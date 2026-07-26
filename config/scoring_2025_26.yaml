@@ -1,0 +1,100 @@
+# FPL scoring rules, 2025-26.
+#
+# R2: scoring rules are configuration, not code. Nothing in src/fpl/models/scoring.py
+# hard-codes any value below.
+#
+# This ruleset exists so the Phase 0 replay test scores 2025-26 against its own
+# season's rules rather than next season's. My audit shows 2025-26 and 2026-27 are
+# identical across every component the replay exercises, but asserting that
+# equivalence in code would violate R2 -- so both files ship.
+
+ruleset_id: "2025_26"
+season: "2025-26"
+
+appearance:
+  short_play_points: 1
+  long_play_points: 2
+  long_play_minutes: 60
+
+goals_scored:
+  GK: 10
+  DEF: 6
+  MID: 5
+  FWD: 4
+
+assists: 3
+
+clean_sheets:
+  minimum_minutes: 60
+  points:
+    GK: 4
+    DEF: 4
+    MID: 1
+    FWD: 0
+
+goals_conceded:
+  points_per_unit: -1
+  unit: 2
+  positions: ["GK", "DEF"]
+
+saves:
+  points_per_unit: 1
+  unit: 3
+  positions: ["GK"]
+
+penalties_saved: 5
+penalties_missed: -2
+own_goals: -2
+yellow_cards: -1
+red_cards: -3
+
+# Count thresholds, not points. A position absent from `thresholds` can never earn
+# it: GK is deliberately absent (gotcha 7 -- goalkeeper DC is always 0).
+# Forwards DID earn defensive contribution in 2025-26; it is not new in 2026-27.
+defensive_contribution:
+  points: 2
+  thresholds:
+    DEF: 10
+    MID: 12
+    FWD: 12
+
+# Bonus is a rank within the match (3/2/1 by BPS). Phase 0 passes the recorded
+# value through; deriving it from BPS is a Stage D concern.
+bonus:
+  mode: "passthrough"
+  ranked_points: [3, 2, 1]
+
+verification:
+  # Confirmed against a real bootstrap-static `game_config.scoring` payload.
+  payload_captured_at: null
+  payload_sha256: null
+  payload_confirmed: []
+  # Confirmed by the full-season replay in tests/test_scoring.py, which
+  # reproduces 29,747/29,747 recorded totals. Populated by that test's report.
+  replay_exercised:
+    - "appearance.short_play_points"
+    - "appearance.long_play_points"
+    - "appearance.long_play_minutes"
+    - "goals_scored.DEF"
+    - "goals_scored.MID"
+    - "goals_scored.FWD"
+    - "assists"
+    - "clean_sheets.points.GK"
+    - "clean_sheets.points.DEF"
+    - "clean_sheets.points.MID"
+    - "clean_sheets.minimum_minutes"
+    - "goals_conceded"
+    - "saves"
+    - "penalties_saved"
+    - "penalties_missed"
+    - "own_goals"
+    - "yellow_cards"
+    - "red_cards"
+    - "defensive_contribution"
+  unverified:
+    goals_scored.GK: >
+      Untested either way. No goalkeeper scored in 2025-26 -- measured 0 GK goals
+      across all 29,747 player-fixture rows -- so the replay never exercises this
+      value and the archive cannot confirm it.
+    clean_sheets.points.FWD: >
+      Zero-valued, so the replay cannot distinguish a correct 0 from an omitted rule.

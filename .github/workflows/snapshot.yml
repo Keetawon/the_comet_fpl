@@ -1,0 +1,193 @@
+name: Daily API snapshot (R5)
+
+# The FPL API retains only the current season at per-gameweek granularity. At season
+# rollover that data is destroyed permanently, so a missed day is unrecoverable. This
+# workflow is the durable execution path for R5 -- it does not depend on any developer
+# machine or sandbox having egress.
+#
+# Deliberately built from curl, gzip and jq only. No Python, no uv, no dependency on this
+# repository's package: a refactor or a broken lockfile must never be able to stop the
+# capture. The one job that cannot afford to break has no build step.
+
+on:
+  schedule:
+    # 06:00 UTC daily.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never let two captures race on the same commit.
+concurrency:
+  group: api-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch and validate payloads
+        id: fetch
+        env:
+          API: https://fantasy.premierleague.com/api
+        run: |
+          set -euo pipefail
+
+          DATE="$(date -u +%Y-%m-%d)"
+          STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          DIR="snapshots/${DATE}"
+          mkdir -p "${DIR}"
+          echo "date=${DATE}"   >> "$GITHUB_OUTPUT"
+          echo "dir=${DIR}"     >> "$GITHUB_OUTPUT"
+          echo "stamp=${STAMP}" >> "$GITHUB_OUTPUT"
+
+          # Fetch to a temp file and only accept HTTP 200. --fail makes curl exit non-zero
+          # on 4xx/5xx, and `set -e` turns that into a failed run rather than a commit of
+          # whatever the error body happened to be.
+          fetch() {
+            local name="$1" url="$2" out="$3" code
+            echo "::group::GET ${url}"
+            code="$(curl -sS --fail --show-error \
+                         --retry 3 --retry-delay 5 --retry-connrefused \
+                         --max-time 120 \
+                         -H 'Accept: application/json' \
+                         -H 'User-Agent: fpl-model-snapshot (+github actions)' \
+                         -w '%{http_code}' \
+                         -o "${out}" "${url}")"
+            echo "HTTP ${code}"
+            echo "::endgroup::"
+
+            if [ "${code}" != "200" ]; then
+              echo "::error::${name}: expected HTTP 200, got ${code} -- failing the run rather than committing a partial snapshot"
+              return 1
+            fi
+            # A 200 carrying an empty or non-JSON body is still a failure. Committing it
+            # would look like data forever.
+            if [ ! -s "${out}" ]; then
+              echo "::error::${name}: empty body -- refusing to commit"
+              return 1
+            fi
+            if ! jq -e . "${out}" > /dev/null 2>&1; then
+              echo "::error::${name}: body is not valid JSON -- refusing to commit"
+              return 1
+            fi
+            local bytes
+            bytes="$(wc -c < "${out}")"
+            if [ "${bytes}" -lt 1024 ]; then
+              echo "::error::${name}: body is only ${bytes} bytes, implausibly small -- refusing to commit"
+              return 1
+            fi
+            echo "${name}: ${bytes} bytes, valid JSON"
+          }
+
+          fetch bootstrap-static "${API}/bootstrap-static/" bootstrap.json
+          fetch fixtures         "${API}/fixtures/"         fixtures.json
+
+          # Sanity-check the shapes before they are archived.
+          ELEMENTS="$(jq '.elements | length' bootstrap.json)"
+          TEAMS="$(jq '.teams | length' bootstrap.json)"
+          EVENTS="$(jq '.events | length' bootstrap.json)"
+          FIXTURES="$(jq 'length' fixtures.json)"
+          if [ "${ELEMENTS}" -lt 100 ] || [ "${TEAMS}" -lt 20 ] || [ "${FIXTURES}" -lt 1 ]; then
+            echo "::error::implausible payload: elements=${ELEMENTS} teams=${TEAMS} fixtures=${FIXTURES}"
+            exit 1
+          fi
+          echo "bootstrap-static: ${ELEMENTS} elements, ${TEAMS} teams, ${EVENTS} events"
+          echo "fixtures: ${FIXTURES} fixtures"
+
+          # --- Season rollover signal -------------------------------------------------
+          # As of 2026-07-26 /api/fixtures/ still returned the completed 2025-26 fixtures
+          # while bootstrap-static had rolled over to 2026/27 teams and deadlines. Team ids
+          # are reassigned every season, so anything joining across that boundary is wrong.
+          # Logging the first kickoff on every run means the snapshot history pins the exact
+          # day the fixtures endpoint rolls over.
+          FIRST_KICKOFF="$(jq -r '[.[] | .kickoff_time | select(. != null)] | sort | .[0] // "null"' fixtures.json)"
+          LAST_KICKOFF="$(jq -r '[.[] | .kickoff_time | select(. != null)] | sort | .[-1] // "null"' fixtures.json)"
+          FIRST_DEADLINE="$(jq -r '[.events[] | .deadline_time | select(. != null)] | sort | .[0] // "null"' bootstrap.json)"
+          ALL_FINISHED="$(jq -r 'if length > 0 and all(.[]; .finished) then "true" else "false" end' fixtures.json)"
+
+          echo "first fixtures kickoff_time : ${FIRST_KICKOFF}"
+          echo "last  fixtures kickoff_time : ${LAST_KICKOFF}"
+          echo "first bootstrap deadline    : ${FIRST_DEADLINE}"
+          echo "all fixtures finished       : ${ALL_FINISHED}"
+
+          ROLLOVER="unknown"
+          if [ "${FIRST_KICKOFF}" != "null" ] && [ "${FIRST_DEADLINE}" != "null" ]; then
+            if [[ "${FIRST_KICKOFF}" < "${FIRST_DEADLINE}" ]]; then
+              ROLLOVER="stale"
+              echo "::notice title=Fixtures endpoint stale::first kickoff ${FIRST_KICKOFF} precedes the first bootstrap deadline ${FIRST_DEADLINE} -- /api/fixtures/ still serves the PREVIOUS season. Do not join fixture team ids to bootstrap team ids."
+            else
+              ROLLOVER="rolled-over"
+              echo "::notice title=Fixtures endpoint rolled over::first kickoff ${FIRST_KICKOFF} is at or after the first bootstrap deadline ${FIRST_DEADLINE} -- /api/fixtures/ now serves the current season."
+            fi
+          fi
+          echo "first_kickoff=${FIRST_KICKOFF}" >> "$GITHUB_OUTPUT"
+          echo "rollover=${ROLLOVER}"           >> "$GITHUB_OUTPUT"
+
+          # --- Archive ----------------------------------------------------------------
+          gzip -9 -c bootstrap.json > "${DIR}/bootstrap-static.json.gz"
+          gzip -9 -c fixtures.json  > "${DIR}/fixtures.json.gz"
+          sha256sum "${DIR}"/*.json.gz > "${DIR}/SHA256SUMS"
+
+          # A machine-readable index entry per capture, so the rollover date is queryable
+          # without decompressing every snapshot.
+          jq -n \
+            --arg captured_at    "${STAMP}" \
+            --arg first_kickoff  "${FIRST_KICKOFF}" \
+            --arg last_kickoff   "${LAST_KICKOFF}" \
+            --arg first_deadline "${FIRST_DEADLINE}" \
+            --arg rollover       "${ROLLOVER}" \
+            --argjson all_finished "${ALL_FINISHED}" \
+            --argjson elements   "${ELEMENTS}" \
+            --argjson teams      "${TEAMS}" \
+            --argjson events     "${EVENTS}" \
+            --argjson fixtures   "${FIXTURES}" \
+            '{captured_at:$captured_at, elements:$elements, teams:$teams, events:$events,
+              fixtures:$fixtures, fixtures_first_kickoff:$first_kickoff,
+              fixtures_last_kickoff:$last_kickoff, bootstrap_first_deadline:$first_deadline,
+              fixtures_all_finished:$all_finished, fixtures_endpoint:$rollover}' \
+            > "${DIR}/manifest.json"
+
+          rm -f bootstrap.json fixtures.json
+          ls -l "${DIR}"
+
+      - name: Commit snapshot
+        run: |
+          set -euo pipefail
+          DIR="${{ steps.fetch.outputs.dir }}"
+
+          # Guard against committing an empty directory even if an earlier step somehow
+          # succeeded without writing.
+          if [ ! -s "${DIR}/bootstrap-static.json.gz" ] || [ ! -s "${DIR}/fixtures.json.gz" ]; then
+            echo "::error::snapshot files missing or empty -- refusing to commit"
+            exit 1
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${DIR}"
+
+          if git diff --cached --quiet; then
+            echo "nothing new to commit (already captured today)"
+            exit 0
+          fi
+
+          git commit -m "snapshot: ${{ steps.fetch.outputs.date }} (fixtures ${{ steps.fetch.outputs.rollover }}, first kickoff ${{ steps.fetch.outputs.first_kickoff }})"
+
+          # The scheduled run can race a push to the default branch; rebase and retry.
+          for attempt in 1 2 3 4; do
+            if git push; then
+              echo "pushed on attempt ${attempt}"
+              exit 0
+            fi
+            echo "push failed, rebasing and retrying (attempt ${attempt})"
+            sleep $((2 ** attempt))
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          done
+          echo "::error::could not push the snapshot after 4 attempts"
+          exit 1

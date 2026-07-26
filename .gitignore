@@ -1,0 +1,20 @@
+# Build artefacts and caches
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# The database and the archive cache are both rebuildable from source:
+#   python -m fpl.jobs.build_db
+# ~20 MB of CSV and a ~15 MB DuckDB file, so they are not worth versioning.
+data/
+
+# NOT ignored: snapshots/
+# R5 snapshots are the one thing in this repo that cannot be regenerated -- the FPL API
+# destroys per-gameweek data at season rollover. They are committed by
+# .github/workflows/snapshot.yml and must stay in version control forever.

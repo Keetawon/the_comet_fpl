@@ -348,32 +348,66 @@ never accepts caller SQL.
 ```python
 # src/fpl/features/pit.py
 
+
 class LeakageError(RuntimeError):
     """Raised when an access pattern could read post-as_of information."""
+
 
 @dataclass(frozen=True, slots=True)
 class AsOf:
     ts: datetime
+
     def __post_init__(self) -> None:
         if self.ts.tzinfo is None or self.ts.utcoffset() is None:
             raise LeakageError("as_of must be timezone-aware UTC")
 
+
 # Every column that is only knowable after kickoff.
-OUTCOME_COLUMNS: frozenset[str] = frozenset({
-    "minutes", "starts", "goals_scored", "assists", "clean_sheets",
-    "goals_conceded", "saves", "penalties_saved", "penalties_missed",
-    "own_goals", "yellow_cards", "red_cards", "bonus", "bps", "total_points",
-    "expected_goals", "expected_assists", "expected_goals_conceded",
-    "defensive_contribution", "tackles", "recoveries",
-    "clearances_blocks_interceptions",
-    "goals_for", "goals_against", "team_xg", "team_xgc", "team_bps",
-})
+OUTCOME_COLUMNS: frozenset[str] = frozenset(
+    {
+        "minutes",
+        "starts",
+        "goals_scored",
+        "assists",
+        "clean_sheets",
+        "goals_conceded",
+        "saves",
+        "penalties_saved",
+        "penalties_missed",
+        "own_goals",
+        "yellow_cards",
+        "red_cards",
+        "bonus",
+        "bps",
+        "total_points",
+        "expected_goals",
+        "expected_assists",
+        "expected_goals_conceded",
+        "defensive_contribution",
+        "tackles",
+        "recoveries",
+        "clearances_blocks_interceptions",
+        "goals_for",
+        "goals_against",
+        "team_xg",
+        "team_xgc",
+        "team_bps",
+    }
+)
 
 # Knowable before kickoff — schedule metadata only.
 SCHEDULE_COLUMNS: tuple[str, ...] = (
-    "season", "gw", "fixture", "pulse_id", "kickoff_time",
-    "team_id", "opponent_team_id", "was_home", "fdr",
+    "season",
+    "gw",
+    "fixture",
+    "pulse_id",
+    "kickoff_time",
+    "team_id",
+    "opponent_team_id",
+    "was_home",
+    "fdr",
 )
+
 
 class PointInTimeView:
     """The only sanctioned reader of mart_ facts inside features/.
@@ -393,28 +427,34 @@ class PointInTimeView:
     def __init__(self, con: DuckDBPyConnection, as_of: AsOf) -> None: ...
 
     def observed_player_fixtures(
-        self, *, codes: Sequence[int] | None = None,
+        self,
+        *,
+        codes: Sequence[int] | None = None,
         seasons: Sequence[str] | None = None,
         columns: Sequence[str] | None = None,
     ) -> pl.DataFrame: ...
 
     def observed_team_matches(
-        self, *, team_ids: Sequence[int] | None = None,
+        self,
+        *,
+        team_ids: Sequence[int] | None = None,
         seasons: Sequence[str] | None = None,
         columns: Sequence[str] | None = None,
     ) -> pl.DataFrame: ...
 
     def schedule(
-        self, *, team_ids: Sequence[int] | None = None,
+        self,
+        *,
+        team_ids: Sequence[int] | None = None,
         until: datetime | None = None,
-    ) -> pl.DataFrame: ...        # rejects any OUTCOME_COLUMNS request
+    ) -> pl.DataFrame: ...  # rejects any OUTCOME_COLUMNS request
 ```
 
 A feature is then a pure function of the view, which is what makes the leak test possible:
 
 ```python
 # Phase 1+ shape, shown here only to pin the signature down now.
-FeatureFn = Callable[[PointInTimeView, int], float | None]   # (view, entity_id) -> value
+FeatureFn = Callable[[PointInTimeView, int], float | None]  # (view, entity_id) -> value
 ```
 
 Making leakage awkward, in four layers:
@@ -434,8 +474,8 @@ Making leakage awkward, in four layers:
 
    ```python
    for as_of in sweep:
-       full  = PointInTimeView(full_db,               AsOf(as_of))
-       trunc = PointInTimeView(truncated_to(as_of),   AsOf(as_of))
+       full = PointInTimeView(full_db, AsOf(as_of))
+       trunc = PointInTimeView(truncated_to(as_of), AsOf(as_of))
        assert_frame_equal(accessor(full), accessor(trunc))
    ```
 
@@ -516,3 +556,124 @@ def calculate_points(stats: PlayerMatchStats, rules: ScoringRules, position: Pos
 5. **`scoring_2025_26.yaml`** ships alongside the 2026/27 file so the replay runs against its own
    season's rules rather than next season's. My replay shows the two are identical across every
    component involved, but hard-coding that equivalence would violate R2.
+
+---
+
+# 9. Findings from implementation
+
+Recorded after the plan was approved and built. Section 1 covers what the audit found before
+any code was written; these emerged from making it work.
+
+## 9.1 `AM` is the Assistant Manager element, not a position
+
+The initial plan proposed normalising the archive's drifted position labels as
+`GKP -> GK` and `AM -> MID`. **The `AM` half was wrong.** `AM` is `element_type` 5, the
+Assistant Manager element:
+
+- 322 rows in 2024-25, across **20 managers** (Guardiola, Frank, Hürzeler, …)
+- all with 0 minutes, scored entirely through the `mng_*` columns
+- `element_type` 5 appears in the 2024-25 `players_raw` and **no other season**, confirming
+  the specification's note that the manager element was removed in 2025-26
+
+They are now excluded rather than coerced. Mapping them to MID would have fed 322
+zero-minute non-players into every minutes and rate model.
+
+**Row-count consequences** — the exclusion moves two of the numbers in section 1:
+
+| Quantity | With managers | Excluding managers (as built) |
+|---|---|---|
+| `mart_fact_player_fixture` rows | 139,029 | **138,707** |
+| distinct players | 1,797 | **1,777** |
+| players spanning five seasons | 187 | **187** (unchanged) |
+| new in 2025-26 | 238 | **238** (unchanged) |
+| position changes | 51 (2.8% of 1,797) | 51 (**2.9%** of 1,777) |
+
+The specification's 139,029 and 1,797 both counted managers. The 51 position-changers and
+the span counts are unaffected.
+
+## 9.2 Cards for unused substitutes are systematic, not a glitch
+
+Section 1.3's Finding 1 identified one row — Ashley Barnes, 2025-26 GW22 — as reproducible.
+Building the full-history replay showed it is one of **ten**:
+
+| Season | GW | Player | Card | Points | BPS |
+|---|---|---|---|---|---|
+| 2021-22 | 30 | Kenneh | yellow | −1 | −3 |
+| 2022-23 | 16 | Lascelles | yellow | −1 | −3 |
+| 2022-23 | 19 | Lascelles | yellow | −1 | −3 |
+| **2022-23** | **28** | **Matheus** | **red** | **−3** | **−9** |
+| 2023-24 | 3 | Rodák | yellow | −1 | −3 |
+| 2023-24 | 18 | Bettinelli | yellow | −1 | −3 |
+| 2023-24 | 27 | Felipe | yellow | −1 | −3 |
+| 2023-24 | 31 | Turner | yellow | −1 | −3 |
+| 2024-25 | 8 | Sarabia | yellow | −1 | −3 |
+| 2025-26 | 22 | Barnes | yellow | −1 | −3 |
+
+All ten reproduce exactly. The red card matters independently: it confirms `red_cards` is
+also ungated on minutes, which no yellow-only example could establish.
+
+So the Barnes row is not a data glitch at all — it is one instance of documented FPL
+behaviour that a minutes-gated calculator gets wrong ten times over.
+
+## 9.3 The replay is exact across all five seasons, not just 2025-26
+
+**138,707 / 138,707 = 100.000%.** Recorded `total_points` for every season equals points
+recomputed under the 2025-26 ruleset.
+
+This works *because* `defensive_contribution` is NULL rather than zero before 2025-26: the
+ruleset then awards no DC, which is exactly what those seasons' rules did. It is a strong
+end-to-end check on the null-vs-zero handling. Had the column been zero-filled the seasons
+would still replay, but a genuinely-zero DC would have become indistinguishable from an
+unmeasured one — and every defender's DC-per-90 would be biased low.
+
+## 9.4 Gameweek numbering is not contiguous
+
+**2022-23 has no gameweek 7.** It was cancelled following the death of Queen Elizabeth II in
+September 2022 and its ten fixtures were redistributed, leaving GW8 with seven matches. That
+season has 37 distinct gameweeks; all 380 fixtures are present.
+
+Consequence for Phase 1: a walk-forward backtest must iterate the *observed* gameweeks, not
+`range(1, 39)`. Assuming contiguity would train on an empty gameweek and could mis-align the
+train/predict split by one.
+
+## 9.5 Rest-day tail differs from the specification
+
+Under the definition "calendar days between a team's consecutive kickoffs":
+
+| Measure | Specification | As built |
+|---|---|---|
+| median | 7 | **7** ✅ |
+| share ≤ 4 days (2025-26) | 14.3% | **18.5%** |
+| H1 vs H2 share ≤ 4 days | 12.2% / 16.3% | **15.3% / 21.6%** |
+
+The median and the H1 < H2 direction agree; my tail is uniformly ~3–5pp heavier, so this
+looks like a definitional difference rather than a construction error. The minimum gap is
+**2 days** (six team-matches on 2021-12-28, the COVID-disrupted festive period); every other
+season floors at 3.
+
+The tests therefore assert the median, the 2-day floor and the H1 < H2 direction, and
+**do not** assert a fixed ≤4-day share. Congestion gets measured properly in Phase 2; if you
+want a specific definition pinned now, say which.
+
+## 9.6 Two smaller items
+
+- **Polars `sum()` over an all-NULL group returns 0.0** (section 1.3, Finding 3) was
+  confirmed in practice: it dragged an early pooled `team_xg` mean to 1.08 against a true
+  1.41. All team aggregates are consequently built in SQL, where `SUM`/`MAX` return NULL.
+- **BPS range bounds were widened once**, from ±(20,120) to (−35,145). The observed range is
+  [−25, 128] and both ends are real football: −25 is a defender with an own goal and a red
+  card, 128 a hat-trick plus assists. The range check surfaced them for review, which is what
+  it is for; the bounds now sit just outside the observed extremes.
+
+## 9.7 Still outstanding
+
+`config/scoring_2026_27.yaml` remains **unverified**. `tests/fixtures/bootstrap_static_sample.json`
+is a synthetic placeholder carrying a `_PLACEHOLDER` key, and `verify_rules` refuses to mark
+any field confirmed while that key is present. Replace it with a real capture and run:
+
+```bash
+python -m fpl.jobs.verify_rules --ruleset 2026_27 \
+  --payload tests/fixtures/bootstrap_static_sample.json --write
+```
+
+`goals_scored.GK` stays unverified regardless of what the payload says.

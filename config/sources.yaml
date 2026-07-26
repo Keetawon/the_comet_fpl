@@ -1,0 +1,45 @@
+# Data sources. Section 3 of the specification.
+#
+# The archive is the historical backfill only. It stopped weekly updates after
+# 2024-25 and now refreshes ~3x per season, so it must never be depended on
+# in-season -- that is what the daily snapshot (R5) is for.
+
+archive:
+  base_url: "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data"
+  seasons:
+    - "2021-22"
+    - "2022-23"
+    - "2023-24"
+    - "2024-25"
+    - "2025-26"
+  files:
+    merged_gw: "gws/merged_gw.csv"
+    fixtures: "fixtures.csv"
+    teams: "teams.csv"
+    players_raw: "players_raw.csv"
+
+live_api:
+  base_url: "https://fantasy.premierleague.com/api"
+  endpoints:
+    bootstrap_static: "bootstrap-static/"
+    fixtures: "fixtures/"
+    element_summary: "element-summary/{element_id}/"
+    event_live: "event/{gw}/live/"
+  # Be polite: roughly 1 request/second (section 3.1).
+  min_request_interval_seconds: 1.0
+  timeout_seconds: 30.0
+  max_retries: 4
+  # Exponential backoff base; delays are 2s, 4s, 8s, 16s.
+  retry_backoff_base_seconds: 2.0
+
+current_season:
+  season: "2026-27"
+  ruleset_id: "2026_27"
+  # GW1 deadline, from the specification.
+  gw1_deadline: "2026-08-21T17:30:00Z"
+
+# Local paths, relative to the repository root.
+paths:
+  database: "data/fpl.duckdb"
+  archive_cache: "data/archive"
+  snapshots: "snapshots"

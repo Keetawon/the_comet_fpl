@@ -1,0 +1,96 @@
+# Declared data-quality overrides applied at the stg_ layer.
+#
+# Everything here is a case where the archive records a measured-looking value that
+# is not a measurement. Gotcha 5: zero means "measured as zero", null means "not
+# measured". Zero-filling biases every rate, so these are repaired to NULL.
+#
+# These are declared in config rather than patched in transform code so that each
+# repair is auditable, testable, and visible in review.
+
+nullify:
+  - id: "2022-23-expected-zero-prefix"
+    season: "2022-23"
+    columns:
+      - "expected_goals"
+      - "expected_assists"
+      - "expected_goal_involvements"
+      - "expected_goals_conceded"
+    gw_max: 15
+    reason: >
+      The 2022-23 archive carries the expected_* columns from GW1 but records them
+      as literal 0.0 until GW16. Measured: team xG sums to exactly 0.0 for every
+      gameweek 1-15 while 344 goals were actually scored; real values start at GW16
+      (xG sum 27.66 against 29 goals). Season-level effect of leaving it alone is
+      team_xg mean 0.963 against actual goals 1.426, and corr(team_xg, goals) of
+      0.332 versus 0.587/0.593/0.502 for 2023-24/2024-25/2025-26.
+
+      This is gotcha 5 occurring *inside* a season, so a column-presence check does
+      not catch it. Leaving it would feed 14 gameweeks of fake zeros into any
+      xG-trained Stage A model and is the most likely cause of the xG-vs-goals
+      inversion recorded in section 8 of the specification.
+    expect:
+      # Asserted by tests/test_schema_drift.py.
+      null_through_gw: 15
+      not_null_from_gw: 16
+
+# Ingest range validation (gotcha 13: pre-season payloads contain glitches, e.g. a
+# goalkeeper with 11 goals and 0 minutes). Violations are logged as anomalies and
+# surfaced; they never fail silently and never silently mutate data.
+ranges:
+  minutes: {min: 0, max: 120}
+  goals_scored: {min: 0, max: 9}
+  assists: {min: 0, max: 9}
+  clean_sheets: {min: 0, max: 1}
+  goals_conceded: {min: 0, max: 15}
+  saves: {min: 0, max: 25}
+  penalties_saved: {min: 0, max: 5}
+  penalties_missed: {min: 0, max: 5}
+  own_goals: {min: 0, max: 3}
+  yellow_cards: {min: 0, max: 2}
+  red_cards: {min: 0, max: 1}
+  bonus: {min: 0, max: 3}
+  # Observed range across five seasons is [-25, 128], and both ends are genuine: -25 is a
+  # defender with an own goal and a red card (-4 points), 128 is a hat-trick plus assists
+  # (24 points). Bounds sit just outside the observed extremes so a real glitch still
+  # trips the check.
+  bps: {min: -35, max: 145}
+  defensive_contribution: {min: 0, max: 40}
+  tackles: {min: 0, max: 30}
+  recoveries: {min: 0, max: 40}
+  clearances_blocks_interceptions: {min: 0, max: 40}
+  expected_goals: {min: 0.0, max: 5.0}
+  expected_assists: {min: 0.0, max: 5.0}
+  expected_goals_conceded: {min: 0.0, max: 10.0}
+
+# Cross-field rules. Each is a named check evaluated per row; violations are logged
+# as anomalies with the row identity, never dropped.
+consistency:
+  - id: "goals-without-minutes"
+    description: >
+      A player credited with goals but zero minutes. This is the specification's
+      observed pre-season glitch (a goalkeeper with 11 goals and 0 minutes).
+    predicate: "minutes = 0 AND goals_scored > 0"
+  - id: "gk-defensive-contribution-nonzero"
+    description: >
+      Gotcha 7: goalkeeper defensive_contribution is always 0. A non-zero value
+      means either a position crosswalk error or an upstream data change.
+    predicate: "position = 'GK' AND defensive_contribution > 0"
+  - id: "clean-sheet-with-goals-conceded"
+    description: "A clean sheet recorded alongside a non-zero goals_conceded."
+    predicate: "clean_sheets = 1 AND goals_conceded > 0"
+
+# Known-good anomalies: rows that violate a check above but are genuine FPL
+# behaviour, not data errors. Recorded so the anomaly log stays actionable.
+expected_anomalies:
+  - id: "card-without-appearance"
+    description: >
+      Cards shown to unused substitutes: 0 minutes, non-zero points. Measured 10 such
+      rows across the five seasons -- nine yellows at -1 and one red at -3 (Matheus,
+      2022-23 GW28, bps -9). All ten reproduce exactly.
+
+      FPL scores a booking for a player who never came on, so card points are NOT
+      gated on minutes played. The best-known instance is Ashley Barnes, 2025-26
+      GW22, which a 99.997% replay treats as an unreproducible glitch; it is in fact
+      one instance of a recurring rule. The red-card row is what confirms the same
+      holds for red_cards, which no yellow-only example could establish.
+      See tests/test_quality.py and tests/test_scoring.py.

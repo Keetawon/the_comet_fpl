@@ -1,0 +1,1 @@
+"""FPL points-distribution model."""
