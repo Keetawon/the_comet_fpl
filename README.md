@@ -246,8 +246,19 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | 1 | Stage A team model + validation harness | not started |
 | 2 | Stage B minutes model | not started |
 | 3 | Stages C/D player events + simulation | not started |
+| 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
+
+Phase 3b is an addition to the original phasing, which ended Phase 3 at simulation and had no
+phase delivering Stage E. A GW1 squad is a Stage E output — 15 players, £100.0m, 2/5/5/3, max
+3 per club — so it needs a slot ahead of the dashboard.
+
+`publish` writes static JSON rather than being queried live: the dashboard updates once per
+gameweek, which is a static-site shaped workload. `docs/publish-contract.md` fixes that
+boundary so Streamlit v1 is a thin renderer over the same artefact a React frontend would
+consume, and swapping frontends later costs nothing. Nothing downstream of `publish` queries
+DuckDB.
 
 `docs/phase0-design.md` records the audit behind the schema decisions, including where
 measured values diverged from the original specification and why.
