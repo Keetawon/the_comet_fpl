@@ -126,8 +126,29 @@ jobs:
               echo "::notice title=Fixtures endpoint rolled over::first kickoff ${FIRST_KICKOFF} is at or after the first bootstrap deadline ${FIRST_DEADLINE} -- /api/fixtures/ now serves the current season."
             fi
           fi
-          echo "first_kickoff=${FIRST_KICKOFF}" >> "$GITHUB_OUTPUT"
-          echo "rollover=${ROLLOVER}"           >> "$GITHUB_OUTPUT"
+          # SECURITY: FIRST_KICKOFF comes from the FPL API, so it is untrusted input.
+          # Two things go wrong if it is passed through unsanitised:
+          #   * a newline in the value injects arbitrary extra step outputs into
+          #     $GITHUB_OUTPUT, letting it overwrite `dir` and redirect where we write;
+          #   * the commit step would interpolate it into a shell command.
+          # Restrict it to the ISO-8601 character set and cap the length. Anything else is
+          # replaced wholesale rather than escaped, so there is no quoting to get wrong.
+          # Deliberately NOT grep: `grep -q` matches line by line, so a two-line value
+          # passes whenever either line looks valid -- which is precisely the newline
+          # injection this guards against. Parameter expansion strips every permitted
+          # character and rejects the value if anything at all survives, newlines included,
+          # so the check is over the whole string.
+          sanitise() {
+            local value="$1"
+            local residue="${value//[0-9A-Za-z:.+-]/}"
+            if [ -n "${residue}" ] || [ "${#value}" -eq 0 ] || [ "${#value}" -gt 32 ]; then
+              printf 'unexpected'
+            else
+              printf '%s' "${value}"
+            fi
+          }
+          echo "first_kickoff=$(sanitise "${FIRST_KICKOFF}")" >> "$GITHUB_OUTPUT"
+          echo "rollover=$(sanitise "${ROLLOVER}")"           >> "$GITHUB_OUTPUT"
 
           # --- Archive ----------------------------------------------------------------
           gzip -9 -c bootstrap.json > "${DIR}/bootstrap-static.json.gz"
@@ -157,9 +178,26 @@ jobs:
           ls -l "${DIR}"
 
       - name: Commit snapshot
+        # SECURITY: values reach the script through `env`, never through `${{ }}`
+        # interpolation. GitHub substitutes `${{ }}` into the script text *before* the shell
+        # parses it, so a value derived from the FPL API could otherwise close the quote and
+        # run arbitrary commands -- with `contents: write` on the default branch. Passed as
+        # environment variables they are only ever data, whatever they contain.
+        env:
+          SNAPSHOT_DIR: ${{ steps.fetch.outputs.dir }}
+          SNAPSHOT_DATE: ${{ steps.fetch.outputs.date }}
+          SNAPSHOT_ROLLOVER: ${{ steps.fetch.outputs.rollover }}
+          SNAPSHOT_FIRST_KICKOFF: ${{ steps.fetch.outputs.first_kickoff }}
         run: |
           set -euo pipefail
-          DIR="${{ steps.fetch.outputs.dir }}"
+          DIR="${SNAPSHOT_DIR}"
+
+          # The directory is ours to construct, but assert it anyway: it is the one output
+          # that decides where files are written.
+          case "${DIR}" in
+            snapshots/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+            *) echo "::error::refusing to commit unexpected path: ${DIR}"; exit 1 ;;
+          esac
 
           # Guard against committing an empty directory even if an earlier step somehow
           # succeeded without writing.
@@ -177,7 +215,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "snapshot: ${{ steps.fetch.outputs.date }} (fixtures ${{ steps.fetch.outputs.rollover }}, first kickoff ${{ steps.fetch.outputs.first_kickoff }})"
+          git commit -m "snapshot: ${SNAPSHOT_DATE} (fixtures ${SNAPSHOT_ROLLOVER}, first kickoff ${SNAPSHOT_FIRST_KICKOFF})"
 
           # The scheduled run can race a push to the default branch; rebase and retry.
           for attempt in 1 2 3 4; do

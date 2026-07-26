@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -13,6 +14,30 @@ build/
 #   python -m fpl.jobs.build_db
 # ~20 MB of CSV and a ~15 MB DuckDB file, so they are not worth versioning.
 data/
+
+# Belt and braces: a DuckDB file created outside data/ still must not be committed.
+*.duckdb
+*.duckdb.wal
+
+# Credentials. The FPL API needs no authentication and this project has no secrets, so
+# anything matching these is an accident -- keep it out of history, where it cannot be
+# removed by a later commit.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credentials*.json
+secrets*.y*ml
+service-account*.json
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
 
 # NOT ignored: snapshots/
 # R5 snapshots are the one thing in this repo that cannot be regenerated -- the FPL API
