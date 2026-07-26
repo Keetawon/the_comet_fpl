@@ -216,15 +216,22 @@ def test_rest_days_are_plausible(db: duckdb.DuckDBPyConnection) -> None:
     assert lowest == 2, f"a gap of {lowest} days is implausible for Premier League scheduling"
     assert highest < 90
 
+    # Sub-3-day turnarounds are genuine but very rare. Asserted as a rate rather than an
+    # exact per-season tally: the archive refreshes several times a season and kickoff times
+    # get corrected, so an exact list would fail on a data refresh rather than on a bug. The
+    # timezone regression that once manufactured these is covered by
+    # test_rest_days_are_timezone_invariant.
     tightest = db.execute(
         """
-        SELECT season, count(*) FROM mart_fact_team_match
-        WHERE rest_days < 3 GROUP BY season ORDER BY season
+        SELECT count(*) FILTER (WHERE rest_days < 3), count(*)
+        FROM mart_fact_team_match WHERE rest_days IS NOT NULL
         """
-    ).fetchall()
-    assert tightest == [("2021-22", 6)], (
-        "sub-3-day turnarounds should be confined to the 2021-22 festive period; a new one "
-        "means the schedule has changed or kickoff times are being misparsed"
+    ).fetchone()
+    assert tightest is not None
+    under_three, total = tightest
+    assert under_three / total < 0.005, (
+        f"{under_three}/{total} team-matches show a sub-3-day turnaround, which is too many "
+        "to be real -- suspect kickoff-time parsing or a timezone-dependent date_diff"
     )
 
     # The first match of a team's season has no predecessor, so exactly 20 NULLs per season.
@@ -237,6 +244,61 @@ def test_rest_days_are_plausible(db: duckdb.DuckDBPyConnection) -> None:
         """
     ).fetchone()
     assert nulls is not None and nulls[0] == 0
+
+
+def test_rest_days_are_timezone_invariant() -> None:
+    """`rest_days` must not depend on the machine that built the database.
+
+    Regression test. `date_diff('day', ...)` on TIMESTAMPTZ counts calendar-day boundaries
+    in the *session* timezone, so the original expression produced different stored values
+    per developer: the third pair below measures 2 days apart under UTC and 1 under
+    Asia/Bangkok, which manufactured implausible sub-3-day turnarounds out of nothing.
+
+    A point-in-time system whose stored values shift with the builder's locale is not
+    reproducible, so this is checked directly on the expression rather than trusted to the
+    connection setting.
+    """
+    kickoffs = [
+        ("2025-08-16 12:00:00+00", "2025-08-19 19:00:00+00"),
+        ("2021-12-26 14:00:00+00", "2021-12-28 19:30:00+00"),
+        ("2021-12-26 19:00:00+00", "2021-12-28 15:00:00+00"),
+    ]
+    results: dict[str, list[int]] = {}
+    for timezone in ("UTC", "Asia/Bangkok", "America/Los_Angeles", "Pacific/Kiritimati"):
+        con = duckdb.connect(":memory:")
+        try:
+            con.execute(f"SET TimeZone='{timezone}'")
+            results[timezone] = [
+                con.execute(
+                    "SELECT date_diff('day', TIMESTAMPTZ '"
+                    + earlier
+                    + "' AT TIME ZONE 'UTC', TIMESTAMPTZ '"
+                    + later
+                    + "' AT TIME ZONE 'UTC')"
+                ).fetchone()[0]
+                for earlier, later in kickoffs
+            ]
+        finally:
+            con.close()
+
+    baseline = results["UTC"]
+    assert baseline == [3, 2, 2]
+    for timezone, values in results.items():
+        assert values == baseline, (
+            f"rest_days differs under {timezone}: {values} vs UTC {baseline} -- the "
+            "expression has lost its explicit AT TIME ZONE 'UTC' conversion"
+        )
+
+
+def test_connections_are_pinned_to_utc(db: duckdb.DuckDBPyConnection) -> None:
+    """Belt and braces for the above, and it keeps Windows working.
+
+    A named local timezone coming back from DuckDB forces Polars through `zoneinfo`, which
+    on Windows cannot resolve one without the `tzdata` package. Returning UTC means the
+    common path needs no IANA lookup at all.
+    """
+    row = db.execute("SELECT current_setting('TimeZone')").fetchone()
+    assert row is not None and row[0] == "UTC"
 
 
 def test_second_half_is_more_congested_than_first(db: duckdb.DuckDBPyConnection) -> None:

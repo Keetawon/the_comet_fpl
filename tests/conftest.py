@@ -14,7 +14,7 @@ import duckdb
 import pytest
 
 from fpl.config import repo_root
-from fpl.storage.db import default_db_path
+from fpl.storage.db import connect, default_db_path
 
 FEATURE_TABLES: tuple[str, ...] = (
     "mart_fact_player_fixture",
@@ -42,7 +42,9 @@ def db() -> Iterator[duckdb.DuckDBPyConnection]:
     path = default_db_path()
     if not path.is_file():
         pytest.skip(f"no database at {path}")
-    con = duckdb.connect(str(path), read_only=True)
+    # `connect`, not `duckdb.connect`: tests must see the same session settings production
+    # does, or they cannot detect a setting that production depends on.
+    con = connect(path, read_only=True)
     try:
         yield con
     finally:
@@ -78,7 +80,11 @@ def make_truncated_db(as_of: datetime) -> duckdb.DuckDBPyConnection:
     an accessor forgets its filter, the full database returns extra rows and the two
     disagree.
     """
-    con = duckdb.connect(":memory:")
+    # Via the project's own `connect`, not duckdb directly, so this session is pinned to
+    # UTC like every other. Otherwise DuckDB tags timestamps with the local zone and the
+    # comparison below fails on dtype -- Datetime('us','Asia/Bangkok') is not
+    # Datetime('us','UTC') to Polars, even when the instants are identical.
+    con = connect(":memory:")
     con.execute(f"ATTACH '{default_db_path()}' AS full_db (READ_ONLY)")
     for table in FEATURE_TABLES:
         # `information_schema` is not qualified per attached database; duckdb_columns() is.

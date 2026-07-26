@@ -148,13 +148,19 @@ def build_team_match(con: duckdb.DuckDBPyConnection) -> int:
             GROUP BY season, fixture, team_id
         ),
         with_rest AS (
+            -- `AT TIME ZONE 'UTC'` converts each TIMESTAMPTZ to a naive UTC TIMESTAMP
+            -- before the diff. Without it, date_diff('day', ...) counts calendar-day
+            -- boundaries in the *session* timezone, so this column's value would depend on
+            -- the machine that ran the build: the same pair of kickoffs measures 2 days
+            -- apart under UTC and 1 under Asia/Bangkok. The connection is already pinned to
+            -- UTC; this makes the column correct regardless of that setting.
             SELECT s.*,
                    date_diff(
                        'day',
-                       lag(s.kickoff_time) OVER (
+                       lag(s.kickoff_time AT TIME ZONE 'UTC') OVER (
                            PARTITION BY s.season, s.team_id ORDER BY s.kickoff_time
                        ),
-                       s.kickoff_time
+                       s.kickoff_time AT TIME ZONE 'UTC'
                    ) AS rest_days
             FROM sides AS s
         )

@@ -9,6 +9,10 @@ dependencies = [
     "polars>=1.0",
     # Bridges DuckDB result sets to Polars without a pandas round-trip.
     "pyarrow>=17.0",
+    # Windows ships no IANA timezone database, so `zoneinfo` cannot resolve a named zone
+    # without this. Connections are pinned to UTC precisely so the common path never needs
+    # a lookup, but any tz-aware value that does reach zoneinfo must not crash the suite.
+    "tzdata>=2024.1",
     "httpx>=0.27",
     "pydantic>=2.7",
     "pyyaml>=6.0",

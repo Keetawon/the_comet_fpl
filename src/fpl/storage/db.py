@@ -17,6 +17,11 @@ from fpl.types import RulesetId
 
 _SCHEMA_PATH: Final[Path] = Path(__file__).with_name("schema.sql")
 
+# Every connection runs at UTC. A point-in-time system whose stored values depend on the
+# builder's local timezone is not reproducible, and R4's whole premise is that a value
+# computed for a given instant is fixed.
+SESSION_TIMEZONE: Final[str] = "UTC"
+
 # Table-role boundaries. The feature builder may read exactly these tables; everything
 # else -- and in particular every mart_target_* table -- is out of reach. Enforced at
 # runtime by features.pit.FeatureSource and statically by tests/test_point_in_time.py.
@@ -43,11 +48,24 @@ def default_db_path() -> Path:
 def connect(
     db_path: Path | str | None = None, *, read_only: bool = False
 ) -> duckdb.DuckDBPyConnection:
-    """Open a connection, creating the parent directory when writing."""
+    """Open a connection, creating the parent directory when writing.
+
+    The session timezone is pinned to UTC. This is not cosmetic -- DuckDB evaluates
+    date/time functions on TIMESTAMPTZ in the *session* timezone, so without it the
+    contents of the fact tables depend on the machine that built them. Measured: the same
+    pair of kickoff times yields a rest-day gap of 2 under UTC and 1 under Asia/Bangkok,
+    because `date_diff('day', ...)` counts calendar boundaries in local time.
+
+    Pinning it also makes timestamps come back tagged UTC rather than a named local zone,
+    which avoids resolving the IANA database at all -- on Windows `zoneinfo` cannot resolve
+    a named zone unless the `tzdata` package is installed.
+    """
     resolved = Path(db_path) if db_path is not None else default_db_path()
     if str(resolved) != ":memory:":
         resolved.parent.mkdir(parents=True, exist_ok=True)
-    return duckdb.connect(str(resolved), read_only=read_only)
+    con = duckdb.connect(str(resolved), read_only=read_only)
+    con.execute(f"SET TimeZone='{SESSION_TIMEZONE}'")
+    return con
 
 
 def apply_schema(con: duckdb.DuckDBPyConnection) -> None:
