@@ -1,0 +1,5 @@
+# Canonical project skill metadata.
+interface:
+  display_name: "Audit FPL Live Snapshots"
+  short_description: "Audit durable FPL live-data capture"
+  default_prompt: "Use $audit-fpl-live-snapshots to review the live snapshot pipeline."
