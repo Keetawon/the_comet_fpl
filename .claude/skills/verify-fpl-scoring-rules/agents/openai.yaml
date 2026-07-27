@@ -1,0 +1,5 @@
+# Canonical project skill metadata.
+interface:
+  display_name: "Verify FPL Scoring Rules"
+  short_description: "Verify configured FPL scoring safely"
+  default_prompt: "Use $verify-fpl-scoring-rules to validate this season scoring configuration."

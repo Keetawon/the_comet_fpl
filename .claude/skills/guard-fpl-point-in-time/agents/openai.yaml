@@ -1,0 +1,5 @@
+# Canonical project skill metadata.
+interface:
+  display_name: "Guard FPL Point-in-Time"
+  short_description: "Prevent temporal and target leakage in FPL"
+  default_prompt: "Use $guard-fpl-point-in-time to review this feature or backtest for leakage."

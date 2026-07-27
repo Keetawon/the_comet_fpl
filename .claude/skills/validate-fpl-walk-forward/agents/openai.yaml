@@ -1,0 +1,5 @@
+# Canonical project skill metadata.
+interface:
+  display_name: "Validate FPL Walk-Forward"
+  short_description: "Validate leakage-safe FPL model backtests"
+  default_prompt: "Use $validate-fpl-walk-forward to design or review this model evaluation."
