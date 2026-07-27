@@ -319,10 +319,16 @@ than competing. The original specification found the opposite, on data that has 
 repaired: 2022-23's `expected_*` zeros held its mean team xG at 0.963 against a true 1.499,
 and that season flips from 1.5917 to 1.5344 once repaired.
 
-**Known contract defect.** `interval_80_maximum_absolute_error: 0.05` is written against a
-quantity no count model can attain. A perfectly specified Poisson's narrowest central 80%
-interval actually holds 0.92-0.97 at team-goal rates, because a distribution over whole goals
-cannot be trimmed to an exact quantile. The randomised-PIT coverage measures the same
-property and lands on 0.80; every baseline above passes on it and fails on the raw one.
-Amending a pre-registered gate is an owner decision and is listed under
-[Priorities](AGENTS.md#priorities-for-upcoming-work).
+**Contract amendment 1.1 — the calibration gate now names its metric.** The original gate,
+`interval_80_maximum_absolute_error`, did not say which 80% interval it meant, and the obvious
+one is wrong for counts. The central interval between integer quantiles covers strictly more
+than 80% by construction, and the excess measures the discreteness of the distribution rather
+than the model. That makes the gate point backwards: at a true rate of 1.80 a *correct* model
+misses 80% by 0.164 and fails, while a model predicting 2.40 — 33% too high — misses by 0.002
+and passes. Across five true rates the raw measure was closest to nominal at the correct rate
+in zero cases; the randomised-PIT band coverage is exactly 0.80 at the truth in all five. The
+gate is now `pit_interval_80_maximum_absolute_error`, same 0.05 tolerance, with the raw figure
+still reported. Recorded in `config/phase1_evaluation.yaml` under `amendments:` and explained
+in [`docs/phase1-evaluation-contract.md`](docs/phase1-evaluation-contract.md#amendments); the
+loader rejects a version bump that has no amendment record. Made with zero candidates
+evaluated, which is the only condition under which amending a pre-registered gate is honest.

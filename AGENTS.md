@@ -150,12 +150,15 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   log score, and wins in every season that has xG. The original specification's opposite
   finding predates the 2022-23 `expected_*` repair. 2021-22 has no xG at all, so the xG
   baseline degenerates to the league intercept there rather than competing.
-- **80% interval coverage cannot be measured with a raw central interval on a count
-  distribution.** Swept over rates 0.1-4.0, a perfectly specified Poisson covers 0.813 to
-  0.983 and never lands on 0.80; across the 1.0-1.8 band where team goals sit it covers 0.92
-  to 0.97. Use the randomised-PIT coverage, which lands on 0.798-0.803 for the same models.
-  `ScoreReport.interval_80_absolute_error` already does; `config/phase1_evaluation.yaml`
-  still gates on the raw figure and needs an owner decision before any candidate is judged.
+- **80% interval coverage must never be gated on a raw central interval for a count
+  distribution.** `[q0.1, q0.9]` covers `F(q0.9) - F(q0.1 - 1)`, strictly above 0.80 by
+  construction, and the excess measures the pmf's discreteness rather than the model. It
+  therefore prefers wrong models: at a true rate of 1.80 the correct model misses 80% by
+  0.164 and a model biased 33% high misses by 0.002. Across true rates 1.0-2.2 the raw
+  measure was closest to nominal at the correct rate in zero of five cases. A correctly
+  specified model's randomised PIT is exactly `Uniform(0, 1)`, so its band coverage is
+  exactly 0.80 at the truth. Contract amendment 1.1 gates
+  `pit_interval_80_maximum_absolute_error`; the raw figure stays reported.
 - Polars `group_by` without `maintain_order=True` partitions across threads, so a float sum
   is not bit-reproducible: 16 of 20 repeat aggregations on this archive disagreed, and the
   difference reached the reported log score. Every aggregation feeding a pre-registered
@@ -167,10 +170,11 @@ Unless the user sets another priority, address prerequisites before model sophis
 
 1. Make full archive database rebuilds failure-atomic; live capture is already transactional.
 2. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
-3. Resolve the `interval_80_maximum_absolute_error` gate. It is written against a quantity no
-   count model can attain; the harness reports both coverages so the decision is informed.
-   Amending a pre-registered gate is the user's call and must happen before a candidate is
-   judged, not after.
+3. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
+   `amendments:` record; the loader rejects a bump without one. State how many candidates had
+   been evaluated. A pre-registered gate may not be amended after a candidate is judged.
+   Amendment 1.1 resolved the calibration gate; the deferred stronger check is a PIT
+   uniformity test, which remains an owner decision.
 4. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
    observing candidate results. The bar is `trailing_xg_attack_defence` at mean log score
    1.5227 over 181 folds and 3,640 predictions; a candidate needs 1.5075 or better to clear

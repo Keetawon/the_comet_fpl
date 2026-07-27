@@ -18,9 +18,11 @@ from fpl.validate.harness import (
     _training_window,
     compare_xg_against_goals,
     format_report,
+    passes_calibration_gate,
     run,
     run_fold,
 )
+from fpl.validate.metrics import ScoreReport
 
 pytestmark = pytest.mark.archive
 
@@ -206,21 +208,44 @@ def test_a_full_run_covers_every_fold_and_prediction(db: duckdb.DuckDBPyConnecti
     assert coverage >= contract.promotion.minimum_fixture_coverage
 
 
-def test_raw_interval_coverage_breaches_the_contract_gate_for_every_baseline(
-    one_season,
-) -> None:
-    """Measured evidence that the pre-registered gate is written against the wrong quantity.
+def test_every_baseline_passes_the_amended_calibration_gate(one_season) -> None:
+    """Amendment 1.1, measured on the archive rather than on a swept Poisson.
 
-    `interval_80_maximum_absolute_error: 0.05` cannot be met by *any* count model, correct or
-    not: the raw coverage of a well-specified Poisson at team-goal rates sits above 0.92. The
-    PIT-based coverage is the attainable measure of the same property, and every baseline
-    lands near 0.80 on it. Raising this is a contract amendment for the user to make, not
-    something to relax quietly after seeing results.
+    Every baseline lands within 0.05 of 80% on the PIT coverage and none of them does on the
+    raw coverage. Since these are the comparators a candidate is judged against, a gate they
+    all fail would not be a demanding bar -- it would be a broken measurement.
     """
-    gate = load_phase1_evaluation().promotion.interval_80_maximum_absolute_error
+    gate = load_phase1_evaluation().promotion.pit_interval_80_maximum_absolute_error
     for report in one_season.overall.values():
-        assert abs(report.interval_80_coverage - 0.80) > gate, report.name
-        assert abs(report.pit_interval_80_coverage - 0.80) < 0.05, report.name
+        assert passes_calibration_gate(report), report.name
+        assert report.pit_interval_80_absolute_error <= gate, report.name
+        assert abs(report.interval_80_coverage - 0.80) > gate, (
+            f"{report.name} was expected to breach the superseded raw-interval gate"
+        )
+
+
+def test_the_calibration_gate_reads_its_tolerance_from_the_contract() -> None:
+    """The gate has to be able to fail, and has to follow the config rather than a constant."""
+    report = ScoreReport(
+        name="badly_calibrated",
+        predictions=100,
+        mean_log_score=1.0,
+        mean_crps=1.0,
+        interval_80_coverage=0.80,
+        pit_interval_80_coverage=0.55,
+        mean_absolute_error=1.0,
+        pit_values=(),
+    )
+    assert not passes_calibration_gate(report)
+    assert report.pit_interval_80_absolute_error == pytest.approx(0.25)
+
+
+def test_the_report_shows_the_gate_and_names_the_contract_version(one_season) -> None:
+    text = format_report(one_season)
+    contract = load_phase1_evaluation()
+    assert "calibration gate" in text
+    assert f"contract {contract.contract_version}" in text
+    assert "reported, not gated" in text
 
 
 # --------------------------------------------------------------------------------------

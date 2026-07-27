@@ -316,13 +316,42 @@ class Phase1MetricPolicy(_Frozen):
     downstream_player_points: frozenset[str]
 
 
+# The version that predates the amendment log. Typed as a plain `str` rather than inlined,
+# because the rule below is a general policy about versions and not a statement about whichever
+# literal `contract_version` currently pins.
+ORIGINAL_PHASE1_CONTRACT_VERSION: str = "1.0"
+
+
+class Phase1Amendment(_Frozen):
+    """One recorded change to a pre-registered contract.
+
+    Amending a gate after seeing a candidate's results is the failure this whole file exists
+    to prevent, so an amendment has to say when it happened and how many candidates had been
+    evaluated by then. The number is not checkable, but requiring it to be written down makes
+    a dishonest amendment a false statement rather than an omission.
+    """
+
+    version: str = Field(min_length=1)
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    candidates_evaluated_before_amendment: int = Field(ge=0)
+    changed: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    evidence: str = Field(min_length=1)
+    tolerance_rationale: str | None = None
+    deferred: str | None = None
+
+
 class Phase1PromotionGate(_Frozen):
     compare_against: Literal["best_eligible_required_stage_a_baseline"]
     comparison_population: Literal["same_eligible_predictions"]
     relative_lift_formula: Literal["(baseline - candidate) / abs(baseline)"]
     minimum_primary_relative_lift: float = Field(ge=0.0)
     maximum_crps_relative_regression: float = Field(ge=0.0)
-    interval_80_maximum_absolute_error: float = Field(ge=0.0, le=1.0)
+    # Randomised-PIT band coverage. The superseded `interval_80_maximum_absolute_error` gated
+    # the raw central interval, which for a count distribution is set by the discreteness of
+    # the pmf rather than by the model -- see amendment 1.1. `extra="forbid"` means a config
+    # still carrying the old key fails to load rather than being silently ignored.
+    pit_interval_80_maximum_absolute_error: float = Field(ge=0.0, le=1.0)
     minimum_fixture_coverage: float = Field(gt=0.0, le=1.0)
     minimum_fold_count: int = Field(ge=1)
     require_each_reported_season_to_pass: Literal[True]
@@ -337,8 +366,9 @@ class Phase1ReportingPolicy(_Frozen):
 class Phase1EvaluationConfig(_Frozen):
     """Executable entry and promotion contract for the Stage A walk-forward."""
 
-    contract_version: Literal["1.0"]
+    contract_version: Literal["1.1"]
     phase: Literal[1]
+    amendments: tuple[Phase1Amendment, ...] = ()
     target: Phase1TargetPolicy
     cutoff: Phase1CutoffPolicy
     training: Phase1TrainingPolicy
@@ -376,7 +406,11 @@ class Phase1EvaluationConfig(_Frozen):
         required_proper = {"mean_log_score", "mean_crps"}
         if missing := required_proper - self.metrics.proper_distribution:
             raise ValueError(f"Phase 1 missing proper distribution metrics: {sorted(missing)}")
-        required_calibration = {"randomized_pit", "interval_80_coverage"}
+        required_calibration = {
+            "randomized_pit",
+            "interval_80_coverage",
+            "pit_interval_80_coverage",
+        }
         if missing := required_calibration - self.metrics.calibration:
             raise ValueError(f"Phase 1 missing calibration outputs: {sorted(missing)}")
         required_dimensions = {"fold", "season", "promoted_status", "home_away"}
@@ -385,6 +419,17 @@ class Phase1EvaluationConfig(_Frozen):
         required_counts = {"predictions", "exclusions", "cold_starts", "uncertainty"}
         if missing := required_counts - self.reporting.counts:
             raise ValueError(f"Phase 1 missing report counts: {sorted(missing)}")
+
+        # A version bump is how a changed gate becomes visible, so it may not happen without
+        # the record that says what changed and why. Without this the contract could be
+        # rewritten between two commits and read as though it had always said so.
+        if self.contract_version != ORIGINAL_PHASE1_CONTRACT_VERSION and not any(
+            amendment.version == self.contract_version for amendment in self.amendments
+        ):
+            raise ValueError(
+                f"Phase 1 contract version {self.contract_version} has no amendment record; "
+                "a pre-registered gate may not change without one"
+            )
         return self
 
 

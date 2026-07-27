@@ -175,21 +175,45 @@ def run(
     )
 
 
-def format_report(result: HarnessResult) -> str:
+def passes_calibration_gate(
+    report: ScoreReport, config: Phase1EvaluationConfig | None = None
+) -> bool:
+    """Apply the contract's calibration gate to one scored population.
+
+    Written as code rather than left in the YAML because the gate's whole history is an
+    ambiguity about which coverage it meant. Reading it from the typed config means a future
+    change to the tolerance takes effect here without anyone remembering to update a constant.
+    """
+    resolved = config or load_phase1_evaluation()
+    return (
+        report.pit_interval_80_absolute_error
+        <= resolved.promotion.pit_interval_80_maximum_absolute_error
+    )
+
+
+def format_report(result: HarnessResult, config: Phase1EvaluationConfig | None = None) -> str:
+    resolved = config or load_phase1_evaluation()
+    tolerance = resolved.promotion.pit_interval_80_maximum_absolute_error
     lines = [
         f"folds evaluated : {result.folds_evaluated}",
         f"predictions     : {result.predictions}",
         "",
-        f"{'baseline':<32}{'log score':>11}{'CRPS':>9}{'PIT 80%':>9}{'raw 80%':>9}{'MAE':>8}",
-        "-" * 78,
+        f"{'baseline':<32}{'log score':>11}{'CRPS':>9}{'PIT 80%':>9}{'raw 80%':>9}{'MAE':>8}"
+        f"{'calib':>8}",
+        "-" * 86,
     ]
     ordered = sorted(result.overall.values(), key=lambda report: report.mean_log_score)
     for report in ordered:
+        gate = "pass" if passes_calibration_gate(report, resolved) else "FAIL"
         lines.append(
             f"{report.name:<32}{report.mean_log_score:>11.4f}{report.mean_crps:>9.4f}"
             f"{report.pit_interval_80_coverage:>9.3f}{report.interval_80_coverage:>9.3f}"
-            f"{report.mean_absolute_error:>8.3f}"
+            f"{report.mean_absolute_error:>8.3f}{gate:>8}"
         )
+    lines.append(
+        f"calibration gate: |PIT 80% - 0.80| <= {tolerance:.2f}  "
+        f"(contract {resolved.contract_version}; the raw 80% column is reported, not gated)"
+    )
 
     best = ordered[0]
     lines += ["", f"best baseline: {best.name} (log score {best.mean_log_score:.4f})", ""]

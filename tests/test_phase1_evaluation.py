@@ -51,7 +51,11 @@ def test_phase1_contract_requires_distribution_and_calibration_metrics() -> None
     assert contract.metrics.primary == "mean_log_score"
     assert contract.metrics.primary_direction == "lower_is_better"
     assert {"mean_log_score", "mean_crps"} <= contract.metrics.proper_distribution
-    assert {"randomized_pit", "interval_80_coverage"} <= contract.metrics.calibration
+    assert {
+        "randomized_pit",
+        "interval_80_coverage",
+        "pit_interval_80_coverage",
+    } <= contract.metrics.calibration
     assert "spearman_within_gameweek" in contract.metrics.ranking
 
 
@@ -62,7 +66,7 @@ def test_phase1_promotion_gate_is_measurable() -> None:
     assert gate.relative_lift_formula == "(baseline - candidate) / abs(baseline)"
     assert gate.minimum_primary_relative_lift == 0.01
     assert gate.maximum_crps_relative_regression == 0.0
-    assert gate.interval_80_maximum_absolute_error == 0.05
+    assert gate.pit_interval_80_maximum_absolute_error == 0.05
     assert gate.minimum_fixture_coverage == 0.98
     assert gate.minimum_fold_count == 20
     assert gate.require_each_reported_season_to_pass is True
@@ -98,4 +102,58 @@ def test_report_cannot_hide_exclusions_or_cold_starts() -> None:
     reporting["counts"] = ["predictions", "exclusions"]
 
     with pytest.raises(ValueError, match="missing report counts"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+# --------------------------------------------------------------------------------------
+# Amendment 1.1: the calibration gate names its metric
+# --------------------------------------------------------------------------------------
+
+
+def test_the_calibration_gate_names_the_metric_it_measures() -> None:
+    """The superseded key said `interval_80` without saying which interval.
+
+    That ambiguity is the whole defect: the harness built the raw central interval, which for
+    a count distribution is governed by the discreteness of the pmf rather than by the model.
+    `extra="forbid"` means a config still carrying the old key cannot load at all, so the
+    change cannot be half-applied.
+    """
+    document = copy.deepcopy(_document())
+    promotion = document["promotion"]
+    assert isinstance(promotion, dict)
+    assert "interval_80_maximum_absolute_error" not in promotion
+    assert promotion["pit_interval_80_maximum_absolute_error"] == 0.05
+
+    promotion["interval_80_maximum_absolute_error"] = 0.05
+    with pytest.raises(ValidationError, match=r"[Ee]xtra"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+def test_the_amendment_is_recorded_with_its_reason_and_evidence() -> None:
+    contract = load_phase1_evaluation()
+    assert contract.contract_version == "1.1"
+    amendment = next(a for a in contract.amendments if a.version == "1.1")
+    assert amendment.candidates_evaluated_before_amendment == 0, (
+        "amending a pre-registered gate is only legitimate before a candidate could bias it"
+    )
+    assert "pit_interval_80_maximum_absolute_error" in amendment.changed
+    assert amendment.reason and amendment.evidence
+
+
+def test_a_version_bump_without_an_amendment_record_is_rejected() -> None:
+    """Otherwise a gate could be rewritten between two commits and read as always having said so."""
+    document = copy.deepcopy(_document())
+    document["amendments"] = []
+
+    with pytest.raises(ValueError, match="no amendment record"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+def test_an_amendment_cannot_be_recorded_without_a_date() -> None:
+    document = copy.deepcopy(_document())
+    amendments = document["amendments"]
+    assert isinstance(amendments, list)
+    amendments[0]["date"] = "soon"
+
+    with pytest.raises(ValidationError, match="pattern"):
         Phase1EvaluationConfig.model_validate(document)

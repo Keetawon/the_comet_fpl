@@ -4,8 +4,49 @@
 # folds, baselines, metrics, or lift gates after seeing its results. The typed loader rejects
 # missing required comparisons and any contiguous gameweek policy.
 
-contract_version: "1.0"
+contract_version: "1.1"
 phase: 1
+
+# Amending a pre-registered contract is only legitimate before a candidate exists to bias the
+# choice, and only with the reason recorded. The loader enforces the record: any version other
+# than 1.0 must carry a matching entry here.
+amendments:
+  - version: "1.1"
+    date: "2026-07-27"
+    candidates_evaluated_before_amendment: 0
+    changed: >-
+      promotion.interval_80_maximum_absolute_error becomes
+      promotion.pit_interval_80_maximum_absolute_error, at the same tolerance of 0.05.
+      pit_interval_80_coverage joins the required calibration outputs; interval_80_coverage
+      stays reported but is no longer gated.
+    reason: >-
+      The superseded gate did not measure calibration. It was written against the coverage of
+      a central interval built from integer quantiles, [q0.1, q0.9]. For any count
+      distribution that interval covers F(q0.9) - F(q0.1 - 1), which exceeds 0.80 by
+      construction and by an amount set by the discreteness of the pmf rather than by the
+      quality of the model. The gate was therefore not merely hard to pass; it preferred
+      miscalibrated models to correct ones.
+    evidence: >-
+      Computed exactly, not simulated. Swept over rates 0.1-4.0 a correctly specified Poisson
+      covers 0.813 to 0.983 and never 0.80; across the 1.0-1.8 band where team goals sit it
+      covers 0.92-0.97. At a true rate of 1.80 the correct model scores |coverage - 0.80| =
+      0.164 and fails, while a model predicting 2.40 -- a 33% overestimate -- scores 0.0017
+      and passes. Across true rates 1.0, 1.35, 1.6, 1.8 and 2.2 the raw measure is closest to
+      nominal at the correct rate in zero of five cases. The randomised PIT of a correctly
+      specified model is exactly Uniform(0,1), so its 0.1-0.9 band coverage is exactly 0.80 at
+      the truth in all five, and degrades away from it. All five Stage A baselines score
+      0.787-0.804 on the PIT measure and 0.927-0.942 on the superseded one.
+    tolerance_rationale: >-
+      0.05 is carried over unchanged: the amendment fixes which quantity is measured, not how
+      strict the gate is. Because require_each_reported_season_to_pass applies it per season
+      -- 600 to 760 predictions -- 0.05 is about 3.1 to 3.4 binomial standard errors, a screen
+      against gross miscalibration rather than a precision test.
+    deferred: >-
+      Band coverage is necessary but not sufficient for calibration: a model can hold exactly
+      0.80 inside the band while being non-uniform within it. A Kolmogorov-Smirnov or
+      chi-square test on the PIT histogram would be the stronger check. Adding it is a further
+      amendment and is left to the owner; it is recorded here so the weakness is not silently
+      inherited.
 
 target:
   entity: team
@@ -58,7 +99,9 @@ metrics:
     - mae_goals
   calibration:
     - randomized_pit
+    # Both coverages are reported. Only the PIT one is gated -- see amendment 1.1.
     - interval_80_coverage
+    - pit_interval_80_coverage
   ranking:
     - spearman_within_gameweek
   downstream_player_points:
@@ -72,7 +115,9 @@ promotion:
   relative_lift_formula: "(baseline - candidate) / abs(baseline)"
   minimum_primary_relative_lift: 0.01
   maximum_crps_relative_regression: 0.0
-  interval_80_maximum_absolute_error: 0.05
+  # Randomised-PIT band coverage, not the raw interval. The key names the metric so the
+  # ambiguity that produced amendment 1.1 cannot recur.
+  pit_interval_80_maximum_absolute_error: 0.05
   minimum_fixture_coverage: 0.98
   minimum_fold_count: 20
   require_each_reported_season_to_pass: true

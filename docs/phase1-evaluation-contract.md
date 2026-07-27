@@ -1,8 +1,9 @@
 # Phase 1 evaluation contract
 
-**Status: contract implemented; Stage A model not started.** The machine-readable source is
-`config/phase1_evaluation.yaml`, validated by `Phase1EvaluationConfig`. This document explains
-the decisions; it does not override that file.
+**Status: contract and harness implemented at version 1.1; Stage A model not started.** The
+machine-readable source is `config/phase1_evaluation.yaml`, validated by
+`Phase1EvaluationConfig` and executed by `src/fpl/validate/`. This document explains the
+decisions; it does not override that file.
 
 ## Scope and entry gate
 
@@ -55,14 +56,15 @@ The primary metric is mean log score (lower is better), with mean CRPS as a seco
 distribution score.
 Poisson deviance and goal MAE are diagnostics, not substitutes for distribution scoring.
 Randomized PIT and 80% predictive-interval coverage expose calibration; Spearman correlation is
-reported within gameweek as a ranking diagnostic.
+reported within gameweek as a ranking diagnostic. Both the raw and PIT-based 80% coverages are
+reported, but only the PIT one is gated -- see amendment 1.1.
 
 A Stage A candidate is promoted only if, on every reported season:
 
 - mean log score improves by at least 1% over the best required eligible baseline on the same
   prediction rows, using `(baseline - candidate) / abs(baseline)`;
 - CRPS does not regress relative to that baseline;
-- observed 80% interval coverage is within five percentage points of 80%;
+- randomised-PIT 80% band coverage is within five percentage points of 80%;
 - at least 98% of eligible team-fixtures receive a prediction;
 - at least 20 walk-forward folds are evaluated; and
 - point-in-time and truncation-equivalence tests have zero failures.
@@ -70,6 +72,52 @@ A Stage A candidate is promoted only if, on every reported season:
 The report must include fold, season, promoted-status, and home/away slices plus counts for
 predictions, exclusions, cold starts, and uncertainty. A headline aggregate without those counts
 does not satisfy the gate.
+
+## Amendments
+
+A pre-registered contract that can be edited silently is not pre-registered. Every version
+after 1.0 therefore carries a machine-readable record in `amendments:`, and the loader rejects
+a version bump without one. The record states how many candidates had been evaluated when the
+change was made, because that -- not the wording of the reason -- is what determines whether an
+amendment is legitimate.
+
+### 1.1 -- the calibration gate names its metric (2026-07-27, 0 candidates evaluated)
+
+`promotion.interval_80_maximum_absolute_error` becomes
+`promotion.pit_interval_80_maximum_absolute_error` at the same tolerance of 0.05.
+`pit_interval_80_coverage` joins the required calibration outputs. The raw coverage remains
+reported and is no longer gated.
+
+The superseded key did not say which interval it meant, and the harness built the obvious one:
+the central interval between integer quantiles, `[q0.1, q0.9]` with `q_p = min{g : F(g) >= p}`.
+For a count distribution that interval covers `F(q0.9) - F(q0.1 - 1)`, which is strictly
+greater than 0.80 by construction. The excess is the discreteness of the pmf, not an error the
+model made, and it does not shrink with more data.
+
+The failure is not that the gate is hard. It is that it points the wrong way:
+
+| true rate | model rate | raw coverage | \|error\| | old gate | PIT coverage | \|error\| |
+|---|---|---|---|---|---|---|
+| 1.80 | **1.80** (correct) | 0.9636 | 0.164 | **fail** | 0.8000 | 0.000 |
+| 1.80 | 2.40 (33% high) | 0.7983 | 0.002 | **pass** | 0.7832 | 0.017 |
+
+Gating the raw figure would have rejected a perfectly specified model and promoted a badly
+biased one. Swept over true rates 1.0, 1.35, 1.6, 1.8 and 2.2, the raw measure is closest to
+nominal at the correct rate in **zero of five** cases. The randomised PIT of a correctly
+specified model is exactly `Uniform(0, 1)`, so its `[0.1, 0.9]` band coverage is exactly 0.80
+at the truth in all five and degrades away from it. On the archive, all five Stage A baselines
+score 0.787-0.804 on the PIT measure and 0.927-0.942 on the superseded one.
+
+The tolerance is carried over unchanged at 0.05. The amendment fixes which quantity is
+measured, not how strict the gate is. Applied per reported season -- 600 to 760 predictions --
+0.05 is roughly 3.1 to 3.4 binomial standard errors: a screen against gross miscalibration
+rather than a precision test.
+
+**Known and deliberately not fixed here.** Band coverage is necessary but not sufficient for
+calibration: a model can hold exactly 0.80 inside the band while being non-uniform within it. A
+Kolmogorov-Smirnov or chi-square test on the PIT histogram would be the stronger check. Adding
+it is a further amendment and remains an owner decision; it is recorded so the weakness is not
+silently inherited.
 
 ## Exit criterion
 

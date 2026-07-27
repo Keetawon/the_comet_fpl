@@ -134,15 +134,24 @@ class ScoreReport:
     pit_values: tuple[float, ...]
 
     @property
-    def interval_80_absolute_error(self) -> float:
-        """Distance from 80% using the *PIT* coverage, which is the attainable one.
+    def pit_interval_80_absolute_error(self) -> float:
+        """The contract's calibration gate, on the PIT coverage. Named for the config key.
 
-        The naive interval measure cannot land on 80% for a count distribution and must not
-        be used as a gate. A distribution over whole goals cannot be trimmed to an exact
-        quantile, so the narrowest central interval holding *at least* 80% holds more --
-        swept over rates 0.1 to 4.0 a perfectly specified Poisson covers 0.813 to 0.983, and
-        0.92 to 0.97 across the 1.0-1.8 band where team goals actually sit. The randomised
-        PIT restores continuity and lands on 0.798-0.803 for the same models.
+        The raw central interval must not be gated, and the reason is sharper than it first
+        looks. That interval is `[q0.1, q0.9]` with `q_p = min{g : F(g) >= p}`, so it covers
+        `F(q0.9) - F(q0.1 - 1)`, which exceeds 0.80 by construction for any count
+        distribution -- the excess is the discreteness of the pmf, not an error the model
+        made. Swept over rates 0.1-4.0 a correctly specified Poisson covers 0.813 to 0.983
+        and never 0.80.
+
+        The consequence is not that the measure is merely strict but that it points the wrong
+        way. At a true rate of 1.80 a correct model covers 0.964, missing 80% by 0.164, while
+        a model predicting 2.40 covers 0.798 and misses by 0.0017: gating on the raw figure
+        rejects the correct model and promotes one biased 33% high.
+
+        The randomised PIT of a correctly specified model is exactly Uniform(0, 1), so its
+        0.1-0.9 band coverage is exactly 0.80 at the truth and falls away from it. That is the
+        quantity worth gating, and amendment 1.1 gates it.
         """
         return abs(self.pit_interval_80_coverage - 0.80)
 

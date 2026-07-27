@@ -16,6 +16,7 @@ import pytest
 from fpl.validate.metrics import (
     MAX_GOALS,
     Distribution,
+    cdf,
     central_interval,
     crps,
     expected_goals,
@@ -229,7 +230,7 @@ def test_central_interval_holds_at_least_the_requested_mass() -> None:
 
 
 def test_raw_interval_coverage_of_a_correct_model_never_reaches_eighty_percent() -> None:
-    """The measured defect behind `ScoreReport.interval_80_absolute_error`.
+    """The measured defect behind amendment 1.1.
 
     A distribution over whole goals cannot be trimmed to an exact quantile, so the narrowest
     central interval holding *at least* 80% almost always holds appreciably more. Swept over
@@ -277,7 +278,7 @@ def test_score_predictions_reports_both_coverages_and_gates_on_the_pit_one() -> 
     assert report.interval_80_coverage > 0.86
     assert abs(report.pit_interval_80_coverage - 0.80) < 0.03
     # The gate property must follow the PIT figure, not the raw one.
-    assert report.interval_80_absolute_error == pytest.approx(
+    assert report.pit_interval_80_absolute_error == pytest.approx(
         abs(report.pit_interval_80_coverage - 0.80)
     )
     assert len(report.pit_values) == len(observations)
@@ -333,3 +334,73 @@ def test_relative_lift_matches_the_contract_formula() -> None:
 def test_relative_lift_rejects_a_zero_baseline() -> None:
     with pytest.raises(ValueError, match="zero"):
         relative_lift(0.0, 1.0)
+
+
+def _exact_raw_coverage(model_rate: float, true_rate: float) -> float:
+    """P(draw from `true_rate` falls in the 80% interval built from `model_rate`)."""
+    low, high = central_interval(poisson_pmf(model_rate), 0.8)
+    return sum(poisson_pmf(true_rate)[low : high + 1])
+
+
+def _exact_pit_coverage(model_rate: float, true_rate: float) -> float:
+    """P(0.1 <= randomised PIT <= 0.9), integrated rather than sampled.
+
+    Within the observed bin the PIT is uniform on `[F(k-1), F(k)]`, so the probability of
+    landing in the band is that segment's overlap with `[0.1, 0.9]` as a fraction of the bin.
+    Doing it exactly removes the seed from the argument entirely.
+    """
+    model = poisson_pmf(model_rate)
+    truth = poisson_pmf(true_rate)
+    cumulative = cdf(model)
+    total = 0.0
+    for goals, mass in enumerate(truth):
+        if model[goals] <= 0:
+            continue
+        lower = cumulative[goals - 1] if goals else 0.0
+        overlap = max(0.0, min(cumulative[goals], 0.9) - max(lower, 0.1))
+        total += mass * (overlap / model[goals])
+    return total
+
+
+TEAM_GOAL_RATES = (1.0, 1.35, 1.6, 1.8, 2.2)
+CANDIDATE_RATES = (0.8, 1.0, 1.35, 1.6, 1.8, 2.4, 3.0)
+
+
+def test_pit_band_coverage_is_exactly_eighty_percent_at_the_truth() -> None:
+    """The property that makes it gateable.
+
+    A correctly specified model's randomised PIT is exactly Uniform(0, 1), so the fraction
+    landing in `[0.1, 0.9]` is exactly 0.80 -- not approximately, and not dependent on the
+    rate. Nothing about the discreteness of goals survives the transform.
+    """
+    for rate in TEAM_GOAL_RATES:
+        assert _exact_pit_coverage(rate, rate) == pytest.approx(0.80, abs=1e-12)
+
+
+def test_the_superseded_gate_prefers_a_miscalibrated_model_to_a_correct_one() -> None:
+    """Amendment 1.1's evidence, and the reason the old gate was not merely strict.
+
+    At a true rate of 1.80 the correct model's raw coverage misses 80% by 0.164 and fails the
+    old gate, while a model predicting 2.40 -- 33% too high -- misses by 0.002 and passes it.
+    Gating the raw figure would have rejected the right answer in favour of a biased one.
+    """
+    truth = 1.8
+    correct = abs(_exact_raw_coverage(truth, truth) - 0.80)
+    biased = abs(_exact_raw_coverage(2.4, truth) - 0.80)
+    assert correct > 0.05, "the correct model fails the superseded gate"
+    assert biased < 0.05, "the biased model passes it"
+    assert biased < correct
+
+
+def test_only_the_pit_measure_is_minimised_by_the_truth() -> None:
+    """Swept across the band where team goals sit, so the finding is not one lucky rate."""
+    for truth in TEAM_GOAL_RATES:
+        candidates = sorted({*CANDIDATE_RATES, truth})
+        raw_errors = {r: abs(_exact_raw_coverage(r, truth) - 0.80) for r in candidates}
+        pit_errors = {r: abs(_exact_pit_coverage(r, truth) - 0.80) for r in candidates}
+        best_raw = min(candidates, key=lambda r: raw_errors[r])
+        best_pit = min(candidates, key=lambda r: pit_errors[r])
+        assert best_pit == truth, f"PIT coverage should be closest to nominal at {truth}"
+        assert best_raw != truth, (
+            f"raw coverage was expected to favour a wrong rate at {truth}, got {best_raw}"
+        )
