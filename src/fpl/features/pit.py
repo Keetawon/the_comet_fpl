@@ -183,6 +183,13 @@ class FeatureSource:
             ).fetchall()
         ]
 
+    def _has_table(self, table: str) -> bool:
+        self._check_table(table)
+        row = self.__con.execute(
+            "SELECT count(*) FROM information_schema.tables WHERE table_name = ?", [table]
+        ).fetchone()
+        return bool(row and row[0])
+
     def _select(
         self,
         table: str,
@@ -200,7 +207,44 @@ class FeatureSource:
         projection = ", ".join(f'"{column}"' for column in columns)
         where = f"WHERE {' AND '.join(predicates)}" if predicates else ""
         relation = self.__con.execute(f"SELECT {projection} FROM {table} {where}", list(params))
-        return pl.from_arrow(relation.arrow())  # type: ignore[return-value]
+        return pl.from_arrow(relation.to_arrow_table())  # type: ignore[return-value]
+
+    def _select_latest_known(
+        self,
+        table: str,
+        *,
+        columns: Sequence[str],
+        identity_columns: Sequence[str],
+        known_at: datetime,
+        predicates: Sequence[str],
+        params: Sequence[object],
+    ) -> pl.DataFrame:
+        """Newest version per identity that existed at `known_at`."""
+        self._check_table(table)
+        available = set(self._columns(table))
+        required = set(columns) | set(identity_columns) | {"known_at", "capture_id"}
+        unknown = sorted(required - available)
+        if unknown:
+            raise ValueError(f"unknown column(s) for {table}: {unknown}")
+        projection = ", ".join(f'"{column}"' for column in columns)
+        partition = ", ".join(f'"{column}"' for column in identity_columns)
+        where = f"AND {' AND '.join(predicates)}" if predicates else ""
+        relation = self.__con.execute(
+            f"""
+            WITH ranked AS (
+                SELECT *, row_number() OVER (
+                    PARTITION BY {partition}
+                    ORDER BY known_at DESC, capture_id DESC
+                ) AS version_rank
+                FROM {table}
+                WHERE known_at <= ?
+            )
+            SELECT {projection} FROM ranked
+            WHERE version_rank = 1 {where}
+            """,
+            [known_at, *params],
+        )
+        return pl.from_arrow(relation.to_arrow_table())  # type: ignore[return-value]
 
 
 class PointInTimeView:
@@ -269,19 +313,39 @@ class PointInTimeView:
 
         # Caller filters first...
         if entity_values is not None:
-            placeholders = ", ".join("?" for _ in entity_values)
-            predicates.append(f"{entity_column} IN ({placeholders})")
-            params.extend(entity_values)
+            if entity_values:
+                placeholders = ", ".join("?" for _ in entity_values)
+                predicates.append(f"{entity_column} IN ({placeholders})")
+                params.extend(entity_values)
+            else:
+                predicates.append("FALSE")
         if seasons is not None:
-            placeholders = ", ".join("?" for _ in seasons)
-            predicates.append(f"season IN ({placeholders})")
-            params.extend(seasons)
+            if seasons:
+                placeholders = ", ".join("?" for _ in seasons)
+                predicates.append(f"season IN ({placeholders})")
+                params.extend(seasons)
+            else:
+                predicates.append("FALSE")
 
         # ...and the point-in-time boundary last, appended here and nowhere else.
         predicates.append("kickoff_time < ?")
         params.append(self._as_of.ts)
 
-        return self._source._select(table, columns=selected, predicates=predicates, params=params)
+        archive = self._source._select(
+            table, columns=selected, predicates=predicates, params=params
+        )
+        live_table = "mart_fact_player_fixture_live"
+        if table != "mart_fact_player_fixture" or not self._source._has_table(live_table):
+            return archive
+        live = self._source._select_latest_known(
+            live_table,
+            columns=selected,
+            identity_columns=("season", "code", "fixture"),
+            known_at=self._as_of.ts,
+            predicates=predicates,
+            params=params,
+        )
+        return pl.concat([archive, live], how="vertical_relaxed")
 
     # -- schedule: metadata only, future rows permitted ---------------------------------
 
@@ -309,11 +373,17 @@ class PointInTimeView:
         predicates: list[str] = []
         params: list[object] = []
         if team_ids is not None:
-            predicates.append(f"team_id IN ({', '.join('?' for _ in team_ids)})")
-            params.extend(team_ids)
+            if team_ids:
+                predicates.append(f"team_id IN ({', '.join('?' for _ in team_ids)})")
+                params.extend(team_ids)
+            else:
+                predicates.append("FALSE")
         if seasons is not None:
-            predicates.append(f"season IN ({', '.join('?' for _ in seasons)})")
-            params.extend(seasons)
+            if seasons:
+                predicates.append(f"season IN ({', '.join('?' for _ in seasons)})")
+                params.extend(seasons)
+            else:
+                predicates.append("FALSE")
         if until is not None:
             if until.tzinfo is None:
                 raise LeakageError("`until` must be timezone-aware")
@@ -324,8 +394,22 @@ class PointInTimeView:
                 raise LeakageError("`since` must be timezone-aware")
             predicates.append("kickoff_time >= ?")
             params.append(since)
-        return self._source._select(
+        archive = self._source._select(
             "mart_fact_team_match", columns=selected, predicates=predicates, params=params
+        )
+        live_table = "mart_team_fixture_live"
+        if not self._source._has_table(live_table):
+            return archive
+        live = self._source._select_latest_known(
+            live_table,
+            columns=selected,
+            identity_columns=("season", "team_id", "fixture"),
+            known_at=self._as_of.ts,
+            predicates=predicates,
+            params=params,
+        )
+        return pl.concat([archive, live], how="vertical_relaxed").unique(
+            subset=["season", "fixture", "team_id"], keep="last"
         )
 
     def upcoming_fixtures(

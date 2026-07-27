@@ -1,5 +1,10 @@
 # Phase 0 — Design for review
 
+> Historical design record. Phase 0b subsequently added atomic manifests, event-live and
+> finalized element-summary capture, checksum-verified file loading, versioned current-season
+> facts/schedules, and `known_at <= as_of` enforcement. For current operational behavior, use
+> `README.md`, `AGENTS.md`, and the executable tests; unresolved scoring verification remains.
+
 Status: **awaiting approval, no implementation code written yet.**
 
 Every number below was re-measured against the real archive (5 seasons pulled from

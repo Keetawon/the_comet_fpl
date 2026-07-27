@@ -31,6 +31,8 @@ FEATURE_READABLE_TABLES: Final[frozenset[str]] = frozenset(
         "mart_fact_team_match",
         "mart_dim_player",
         "mart_dim_team",
+        "mart_fact_player_fixture_live",
+        "mart_team_fixture_live",
     }
 )
 

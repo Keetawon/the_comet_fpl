@@ -12,7 +12,9 @@ different answers:
 
 A single `xP` answers only the first.
 
-**Current status: Phase 0 (data foundation) complete.** No models yet — see
+**Current status: Phase 0b (historical and live data foundation) complete.** No models yet.
+The official 2026/27 payload confirms 17 configured scoring fields; seven thresholds/units
+that it does not publish remain explicitly unverified before Phase 1 — see
 [Phasing](#phasing).
 
 ---
@@ -64,14 +66,14 @@ against vendored fixtures. See [Snapshots (R5)](#snapshots-r5).
 ```
 config/       sources.yaml, scoring_<ruleset>.yaml, data_quality.yaml
 src/fpl/
-  ingest/     archive.py (backfill), fpl_api.py (live client)
+  ingest/     archive.py, fpl_api.py, live_snapshot.py, snapshot_files.py
   storage/    db.py, schema.sql
   transform/  crosswalk.py, facts.py, quality.py
   features/   pit.py   -- point-in-time access layer (R4)
   models/     scoring.py
-  jobs/       build_db.py, daily_snapshot.py, verify_rules.py
+  jobs/       build_db.py, daily_snapshot.py, load_snapshots.py, verify_rules.py
 tests/
-.github/workflows/snapshot.yml   -- R5 execution path
+.github/workflows/               -- CI plus daily and finalized-history R5 capture
 ```
 
 ## Storage layers
@@ -91,6 +93,8 @@ zero-filling biases every rate. Casting happens once, at the `stg_` boundary.
 | `mart_fact_player_fixture` | 138,707 | **the feature builder, only** |
 | `mart_fact_team_match` | 3,800 | the feature builder |
 | `mart_dim_player` / `mart_dim_team` | 1,777 codes / 100 | the feature builder |
+| `mart_fact_player_fixture_live` | versioned current season | the feature builder through `known_at` |
+| `mart_team_fixture_live` | versioned current schedule | the feature builder through `known_at` |
 | `mart_target_player_fixture` | 138,707 | the validation harness and dashboard |
 | `mart_target_completeness` | per season × ruleset | the validation harness |
 
@@ -140,11 +144,12 @@ table. Four runtime layers plus two static ones:
 1. `AsOf` rejects naive datetimes, so timezone cannot silently move the boundary.
 2. No caller SQL; column names are validated against a per-table allowlist.
 3. `observed_*` appends `kickoff_time < as_of` itself, after any caller filters.
-4. `schedule()` may return future rows but projects only pre-kickoff columns — a future
+4. Live facts and schedules additionally select only versions with `known_at <= as_of`.
+5. `schedule()` may return future rows but projects only pre-kickoff columns — a future
    outcome is absent, not merely filtered.
-5. An **AST scan** fails any module in `features/` that imports duckdb, calls `.execute(`,
+6. An **AST scan** fails any module in `features/` that imports duckdb, calls `.execute(`,
    or names a table directly.
-6. **Truncation equivalence**: for a sweep of `as_of` values, results built against the
+7. **Truncation equivalence**: for a sweep of `as_of` values, results built against the
    full database must equal results built against a database physically truncated to
    `as_of`. A forgotten filter returns extra rows and fails.
 
@@ -160,22 +165,31 @@ permanently, and **missing a week is unrecoverable**.
 Two execution paths:
 
 ```bash
-# Local/production: writes an immutable timestamped snapshot to the database.
+# Lightweight daily capture: bootstrap, fixtures, and active event-live.
 uv run python -m fpl.jobs.daily_snapshot
+
+# After a gameweek finalises: also capture every authoritative element-summary history.
+uv run python -m fpl.jobs.daily_snapshot --player-history
 
 # Proves the full code path without network, against a local stub server.
 uv run python -m fpl.jobs.daily_snapshot --dry-run
+
+# Verify and ingest one or more committed workflow snapshot packages.
+uv run python -m fpl.jobs.load_snapshots snapshots/daily/2026-08-22/2026-08-22T060000Z
+uv run python -m fpl.jobs.load_snapshots snapshots/player-history/2026-27/gw-1
 ```
 
-`daily_snapshot` **exits non-zero with an explicit diagnostic** when egress is blocked. It
-never writes an empty or partial snapshot — a truncated snapshot is worse than an absent
-one, because it looks like data.
+`daily_snapshot` **exits non-zero with an explicit diagnostic** when egress is blocked. A
+capture header, payload manifest, legacy raw rows, and typed live rows commit in one DuckDB
+transaction; a mid-write or loader failure rolls all of them back. Checksums are revalidated
+when committed file packages are loaded.
 
-`.github/workflows/snapshot.yml` is the durable path: a daily 06:00 UTC cron (plus
-`workflow_dispatch`) that fetches `bootstrap-static` and `fixtures`, gzips them to
-`snapshots/{date}/`, and commits them back. It uses only `curl`, `gzip` and `jq` so it
-cannot break when this package changes, and it fails the run on any non-200 rather than
-committing an empty file.
+`.github/workflows/snapshot.yml` is the lightweight durable path: a daily 06:00 UTC cron
+captures `bootstrap-static`, `fixtures`, and event-live. `player-history.yml` checks daily for
+a newly finalized gameweek and then captures every `element-summary` into one compressed,
+checksummed package. Element history, not the gameweek-aggregated live feed, supplies the
+`(season, code, fixture)` rows needed for double gameweeks. Both workflows are shell-only so
+a broken Python environment cannot stop irreplaceable raw capture.
 
 It also logs the **first `kickoff_time` in the fixtures payload** on every run. As of
 2026-07-26 that endpoint still returns the completed 2025-26 fixtures while
@@ -242,7 +256,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 
 | Phase | Deliverable | Status |
 |---|---|---|
-| **0** | Ingestion, storage, crosswalks, facts, scoring calculator, snapshots | **complete** |
+| **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | not started |
 | 2 | Stage B minutes model | not started |
 | 3 | Stages C/D player events + simulation | not started |

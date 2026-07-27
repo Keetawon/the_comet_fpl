@@ -7,6 +7,7 @@ code, and R5 is the one job that must be provably correct before it ever runs fo
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,7 +16,7 @@ import duckdb
 import httpx
 import pytest
 
-from fpl.config import LiveApiSource, load_sources
+from fpl.config import LiveApiSource, config_dir, load_sources
 from fpl.ingest.fpl_api import (
     ApiFixture,
     ApiResponseError,
@@ -315,11 +316,11 @@ def test_snapshot_writes_an_immutable_timestamped_row(
         rows = con.execute(
             "SELECT endpoint, gw, sha256, length(payload) FROM snapshot_bootstrap ORDER BY endpoint"
         ).fetchall()
-        assert [row[0] for row in rows] == ["bootstrap-static", "fixtures"]
-        for _, gw, sha, size in rows:
+        assert [row[0] for row in rows] == ["bootstrap-static", "event-live/1", "fixtures"]
+        for endpoint, gw, sha, size in rows:
             assert gw == 1  # from the payload's is_next event
             assert len(sha) == 64
-            assert size > 1000
+            assert size > (10 if endpoint.startswith("event-live") else 1000)
         # A single captured_at ties the endpoints into one capture.
         stamps = con.execute(
             "SELECT count(DISTINCT captured_at) FROM snapshot_bootstrap"
@@ -350,7 +351,7 @@ def test_snapshot_is_append_only_across_runs(
     con = duckdb.connect(str(db_path), read_only=True)
     try:
         total = con.execute("SELECT count(*) FROM snapshot_bootstrap").fetchone()
-        assert total is not None and total[0] == 4
+        assert total is not None and total[0] == 6
     finally:
         con.close()
 
@@ -412,16 +413,46 @@ def test_verify_rules_resolves_every_field(bootstrap_payload_path: Path) -> None
     assert not [check for check in checks if check.status == "MISMATCH"]
 
 
-def test_verify_rules_refuses_to_confirm_from_a_placeholder(
+def test_verify_rules_refuses_to_rewrite_from_a_placeholder(
     bootstrap_payload_path: Path,
 ) -> None:
     """The vendored payload is synthetic, so nothing may be marked confirmed from it."""
     payload = json.loads(bootstrap_payload_path.read_text("utf-8"))
     assert "_PLACEHOLDER" in payload
 
+    path = config_dir() / "scoring_2026_27.yaml"
+    before = path.read_bytes()
+    code, _ = verify_rules.verify("2026_27", bootstrap_payload_path, write=True)
+    assert code == verify_rules.EXIT_OK
+    assert path.read_bytes() == before
+
+
+def test_real_2026_27_scoring_extract_has_no_false_map_mismatches() -> None:
+    payload = Path(__file__).parent / "fixtures" / "bootstrap_scoring_2026_27_real.json"
+    code, checks = verify_rules.verify("2026_27", payload, write=False)
+    assert code == verify_rules.EXIT_OK
+    assert not [check for check in checks if check.status == "MISMATCH"]
+    unconfirmed = {check.path for check in checks if check.status == "unconfirmed"}
+    assert unconfirmed == {
+        "appearance.long_play_minutes",
+        "clean_sheets.minimum_minutes",
+        "goals_conceded.unit",
+        "saves.unit",
+        "defensive_contribution.thresholds.DEF",
+        "defensive_contribution.thresholds.MID",
+        "defensive_contribution.thresholds.FWD",
+    }
     from fpl.config import load_scoring_rules
 
-    assert load_scoring_rules("2026_27").verification.payload_confirmed == []
+    verification = load_scoring_rules("2026_27").verification
+    expected_confirmed = {
+        check.path
+        for check in checks
+        if check.status == "confirmed"
+        and check.path not in {"goals_scored.GK", "clean_sheets.points.FWD"}
+    }
+    assert set(verification.payload_confirmed) == expected_confirmed
+    assert verification.payload_sha256 == hashlib.sha256(payload.read_bytes()).hexdigest()
 
 
 def test_verify_rules_reports_a_mismatch_and_does_not_write(tmp_path: Path) -> None:

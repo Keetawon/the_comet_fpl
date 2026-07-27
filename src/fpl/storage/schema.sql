@@ -51,6 +51,33 @@ CREATE TABLE IF NOT EXISTS snapshot_bootstrap (
     PRIMARY KEY (captured_at, endpoint)
 );
 
+-- Phase 0b capture contract. A capture header and all of its payload rows are committed
+-- in one transaction. `parameter` carries the gameweek or element id without baking it
+-- into the endpoint name, and the manifest makes file/DB snapshots independently
+-- verifiable.
+CREATE TABLE IF NOT EXISTS snapshot_capture (
+    capture_id      VARCHAR PRIMARY KEY,
+    captured_at    TIMESTAMPTZ NOT NULL,
+    season          VARCHAR NOT NULL,
+    gw              INTEGER,
+    mode            VARCHAR NOT NULL,
+    payload_count   INTEGER NOT NULL,
+    manifest        JSON NOT NULL,
+    manifest_sha256 VARCHAR NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS snapshot_payload (
+    capture_id VARCHAR NOT NULL,
+    endpoint   VARCHAR NOT NULL,
+    parameter  VARCHAR NOT NULL,
+    payload    JSON NOT NULL,
+    sha256     VARCHAR NOT NULL,
+    byte_count BIGINT NOT NULL,
+    row_count  BIGINT,
+    PRIMARY KEY (capture_id, endpoint, parameter),
+    FOREIGN KEY (capture_id) REFERENCES snapshot_capture(capture_id)
+);
+
 -- Gotcha 13: pre-season payloads contain glitches (a goalkeeper with 11 goals and 0
 -- minutes). Range and consistency violations are recorded here, never silently
 -- dropped and never silently repaired.
@@ -161,6 +188,81 @@ CREATE TABLE IF NOT EXISTS stg_player (
     PRIMARY KEY (season, element)
 );
 
+-- Current-season rows are versioned by the time they became known. They deliberately
+-- remain separate from the archive, which cannot truthfully reconstruct knowledge time.
+CREATE TABLE IF NOT EXISTS stg_live_player_version (
+    season       VARCHAR NOT NULL,
+    element      INTEGER NOT NULL,
+    code         INTEGER NOT NULL,
+    known_at     TIMESTAMPTZ NOT NULL,
+    capture_id   VARCHAR NOT NULL,
+    web_name     VARCHAR,
+    element_type INTEGER NOT NULL,
+    position     VARCHAR NOT NULL,
+    team_id      INTEGER NOT NULL,
+    now_cost     INTEGER,
+    status       VARCHAR,
+    PRIMARY KEY (season, element, capture_id)
+);
+
+CREATE TABLE IF NOT EXISTS stg_live_fixture_version (
+    season            VARCHAR NOT NULL,
+    fixture           INTEGER NOT NULL,
+    known_at          TIMESTAMPTZ NOT NULL,
+    capture_id        VARCHAR NOT NULL,
+    gw                INTEGER,
+    kickoff_time      TIMESTAMPTZ,
+    team_h            INTEGER NOT NULL,
+    team_a            INTEGER NOT NULL,
+    team_h_difficulty INTEGER,
+    team_a_difficulty INTEGER,
+    finished          BOOLEAN,
+    PRIMARY KEY (season, fixture, capture_id)
+);
+
+CREATE TABLE IF NOT EXISTS stg_live_player_fixture_version (
+    season                          VARCHAR NOT NULL,
+    element                         INTEGER NOT NULL,
+    code                            INTEGER NOT NULL,
+    fixture                         INTEGER NOT NULL,
+    pulse_id                        INTEGER,
+    known_at                        TIMESTAMPTZ NOT NULL,
+    capture_id                      VARCHAR NOT NULL,
+    gw                              INTEGER NOT NULL,
+    kickoff_time                    TIMESTAMPTZ NOT NULL,
+    position                        VARCHAR NOT NULL,
+    team_id                         INTEGER NOT NULL,
+    opponent_team_id                INTEGER NOT NULL,
+    was_home                        BOOLEAN NOT NULL,
+    minutes                         INTEGER,
+    starts                          INTEGER,
+    goals_scored                    INTEGER,
+    assists                         INTEGER,
+    clean_sheets                    INTEGER,
+    goals_conceded                  INTEGER,
+    saves                           INTEGER,
+    penalties_saved                 INTEGER,
+    penalties_missed                INTEGER,
+    own_goals                       INTEGER,
+    yellow_cards                    INTEGER,
+    red_cards                       INTEGER,
+    bonus                           INTEGER,
+    bps                             INTEGER,
+    expected_goals                  DOUBLE,
+    expected_assists                DOUBLE,
+    expected_goals_conceded         DOUBLE,
+    defensive_contribution          INTEGER,
+    tackles                         INTEGER,
+    recoveries                      INTEGER,
+    clearances_blocks_interceptions INTEGER,
+    value                           INTEGER,
+    selected                        INTEGER,
+    transfers_in                    INTEGER,
+    transfers_out                   INTEGER,
+    total_points                    INTEGER,
+    PRIMARY KEY (season, element, fixture, capture_id)
+);
+
 -- ====================================================================================
 -- mart layer
 -- ====================================================================================
@@ -229,6 +331,65 @@ CREATE TABLE IF NOT EXISTS mart_fact_player_fixture (
     transfers_in                    INTEGER,
     transfers_out                   INTEGER,
     PRIMARY KEY (season, code, fixture)
+);
+
+-- Same component-only contract as the archive mart, with bitemporal capture metadata.
+-- PointInTimeView chooses the newest version whose known_at is no later than `as_of`.
+CREATE TABLE IF NOT EXISTS mart_fact_player_fixture_live (
+    season                          VARCHAR NOT NULL,
+    gw                              INTEGER NOT NULL,
+    fixture                         INTEGER NOT NULL,
+    pulse_id                        INTEGER,
+    kickoff_time                    TIMESTAMPTZ NOT NULL,
+    code                            INTEGER NOT NULL,
+    position                        VARCHAR NOT NULL,
+    team_id                         INTEGER NOT NULL,
+    opponent_team_id                INTEGER NOT NULL,
+    was_home                        BOOLEAN NOT NULL,
+    minutes                         INTEGER,
+    starts                          INTEGER,
+    goals_scored                    INTEGER,
+    assists                         INTEGER,
+    clean_sheets                    INTEGER,
+    goals_conceded                  INTEGER,
+    saves                           INTEGER,
+    penalties_saved                 INTEGER,
+    penalties_missed                INTEGER,
+    own_goals                       INTEGER,
+    yellow_cards                    INTEGER,
+    red_cards                       INTEGER,
+    bonus                           INTEGER,
+    bps                             INTEGER,
+    expected_goals                  DOUBLE,
+    expected_assists                DOUBLE,
+    expected_goals_conceded         DOUBLE,
+    defensive_contribution          INTEGER,
+    tackles                         INTEGER,
+    recoveries                      INTEGER,
+    clearances_blocks_interceptions INTEGER,
+    value                           INTEGER,
+    selected                        INTEGER,
+    transfers_in                    INTEGER,
+    transfers_out                   INTEGER,
+    known_at                        TIMESTAMPTZ NOT NULL,
+    capture_id                      VARCHAR NOT NULL,
+    PRIMARY KEY (season, code, fixture, capture_id)
+);
+
+CREATE TABLE IF NOT EXISTS mart_team_fixture_live (
+    season           VARCHAR NOT NULL,
+    gw               INTEGER,
+    fixture          INTEGER NOT NULL,
+    pulse_id         INTEGER,
+    kickoff_time     TIMESTAMPTZ,
+    team_id          INTEGER NOT NULL,
+    opponent_team_id INTEGER NOT NULL,
+    was_home         BOOLEAN NOT NULL,
+    fdr               INTEGER,
+    rest_days         INTEGER,
+    known_at          TIMESTAMPTZ NOT NULL,
+    capture_id        VARCHAR NOT NULL,
+    PRIMARY KEY (season, team_id, fixture, capture_id)
 );
 
 -- Exactly 3,800 rows after a correct build (760 per season x 5).

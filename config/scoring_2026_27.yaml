@@ -2,14 +2,14 @@
 #
 # R2: scoring rules are configuration, not code.
 #
-# Provenance: hand-transcribed from section 5 of the specification. Verification
-# against the live `game_config.scoring` requires a bootstrap-static payload; run
+# Provenance: initially transcribed from section 5 of the specification, then compared
+# with the official bootstrap-static payload captured at 2026-07-27T01:46:09Z. Run
 #
 #     python -m fpl.jobs.verify_rules --payload <path-to-bootstrap-static.json>
 #
-# which rewrites the `verification` block below with the fields the payload
-# actually confirms. Until that has run against a real payload, every field is
-# unconfirmed and `payload_confirmed` stays empty.
+# which rewrites the verification block with fields the payload actually exposes. The
+# live block confirms 17 configured fields but omits seven thresholds/units, which stay
+# explicitly unverified below.
 #
 # Two separate notions of trust are tracked deliberately, because they differ:
 #   payload_confirmed  -- the value matches the live game_config.scoring
@@ -69,9 +69,26 @@ bonus:
   ranked_points: [3, 2, 1]
 
 verification:
-  payload_captured_at: null
-  payload_sha256: null
-  payload_confirmed: []
+  payload_captured_at: "2026-07-27T01:46:09Z"
+  payload_sha256: "79203f6828a610953c0508acc1687df558347d28c997652c14b8bf072a36ab30"
+  payload_confirmed:
+    - appearance.long_play_points
+    - appearance.short_play_points
+    - assists
+    - clean_sheets.points.DEF
+    - clean_sheets.points.GK
+    - clean_sheets.points.MID
+    - defensive_contribution.points
+    - goals_conceded.points_per_unit
+    - goals_scored.DEF
+    - goals_scored.FWD
+    - goals_scored.MID
+    - own_goals
+    - penalties_missed
+    - penalties_saved
+    - red_cards
+    - saves.points_per_unit
+    - yellow_cards
   # 2026-27 has not been played, so nothing can be replay-exercised yet. The
   # 2025_26 ruleset is byte-identical in every scoring component and IS
   # replay-verified at 29,747/29,747; that is the strongest evidence available
@@ -86,7 +103,24 @@ verification:
     clean_sheets.points.FWD: >
       Zero-valued, so a correct 0 is indistinguishable from an omitted rule. No
       replay can tell the two apart.
-    ALL: >
-      No live payload has been supplied yet, so no field in this file has been
-      confirmed against game_config.scoring. Remove this key once
-      `verify_rules` has run.
+    appearance.long_play_minutes: >
+      The captured game_config.scoring block publishes appearance points but no
+      minute threshold.
+    clean_sheets.minimum_minutes: >
+      The captured game_config.scoring block publishes clean-sheet points but no
+      minute threshold.
+    goals_conceded.unit: >
+      The captured game_config.scoring block publishes the per-position penalty
+      but not the two-goal unit.
+    saves.unit: >
+      The captured game_config.scoring block publishes the save point but not the
+      three-save unit.
+    defensive_contribution.thresholds.DEF: >
+      The captured game_config.scoring block publishes the points but not the
+      position threshold.
+    defensive_contribution.thresholds.MID: >
+      The captured game_config.scoring block publishes the points but not the
+      position threshold.
+    defensive_contribution.thresholds.FWD: >
+      The captured game_config.scoring block publishes the points but not the
+      position threshold.

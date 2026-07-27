@@ -40,7 +40,8 @@ jobs:
 
           DATE="$(date -u +%Y-%m-%d)"
           STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          DIR="snapshots/${DATE}"
+          STAMP_DIR="$(date -u +%Y-%m-%dT%H%M%SZ)"
+          DIR="snapshots/daily/${DATE}/${STAMP_DIR}"
           mkdir -p "${DIR}"
           echo "date=${DATE}"   >> "$GITHUB_OUTPUT"
           echo "dir=${DIR}"     >> "$GITHUB_OUTPUT"
@@ -50,7 +51,7 @@ jobs:
           # on 4xx/5xx, and `set -e` turns that into a failed run rather than a commit of
           # whatever the error body happened to be.
           fetch() {
-            local name="$1" url="$2" out="$3" code
+            local name="$1" url="$2" out="$3" min_bytes="${4:-1024}" code
             echo "::group::GET ${url}"
             code="$(curl -sS --fail --show-error \
                          --retry 3 --retry-delay 5 --retry-connrefused \
@@ -78,7 +79,7 @@ jobs:
             fi
             local bytes
             bytes="$(wc -c < "${out}")"
-            if [ "${bytes}" -lt 1024 ]; then
+            if [ "${bytes}" -lt "${min_bytes}" ]; then
               echo "::error::${name}: body is only ${bytes} bytes, implausibly small -- refusing to commit"
               return 1
             fi
@@ -86,19 +87,46 @@ jobs:
           }
 
           fetch bootstrap-static "${API}/bootstrap-static/" bootstrap.json
+          sleep 1
           fetch fixtures         "${API}/fixtures/"         fixtures.json
+          sleep 1
+
+          # event-live is the cheap daily outcome safety net. It may legitimately contain
+          # zero elements before GW1, so its minimum size is lower than the large endpoints.
+          LIVE_GW="$(jq -r '
+            ([.events[] | select(.is_current) | .id][0] //
+             [.events[] | select(.is_next) | .id][0] //
+             ([.events[] | select(.finished) | .id] | max) // empty)
+          ' bootstrap.json)"
+          case "${LIVE_GW}" in
+            ''|*[!0-9]*)
+              if [ -n "${LIVE_GW}" ]; then
+                echo "::error::invalid gameweek from bootstrap: ${LIVE_GW}"
+                exit 1
+              fi
+              ;;
+          esac
+          if [ -n "${LIVE_GW}" ]; then
+            fetch event-live "${API}/event/${LIVE_GW}/live/" event-live.json 10
+          else
+            echo "::notice::no current, next, or finished gameweek; event-live omitted"
+            printf '{"elements":[]}' > event-live.json
+          fi
 
           # Sanity-check the shapes before they are archived.
           ELEMENTS="$(jq '.elements | length' bootstrap.json)"
           TEAMS="$(jq '.teams | length' bootstrap.json)"
           EVENTS="$(jq '.events | length' bootstrap.json)"
           FIXTURES="$(jq 'length' fixtures.json)"
+          LIVE_ELEMENTS="$(jq '.elements | length' event-live.json)"
+          jq -e '.elements | type == "array"' event-live.json > /dev/null
           if [ "${ELEMENTS}" -lt 100 ] || [ "${TEAMS}" -lt 20 ] || [ "${FIXTURES}" -lt 1 ]; then
             echo "::error::implausible payload: elements=${ELEMENTS} teams=${TEAMS} fixtures=${FIXTURES}"
             exit 1
           fi
           echo "bootstrap-static: ${ELEMENTS} elements, ${TEAMS} teams, ${EVENTS} events"
           echo "fixtures: ${FIXTURES} fixtures"
+          echo "event-live GW${LIVE_GW:-none}: ${LIVE_ELEMENTS} elements"
 
           # --- Season rollover signal -------------------------------------------------
           # As of 2026-07-26 /api/fixtures/ still returned the completed 2025-26 fixtures
@@ -109,6 +137,13 @@ jobs:
           FIRST_KICKOFF="$(jq -r '[.[] | .kickoff_time | select(. != null)] | sort | .[0] // "null"' fixtures.json)"
           LAST_KICKOFF="$(jq -r '[.[] | .kickoff_time | select(. != null)] | sort | .[-1] // "null"' fixtures.json)"
           FIRST_DEADLINE="$(jq -r '[.events[] | .deadline_time | select(. != null)] | sort | .[0] // "null"' bootstrap.json)"
+          if ! [[ "${FIRST_DEADLINE}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
+            echo "::error::invalid first deadline: ${FIRST_DEADLINE}"
+            exit 1
+          fi
+          START_YEAR="${FIRST_DEADLINE:0:4}"
+          END_YEAR="$((10#${START_YEAR} + 1))"
+          SEASON="${START_YEAR}-${END_YEAR:2:2}"
           ALL_FINISHED="$(jq -r 'if length > 0 and all(.[]; .finished) then "true" else "false" end' fixtures.json)"
 
           echo "first fixtures kickoff_time : ${FIRST_KICKOFF}"
@@ -153,6 +188,7 @@ jobs:
           # --- Archive ----------------------------------------------------------------
           gzip -9 -c bootstrap.json > "${DIR}/bootstrap-static.json.gz"
           gzip -9 -c fixtures.json  > "${DIR}/fixtures.json.gz"
+          gzip -9 -c event-live.json > "${DIR}/event-live-${LIVE_GW:-none}.json.gz"
           sha256sum "${DIR}"/*.json.gz > "${DIR}/SHA256SUMS"
 
           # A machine-readable index entry per capture, so the rollover date is queryable
@@ -163,18 +199,23 @@ jobs:
             --arg last_kickoff   "${LAST_KICKOFF}" \
             --arg first_deadline "${FIRST_DEADLINE}" \
             --arg rollover       "${ROLLOVER}" \
+            --arg live_gw        "${LIVE_GW}" \
+            --arg season         "${SEASON}" \
             --argjson all_finished "${ALL_FINISHED}" \
             --argjson elements   "${ELEMENTS}" \
             --argjson teams      "${TEAMS}" \
             --argjson events     "${EVENTS}" \
             --argjson fixtures   "${FIXTURES}" \
-            '{captured_at:$captured_at, elements:$elements, teams:$teams, events:$events,
+            --argjson live_elements "${LIVE_ELEMENTS}" \
+            '{schema_version:"1", captured_at:$captured_at, season:$season,
+              elements:$elements, teams:$teams, events:$events,
               fixtures:$fixtures, fixtures_first_kickoff:$first_kickoff,
               fixtures_last_kickoff:$last_kickoff, bootstrap_first_deadline:$first_deadline,
-              fixtures_all_finished:$all_finished, fixtures_endpoint:$rollover}' \
+              fixtures_all_finished:$all_finished, fixtures_endpoint:$rollover,
+              event_live:{gw:$live_gw, elements:$live_elements}}' \
             > "${DIR}/manifest.json"
 
-          rm -f bootstrap.json fixtures.json
+          rm -f bootstrap.json fixtures.json event-live.json
           ls -l "${DIR}"
 
       - name: Commit snapshot
@@ -195,13 +236,15 @@ jobs:
           # The directory is ours to construct, but assert it anyway: it is the one output
           # that decides where files are written.
           case "${DIR}" in
-            snapshots/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+            snapshots/daily/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z) ;;
             *) echo "::error::refusing to commit unexpected path: ${DIR}"; exit 1 ;;
           esac
 
           # Guard against committing an empty directory even if an earlier step somehow
           # succeeded without writing.
-          if [ ! -s "${DIR}/bootstrap-static.json.gz" ] || [ ! -s "${DIR}/fixtures.json.gz" ]; then
+          if [ ! -s "${DIR}/bootstrap-static.json.gz" ] || \
+             [ ! -s "${DIR}/fixtures.json.gz" ] || \
+             ! compgen -G "${DIR}/event-live-*.json.gz" > /dev/null; then
             echo "::error::snapshot files missing or empty -- refusing to commit"
             exit 1
           fi

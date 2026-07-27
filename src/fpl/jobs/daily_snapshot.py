@@ -12,22 +12,17 @@ permanently, so **missing a week is unrecoverable**. That asymmetry drives two d
     endpoint must succeed or the whole capture is abandoned and the process exits
     non-zero with a diagnostic naming the cause.
 
-This sandbox has no egress to fantasy.premierleague.com, which is exactly why
-`--dry-run` and `.github/workflows/snapshot.yml` exist: the former proves the code path,
-the latter is the durable execution path.
+`--dry-run` proves the local code path without depending on egress. The GitHub workflows
+remain the durable execution path because an irreplaceable capture must not depend on a
+developer machine being online.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
 import logging
 import sys
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import duckdb
 
@@ -38,6 +33,11 @@ from fpl.ingest.fpl_api import (
     EgressBlockedError,
     FplApiClient,
     detect_season_skew,
+)
+from fpl.ingest.live_snapshot import (
+    CapturedPayload,
+    capture_payload,
+    write_capture,
 )
 from fpl.ingest.stub_server import StubFplApi
 from fpl.storage.db import initialise
@@ -53,25 +53,16 @@ EXIT_API_ERROR = 3
 _FIXTURE_DIR = repo_root() / "tests" / "fixtures"
 
 
-@dataclass(frozen=True, slots=True)
-class CapturedEndpoint:
-    endpoint: str
-    payload: Any
-    sha256: str
-
-    @property
-    def payload_json(self) -> str:
-        return json.dumps(self.payload, separators=(",", ":"), sort_keys=True)
+CapturedEndpoint = CapturedPayload
 
 
-def _capture(endpoint: str, payload: Any) -> CapturedEndpoint:
-    body = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-    return CapturedEndpoint(
-        endpoint=endpoint, payload=payload, sha256=hashlib.sha256(body.encode()).hexdigest()
-    )
+def _capture(endpoint: str, payload: object, *, parameter: str = "") -> CapturedEndpoint:
+    return capture_payload(endpoint, payload, parameter=parameter)
 
 
-def fetch_all(client: FplApiClient) -> list[CapturedEndpoint]:
+def fetch_all(
+    client: FplApiClient, *, include_player_history: bool = False
+) -> list[CapturedEndpoint]:
     """Fetch every endpoint the snapshot covers.
 
     Ordered so bootstrap-static -- the payload that carries the rules and the gameweek
@@ -79,7 +70,28 @@ def fetch_all(client: FplApiClient) -> list[CapturedEndpoint]:
     """
     bootstrap = client.raw_bootstrap_static()
     fixtures = client.raw_fixtures()
-    return [_capture("bootstrap-static", bootstrap), _capture("fixtures", fixtures)]
+    captured = [_capture("bootstrap-static", bootstrap), _capture("fixtures", fixtures)]
+    parsed = BootstrapStatic.model_validate(bootstrap)
+    event = parsed.current_event() or parsed.next_event()
+    if event is None:
+        finished = [item for item in parsed.events if item.finished]
+        event = max(finished, key=lambda item: item.id, default=None)
+    if event is not None:
+        captured.append(
+            _capture("event-live", client.raw_event_live(event.id), parameter=str(event.id))
+        )
+    if include_player_history:
+        for player in parsed.elements:
+            if player.element_type not in {1, 2, 3, 4}:
+                continue
+            captured.append(
+                _capture(
+                    "element-summary",
+                    client.raw_element_summary(player.id),
+                    parameter=str(player.id),
+                )
+            )
+    return captured
 
 
 def log_rollover_signal(captured: list[CapturedEndpoint]) -> str:
@@ -128,16 +140,17 @@ def write_snapshot(
     con: duckdb.DuckDBPyConnection, captured: list[CapturedEndpoint], *, gw: int | None
 ) -> int:
     """Append every captured endpoint under a single `captured_at`. All or nothing."""
-    captured_at = datetime.now(UTC)
-    for capture in captured:
-        con.execute(
-            """
-            INSERT INTO snapshot_bootstrap (captured_at, gw, endpoint, payload, sha256)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            [captured_at, gw, capture.endpoint, capture.payload_json, capture.sha256],
-        )
-    return len(captured)
+    sources = load_sources()
+    result = write_capture(
+        con,
+        captured,
+        season=sources.current_season.season,
+        gw=gw,
+        mode=(
+            "player-history" if any(c.endpoint == "element-summary" for c in captured) else "daily"
+        ),
+    )
+    return result.payload_count
 
 
 def _next_gw(captured: list[CapturedEndpoint]) -> int | None:
@@ -158,6 +171,7 @@ def run(
     db_path: Path | None = None,
     dry_run: bool = False,
     base_url: str | None = None,
+    include_player_history: bool = False,
 ) -> int:
     """Capture a snapshot. Returns a process exit code."""
     sources = load_sources()
@@ -175,18 +189,36 @@ def run(
             fixtures_path=fixtures_fixture,
             bootstrap_route="/" + sources.live_api.endpoints["bootstrap_static"].rstrip("/"),
             fixtures_route="/" + sources.live_api.endpoints["fixtures"].rstrip("/"),
+            event_live_route="/"
+            + sources.live_api.endpoints["event_live"].format(gw=1).rstrip("/"),
         ) as stub:
             # A dry run must not touch the real database: it writes to an in-memory one so
             # the full write path is still exercised.
-            return _capture_and_write(base_url=stub.base_url, db_path=":memory:", label="dry-run")
+            return _capture_and_write(
+                base_url=stub.base_url,
+                db_path=":memory:",
+                label="dry-run",
+                include_player_history=False,
+            )
 
-    return _capture_and_write(base_url=base_url, db_path=db_path, label="snapshot")
+    return _capture_and_write(
+        base_url=base_url,
+        db_path=db_path,
+        label="snapshot",
+        include_player_history=include_player_history,
+    )
 
 
-def _capture_and_write(*, base_url: str | None, db_path: Path | str | None, label: str) -> int:
+def _capture_and_write(
+    *,
+    base_url: str | None,
+    db_path: Path | str | None,
+    label: str,
+    include_player_history: bool,
+) -> int:
     try:
         with FplApiClient(base_url=base_url) as client:
-            captured = fetch_all(client)
+            captured = fetch_all(client, include_player_history=include_player_history)
     except EgressBlockedError as error:
         # Deliberately loud and specific. A silent empty snapshot would be indistinguishable
         # from a day on which nothing happened, and R5 data cannot be recovered later.
@@ -236,10 +268,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--base-url", default=None, help="override the API base URL (for a local mirror)"
     )
+    parser.add_argument(
+        "--player-history",
+        action="store_true",
+        help="also capture every element-summary payload; run after a gameweek finalises",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    return run(db_path=args.db, dry_run=args.dry_run, base_url=args.base_url)
+    return run(
+        db_path=args.db,
+        dry_run=args.dry_run,
+        base_url=args.base_url,
+        include_player_history=args.player_history,
+    )
 
 
 if __name__ == "__main__":

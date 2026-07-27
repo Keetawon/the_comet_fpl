@@ -98,6 +98,37 @@ def _positional(
     return None, None
 
 
+def _unit_points(
+    scoring: dict[str, Any], bases: Sequence[str], positions: frozenset[Position]
+) -> tuple[str | None, object | None]:
+    """Normalise a scalar unit score or a position map to the configured unit score.
+
+    The 2026/27 payload changed `goals_conceded` and `defensive_contribution` from
+    scalars to maps. A map confirms the scalar config only when every enabled position
+    has the same value and every explicitly listed disabled position has zero.
+    """
+    for base in bases:
+        matched, node = _lookup(scoring, [base])
+        if node is None:
+            continue
+        if not isinstance(node, dict):
+            return matched, node
+        enabled: list[object] = []
+        for position in positions:
+            _, value = _positional(scoring, [base], position)
+            if value is None:
+                return base, node
+            enabled.append(value)
+        for position in set(Position) - set(positions):
+            _, value = _positional(scoring, [base], position)
+            if value not in {None, 0}:
+                return base, node
+        if enabled and all(value == enabled[0] for value in enabled):
+            return base, enabled[0]
+        return base, node
+    return None, None
+
+
 def check_ruleset(rules: ScoringRules, scoring: dict[str, Any]) -> list[FieldCheck]:
     """Compare every scoring field in `rules` against the payload."""
     checks: list[FieldCheck] = []
@@ -135,11 +166,20 @@ def check_ruleset(rules: ScoringRules, scoring: dict[str, Any]) -> list[FieldChe
             value,
             _positional(scoring, ["clean_sheets", "scoring_clean_sheets"], position),
         )
+    add(
+        "clean_sheets.minimum_minutes",
+        rules.clean_sheets.minimum_minutes,
+        _lookup(scoring, ["clean_sheets_limit", "scoring_clean_sheets_limit"]),
+    )
 
     add(
         "goals_conceded.points_per_unit",
         rules.goals_conceded.points_per_unit,
-        _lookup(scoring, ["goals_conceded", "scoring_goals_conceded"]),
+        _unit_points(
+            scoring,
+            ["goals_conceded", "scoring_goals_conceded"],
+            rules.goals_conceded.positions,
+        ),
     )
     add(
         "goals_conceded.unit",
@@ -172,7 +212,11 @@ def check_ruleset(rules: ScoringRules, scoring: dict[str, Any]) -> list[FieldChe
     add(
         "defensive_contribution.points",
         rules.defensive_contribution.points,
-        _lookup(scoring, ["defensive_contribution", "scoring_defensive_contribution"]),
+        _unit_points(
+            scoring,
+            ["defensive_contribution", "scoring_defensive_contribution"],
+            frozenset(rules.defensive_contribution.thresholds),
+        ),
     )
     for position, threshold in sorted(rules.defensive_contribution.thresholds.items()):
         add(
@@ -272,7 +316,12 @@ def _rewrite_verification(
     path = config_dir() / f"scoring_{ruleset_id}.yaml"
     document = yaml.safe_load(path.read_text("utf-8"))
     verification = document.setdefault("verification", {})
-    verification["payload_captured_at"] = datetime.now(UTC).isoformat()
+    payload = json.loads(payload_path.read_text("utf-8"))
+    capture = payload.get("_CAPTURE", {}) if isinstance(payload, dict) else {}
+    captured_at = capture.get("captured_at") if isinstance(capture, dict) else None
+    if captured_at is None:
+        captured_at = datetime.now(UTC).isoformat()
+    verification["payload_captured_at"] = captured_at
     verification["payload_sha256"] = hashlib.sha256(payload_path.read_bytes()).hexdigest()
     verification["payload_confirmed"] = sorted(check.path for check in confirmed)
 

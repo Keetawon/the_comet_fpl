@@ -149,6 +149,53 @@ class ApiFixture(_Payload):
     pulse_id: int | None = None
 
 
+class ElementHistory(_Payload):
+    """One authoritative player-fixture row from element-summary.
+
+    The live endpoint is gameweek-aggregated, so it cannot distinguish two fixtures in a
+    double gameweek. Element history is the source of truth for this grain.
+    """
+
+    element: int
+    fixture: int
+    opponent_team: int
+    total_points: int | None = None
+    was_home: bool
+    kickoff_time: datetime
+    round: int
+    minutes: int | None = None
+    starts: int | None = None
+    goals_scored: int | None = None
+    assists: int | None = None
+    clean_sheets: int | None = None
+    goals_conceded: int | None = None
+    saves: int | None = None
+    penalties_saved: int | None = None
+    penalties_missed: int | None = None
+    own_goals: int | None = None
+    yellow_cards: int | None = None
+    red_cards: int | None = None
+    bonus: int | None = None
+    bps: int | None = None
+    expected_goals: float | None = None
+    expected_assists: float | None = None
+    expected_goals_conceded: float | None = None
+    defensive_contribution: int | None = None
+    tackles: int | None = None
+    recoveries: int | None = None
+    clearances_blocks_interceptions: int | None = None
+    value: int | None = None
+    selected: int | None = None
+    transfers_in: int | None = None
+    transfers_out: int | None = None
+
+
+class ElementSummary(_Payload):
+    fixtures: list[ApiFixture] = Field(default_factory=list)
+    history: list[ElementHistory] = Field(default_factory=list)
+    history_past: list[dict[str, Any]] = Field(default_factory=list)
+
+
 @dataclass(frozen=True, slots=True)
 class SeasonSkew:
     """Whether the fixtures payload belongs to the same season as bootstrap-static.
@@ -294,3 +341,14 @@ class FplApiClient:
 
     def raw_fixtures(self) -> Any:
         return self.get_json(self._config.endpoints["fixtures"])
+
+    def raw_event_live(self, gw: int) -> Any:
+        path = self._config.endpoints["event_live"].format(gw=gw)
+        return self.get_json(path)
+
+    def raw_element_summary(self, element_id: int) -> Any:
+        path = self._config.endpoints["element_summary"].format(element_id=element_id)
+        return self.get_json(path)
+
+    def element_summary(self, element_id: int) -> ElementSummary:
+        return ElementSummary.model_validate(self.raw_element_summary(element_id))
