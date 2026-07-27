@@ -670,15 +670,13 @@ want a specific definition pinned now, say which.
   card, 128 a hat-trick plus assists. The range check surfaced them for review, which is what
   it is for; the bounds now sit just outside the observed extremes.
 
-## 9.7 Still outstanding
+## 9.7 2026/27 scoring verification resolution
 
-`config/scoring_2026_27.yaml` remains **unverified**. `tests/fixtures/bootstrap_static_sample.json`
-is a synthetic placeholder carrying a `_PLACEHOLDER` key, and `verify_rules` refuses to mark
-any field confirmed while that key is present. Replace it with a real capture and run:
+Resolved on 2026-07-27. A real official bootstrap scoring extract confirms 17 fields. The seven
+thresholds and units omitted by that payload are confirmed separately by captured official
+published scoring sources, with source URLs, capture times, and SHA-256 values recorded in
+`config/scoring_2026_27.yaml`. Payload, documentation, and replay evidence remain separate.
 
-```bash
-python -m fpl.jobs.verify_rules --ruleset 2026_27 \
-  --payload tests/fixtures/bootstrap_static_sample.json --write
-```
-
-`goals_scored.GK` stays unverified regardless of what the payload says.
+Two branches stay under `verification.unverified`: `goals_scored.GK`, because no goalkeeper goal
+exists in the replay data, and `clean_sheets.points.FWD`, because a zero-valued branch cannot be
+distinguished from omission by replay. The ruleset is therefore not described as fully validated.

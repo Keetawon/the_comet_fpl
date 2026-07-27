@@ -13,9 +13,10 @@ different answers:
 A single `xP` answers only the first.
 
 **Current status: Phase 0b (historical and live data foundation) complete.** No models yet.
-The official 2026/27 payload confirms 17 configured scoring fields; seven thresholds/units
-that it does not publish remain explicitly unverified before Phase 1 — see
-[Phasing](#phasing).
+The official 2026/27 payload confirms 17 configured scoring fields, and official published
+rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
+explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
+evaluation contract is defined before model fitting — see [Phasing](#phasing).
 
 ---
 
@@ -64,7 +65,7 @@ against vendored fixtures. See [Snapshots (R5)](#snapshots-r5).
 ## Layout
 
 ```
-config/       sources.yaml, scoring_<ruleset>.yaml, data_quality.yaml
+config/       sources, scoring, data quality, and Phase 1 evaluation contracts
 src/fpl/
   ingest/     archive.py, fpl_api.py, live_snapshot.py, snapshot_files.py
   storage/    db.py, schema.sql
@@ -213,6 +214,12 @@ it has a named regression test.
 `goals_scored.GK` (10 points) is **untested either way**: no goalkeeper scored in 2025-26,
 measured across all 29,747 rows, so no replay can exercise it.
 
+For 2026/27, provenance keeps three evidence classes separate: values present in the live
+payload, values stated by captured official rule sources, and branches exercised by real-data
+replay. The seven payload omissions are now covered by official rules; `goals_scored.GK` and the
+zero-valued forward clean-sheet branch remain explicitly unexercised rather than being promoted
+by documentation alone.
+
 ## Data notes worth knowing
 
 Every one of these is a test.
@@ -257,7 +264,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | Phase | Deliverable | Status |
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
-| 1 | Stage A team model + validation harness | not started |
+| 1 | Stage A team model + validation harness | evaluation contract defined; model not started |
 | 2 | Stage B minutes model | not started |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
@@ -276,3 +283,7 @@ DuckDB.
 
 `docs/phase0-design.md` records the audit behind the schema decisions, including where
 measured values diverged from the original specification and why.
+
+`docs/phase1-evaluation-contract.md` fixes the Stage A entity/grain, point-in-time cutoff,
+observed-gameweek walk-forward, required baselines, proper distribution metrics, calibration
+outputs, reporting slices, and promotion gates before the first candidate is fitted.

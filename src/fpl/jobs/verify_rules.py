@@ -23,6 +23,7 @@ unconfirmed, never guessed.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import sys
@@ -311,8 +312,6 @@ def _rewrite_verification(
     confirmed: list[FieldCheck],
     unconfirmed: list[FieldCheck],
 ) -> None:
-    import hashlib
-
     path = config_dir() / f"scoring_{ruleset_id}.yaml"
     document = yaml.safe_load(path.read_text("utf-8"))
     verification = document.setdefault("verification", {})
@@ -322,11 +321,20 @@ def _rewrite_verification(
     if captured_at is None:
         captured_at = datetime.now(UTC).isoformat()
     verification["payload_captured_at"] = captured_at
-    verification["payload_sha256"] = hashlib.sha256(payload_path.read_bytes()).hexdigest()
+    verification["payload_sha256"] = _canonical_text_sha256(payload_path)
     verification["payload_confirmed"] = sorted(check.path for check in confirmed)
 
+    authoritative = {
+        path
+        for source in verification.get("authoritative_sources", [])
+        if isinstance(source, dict)
+        for path in source.get("confirmed", [])
+        if isinstance(path, str)
+    }
     notes = dict(_NEVER_CONFIRMED)
     for check in unconfirmed:
+        if check.path in authoritative:
+            continue
         notes.setdefault(
             check.path,
             "No key in the captured payload matched this field under any known layout, so "
@@ -334,6 +342,12 @@ def _rewrite_verification(
         )
     verification["unverified"] = notes
     path.write_text(yaml.safe_dump(document, sort_keys=False, width=88), "utf-8")
+
+
+def _canonical_text_sha256(path: Path) -> str:
+    """Hash textual evidence independently of Git's platform line-ending checkout."""
+    canonical = path.read_text("utf-8").replace("\r\n", "\n").encode()
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def main(argv: list[str] | None = None) -> int:
