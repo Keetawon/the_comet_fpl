@@ -72,6 +72,7 @@ src/fpl/
   transform/  crosswalk.py, facts.py, quality.py
   features/   pit.py   -- point-in-time access layer (R4)
   models/     scoring.py
+  validate/   metrics.py, folds.py, baselines.py, harness.py -- Stage A evaluation
   jobs/       build_db.py, daily_snapshot.py, load_snapshots.py, verify_rules.py
 tests/
 .github/workflows/               -- CI plus daily and finalized-history R5 capture
@@ -264,7 +265,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | Phase | Deliverable | Status |
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
-| 1 | Stage A team model + validation harness | evaluation contract defined; model not started |
+| 1 | Stage A team model + validation harness | **harness implemented and run**; model not started |
 | 2 | Stage B minutes model | not started |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
@@ -287,3 +288,41 @@ measured values diverged from the original specification and why.
 `docs/phase1-evaluation-contract.md` fixes the Stage A entity/grain, point-in-time cutoff,
 observed-gameweek walk-forward, required baselines, proper distribution metrics, calibration
 outputs, reporting slices, and promotion gates before the first candidate is fitted.
+
+---
+
+## The Stage A bar
+
+```bash
+python -m fpl.validate.harness            # every baseline, every fold
+python -m fpl.validate.harness --season 2025-26
+```
+
+181 walk-forward folds, 3,640 team-fixture predictions, one fold per *observed* gameweek.
+Nothing is fitted yet; these are the honest comparators a model has to beat.
+
+| baseline | mean log score | mean CRPS | PIT 80% | raw 80% | MAE |
+|---|---|---|---|---|---|
+| `trailing_xg_attack_defence` | **1.5227** | 0.6555 | 0.804 | 0.942 | 0.982 |
+| `naive_fdr` | 1.5262 | 0.6580 | 0.799 | 0.929 | 0.976 |
+| `trailing_goals_attack_defence` | 1.5325 | 0.6619 | 0.787 | 0.927 | 0.976 |
+| `promoted_team_pooled_prior` | 1.5481 | 0.6739 | 0.794 | 0.929 | 1.012 |
+| `league_home_away_goals` | 1.5522 | 0.6764 | 0.794 | 0.929 | 1.016 |
+
+A candidate must reach **1.5075** to clear the contract's 1% relative-lift gate, without
+regressing CRPS, in every reported season.
+
+**xG or recorded goals as the training signal?** xG, by +0.64% relative lift, winning in
+2022-23, 2023-24, 2024-25 and 2025-26. It loses only 2021-22, which carries no xG at all --
+there the xG baseline degenerates exactly to the league intercept (1.5736 = 1.5736) rather
+than competing. The original specification found the opposite, on data that has since been
+repaired: 2022-23's `expected_*` zeros held its mean team xG at 0.963 against a true 1.499,
+and that season flips from 1.5917 to 1.5344 once repaired.
+
+**Known contract defect.** `interval_80_maximum_absolute_error: 0.05` is written against a
+quantity no count model can attain. A perfectly specified Poisson's narrowest central 80%
+interval actually holds 0.92-0.97 at team-goal rates, because a distribution over whole goals
+cannot be trimmed to an exact quantile. The randomised-PIT coverage measures the same
+property and lands on 0.80; every baseline above passes on it and fails on the raw one.
+Amending a pre-registered gate is an owner decision and is listed under
+[Priorities](AGENTS.md#priorities-for-upcoming-work).

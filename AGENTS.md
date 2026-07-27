@@ -77,6 +77,8 @@ Also preserve these data contracts:
 - `src/fpl/storage/`: DuckDB connection policy and schema.
 - `src/fpl/transform/`: raw-to-staging crosswalks, validation, facts, and targets.
 - `src/fpl/features/`: point-in-time-safe read API and, later, feature construction.
+- `src/fpl/validate/`: walk-forward folds, proper scoring rules, Stage A baselines, harness.
+  It reads outcomes, which the feature layer may not -- scoring a prediction needs the label.
 - `src/fpl/models/`: scoring now; statistical models belong here as phases advance.
 - `src/fpl/jobs/`: thin orchestration/CLI entry points.
 - `tests/`: executable data contracts; vendored API fixtures keep tests offline.
@@ -144,6 +146,20 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   1.935 goals against 1.040 for the strongest -- a 1.86x range.
 - Any persistence figure must be measured **within position**. Pooled across positions
   xG/90 reads 0.871, which measures the position rather than the player.
+- **xG beats recorded goals as the Stage A training signal**, by +0.64% relative lift on mean
+  log score, and wins in every season that has xG. The original specification's opposite
+  finding predates the 2022-23 `expected_*` repair. 2021-22 has no xG at all, so the xG
+  baseline degenerates to the league intercept there rather than competing.
+- **80% interval coverage cannot be measured with a raw central interval on a count
+  distribution.** Swept over rates 0.1-4.0, a perfectly specified Poisson covers 0.813 to
+  0.983 and never lands on 0.80; across the 1.0-1.8 band where team goals sit it covers 0.92
+  to 0.97. Use the randomised-PIT coverage, which lands on 0.798-0.803 for the same models.
+  `ScoreReport.interval_80_absolute_error` already does; `config/phase1_evaluation.yaml`
+  still gates on the raw figure and needs an owner decision before any candidate is judged.
+- Polars `group_by` without `maintain_order=True` partitions across threads, so a float sum
+  is not bit-reproducible: 16 of 20 repeat aggregations on this archive disagreed, and the
+  difference reached the reported log score. Every aggregation feeding a pre-registered
+  evaluation must pin the order.
 
 ## Priorities for upcoming work
 
@@ -151,9 +167,14 @@ Unless the user sets another priority, address prerequisites before model sophis
 
 1. Make full archive database rebuilds failure-atomic; live capture is already transactional.
 2. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
-3. Implement the Stage A validation harness exactly against `config/phase1_evaluation.yaml`.
+3. Resolve the `interval_80_maximum_absolute_error` gate. It is written against a quantity no
+   count model can attain; the harness reports both coverages so the decision is informed.
+   Amending a pre-registered gate is the user's call and must happen before a candidate is
+   judged, not after.
 4. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
-   observing candidate results.
+   observing candidate results. The bar is `trailing_xg_attack_defence` at mean log score
+   1.5227 over 181 folds and 3,640 predictions; a candidate needs 1.5075 or better to clear
+   the 1% lift gate.
 
 ## Sub-agent coordination and handoff
 
