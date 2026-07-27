@@ -7,7 +7,6 @@ code, and R5 is the one job that must be provably correct before it ever runs fo
 
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +14,7 @@ from pathlib import Path
 import duckdb
 import httpx
 import pytest
+import yaml
 
 from fpl.config import LiveApiSource, config_dir, load_sources
 from fpl.ingest.fpl_api import (
@@ -452,7 +452,39 @@ def test_real_2026_27_scoring_extract_has_no_false_map_mismatches() -> None:
         and check.path not in {"goals_scored.GK", "clean_sheets.points.FWD"}
     }
     assert set(verification.payload_confirmed) == expected_confirmed
-    assert verification.payload_sha256 == hashlib.sha256(payload.read_bytes()).hexdigest()
+    assert verification.payload_sha256 == verify_rules._canonical_text_sha256(payload)
+
+
+def test_payload_rewrite_preserves_authoritatively_resolved_omissions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refreshing bootstrap evidence must not reopen fields resolved from official rules."""
+    config_path = config_dir() / "scoring_2026_27.yaml"
+    temporary_config = tmp_path / config_path.name
+    temporary_config.write_bytes(config_path.read_bytes())
+    payload = Path(__file__).parent / "fixtures" / "bootstrap_scoring_2026_27_real.json"
+    omitted = [
+        "appearance.long_play_minutes",
+        "clean_sheets.minimum_minutes",
+        "goals_conceded.unit",
+        "saves.unit",
+        "defensive_contribution.thresholds.DEF",
+        "defensive_contribution.thresholds.MID",
+        "defensive_contribution.thresholds.FWD",
+    ]
+    unconfirmed = [
+        verify_rules.FieldCheck(path=path, expected=None, observed=None, matched_key=None)
+        for path in omitted
+    ]
+
+    monkeypatch.setattr(verify_rules, "config_dir", lambda: tmp_path)
+    verify_rules._rewrite_verification("2026_27", payload, [], unconfirmed)
+
+    rewritten = yaml.safe_load(temporary_config.read_text("utf-8"))
+    assert set(rewritten["verification"]["unverified"]) == {
+        "goals_scored.GK",
+        "clean_sheets.points.FWD",
+    }
 
 
 def test_verify_rules_reports_a_mismatch_and_does_not_write(tmp_path: Path) -> None:

@@ -1,0 +1,91 @@
+# Phase 1 Stage A evaluation and promotion contract.
+#
+# This file is intentionally defined before model code. A candidate cannot choose easier
+# folds, baselines, metrics, or lift gates after seeing its results. The typed loader rejects
+# missing required comparisons and any contiguous gameweek policy.
+
+contract_version: "1.0"
+phase: 1
+
+target:
+  entity: team
+  # Team IDs are season-scoped; a bare team_id is never a cross-season entity.
+  grain: season_team_fixture
+  outcome: goals_distribution
+  # Stage A predicts goals, not FPL points. This pins the downstream scoring target so later
+  # player-point comparisons cannot silently switch to recorded historical rules.
+  downstream_points_ruleset: "2026_27"
+  completeness_table: mart_target_completeness
+  incomplete_target_policy: exclude_and_report
+
+cutoff:
+  # Iterate values actually present in the facts. 2022-23 has no GW7.
+  split_unit: observed_gameweek
+  prediction_time: gameweek_deadline_as_of
+  observed_results: "kickoff_time < as_of"
+  snapshot_versions: "known_at <= as_of"
+
+training:
+  window: expanding
+  minimum_observed_gameweeks: 8
+  minimum_team_matches: 6
+  fit_transforms_within_fold: true
+  preserve_nulls: true
+  seed: 202627
+
+baselines:
+  stage_a:
+    - league_home_away_goals
+    - trailing_goals_attack_defence
+    - trailing_xg_attack_defence
+    - naive_fdr
+    - promoted_team_pooled_prior
+  # These are not Stage A team-goal comparators. They are pinned now so the downstream
+  # player-points harness cannot omit the minimum honest comparisons later.
+  downstream_player_points:
+    - fpl_ep_next_recorded_rules
+    - trailing_5_recorded_points
+    - naive_fdr
+
+metrics:
+  primary: mean_log_score
+  primary_direction: lower_is_better
+  proper_distribution:
+    - mean_log_score
+    - mean_crps
+  diagnostics:
+    - poisson_deviance
+    - mae_goals
+  calibration:
+    - randomized_pit
+    - interval_80_coverage
+  ranking:
+    - spearman_within_gameweek
+  downstream_player_points:
+    - mae_points
+    - spearman_within_position_gameweek
+    - log_loss_p_return
+
+promotion:
+  compare_against: best_eligible_required_stage_a_baseline
+  comparison_population: same_eligible_predictions
+  relative_lift_formula: "(baseline - candidate) / abs(baseline)"
+  minimum_primary_relative_lift: 0.01
+  maximum_crps_relative_regression: 0.0
+  interval_80_maximum_absolute_error: 0.05
+  minimum_fixture_coverage: 0.98
+  minimum_fold_count: 20
+  require_each_reported_season_to_pass: true
+  require_zero_leakage_failures: true
+
+reporting:
+  dimensions:
+    - fold
+    - season
+    - promoted_status
+    - home_away
+  counts:
+    - predictions
+    - exclusions
+    - cold_starts
+    - uncertainty

@@ -119,16 +119,37 @@ def test_unexercised_rules_are_declared_unverified_in_config() -> None:
             )
 
 
-def test_2026_27_claims_only_payload_observed_verification() -> None:
-    """Payload confirmation is recorded, while absent fields and replay stay unverified."""
+def test_2026_27_separates_payload_and_authoritative_verification() -> None:
+    """Payload omissions are resolved only by named, captured official sources."""
     rules = load_scoring_rules("2026_27")
     assert len(rules.verification.payload_confirmed) == 17
     assert rules.verification.payload_captured_at is not None
     assert rules.verification.payload_sha256 is not None
+    assert len(rules.verification.authoritative_sources) == 2
+    assert rules.verification.authoritatively_confirmed() == {
+        "appearance.long_play_minutes",
+        "clean_sheets.minimum_minutes",
+        "goals_conceded.unit",
+        "saves.unit",
+        "defensive_contribution.thresholds.DEF",
+        "defensive_contribution.thresholds.MID",
+        "defensive_contribution.thresholds.FWD",
+    }
     assert rules.verification.replay_exercised == []
+    assert set(rules.verification.unverified) == {
+        "goals_scored.GK",
+        "clean_sheets.points.FWD",
+    }
     assert not rules.verification.is_confirmed("goals_scored.GK")
-    assert not rules.verification.is_confirmed("appearance.long_play_minutes")
+    assert rules.verification.is_confirmed("appearance.long_play_minutes")
     assert rules.verification.is_confirmed("assists")
+
+
+def test_authoritative_rule_sources_must_be_official() -> None:
+    document = yaml.safe_load((config_dir() / "scoring_2026_27.yaml").read_text("utf-8"))
+    document["verification"]["authoritative_sources"][0]["url"] = "https://example.com/rules"
+    with pytest.raises(ValueError, match="official Premier League URL"):
+        ScoringRules.model_validate(document)
 
 
 def test_2025_26_records_what_the_replay_exercised() -> None:

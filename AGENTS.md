@@ -11,12 +11,11 @@ gameweek. It is a Python 3.12 data and modelling codebase built around DuckDB, P
 HTTPX, YAML configuration, pytest, Ruff, and strict mypy.
 
 Phase 0b's historical and live data foundation is implemented and tested. Phase 1 modelling
-has not started. The official 2026/27 payload confirms 17 scoring fields, but seven
-thresholds/units are absent from it. Do not describe the ruleset as fully verified until
-that remaining gap is closed:
-
-- Resolve the fields listed under `verification.unverified` from authoritative rules or
-  current-season replay evidence; do not infer them from the absent payload keys.
+has not started, but its evaluation contract is implemented in `config/phase1_evaluation.yaml`.
+The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
+the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
+Do not describe the ruleset as fully validated while either remains under
+`verification.unverified`.
 
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
@@ -107,11 +106,11 @@ and keep production dependencies separate from development tools.
 
 Unless the user sets another priority, address prerequisites before model sophistication:
 
-1. Resolve the seven 2026/27 scoring thresholds/units absent from the live payload.
-2. Make full archive database rebuilds failure-atomic; live capture is already transactional.
-3. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
-4. Define Phase 1 entry/exit criteria, walk-forward baselines, metrics, and lift gates before
-   implementing the team model.
+1. Make full archive database rebuilds failure-atomic; live capture is already transactional.
+2. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
+3. Implement the Stage A validation harness exactly against `config/phase1_evaluation.yaml`.
+4. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
+   observing candidate results.
 
 ## Sub-agent coordination and handoff
 
