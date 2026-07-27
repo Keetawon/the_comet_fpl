@@ -85,11 +85,13 @@ class StubFplApi:
         fixtures_path: Path,
         bootstrap_route: str = "/bootstrap-static",
         fixtures_route: str = "/fixtures",
+        event_live_route: str = "/event/1/live",
     ) -> Self:
         return cls(
             {
                 bootstrap_route: StubRoute(body=json.loads(bootstrap_path.read_text("utf-8"))),
                 fixtures_route: StubRoute(body=json.loads(fixtures_path.read_text("utf-8"))),
+                event_live_route: StubRoute(body={"elements": []}),
             }
         )
 

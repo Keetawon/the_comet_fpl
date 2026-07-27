@@ -168,6 +168,8 @@ def test_feature_source_permits_exactly_the_component_tables() -> None:
             "mart_fact_team_match",
             "mart_dim_player",
             "mart_dim_team",
+            "mart_fact_player_fixture_live",
+            "mart_team_fixture_live",
         }
         for table in source.readable_tables():
             source._check_table(table)  # must not raise
@@ -322,6 +324,24 @@ def test_returned_frames_are_polars() -> None:
     with FeatureSource.open(default_db_path()) as source:
         view = PointInTimeView(source, AsOf(AS_OF_SWEEP[2]))
         assert isinstance(view.observed_team_matches(), pl.DataFrame)
+
+
+def test_empty_filters_return_empty_frames() -> None:
+    """An empty allowlist means no entities, never invalid `IN ()` SQL or all entities."""
+    con = duckdb.connect(":memory:")
+    try:
+        con.execute(
+            """
+            CREATE TABLE mart_fact_player_fixture (
+                season VARCHAR, code INTEGER, fixture INTEGER, kickoff_time TIMESTAMPTZ
+            )
+            """
+        )
+        view = PointInTimeView(FeatureSource(con), AsOf(AS_OF_SWEEP[0]))
+        assert view.observed_player_fixtures(codes=[]).is_empty()
+        assert view.observed_player_fixtures(seasons=[]).is_empty()
+    finally:
+        con.close()
 
 
 # --------------------------------------------------------------------------------------

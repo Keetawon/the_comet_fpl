@@ -7,6 +7,7 @@ network access**.
 |---|---|
 | `bootstrap_static_sample.json` | `bootstrap-static` response |
 | `fixtures_sample.json` | `fixtures` response |
+| `bootstrap_scoring_2026_27_real.json` | Exact scoring block extracted from the official 2026/27 bootstrap payload |
 
 ## Status: `bootstrap_static_sample.json` is a SYNTHETIC PLACEHOLDER
 
@@ -25,12 +26,12 @@ What is faithful in it:
   returned last season while `bootstrap-static` had rolled over. `--dry-run` therefore
   exercises the skew detection for real rather than against a contrived case.
 
-What is **not** verified:
+What this synthetic full payload does **not** verify:
 
-- `game_config.scoring` is transcribed from the specification, not captured. Its key
-  layout is a best guess at the real payload's shape. **No scoring value in
-  `config/scoring_2026_27.yaml` may be treated as confirmed until a real capture has been
-  verified.**
+- Its `game_config.scoring` block is transcribed and is never used as confirmation evidence.
+  `bootstrap_scoring_2026_27_real.json` contains the exact block extracted from the official
+  2026/27 bootstrap response, with capture timestamp and original-payload SHA-256. It confirms
+  the fields actually published there; omitted thresholds and units remain unverified.
 
 ## Replacing it with a real capture
 
@@ -40,10 +41,10 @@ curl -s https://fantasy.premierleague.com/api/bootstrap-static/ \
 curl -s https://fantasy.premierleague.com/api/fixtures/ \
   > tests/fixtures/fixtures_sample.json
 
-# Verify the 2026/27 rules against the real game_config.scoring and rewrite the
+# Verify the 2026/27 rules against the committed real scoring extract and rewrite the
 # `verification` block with whatever the payload actually confirms.
 uv run python -m fpl.jobs.verify_rules --ruleset 2026_27 \
-  --payload tests/fixtures/bootstrap_static_sample.json --write
+  --payload tests/fixtures/bootstrap_scoring_2026_27_real.json --write
 ```
 
 `verify_rules` reports three outcomes per field, and only the first marks a field

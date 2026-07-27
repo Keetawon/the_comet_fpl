@@ -1,0 +1,143 @@
+name: Finalized player history snapshot (R5)
+
+# element-summary is the authoritative player-fixture source. Unlike event-live, it
+# preserves fixture grain through double gameweeks. This job runs daily but writes only
+# when the latest finalized gameweek has advanced, so it captures each completed GW once
+# without adding hundreds of near-identical payloads every day.
+
+on:
+  schedule:
+    - cron: "30 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: api-snapshot
+  cancel-in-progress: false
+
+jobs:
+  player-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Capture a newly finalized gameweek
+        id: capture
+        env:
+          API: https://fantasy.premierleague.com/api
+        run: |
+          set -euo pipefail
+          WORK="${RUNNER_TEMP}/fpl-player-history"
+          mkdir -p "${WORK}/elements"
+
+          get() {
+            local url="$1" out="$2"
+            curl -sS --fail --show-error \
+              --retry 3 --retry-delay 5 --retry-connrefused \
+              --max-time 120 \
+              -H 'Accept: application/json' \
+              -H 'User-Agent: fpl-model-snapshot (+github actions)' \
+              -o "${out}" "${url}"
+            test -s "${out}"
+            jq -e . "${out}" > /dev/null
+          }
+
+          get "${API}/bootstrap-static/" "${WORK}/bootstrap.json"
+          sleep 1
+          FINISHED_GW="$(jq -r '[.events[] | select(.finished) | .id] | max // empty' "${WORK}/bootstrap.json")"
+          if [ -z "${FINISHED_GW}" ]; then
+            echo "no finalized gameweek yet"
+            echo "captured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "${FINISHED_GW}" in
+            ''|*[!0-9]*) echo "::error::invalid gameweek: ${FINISHED_GW}"; exit 1 ;;
+          esac
+
+          FIRST_DEADLINE="$(jq -r '[.events[].deadline_time | select(. != null)] | min' "${WORK}/bootstrap.json")"
+          if ! [[ "${FIRST_DEADLINE}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
+            echo "::error::invalid first deadline: ${FIRST_DEADLINE}"
+            exit 1
+          fi
+          START_YEAR="${FIRST_DEADLINE:0:4}"
+          END_YEAR="$((10#${START_YEAR} + 1))"
+          SEASON="${START_YEAR}-${END_YEAR:2:2}"
+          TARGET="snapshots/player-history/${SEASON}/gw-${FINISHED_GW}"
+          if [ -s "${TARGET}/manifest.json" ]; then
+            echo "GW${FINISHED_GW} is already captured at ${TARGET}"
+            echo "captured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          get "${API}/fixtures/" "${WORK}/fixtures.json"
+          sleep 1
+          FIRST_KICKOFF="$(jq -r '[.[].kickoff_time | select(. != null)] | min' "${WORK}/fixtures.json")"
+          if [[ "${FIRST_KICKOFF}" < "${FIRST_DEADLINE}" ]]; then
+            echo "::error::fixtures still belong to the previous season; refusing to crosswalk season-scoped team ids"
+            exit 1
+          fi
+
+          mapfile -t ELEMENT_IDS < <(jq -r '.elements[].id' "${WORK}/bootstrap.json")
+          if [ "${#ELEMENT_IDS[@]}" -lt 100 ]; then
+            echo "::error::implausible element count: ${#ELEMENT_IDS[@]}"
+            exit 1
+          fi
+          for element_id in "${ELEMENT_IDS[@]}"; do
+            case "${element_id}" in
+              ''|*[!0-9]*) echo "::error::invalid element id: ${element_id}"; exit 1 ;;
+            esac
+            get "${API}/element-summary/${element_id}/" "${WORK}/elements/${element_id}.json"
+            jq -e '.history | type == "array"' "${WORK}/elements/${element_id}.json" > /dev/null
+            sleep 1
+          done
+
+          mkdir -p "${TARGET}"
+          gzip -9 -c "${WORK}/bootstrap.json" > "${TARGET}/bootstrap-static.json.gz"
+          gzip -9 -c "${WORK}/fixtures.json" > "${TARGET}/fixtures.json.gz"
+          tar -C "${WORK}/elements" -czf "${TARGET}/element-summary.tar.gz" .
+          sha256sum "${TARGET}"/*.gz > "${TARGET}/SHA256SUMS"
+
+          STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          HISTORY_ROWS="$(jq -s '[.[].history | length] | add' "${WORK}"/elements/*.json)"
+          jq -n \
+            --arg captured_at "${STAMP}" \
+            --arg season "${SEASON}" \
+            --argjson gw "${FINISHED_GW}" \
+            --argjson elements "${#ELEMENT_IDS[@]}" \
+            --argjson history_rows "${HISTORY_ROWS}" \
+            '{schema_version:"1", captured_at:$captured_at, season:$season,
+              mode:"player-history", history_through_gw:$gw,
+              element_payloads:$elements, player_fixture_rows:$history_rows}' \
+            > "${TARGET}/manifest.json"
+
+          echo "captured=true" >> "$GITHUB_OUTPUT"
+          echo "target=${TARGET}" >> "$GITHUB_OUTPUT"
+          echo "season=${SEASON}" >> "$GITHUB_OUTPUT"
+          echo "gw=${FINISHED_GW}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit player histories
+        if: steps.capture.outputs.captured == 'true'
+        env:
+          TARGET: ${{ steps.capture.outputs.target }}
+          SEASON: ${{ steps.capture.outputs.season }}
+          GW: ${{ steps.capture.outputs.gw }}
+        run: |
+          set -euo pipefail
+          case "${TARGET}" in
+            snapshots/player-history/[0-9][0-9][0-9][0-9]-[0-9][0-9]/gw-[0-9]*) ;;
+            *) echo "::error::refusing unexpected path: ${TARGET}"; exit 1 ;;
+          esac
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${TARGET}"
+          git commit -m "snapshot: ${SEASON} finalized player histories through GW${GW}"
+          for attempt in 1 2 3 4; do
+            if git push; then exit 0; fi
+            sleep $((2 ** attempt))
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          done
+          echo "::error::could not push player histories after 4 attempts"
+          exit 1

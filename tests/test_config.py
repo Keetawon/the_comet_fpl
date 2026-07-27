@@ -119,16 +119,16 @@ def test_unexercised_rules_are_declared_unverified_in_config() -> None:
             )
 
 
-def test_2026_27_claims_no_unearned_verification() -> None:
-    """The live ruleset must not claim confirmation it has not obtained.
-
-    No real payload has been supplied, so `payload_confirmed` must be empty and nothing may
-    be listed as replay-exercised for a season that has not been played.
-    """
+def test_2026_27_claims_only_payload_observed_verification() -> None:
+    """Payload confirmation is recorded, while absent fields and replay stay unverified."""
     rules = load_scoring_rules("2026_27")
-    assert rules.verification.payload_confirmed == []
+    assert len(rules.verification.payload_confirmed) == 17
+    assert rules.verification.payload_captured_at is not None
+    assert rules.verification.payload_sha256 is not None
     assert rules.verification.replay_exercised == []
     assert not rules.verification.is_confirmed("goals_scored.GK")
+    assert not rules.verification.is_confirmed("appearance.long_play_minutes")
+    assert rules.verification.is_confirmed("assists")
 
 
 def test_2025_26_records_what_the_replay_exercised() -> None:

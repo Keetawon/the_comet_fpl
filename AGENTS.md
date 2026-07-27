@@ -10,14 +10,13 @@ This project predicts a full Fantasy Premier League (FPL) points distribution pe
 gameweek. It is a Python 3.12 data and modelling codebase built around DuckDB, Polars, Pydantic,
 HTTPX, YAML configuration, pytest, Ruff, and strict mypy.
 
-Phase 0's historical data foundation is implemented and tested. Phase 1 modelling has not
-started. Do not describe the system as operationally complete until both of these gaps are
-closed:
+Phase 0b's historical and live data foundation is implemented and tested. Phase 1 modelling
+has not started. The official 2026/27 payload confirms 17 scoring fields, but seven
+thresholds/units are absent from it. Do not describe the ruleset as fully verified until
+that remaining gap is closed:
 
-- `config/scoring_2026_27.yaml` is verified against a real FPL payload.
-- The live-data path captures player/gameweek outcomes and loads snapshots into typed,
-  point-in-time-correct current-season facts. The existing snapshot paths capture only
-  `bootstrap-static` and `fixtures`.
+- Resolve the fields listed under `verification.unverified` from authoritative rules or
+  current-season replay evidence; do not infer them from the absent payload keys.
 
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
@@ -108,13 +107,10 @@ and keep production dependencies separate from development tools.
 
 Unless the user sets another priority, address prerequisites before model sophistication:
 
-1. Complete the live player-outcome capture and snapshot-to-current-season mart path, including
-   rollover, crosswalk, immutability, and PIT tests.
-2. Verify the 2026/27 scoring configuration from a real payload.
-3. Make local snapshot writes and full database rebuilds failure-atomic.
-4. Add CI for pytest, Ruff, formatting, and mypy; use the committed lockfile reproducibly.
-5. Reconcile stale Phase 0 documentation and publish-contract contradictions.
-6. Define Phase 1 entry/exit criteria, walk-forward baselines, metrics, and lift gates before
+1. Resolve the seven 2026/27 scoring thresholds/units absent from the live payload.
+2. Make full archive database rebuilds failure-atomic; live capture is already transactional.
+3. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
+4. Define Phase 1 entry/exit criteria, walk-forward baselines, metrics, and lift gates before
    implementing the team model.
 
 ## Sub-agent coordination and handoff
