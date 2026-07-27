@@ -41,7 +41,23 @@ Also preserve these data contracts:
 
 - Player identity is stable `code`; `element` is season-scoped. Team IDs are season-scoped.
 - Never filter or join a bare team ID across multiple seasons. Require a season-qualified
-  `(season, team_id)` key or another verified stable team identity.
+  `(season, team_id)` key, or `mart_dim_team.team_code` for cross-season club identity.
+  `team_code` is 1:1 with the club (27 codes, 27 names over five seasons) and is the only
+  key permitted for following a club between seasons, which Dixon-Coles time decay and
+  promoted-team priors both require. The failure mode is not merely that ids move but that
+  they return: id 10 is Leeds, Leicester, Fulham, Ipswich, then Fulham again, so a
+  cross-season join on team_id appears to work and yields a Fulham history with Ipswich in
+  the middle of it.
+- A player can turn out for more than one club inside a season, so "which team is this
+  player on" is a question with a time in it. `mart_dim_player.team_id` records only the
+  club a player finished the season at: measured 242 transfer stints, of which the
+  dimension matches 120. Resolve a player's club from the fact row's `team_id` or from
+  `mart_dim_player_stint`, never from `mart_dim_player`. Do not assume two stints -- three
+  clubs in one season occurs.
+- When a player moves, his attacking *share* travels with him and the team *scale* does
+  not. Defensive contribution is a property of the team system rather than the player
+  (measured team hit rates range from 0.333 to 0.146), so a transferred player's DC
+  expectation must be rescaled to the destination club, never carried over.
 - Player-fixture grain is `(season, code, fixture)`, not player-gameweek. Double gameweeks are
   real; exact duplicate source rows are not.
 - `NULL` means unmeasured or unavailable and must not be silently converted to zero.
@@ -101,6 +117,33 @@ Run the smallest relevant tests while iterating, then use the full local gate be
 Equivalent `uv run` commands are acceptable. Do not add a new dependency casually; justify it
 against the small single-file data scale, update `pyproject.toml` and the lockfile together,
 and keep production dependencies separate from development tools.
+
+## Measured constants
+
+These were measured against the archive in this repository and supersede any external
+figure. `docs/research-adaptation.md` carries the evidence and the contradicting sources.
+
+- Home advantage is **pooled with decay, never taken from the last one or two seasons**.
+  Per-season gaps are 0.208 / 0.416 / 0.321 / 0.092 / 0.303 goals; a single season's
+  estimate has a standard error near 0.09, the same size as the "collapse" some sources
+  report, and 2025-26 rebounded after 2024-25's low. Pooled value 0.268.
+- Promoted-team prior: attack **0.719x** league (sd 0.157), defence **1.309x** (sd 0.228),
+  as the mean of per-team ratios rather than a ratio of pooled means. The spread is the
+  point -- Fulham 2022-23 arrived at 1.015 and Southampton 2024-25 at 0.466 -- so the prior
+  must carry its variance and yield quickly to observed matches. Defence improves over a
+  season (+31% conceded in GW1-10, +14% from GW11) while attack does not, so the two sides
+  decay differently.
+- Finishing (goals minus xG) does not persist: FWD 0.138, MID 0.060, DEF -0.103
+  season-to-season. Shrink it essentially fully to the positional mean.
+- Defender attacking signal is **xA, not xG**: persistence 0.784 against 0.319.
+- Goalkeeper save rate is a league constant at **67.3% +/- 0.4pp** over five seasons, so
+  individual deviation is almost all noise. `saves + goals_conceded` is the only available
+  proxy for shots on target faced.
+- Team strength combines **multiplicatively**: `atk x def_opponent` correlates 0.439 with
+  goals scored, the subtractive form 0.070. Facing the weakest quartile of defences yields
+  1.935 goals against 1.040 for the strongest -- a 1.86x range.
+- Any persistence figure must be measured **within position**. Pooled across positions
+  xG/90 reads 0.871, which measures the position rather than the player.
 
 ## Priorities for upcoming work
 

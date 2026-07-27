@@ -46,6 +46,8 @@ _COMPONENT_COLUMNS: tuple[str, ...] = (
     "expected_goals",
     "expected_assists",
     "expected_goals_conceded",
+    "threat",
+    "creativity",
     "defensive_contribution",
     "tackles",
     "recoveries",
@@ -77,10 +79,55 @@ def build_dimensions(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("DELETE FROM mart_dim_team")
     con.execute(
         """
-        INSERT INTO mart_dim_team (season, team_id, team_name, short_name, pulse_id)
-        SELECT season, team_id, team_name, short_name, pulse_id FROM stg_team
+        INSERT INTO mart_dim_team (season, team_id, team_code, team_name, short_name, pulse_id)
+        SELECT season, team_id, team_code, team_name, short_name, pulse_id FROM stg_team
         """
     )
+
+
+def build_player_stints(con: duckdb.DuckDBPyConnection) -> int:
+    """One row per club spell a player had inside a season.
+
+    `mart_dim_player` carries only the club a player finished the season at, which is wrong
+    for about half of all transfer stints -- measured 242 stints across five seasons, of
+    which the dimension matches 120. Eze played GW1-2 for Crystal Palace and GW3-38 for
+    Arsenal; Buonanotte had three clubs in 2025-26.
+
+    Getting this wrong is not cosmetic. A player's attacking *share* travels with him but the
+    team *scale* does not, and defensive-contribution rates are a property of the team system
+    rather than the player -- measured team hit rates range from 0.333 to 0.146. Resolving a
+    transferred player's club through the dimension attributes the wrong team strength and
+    the wrong DC environment to roughly 25 players per season, silently.
+
+    Built from the fact rows, whose `team_id` is correct per fixture (verified: zero rows
+    where the recorded team is not one of the two sides of that fixture).
+    """
+    con.execute("DELETE FROM mart_dim_player_stint")
+    con.execute(
+        """
+        INSERT INTO mart_dim_player_stint (
+            season, code, team_id, stint_index, first_gw, last_gw,
+            first_kickoff, last_kickoff, appearances, minutes
+        )
+        WITH spells AS (
+            SELECT season, code, team_id,
+                   min(gw) AS first_gw, max(gw) AS last_gw,
+                   min(kickoff_time) AS first_kickoff, max(kickoff_time) AS last_kickoff,
+                   count(*) AS appearances,
+                   sum(minutes) AS minutes
+            FROM mart_fact_player_fixture
+            GROUP BY season, code, team_id
+        )
+        SELECT season, code, team_id,
+               CAST(row_number() OVER (
+                   PARTITION BY season, code ORDER BY first_kickoff
+               ) AS INTEGER) AS stint_index,
+               first_gw, last_gw, first_kickoff, last_kickoff,
+               CAST(appearances AS INTEGER), CAST(minutes AS INTEGER)
+        FROM spells
+        """
+    )
+    return _scalar(con, "SELECT count(*) FROM mart_dim_player_stint")
 
 
 def build_player_fixture(con: duckdb.DuckDBPyConnection) -> int:
@@ -292,8 +339,12 @@ def _record_completeness(con: duckdb.DuckDBPyConnection, rules: ScoringRules) ->
 
 def build_all(con: duckdb.DuckDBPyConnection) -> FactCounts:
     build_dimensions(con)
+    player_fixture_rows = build_player_fixture(con)
+    # After the facts: stints are derived from them, because the fact row's team_id is the
+    # only per-fixture-correct record of which club a player turned out for.
+    build_player_stints(con)
     return FactCounts(
-        player_fixture_rows=build_player_fixture(con),
+        player_fixture_rows=player_fixture_rows,
         team_match_rows=build_team_match(con),
         target_rows=build_targets(con),
     )

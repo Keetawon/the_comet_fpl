@@ -163,7 +163,15 @@ def test_recorded_points_live_only_in_staging(db: duckdb.DuckDBPyConnection) -> 
             """
         ).fetchall()
     ]
-    assert locations == ["raw_merged_gw", "raw_players", "stg_player_fixture"]
+    # The rule, not a fixed list: raw_ and stg_ may carry it -- both the archive CSVs and the
+    # live element-summary payload do -- but no mart_ table may. Asserting an exact list of
+    # tables would fail whenever a legitimate new staging table lands, which is a data
+    # refresh rather than a contract breach.
+    assert locations, "total_points should still exist somewhere upstream"
+    assert all(name.startswith(("raw_", "stg_")) for name in locations), (
+        f"total_points escaped the raw/staging layers: {locations}"
+    )
+    assert "stg_player_fixture" in locations
     assert not [name for name in locations if name.startswith("mart_")]
 
 

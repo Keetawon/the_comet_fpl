@@ -24,7 +24,7 @@ request-time inference.
 ```
 public/data/
   manifest.json            provenance, target gameweek, model version   (every view)
-  players.json             one row per player, next-GW and next-5 xP     (player table, captaincy)
+  players.json             per-gameweek xP for the next 6 GWs            (player table, captaincy)
   fixtures.json            schedule + model lambdas + FPL FDR            (fixture ticker)
   teams.json               attack/defence ratings with uncertainty       (team ratings)
   calibration.json         backtest vs the three baselines               (model transparency)
@@ -105,13 +105,25 @@ Drives the player table and the captaincy view. One row per player.
       "position": "MID", "team_id": 12, "team_short": "LIV",
       "price": 145, "selected_by_percent": 41.2, "status": "a",
       "chance_of_playing": 100,
-      "xp_next": 6.41, "xp_next_5": 29.8, "variance": 21.4,
+      "xp_next": 6.41, "variance": 21.4,
       "p_returns": 0.512, "p_haul": 0.371, "p_60_plus": 0.883,
       "xp_per_million": 0.442,
-      "fixtures": [
-        {"gw": 1, "opponent_short": "BOU", "was_home": true,
-         "lambda_for": 2.14, "lambda_against": 0.92, "fpl_fdr": 2}
-      ]
+      "gameweeks": [
+        {"gw": 1, "xp": 6.41, "p_returns": 0.512, "p_haul": 0.371, "variance": 21.4,
+         "is_double": false, "is_blank": false,
+         "fixtures": [
+           {"opponent_short": "BOU", "was_home": true,
+            "lambda_for": 2.14, "lambda_against": 0.92, "fpl_fdr": 2}
+         ]},
+        {"gw": 2, "xp": 11.83, "p_haul": 0.62, "is_double": true,
+         "fixtures": [{"opponent_short": "WHU", ...}, {"opponent_short": "EVE", ...}]},
+        {"gw": 3, "xp": 0.0, "p_haul": 0.0, "is_blank": true, "fixtures": []}
+      ],
+      "horizons": {
+        "1": {"xp": 6.41,  "p_returns": 0.512, "p_haul": 0.371, "variance": 21.4},
+        "4": {"xp": 24.83, "p_returns": 0.938, "p_haul": 0.826, "variance": 74.2},
+        "6": {"xp": 36.20, "p_returns": 0.981, "p_haul": 0.914, "variance": 108.7}
+      }
     }
   ]
 }
@@ -126,6 +138,30 @@ Drives the player table and the captaincy view. One row per player.
 - `fixtures` carries the model's own `lambda_for`/`lambda_against` **and** `fpl_fdr`, so the
   ticker can show where the model disagrees with FPL rather than replacing one opaque number
   with another.
+
+### The gameweek horizon, and what may be summed
+
+The unit is the **gameweek**, not the fixture, because squad planning happens per gameweek --
+you pick a side for GW1, not for "the next six matches". A gameweek holds zero, one or two
+fixtures, so the two are genuinely different:
+
+- **Double gameweek** -- `is_double`, and the gameweek's `xp` is the sum over both fixtures.
+- **Blank gameweek** -- `is_blank`, `xp` is 0.0 and the entry is still present. A missing
+  entry and a zero entry mean different things to a manager, so blanks are never omitted.
+
+This works only because the fact grain is `(code, fixture)` rather than `(code, gameweek)`.
+Aggregating to gameweeks is a presentation choice made at publish time; the reverse would
+have been impossible.
+
+**Only `xp` may be summed across gameweeks.** Expectation is linear, so a client may add
+`gameweeks[].xp` over any subset and be exactly right regardless of how correlated the
+fixtures are.
+
+`p_returns`, `p_haul` and `variance` **must not be summed** -- `P(haul in 4 GWs)` is not the
+sum of four per-gameweek probabilities, and adding them overstates the result every time. The
+simulator holds the joint distribution, so it precomputes those aggregates for N = 1..6 in
+`horizons` at no extra cost. A client wanting a horizon the export does not carry must ask
+for it to be added rather than deriving it.
 
 ## players/{code}.json
 

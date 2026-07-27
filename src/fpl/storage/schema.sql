@@ -138,6 +138,12 @@ CREATE TABLE IF NOT EXISTS stg_player_fixture (
     expected_goals                  DOUBLE,
     expected_assists                DOUBLE,
     expected_goals_conceded         DOUBLE,
+    -- Opta indices. `threat` is the closest available proxy for shot volume, which the
+    -- literature says stabilises faster than xG -- and measured here it does: season-to-season
+    -- persistence 0.557 vs 0.319 (DEF), 0.828 vs 0.740 (MID), 0.625 vs 0.571 (FWD).
+    -- They are also present for 2021-22, which has no xG at all.
+    threat                          DOUBLE,
+    creativity                      DOUBLE,
     defensive_contribution          INTEGER,
     tackles                         INTEGER,
     recoveries                      INTEGER,
@@ -251,6 +257,12 @@ CREATE TABLE IF NOT EXISTS stg_live_player_fixture_version (
     expected_goals                  DOUBLE,
     expected_assists                DOUBLE,
     expected_goals_conceded         DOUBLE,
+    -- Opta indices. `threat` is the closest available proxy for shot volume, which the
+    -- literature says stabilises faster than xG -- and measured here it does: season-to-season
+    -- persistence 0.557 vs 0.319 (DEF), 0.828 vs 0.740 (MID), 0.625 vs 0.571 (FWD).
+    -- They are also present for 2021-22, which has no xG at all.
+    threat                          DOUBLE,
+    creativity                      DOUBLE,
     defensive_contribution          INTEGER,
     tackles                         INTEGER,
     recoveries                      INTEGER,
@@ -281,10 +293,43 @@ CREATE TABLE IF NOT EXISTS mart_dim_player (
 CREATE TABLE IF NOT EXISTS mart_dim_team (
     season     VARCHAR NOT NULL,
     team_id    INTEGER NOT NULL,
+    -- STABLE ACROSS SEASONS. `team_id` is reassigned every year and is meaningless
+    -- outside its season: id 10 is Leeds, then Leicester, then Fulham, then Ipswich, then
+    -- Fulham again. That last repeat is the dangerous one -- a cross-season join on
+    -- team_id "works" and silently produces a Fulham history with Ipswich in the middle.
+    -- `team_code` is 1:1 with the club (27 codes, 27 names across five seasons) and is the
+    -- only key that may be used to follow a club between seasons, e.g. for Dixon-Coles
+    -- time decay across a season boundary or for pooling promoted-team priors.
+    team_code  INTEGER,
     team_name  VARCHAR NOT NULL,
     short_name VARCHAR NOT NULL,
     pulse_id   INTEGER,
     PRIMARY KEY (season, team_id)
+);
+
+-- One row per club spell a player had inside a season.
+--
+-- `mart_dim_player.team_id` records only the club a player finished the season at, so it is
+-- wrong for roughly half of all transfer stints: measured 242 stints across five seasons, of
+-- which the dimension matches only 120. Eze played GW1-2 for Crystal Palace and GW3-38 for
+-- Arsenal; Buonanotte had three clubs in 2025-26 alone. Any feature that resolves a player's
+-- team through the dimension attributes the wrong team strength, the wrong fixture and the
+-- wrong defensive-contribution environment to ~25 players per season, silently.
+--
+-- Features must resolve a player's club from the fact row or from this table, never from
+-- mart_dim_player.
+CREATE TABLE IF NOT EXISTS mart_dim_player_stint (
+    season         VARCHAR NOT NULL,
+    code           INTEGER NOT NULL,
+    team_id        INTEGER NOT NULL,
+    stint_index    INTEGER NOT NULL,  -- 1-based, ordered by first appearance
+    first_gw       INTEGER NOT NULL,
+    last_gw        INTEGER NOT NULL,
+    first_kickoff  TIMESTAMPTZ NOT NULL,
+    last_kickoff   TIMESTAMPTZ NOT NULL,
+    appearances    INTEGER NOT NULL,
+    minutes        INTEGER,
+    PRIMARY KEY (season, code, team_id)
 );
 
 -- COMPONENTS ONLY. No points column of any kind, by design and by test.
@@ -322,6 +367,12 @@ CREATE TABLE IF NOT EXISTS mart_fact_player_fixture (
     expected_goals                  DOUBLE,
     expected_assists                DOUBLE,
     expected_goals_conceded         DOUBLE,
+    -- Opta indices. `threat` is the closest available proxy for shot volume, which the
+    -- literature says stabilises faster than xG -- and measured here it does: season-to-season
+    -- persistence 0.557 vs 0.319 (DEF), 0.828 vs 0.740 (MID), 0.625 vs 0.571 (FWD).
+    -- They are also present for 2021-22, which has no xG at all.
+    threat                          DOUBLE,
+    creativity                      DOUBLE,
     defensive_contribution          INTEGER,
     tackles                         INTEGER,
     recoveries                      INTEGER,
@@ -363,6 +414,12 @@ CREATE TABLE IF NOT EXISTS mart_fact_player_fixture_live (
     expected_goals                  DOUBLE,
     expected_assists                DOUBLE,
     expected_goals_conceded         DOUBLE,
+    -- Opta indices. `threat` is the closest available proxy for shot volume, which the
+    -- literature says stabilises faster than xG -- and measured here it does: season-to-season
+    -- persistence 0.557 vs 0.319 (DEF), 0.828 vs 0.740 (MID), 0.625 vs 0.571 (FWD).
+    -- They are also present for 2021-22, which has no xG at all.
+    threat                          DOUBLE,
+    creativity                      DOUBLE,
     defensive_contribution          INTEGER,
     tackles                         INTEGER,
     recoveries                      INTEGER,

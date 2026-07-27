@@ -111,7 +111,7 @@ def _nullify_expression(
     target = f'{alias}."{column}"'
     cast = (
         f"TRY_CAST({target} AS DOUBLE)"
-        if column.startswith("expected_")
+        if column.startswith("expected_") or column in {"threat", "creativity"}
         else f"TRY_CAST({target} AS INTEGER)"
     )
     if not predicates:
@@ -156,6 +156,8 @@ def build_player_fixture(
         "expected_goals",
         "expected_assists",
         "expected_goals_conceded",
+        "threat",
+        "creativity",
         "defensive_contribution",
         "tackles",
         "recoveries",

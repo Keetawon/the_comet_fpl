@@ -180,6 +180,8 @@ class ElementHistory(_Payload):
     expected_goals: float | None = None
     expected_assists: float | None = None
     expected_goals_conceded: float | None = None
+    threat: float | None = None
+    creativity: float | None = None
     defensive_contribution: int | None = None
     tackles: int | None = None
     recoveries: int | None = None
