@@ -17,6 +17,10 @@ the seven thresholds/units absent from it. Two replay edge cases remain explicit
 Do not describe the ruleset as fully validated while either remains under
 `verification.unverified`.
 
+Full archive rebuilds are failure-atomic: `build_db` rebuilds a sibling DuckDB, preserves
+existing live snapshot state, refuses to overwrite a concurrently changed target, and promotes
+with one atomic replacement only after success.
+
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
 publish boundary is a design contract and is not implemented.
@@ -106,11 +110,11 @@ and keep production dependencies separate from development tools.
 
 Unless the user sets another priority, address prerequisites before model sophistication:
 
-1. Make full archive database rebuilds failure-atomic; live capture is already transactional.
-2. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
-3. Implement the Stage A validation harness exactly against `config/phase1_evaluation.yaml`.
-4. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
+1. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
+2. Implement the Stage A validation harness exactly against `config/phase1_evaluation.yaml`.
+3. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
    observing candidate results.
+4. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff
 

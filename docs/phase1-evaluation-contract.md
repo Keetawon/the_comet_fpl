@@ -14,10 +14,12 @@ Model implementation starts only when all of these are true:
 
 1. Phase 0b facts and point-in-time access tests pass.
 2. The seven scoring values omitted by `game_config.scoring` have named authoritative evidence.
-3. Full archive database replacement is failure-atomic, with a failure-path test.
+3. Full archive database replacement is failure-atomic, preserves live snapshots, and has
+   failure and concurrent-update tests.
 4. This contract and its tests pass unchanged before the first candidate is fitted.
 
-The third item is still outstanding. Phase 1 model code must not start by working around it.
+All four entry contracts are now implemented. Stage A work starts with the validation harness,
+not with candidate fitting.
 
 ## Walk-forward split
 
