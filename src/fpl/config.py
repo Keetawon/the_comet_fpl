@@ -400,6 +400,83 @@ class Phase1StageACandidateV3Policy(_Frozen):
         return self
 
 
+class Phase1StageACandidateV4Policy(_Frozen):
+    """Pre-registered Candidate V4: the leakage-safe sequential dynamic team-goals filter.
+
+    V4 is the structural successor to the *invalidated* V3. It keeps V3's mean-reverting online
+    Poisson filter but fixes the four defects that voided V3's development number. Three of the
+    fixes are procedure pins declared here as ``Literal[True]`` so that ``extra="forbid"`` makes a
+    config that silently weakens one fail to load rather than be ignored:
+
+    * ``holdout_walk_forward`` -- the inner holdout is a true per-observed-gameweek walk-forward
+      (predict every fixture in a gameweek from the pre-gameweek state, score, then absorb that
+      gameweek's results before advancing), never the one-frozen-state scoring V3 used.
+    * ``cold_start_in_fitting`` -- the six-match cold-start prior is applied in the fitting
+      residual as well as in prediction, not only at prediction time.
+    * ``returning_promoted_count_reset`` -- a club's eligible match count is reset for every
+      newly promoted season (including a club relegated and promoted back), while incumbents
+      keep their declared summer retention.
+
+    The fourth fix replaces V3's full-archive promoted constants with a fold-local estimator:
+    ``promoted_prior_source = fold_local_earlier_cohorts`` estimates the prior from promoted
+    cohorts whose matches are inside the fold (seasons strictly before the prediction season),
+    excludes the current promoted cohort from its own prior, and falls back to a declared
+    neutral ``1.0 / 1.0`` when no eligible cohort exists. ``promoted_prior_min_matches`` fixes
+    the sample behaviour (a cohort club needs this many matches in its promotion season to
+    count) and ``promoted_prior_shrinkage_matches`` fixes the shrinkage weight toward neutral.
+
+    Like V3 this block is additive and optional, shares no field with V2, substitutes for
+    nothing, changes no baseline, gate, tolerance, or eligible row, and is never loaded into the
+    default harness command. ``development_only`` is pinned ``True``: V4 is judged by no gate
+    here until it is evaluated, and no V4 historical number exists yet.
+    """
+
+    name: Literal["dynamic_team_goals_v4"]
+    development_only: Literal[True]
+    inner_holdout_observed_gameweeks: int = Field(ge=1)
+    minimum_inner_training_observed_gameweeks: int = Field(ge=1)
+    holdout_walk_forward: Literal[True]
+    cold_start_in_fitting: Literal[True]
+    returning_promoted_count_reset: Literal[True]
+    learning_rate: tuple[float, ...] = Field(min_length=1)
+    retention: tuple[float, ...] = Field(min_length=1)
+    season_retention: tuple[float, ...] = Field(min_length=1)
+    fallback_learning_rate: float = Field(gt=0.0)
+    fallback_retention: float = Field(gt=0.0, le=1.0)
+    fallback_season_retention: float = Field(gt=0.0, le=1.0)
+    promoted_prior_source: Literal["fold_local_earlier_cohorts"]
+    fallback_attack_prior: float = Field(gt=0.0)
+    fallback_defence_prior: float = Field(gt=0.0)
+    promoted_prior_min_matches: int = Field(ge=1)
+    promoted_prior_shrinkage_matches: float = Field(ge=0.0)
+    xg_policy: Literal["use_when_measured_scaled_to_goals"]
+    rate_floor: float = Field(gt=0.0)
+    log_strength_cap: float = Field(gt=0.0)
+
+    @model_validator(mode="after")
+    def _valid_search_space(self) -> Self:
+        if self.minimum_inner_training_observed_gameweeks < self.inner_holdout_observed_gameweeks:
+            raise ValueError("inner training history cannot be shorter than the holdout")
+        for label, grid, lo, hi in (
+            ("learning_rate", self.learning_rate, 0.0, None),
+            ("retention", self.retention, 0.0, 1.0),
+            ("season_retention", self.season_retention, 0.0, 1.0),
+        ):
+            if any(value <= lo for value in grid):
+                raise ValueError(f"{label} values must be greater than {lo}")
+            if hi is not None and any(value > hi for value in grid):
+                raise ValueError(f"{label} values must not exceed {hi}")
+            if tuple(sorted(set(grid))) != grid:
+                raise ValueError(f"{label} values must be unique and increasing")
+        if self.fallback_learning_rate not in self.learning_rate:
+            raise ValueError("fallback learning rate must be in the declared grid")
+        if self.fallback_retention not in self.retention:
+            raise ValueError("fallback retention must be in the declared grid")
+        if self.fallback_season_retention not in self.season_retention:
+            raise ValueError("fallback season retention must be in the declared grid")
+        return self
+
+
 class Phase1BaselinePolicy(_Frozen):
     stage_a: frozenset[str]
     downstream_player_points: frozenset[str]
@@ -465,7 +542,7 @@ class Phase1ReportingPolicy(_Frozen):
 class Phase1EvaluationConfig(_Frozen):
     """Executable entry and promotion contract for the Stage A walk-forward."""
 
-    contract_version: Literal["1.4"]
+    contract_version: Literal["1.5"]
     phase: Literal[1]
     amendments: tuple[Phase1Amendment, ...] = ()
     target: Phase1TargetPolicy
@@ -473,8 +550,14 @@ class Phase1EvaluationConfig(_Frozen):
     training: Phase1TrainingPolicy
     stage_a_candidate: Phase1StageACandidatePolicy
     # Candidate V3 is a development-only structural probe. Optional and additive: absent
-    # from every V1/V2 evaluation, it never substitutes for V2 and changes no gate.
+    # from every V1/V2 evaluation, it never substitutes for V2 and changes no gate. V3's single
+    # historical development result is invalidated (see docs/phase1-candidate-v3-invalidation.md);
+    # the block is retained frozen rather than repaired.
     stage_a_candidate_v3: Phase1StageACandidateV3Policy | None = None
+    # Candidate V4 is the leakage-safe successor to the invalidated V3. Optional and additive in
+    # the same way: it shares no field with V2/V3, substitutes for nothing, and is never loaded
+    # by the default harness command. Pre-registered before any V4 evaluation.
+    stage_a_candidate_v4: Phase1StageACandidateV4Policy | None = None
     baselines: Phase1BaselinePolicy
     metrics: Phase1MetricPolicy
     promotion: Phase1PromotionGate

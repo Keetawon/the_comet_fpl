@@ -435,3 +435,15 @@ summer shrinkage in 92/181) are recorded as diagnostics for a future hypothesis,
 permission to widen the grid. Full result and caveats in
 [`docs/phase1-candidate-v3-development.md`](docs/phase1-candidate-v3-development.md). The
 trailing-goals baseline remains the Stage A model.
+
+### Candidate V4: leakage-safe successor, pre-registered, not yet evaluated
+
+`dynamic_team_goals_v4` is pre-registered (contract amendment 1.5) as the leakage-safe structural
+successor to the invalidated V3. It keeps V3's sequential dynamic filter and fixes all four V3
+defects: the inner holdout is a true per-observed-gameweek walk-forward, the six-match cold-start
+prior is used in the fitting residual as well as prediction, returning promoted clubs reset their
+eligible count, and the promoted prior is estimated fold-locally from earlier promoted cohorts
+(no full-archive constant, neutral `1.0/1.0` fallback). The three leakage-safety fixes are pinned
+on as frozen config fields. **No V4 historical evaluation has been run**; V4 is development-only,
+judged by no gate, and the trailing-goals baseline remains Stage A. Design and the frozen grid in
+[`docs/phase1-candidate-v4-design.md`](docs/phase1-candidate-v4-design.md).

@@ -4,7 +4,7 @@
 # folds, baselines, metrics, or lift gates after seeing its results. The typed loader rejects
 # missing required comparisons and any contiguous gameweek policy.
 
-contract_version: "1.4"
+contract_version: "1.5"
 phase: 1
 
 # Amending a pre-registered contract is only legitimate before a candidate exists to bias the
@@ -134,6 +134,47 @@ amendments:
       A genuine promotion attempt for the dynamic model would be a separately pre-registered
       candidate evaluated against prospective 2026/27 data under the unchanged promotion
       gate. This amendment pre-registers the development probe and its grid only.
+  - version: "1.5"
+    date: "2026-07-28"
+    candidates_evaluated_before_amendment: 3
+    changed: >-
+      Adds the optional, additive stage_a_candidate_v4 block pre-registering a leakage-safe
+      successor (dynamic_team_goals_v4) to the invalidated Candidate V3, and records V3's
+      invalidation. No existing baseline, outer row, lift threshold, CRPS rule, calibration
+      tolerance, coverage requirement, fold requirement, leakage requirement, the Candidate V2
+      stage_a_candidate policy, or the frozen Candidate V3 stage_a_candidate_v3 policy changes.
+      V4 is not substituted for V2 or V3 by any default command.
+    reason: >-
+      Candidate V3's single historical development result is INVALIDATED, not merely
+      non-promoted: review found four defects. Two are leakage -- the promoted cold-start prior
+      was a full-archive constant estimated from seasons future to early folds, and the inner
+      holdout scored all six held-out gameweeks from one frozen state rather than a chronological
+      observed-gameweek walk-forward. The other two are fitting/provenance defects -- the
+      six-match cold-start prior was applied at prediction only, not in the fitting residual,
+      returning promoted clubs retained old Premier-League match counts, and the development
+      runner accepted a dirty worktree while recording only a clean-looking commit SHA. A
+      leakage-tainted number cannot be salvaged by being short of the gate, so V3's value is
+      void for comparison. Candidate V4 keeps V3's structural hypothesis (a sequential,
+      mean-reverting online Poisson filter) and fixes all four defects with procedure pins and a
+      fold-local promoted-prior estimator, so its eventual development number can finally be
+      trusted. This amendment pre-registers V4 and its grid before any V4 evaluation.
+    evidence: >-
+      Three candidates (V1, V2, and the invalidated V3) had produced a number before this
+      amendment. The four V3 defects and the voided values are documented in
+      docs/phase1-candidate-v3-invalidation.md; V3's frozen code and its audit-record values are
+      left untouched. V4's three leakage-safety properties are pinned as Literal[True] config
+      fields (holdout_walk_forward, cold_start_in_fitting, returning_promoted_count_reset) so a
+      silent weakening fails to load, and its promoted prior carries no full-archive constant.
+      No V4 evaluation exists yet.
+    tolerance_rationale: >-
+      No promotion tolerance changes. V4 is not a promotion candidate and is judged by no gate
+      here; it is reported with the same metrics, slices, and counts as V2 for honest comparison
+      against the unchanged baseline, and any V4 number is explicitly not a promotion verdict.
+    deferred: >-
+      A genuine promotion attempt for V4 would be a separately pre-registered evaluation against
+      prospective 2026/27 data under the unchanged promotion gate. This amendment pre-registers
+      the leakage-safe structural probe and its grid only; no V4 historical score is run or
+      recorded by it.
 
 target:
   entity: team
@@ -203,6 +244,40 @@ stage_a_candidate_v3:
   fallback_season_retention: 0.75
   promoted_attack_prior: 0.719
   promoted_defence_prior: 1.309
+  xg_policy: use_when_measured_scaled_to_goals
+  rate_floor: 0.05
+  log_strength_cap: 2.0
+
+# Candidate V4 is the leakage-safe successor to the invalidated Candidate V3. It keeps V3's
+# sequential, mean-reverting online Poisson filter but fixes the four defects: the inner holdout
+# is a true per-observed-gameweek walk-forward, the six-match cold-start prior is used in the
+# fitting residual as well as prediction, returning promoted clubs reset their match count, and
+# the promoted prior is estimated fold-locally from earlier promoted cohorts with a declared
+# neutral fallback (no full-archive constant). It shares no field with V2/V3, substitutes for
+# nothing, is judged by no promotion gate, and is never run by the default harness command. See
+# docs/phase1-candidate-v4-design.md and amendment 1.5. No V4 evaluation exists yet.
+stage_a_candidate_v4:
+  name: dynamic_team_goals_v4
+  development_only: true
+  inner_holdout_observed_gameweeks: 6
+  minimum_inner_training_observed_gameweeks: 12
+  # Pinned-true procedure declarations: extra="forbid" makes a silent weakening fail to load.
+  holdout_walk_forward: true
+  cold_start_in_fitting: true
+  returning_promoted_count_reset: true
+  learning_rate: [0.05, 0.10, 0.20]
+  retention: [0.985, 0.995, 1.0]
+  season_retention: [0.5, 0.75, 1.0]
+  fallback_learning_rate: 0.10
+  fallback_retention: 0.995
+  fallback_season_retention: 0.75
+  # Fold-local promoted-prior estimator. Earlier promoted cohorts only; neutral fallback when
+  # none are eligible. shrinkage_matches fixes the pull toward neutral in match-units.
+  promoted_prior_source: fold_local_earlier_cohorts
+  fallback_attack_prior: 1.0
+  fallback_defence_prior: 1.0
+  promoted_prior_min_matches: 6
+  promoted_prior_shrinkage_matches: 6.0
   xg_policy: use_when_measured_scaled_to_goals
   rate_floor: 0.05
   log_strength_cap: 2.0

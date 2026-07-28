@@ -1,12 +1,14 @@
 # Phase 1 evaluation contract
 
-**Status: contract and harness implemented at version 1.4. Candidates V1 and V2 were evaluated
+**Status: contract and harness implemented at version 1.5. Candidates V1 and V2 were evaluated
 and neither promoted. The required trailing-goals baseline remains Stage A. Amendment 1.4
-pre-registers a development-only Candidate V3 (`dynamic_team_goals_v3`) for one historical
-development evaluation; it is not a promotion candidate and changes no gate.** The
-machine-readable source is `config/phase1_evaluation.yaml`, validated by
-`Phase1EvaluationConfig` and executed by `src/fpl/validate/`. This document explains the
-decisions; it does not override that file.
+pre-registered a development-only Candidate V3 (`dynamic_team_goals_v3`); its single historical
+development result is now **invalidated** (two leakage defects plus fitting/provenance defects),
+so its number is void for comparison. Amendment 1.5 pre-registers Candidate V4
+(`dynamic_team_goals_v4`), the leakage-safe structural successor to V3; it is development-only,
+has not been evaluated, and changes no gate.** The machine-readable source is
+`config/phase1_evaluation.yaml`, validated by `Phase1EvaluationConfig` and executed by
+`src/fpl/validate/`. This document explains the decisions; it does not override that file.
 
 ## Scope and entry gate
 
@@ -151,6 +153,22 @@ development evidence and judged by no promotion gate. The historical development
 recorded in [`docs/phase1-candidate-v3-development.md`](phase1-candidate-v3-development.md).
 Prospective 2026/27 data is reserved as the untouched confirmation set.
 
+### Candidate V4: pre-registered leakage-safe successor to V3 (not yet evaluated)
+
+Candidate V4 (`dynamic_team_goals_v4`) is the structural successor to the invalidated V3. It
+keeps V3's sequential, mean-reverting online Poisson filter and fixes the four defects that
+voided V3's number: the inner holdout is a true per-observed-gameweek walk-forward (predict every
+fixture in a gameweek from the pre-gameweek state, score, then advance), the six-match cold-start
+prior is used in the fitting residual as well as in prediction, returning promoted clubs reset
+their eligible count, and the promoted prior is estimated fold-locally from earlier cohorts with
+a declared neutral `1.0 / 1.0` fallback (no full-archive constant). Its design, equations,
+point-in-time argument, and pre-registered grid are fixed in
+[`docs/phase1-candidate-v4-design.md`](phase1-candidate-v4-design.md); its policy is the additive
+`stage_a_candidate_v4` block. The three leakage-safety fixes are pinned on as `Literal[True]`
+config fields so a silent weakening fails to load. V4 is pre-registered before any evaluation:
+no V4 historical score exists, V4 is judged by no gate, and a result would be development
+evidence only. Prospective 2026/27 data is reserved as the untouched confirmation set.
+
 ## Metrics, reports, and promotion
 
 Mean log score is primary and mean CRPS is the second proper distribution score. Poisson
@@ -215,7 +233,23 @@ calibration tolerance, coverage requirement, fold requirement, leakage requireme
 `stage_a_candidate` policy changes; V3 is never substituted for V2 by any default command. Two
 candidates (V1, V2) had been evaluated when this was made. V3 is judged by no promotion gate: it
 is reported with V2's metrics, slices, and counts for honest comparison against the unchanged
-baseline, and its historical number is explicitly not a promotion verdict.
+baseline, and its historical number is explicitly not a promotion verdict. **V3's single
+development result was later invalidated (see 1.5).**
+
+### 1.5 -- Candidate V3 invalidation and Candidate V4 pre-registration (2026-07-28, 3 candidates)
+
+Candidate V3's single historical development result is **invalidated**, not merely non-promoted:
+review found four defects (two leakage -- the promoted prior drew on full-archive future seasons,
+and the inner holdout scored all six gameweeks from one frozen state; plus cold-start residual and
+returning-promoted count defects, and a runner that accepted a dirty worktree). V3's number is
+therefore void for comparison and is kept only as an audit record; its code is left frozen rather
+than repaired. This amendment adds the optional, additive `stage_a_candidate_v4` block pre-registering
+the leakage-safe successor `dynamic_team_goals_v4`, which fixes all four defects with procedure
+pins and a fold-local promoted-prior estimator. Three candidates (V1, V2, the invalidated V3) had
+produced a number before this was made. No baseline, outer row, lift threshold, CRPS rule,
+calibration tolerance, coverage requirement, fold requirement, leakage requirement, the V2
+policy, or the frozen V3 policy changes; V4 is never substituted for V2 or V3 by any default
+command, is judged by no gate, and has not been evaluated.
 
 ## Exit criterion
 

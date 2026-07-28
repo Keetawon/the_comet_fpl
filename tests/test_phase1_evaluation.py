@@ -144,7 +144,7 @@ def test_the_calibration_gate_names_the_metric_it_measures() -> None:
 
 def test_the_amendment_is_recorded_with_its_reason_and_evidence() -> None:
     contract = load_phase1_evaluation()
-    assert contract.contract_version == "1.4"
+    assert contract.contract_version == "1.5"
     amendment = next(a for a in contract.amendments if a.version == "1.1")
     assert amendment.candidates_evaluated_before_amendment == 0, (
         "amending a pre-registered gate is only legitimate before a candidate could bias it"
@@ -288,3 +288,113 @@ def test_v3_is_optional_and_does_not_touch_v1_v2_results() -> None:
     contract = Phase1EvaluationConfig.model_validate(document)
     assert contract.stage_a_candidate_v3 is None
     assert contract.stage_a_candidate.name == "dixon_coles_team_goals_v2"
+
+
+# --------------------------------------------------------------------------------------
+# Amendment 1.5: Candidate V4 pre-registration (leakage-safe successor to invalidated V3)
+# --------------------------------------------------------------------------------------
+
+
+def test_candidate_v4_search_is_pre_registered() -> None:
+    candidate = load_phase1_evaluation().stage_a_candidate_v4
+    assert candidate is not None
+    assert candidate.name == "dynamic_team_goals_v4"
+    assert candidate.development_only is True
+    assert candidate.learning_rate == (0.05, 0.10, 0.20)
+    assert candidate.retention == (0.985, 0.995, 1.0)
+    assert candidate.season_retention == (0.5, 0.75, 1.0)
+    assert candidate.fallback_learning_rate == 0.10
+    assert candidate.fallback_retention == 0.995
+    assert candidate.fallback_season_retention == 0.75
+    assert candidate.inner_holdout_observed_gameweeks == 6
+    assert candidate.minimum_inner_training_observed_gameweeks == 12
+
+
+def test_v4_procedure_pins_are_frozen_true() -> None:
+    """The three leakage-safety fixes are pinned true so a silent weakening fails to load."""
+    candidate = load_phase1_evaluation().stage_a_candidate_v4
+    assert candidate is not None
+    assert candidate.holdout_walk_forward is True
+    assert candidate.cold_start_in_fitting is True
+    assert candidate.returning_promoted_count_reset is True
+
+
+def test_v4_carries_no_full_archive_promoted_constant() -> None:
+    """Fix 4: V4 has a fold-local estimator and a neutral fallback, never V3's archive constants."""
+    candidate = load_phase1_evaluation().stage_a_candidate_v4
+    assert candidate is not None
+    assert candidate.promoted_prior_source == "fold_local_earlier_cohorts"
+    assert candidate.fallback_attack_prior == 1.0
+    assert candidate.fallback_defence_prior == 1.0
+    assert candidate.promoted_prior_min_matches == 6
+    assert candidate.promoted_prior_shrinkage_matches == 6.0
+    assert not hasattr(candidate, "promoted_attack_prior")
+    assert not hasattr(candidate, "promoted_defence_prior")
+
+
+def test_v4_pin_cannot_be_weakened() -> None:
+    """A config that turns a frozen procedure pin off must fail to load."""
+    document = copy.deepcopy(_document())
+    candidate = document["stage_a_candidate_v4"]
+    assert isinstance(candidate, dict)
+    candidate["holdout_walk_forward"] = False
+    with pytest.raises(ValidationError, match=r"[Ee]xtra|holdout_walk_forward|Literal"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+def test_amendment_1_5_records_the_v4_pre_registration_additively() -> None:
+    contract = load_phase1_evaluation()
+    amendment = next(a for a in contract.amendments if a.version == "1.5")
+    assert amendment.candidates_evaluated_before_amendment == 3
+    assert amendment.date == "2026-07-28"
+    assert "stage_a_candidate_v4" in amendment.changed
+    assert "additive" in amendment.changed
+    assert "INVALIDATED" in amendment.reason
+    assert "four defects" in amendment.reason
+    # The V2 policy, the frozen V3 policy, and every promotion gate are untouched.
+    assert contract.stage_a_candidate.name == "dixon_coles_team_goals_v2"
+    assert contract.stage_a_candidate_v3 is not None
+    assert contract.stage_a_candidate_v3.name == "dynamic_team_goals_v3"
+    gate = contract.promotion
+    assert gate.minimum_primary_relative_lift == 0.01
+    assert gate.maximum_crps_relative_regression == 0.0
+    assert gate.pit_interval_80_maximum_absolute_error == 0.05
+
+
+def test_v4_grid_values_must_be_ordered_unique_and_bounded() -> None:
+    document = copy.deepcopy(_document())
+    candidate = document["stage_a_candidate_v4"]
+    assert isinstance(candidate, dict)
+    candidate["retention"] = [1.0, 0.995, 0.985]  # decreasing
+    with pytest.raises(ValueError, match="unique and increasing"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+def test_v4_fallback_outside_the_grid_is_rejected() -> None:
+    document = copy.deepcopy(_document())
+    candidate = document["stage_a_candidate_v4"]
+    assert isinstance(candidate, dict)
+    candidate["fallback_learning_rate"] = 0.13  # not in the declared grid
+    with pytest.raises(ValueError, match="fallback learning rate"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+def test_v4_must_stay_development_only() -> None:
+    document = copy.deepcopy(_document())
+    candidate = document["stage_a_candidate_v4"]
+    assert isinstance(candidate, dict)
+    candidate["development_only"] = False
+    with pytest.raises(ValidationError, match=r"[Ee]xtra|development_only|Literal"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+def test_v4_is_optional_and_preserves_v1_v2_v3() -> None:
+    """Removing the V4 block still loads the contract, with V2 and the frozen V3 intact."""
+    document = copy.deepcopy(_document())
+    document.pop("stage_a_candidate_v4")
+    contract = Phase1EvaluationConfig.model_validate(document)
+    assert contract.stage_a_candidate_v4 is None
+    assert contract.stage_a_candidate.name == "dixon_coles_team_goals_v2"
+    assert contract.stage_a_candidate_v3 is not None
+    assert contract.stage_a_candidate_v3.name == "dynamic_team_goals_v3"
+    assert "dynamic_team_goals_v4" not in contract.baselines.stage_a
