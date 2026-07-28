@@ -28,6 +28,12 @@ procedure pins and a fold-local promoted-prior estimator. Its single historical 
 evaluation (1.4945 mean log score, +0.3888% lift over the 1.5003 baseline, short of the 1% gate,
 fractionally behind V2) is development-only and not a promotion verdict; the trailing-goals
 baseline remains Stage A.
+Phase 2's Stage B (player minutes) evaluation contract is pre-registered and implemented at
+version 1.0 (`config/phase2_evaluation.yaml`, `docs/phase2-evaluation-contract.md`): four
+ordered minute bins whose 60-minute boundary is cross-checked against the scoring rules, the
+registered player population, required baselines, metrics, and a frozen promotion gate. No
+Stage B model has been fitted; the historical number it will produce is a development number,
+not an upper bound.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -241,7 +247,18 @@ Unless the user sets another priority, address prerequisites before model sophis
    observing candidate results. The bar is `trailing_goals_attack_defence` at mean log score
    1.5003 over 181 folds and 3,640 predictions; a candidate needs **1.4853** or better to
    clear the 1% lift gate, and must not lose to that baseline in any reported season.
-5. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
+5. The next Stage B task is implementing the EXACT four baselines frozen in
+   `config/phase2_evaluation.yaml` contract 1.0 (`position_minutes_frequency`,
+   `last_observed_player_minutes`, `trailing_5_player_minutes`,
+   `trailing_5_team_position_minutes`) and the player-grain `(season, code, fixture)`
+   walk-forward harness under that contract. NO Stage B candidate may be fitted before those
+   prerequisites pass. The contract freezes the population, target-roster knowledge-time
+   policy, bin shape, baseline definitions, metrics, scoring/calibration definitions, and
+   promotion gate via the typed loader; every frozen set is exact (additions as well as
+   deletions are rejected) and every frozen scalar is pinned. The historical number it will
+   produce is a development number, not an upper bound, and a gate may never be amended after
+   a candidate is judged.
+6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff
 

@@ -662,6 +662,650 @@ class Phase1EvaluationConfig(_Frozen):
 
 
 # --------------------------------------------------------------------------------------
+# Phase 2 evaluation contract (Stage B player minutes)
+# --------------------------------------------------------------------------------------
+
+
+class Phase2Amendment(_Frozen):
+    """One recorded change to the Phase 2 contract. Mirrors the Phase 1 discipline: an
+    amendment must say when it happened and how many candidates had been evaluated by then,
+    so a gate cannot be rewritten between two commits and read as if it had always said so."""
+
+    version: str = Field(min_length=1)
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    candidates_evaluated_before_amendment: int = Field(ge=0)
+    changed: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    evidence: str = Field(min_length=1)
+    tolerance_rationale: str | None = None
+    deferred: str | None = None
+
+
+class Phase2TargetPolicy(_Frozen):
+    entity: Literal["player"]
+    # Player-fixture grain, not player-gameweek: double gameweeks are separate fixtures.
+    grain: Literal["season_player_code_fixture"]
+    outcome: Literal["minutes_distribution"]
+    # Pinned to the exact ruleset whose appearance / clean-sheet thresholds define the 60-minute
+    # bin boundary. A different ruleset requires a new contract version, not a silent edit.
+    downstream_points_ruleset: Literal["2026_27"]
+    # `code` is the stable cross-season player key (1:1 with permanent identity).
+    # `element_id`/`element` are season-scoped and reassigned yearly; across this archive
+    # element_id 308 is Almiron/Aké/Salah/Ward/Heath across five seasons, so a bare
+    # element_id cross-season join merges five different players. Cross-season tracking uses
+    # `code`; the only season-local alternative is a (season, element_id) key.
+    identity_policy: Literal["code_is_cross_season_player_key"]
+
+
+class Phase2PopulationPolicy(_Frozen):
+    # The REGISTERED FPL PLAYER POPULATION: every player-fixture row with a non-NULL minutes
+    # outcome, including registered nonparticipants at minutes=0. Zero-minute rows are never
+    # filtered.
+    include_zero_minutes: Literal[True]
+    eligible_outcome: Literal["minutes_not_null"]
+    registered_population: Literal["mart_fact_player_fixture_minutes_not_null"]
+
+
+# The exact column set the target roster may carry into the minutes model. Identity/schedule
+# metadata only: ``code`` is the stable cross-season player key, ``team_id`` is season-qualified,
+# and ``minutes`` (the LABEL) is deliberately absent -- it lives outside the model-facing
+# projection. Defined here as a plain module constant (NOT imported from ``fpl.features.pit``)
+# because ``features.pit -> storage.db -> config`` would be a circular import. The authoritative
+# disjointness check against the real ``OUTCOME_COLUMNS`` lives in the test file, where importing
+# ``fpl.features.pit`` is safe.
+PHASE2_TARGET_ROSTER_PROXY_COLUMNS: frozenset[str] = frozenset(
+    {
+        "season",
+        "gw",
+        "fixture",
+        "kickoff_time",
+        "code",
+        "position",
+        "team_id",
+        "opponent_team_id",
+        "was_home",
+    }
+)
+# Outcome / season-scoped-alias columns the proxy must NEVER carry. ``minutes`` is the label;
+# ``starts`` is an outcome; ``element_id``/``element`` are season-scoped and reassigned yearly.
+PHASE2_TARGET_ROSTER_FORBIDDEN_COLUMNS: frozenset[str] = frozenset(
+    {"element_id", "element", "minutes", "starts"}
+)
+
+
+class Phase2TargetRosterPolicy(_Frozen):
+    """Which players to predict, and from what -- the knowledge-time policy.
+
+    The minutes model cannot discover which players to predict from
+    ``PointInTimeView.schedule()`` (a team-level schedule projection), and the archive does not
+    version player registration, position, or club at the real FPL deadline. This policy records
+    honestly that the historical target roster is an UNVERSIONED archive proxy projected from the
+    target rows -- analogous to the schedule-cutoff limitation -- and pins the exact safe proxy
+    column set plus the live/prospective requirement. The proxy columns are validated to equal
+    ``PHASE2_TARGET_ROSTER_PROXY_COLUMNS`` exactly (rejecting additions and deletions) and to be
+    disjoint from ``PHASE2_TARGET_ROSTER_FORBIDDEN_COLUMNS``.
+    """
+
+    historical_roster_status: Literal["archive_proxy_unversioned_at_real_deadline"]
+    historical_source: Literal[
+        "archive_player_fixture_identity_schedule_proxy_projected_from_target_rows"
+    ]
+    proxy_columns: frozenset[str]
+    minutes_role: Literal["label_outside_model_facing_projection"]
+    live_prospective_registry: Literal[
+        "versioned_player_registry_selected_known_at_le_as_of_before_model_sees_entity_team_position"
+    ]
+    cross_season_team_identity: Literal["season_qualified_team_id_resolved_to_stable_team_code"]
+    point_in_time_disclaimer: Literal["not_fully_reconstructable_pit_at_real_deadline"]
+
+    @model_validator(mode="after")
+    def _proxy_columns_pinned(self) -> Self:
+        if self.proxy_columns != PHASE2_TARGET_ROSTER_PROXY_COLUMNS:
+            missing = PHASE2_TARGET_ROSTER_PROXY_COLUMNS - self.proxy_columns
+            extra = self.proxy_columns - PHASE2_TARGET_ROSTER_PROXY_COLUMNS
+            parts: list[str] = []
+            if missing:
+                parts.append(f"missing required proxy columns: {sorted(missing)}")
+            if extra:
+                parts.append(f"unexpected proxy columns: {sorted(extra)}")
+            raise ValueError(
+                "Phase 2 target roster proxy columns must be exactly "
+                f"{sorted(PHASE2_TARGET_ROSTER_PROXY_COLUMNS)}; " + "; ".join(parts)
+            )
+        overlap = PHASE2_TARGET_ROSTER_FORBIDDEN_COLUMNS & self.proxy_columns
+        if overlap:
+            raise ValueError(
+                "Phase 2 target roster proxy columns must be disjoint from the forbidden "
+                f"outcome/alias columns {sorted(PHASE2_TARGET_ROSTER_FORBIDDEN_COLUMNS)}; "
+                f"overlap: {sorted(overlap)}"
+            )
+        if "code" not in self.proxy_columns:
+            raise ValueError(
+                "Phase 2 target roster proxy columns must include 'code' (the stable "
+                "cross-season player key)"
+            )
+        return self
+
+
+class Phase2CutoffPolicy(_Frozen):
+    split_unit: Literal["observed_gameweek"]
+    prediction_time: Literal["archive_first_kickoff_proxy_for_gameweek_deadline"]
+    observed_results: Literal["kickoff_time < as_of"]
+    snapshot_versions: Literal["known_at <= as_of"]
+
+
+class Phase2TrainingPolicy(_Frozen):
+    window: Literal["expanding"]
+    minimum_observed_gameweeks: Literal[8]
+    # No minimum player-history exclusion: every eligible row gets a fallback distribution.
+    no_minimum_player_history_exclusion: Literal[True]
+    cold_start_policy: Literal["every_eligible_row_receives_fallback_distribution"]
+    fit_transforms_within_fold: Literal[True]
+    preserve_nulls: Literal[True]
+    seed: Literal[202627]
+
+
+class Phase2MinuteBin(_Frozen):
+    """One ordered minute bin. Keys are frozen; boundaries are explicit config data."""
+
+    key: Literal["0", "1_59", "60_89", "90"]
+    minutes_min: int = Field(ge=0)
+    # None means unbounded above (the "90" bin folds 90-or-above into full match).
+    minutes_max: int | None
+
+
+def _expected_bin_range(key: str) -> tuple[int, int | None]:
+    """Derive the expected ``(minutes_min, minutes_max)`` from the frozen bin KEY text.
+
+    The numeric range is a property of the key string itself, never hardcoded separately, so
+    the key is the single source of the range and contiguity is structural:
+
+      - ``"0"``    => ``(0, 0)``        -- bare point bin at zero
+      - ``"1_59"`` => ``(1, 59)``       -- split on ``"_"`` yields the closed range
+      - ``"60_89"``=> ``(60, 89)``
+      - ``"90"``   => ``(90, None)``    -- bare point bin, open-ended above (90-or-above folds)
+    """
+    if "_" in key:
+        low_text, high_text = key.split("_", 1)
+        return int(low_text), int(high_text)
+    point = int(key)
+    if point == 0:
+        return 0, 0
+    return point, None  # bare "90" is open-ended above
+
+
+class Phase2OutputPolicy(_Frozen):
+    bins: tuple[Phase2MinuteBin, ...]
+
+    @model_validator(mode="after")
+    def _ordered_contiguous_four_bins(self) -> Self:
+        if len(self.bins) != 4:
+            raise ValueError("Stage B requires exactly four minute bins")
+        keys = tuple(bin_.key for bin_ in self.bins)
+        expected_keys: tuple[str, ...] = ("0", "1_59", "60_89", "90")
+        if keys != expected_keys:
+            raise ValueError(
+                f"Stage B bin keys must be exactly {expected_keys} in order; got {keys}"
+            )
+        # Bin numeric ranges are DERIVED FROM THE FROZEN KEY TEXT, never hardcoded separately.
+        # Validating each bin's min/max against its key-derived expectation also enforces
+        # contiguity and the open-ended "90" tail structurally.
+        for bin_ in self.bins:
+            expected_min, expected_max = _expected_bin_range(bin_.key)
+            if bin_.minutes_min != expected_min:
+                raise ValueError(
+                    f'Stage B bin "{bin_.key}" minutes_min must equal the key-derived value '
+                    f"{expected_min}; got {bin_.minutes_min}"
+                )
+            if bin_.minutes_max != expected_max:
+                raise ValueError(
+                    f'Stage B bin "{bin_.key}" minutes_max must equal the key-derived value '
+                    f"{expected_max}; got {bin_.minutes_max}"
+                )
+        return self
+
+    def long_bin_lower_boundary(self) -> int:
+        """The 60-minute lower boundary of the "60_89" bin, read from this contract.
+
+        This is the value the loader cross-checks against the downstream ruleset's
+        appearance.long_play_minutes and clean_sheets.minimum_minutes. It is never hardcoded.
+        """
+        return self.bins[2].minutes_min
+
+
+# The exact, name-keyed pin table for the four Stage B baselines. Each entry fixes the
+# identity, population, order, window, and fallback its name requires; the per-baseline
+# ``model_validator`` rejects any field that drifts from its pin.
+_PHASE2_BASELINE_PINS: dict[str, dict[str, str | int | None]] = {
+    "position_minutes_frequency": {
+        "identity": "target_position",
+        "population": "all_prior_eligible_rows_at_target_position",
+        "order": "none_applicable_all_rows",
+        "window": None,
+        "fallback": "unsmoothed_all_position_prior_rows",
+        "estimator": "raw_empirical_bin_frequency_count_divided_by_n",
+    },
+    "last_observed_player_minutes": {
+        "identity": "stable_code",
+        "population": "most_recent_prior_player_fixture_row",
+        "order": "kickoff_time_then_season_then_fixture",
+        "window": None,
+        "fallback": "position_minutes_frequency",
+        "estimator": "raw_empirical_bin_frequency_count_divided_by_n",
+    },
+    "trailing_5_player_minutes": {
+        "identity": "stable_code",
+        "population": "up_to_5_most_recent_prior_player_fixture_rows_including_zero",
+        "order": "kickoff_time_then_season_then_fixture",
+        "window": 5,
+        "fallback": "position_minutes_frequency",
+        "estimator": "raw_empirical_bin_frequency_count_divided_by_n",
+    },
+    "trailing_5_team_position_minutes": {
+        "identity": "season_qualified_team_id_resolved_to_stable_team_code",
+        "population": (
+            "all_prior_eligible_rows_at_target_position_in_clubs_5_most_recent_completed_fixtures"
+        ),
+        "order": "kickoff_time_then_season_then_fixture",
+        "window": 5,
+        "fallback": "position_minutes_frequency",
+        "estimator": "raw_empirical_bin_frequency_count_divided_by_n",
+    },
+}
+
+
+class Phase2BaselineDefinition(_Frozen):
+    """One frozen Stage B baseline definition.
+
+    The discriminating ``name`` selects the exact deterministic algorithm; a ``model_validator``
+    pins every other field to the value that name requires, so any drift in window, smoothing,
+    fallback, order, identity, or population fails to load. Probability estimates are raw
+    ``count / n`` with NO additive smoothing (``additive_smoothing`` is pinned to ``"none"``);
+    a one-hot zero probability REMAINS zero and is handled only by the registered
+    log-probability floor (see ``Phase2ScoringCalibrationPolicy``).
+    """
+
+    name: Literal[
+        "position_minutes_frequency",
+        "last_observed_player_minutes",
+        "trailing_5_player_minutes",
+        "trailing_5_team_position_minutes",
+    ]
+    identity: Literal[
+        "target_position",
+        "stable_code",
+        "season_qualified_team_id_resolved_to_stable_team_code",
+    ]
+    population: Literal[
+        "all_prior_eligible_rows_at_target_position",
+        "most_recent_prior_player_fixture_row",
+        "up_to_5_most_recent_prior_player_fixture_rows_including_zero",
+        "all_prior_eligible_rows_at_target_position_in_clubs_5_most_recent_completed_fixtures",
+    ]
+    order: Literal[
+        "none_applicable_all_rows",
+        "kickoff_time_then_season_then_fixture",
+    ]
+    window: int | None
+    additive_smoothing: Literal["none"]
+    fallback: Literal[
+        "unsmoothed_all_position_prior_rows",
+        "position_minutes_frequency",
+    ]
+    # The probability estimator: raw empirical bin frequency = count of
+    # occurrences in a bin divided by total n (a one-hot / empirical frequency
+    # distribution over the four ordered minute bins; for last-observed this is
+    # effectively a one-row empirical frequency / one-hot). A Literal so any
+    # other value is rejected, and pinned per-name via ``_PHASE2_BASELINE_PINS``
+    # so changing it on any baseline fails to load.
+    estimator: Literal["raw_empirical_bin_frequency_count_divided_by_n"]
+
+    @model_validator(mode="after")
+    def _pinned_to_name(self) -> Self:
+        pinned = _PHASE2_BASELINE_PINS[self.name]
+        for field_name, expected_value in pinned.items():
+            actual = getattr(self, field_name)
+            if actual != expected_value:
+                raise ValueError(
+                    f'Stage B baseline "{self.name}" has {field_name}={actual!r} but the '
+                    f"frozen definition pins it to {expected_value!r}"
+                )
+        return self
+
+
+class Phase2BaselinePolicy(_Frozen):
+    stage_b: frozenset[str]
+    definitions: tuple[Phase2BaselineDefinition, ...]
+    # ep_next is points, not minutes; pinned as excluded so it cannot be silently added.
+    excluded: frozenset[str]
+
+    @model_validator(mode="after")
+    def _definitions_match_stage_b(self) -> Self:
+        names = [definition.name for definition in self.definitions]
+        if len(names) != len(set(names)):
+            raise ValueError(
+                f"Stage B baseline definitions have duplicate names: {names}; each baseline "
+                "must be defined exactly once"
+            )
+        if set(names) != self.stage_b:
+            raise ValueError(
+                f"Stage B baseline definition names {sorted(set(names))} must match the "
+                f"stage_b set exactly {sorted(self.stage_b)}"
+            )
+        return self
+
+
+class Phase2MetricPolicy(_Frozen):
+    primary: Literal["mean_log_score"]
+    primary_direction: Literal["lower_is_better"]
+    proper_distribution: frozenset[str]
+    binary_guardrails: frozenset[str]
+    calibration: frozenset[str]
+    reliability_buckets_carry_n: Literal[True]
+    ranking: frozenset[str]
+
+
+class Phase2PromotionGate(_Frozen):
+    compare_against: Literal["best_eligible_required_stage_b_baseline"]
+    comparison_population: Literal["same_eligible_predictions"]
+    relative_lift_formula: Literal["(baseline - candidate) / abs(baseline)"]
+    minimum_primary_relative_lift: float
+    # AGGREGATE guardrails only: RPS and Brier non-regression are evaluated on the full
+    # prediction set, never per season. ONLY mean log score has a per-season non-regression
+    # rule (``require_no_season_mean_log_score_regression``).
+    maximum_ranked_probability_score_relative_regression: float
+    maximum_brier_relative_regression_any_minutes: float
+    maximum_brier_relative_regression_60_plus: float
+    pit_interval_80_maximum_absolute_error: float
+    minimum_fold_count: Literal[181]
+    require_no_season_mean_log_score_regression: Literal[True]
+    require_zero_leakage_failures: Literal[True]
+    # Pinned to exactly 1.0: every eligible row must receive a prediction. May not be relaxed.
+    minimum_prediction_coverage: float
+
+    @field_validator("minimum_primary_relative_lift")
+    @classmethod
+    def _lift_pinned(cls, value: float) -> float:
+        if value != 0.01:
+            raise ValueError(f"minimum_primary_relative_lift is pinned to 0.01; got {value!r}")
+        return value
+
+    @field_validator("maximum_ranked_probability_score_relative_regression")
+    @classmethod
+    def _rps_regression_pinned(cls, value: float) -> float:
+        if value != 0.0:
+            raise ValueError(
+                "maximum_ranked_probability_score_relative_regression is pinned to 0.0 "
+                f"(aggregate guardrail only; got {value!r})"
+            )
+        return value
+
+    @field_validator("maximum_brier_relative_regression_any_minutes")
+    @classmethod
+    def _brier_any_pinned(cls, value: float) -> float:
+        if value != 0.0:
+            raise ValueError(
+                "maximum_brier_relative_regression_any_minutes is pinned to 0.0 "
+                f"(aggregate guardrail only; got {value!r})"
+            )
+        return value
+
+    @field_validator("maximum_brier_relative_regression_60_plus")
+    @classmethod
+    def _brier_60_plus_pinned(cls, value: float) -> float:
+        if value != 0.0:
+            raise ValueError(
+                "maximum_brier_relative_regression_60_plus is pinned to 0.0 "
+                f"(aggregate guardrail only; got {value!r})"
+            )
+        return value
+
+    @field_validator("pit_interval_80_maximum_absolute_error")
+    @classmethod
+    def _pit_error_pinned(cls, value: float) -> float:
+        if value != 0.05:
+            raise ValueError(
+                f"pit_interval_80_maximum_absolute_error is pinned to 0.05; got {value!r}"
+            )
+        return value
+
+    @field_validator("minimum_prediction_coverage")
+    @classmethod
+    def _coverage_is_total(cls, value: float) -> float:
+        if value != 1.0:
+            raise ValueError(
+                "minimum_prediction_coverage is pinned to 1.0: every eligible row must "
+                "receive a prediction, and this gate may not be relaxed"
+            )
+        return value
+
+
+class Phase2ReportingPolicy(_Frozen):
+    dimensions: frozenset[str]
+    counts: frozenset[str]
+    starts_reporting: Literal["measured_only"]
+
+
+class Phase2HistoricalFeaturePolicy(_Frozen):
+    availability_status: Literal["excluded_unavailable_in_archive"]
+    point_in_time_only: Literal["reconstructable_fields_only"]
+    live_availability_prospective_candidate: Literal["separately_named_prospective_only"]
+    # The historical number is a development number on the local archive, NOT an upper bound.
+    historical_score_is: Literal["development_number_not_upper_bound"]
+
+
+class Phase2ScoringCalibrationPolicy(_Frozen):
+    """Frozen scoring / calibration definitions for Stage B.
+
+    Values and semantics are pinned; a config that silently weakens a log-probability floor, a
+    metric definition, the randomised-PIT band, the PIT seed, or the reliability grid fails to
+    load. This block freezes DEFINITIONS only -- the metric FUNCTIONS themselves are implemented
+    in a separate slice (``validate`` / ``models``), not here.
+    """
+
+    log_probability_floor: float
+    ranked_probability_score: Literal[
+        "sum_of_squared_ordered_category_cdf_errors_not_physical_minute_distance"
+    ]
+    brier: Literal["squared_binary_probability_error"]
+    randomized_pit_band: tuple[float, float]
+    randomized_pit_seed: Literal[202627]
+    reliability_edges: tuple[float, ...]
+    reliability_buckets: Literal["left_closed_right_open_except_final_bucket_right_closed"]
+    reliability_bucket_n: Literal[True]
+
+    @field_validator("log_probability_floor")
+    @classmethod
+    def _log_probability_floor_pinned(cls, value: float) -> float:
+        if value != 1e-12:
+            raise ValueError(f"log_probability_floor is pinned to 1e-12; got {value!r}")
+        return value
+
+    @field_validator("randomized_pit_band")
+    @classmethod
+    def _pit_band_pinned(cls, value: tuple[float, float]) -> tuple[float, float]:
+        if value != (0.1, 0.9):
+            raise ValueError(f"randomized_pit_band is pinned to (0.1, 0.9); got {value!r}")
+        return value
+
+    @field_validator("reliability_edges")
+    @classmethod
+    def _reliability_edges_pinned(cls, value: tuple[float, ...]) -> tuple[float, ...]:
+        expected = tuple(round(i / 10, 1) for i in range(11))
+        if value != expected:
+            raise ValueError(
+                f"reliability_edges is pinned to 0.0..1.0 in 0.1 steps ({expected}); got {value!r}"
+            )
+        return value
+
+
+class Phase2MonteCarloPolicy(_Frozen):
+    scope: Literal["out_of_scope_closed_form_marginal"]
+
+
+# The original Phase 2 contract version. A non-original version requires an amendment record;
+# the original does not. Mirrors the Phase 1 original-version discipline.
+ORIGINAL_PHASE2_CONTRACT_VERSION: str = "1.0"
+
+
+def _require_exact_set(actual: frozenset[str], required: set[str], *, label: str) -> None:
+    """Exact-set check: reject additions as well as deletions.
+
+    Keeps the ``missing required <label>`` wording so existing tests stay valid; unexpected
+    extras get a parallel ``unexpected <label>`` message. Used for every frozen Stage B set so
+    a baseline, metric, dimension, or count cannot be silently added or dropped.
+    """
+    if actual == required:
+        return
+    missing = required - actual
+    extra = actual - required
+    parts: list[str] = []
+    if missing:
+        parts.append(f"missing required {label}: {sorted(missing)}")
+    if extra:
+        parts.append(f"unexpected {label}: {sorted(extra)}")
+    raise ValueError(f"Phase 2 {label} must be exactly {sorted(required)}; " + "; ".join(parts))
+
+
+class Phase2EvaluationConfig(_Frozen):
+    """Executable entry and promotion contract for the Stage B (player minutes) walk-forward.
+
+    Stage B predicts a four-bin minutes distribution over the registered FPL player
+    population. No model is fit by this contract: it freezes the population, grain, identity
+    policy, bin shape, baselines, metrics, and promotion gate before any candidate exists. The
+    60-minute bin boundary is cross-checked against the configured downstream ruleset at load
+    time via :meth:`verify_minutes_boundary`.
+    """
+
+    contract_version: Literal["1.0"]
+    phase: Literal[2]
+    amendments: tuple[Phase2Amendment, ...] = ()
+    target: Phase2TargetPolicy
+    target_roster: Phase2TargetRosterPolicy
+    population: Phase2PopulationPolicy
+    cutoff: Phase2CutoffPolicy
+    training: Phase2TrainingPolicy
+    output: Phase2OutputPolicy
+    baselines: Phase2BaselinePolicy
+    metrics: Phase2MetricPolicy
+    promotion: Phase2PromotionGate
+    reporting: Phase2ReportingPolicy
+    historical_features: Phase2HistoricalFeaturePolicy
+    scoring_calibration: Phase2ScoringCalibrationPolicy
+    monte_carlo: Phase2MonteCarloPolicy
+
+    @model_validator(mode="after")
+    def _required_baselines_metrics_and_outputs(self) -> Self:
+        # Every frozen Stage B set is EXACT: a baseline, metric, dimension, or count may be
+        # neither silently dropped nor silently added.
+        _require_exact_set(
+            self.baselines.stage_b,
+            {
+                "position_minutes_frequency",
+                "last_observed_player_minutes",
+                "trailing_5_player_minutes",
+                "trailing_5_team_position_minutes",
+            },
+            label="Stage B baselines",
+        )
+        _require_exact_set(
+            self.baselines.excluded,
+            {"fpl_ep_next_recorded_rules"},
+            label="excluded baselines",
+        )
+        _require_exact_set(
+            self.metrics.proper_distribution,
+            {"mean_log_score", "mean_ranked_probability_score"},
+            label="proper distribution metrics",
+        )
+        _require_exact_set(
+            self.metrics.binary_guardrails,
+            {"mean_brier_any_minutes", "mean_brier_60_plus"},
+            label="binary guardrail metrics",
+        )
+        _require_exact_set(
+            self.metrics.calibration,
+            {
+                "randomized_pit",
+                "pit_interval_80_coverage",
+                "reliability_any_minutes",
+                "reliability_60_plus",
+            },
+            label="calibration outputs",
+        )
+        _require_exact_set(
+            self.metrics.ranking,
+            {"spearman_p60_within_position_gameweek"},
+            label="ranking outputs",
+        )
+        _require_exact_set(
+            self.reporting.dimensions,
+            {
+                "fold",
+                "season",
+                "position",
+                "home_away",
+                "transfer_status",
+                "player_history_cohort",
+            },
+            label="report dimensions",
+        )
+        _require_exact_set(
+            self.reporting.counts,
+            {"predictions", "exclusions", "cold_starts", "uncertainty"},
+            label="report counts",
+        )
+        return self
+
+    @model_validator(mode="after")
+    def _version_needs_amendment_record_unless_original(self) -> Self:
+        """A non-original version must carry its amendment record; the original (1.0) need not."""
+        if self.contract_version != ORIGINAL_PHASE2_CONTRACT_VERSION and not any(
+            amendment.version == self.contract_version for amendment in self.amendments
+        ):
+            raise ValueError(
+                f"Phase 2 contract version {self.contract_version} has no amendment record; "
+                "a pre-registered gate may not change without one"
+            )
+        return self
+
+    def verify_minutes_boundary(self, scoring: ScoringRules) -> Self:
+        """Fail closed unless the long-bin lower boundary matches both scoring thresholds.
+
+        The 60-minute boundary between the "1_59" and "60_89" bins is the appearance /
+        clean-sheet threshold in the downstream ruleset. It is read from this contract's bin
+        definition (never hardcoded in Python) and cross-checked against BOTH
+        ``appearance.long_play_minutes`` and ``clean_sheets.minimum_minutes``. If the two
+        thresholds disagree with each other, if either disagrees with the contract boundary,
+        or if the boundary exceeds 90 minutes, this raises and a new contract / output shape is
+        required.
+        """
+        boundary = self.output.long_bin_lower_boundary()
+        long_play = scoring.appearance.long_play_minutes
+        clean_sheet = scoring.clean_sheets.minimum_minutes
+        if long_play != clean_sheet:
+            raise ValueError(
+                f"downstream ruleset {scoring.ruleset_id!r} is internally inconsistent: "
+                f"appearance.long_play_minutes ({long_play}) != "
+                f"clean_sheets.minimum_minutes ({clean_sheet}); the Stage B bin boundary "
+                "must match a single threshold"
+            )
+        if boundary != long_play:
+            raise ValueError(
+                f"Stage B long-bin lower boundary is {boundary} but downstream ruleset "
+                f"{scoring.ruleset_id!r} appearance.long_play_minutes and "
+                f"clean_sheets.minimum_minutes are both {long_play}; the contract output "
+                "shape must match the scoring threshold, or vice versa"
+            )
+        if boundary > 90:
+            raise ValueError(
+                f"Stage B long-bin lower boundary {boundary} exceeds 90 minutes, which is "
+                "impossible for a match; the contract output shape is invalid"
+            )
+        return self
+
+
+# --------------------------------------------------------------------------------------
 # Loading
 # --------------------------------------------------------------------------------------
 
@@ -723,3 +1367,23 @@ def load_phase1_evaluation(path: Path | None = None) -> Phase1EvaluationConfig:
     return Phase1EvaluationConfig.model_validate(
         _read_yaml(path or config_dir() / "phase1_evaluation.yaml")
     )
+
+
+@functools.cache
+def load_phase2_evaluation(
+    path: Path | None = None,
+    *,
+    scoring_path: Path | None = None,
+) -> Phase2EvaluationConfig:
+    """Load the Phase 2 Stage B contract and cross-check the 60-minute bin boundary.
+
+    ``scoring_path`` is the seam for offline tests: it is forwarded to
+    :func:`load_scoring_rules` for the contract's ``downstream_points_ruleset``, so a test can
+    inject a temporary scoring YAML whose threshold disagrees with the contract and assert the
+    loader fails closed. In production it is ``None`` and the configured ruleset is loaded.
+    """
+    contract = Phase2EvaluationConfig.model_validate(
+        _read_yaml(path or config_dir() / "phase2_evaluation.yaml")
+    )
+    scoring = load_scoring_rules(contract.target.downstream_points_ruleset, path=scoring_path)
+    return contract.verify_minutes_boundary(scoring)

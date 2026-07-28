@@ -1,0 +1,293 @@
+# Phase 2 Stage B (player minutes) evaluation and promotion contract.
+#
+# This file is intentionally defined before any Stage B model code. A candidate cannot choose
+# easier folds, populations, bin shapes, baselines, metrics, or lift gates after seeing its
+# results. The typed loader rejects a missing required comparison, a mutated bin shape, and --
+# crucially -- any disagreement between the 60-minute bin boundary and the configured
+# downstream ruleset's appearance / clean-sheet thresholds.
+#
+# NO model has been fit under this contract. Zero candidates and zero evaluations precede it.
+
+contract_version: "1.0"
+phase: 2
+
+# Amending a pre-registered contract is only legitimate before a candidate exists to bias the
+# choice, and only with the reason recorded. The original version (1.0) needs no amendment
+# record; the loader's "a version other than 1.0 requires an amendment record" rule is forward
+# machinery only. This is the original version, so the list is empty.
+amendments: []
+
+target:
+  entity: player
+  # Player-fixture grain, NOT player-gameweek. Double gameweeks are SEPARATE fixtures: the
+  # source carries one (season, code, fixture) row per fixture, and collapsing them would
+  # destroy the minutes signal.
+  grain: season_player_code_fixture
+  outcome: minutes_distribution
+  # Pins the downstream scoring ruleset whose appearance / clean-sheet thresholds define the
+  # 60-minute bin boundary. The loader cross-checks the boundary against BOTH
+  # appearance.long_play_minutes AND clean_sheets.minimum_minutes for this ruleset.
+  downstream_points_ruleset: "2026_27"
+  # Player identity: `code` is the stable cross-season key (1:1 with the player's permanent
+  # identity). `element_id` / archive `element` are season-scoped and REASSIGNED yearly.
+  # Across this archive element_id 308 is Almiron (2021-22), Aké (2022-23), Salah (2023-24),
+  # Ward (2024-25), and Heath (2025-26); joining a bare element_id across seasons merges five
+  # different players into one history. Cross-season player tracking MUST use `code`; the only
+  # permitted season-local alternative is a season-qualified (season, element_id) key.
+  identity_policy: code_is_cross_season_player_key
+
+target_roster:
+  # The minutes model cannot discover which players to predict from PointInTimeView.schedule()
+  # (a team-level schedule projection), and the archive does NOT version player registration /
+  # position / club at the real FPL deadline. The historical target roster is therefore an
+  # UNVERSIONED archive proxy projected from the target rows -- analogous to the schedule-cutoff
+  # limitation, NOT a claim that membership/position/club were known at the real deadline.
+  historical_roster_status: archive_proxy_unversioned_at_real_deadline
+  historical_source: archive_player_fixture_identity_schedule_proxy_projected_from_target_rows
+  # Identity/schedule metadata ONLY. `code` is the stable cross-season player key; `team_id` is
+  # season-qualified. `minutes` is the LABEL and is kept OUT of this projection; `element_id` /
+  # `element` are season-scoped aliases and absent. The exact set is enforced by the typed
+  # loader (it must equal this list exactly and stay disjoint from the outcome columns).
+  proxy_columns:
+    - season
+    - gw
+    - fixture
+    - kickoff_time
+    - code
+    - position
+    - team_id
+    - opponent_team_id
+    - was_home
+  minutes_role: label_outside_model_facing_projection
+  # Live / prospective Stage B work must select entities from a versioned player registry whose
+  # known_at <= as_of BEFORE the model sees entity / team / position -- the historical proxy
+  # cannot be reused there without forfeiting any historical-lift claim.
+  live_prospective_registry: versioned_player_registry_selected_known_at_le_as_of_before_model_sees_entity_team_position
+  # Never join a bare team_id across seasons; resolve the target row's season-qualified team_id
+  # to the stable team_code for any cross-season club identity.
+  cross_season_team_identity: season_qualified_team_id_resolved_to_stable_team_code
+  point_in_time_disclaimer: not_fully_reconstructable_pit_at_real_deadline
+
+population:
+  # The REGISTERED FPL PLAYER POPULATION: every mart_fact_player_fixture row with a non-NULL
+  # `minutes` outcome for a club fixture, INCLUDING registered nonparticipants at minutes=0.
+  # The source carries the broader registered FPL player pool -- a median of 33-39 player rows
+  # per team-fixture (min 23, median 36, max 59) -- of which only about 13.8-15.2 actually play
+  # (minutes>0; min 11, median 15, max 17). This is the registered FPL player population, NOT a
+  # matchday-squad population, and the registered count strictly exceeds the appeared count for
+  # every team-fixture. Zero-minute rows are NEVER filtered: most registered rows do not play,
+  # so dropping them would hide the single most load-bearing probability mass in the system.
+  include_zero_minutes: true
+  eligible_outcome: minutes_not_null
+  # Evidence (local archive, no DB needed to read this contract): 138,707 unique
+  # (season, code, fixture) keys; zero NULL minutes; per-team-fixture registered population
+  # min/median/max = 23/36/59 and appeared (minutes>0) = 11/15/17; minutes range 0-90.
+  registered_population: mart_fact_player_fixture_minutes_not_null
+
+cutoff:
+  # Iterate OBSERVED gameweek values actually present in the facts. 2022-23 has no GW7; a
+  # walk-forward that assumed range(1, 39) would train on an empty gameweek.
+  split_unit: observed_gameweek
+  # The archive has no authoritative deadline history and no versioned historical availability.
+  # First kickoff in the predicted gameweek is the latest available proxy that still excludes
+  # every outcome from that gameweek. It is a proxy, NOT a claim that schedule, postponement,
+  # or availability fields were known at the real deadline.
+  prediction_time: archive_first_kickoff_proxy_for_gameweek_deadline
+  observed_results: "kickoff_time < as_of"
+  snapshot_versions: "known_at <= as_of"
+
+training:
+  window: expanding
+  minimum_observed_gameweeks: 8
+  # NO minimum player-history exclusion. Every eligible row receives a prediction; a row with
+  # no usable player history receives the declared fallback distribution and is reported as a
+  # cold start, never dropped.
+  no_minimum_player_history_exclusion: true
+  cold_start_policy: every_eligible_row_receives_fallback_distribution
+  fit_transforms_within_fold: true
+  preserve_nulls: true
+  seed: 202627
+
+output:
+  # Four ORDERED minute bins. The KEYS are frozen; the minute BOUNDARIES are explicit fields
+  # below. The 60-minute lower boundary of "60_89" is read from this contract (never hardcoded
+  # in Python) and cross-checked at load time against the configured downstream ruleset's
+  # appearance.long_play_minutes AND clean_sheets.minimum_minutes. The loader fails closed if
+  # those two thresholds disagree with each other, if either disagrees with the contract
+  # boundary, or if the boundary exceeds 90.
+  bins:
+    - key: "0"
+      minutes_min: 0
+      minutes_max: 0
+    - key: "1_59"
+      minutes_min: 1
+      minutes_max: 59
+    - key: "60_89"
+      minutes_min: 60
+      minutes_max: 89
+    - key: "90"
+      minutes_min: 90
+      # 90 or above, folded into full match. minutes_max null means unbounded above.
+      minutes_max: null
+
+baselines:
+  # Every baseline produces the SAME four-bin distribution on the SAME eligible population.
+  # Each definition is frozen to its exact deterministic algorithm; the implementations are a
+  # separate slice. None carries an unregistered tunable parameter. Probability estimates are
+  # raw count/n with NO additive smoothing; a one-hot zero probability REMAINS zero and is
+  # handled ONLY by the registered log-probability floor (scoring_calibration below). Order is
+  # always kickoff_time then season then fixture where an order applies.
+  stage_b:
+    - position_minutes_frequency
+    - last_observed_player_minutes
+    - trailing_5_player_minutes
+    - trailing_5_team_position_minutes
+  definitions:
+    # Fold-local UNsmoothed empirical four-bin frequency over ALL prior eligible training rows
+    # at the target player's CURRENT position. Fallback if that position has no rows =
+    # unsmoothed all-position prior rows. (No smoothing; raw count/n.)
+    - name: position_minutes_frequency
+      identity: target_position
+      population: all_prior_eligible_rows_at_target_position
+      order: none_applicable_all_rows
+      window: null
+      additive_smoothing: none
+      fallback: unsmoothed_all_position_prior_rows
+      estimator: raw_empirical_bin_frequency_count_divided_by_n
+    # Identity = stable `code`. ONE-HOT distribution at the most recent prior player-fixture
+    # bin. Fallback if no prior row = position_minutes_frequency.
+    - name: last_observed_player_minutes
+      identity: stable_code
+      population: most_recent_prior_player_fixture_row
+      order: kickoff_time_then_season_then_fixture
+      window: null
+      additive_smoothing: none
+      fallback: position_minutes_frequency
+      estimator: raw_empirical_bin_frequency_count_divided_by_n
+    # Identity = stable `code`. UNsmoothed empirical frequency over up to the FIVE most recent
+    # prior player-fixture rows INCLUDING zero-minute rows. Fallback if none =
+    # position_minutes_frequency. (Window pinned to exactly 5.)
+    - name: trailing_5_player_minutes
+      identity: stable_code
+      population: up_to_5_most_recent_prior_player_fixture_rows_including_zero
+      order: kickoff_time_then_season_then_fixture
+      window: 5
+      additive_smoothing: none
+      fallback: position_minutes_frequency
+      estimator: raw_empirical_bin_frequency_count_divided_by_n
+    # Resolve target club from the target row's SEASON-QUALIFIED team_id to the STABLE
+    # team_code; select that club's FIVE most recent COMPLETED fixtures before cutoff; take
+    # UNsmoothed empirical frequency over ALL prior eligible player rows at the TARGET position
+    # in those fixtures. Fallback if none = position_minutes_frequency. NEVER use
+    # mart_dim_player.team_id and NEVER join a bare team_id across seasons.
+    - name: trailing_5_team_position_minutes
+      identity: season_qualified_team_id_resolved_to_stable_team_code
+      population: all_prior_eligible_rows_at_target_position_in_clubs_5_most_recent_completed_fixtures
+      order: kickoff_time_then_season_then_fixture
+      window: 5
+      additive_smoothing: none
+      fallback: position_minutes_frequency
+      estimator: raw_empirical_bin_frequency_count_divided_by_n
+  # ep_next is NOT a Stage B baseline: it is FPL POINTS, not minutes, and predicting points is
+  # a later stage. Pinned here as excluded so it cannot be silently added as a comparator.
+  excluded:
+    - fpl_ep_next_recorded_rules
+
+metrics:
+  primary: mean_log_score
+  primary_direction: lower_is_better
+  proper_distribution:
+    - mean_log_score
+    - mean_ranked_probability_score
+  binary_guardrails:
+    - mean_brier_any_minutes
+    - mean_brier_60_plus
+  calibration:
+    - randomized_pit
+    - pit_interval_80_coverage
+    - reliability_any_minutes
+    - reliability_60_plus
+  # Reliability buckets MUST carry a count n per bucket. Curves are REPORT-ONLY in v1.0;
+  # there is no post-hoc tolerance on them and they gate nothing.
+  reliability_buckets_carry_n: true
+  ranking:
+    - spearman_p60_within_position_gameweek
+
+promotion:
+  compare_against: best_eligible_required_stage_b_baseline
+  comparison_population: same_eligible_predictions
+  relative_lift_formula: "(baseline - candidate) / abs(baseline)"
+  # Aggregate mean-log-score lift required against the best eligible required baseline.
+  minimum_primary_relative_lift: 0.01
+  # No ranked-probability-score regression tolerated (AGGREGATE guardrail only; there is NO
+  # per-season RPS gate -- only mean log score is guarded per season).
+  maximum_ranked_probability_score_relative_regression: 0.0
+  # No Brier regression tolerated on EITHER binary margin (AGGREGATE guardrail only; there is
+  # NO per-season Brier gate). Evaluated independently per margin.
+  maximum_brier_relative_regression_any_minutes: 0.0
+  maximum_brier_relative_regression_60_plus: 0.0
+  pit_interval_80_maximum_absolute_error: 0.05
+  # Pinned to exactly 1.0: every eligible row must receive a prediction. This gate may NOT be
+  # relaxed; the loader rejects any other value.
+  minimum_prediction_coverage: 1.0
+  minimum_fold_count: 181
+  # No mean-log-score regression in ANY reported season. This is not a per-season 1% gate --
+  # it only forbids regression. Aggregate lift is still judged by minimum_primary_relative_lift.
+  require_no_season_mean_log_score_regression: true
+  require_zero_leakage_failures: true
+
+reporting:
+  dimensions:
+    - fold
+    - season
+    - position
+    - home_away
+    - transfer_status
+    - player_history_cohort
+  counts:
+    - predictions
+    - exclusions
+    - cold_starts
+    - uncertainty
+  # `starts` may be reported ONLY where measured: 2021-22 `starts` is entirely NULL, so any
+  # `starts`-based slice must exclude that season rather than treat NULL as zero.
+  starts_reporting: measured_only
+
+# Historical feature policy: only reconstructable point-in-time fields are permitted.
+# Availability / status / chance-of-playing is UNAVAILABLE in the archive and EXCLUDED. A
+# future use of versioned live availability would be a SEPARATELY NAMED prospective candidate
+# and may NOT claim historical lift.
+historical_features:
+  availability_status: excluded_unavailable_in_archive
+  point_in_time_only: reconstructable_fields_only
+  live_availability_prospective_candidate: separately_named_prospective_only
+  # The historical number this contract produces is a development number on the local archive.
+  # It is NOT an upper bound of any kind.
+  historical_score_is: development_number_not_upper_bound
+
+# Frozen scoring / calibration definitions. Values and semantics are pinned; the loader
+# rejects any silent weakening. This freezes DEFINITIONS only -- the metric FUNCTIONS are
+# implemented in a separate slice, not by loading this contract.
+scoring_calibration:
+  # Floor applied to every predicted probability before taking the log, so a one-hot zero never
+  # produces -inf. Pinned to 1e-12.
+  log_probability_floor: 1.0e-12
+  # RPS is the sum of squared ordered-CATEGORY CDF errors (the four bins are ordered
+  # categories), NOT a physical-minute distance -- a 0->90 miss is not "90 units worse" than a
+  # 0->1 miss.
+  ranked_probability_score: sum_of_squared_ordered_category_cdf_errors_not_physical_minute_distance
+  brier: squared_binary_probability_error
+  # Randomised-PIT band edges (left, right).
+  randomized_pit_band: [0.1, 0.9]
+  randomized_pit_seed: 202627
+  # 11 edges => 10 reliability buckets; computed as round(i/10, 1) for i in 0..10.
+  reliability_edges: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+  reliability_buckets: left_closed_right_open_except_final_bucket_right_closed
+  # Every reliability bucket carries a count n.
+  reliability_bucket_n: true
+
+# Stage B is a CLOSED-FORM marginal distribution over the four minute bins. Monte Carlo is
+# explicitly out of scope and the minutes model stays separate from per-minute event / rate
+# models (R6).
+monte_carlo:
+  scope: out_of_scope_closed_form_marginal

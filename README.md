@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | not started |
+| 2 | Stage B minutes model | evaluation contract pre-registered/implemented; **no model fitted yet** |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -298,6 +298,12 @@ measured values diverged from the original specification and why.
 `docs/phase1-evaluation-contract.md` fixes the Stage A entity/grain, point-in-time cutoff,
 observed-gameweek walk-forward, required baselines, proper distribution metrics, calibration
 outputs, reporting slices, and promotion gates before the first candidate is fitted.
+
+`docs/phase2-evaluation-contract.md` pre-registers the Stage B (player minutes) contract at
+version 1.0 — the registered player population, `(season, code, fixture)` grain, four ordered
+minute bins whose 60-minute boundary is cross-checked against the scoring rules, required
+baselines, metrics, and promotion gate. **No Stage B model has been fitted;** the historical
+number is a development number, not an upper bound.
 
 ---
 
