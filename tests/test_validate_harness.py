@@ -7,16 +7,20 @@ does stop at the fold cutoff.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import duckdb
 import pytest
 
 from fpl.config import load_phase1_evaluation
+from fpl.models.team_goals import StageATeamModel
 from fpl.validate.baselines import build_baselines
 from fpl.validate.folds import generate_folds
 from fpl.validate.harness import (
     _fold_fixtures,
     _training_window,
     compare_xg_against_goals,
+    evaluate_gate,
     format_report,
     passes_calibration_gate,
     run,
@@ -112,6 +116,27 @@ def test_run_fold_predicts_every_baseline_on_the_same_rows(
     assert set(result.distributions) == names
     for distributions in result.distributions.values():
         assert len(distributions) == len(result.observed)
+    assert set(result.cold_starts) == names
+    assert len(result.promoted_status) == len(result.observed)
+    assert len(result.home_away) == len(result.observed)
+
+
+def test_candidate_v2_retains_fold_local_parameters(db: duckdb.DuckDBPyConnection) -> None:
+    contract = load_phase1_evaluation()
+    fold = generate_folds(db)[-1]
+    candidate = StageATeamModel(
+        contract.stage_a_candidate,
+        minimum_team_matches=contract.training.minimum_team_matches,
+    )
+    result = run_fold(db, fold, [candidate])
+    assert result is not None
+    parameters = result.parameters[candidate.name]
+    assert parameters["half_life_days"] in {
+        *contract.stage_a_candidate.half_life_days,
+        "no_decay",
+    }
+    assert parameters["prior_matches"] in contract.stage_a_candidate.prior_matches
+    assert parameters["inner_holdout_observed_gameweeks"] == 6
 
 
 def test_baselines_are_refitted_inside_each_fold(db: duckdb.DuckDBPyConnection) -> None:
@@ -142,12 +167,29 @@ def test_baselines_are_refitted_inside_each_fold(db: duckdb.DuckDBPyConnection) 
 def test_a_single_season_run_scores_every_played_fixture(one_season) -> None:
     assert one_season.folds_evaluated == 38
     assert one_season.predictions == 760  # 380 fixtures x 2 sides
+    assert one_season.eligible_predictions == 760
+    assert one_season.leakage_failures == 0
+    assert one_season.folds_by_season == {"2025-26": 38}
     assert set(one_season.by_season) == {"2025-26"}
 
 
 def test_every_baseline_is_scored_on_the_same_population(one_season) -> None:
     counts = {report.predictions for report in one_season.overall.values()}
     assert counts == {one_season.predictions}
+    assert {report.eligible_predictions for report in one_season.overall.values()} == {760}
+    assert {report.exclusions for report in one_season.overall.values()} == {0}
+
+
+def test_every_contracted_report_dimension_is_materialised(one_season) -> None:
+    assert len(one_season.by_fold) == 38
+    assert set(one_season.by_promoted_status) == {"established", "promoted"}
+    assert set(one_season.by_home_away) == {"home", "away"}
+    assert len(one_season.parameters_by_fold) == 38
+    for report in one_season.overall.values():
+        assert report.mean_log_score_standard_error > 0.0
+        assert report.mean_poisson_deviance > 0.0
+        assert report.mean_predictive_variance > 0.0
+        assert -1.0 <= report.spearman_within_gameweek <= 1.0
 
 
 def test_reported_scores_are_finite_and_plausible(one_season) -> None:
@@ -229,11 +271,18 @@ def test_the_calibration_gate_reads_its_tolerance_from_the_contract() -> None:
     report = ScoreReport(
         name="badly_calibrated",
         predictions=100,
+        eligible_predictions=100,
+        exclusions=0,
+        cold_starts=0,
         mean_log_score=1.0,
+        mean_log_score_standard_error=0.1,
         mean_crps=1.0,
+        mean_poisson_deviance=1.0,
         interval_80_coverage=0.80,
         pit_interval_80_coverage=0.55,
         mean_absolute_error=1.0,
+        mean_predictive_variance=1.0,
+        spearman_within_gameweek=0.0,
         pit_values=(),
     )
     assert not passes_calibration_gate(report)
@@ -246,6 +295,10 @@ def test_the_report_shows_the_gate_and_names_the_contract_version(one_season) ->
     assert "calibration gate" in text
     assert f"contract {contract.contract_version}" in text
     assert "reported, not gated" in text
+    assert "by promoted status" in text
+    assert "by home/away" in text
+    assert "raw80" in text
+    assert "excl" in text
 
 
 # --------------------------------------------------------------------------------------
@@ -260,7 +313,65 @@ def test_format_report_lists_every_baseline_in_score_order(one_season) -> None:
     ordered = sorted(one_season.overall.values(), key=lambda r: r.mean_log_score)
     positions = [text.index(report.name) for report in ordered]
     assert positions == sorted(positions)
-    assert one_season.best_baseline() in text.split("best baseline: ")[1]
+    assert one_season.best_baseline() in text.split("best required baseline: ")[1]
+
+
+def test_gate_enforces_coverage_leakage_and_every_season_guardrail(one_season) -> None:
+    comparator = one_season.best_baseline()
+    baseline = one_season.overall[comparator]
+    candidate = replace(
+        baseline,
+        name="candidate",
+        mean_log_score=baseline.mean_log_score * 0.98,
+        mean_crps=baseline.mean_crps * 0.99,
+        pit_interval_80_coverage=0.80,
+    )
+    season_baseline = one_season.by_season["2025-26"][comparator]
+    season_candidate = replace(
+        season_baseline,
+        name="candidate",
+        mean_log_score=season_baseline.mean_log_score * 0.98,
+        mean_crps=season_baseline.mean_crps * 0.99,
+        pit_interval_80_coverage=0.80,
+    )
+    passing = replace(
+        one_season,
+        required_baselines=frozenset({comparator}),
+        overall={comparator: baseline, "candidate": candidate},
+        by_season={"2025-26": {comparator: season_baseline, "candidate": season_candidate}},
+    )
+    assert all(check.passed for check in evaluate_gate(passing, "candidate"))
+
+    low_coverage = replace(
+        passing,
+        overall={
+            comparator: baseline,
+            "candidate": replace(candidate, predictions=97, eligible_predictions=100, exclusions=3),
+        },
+    )
+    failed = {check.name for check in evaluate_gate(low_coverage, "candidate") if not check.passed}
+    assert "same eligible prediction population" in failed
+    assert "fixture coverage" in failed
+
+    leaky = replace(passing, leakage_failures=1)
+    failed = {check.name for check in evaluate_gate(leaky, "candidate") if not check.passed}
+    assert "zero leakage failures" in failed
+
+    season_crps_regression = replace(
+        passing,
+        by_season={
+            "2025-26": {
+                comparator: season_baseline,
+                "candidate": replace(season_candidate, mean_crps=season_baseline.mean_crps * 1.01),
+            }
+        },
+    )
+    failed = {
+        check.name
+        for check in evaluate_gate(season_crps_regression, "candidate")
+        if not check.passed
+    }
+    assert "every season avoids CRPS regression" in failed
 
 
 def test_the_xg_comparison_reports_both_baselines_and_a_signed_lift(

@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -61,8 +61,23 @@ _TEAM_MATCH_FROM = """
 @dataclass(frozen=True, slots=True)
 class FoldPredictions:
     fold: Fold
-    distributions: dict[str, list[Distribution]]
+    distributions: dict[str, list[Distribution | None]]
     observed: list[int]
+    cold_starts: dict[str, list[bool]]
+    promoted_status: list[str]
+    home_away: list[str]
+    parameters: dict[str, dict[str, float | int | str]]
+
+
+@dataclass(frozen=True, slots=True)
+class PredictionRecord:
+    distribution: Distribution | None
+    observed: int
+    fold: str
+    season: str
+    promoted_status: str
+    home_away: str
+    cold_start: bool
 
 
 def _training_window(con: duckdb.DuckDBPyConnection, fold: Fold) -> TrainingWindow:
@@ -90,7 +105,11 @@ def _fold_fixtures(con: duckdb.DuckDBPyConnection, fold: Fold) -> pl.DataFrame:
 
 
 def run_fold(
-    con: duckdb.DuckDBPyConnection, fold: Fold, baselines: list[StageABaseline]
+    con: duckdb.DuckDBPyConnection,
+    fold: Fold,
+    baselines: list[StageABaseline],
+    *,
+    promoted: dict[str, frozenset[int]] | None = None,
 ) -> FoldPredictions | None:
     """Fit every baseline on the fold's training window and predict its gameweek."""
     assert_no_leakage(con, fold)
@@ -102,27 +121,102 @@ def run_fold(
     if fixtures.is_empty():
         return None
 
-    distributions: dict[str, list[Distribution]] = {}
+    distributions: dict[str, list[Distribution | None]] = {}
+    cold_starts: dict[str, list[bool]] = {}
+    parameters: dict[str, dict[str, float | int | str]] = {}
     for baseline in baselines:
         # Refitted inside every fold: the contract requires transforms fitted within the fold,
         # so nothing learned from the future can survive into an earlier prediction.
+        baseline.set_prediction_season(fold.season)
         baseline.fit(window)
-        distributions[baseline.name] = baseline.predict(fixtures)
+        predicted = list(baseline.predict(fixtures))
+        if len(predicted) != fixtures.height:
+            raise ValueError(
+                f"{baseline.name} returned {len(predicted)} predictions for "
+                f"{fixtures.height} eligible rows"
+            )
+        distributions[baseline.name] = predicted
+        cold_starts[baseline.name] = [
+            baseline.is_cold_start(row) for row in fixtures.iter_rows(named=True)
+        ]
+        parameters[baseline.name] = baseline.parameters()
 
     observed = [int(value) for value in fixtures["goals_for"].to_list()]
-    return FoldPredictions(fold=fold, distributions=distributions, observed=observed)
+    promoted_codes = (promoted or promoted_team_codes(con)).get(fold.season, frozenset())
+    promoted_status = [
+        "promoted" if int(value) in promoted_codes else "established"
+        for value in fixtures["team_code"].to_list()
+    ]
+    home_away = ["home" if bool(value) else "away" for value in fixtures["was_home"].to_list()]
+    return FoldPredictions(
+        fold=fold,
+        distributions=distributions,
+        observed=observed,
+        cold_starts=cold_starts,
+        promoted_status=promoted_status,
+        home_away=home_away,
+        parameters=parameters,
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class HarnessResult:
     folds_evaluated: int
+    folds_by_season: dict[str, int]
     predictions: int
+    eligible_predictions: int
+    leakage_failures: int
+    required_baselines: frozenset[str]
     overall: dict[str, ScoreReport]
+    by_fold: dict[str, dict[str, ScoreReport]]
     by_season: dict[str, dict[str, ScoreReport]]
+    by_promoted_status: dict[str, dict[str, ScoreReport]]
+    by_home_away: dict[str, dict[str, ScoreReport]]
+    parameters_by_fold: dict[str, dict[str, dict[str, float | int | str]]]
 
     def best_baseline(self) -> str:
         """Lowest mean log score overall -- what a candidate must beat."""
-        return min(self.overall, key=lambda name: self.overall[name].mean_log_score)
+        eligible = {
+            name: self.overall[name] for name in self.required_baselines if name in self.overall
+        }
+        return min(eligible, key=lambda name: eligible[name].mean_log_score)
+
+
+def _score_records(name: str, records: Sequence[PredictionRecord], *, seed: int) -> ScoreReport:
+    scored = [record for record in records if record.distribution is not None]
+    return score_predictions(
+        name,
+        [record.distribution for record in scored if record.distribution is not None],
+        [record.observed for record in scored],
+        seed=seed,
+        eligible_predictions=len(records),
+        cold_starts=[record.cold_start for record in scored],
+        rank_groups=[record.fold for record in scored],
+    )
+
+
+def _slice_records(
+    records: dict[str, list[PredictionRecord]],
+    attribute: str,
+) -> dict[str, dict[str, list[PredictionRecord]]]:
+    sliced: dict[str, dict[str, list[PredictionRecord]]] = defaultdict(lambda: defaultdict(list))
+    for name, predictions in records.items():
+        for prediction in predictions:
+            key = str(getattr(prediction, attribute))
+            sliced[key][name].append(prediction)
+    return sliced
+
+
+def _score_slices(
+    sliced: dict[str, dict[str, list[PredictionRecord]]], *, seed: int
+) -> dict[str, dict[str, ScoreReport]]:
+    return {
+        key: {
+            name: _score_records(name, predictions, seed=seed)
+            for name, predictions in names.items()
+        }
+        for key, names in sliced.items()
+    }
 
 
 def run(
@@ -151,40 +245,55 @@ def run(
     if seasons:
         folds = [fold for fold in folds if fold.season in seasons]
 
-    pooled: dict[str, list[Distribution]] = defaultdict(list)
-    pooled_observed: list[int] = []
-    per_season: dict[str, dict[str, list[Distribution]]] = defaultdict(lambda: defaultdict(list))
-    per_season_observed: dict[str, list[int]] = defaultdict(list)
+    records: dict[str, list[PredictionRecord]] = defaultdict(list)
+    parameters_by_fold: dict[str, dict[str, dict[str, float | int | str]]] = {}
+    folds_by_season: dict[str, int] = defaultdict(int)
 
     evaluated = 0
     for fold in folds:
-        result = run_fold(con, fold, baselines)
+        result = run_fold(con, fold, baselines, promoted=promoted)
         if result is None:
             continue
         evaluated += 1
-        pooled_observed.extend(result.observed)
-        per_season_observed[fold.season].extend(result.observed)
+        folds_by_season[fold.season] += 1
+        fold_key = f"{fold.season}-GW{fold.gw}"
+        parameters_by_fold[fold_key] = result.parameters
         for name, distributions in result.distributions.items():
-            pooled[name].extend(distributions)
-            per_season[fold.season][name].extend(distributions)
+            for index, distribution in enumerate(distributions):
+                records[name].append(
+                    PredictionRecord(
+                        distribution=distribution,
+                        observed=result.observed[index],
+                        fold=fold_key,
+                        season=fold.season,
+                        promoted_status=result.promoted_status[index],
+                        home_away=result.home_away[index],
+                        cold_start=result.cold_starts[name][index],
+                    )
+                )
 
     seed = resolved.training.seed
     overall = {
-        name: score_predictions(name, distributions, pooled_observed, seed=seed)
-        for name, distributions in pooled.items()
+        name: _score_records(name, predictions, seed=seed) for name, predictions in records.items()
     }
-    by_season = {
-        season: {
-            name: score_predictions(name, distributions, per_season_observed[season], seed=seed)
-            for name, distributions in names.items()
-        }
-        for season, names in per_season.items()
-    }
+    by_fold = _score_slices(_slice_records(records, "fold"), seed=seed)
+    by_season = _score_slices(_slice_records(records, "season"), seed=seed)
+    by_promoted_status = _score_slices(_slice_records(records, "promoted_status"), seed=seed)
+    by_home_away = _score_slices(_slice_records(records, "home_away"), seed=seed)
+    predictions = len(next(iter(records.values()))) if records else 0
     return HarnessResult(
         folds_evaluated=evaluated,
-        predictions=len(pooled_observed),
+        folds_by_season=dict(folds_by_season),
+        predictions=predictions,
+        eligible_predictions=predictions,
+        leakage_failures=0,
+        required_baselines=resolved.baselines.stage_a,
         overall=overall,
+        by_fold=by_fold,
         by_season=by_season,
+        by_promoted_status=by_promoted_status,
+        by_home_away=by_home_away,
+        parameters_by_fold=parameters_by_fold,
     )
 
 
@@ -209,27 +318,39 @@ def format_report(result: HarnessResult, config: Phase1EvaluationConfig | None =
     tolerance = resolved.promotion.pit_interval_80_maximum_absolute_error
     lines = [
         f"folds evaluated : {result.folds_evaluated}",
-        f"predictions     : {result.predictions}",
+        f"predictions     : {result.predictions} / {result.eligible_predictions} eligible",
+        f"leakage failures: {result.leakage_failures}",
+        f"report slices   : {len(result.by_fold)} folds, {len(result.by_season)} seasons, "
+        f"{len(result.by_promoted_status)} promoted-status, {len(result.by_home_away)} venue",
         "",
-        f"{'baseline':<32}{'log score':>11}{'CRPS':>9}{'PIT 80%':>9}{'raw 80%':>9}{'MAE':>8}"
-        f"{'calib':>8}",
-        "-" * 86,
+        f"{'model':<32}{'log':>8}{'SE':>8}{'CRPS':>8}{'dev':>8}{'var':>8}"
+        f"{'raw80':>8}{'PIT80':>8}{'MAE':>8}{'rank':>8}{'cover':>8}"
+        f"{'n':>7}{'excl':>7}{'cold':>7}",
+        "-" * 143,
     ]
     ordered = sorted(result.overall.values(), key=lambda report: report.mean_log_score)
     for report in ordered:
-        gate = "pass" if passes_calibration_gate(report, resolved) else "FAIL"
         lines.append(
-            f"{report.name:<32}{report.mean_log_score:>11.4f}{report.mean_crps:>9.4f}"
-            f"{report.pit_interval_80_coverage:>9.3f}{report.interval_80_coverage:>9.3f}"
-            f"{report.mean_absolute_error:>8.3f}{gate:>8}"
+            f"{report.name:<32}{report.mean_log_score:>8.4f}"
+            f"{report.mean_log_score_standard_error:>8.4f}{report.mean_crps:>8.4f}"
+            f"{report.mean_poisson_deviance:>8.4f}{report.mean_predictive_variance:>8.3f}"
+            f"{report.interval_80_coverage:>8.3f}{report.pit_interval_80_coverage:>8.3f}"
+            f"{report.mean_absolute_error:>8.3f}{report.spearman_within_gameweek:>8.3f}"
+            f"{report.fixture_coverage:>8.3f}{report.predictions:>7d}"
+            f"{report.exclusions:>7d}{report.cold_starts:>7d}"
         )
     lines.append(
         f"calibration gate: |PIT 80% - 0.80| <= {tolerance:.2f}  "
         f"(contract {resolved.contract_version}; the raw 80% column is reported, not gated)"
     )
 
-    best = ordered[0]
-    lines += ["", f"best baseline: {best.name} (log score {best.mean_log_score:.4f})", ""]
+    best_name = result.best_baseline()
+    best = result.overall[best_name]
+    lines += [
+        "",
+        f"best required baseline: {best.name} (log score {best.mean_log_score:.4f})",
+        "",
+    ]
 
     lines.append("by season (mean log score):")
     names = [report.name for report in ordered]
@@ -241,6 +362,39 @@ def format_report(result: HarnessResult, config: Phase1EvaluationConfig | None =
             scored = result.by_season[season].get(name)
             row += (f"{scored.mean_log_score:.4f}" if scored else "-").rjust(16)
         lines.append(row)
+
+    for title, slices in (
+        ("by promoted status", result.by_promoted_status),
+        ("by home/away", result.by_home_away),
+    ):
+        lines += ["", f"{title} (mean log score):"]
+        slice_header = "slice".ljust(12) + "".join(name[:14].rjust(16) for name in names)
+        lines += [slice_header, "-" * len(slice_header)]
+        for key in sorted(slices):
+            row = key.ljust(12)
+            for name in names:
+                scored = slices[key].get(name)
+                row += (f"{scored.mean_log_score:.4f}" if scored else "-").rjust(16)
+            lines.append(row)
+
+    parameter_values: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
+    for models in result.parameters_by_fold.values():
+        for model, parameters in models.items():
+            for key, value in parameters.items():
+                parameter_values[model][key][str(value)] += 1
+    parameter_values = {
+        model: parameters for model, parameters in parameter_values.items() if parameters
+    }
+    if parameter_values:
+        lines += ["", "fold-local selected parameters:"]
+        for model in sorted(parameter_values):
+            lines.append(f"  {model}")
+            for key in sorted(parameter_values[model]):
+                counts = ", ".join(
+                    f"{value}={count}"
+                    for value, count in sorted(parameter_values[model][key].items())
+                )
+                lines.append(f"    {key}: {counts}")
     return "\n".join(lines)
 
 
@@ -275,6 +429,13 @@ def evaluate_gate(
     crps_change = relative_lift(baseline.mean_crps, scored.mean_crps)
     checks = [
         GateCheck(
+            "same eligible prediction population",
+            scored.eligible_predictions == baseline.eligible_predictions
+            and scored.predictions == baseline.predictions,
+            f"candidate {scored.predictions}/{scored.eligible_predictions}, "
+            f"baseline {baseline.predictions}/{baseline.eligible_predictions}",
+        ),
+        GateCheck(
             f"log score lift over {comparator}",
             lift >= gate.minimum_primary_relative_lift,
             f"{lift:+.4%} against a required {gate.minimum_primary_relative_lift:.0%} "
@@ -293,30 +454,73 @@ def evaluate_gate(
             f"<= {gate.pit_interval_80_maximum_absolute_error}",
         ),
         GateCheck(
+            "fixture coverage",
+            scored.fixture_coverage >= gate.minimum_fixture_coverage,
+            f"{scored.fixture_coverage:.2%} against a required {gate.minimum_fixture_coverage:.0%}",
+        ),
+        GateCheck(
             "fold count",
             result.folds_evaluated >= gate.minimum_fold_count,
             f"{result.folds_evaluated} folds against a required {gate.minimum_fold_count}",
         ),
+        GateCheck(
+            "zero leakage failures",
+            result.leakage_failures == 0,
+            f"{result.leakage_failures} leakage failures",
+        ),
     ]
 
     if gate.require_each_reported_season_to_pass:
-        failures = []
+        log_failures = []
+        crps_failures = []
+        calibration_failures = []
+        coverage_failures = []
+        fold_failures = []
+        population_failures = []
         for season in sorted(result.by_season):
             reports = result.by_season[season]
             if candidate not in reports or comparator not in reports:
+                population_failures.append(f"{season} missing report")
                 continue
+            season_baseline = reports[comparator]
+            season_candidate = reports[candidate]
             season_lift = relative_lift(
-                reports[comparator].mean_log_score, reports[candidate].mean_log_score
+                season_baseline.mean_log_score, season_candidate.mean_log_score
             )
             if season_lift < gate.minimum_primary_relative_lift:
-                failures.append(f"{season} {season_lift:+.2%}")
-        checks.append(
-            GateCheck(
-                "every reported season clears the gate",
-                not failures,
-                "all seasons pass" if not failures else "below the bar in " + ", ".join(failures),
+                log_failures.append(f"{season} {season_lift:+.2%}")
+            season_crps = relative_lift(season_baseline.mean_crps, season_candidate.mean_crps)
+            if season_crps < -gate.maximum_crps_relative_regression:
+                crps_failures.append(f"{season} {season_crps:+.2%}")
+            if not passes_calibration_gate(season_candidate, resolved):
+                calibration_failures.append(
+                    f"{season} error {season_candidate.pit_interval_80_absolute_error:.3f}"
+                )
+            if season_candidate.fixture_coverage < gate.minimum_fixture_coverage:
+                coverage_failures.append(f"{season} {season_candidate.fixture_coverage:.2%}")
+            if result.folds_by_season.get(season, 0) < gate.minimum_fold_count:
+                fold_failures.append(f"{season} {result.folds_by_season.get(season, 0)}")
+            if (
+                season_candidate.eligible_predictions != season_baseline.eligible_predictions
+                or season_candidate.predictions != season_baseline.predictions
+            ):
+                population_failures.append(season)
+
+        for name, failures in (
+            ("every season clears log-score lift", log_failures),
+            ("every season avoids CRPS regression", crps_failures),
+            ("every season passes calibration", calibration_failures),
+            ("every season passes fixture coverage", coverage_failures),
+            ("every season has enough folds", fold_failures),
+            ("every season uses the same population", population_failures),
+        ):
+            checks.append(
+                GateCheck(
+                    name,
+                    not failures,
+                    "all seasons pass" if not failures else ", ".join(failures),
+                )
             )
-        )
     return checks
 
 
@@ -379,17 +583,23 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    contract = load_phase1_evaluation()
     candidates: list[StageABaseline] = []
     if not args.baselines_only:
         # Imported here rather than at module scope: the harness defines the contract the
         # models are judged against, so it must not depend on any particular model existing.
         from fpl.models.team_goals import StageATeamModel
 
-        candidates.append(StageATeamModel())
+        candidates.append(
+            StageATeamModel(
+                contract.stage_a_candidate,
+                minimum_team_matches=contract.training.minimum_team_matches,
+            )
+        )
 
     con = connect(args.db, read_only=True)
     try:
-        result = run(con, seasons=args.seasons, candidates=candidates)
+        result = run(con, config=contract, seasons=args.seasons, candidates=candidates)
     finally:
         con.close()
 

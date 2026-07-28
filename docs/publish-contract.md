@@ -1,7 +1,8 @@
 # The publish contract
 
-**Status: agreed design, not yet implemented.** Phase 4 builds it. Recorded now so Phases
-1–3 write towards a fixed boundary rather than being retrofitted.
+**Status: agreed design, not yet implemented.** Phase 3b builds the Stage E optimiser and this
+static export; Phase 4 builds the first dashboard consumer. Recorded now so Phases 1–3 write
+towards a fixed boundary rather than being retrofitted.
 
 ## Why this exists
 
@@ -230,7 +231,7 @@ Baselines are named in the file, not assumed by the frontend, so adding a fourth
 pipeline change only. `n` accompanies every reliability bucket — a calibration curve without
 bin counts hides that the tail bins are three observations.
 
-## Implementation notes for Phase 4
+## Implementation notes for Phase 3b
 
 - Artefacts are written by `src/fpl/publish/export.py`, with **pydantic models defining every
   payload**. The models are the contract; the JSON is their serialisation.

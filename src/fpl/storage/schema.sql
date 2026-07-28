@@ -506,3 +506,30 @@ CREATE TABLE IF NOT EXISTS mart_target_completeness (
     row_count          BIGINT NOT NULL,
     PRIMARY KEY (season, ruleset_id)
 );
+
+-- ====================================================================================
+-- Additive migrations for databases cloned by the failure-atomic archive rebuild
+-- ====================================================================================
+-- `CREATE TABLE IF NOT EXISTS` does not evolve a table that already exists. Full rebuilds
+-- intentionally clone the current database so irreplaceable live captures survive, which
+-- means additive schema changes must also upgrade that clone before any layer is rebuilt.
+-- Existing rows receive NULL: these fields were unmeasured in the old schema and must never
+-- be backfilled as zero.
+ALTER TABLE stg_player_fixture
+    ADD COLUMN IF NOT EXISTS threat DOUBLE;
+ALTER TABLE stg_player_fixture
+    ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE stg_live_player_fixture_version
+    ADD COLUMN IF NOT EXISTS threat DOUBLE;
+ALTER TABLE stg_live_player_fixture_version
+    ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE mart_fact_player_fixture
+    ADD COLUMN IF NOT EXISTS threat DOUBLE;
+ALTER TABLE mart_fact_player_fixture
+    ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE mart_fact_player_fixture_live
+    ADD COLUMN IF NOT EXISTS threat DOUBLE;
+ALTER TABLE mart_fact_player_fixture_live
+    ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE mart_dim_team
+    ADD COLUMN IF NOT EXISTS team_code INTEGER;

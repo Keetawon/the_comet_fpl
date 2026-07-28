@@ -15,6 +15,7 @@ import duckdb
 import polars as pl
 import pytest
 
+from fpl.config import load_phase1_evaluation
 from fpl.models.team_goals import (
     HALF_LIFE_DAYS,
     PRIOR_MATCHES,
@@ -195,7 +196,25 @@ def test_a_club_with_no_history_lands_exactly_on_its_prior() -> None:
     )
     # 99 never appears in the fixtures, so it is unrated and falls back on lookup.
     assert 99 not in ratings.attack
-    assert ratings.rate(99, 1, was_home=True) == pytest.approx(ratings.home)
+    assert ratings.rate(99, 1, was_home=True) == pytest.approx(ratings.home * PROMOTED_ATTACK_RATIO)
+
+
+def test_fewer_than_six_matches_uses_the_declared_prior_not_a_noisy_rating() -> None:
+    rows = _flat_league()
+    rows += [_fixture(5, 1, home=True, goals=6.0), _fixture(1, 5, home=False, goals=0.0)]
+    ratings = fit_ratings(
+        rows,
+        prior_attack={5: PROMOTED_ATTACK_RATIO},
+        prior_defence={5: PROMOTED_DEFENCE_RATIO},
+        prior_matches=8.0,
+    )
+    assert ratings.matches[5] == 1
+    assert ratings.rate(5, 1, was_home=True, minimum_matches=6) == pytest.approx(
+        ratings.home * PROMOTED_ATTACK_RATIO * ratings.defence[1]
+    )
+    assert ratings.rate(5, 1, was_home=True) != pytest.approx(
+        ratings.home * PROMOTED_ATTACK_RATIO * ratings.defence[1]
+    )
 
 
 def test_the_prior_pulls_a_promoted_club_down_when_it_has_played_a_little() -> None:
@@ -405,8 +424,25 @@ def test_hyperparameter_selection_is_bounded_by_the_training_window() -> None:
     """
     model = StageATeamModel()
     model.fit(TrainingWindow(_season_frame(gameweeks=40)))
-    assert model._half_life in HALF_LIFE_DAYS
+    assert model._half_life is None or model._half_life in HALF_LIFE_DAYS
     assert model._prior_matches in PRIOR_MATCHES
+
+
+def test_candidate_v2_uses_the_pre_registered_grid() -> None:
+    candidate = load_phase1_evaluation().stage_a_candidate
+    assert candidate.half_life_days == HALF_LIFE_DAYS
+    assert candidate.prior_matches == PRIOR_MATCHES
+
+
+def test_inner_holdout_is_exactly_six_observed_gameweeks() -> None:
+    model = StageATeamModel()
+    split = model._inner_holdout(_season_frame(gameweeks=20))
+    assert split is not None
+    inner, holdout = split
+    assert set(holdout["gw"].to_list()) == {15, 16, 17, 18, 19, 20}
+    assert len(set(zip(holdout["season"].to_list(), holdout["gw"].to_list(), strict=True))) == 6
+    assert inner["gw"].max() == 14
+    assert len(model._inner_holdout_gameweeks) == 6
 
 
 def test_the_model_keys_on_team_code_not_team_id() -> None:
@@ -446,10 +482,31 @@ def test_the_fit_is_deterministic() -> None:
 def test_promoted_clubs_are_declared_by_team_code() -> None:
     model = StageATeamModel()
     model.set_promoted({SEASON: frozenset({9})})
+    model.set_prediction_season(SEASON)
     model.fit(TrainingWindow(_season_frame()))
-    attack, defence = model._priors(pl.DataFrame())
+    attack, defence = model._priors()
     assert attack[9] == PROMOTED_ATTACK_RATIO
     assert defence[9] == PROMOTED_DEFENCE_RATIO
+
+
+def test_promoted_priors_are_scoped_to_the_prediction_season() -> None:
+    model = StageATeamModel()
+    model.set_promoted({"2024-25": frozenset({8}), SEASON: frozenset({9})})
+    model.set_prediction_season(SEASON)
+    attack, defence = model._priors()
+    assert set(attack) == {9}
+    assert set(defence) == {9}
+
+
+def test_rho_pairs_every_fixture_instead_of_overwriting_repeated_club_pairs() -> None:
+    frame = _season_frame(gameweeks=20)
+    model = StageATeamModel()
+    model.set_prediction_season(SEASON)
+    model.fit(TrainingWindow(frame))
+    rows = model._rows(frame)
+    latest = max(kickoff for kickoff, _ in rows)
+    weighted = model._weighted(rows, latest, model._half_life)
+    assert len(model._rho_pairs(weighted, model._ratings)) == frame["fixture"].n_unique()
 
 
 # --------------------------------------------------------------------------------------

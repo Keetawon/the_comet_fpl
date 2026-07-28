@@ -1,11 +1,12 @@
-# Phase 0 — Design for review
+# Phase 0 — historical design and as-built audit
 
 > Historical design record. Phase 0b subsequently added atomic manifests, event-live and
 > finalized element-summary capture, checksum-verified file loading, versioned current-season
 > facts/schedules, and `known_at <= as_of` enforcement. For current operational behavior, use
-> `README.md`, `AGENTS.md`, and the executable tests; unresolved scoring verification remains.
+> `README.md`, `AGENTS.md`, and the executable tests. Sections 1–8 preserve the original audit
+> and proposed decisions in their historical tense; section 9 records the as-built resolution.
 
-Status: **awaiting approval, no implementation code written yet.**
+Status: **Phase 0b implemented and tested.** This is not a current implementation plan.
 
 Every number below was re-measured against the real archive (5 seasons pulled from
 `vaastav/Fantasy-Premier-League`) before writing this document. Section 1 records where my
@@ -115,7 +116,11 @@ first pooled `team_xg` mean to 1.08. Every aggregate in `facts.py` is null-guard
 
 ---
 
-## 2. Blocker: the FPL live API is not reachable from this environment
+## 2. Historical environment blocker — resolved
+
+At the time of the original audit, the FPL live API was unreachable from the execution
+environment. The offline client/stub strategy described below was implemented. A later real
+official payload and captured official rule pages resolved the scoring provenance; see §9.7.
 
 ```
 $ curl https://fantasy.premierleague.com/api/bootstrap-static/
@@ -545,22 +550,14 @@ def calculate_points(stats: PlayerMatchStats, rules: ScoringRules, position: Pos
 
 ---
 
-## 8. Decisions I need before implementing
+## 8. Original decisions and their as-built resolution
 
-1. **FPL API egress is blocked (section 2).** Preferred: build + offline-test the client and
-   snapshot job, ship `scoring_2026_27.yaml` as `verified: false`, and have `daily_snapshot` fail
-   loudly here. Alternative: you allowlist `fantasy.premierleague.com`, or paste one
-   `bootstrap-static` payload for me to vendor as a test fixture and verify the 2026/27 rules
-   against.
-2. **`fdr` on `mart_fact_team_match`** — added for the Phase 1 naive-FDR baseline. Confirm.
-3. **`total_points` retained on `mart_fact_player_fixture`** — needed as the replay target. It is a
-   documented R1 hazard; my alternative is to keep it in `stg_` only and have the replay test read
-   from there. Say which you prefer.
-4. **Scoring test strictness** — I intend to assert **100.000%** (29,747/29,747), not the DoD's
-   99.997%. Stricter than asked, and it will fail loudly if anyone re-gates cards on minutes.
-5. **`scoring_2025_26.yaml`** ships alongside the 2026/27 file so the replay runs against its own
-   season's rules rather than next season's. My replay shows the two are identical across every
-   component involved, but hard-coding that equivalence would violate R2.
+1. The API client and snapshot job were implemented with offline fixtures and a local stub;
+   blocked egress fails loudly. Official payload and rule-source provenance were later captured.
+2. `fdr` is present on `mart_fact_team_match` for the registered Stage A baseline.
+3. Recorded points remain in staging and target-only marts, never feature-readable marts.
+4. Replay strictness is 100.000%, including named zero-minute card regressions.
+5. `scoring_2025_26.yaml` and `scoring_2026_27.yaml` remain separate rulesets under R2.
 
 ---
 

@@ -10,12 +10,18 @@ This project predicts a full Fantasy Premier League (FPL) points distribution pe
 gameweek. It is a Python 3.12 data and modelling codebase built around DuckDB, Polars, Pydantic,
 HTTPX, YAML configuration, pytest, Ruff, and strict mypy.
 
-Phase 0b's historical and live data foundation is implemented and tested. Phase 1 modelling
-has not started, but its evaluation contract is implemented in `config/phase1_evaluation.yaml`.
+Phase 0b's historical and live data foundation is implemented and tested. Phase 1's Stage A
+harness and Candidates V1/V2 are implemented; neither cleared the fixed promotion gate. V2 was
+pre-registered under contract 1.3 before its single outer evaluation and scored 1.4939 against
+the 1.5003 best baseline, only a 0.4284% lift against the required 1%.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
 `verification.unverified`.
+
+Full archive rebuilds are failure-atomic: `build_db` rebuilds a sibling DuckDB, preserves
+existing live snapshot state, refuses to overwrite a concurrently changed target, and promotes
+with one atomic replacement only after success.
 
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
@@ -178,13 +184,21 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   by phase of season it gains +2.09% and +2.61% in the opening nine gameweeks of 2022-23 and
   2023-24, and loses throughout 2021-22, which has neither a preceding season nor any xG.
   Judge a team model by regime, not by a pooled figure that averages those away.
+- Candidate V2 is also a **documented non-promotion**: log score 1.4939, CRPS 0.6355,
+  PIT-80 0.803, 3,640/3,640 predictions, 84 cold starts, and zero leakage failures. It misses
+  aggregate log lift and the per-season log gate in four seasons; CRPS regresses in 2021-22,
+  2022-23, and 2025-26. Its 2-match prior-grid boundary was selected in 72 of 181 folds. This
+  is diagnostic evidence for a new structural hypothesis, not permission to widen V2 post hoc.
 
 ## Priorities for upcoming work
 
 Unless the user sets another priority, address prerequisites before model sophistication:
 
-1. Make full archive database rebuilds failure-atomic; live capture is already transactional.
-2. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
+1. Keep `trailing_goals_attack_defence` as the Stage A model. Do not promote either failed
+   candidate and do not reinterpret V2 after seeing its outer result.
+2. Before registering Candidate V3, state a structural hypothesis that addresses the measured
+   season/regime failures. Do not respond to V2's 2-match boundary selection by merely widening
+   its grid; a new candidate needs a separately named, committed policy and regression tests.
 3. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
    `amendments:` record; the loader rejects a bump without one. State how many candidates had
    been evaluated. A pre-registered gate may not be amended after a candidate is judged.
@@ -194,6 +208,7 @@ Unless the user sets another priority, address prerequisites before model sophis
    observing candidate results. The bar is `trailing_goals_attack_defence` at mean log score
    1.5003 over 181 folds and 3,640 predictions; a candidate needs **1.4853** or better to
    clear the 1% lift gate, and must not lose to that baseline in any reported season.
+5. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff
 
