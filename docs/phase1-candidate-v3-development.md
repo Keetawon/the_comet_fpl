@@ -8,7 +8,9 @@
 > retained **only as an audit record** of what the defective procedure printed. See
 > [`phase1-candidate-v3-invalidation.md`](phase1-candidate-v3-invalidation.md). The content
 > below is unchanged. The leakage-safe successor is the separately pre-registered
-> `dynamic_team_goals_v4` (contract amendment 1.5); it has not been evaluated.
+> `dynamic_team_goals_v4` (contract amendment 1.5). It had not been evaluated when this
+> invalidation banner was written; its later development-only result is recorded in
+> [`phase1-candidate-v4-development.md`](phase1-candidate-v4-development.md).
 
 **DEVELOPMENT ONLY — NOT A PROMOTION RESULT.** This is the single historical development
 evaluation pre-registered for Candidate V3 (`dynamic_team_goals_v3`). It is not a promotion

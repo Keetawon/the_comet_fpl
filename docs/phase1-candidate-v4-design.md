@@ -1,13 +1,15 @@
 # Candidate V4 design: the leakage-safe sequential dynamic team-goals model
 
-**Status: pre-registered for development only, not yet evaluated.** Candidate V4
+**Status: frozen pre-registration record, written before evaluation.** Candidate V4
 (`dynamic_team_goals_v4`) is the structural successor to the **invalidated** Candidate V3. It
 keeps V3's hypothesis -- team strength is a slowly time-varying latent quantity, estimated
 *sequentially* by a mean-reverting online Poisson filter in log space with explicit summer
 shrinkage -- and fixes the four defects that voided V3's development number
 ([`phase1-candidate-v3-invalidation.md`](phase1-candidate-v3-invalidation.md)). No V4
-historical evaluation has been run; nothing in this document is a result, and V4 is judged by no
-promotion gate. The required Stage A baseline remains `trailing_goals_attack_defence`.
+historical evaluation had been run when this design was frozen; nothing in this document is a
+result, and V4 is judged by no promotion gate. The later development-only result is recorded in
+[`phase1-candidate-v4-development.md`](phase1-candidate-v4-development.md). The required Stage A
+baseline remains `trailing_goals_attack_defence`.
 
 **Timeline note.** Commit `cdb1240` invalidated V3 immediately before commit `7aa2dbf`
 pre-registered V4; V4 is the leakage-safe successor to that invalidated result. This document is

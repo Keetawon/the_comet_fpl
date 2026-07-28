@@ -419,7 +419,10 @@ evaluated, which is the only condition under which amending a pre-registered gat
 > about the Stage A model or any gate changed. Full detail in
 > [`docs/phase1-candidate-v3-invalidation.md`](docs/phase1-candidate-v3-invalidation.md). The
 > leakage-safe successor `dynamic_team_goals_v4` is pre-registered separately (contract
-> amendment 1.5) and has not been evaluated. The narrative below is the original record.
+> amendment 1.5). It had not yet been evaluated when V3 was invalidated; its later
+> development-only result is recorded in
+> [`docs/phase1-candidate-v4-development.md`](docs/phase1-candidate-v4-development.md). The
+> narrative below is the original V3 record.
 
 `dynamic_team_goals_v3` is a **development-only structural probe**, not a promotion candidate.
 It tests whether team strength is a slowly time-varying latent quantity best estimated
@@ -453,10 +456,11 @@ on as frozen config fields.
 Its single historical development evaluation scored **1.4945** against the unchanged
 `trailing_goals_attack_defence` baseline (1.5003), a **+0.3888%** lift — real but modest, short of
 the 1% promotion gate, and fractionally behind V2 (1.4939) on both proper scores. It improves CRPS
-(0.6363 vs 0.6393), has the best calibration of any candidate (PIT-80 exactly 0.800), regresses
-only in 2021-22 and 2025-26, and runs leakage-safe (140 cold starts, 0 leakage failures, all three
-procedure pins fired in 181/181 folds). **This is a development-only number, not a promotion
-verdict**; the structural hypothesis is competitive with — not better than — the existing batch
-candidate, and the trailing-goals baseline remains Stage A. Full result and caveats in
+(0.6363 vs 0.6393), has exactly nominal PIT-80 calibration (0.800, tied with V1 and better than
+V2), regresses only in 2021-22 and 2025-26, and runs leakage-safe (140 cold starts, 0 leakage
+failures, all three procedure pins fired in 181/181 folds). **This is a development-only number,
+not a promotion verdict**; the structural hypothesis is competitive with — not better than —
+the corrected batch candidate V2, and the trailing-goals baseline remains Stage A. Full result
+and caveats in
 [`docs/phase1-candidate-v4-development.md`](docs/phase1-candidate-v4-development.md). Design and
 the frozen grid in [`docs/phase1-candidate-v4-design.md`](docs/phase1-candidate-v4-design.md).

@@ -256,7 +256,8 @@ pins and a fold-local promoted-prior estimator. The block is required at contrac
 V2, the invalidated V3) had produced a number before this was made. No baseline, outer row, lift
 threshold, CRPS rule, calibration tolerance, coverage requirement, fold requirement, leakage
 requirement, the V2 policy, or the frozen V3 policy changes; V4 is never substituted for V2 or V3
-by any default command, is judged by no gate, and has not been evaluated.
+by any default command, is judged by no gate, and had not been evaluated when amendment 1.5 was
+committed.
 
 ## Exit criterion
 

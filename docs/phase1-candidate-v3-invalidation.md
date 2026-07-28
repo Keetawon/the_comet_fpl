@@ -9,8 +9,9 @@ unchanged. This document supersedes the verdict in
 unchanged below its invalidation banner as an **audit record of the original values** only.
 
 A later candidate (`dynamic_team_goals_v4`, contract amendment 1.5) is pre-registered
-separately to fix the four defects named here. V4 has not been evaluated and this document
-makes no claim about V4.
+separately to fix the four defects named here. V4 had not been evaluated when this invalidation
+was committed, so this document makes no claim about it; its later development-only result is
+recorded in [`phase1-candidate-v4-development.md`](phase1-candidate-v4-development.md).
 
 ## Why the result is invalid rather than merely non-promoted
 

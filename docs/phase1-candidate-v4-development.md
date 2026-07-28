@@ -80,12 +80,16 @@ a promotion candidate would need to beat by 1% (i.e. reach 1.4853).
 | Within-gameweek Spearman | 0.320 | 0.306 | diagnostic |
 | Cold starts | 140 | 0 | reported |
 
-For reference on the same population, Candidate V2 scored **1.4939** (+0.4284% lift, CRPS
-0.6355, PIT-80 0.803) and the invalidated V3 printed 1.4956 (void — see
+For complete candidate-history context on the same population, Candidate V1 scored **1.4886**
+(+0.7828% lift, PIT-80 0.800) but failed the aggregate and per-season 1% gates and had documented
+mechanics defects that made it unsuitable for silent modification; its non-promotion remains
+valid. Corrected Candidate V2 scored **1.4939** (+0.4284% lift, CRPS 0.6355, PIT-80 0.803), and
+the invalidated V3 printed 1.4956 (void — see
 [`phase1-candidate-v3-invalidation.md`](phase1-candidate-v3-invalidation.md)). V4 (1.4945) is
 therefore fractionally behind V2 on the primary metric and on CRPS, with the cleanest
-calibration of any candidate so far (PIT-80 exactly 0.800). **None clears the 1% promotion
-lift, and none is promoted.** V4's 140 cold starts match the `promoted_team_pooled_prior`
+calibration among the corrected candidates (PIT-80 exactly 0.800) and tied with V1 on that
+diagnostic. **None clears the 1% promotion lift, and none is promoted.** V4's 140 cold starts
+match the `promoted_team_pooled_prior`
 baseline's cohort rather than V2/V3's 84: fix 3 (returning-promoted count reset) makes a club
 relegated and promoted back cold again, which is the intended behaviour and the reason the count
 moved.
@@ -206,9 +210,9 @@ for a future structural hypothesis, not as permission to change V4 after seeing 
 
 **DEVELOPMENT ONLY. Do not promote.** Candidate V4 improves on the trailing-goals baseline by
 +0.3888% on mean log score (1.4945 vs 1.5003) and by +0.4588% on CRPS, with the best calibration
-of any candidate (PIT-80 exactly 0.800, error 0.000), full fixture coverage (3,640/3,640), and
-zero leakage failures. It does not approach the 1% promotion lift (it would need 1.4853), and
-regresses in 2021-22 (−0.82%) and 2025-26 (−0.32%).
+among the corrected candidates (PIT-80 exactly 0.800, error 0.000; tied with V1), full fixture
+coverage (3,640/3,640), and zero leakage failures. It does not approach the 1% promotion lift
+(it would need 1.4853), and regresses in 2021-22 (−0.82%) and 2025-26 (−0.32%).
 
 **Did the structural hypothesis improve historically?** Only marginally, and not over the
 existing structural candidate. The leakage-safe sequential dynamic filter beats the simple
@@ -216,7 +220,8 @@ trailing-goals baseline (+0.39% aggregate) but lands fractionally behind V2's ba
 Dixon-Coles on both proper scores (1.4945 vs 1.4939 log; 0.6363 vs 0.6355 CRPS). The sequential,
 mean-reverting adaptation is therefore competitive with — not better than — the existing
 structural candidate, and it shares the same regime signature (loses where cross-season history
-and xG are thinnest). Its one clean win is calibration. The boundary selections (slowest
+and xG are thinnest). Relative to V2, its one clean win is calibration; it ties V1 on that
+diagnostic while trailing V1's historical primary score. The boundary selections (slowest
 learning rate in 164/181, bimodal summer retention) point at where a different structural
 hypothesis would have to go.
 

@@ -210,9 +210,9 @@ Unless the user sets another priority, address prerequisites before model sophis
 
 1. Keep `trailing_goals_attack_defence` as the Stage A model. Do not promote any failed
    candidate (V1, V2) and do not reinterpret one after seeing its outer result. Candidate V3
-   is development-only **and its single historical development result is INVALIDATED** (two
-   leakage defects plus fitting/provenance defects): its number is void for comparison, is
-   kept only as an audit record, and must not be tuned again.
+   is development-only **and its single historical development result is INVALIDATED** (one
+   leakage defect plus specification/fitting and provenance defects): its number is void for
+   comparison, is kept only as an audit record, and must not be tuned again.
 2. Candidate V3 was pre-registered and development-evaluated under a separately
    named, committed policy (`dynamic_team_goals_v3`, amendment 1.4) with regression tests, but
    that result is invalidated (see item 1 and `docs/phase1-candidate-v3-invalidation.md`), so
