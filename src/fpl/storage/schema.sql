@@ -531,3 +531,5 @@ ALTER TABLE mart_fact_player_fixture_live
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE mart_fact_player_fixture_live
     ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE mart_dim_team
+    ADD COLUMN IF NOT EXISTS team_code INTEGER;

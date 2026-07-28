@@ -130,15 +130,16 @@ def test_rebuild_applies_additive_schema_migrations_to_a_cloned_database(
 ) -> None:
     """A cloned pre-Opta database must gain new nullable columns before rebuilding."""
     target = tmp_path / "fpl.duckdb"
-    migrated_tables = (
-        "stg_player_fixture",
-        "stg_live_player_fixture_version",
-        "mart_fact_player_fixture",
-        "mart_fact_player_fixture_live",
-    )
+    migrated_columns = {
+        "stg_player_fixture": {"threat", "creativity"},
+        "stg_live_player_fixture_version": {"threat", "creativity"},
+        "mart_fact_player_fixture": {"threat", "creativity"},
+        "mart_fact_player_fixture_live": {"threat", "creativity"},
+        "mart_dim_team": {"team_code"},
+    }
     con = duckdb.connect(str(target))
     try:
-        for table in migrated_tables:
+        for table in migrated_columns:
             con.execute(f"CREATE TABLE {table} (legacy_marker INTEGER)")
     finally:
         con.close()
@@ -147,9 +148,9 @@ def test_rebuild_applies_additive_schema_migrations_to_a_cloned_database(
     assert build_db.build(db_path=target) == 0
     con = duckdb.connect(str(target), read_only=True)
     try:
-        for table in migrated_tables:
+        for table, expected in migrated_columns.items():
             columns = set(table_columns(con, table))
-            assert {"threat", "creativity"} <= columns
+            assert expected <= columns
     finally:
         con.close()
 
