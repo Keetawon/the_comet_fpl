@@ -24,8 +24,10 @@ a dirty worktree). So V3's 1.4956 number and every slice/CRPS/cold-start/paramet
 void for comparison and are kept only as an audit record. Candidate V4
 (`dynamic_team_goals_v4`, amendment 1.5) is the leakage-safe successor pre-registered before any
 evaluation: it keeps V3's sequential dynamic filter and fixes all four defects with frozen
-procedure pins and a fold-local promoted-prior estimator. No V4 historical score has been run.
-The trailing-goals baseline remains Stage A.
+procedure pins and a fold-local promoted-prior estimator. Its single historical development
+evaluation (1.4945 mean log score, +0.3888% lift over the 1.5003 baseline, short of the 1% gate,
+fractionally behind V2) is development-only and not a promotion verdict; the trailing-goals
+baseline remains Stage A.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -216,7 +218,10 @@ Unless the user sets another priority, address prerequisites before model sophis
    that result is invalidated (see item 1 and `docs/phase1-candidate-v3-invalidation.md`), so
    its boundary selections (slowest learning rate in 153/181 folds, strongest summer
    shrinkage in 92/181) are **void diagnostics**, not evidence. A leakage-safe successor needs
-   its own named policy (Candidate V4, amendment 1.5), not a post-hoc tweak of V3.
+   its own named policy (Candidate V4, amendment 1.5), not a post-hoc tweak of V3. Candidate V4
+   has now had its single development evaluation (1.4945, +0.39% lift, not promoted; see
+   `docs/phase1-candidate-v4-development.md`) and is left as committed — do not retune its grid,
+   priors, estimator, fallback, or thresholds after seeing that result.
 3. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
    `amendments:` record; the loader rejects a bump without one. State how many candidates had
    been evaluated. A pre-registered gate may not be amended after a candidate is judged.

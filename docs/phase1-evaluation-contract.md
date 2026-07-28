@@ -6,7 +6,7 @@ pre-registered a development-only Candidate V3 (`dynamic_team_goals_v3`); its si
 development result is now **invalidated** (one leakage defect plus specification/fitting and
 provenance defects), so its number is void for comparison. Amendment 1.5 pre-registers Candidate V4
 (`dynamic_team_goals_v4`), the leakage-safe structural successor to V3; it is development-only,
-has not been evaluated, and changes no gate.** The machine-readable source is
+was evaluated once (1.4945, +0.3888% lift, not promoted), and changes no gate.** The machine-readable source is
 `config/phase1_evaluation.yaml`, validated by `Phase1EvaluationConfig` and executed by
 `src/fpl/validate/`. This document explains the decisions; it does not override that file.
 
@@ -155,7 +155,7 @@ development evidence and judged by no promotion gate. The historical development
 recorded in [`docs/phase1-candidate-v3-development.md`](phase1-candidate-v3-development.md).
 Prospective 2026/27 data is reserved as the untouched confirmation set.
 
-### Candidate V4: pre-registered leakage-safe successor to V3 (not yet evaluated)
+### Candidate V4: leakage-safe successor to V3, development-only result (not promoted)
 
 Candidate V4 (`dynamic_team_goals_v4`) is the structural successor to the invalidated V3. It
 keeps V3's sequential, mean-reverting online Poisson filter and fixes the four defects that
@@ -167,9 +167,12 @@ a declared neutral `1.0 / 1.0` fallback (no full-archive constant). Its design, 
 point-in-time argument, and pre-registered grid are fixed in
 [`docs/phase1-candidate-v4-design.md`](phase1-candidate-v4-design.md); its policy is the additive
 `stage_a_candidate_v4` block. The three leakage-safety fixes are pinned on as `Literal[True]`
-config fields so a silent weakening fails to load. V4 is pre-registered before any evaluation:
-no V4 historical score exists, V4 is judged by no gate, and a result would be development
-evidence only. Prospective 2026/27 data is reserved as the untouched confirmation set.
+config fields so a silent weakening fails to load. V4 was pre-registered before its single
+evaluation: it scored **1.4945** (+0.3888% lift over the 1.5003 baseline, short of the 1% gate,
+fractionally behind V2), is judged by no gate, and that number is development evidence only, not
+a promotion verdict — the trailing-goals baseline remains Stage A. Full development result in
+[`docs/phase1-candidate-v4-development.md`](phase1-candidate-v4-development.md). Prospective
+2026/27 data is reserved as the untouched confirmation set.
 
 ## Metrics, reports, and promotion
 

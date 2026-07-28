@@ -14,8 +14,10 @@ A single `xP` answers only the first.
 
 **Current status: Phase 0b complete; Phase 1 Stage A is in validation.** Candidates V1 and V2
 were fitted under the fixed walk-forward contract and correctly not promoted. V2 scored 1.4939
-against the 1.5003 best baseline, a 0.4284% lift against the required 1%; the trailing-goals
-baseline therefore remains the Stage A model.
+against the 1.5003 best baseline, a 0.4284% lift against the required 1%. Candidate V3's
+development result was invalidated (a leakage defect); its leakage-safe successor Candidate V4
+was evaluated once as development-only — 1.4945, a +0.39% lift short of the 1% gate and not a
+promotion verdict — so the trailing-goals baseline remains the Stage A model.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
@@ -273,7 +275,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | Phase | Deliverable | Status |
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
-| 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared** |
+| 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
 | 2 | Stage B minutes model | not started |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
@@ -438,7 +440,7 @@ permission to widen the grid. Full result and caveats in
 [`docs/phase1-candidate-v3-development.md`](docs/phase1-candidate-v3-development.md). The
 trailing-goals baseline remains the Stage A model.
 
-### Candidate V4: leakage-safe successor, pre-registered, not yet evaluated
+### Candidate V4: leakage-safe successor, development-only result, not promoted
 
 `dynamic_team_goals_v4` is pre-registered (contract amendment 1.5) as the leakage-safe structural
 successor to the invalidated V3. It keeps V3's sequential dynamic filter and fixes all four V3
@@ -446,6 +448,15 @@ defects: the inner holdout is a true per-observed-gameweek walk-forward, the six
 prior is used in the fitting residual as well as prediction, returning promoted clubs reset their
 eligible count, and the promoted prior is estimated fold-locally from earlier promoted cohorts
 (no full-archive constant, neutral `1.0/1.0` fallback). The three leakage-safety fixes are pinned
-on as frozen config fields. **No V4 historical evaluation has been run**; V4 is development-only,
-judged by no gate, and the trailing-goals baseline remains Stage A. Design and the frozen grid in
-[`docs/phase1-candidate-v4-design.md`](docs/phase1-candidate-v4-design.md).
+on as frozen config fields.
+
+Its single historical development evaluation scored **1.4945** against the unchanged
+`trailing_goals_attack_defence` baseline (1.5003), a **+0.3888%** lift — real but modest, short of
+the 1% promotion gate, and fractionally behind V2 (1.4939) on both proper scores. It improves CRPS
+(0.6363 vs 0.6393), has the best calibration of any candidate (PIT-80 exactly 0.800), regresses
+only in 2021-22 and 2025-26, and runs leakage-safe (140 cold starts, 0 leakage failures, all three
+procedure pins fired in 181/181 folds). **This is a development-only number, not a promotion
+verdict**; the structural hypothesis is competitive with — not better than — the existing batch
+candidate, and the trailing-goals baseline remains Stage A. Full result and caveats in
+[`docs/phase1-candidate-v4-development.md`](docs/phase1-candidate-v4-development.md). Design and
+the frozen grid in [`docs/phase1-candidate-v4-design.md`](docs/phase1-candidate-v4-design.md).
