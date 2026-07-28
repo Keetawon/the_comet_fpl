@@ -12,9 +12,10 @@ different answers:
 
 A single `xP` answers only the first.
 
-**Current status: Phase 0b complete; Phase 1 Stage A is in validation.** Candidate V1 was fitted
-and correctly not promoted. Candidate V2 is pre-registered under evaluation contract 1.3 but
-has not yet been run against the outer walk-forward folds.
+**Current status: Phase 0b complete; Phase 1 Stage A is in validation.** Candidates V1 and V2
+were fitted under the fixed walk-forward contract and correctly not promoted. V2 scored 1.4939
+against the 1.5003 best baseline, a 0.4284% lift against the required 1%; the trailing-goals
+baseline therefore remains the Stage A model.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
@@ -272,7 +273,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | Phase | Deliverable | Status |
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
-| 1 | Stage A team model + validation harness | harness run; **candidate fitted, gate not cleared** |
+| 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared** |
 | 2 | Stage B minutes model | not started |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
@@ -353,13 +354,34 @@ the trailing ratio uses is a bar it cannot clear by being better at football.
 Per the contract, that is a **documented non-promotion, not a reason to move the bar**. The
 gate stays as pre-registered; the baseline ships until a candidate clears it honestly.
 
-### Candidate V2: pre-registered, not yet evaluated
+### Candidate V2: a documented non-promotion
 
 Contract 1.3 records V1's implementation defects and fixes them in a separately named
-`dixon_coles_team_goals_v2`. V2 uses exactly six observed gameweeks for inner validation,
-season-scoped promoted priors, the six-match cold-start policy, fixture-level Dixon-Coles
-pairing, and the pre-registered wider half-life/prior grid. Every declared diagnostic, slice,
-count, and gate is executable. No outer baseline or promotion threshold changed.
+`dixon_coles_team_goals_v2`. Its search space was committed before one outer evaluation. No
+outer baseline or threshold changed.
+
+| result | Candidate V2 | best required baseline | gate |
+|---|---:|---:|---|
+| mean log score | **1.4939** | 1.5003 | **fail** -- +0.4284%, needs +1% |
+| mean CRPS | **0.6355** | 0.6393 | pass -- +0.5842% |
+| PIT 80% coverage | 0.803 | 0.798 | pass -- error 0.003 |
+| fixture coverage | 3,640 / 3,640 | 3,640 / 3,640 | pass |
+| leakage failures | 0 | 0 | pass |
+
+The evaluation ran on 2026-07-28 over the complete 2021-22 through 2025-26 archive. Percentage
+lifts use the unrounded aggregates retained by the harness; the displayed scores are rounded to
+four decimals.
+
+The per-season log gate fails in 2021-22 (-0.14%), 2022-23 (+0.15%), 2023-24 (+0.55%),
+and 2025-26 (+0.02%); only 2024-25 clears 1% (+1.43%). CRPS also regresses in 2021-22,
+2022-23, and 2025-26. All seasons pass calibration, coverage, fold-count, population, and
+leakage guardrails.
+
+The exact six-gameweek holdout ran in 171 folds; the first 10 used the declared no-decay,
+8-match fallback. Half-life selections were 40/80/160/320/640/no-decay in
+27/43/42/18/16/35 folds. Prior selections were 2/4/8/16/32 matches in
+72/20/41/24/24 folds. The 2-match boundary is recorded evidence for a future structural
+hypothesis, not permission to widen V2 after observing it.
 
 **xG or recorded goals as the training signal?** **xG — wherever xG is measured.** Over the
 three seasons with complete coverage it wins by +0.71% relative lift and takes each of them

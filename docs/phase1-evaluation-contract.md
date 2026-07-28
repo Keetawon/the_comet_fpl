@@ -1,7 +1,7 @@
 # Phase 1 evaluation contract
 
-**Status: contract and harness implemented at version 1.3. Candidate V1 was evaluated and did
-not promote. Candidate V2 is pre-registered and has not yet been outer-evaluated.** The
+**Status: contract and harness implemented at version 1.3. Candidates V1 and V2 were evaluated
+and neither promoted. The required trailing-goals baseline remains Stage A.** The
 machine-readable source is `config/phase1_evaluation.yaml`, validated by
 `Phase1EvaluationConfig` and executed by `src/fpl/validate/`. This document explains the
 decisions; it does not override that file.
@@ -79,7 +79,7 @@ Review also found mechanics that made V1 unsuitable as a base for silent modific
 These findings do not invalidate the non-promotion. They define a separately named V2 candidate
 under the same outer population and promotion bar.
 
-### Candidate V2: pre-registered, not yet evaluated
+### Candidate V2: pre-registered, evaluated once, not promoted
 
 | Setting | Pre-registered value |
 |---|---|
@@ -96,9 +96,35 @@ under the same outer population and promotion bar.
 | Fit convergence | 60 sweeps, tolerance `1e-10` |
 | Rho grid | -0.20 to 0.20 in steps of 0.01, using every season-fixture match |
 
-The wider search is fixed because V1 selected or defaulted to the 320-day boundary in 73 of 181
-folds and selected the 4-match boundary in 74. V2 may be evaluated once without changing this
-grid after its outer results are observed.
+The wider search was fixed because V1 selected or defaulted to the 320-day boundary in 73 of
+181 folds and selected the 4-match boundary in 74. The policy and implementation were committed
+as `c46662f` before V2's single outer evaluation.
+
+| Metric | Candidate V2 | Best required baseline | Result |
+|---|---:|---:|---|
+| Mean log score | 1.4939 | 1.5003 | +0.4284%; fails required +1% |
+| Mean log-score SE | 0.0110 | 0.0115 | diagnostic |
+| Mean CRPS | 0.6355 | 0.6393 | +0.5842%; passes |
+| Poisson deviance | 1.1233 | 1.1361 | diagnostic |
+| PIT 80% coverage | 0.803 | 0.798 | error 0.003; passes |
+| Raw 80% coverage | 0.935 | 0.930 | reported, not gated |
+| Fixture coverage | 3,640 / 3,640 | 3,640 / 3,640 | passes |
+| Cold starts | 84 | 0 | reported |
+| Leakage failures | 0 | 0 | passes |
+
+This evaluation ran on 2026-07-28 over the complete 2021-22 through 2025-26 archive. Relative
+lifts are computed from the harness's unrounded aggregates; displayed scores are rounded to four
+decimals and therefore do not reproduce the final basis-point exactly when recomputed by hand.
+
+The per-season log gate fails in 2021-22 (-0.14%), 2022-23 (+0.15%), 2023-24 (+0.55%), and
+2025-26 (+0.02%); only 2024-25 clears 1% (+1.43%). CRPS regresses in 2021-22 (-0.41%),
+2022-23 (-0.15%), and 2025-26 (-0.24%). Every season passes calibration, fixture coverage,
+fold count, same-population, and leakage checks. The computed verdict is **DO NOT PROMOTE**.
+
+Fold-local selection used the exact six-gameweek holdout in 171 folds and the declared fallback
+in the first 10. Half-life counts for 40/80/160/320/640/no-decay were
+27/43/42/18/16/35; prior-match counts for 2/4/8/16/32 were 72/20/41/24/24. The lower
+prior boundary is evidence for designing a new hypothesis, not for changing V2 after evaluation.
 
 ## Metrics, reports, and promotion
 
