@@ -22,7 +22,7 @@ from fpl.validate.harness import (
     run,
     run_fold,
 )
-from fpl.validate.metrics import ScoreReport
+from fpl.validate.metrics import ScoreReport, relative_lift
 
 pytestmark = pytest.mark.archive
 
@@ -273,38 +273,52 @@ def test_the_xg_comparison_reports_both_baselines_and_a_signed_lift(
     assert "winner on the contract's primary metric" in text
 
 
-def test_xg_beats_goals_once_the_2022_23_zero_prefix_is_repaired(
-    db: duckdb.DuckDBPyConnection,
-) -> None:
-    """The specification's open question, answered on the contract's own metric.
+def test_xg_wins_wherever_xg_is_actually_measured(db: duckdb.DuckDBPyConnection) -> None:
+    """The specification's open question, answered on the seasons that can answer it.
 
-    The original quick test favoured recorded goals, but it ran before the 2022-23
-    `expected_*` defect was repaired -- that season's first fifteen gameweeks carried zeros
-    where xG was unmeasured, which held its mean team xG at 0.963 against a true 1.499.
-    With the repair in place xG wins overall and in every season that has any.
+    Pooled over all five seasons the goals baseline wins, but that number cannot be read as
+    "goals beat xG": two of the five seasons have no xG to train on. 2021-22 carries none at
+    all, so the xG baseline degenerates exactly to the league intercept there, and 2022-23
+    carries it for only 64% of team-fixtures. The pooled figure is therefore mostly measuring
+    xG's absence.
 
-    2021-22 is the exception and cannot be otherwise: it carries no xG at all, so the xG
-    baseline degenerates to the league intercept and ties with it rather than competing.
+    Restricted to the three seasons with complete xG coverage, xG wins outright -- every
+    season individually, on both proper scores. That is the honest answer: use xG where it
+    exists, and expect no benefit from it in a season that lacks it.
     """
+    coverage = {
+        season: (measured, total)
+        for season, total, measured in db.execute(
+            """
+            SELECT season, count(*), count(team_xg) FROM mart_fact_team_match
+            GROUP BY season ORDER BY season
+            """
+        ).fetchall()
+    }
+    assert coverage["2021-22"][0] == 0, "2021-22 was expected to carry no xG at all"
+    assert coverage["2022-23"][0] < coverage["2022-23"][1], "2022-23 xG is partial"
+    complete = ["2023-24", "2024-25", "2025-26"]
+    for season in complete:
+        assert coverage[season][0] == coverage[season][1], season
+
     result = run(db)
     goals = result.overall["trailing_goals_attack_defence"]
     xg = result.overall["trailing_xg_attack_defence"]
-    assert xg.mean_log_score < goals.mean_log_score
-    assert xg.mean_crps < goals.mean_crps
+    assert goals.mean_log_score < xg.mean_log_score, "pooled, xG loses to its own absence"
 
-    per_season_winner = {
-        season: (
-            "xg"
-            if reports["trailing_xg_attack_defence"].mean_log_score
-            < reports["trailing_goals_attack_defence"].mean_log_score
-            else "goals"
-        )
-        for season, reports in result.by_season.items()
-    }
-    assert per_season_winner["2021-22"] == "goals"
-    for season in ("2022-23", "2023-24", "2024-25", "2025-26"):
-        assert per_season_winner[season] == "xg", season
-
-    league = result.by_season["2021-22"]["league_home_away_goals"].mean_log_score
+    league_2021 = result.by_season["2021-22"]["league_home_away_goals"].mean_log_score
     xg_2021 = result.by_season["2021-22"]["trailing_xg_attack_defence"].mean_log_score
-    assert xg_2021 == pytest.approx(league), "with no xG the baseline must be the intercept"
+    assert xg_2021 == pytest.approx(league_2021), "with no xG the baseline is the intercept"
+
+    for season in complete:
+        reports = result.by_season[season]
+        assert (
+            reports["trailing_xg_attack_defence"].mean_log_score
+            < reports["trailing_goals_attack_defence"].mean_log_score
+        ), season
+
+    measured = run(db, seasons=complete)
+    goals_only = measured.overall["trailing_goals_attack_defence"]
+    xg_only = measured.overall["trailing_xg_attack_defence"]
+    assert relative_lift(goals_only.mean_log_score, xg_only.mean_log_score) > 0.005
+    assert xg_only.mean_crps < goals_only.mean_crps

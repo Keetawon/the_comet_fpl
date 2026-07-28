@@ -154,6 +154,13 @@ class LeagueHomeAwayGoals(StageABaseline):
 
 @dataclass
 class _Ratings:
+    """Attack and defence multipliers keyed on `team_code`, never on `team_id`.
+
+    A rating follows a club across seasons, and `team_id` does not: it is reassigned every
+    summer and it recurs, so pooling on it produces a history that looks continuous while
+    actually belonging to several different clubs.
+    """
+
     attack: dict[int, float] = field(default_factory=dict)
     defence: dict[int, float] = field(default_factory=dict)
     matches: dict[int, int] = field(default_factory=dict)
@@ -194,14 +201,14 @@ class TrailingAttackDefence(StageABaseline):
         # so a float sum lands on a different last bit from run to run. Measured on this
         # archive, 16 of 20 repeat aggregations disagreed, and that reached the reported log
         # score. A pre-registered evaluation has to reproduce exactly.
-        grouped = usable.group_by("team_id", maintain_order=True).agg(
+        grouped = usable.group_by("team_code", maintain_order=True).agg(
             pl.col(scored).sum().alias("scored_total"),
             pl.col(conceded).sum().alias("conceded_total"),
             pl.len().alias("matches"),
         )
         ratings = _Ratings()
         for row in grouped.iter_rows(named=True):
-            team = int(row["team_id"])
+            team = int(row["team_code"])
             matches = int(row["matches"])
             ratings.matches[team] = matches
             ratings.attack[team] = _shrunk_ratio(float(row["scored_total"]), matches, league)
@@ -210,8 +217,8 @@ class TrailingAttackDefence(StageABaseline):
 
     def rate_for(self, row: Row) -> float:
         venue_mean = self._home if _as_bool(row, "was_home") else self._away
-        attack = self._ratings.attack.get(_as_int(row, "team_id"), 1.0)
-        defence = self._ratings.defence.get(_as_int(row, "opponent_team_id"), 1.0)
+        attack = self._ratings.attack.get(_as_int(row, "team_code"), 1.0)
+        defence = self._ratings.defence.get(_as_int(row, "opponent_team_code"), 1.0)
         return max(venue_mean * attack * defence, 0.05)
 
     def predict(self, fixtures: pl.DataFrame) -> list[Distribution]:
@@ -301,7 +308,7 @@ class PromotedTeamPooledPrior(StageABaseline):
         self._matches: dict[tuple[str, int], int] = {}
 
     def set_promoted(self, promoted: dict[str, frozenset[int]]) -> None:
-        """Season -> team ids newly promoted into the league that season."""
+        """Season -> `team_code` of clubs newly promoted into the league that season."""
         self._promoted = promoted
 
     def fit(self, window: TrainingWindow) -> None:
@@ -309,26 +316,26 @@ class PromotedTeamPooledPrior(StageABaseline):
         if frame.is_empty():
             return
         self._home, self._away = _venue_means(frame)
-        grouped = frame.group_by(["season", "team_id"], maintain_order=True).agg(
+        grouped = frame.group_by(["season", "team_code"], maintain_order=True).agg(
             pl.len().alias("matches")
         )
         self._matches = {
-            (str(row["season"]), int(row["team_id"])): int(row["matches"])
+            (str(row["season"]), int(row["team_code"])): int(row["matches"])
             for row in grouped.iter_rows(named=True)
         }
 
-    def _is_cold_start(self, season: str, team_id: int) -> bool:
+    def _is_cold_start(self, season: str, team_code: int) -> bool:
         """Newly promoted, and not yet enough matches to speak for itself."""
-        if team_id not in self._promoted.get(season, frozenset()):
+        if team_code not in self._promoted.get(season, frozenset()):
             return False
-        return self._matches.get((season, team_id), 0) < self._minimum
+        return self._matches.get((season, team_code), 0) < self._minimum
 
     def rate_for(self, row: Row) -> float:
         season = _as_str(row, "season")
         rate = self._home if _as_bool(row, "was_home") else self._away
-        if self._is_cold_start(season, _as_int(row, "team_id")):
+        if self._is_cold_start(season, _as_int(row, "team_code")):
             rate *= PROMOTED_ATTACK_RATIO
-        if self._is_cold_start(season, _as_int(row, "opponent_team_id")):
+        if self._is_cold_start(season, _as_int(row, "opponent_team_code")):
             rate *= PROMOTED_DEFENCE_RATIO
         return max(rate, 0.05)
 

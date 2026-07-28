@@ -28,22 +28,19 @@ from fpl.validate.baselines import (
     baseline_names,
     build_baselines,
 )
-from fpl.validate.folds import promoted_team_ids
+from fpl.validate.folds import promoted_team_codes
 from fpl.validate.metrics import MAX_GOALS, expected_goals
 
-COLUMNS = (
-    "season",
-    "gw",
-    "fixture",
-    "team_id",
-    "opponent_team_id",
-    "was_home",
-    "goals_for",
-    "goals_against",
-    "team_xg",
-    "team_xgc",
-    "fdr",
-)
+TEAM_MATCH_SQL = """
+    m.season, m.gw, m.fixture, m.team_id, m.opponent_team_id,
+    club.team_code AS team_code, opponent.team_code AS opponent_team_code,
+    m.was_home, m.goals_for, m.goals_against, m.team_xg, m.team_xgc, m.fdr
+    FROM mart_fact_team_match AS m
+    JOIN mart_dim_team AS club
+      ON club.season = m.season AND club.team_id = m.team_id
+    JOIN mart_dim_team AS opponent
+      ON opponent.season = m.season AND opponent.team_id = m.opponent_team_id
+"""
 
 
 def _row(
@@ -53,6 +50,8 @@ def _row(
     fixture: int = 1,
     team_id: int = 1,
     opponent_team_id: int = 2,
+    team_code: int | None = None,
+    opponent_code: int | None = None,
     was_home: bool = True,
     goals_for: int | None = 1,
     goals_against: int | None = 1,
@@ -66,6 +65,10 @@ def _row(
         "fixture": fixture,
         "team_id": team_id,
         "opponent_team_id": opponent_team_id,
+        # Defaulting the club code to the id keeps the synthetic single-season cases
+        # readable; the cross-season tests set them apart explicitly.
+        "team_code": team_id if team_code is None else team_code,
+        "opponent_team_code": opponent_team_id if opponent_code is None else opponent_code,
         "was_home": was_home,
         "goals_for": goals_for,
         "goals_against": goals_against,
@@ -82,6 +85,8 @@ def _frame(rows: list[dict[str, object]]) -> pl.DataFrame:
         "fixture": pl.Int64,
         "team_id": pl.Int64,
         "opponent_team_id": pl.Int64,
+        "team_code": pl.Int64,
+        "opponent_team_code": pl.Int64,
         "was_home": pl.Boolean,
         "goals_for": pl.Int64,
         "goals_against": pl.Int64,
@@ -515,13 +520,7 @@ def test_the_xg_baseline_degenerates_to_the_league_baseline_in_2021_22(
 
     This is why 2021-22 is the one season the xG baseline does not win: it is not competing.
     """
-    frame = db.execute(
-        """
-        SELECT season, gw, fixture, team_id, opponent_team_id, was_home,
-               goals_for, goals_against, team_xg, team_xgc, fdr
-        FROM mart_fact_team_match WHERE season = '2021-22'
-        """
-    ).pl()
+    frame = db.execute(f"SELECT {TEAM_MATCH_SQL} WHERE m.season = '2021-22'").pl()
     assert frame["team_xg"].null_count() == frame.height, "2021-22 was expected to have no xG"
 
     window = TrainingWindow(frame)
@@ -538,14 +537,8 @@ def test_the_xg_baseline_degenerates_to_the_league_baseline_in_2021_22(
 def test_promoted_prior_moves_exactly_the_clubs_that_came_up(
     db: duckdb.DuckDBPyConnection,
 ) -> None:
-    promoted = promoted_team_ids(db)
-    frame = db.execute(
-        """
-        SELECT season, gw, fixture, team_id, opponent_team_id, was_home,
-               goals_for, goals_against, team_xg, team_xgc, fdr
-        FROM mart_fact_team_match WHERE season < '2025-26'
-        """
-    ).pl()
+    promoted = promoted_team_codes(db)
+    frame = db.execute(f"SELECT {TEAM_MATCH_SQL} WHERE m.season < '2025-26'").pl()
 
     baseline = PromotedTeamPooledPrior(minimum_team_matches=6)
     baseline.set_promoted(promoted)
@@ -555,12 +548,7 @@ def test_promoted_prior_moves_exactly_the_clubs_that_came_up(
     league.fit(TrainingWindow(frame))
 
     opening = db.execute(
-        """
-        SELECT season, gw, fixture, team_id, opponent_team_id, was_home,
-               goals_for, goals_against, team_xg, team_xgc, fdr
-        FROM mart_fact_team_match WHERE season = '2025-26' AND gw = 1
-        ORDER BY fixture, team_id
-        """
+        f"SELECT {TEAM_MATCH_SQL} WHERE m.season = '2025-26' AND m.gw = 1 ORDER BY m.fixture"
     ).pl()
     promoted_2025 = promoted["2025-26"]
     assert len(promoted_2025) == 3
@@ -571,7 +559,7 @@ def test_promoted_prior_moves_exactly_the_clubs_that_came_up(
         league.predict_rates(opening),
         strict=True,
     ):
-        involved = row["team_id"] in promoted_2025 or row["opponent_team_id"] in promoted_2025
+        involved = row["team_code"] in promoted_2025 or row["opponent_team_code"] in promoted_2025
         if involved:
             assert adjusted != pytest.approx(neutral), row
         else:
@@ -583,22 +571,10 @@ def test_baseline_rates_stay_inside_a_plausible_football_range(
     db: duckdb.DuckDBPyConnection,
 ) -> None:
     """A rate outside this band means a rating blew up, not that a team is that good."""
-    frame = db.execute(
-        """
-        SELECT season, gw, fixture, team_id, opponent_team_id, was_home,
-               goals_for, goals_against, team_xg, team_xgc, fdr
-        FROM mart_fact_team_match WHERE season < '2025-26'
-        """
-    ).pl()
-    fixtures = db.execute(
-        """
-        SELECT season, gw, fixture, team_id, opponent_team_id, was_home,
-               goals_for, goals_against, team_xg, team_xgc, fdr
-        FROM mart_fact_team_match WHERE season = '2025-26'
-        """
-    ).pl()
+    frame = db.execute(f"SELECT {TEAM_MATCH_SQL} WHERE m.season < '2025-26'").pl()
+    fixtures = db.execute(f"SELECT {TEAM_MATCH_SQL} WHERE m.season = '2025-26'").pl()
 
-    promoted = promoted_team_ids(db)
+    promoted = promoted_team_codes(db)
     for baseline in build_baselines():
         setter = getattr(baseline, "set_promoted", None)
         if setter is not None:

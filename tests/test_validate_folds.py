@@ -20,7 +20,7 @@ from fpl.validate.folds import (
     assert_no_leakage,
     generate_folds,
     observed_gameweeks,
-    promoted_team_ids,
+    promoted_team_codes,
 )
 
 pytestmark = pytest.mark.archive
@@ -159,7 +159,7 @@ def test_fold_team_fixture_counts_are_plausible(db: duckdb.DuckDBPyConnection) -
 def test_three_clubs_are_promoted_into_every_season_after_the_first(
     db: duckdb.DuckDBPyConnection,
 ) -> None:
-    promoted = promoted_team_ids(db)
+    promoted = promoted_team_codes(db)
     assert promoted["2021-22"] == frozenset(), "the earliest season has no predecessor"
     for season in SEASONS[1:]:
         assert len(promoted[season]) == 3, f"{season}: {sorted(promoted[season])}"
@@ -171,10 +171,9 @@ def test_promotion_is_resolved_by_team_code_not_team_id(
     """The reason `team_id` may never be used as a cross-season club identity.
 
     Team id 17 is a different club in every one of the five seasons: Spurs, Southampton,
-    Sheffield United, Southampton again, Sunderland. Three of those five are promoted clubs
-    and two are not. Any promotion logic keyed on the id would therefore be wrong in both
-    directions -- and would look like a club that persisted across a season it was absent
-    for.
+    Sheffield United, Southampton again, Sunderland. Any promotion logic keyed on the id
+    would be wrong in both directions -- and would look like a club that persisted across a
+    season it was absent for.
     """
     rows = db.execute(
         "SELECT season, team_code FROM mart_dim_team WHERE team_id = 17 ORDER BY season"
@@ -188,18 +187,19 @@ def test_promotion_is_resolved_by_team_code_not_team_id(
         "2025-26": 56,  # Sunderland
     }
 
-    promoted = promoted_team_ids(db)
-    assert 17 not in promoted["2022-23"], "Southampton were in the league the season before"
-    assert 17 in promoted["2023-24"], "Sheffield United came up"
-    assert 17 in promoted["2024-25"], "Southampton came back up"
-    assert 17 in promoted["2025-26"], "Sunderland came up"
+    promoted = promoted_team_codes(db)
+    # Answers are in team_code, so the same id resolves to a different verdict each season.
+    assert codes["2022-23"] not in promoted["2022-23"], "Southampton were up the season before"
+    assert codes["2023-24"] in promoted["2023-24"], "Sheffield United came up"
+    assert codes["2024-25"] in promoted["2024-25"], "Southampton came back up"
+    assert codes["2025-26"] in promoted["2025-26"], "Sunderland came up"
 
 
 def test_promoted_clubs_were_absent_from_the_previous_season(
     db: duckdb.DuckDBPyConnection,
 ) -> None:
     """The definition itself, restated as a query so the implementation cannot drift."""
-    promoted = promoted_team_ids(db)
+    promoted = promoted_team_codes(db)
     codes_by_season = {
         season: {
             row[0]
@@ -210,11 +210,4 @@ def test_promoted_clubs_were_absent_from_the_previous_season(
         for season in SEASONS
     }
     for previous, current in pairwise(SEASONS):
-        promoted_codes = {
-            row[0]
-            for row in db.execute(
-                "SELECT team_code FROM mart_dim_team WHERE season = ? AND team_id = ANY(?)",
-                [current, list(promoted[current])],
-            ).fetchall()
-        }
-        assert promoted_codes == codes_by_season[current] - codes_by_season[previous]
+        assert promoted[current] == codes_by_season[current] - codes_by_season[previous]

@@ -28,26 +28,33 @@ from fpl.validate.folds import (
     Fold,
     assert_no_leakage,
     generate_folds,
-    promoted_team_ids,
+    promoted_team_codes,
 )
 from fpl.validate.metrics import Distribution, ScoreReport, relative_lift, score_predictions
 
 logger = logging.getLogger("fpl.validate.harness")
 
-_TEAM_MATCH_COLUMNS = (
-    "season",
-    "gw",
-    "fixture",
-    "kickoff_time",
-    "team_id",
-    "opponent_team_id",
-    "was_home",
-    "goals_for",
-    "goals_against",
-    "team_xg",
-    "team_xgc",
-    "fdr",
-)
+# Every read of the team-match facts goes through this projection, and it carries `team_code`
+# for both sides. Team ids are season-scoped and get reassigned between seasons -- id 17 is
+# Spurs, Southampton, Sheffield United, Southampton, then Sunderland across the five seasons
+# here -- so a rating keyed on the bare id silently pools different clubs. `team_code` is 1:1
+# with the club and is the only key permitted for following one between seasons.
+_TEAM_MATCH_SELECT = """
+    m.season, m.gw, m.fixture, m.kickoff_time,
+    m.team_id, m.opponent_team_id,
+    club.team_code AS team_code,
+    opponent.team_code AS opponent_team_code,
+    m.was_home, m.goals_for, m.goals_against,
+    m.team_xg, m.team_xgc, m.fdr
+"""
+
+_TEAM_MATCH_FROM = """
+    FROM mart_fact_team_match AS m
+    JOIN mart_dim_team AS club
+      ON club.season = m.season AND club.team_id = m.team_id
+    JOIN mart_dim_team AS opponent
+      ON opponent.season = m.season AND opponent.team_id = m.opponent_team_id
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,21 +70,19 @@ def _training_window(con: duckdb.DuckDBPyConnection, fold: Fold) -> TrainingWind
     The window expands rather than rolling: a team model needs cross-season history to have
     any prior at all at the start of a season.
     """
-    columns = ", ".join(_TEAM_MATCH_COLUMNS)
     frame = con.execute(
-        f"SELECT {columns} FROM mart_fact_team_match WHERE kickoff_time < ?",
+        f"SELECT {_TEAM_MATCH_SELECT} {_TEAM_MATCH_FROM} WHERE m.kickoff_time < ?",
         [fold.as_of],
     ).pl()
     return TrainingWindow(frame)
 
 
 def _fold_fixtures(con: duckdb.DuckDBPyConnection, fold: Fold) -> pl.DataFrame:
-    columns = ", ".join(_TEAM_MATCH_COLUMNS)
     return con.execute(
         f"""
-        SELECT {columns} FROM mart_fact_team_match
-        WHERE season = ? AND gw = ? AND goals_for IS NOT NULL
-        ORDER BY fixture, team_id
+        SELECT {_TEAM_MATCH_SELECT} {_TEAM_MATCH_FROM}
+        WHERE m.season = ? AND m.gw = ? AND m.goals_for IS NOT NULL
+        ORDER BY m.fixture, m.team_id
         """,
         [fold.season, fold.gw],
     ).pl()
@@ -129,7 +134,7 @@ def run(
     baselines = build_baselines(resolved.training.minimum_team_matches)
     # Which clubs came up is reference data, known before a season starts, so supplying it
     # to the cold-start baseline is not leakage.
-    promoted = promoted_team_ids(con)
+    promoted = promoted_team_codes(con)
     for baseline in baselines:
         setter = getattr(baseline, "set_promoted", None)
         if setter is not None:

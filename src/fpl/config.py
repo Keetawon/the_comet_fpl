@@ -366,7 +366,7 @@ class Phase1ReportingPolicy(_Frozen):
 class Phase1EvaluationConfig(_Frozen):
     """Executable entry and promotion contract for the Stage A walk-forward."""
 
-    contract_version: Literal["1.1"]
+    contract_version: Literal["1.2"]
     phase: Literal[1]
     amendments: tuple[Phase1Amendment, ...] = ()
     target: Phase1TargetPolicy

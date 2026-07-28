@@ -4,7 +4,7 @@
 # folds, baselines, metrics, or lift gates after seeing its results. The typed loader rejects
 # missing required comparisons and any contiguous gameweek policy.
 
-contract_version: "1.1"
+contract_version: "1.2"
 phase: 1
 
 # Amending a pre-registered contract is only legitimate before a candidate exists to bias the
@@ -47,6 +47,31 @@ amendments:
       chi-square test on the PIT histogram would be the stronger check. Adding it is a further
       amendment and is left to the owner; it is recorded here so the weakness is not silently
       inherited.
+  - version: "1.2"
+    date: "2026-07-28"
+    candidates_evaluated_before_amendment: 0
+    changed: >-
+      The Stage A baselines now key attack and defence ratings on team_code instead of a bare
+      team_id, and promoted_team_codes replaces promoted_team_ids. No field in this file
+      changed, but the number a candidate is judged against did, so it is recorded here.
+    reason: >-
+      The baselines pooled ratings on team_id across seasons, which the repository's own
+      non-negotiable rules forbid. Team ids are season-scoped and are reassigned: id 17 is
+      Spurs, Southampton, Sheffield United, Southampton, then Sunderland across the five
+      seasons in the archive. The 2025-26 opening fold therefore rated Sunderland on a
+      history made of Spurs, Southampton and Sheffield United, and compressed the 26 distinct
+      clubs in the training window into 20 id slots.
+    evidence: >-
+      Fixing it moved the best baseline's mean log score from 1.5227 to 1.5003 over the same
+      181 folds and 3,640 predictions, so the score a candidate must reach to clear the 1%
+      lift gate fell from 1.5075 to 1.4853. The amendment therefore makes the bar harder, not
+      easier, which is the only direction a baseline change may move without suspicion.
+    tolerance_rationale: >-
+      No gate value changed. The lift threshold, the CRPS non-regression rule, and the
+      calibration gate are all untouched.
+    deferred: >-
+      The baselines remain deliberately simple -- no time decay, no schedule adjustment, no
+      joint estimation. That is what makes them baselines. It is not a defect to fix.
 
 target:
   entity: team

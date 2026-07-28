@@ -303,21 +303,22 @@ Nothing is fitted yet; these are the honest comparators a model has to beat.
 
 | baseline | mean log score | mean CRPS | PIT 80% | raw 80% | MAE |
 |---|---|---|---|---|---|
-| `trailing_xg_attack_defence` | **1.5227** | 0.6555 | 0.804 | 0.942 | 0.982 |
+| `trailing_goals_attack_defence` | **1.5003** | 0.6393 | 0.798 | 0.930 | 0.943 |
+| `trailing_xg_attack_defence` | 1.5107 | 0.6460 | 0.803 | 0.944 | 0.966 |
 | `naive_fdr` | 1.5262 | 0.6580 | 0.799 | 0.929 | 0.976 |
-| `trailing_goals_attack_defence` | 1.5325 | 0.6619 | 0.787 | 0.927 | 0.976 |
 | `promoted_team_pooled_prior` | 1.5481 | 0.6739 | 0.794 | 0.929 | 1.012 |
 | `league_home_away_goals` | 1.5522 | 0.6764 | 0.794 | 0.929 | 1.016 |
 
-A candidate must reach **1.5075** to clear the contract's 1% relative-lift gate, without
+A candidate must reach **1.4853** to clear the contract's 1% relative-lift gate, without
 regressing CRPS, in every reported season.
 
-**xG or recorded goals as the training signal?** xG, by +0.64% relative lift, winning in
-2022-23, 2023-24, 2024-25 and 2025-26. It loses only 2021-22, which carries no xG at all --
-there the xG baseline degenerates exactly to the league intercept (1.5736 = 1.5736) rather
-than competing. The original specification found the opposite, on data that has since been
-repaired: 2022-23's `expected_*` zeros held its mean team xG at 0.963 against a true 1.499,
-and that season flips from 1.5917 to 1.5344 once repaired.
+**xG or recorded goals as the training signal?** **xG — wherever xG is measured.** Over the
+three seasons with complete coverage it wins by +0.71% relative lift and takes each of them
+individually on both proper scores. The pooled five-season figure says the opposite only
+because it is measuring xG's absence: 2021-22 carries no xG at all, so the xG baseline
+degenerates exactly to the league intercept (1.5736 = 1.5736), and 2022-23 carries it for 64%
+of team-fixtures. Quoting the pooled number as "goals win" would be reading a data gap as a
+result.
 
 **Contract amendment 1.1 — the calibration gate now names its metric.** The original gate,
 `interval_80_maximum_absolute_error`, did not say which 80% interval it meant, and the obvious

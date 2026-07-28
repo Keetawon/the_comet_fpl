@@ -131,7 +131,7 @@ def test_the_calibration_gate_names_the_metric_it_measures() -> None:
 
 def test_the_amendment_is_recorded_with_its_reason_and_evidence() -> None:
     contract = load_phase1_evaluation()
-    assert contract.contract_version == "1.1"
+    assert contract.contract_version == "1.2"
     amendment = next(a for a in contract.amendments if a.version == "1.1")
     assert amendment.candidates_evaluated_before_amendment == 0, (
         "amending a pre-registered gate is only legitimate before a candidate could bias it"
@@ -157,3 +157,15 @@ def test_an_amendment_cannot_be_recorded_without_a_date() -> None:
 
     with pytest.raises(ValidationError, match="pattern"):
         Phase1EvaluationConfig.model_validate(document)
+
+
+def test_the_baseline_identity_fix_is_recorded_and_made_the_bar_harder() -> None:
+    """Amendment 1.2 changed no field here, only what the baselines compute.
+
+    A baseline change moves the number a candidate is judged against, so it belongs in the
+    amendment log even though the YAML gates are untouched. The direction is what makes it
+    legitimate: the score a candidate must reach fell from 1.5075 to 1.4853.
+    """
+    amendment = next(a for a in load_phase1_evaluation().amendments if a.version == "1.2")
+    assert amendment.candidates_evaluated_before_amendment == 0
+    assert "team_code" in amendment.changed

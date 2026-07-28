@@ -41,7 +41,10 @@ Also preserve these data contracts:
 
 - Player identity is stable `code`; `element` is season-scoped. Team IDs are season-scoped.
 - Never filter or join a bare team ID across multiple seasons. Require a season-qualified
-  `(season, team_id)` key, or `mart_dim_team.team_code` for cross-season club identity.
+  `(season, team_id)` key, or `mart_dim_team.team_code` for cross-season club identity. This
+  rule has been broken once already, inside the Stage A baselines, and it cost 0.022 of mean
+  log score and inverted the xG-versus-goals answer before anyone noticed -- the 26 distinct
+  clubs in a four-season window were being compressed into 20 id slots.
   `team_code` is 1:1 with the club (27 codes, 27 names over five seasons) and is the only
   key permitted for following a club between seasons, which Dixon-Coles time decay and
   promoted-team priors both require. The failure mode is not merely that ids move but that
@@ -146,10 +149,12 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   1.935 goals against 1.040 for the strongest -- a 1.86x range.
 - Any persistence figure must be measured **within position**. Pooled across positions
   xG/90 reads 0.871, which measures the position rather than the player.
-- **xG beats recorded goals as the Stage A training signal**, by +0.64% relative lift on mean
-  log score, and wins in every season that has xG. The original specification's opposite
-  finding predates the 2022-23 `expected_*` repair. 2021-22 has no xG at all, so the xG
-  baseline degenerates to the league intercept there rather than competing.
+- **xG beats recorded goals as the Stage A training signal wherever xG is measured**, by
+  +0.71% relative lift on mean log score over the three seasons with complete coverage, and
+  it wins each of them individually on both proper scores. Pooled over all five seasons goals
+  wins by 0.70%, but that figure measures xG's *absence*: 2021-22 carries none at all (the xG
+  baseline degenerates exactly to the league intercept) and 2022-23 only 64%. Never quote the
+  pooled number as the answer.
 - **80% interval coverage must never be gated on a raw central interval for a count
   distribution.** `[q0.1, q0.9]` covers `F(q0.9) - F(q0.1 - 1)`, strictly above 0.80 by
   construction, and the excess measures the pmf's discreteness rather than the model. It
@@ -176,9 +181,9 @@ Unless the user sets another priority, address prerequisites before model sophis
    Amendment 1.1 resolved the calibration gate; the deferred stronger check is a PIT
    uniformity test, which remains an owner decision.
 4. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
-   observing candidate results. The bar is `trailing_xg_attack_defence` at mean log score
-   1.5227 over 181 folds and 3,640 predictions; a candidate needs 1.5075 or better to clear
-   the 1% lift gate.
+   observing candidate results. The bar is `trailing_goals_attack_defence` at mean log score
+   1.5003 over 181 folds and 3,640 predictions; a candidate needs **1.4853** or better to
+   clear the 1% lift gate, and must not lose to that baseline in any reported season.
 
 ## Sub-agent coordination and handoff
 

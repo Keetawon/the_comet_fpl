@@ -143,12 +143,12 @@ def assert_no_leakage(con: duckdb.DuckDBPyConnection, fold: Fold) -> None:
         )
 
 
-def promoted_team_ids(con: duckdb.DuckDBPyConnection) -> dict[str, frozenset[int]]:
-    """Season -> team ids of clubs that were not in the league the previous season.
+def promoted_team_codes(con: duckdb.DuckDBPyConnection) -> dict[str, frozenset[int]]:
+    """Season -> `team_code` of clubs that were not in the league the previous season.
 
-    Resolved through `team_code`, the only stable club identity across seasons. Doing this
-    with `team_id` would be wrong in both directions: ids are reassigned, and they recur, so a
-    club can appear to persist while actually being a different one.
+    Both the question and the answer are in `team_code`, the only stable club identity across
+    seasons. Returning team ids instead would hand a caller a key that is only valid inside
+    one season, which is how the same mistake gets made one layer down.
 
     The earliest season has no predecessor and therefore reports no promoted clubs.
     """
@@ -164,7 +164,7 @@ def promoted_team_ids(con: duckdb.DuckDBPyConnection) -> dict[str, frozenset[int
     for previous, current in pairwise(seasons):
         before = set(by_season[previous]["team_code"].to_list())
         promoted[current] = frozenset(
-            int(row["team_id"])
+            int(row["team_code"])
             for row in by_season[current].iter_rows(named=True)
             if row["team_code"] not in before
         )
