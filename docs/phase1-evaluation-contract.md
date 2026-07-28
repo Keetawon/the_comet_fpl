@@ -1,7 +1,9 @@
 # Phase 1 evaluation contract
 
-**Status: contract and harness implemented at version 1.3. Candidates V1 and V2 were evaluated
-and neither promoted. The required trailing-goals baseline remains Stage A.** The
+**Status: contract and harness implemented at version 1.4. Candidates V1 and V2 were evaluated
+and neither promoted. The required trailing-goals baseline remains Stage A. Amendment 1.4
+pre-registers a development-only Candidate V3 (`dynamic_team_goals_v3`) for one historical
+development evaluation; it is not a promotion candidate and changes no gate.** The
 machine-readable source is `config/phase1_evaluation.yaml`, validated by
 `Phase1EvaluationConfig` and executed by `src/fpl/validate/`. This document explains the
 decisions; it does not override that file.
@@ -126,6 +128,19 @@ in the first 10. Half-life counts for 40/80/160/320/640/no-decay were
 27/43/42/18/16/35; prior-match counts for 2/4/8/16/32 were 72/20/41/24/24. The lower
 prior boundary is evidence for designing a new hypothesis, not for changing V2 after evaluation.
 
+### Candidate V3: pre-registered for historical development only
+
+Candidate V3 (`dynamic_team_goals_v3`) is a **development-only** structural probe, not a
+promotion candidate. It tests whether a sequential, mean-reverting online Poisson filter in
+log space adapts to changing team strength more honestly than V2's batch re-fit, while
+retaining useful cross-season information through an explicit retention factor. Its design,
+equations, point-in-time argument, cold-start behaviour, and pre-registered grid are fixed in
+[`docs/phase1-candidate-v3-design.md`](phase1-candidate-v3-design.md); its policy is the
+additive `stage_a_candidate_v3` block. It is evaluated once on the historical archive as
+development evidence and judged by no promotion gate. The historical development result is
+recorded in [`docs/phase1-candidate-v3-development.md`](phase1-candidate-v3-development.md).
+Prospective 2026/27 data is reserved as the untouched confirmation set.
+
 ## Metrics, reports, and promotion
 
 Mean log score is primary and mean CRPS is the second proper distribution score. Poisson
@@ -181,6 +196,16 @@ metric, slice, count, same-population check, per-season guardrail, coverage chec
 leakage check. The outer rows, required baselines, 1% lift, CRPS, calibration, coverage, fold, and
 leakage thresholds are unchanged. The archive cutoff is explicitly labeled as a first-kickoff
 proxy rather than an authoritative deadline.
+
+### 1.4 -- Candidate V3 development pre-registration (2026-07-28, 2 candidates)
+
+Adds the optional, additive `stage_a_candidate_v3` block pre-registering a development-only
+`dynamic_team_goals_v3` and its search grid. No baseline, outer row, lift threshold, CRPS rule,
+calibration tolerance, coverage requirement, fold requirement, leakage requirement, or the V2
+`stage_a_candidate` policy changes; V3 is never substituted for V2 by any default command. Two
+candidates (V1, V2) had been evaluated when this was made. V3 is judged by no promotion gate: it
+is reported with V2's metrics, slices, and counts for honest comparison against the unchanged
+baseline, and its historical number is explicitly not a promotion verdict.
 
 ## Exit criterion
 

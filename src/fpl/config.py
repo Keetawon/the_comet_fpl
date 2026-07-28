@@ -345,6 +345,61 @@ class Phase1StageACandidatePolicy(_Frozen):
         return self
 
 
+class Phase1StageACandidateV3Policy(_Frozen):
+    """Pre-registered Candidate V3 search space: a sequential dynamic team-goals filter.
+
+    Candidate V3 is a *development-only* structural probe, not a promotion candidate. It
+    exists to test whether a sequential, mean-reverting online Poisson filter adapts to
+    changing team strength more honestly than V2's batch re-fit. Its policy is additive to
+    the contract: it shares none of V2's fields, changes no baseline, gate, tolerance, or
+    eligible row, and is never substituted for V2 by the default harness command. The
+    `development_only` flag is pinned `True` so a config that silently promoted V3 to a
+    promotion candidate would fail to load.
+    """
+
+    name: Literal["dynamic_team_goals_v3"]
+    development_only: Literal[True]
+    inner_holdout_observed_gameweeks: int = Field(ge=1)
+    minimum_inner_training_observed_gameweeks: int = Field(ge=1)
+    # Per-match Poisson log-likelihood gradient step (adaptation speed).
+    learning_rate: tuple[float, ...] = Field(min_length=1)
+    # Per-appearance retention: state persistence / mean reversion within a season.
+    retention: tuple[float, ...] = Field(min_length=1)
+    # Explicit between-season shrinkage applied once at each season boundary.
+    season_retention: tuple[float, ...] = Field(min_length=1)
+    fallback_learning_rate: float = Field(gt=0.0)
+    fallback_retention: float = Field(gt=0.0, le=1.0)
+    fallback_season_retention: float = Field(gt=0.0, le=1.0)
+    promoted_attack_prior: float = Field(gt=0.0)
+    promoted_defence_prior: float = Field(gt=0.0)
+    xg_policy: Literal["use_when_measured_scaled_to_goals"]
+    rate_floor: float = Field(gt=0.0)
+    log_strength_cap: float = Field(gt=0.0)
+
+    @model_validator(mode="after")
+    def _valid_search_space(self) -> Self:
+        if self.minimum_inner_training_observed_gameweeks < self.inner_holdout_observed_gameweeks:
+            raise ValueError("inner training history cannot be shorter than the holdout")
+        for label, grid, lo, hi in (
+            ("learning_rate", self.learning_rate, 0.0, None),
+            ("retention", self.retention, 0.0, 1.0),
+            ("season_retention", self.season_retention, 0.0, 1.0),
+        ):
+            if any(value <= lo for value in grid):
+                raise ValueError(f"{label} values must be greater than {lo}")
+            if hi is not None and any(value > hi for value in grid):
+                raise ValueError(f"{label} values must not exceed {hi}")
+            if tuple(sorted(set(grid))) != grid:
+                raise ValueError(f"{label} values must be unique and increasing")
+        if self.fallback_learning_rate not in self.learning_rate:
+            raise ValueError("fallback learning rate must be in the declared grid")
+        if self.fallback_retention not in self.retention:
+            raise ValueError("fallback retention must be in the declared grid")
+        if self.fallback_season_retention not in self.season_retention:
+            raise ValueError("fallback season retention must be in the declared grid")
+        return self
+
+
 class Phase1BaselinePolicy(_Frozen):
     stage_a: frozenset[str]
     downstream_player_points: frozenset[str]
@@ -410,13 +465,16 @@ class Phase1ReportingPolicy(_Frozen):
 class Phase1EvaluationConfig(_Frozen):
     """Executable entry and promotion contract for the Stage A walk-forward."""
 
-    contract_version: Literal["1.3"]
+    contract_version: Literal["1.4"]
     phase: Literal[1]
     amendments: tuple[Phase1Amendment, ...] = ()
     target: Phase1TargetPolicy
     cutoff: Phase1CutoffPolicy
     training: Phase1TrainingPolicy
     stage_a_candidate: Phase1StageACandidatePolicy
+    # Candidate V3 is a development-only structural probe. Optional and additive: absent
+    # from every V1/V2 evaluation, it never substitutes for V2 and changes no gate.
+    stage_a_candidate_v3: Phase1StageACandidateV3Policy | None = None
     baselines: Phase1BaselinePolicy
     metrics: Phase1MetricPolicy
     promotion: Phase1PromotionGate

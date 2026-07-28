@@ -4,7 +4,7 @@
 # folds, baselines, metrics, or lift gates after seeing its results. The typed loader rejects
 # missing required comparisons and any contiguous gameweek policy.
 
-contract_version: "1.3"
+contract_version: "1.4"
 phase: 1
 
 # Amending a pre-registered contract is only legitimate before a candidate exists to bias the
@@ -104,6 +104,36 @@ amendments:
       Historical archive rows do not carry authoritative FPL deadline or schedule knowledge
       versions. Folds therefore retain first kickoff as the latest defensible archive cutoff
       and must not claim that historical schedule changes were known at that instant.
+  - version: "1.4"
+    date: "2026-07-28"
+    candidates_evaluated_before_amendment: 2
+    changed: >-
+      Adds an optional, additive stage_a_candidate_v3 block pre-registering a
+      development-only structural candidate (dynamic_team_goals_v3) and its search grid. No
+      existing baseline, outer row, lift threshold, CRPS rule, calibration tolerance,
+      coverage requirement, fold requirement, leakage requirement, or the Candidate V2
+      stage_a_candidate policy changes. V3 is not substituted for V2 by any default command.
+    reason: >-
+      Candidates V1 and V2 were evaluated and neither promoted. V2's diagnosis is structural
+      -- its edge is cross-season history and xG, not functional form -- so a new candidate
+      needs a separately named structural policy, not a post-hoc widening of V2's grids. V3
+      tests a sequential, mean-reverting online Poisson filter as a development probe. It is
+      pre-registered for one historical development evaluation only: the archive is
+      development evidence (already seen by V1/V2), prospective 2026/27 data is reserved as
+      the confirmation set, and no V3 historical number is a promotion verdict.
+    evidence: >-
+      Two candidates (V1, V2) had been evaluated when this amendment was made. V2 scored
+      1.4939 against the unchanged 1.5003 best baseline (+0.4284%, short of the required 1%)
+      and selected its 2-match prior boundary in 72 of 181 folds, which is recorded as
+      evidence for a new structural hypothesis rather than as permission to widen V2.
+    tolerance_rationale: >-
+      No promotion tolerance changes. V3 is not a promotion candidate and is judged by no
+      gate here; it is reported with the same metrics, slices, and counts as V2 for honest
+      comparison against the unchanged baseline.
+    deferred: >-
+      A genuine promotion attempt for the dynamic model would be a separately pre-registered
+      candidate evaluated against prospective 2026/27 data under the unchanged promotion
+      gate. This amendment pre-registers the development probe and its grid only.
 
 target:
   entity: team
@@ -154,6 +184,28 @@ stage_a_candidate:
   rho_minimum: -0.20
   rho_maximum: 0.20
   rho_step: 0.01
+
+# Candidate V3 is a development-only structural probe, pre-registered before its single
+# historical development evaluation. It shares no field with Candidate V2, substitutes for
+# nothing, and is judged by no promotion gate. See docs/phase1-candidate-v3-design.md and
+# amendment 1.4. The promoted priors repeat the measured constants also used by V2 and the
+# promoted-team baseline; they are declared here so this block is self-describing.
+stage_a_candidate_v3:
+  name: dynamic_team_goals_v3
+  development_only: true
+  inner_holdout_observed_gameweeks: 6
+  minimum_inner_training_observed_gameweeks: 12
+  learning_rate: [0.05, 0.10, 0.20]
+  retention: [0.985, 0.995, 1.0]
+  season_retention: [0.5, 0.75, 1.0]
+  fallback_learning_rate: 0.10
+  fallback_retention: 0.995
+  fallback_season_retention: 0.75
+  promoted_attack_prior: 0.719
+  promoted_defence_prior: 1.309
+  xg_policy: use_when_measured_scaled_to_goals
+  rate_floor: 0.05
+  log_strength_cap: 2.0
 
 baselines:
   stage_a:
