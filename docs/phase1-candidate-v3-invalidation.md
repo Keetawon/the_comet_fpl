@@ -17,11 +17,14 @@ makes no claim about V4.
 A documented *non-promotion* (V1, V2) is an honest number produced by a leakage-safe
 procedure that simply did not clear the gate. V3's number is not that. Review of
 `src/fpl/models/dynamic_team_goals.py` and `src/fpl/validate/dev_candidate_v3.py` found four
-defects. Two are leakage (the model used information it should not have had at the cutoff),
-one is a fitting procedure that does not match its own specification, and one makes the
-recorded provenance unreliable. A leakage-tainted score cannot be salvaged by its being short
-of the gate: the same leakage could just as easily have flattered it, so the number carries no
-information about the model at all.
+defects. One is leakage -- the promoted cold-start prior was a full-archive constant estimated
+from seasons future to early folds, so the model used information it should not have had at the
+cutoff. Two are specification/fitting defects that do not match the procedure the contract
+describes -- the inner holdout scored all six gameweeks from one frozen state, and the
+six-match cold-start rule was applied at prediction only while returning promoted clubs kept old
+match counts. One makes the recorded provenance unreliable. A leakage-tainted score cannot be
+salvaged by its being short of the gate: the same leakage could just as easily have flattered
+it, so the number carries no information about the model at all.
 
 ## Confirmed defects
 

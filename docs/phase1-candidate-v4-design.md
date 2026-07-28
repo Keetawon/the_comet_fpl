@@ -9,6 +9,10 @@ shrinkage -- and fixes the four defects that voided V3's development number
 historical evaluation has been run; nothing in this document is a result, and V4 is judged by no
 promotion gate. The required Stage A baseline remains `trailing_goals_attack_defence`.
 
+**Timeline note.** Commit `cdb1240` invalidated V3 immediately before commit `7aa2dbf`
+pre-registered V4; V4 is the leakage-safe successor to that invalidated result. This document is
+a follow-up clarification of V4's pre-registration and does not rewrite either commit.
+
 The machine-readable policy lives in `config/phase1_evaluation.yaml` under
 `stage_a_candidate_v4` (contract amendment 1.5). The model is implemented in
 `src/fpl/models/dynamic_team_goals_v4.py`; the development runner is
@@ -71,7 +75,7 @@ on **every** match until six, in fitting as well as prediction. The dynamic stre
 takes the gradient step; what changes is the rate the residual is measured against. Pinned on by
 `cold_start_in_fitting: true`.
 
-### 2.3 Returning-promoted count reset (V3 defect 3)
+### 2.3 Returning-promoted count reset (V3 defect 2, count part)
 
 V3 reset a promoted club's attack and defence to the prior at a season boundary but never reset
 its `counts`, which only ever incremented. A club relegated and promoted back therefore kept its
@@ -80,7 +84,7 @@ for **every** club in the new season's promoted set -- never seen before, or rel
 returned -- while incumbents keep their count and shrink their strength by `season_retention`
 (declared summer retention). Pinned on by `returning_promoted_count_reset: true`.
 
-### 2.4 Fold-local promoted priors (V3 defect 4)
+### 2.4 Fold-local promoted priors (V3 defect 3, the leakage)
 
 V3's promoted priors `0.719 / 1.309` were the full-archive measured constants, applied as fixed
 priors in every season and fold, including early folds whose `as_of` preceded the seasons those
@@ -89,28 +93,32 @@ estimates were drawn from. That is target leakage through a config constant, and
 carries no full-archive constant.
 
 **Estimator (frozen).** For each season `s` strictly before the prediction season whose matches
-are inside the fold, and each club `c` newly promoted into `s` with at least
-`promoted_prior_min_matches` (6) matches in `s`:
+are inside the fold, and each club `c` newly promoted into `s`, attack and defence ratios are
+formed from that club's **measured (non-null) observations of each component** in `s`:
 
 ```
 mu_s                  = mean goals_for over all team-match rows of season s in the frame
-attack_ratio_c        = ((goals_for_c + k * mu_s) / (matches_c + k)) / mu_s
-defence_ratio_c       = ((goals_against_c + k * mu_s) / (matches_c + k)) / mu_s
+attack_ratio_c        = ((goals_for_c + k * mu_s) / (goals_for_n_c + k)) / mu_s
+defence_ratio_c       = ((goals_against_c + k * mu_s) / (goals_against_n_c + k)) / mu_s
 ```
 
 where `k = promoted_prior_shrinkage_matches` (6.0, frozen; the mean of per-club ratios, not a
-ratio of pooled means, exactly as the archive's measured constant was defined). The prior is the
-cohort mean of the per-club ratios, attack and defence separately.
+ratio of pooled means, exactly as the archive's measured constant was defined). A component ratio
+enters only if that component has at least `promoted_prior_min_matches` (6) measured observations,
+so the threshold is per-component, not a row count. The prior is the cohort mean of the per-club
+ratios, attack and defence separately.
 
 **Eligible cohort (frozen).** Promoted clubs in seasons strictly before the prediction season,
-present in the frame, with at least `promoted_prior_min_matches` matches. The current promoted
-cohort (the prediction season's newcomers) is **excluded** from its own initial prior. Because
-the frame is the fold's training window (`kickoff_time < as_of`) and the eligible seasons precede
-the prediction season, appending later seasons to the archive cannot move an earlier fold's
-prior -- those rows are outside the frame.
+present in the frame. The current promoted cohort (the prediction season's newcomers) is
+**excluded** from its own initial prior. Because the frame is the fold's training window
+(`kickoff_time < as_of`) and the eligible seasons precede the prediction season, appending later
+seasons to the archive cannot move an earlier fold's prior -- those rows are outside the frame.
 
-**Sample behaviour (frozen).** One ratio per cohort club, weighted once (not per match); a club
-with fewer than `promoted_prior_min_matches` matches in its promotion season contributes nothing.
+**Sample behaviour (frozen).** One ratio per cohort club per component, weighted once (not per
+match); a component with fewer than `promoted_prior_min_matches` measured observations contributes
+nothing and is never zero-filled, so a club whose defence went unmeasured still contributes its
+attack ratio and simply omits a defence ratio. The two sides fall back independently when no
+eligible component reaches the minimum.
 
 **Fallback (frozen).** With no eligible cohort -- which is the case for the earliest folds, the
 first season having no promoted set at all -- the declared neutral `fallback_attack_prior =

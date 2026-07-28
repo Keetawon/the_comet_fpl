@@ -196,10 +196,12 @@ def test_walk_forward_advances_state_between_holdout_gameweeks() -> None:
     """GW2's prediction must be made from the state GW1's results moved, not the frozen state.
 
     Team 1 is established (>= 6 inner matches) so its dynamic strength is read. GW1 gives it a
-    huge positive residual that boosts its attack; GW2 features team 1 again. A true
-    walk-forward therefore scores GW2 differently from a frozen-state (V3) scoring, which would
-    predict GW2 from the pre-holdout state. A frozen comparator is computed inline; the two
-    disagree iff advancement happened.
+    huge positive residual that boosts its attack; GW2 features team 1 again. A true walk-forward
+    therefore scores GW2 differently from a frozen-state (V3) scoring, which would predict GW2
+    from the pre-holdout state. The genuine pre-holdout state is snapshotted *before*
+    ``_walk_forward_score`` mutates it; the frozen comparator predicts GW1 and GW2 from that
+    snapshot with no absorption, so the two disagree iff GW2's prediction moved because GW1 was
+    absorbed.
     """
     model = DynamicTeamGoalsV4(_flat_policy(), minimum_team_matches=6)
     # Inner training: team 1 plays six times, scoring 1 each, so its attack is near neutral.
@@ -214,6 +216,9 @@ def test_walk_forward_advances_state_between_holdout_gameweeks() -> None:
         retention=0.995,
         season_retention=0.75,
     )
+    # Snapshot the genuine pre-holdout state BEFORE _walk_forward_score mutates it.
+    snap_a, snap_d, snap_c = dict(state.attack), dict(state.defence), dict(state.counts)
+
     # GW1: team 1 scores 6 (large positive residual -> boosts attack[1]); GW2: team 1 plays again.
     gw1 = [_match_row(SEASON, 7, 100, 1, 5, 6.0, 0.0, fixture=301)]
     gw2 = [_match_row(SEASON, 8, 107, 1, 6, 0.0, 0.0, fixture=302)]
@@ -229,7 +234,6 @@ def test_walk_forward_advances_state_between_holdout_gameweeks() -> None:
     )
 
     # Frozen comparator: predict GW1 and GW2 both from the pre-holdout snapshot, no updates.
-    snap_a, snap_d, snap_c = dict(state.attack), dict(state.defence), dict(state.counts)
     frozen = 0.0
     scored = 0
     for batch in (gw1, gw2):
@@ -272,59 +276,74 @@ def test_walk_forward_advances_state_between_holdout_gameweeks() -> None:
 
 
 def test_fixtures_in_one_gameweek_share_one_pre_state_and_are_order_invariant() -> None:
-    """Within a gameweek, every fixture is predicted from the pre-gameweek snapshot.
+    """Same-GW predictions use one snapshot; absorption is in deterministic kickoff order.
 
-    Reordering the fixtures inside one batch cannot change the score, because none of them has
-    been absorbed yet. A double-gameweek club (plays twice in the batch) is predicted at the
-    same rate both times.
+    Club 1 is a double-gameweek club that appears twice in the batch at *different* kickoffs.
+    The batch score is order-invariant because every prediction reads the pre-gameweek snapshot,
+    but absorption is observable in the resulting state (a club updated twice reads its own
+    just-updated strength on the second update), so reversing the input must still yield the
+    same resulting state and the same next-gameweek prediction. That holds only because the
+    helper sorts each batch by actual kickoff before absorbing; without it, reversing the input
+    would change club 1's final strength and every later prediction with it.
     """
     model = DynamicTeamGoalsV4(_flat_policy(), minimum_team_matches=1)
     inner = [_match_row(SEASON, 1, 0, 1, 2, 1.0, 1.0), _match_row(SEASON, 2, 7, 3, 4, 1.0, 1.0)]
-    state, last_season = model._replay(
-        inner,
-        venue_home=1.4,
-        venue_away=1.2,
-        learning_rate=0.10,
-        retention=0.995,
-        season_retention=0.75,
-    )
-    # One gameweek, four independent fixtures; club 1 also plays club 9 (double appearance).
+    # Club 1 appears twice: vs 5 at day 14 (earlier) and vs 9 at day 15 (later), plus two
+    # independent fixtures. The list is deliberately not in kickoff order.
     batch = [
+        _match_row(SEASON, 3, 15, 1, 9, 3.0, 1.0, fixture=313),
         _match_row(SEASON, 3, 14, 1, 5, 2.0, 0.0, fixture=310),
-        _match_row(SEASON, 3, 14, 3, 6, 1.0, 1.0, fixture=311),
         _match_row(SEASON, 3, 14, 7, 8, 0.0, 2.0, fixture=312),
-        _match_row(SEASON, 3, 14, 1, 9, 3.0, 1.0, fixture=313),
+        _match_row(SEASON, 3, 14, 3, 6, 1.0, 1.0, fixture=311),
     ]
-    forward = model._walk_forward_score(
-        state,
-        last_season,
-        [batch],
-        venue_home=1.4,
-        venue_away=1.2,
-        learning_rate=0.10,
-        retention=0.995,
-        season_retention=0.75,
-    )
-    reversed_batch = list(reversed(batch))
-    state2, last_season2 = model._replay(
-        inner,
-        venue_home=1.4,
-        venue_away=1.2,
-        learning_rate=0.10,
-        retention=0.995,
-        season_retention=0.75,
-    )
-    reversed_score = model._walk_forward_score(
-        state2,
-        last_season2,
-        [reversed_batch],
-        venue_home=1.4,
-        venue_away=1.2,
-        learning_rate=0.10,
-        retention=0.995,
-        season_retention=0.75,
-    )
-    assert forward == pytest.approx(reversed_score, abs=1e-12)
+    next_gw = [_match_row(SEASON, 4, 21, 1, 7, 1.0, 1.0, fixture=410)]
+
+    def run(
+        batch_order: list[MatchRow],
+    ) -> tuple[float, float, dict[int, float], dict[int, float], dict[int, int]]:
+        state, last_season = model._replay(
+            inner,
+            venue_home=1.4,
+            venue_away=1.2,
+            learning_rate=0.10,
+            retention=0.995,
+            season_retention=0.75,
+        )
+        batch_score = model._walk_forward_score(
+            state,
+            last_season,
+            [batch_order],
+            venue_home=1.4,
+            venue_away=1.2,
+            learning_rate=0.10,
+            retention=0.995,
+            season_retention=0.75,
+        )
+        # Predict the next gameweek from the state the batch left behind.
+        next_score = model._walk_forward_score(
+            state,
+            last_season,
+            [next_gw],
+            venue_home=1.4,
+            venue_away=1.2,
+            learning_rate=0.10,
+            retention=0.995,
+            season_retention=0.75,
+        )
+        return batch_score, next_score, dict(state.attack), dict(state.defence), dict(state.counts)
+
+    fwd = run(batch)
+    rev = run(list(reversed(batch)))
+
+    # The current batch score is order-invariant (one snapshot).
+    assert fwd[0] == pytest.approx(rev[0], abs=1e-12)
+    # The resulting state is order-invariant only because absorption is forced into kickoff order.
+    for club in set(fwd[2]) | set(rev[2]):
+        assert fwd[2][club] == pytest.approx(rev[2][club], abs=1e-12), f"attack[{club}] differs"
+        assert fwd[3][club] == pytest.approx(rev[3][club], abs=1e-12), f"defence[{club}] differs"
+        assert fwd[4][club] == rev[4][club], f"counts[{club}] differs"
+    # So the next gameweek, predicted from that state, is order-invariant too.
+    assert fwd[1] == pytest.approx(rev[1], abs=1e-12)
 
 
 # --------------------------------------------------------------------------------------
@@ -383,6 +402,113 @@ def test_season_transition_fires_inside_the_holdout() -> None:
 
 def _clip_value(value: float, cap: float = 2.0) -> float:
     return max(-cap, min(cap, value))
+
+
+# --------------------------------------------------------------------------------------
+# Outer season-opening fold: fit() crosses the summer boundary the training window does not
+# --------------------------------------------------------------------------------------
+
+
+def test_outer_season_opening_applies_one_summer_transition() -> None:
+    """Outer GW1 prediction state must cross the summer the training window did not.
+
+    The training window ends in 2024-25, so the replayed state never crossed into the 2025-26
+    prediction season: without an explicit outer transition a returning promoted club stays warm
+    (its 2024-25 count retained) and incumbents stay unshrunk. ``fit`` must apply exactly one
+    transition into the prediction season -- promoted count -> 0 (cold), incumbent strength *=
+    season_retention -- so GW1 predicts from the post-summer state.
+    """
+    policy = _flat_policy(season_retention=(0.5,))
+    model = DynamicTeamGoalsV4(policy, minimum_team_matches=6)
+    model.set_promoted({"2025-26": frozenset({1})})
+    model.set_prediction_season("2025-26")
+    # No 2024-25 promoted cohort is declared, so the fold-local prior is the neutral 1.0/1.0.
+    model._prior_attack_log = math.log(1.0)
+    model._prior_defence_log = math.log(1.0)
+    # Prior-season training only (club 1 returns promoted; club 2 is an incumbent).
+    frame = _season_frame(season="2024-25", gameweeks=8, clubs=(1, 2, 3, 4, 5, 6, 7, 8))
+
+    # Pre-transition incumbent strength, from the same replay fit performs.
+    rows = model._rows(frame)
+    venue_home, venue_away = model._venue_means(frame)
+    prior_state, last_season = model._replay(
+        rows,
+        venue_home=venue_home,
+        venue_away=venue_away,
+        learning_rate=policy.fallback_learning_rate,
+        retention=policy.fallback_retention,
+        season_retention=policy.fallback_season_retention,
+    )
+    assert last_season == "2024-25"
+    incumbent_before = prior_state.attack[2]
+
+    model.fit(TrainingWindow(frame))
+
+    # Returning promoted club 1: reset to cold, and with no 2025-26 training its count is 0
+    # (it would be 8 if the transition were skipped).
+    assert model._state.counts[1] == 0
+    # Incumbent club 2 retains its 2024-25 count and is shrunk exactly once (by 0.5).
+    assert model._state.counts[2] == 8
+    assert model._state.attack[2] == pytest.approx(_clip_value(incumbent_before * 0.5), abs=1e-9)
+
+
+def test_no_second_transition_when_training_includes_the_prediction_season() -> None:
+    """A fold whose training already crossed into the prediction season must not transition again.
+
+    The replay applies the 2024-25 -> 2025-26 transition once, at the first 2025-26 match, so the
+    replayed state ends in the prediction season and ``fit`` adds no second transition. An
+    incumbent would otherwise be shrunk by ``season_retention`` twice.
+    """
+    policy = _flat_policy(season_retention=(0.5,))
+    model = DynamicTeamGoalsV4(policy, minimum_team_matches=6)
+    model.set_prediction_season("2025-26")
+    model._prior_attack_log = math.log(1.0)
+    model._prior_defence_log = math.log(1.0)
+    frame = pl.concat(
+        [
+            _season_frame(
+                season="2024-25",
+                gameweeks=8,
+                kickoff=datetime(2024, 8, 15, 19, 0, tzinfo=UTC),
+                clubs=(1, 2, 3, 4, 5, 6, 7, 8),
+            ),
+            _season_frame(
+                season="2025-26",
+                gameweeks=4,
+                kickoff=datetime(2025, 8, 15, 19, 0, tzinfo=UTC),
+                clubs=(1, 2, 3, 4, 5, 6, 7, 8),
+            ),
+        ]
+    )
+
+    rows = model._rows(frame)
+    venue_home, venue_away = model._venue_means(frame)
+    single, last_season = model._replay(
+        rows,
+        venue_home=venue_home,
+        venue_away=venue_away,
+        learning_rate=policy.fallback_learning_rate,
+        retention=policy.fallback_retention,
+        season_retention=policy.fallback_season_retention,
+    )
+    assert last_season == "2025-26"
+    # A spurious second transition would shrink every incumbent again.
+    double = DynamicState(
+        attack=dict(single.attack),
+        defence=dict(single.defence),
+        counts=dict(single.counts),
+        venue_home=single.venue_home,
+        venue_away=single.venue_away,
+        rate_floor=single.rate_floor,
+    )
+    model._apply_season_transition(double.attack, double.defence, double.counts, "2025-26", 0.5)
+
+    model.fit(TrainingWindow(frame))
+
+    # fit's state is the single-transition replay, not the double.
+    assert model._state.attack[2] == pytest.approx(single.attack[2], abs=1e-9)
+    assert model._state.attack[2] != pytest.approx(double.attack[2], abs=1e-9)
+    assert model._state.counts[2] == single.counts[2]
 
 
 # --------------------------------------------------------------------------------------
@@ -551,6 +677,78 @@ def test_appending_future_rows_does_not_move_an_earlier_fold_prior() -> None:
     assert before == pytest.approx(after, abs=1e-12)
 
 
+def test_promoted_prior_attack_stays_eligible_when_defence_is_null() -> None:
+    """A club whose defence went unmeasured keeps its attack ratio; defence falls back alone.
+
+    Club 91 (promoted 2023-24) has measured goals_for but NULL goals_against; club 92 has both.
+    The attack prior averages both clubs' attack ratios; the defence prior uses club 92 only, so
+    91's missing defence is never zero-filled and never drops 91's attack contribution.
+    """
+    model = DynamicTeamGoalsV4(_flat_policy(), minimum_team_matches=6)
+    model.set_promoted({"2023-24": frozenset({91, 92}), "2024-25": frozenset({93})})
+    rows: list[dict[str, object]] = []
+    for gw in range(1, 7):
+        rows += _match_rows(gw, 91, 1, 1, 3, season="2023-24")  # 91 scores 1, concedes 3
+        rows += _match_rows(gw, 2, 3, 1, 1, season="2023-24")  # league filler
+        rows += _match_rows(gw, 92, 4, 1, 1, season="2023-24")  # 92 scores 1, concedes 1
+        rows += _match_rows(gw, 5, 6, 1, 1, season="2023-24")  # league filler
+    # Defence unmeasured for club 91 only.
+    frame = _frame(rows).with_columns(
+        pl.when(pl.col("team_code") == 91)
+        .then(None)
+        .otherwise(pl.col("goals_against"))
+        .alias("goals_against")
+    )
+    attack_log, defence_log = model._fold_local_promoted_prior(frame, "2024-25")
+
+    eligible = frame.filter(pl.col("season") == "2023-24")
+    mu = float(eligible["goals_for"].mean())
+
+    def ratio(team: int, col: str) -> float:
+        sub = eligible.filter(pl.col("team_code") == team)
+        measured = sub[col].drop_nulls()
+        total = float(measured.sum())
+        n = measured.len()
+        return ((total + 6.0 * mu) / (n + 6.0)) / mu
+
+    # Attack averages both clubs (91 and 92); defence uses 92 only.
+    exp_attack = (ratio(91, "goals_for") + ratio(92, "goals_for")) / 2
+    exp_defence = ratio(92, "goals_against")
+    assert math.exp(attack_log) == pytest.approx(exp_attack, abs=1e-9)
+    assert math.exp(defence_log) == pytest.approx(exp_defence, abs=1e-9)
+    # Defence did not collapse to the neutral fallback: 92 was eligible.
+    assert math.exp(defence_log) != pytest.approx(1.0, abs=1e-9)
+
+
+def test_promoted_prior_defence_falls_back_to_neutral_when_all_defence_is_null() -> None:
+    """With no eligible defence component, defence falls back to 1.0 while attack is still used."""
+    model = DynamicTeamGoalsV4(_flat_policy(), minimum_team_matches=6)
+    model.set_promoted({"2023-24": frozenset({91}), "2024-25": frozenset({93})})
+    rows: list[dict[str, object]] = []
+    for gw in range(1, 7):
+        rows += _match_rows(gw, 91, 1, 2, 3, season="2023-24")  # 91 scores 2, concedes 3
+        rows += _match_rows(gw, 2, 3, 1, 1, season="2023-24")  # league filler
+    frame = _frame(rows).with_columns(
+        pl.when(pl.col("team_code") == 91)
+        .then(None)
+        .otherwise(pl.col("goals_against"))
+        .alias("goals_against")
+    )
+    attack_log, defence_log = model._fold_local_promoted_prior(frame, "2024-25")
+
+    # Defence has no eligible component -> independent neutral fallback.
+    assert math.exp(defence_log) == pytest.approx(1.0, abs=1e-12)
+    # Attack still uses club 91's measured ratio (not the fallback).
+    eligible = frame.filter(pl.col("season") == "2023-24")
+    mu = float(eligible["goals_for"].mean())
+    measured = eligible.filter(pl.col("team_code") == 91)["goals_for"]
+    total = float(measured.sum())
+    n = measured.len()
+    exp_attack = ((total + 6.0 * mu) / (n + 6.0)) / mu
+    assert math.exp(attack_log) == pytest.approx(exp_attack, abs=1e-9)
+    assert math.exp(attack_log) != pytest.approx(1.0, abs=1e-9)
+
+
 # --------------------------------------------------------------------------------------
 # Defect 4 (cont.): point-in-time truncation equivalence on the real archive
 # --------------------------------------------------------------------------------------
@@ -559,14 +757,15 @@ def test_appending_future_rows_does_not_move_an_earlier_fold_prior() -> None:
 @pytest.mark.archive
 def test_full_database_equals_truncated_database_at_the_same_as_of(db) -> None:  # type: ignore[no-untyped-def]
     """V4's prediction at a fold is identical whether the DB is full (future filtered) or
-    physically truncated to ``as_of``. A fold-local prior that read future rows would diverge."""
+    physically truncated to ``as_of``. The truncated side also drops future-season dimension
+    rows, so a fold-local prior or promoted set that read a future-season dimension row would
+    diverge. This is a property check only -- it compares predicted rates, no performance metric."""
     from fpl.validate.folds import generate_folds, promoted_team_codes
     from fpl.validate.harness import _fold_fixtures, _training_window
     from tests.conftest import make_truncated_db
 
     contract = load_phase1_evaluation()
     policy = contract.stage_a_candidate_v4
-    assert policy is not None
     folds = generate_folds(db)
     fold = folds[len(folds) // 2]
     promoted = promoted_team_codes(db)
@@ -578,7 +777,7 @@ def test_full_database_equals_truncated_database_at_the_same_as_of(db) -> None: 
     full.fit(_training_window(db, fold))
     rates_full = full.predict_rates(fixtures)
 
-    truncated = make_truncated_db(fold.as_of)
+    truncated = make_truncated_db(fold.as_of, truncate_future_season_dimensions=True)
     trunc = DynamicTeamGoalsV4(policy, minimum_team_matches=contract.training.minimum_team_matches)
     trunc.set_promoted(promoted_team_codes(truncated))
     trunc.set_prediction_season(fold.season)

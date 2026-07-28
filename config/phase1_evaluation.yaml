@@ -146,18 +146,19 @@ amendments:
       V4 is not substituted for V2 or V3 by any default command.
     reason: >-
       Candidate V3's single historical development result is INVALIDATED, not merely
-      non-promoted: review found four defects. Two are leakage -- the promoted cold-start prior
-      was a full-archive constant estimated from seasons future to early folds, and the inner
-      holdout scored all six held-out gameweeks from one frozen state rather than a chronological
-      observed-gameweek walk-forward. The other two are fitting/provenance defects -- the
-      six-match cold-start prior was applied at prediction only, not in the fitting residual,
-      returning promoted clubs retained old Premier-League match counts, and the development
-      runner accepted a dirty worktree while recording only a clean-looking commit SHA. A
-      leakage-tainted number cannot be salvaged by being short of the gate, so V3's value is
-      void for comparison. Candidate V4 keeps V3's structural hypothesis (a sequential,
-      mean-reverting online Poisson filter) and fixes all four defects with procedure pins and a
-      fold-local promoted-prior estimator, so its eventual development number can finally be
-      trusted. This amendment pre-registers V4 and its grid before any V4 evaluation.
+      non-promoted: review found four defects. One is leakage -- the promoted cold-start prior
+      was a full-archive constant estimated from seasons future to early folds, so the model used
+      information it should not have had at the cutoff. Two are specification/fitting defects --
+      the inner holdout scored all six held-out gameweeks from one frozen state rather than a
+      chronological observed-gameweek walk-forward, the six-match cold-start prior was applied at
+      prediction only (not in the fitting residual), and returning promoted clubs retained old
+      Premier-League match counts. One is a provenance defect -- the development runner accepted a
+      dirty worktree while recording only a clean-looking commit SHA. A leakage-tainted number
+      cannot be salvaged by being short of the gate, so V3's value is void for comparison.
+      Candidate V4 keeps V3's structural hypothesis (a sequential, mean-reverting online Poisson
+      filter) and fixes all four defects with procedure pins and a fold-local promoted-prior
+      estimator, so its eventual development number can finally be trusted. This amendment
+      pre-registers V4 and its grid before any V4 evaluation.
     evidence: >-
       Three candidates (V1, V2, and the invalidated V3) had produced a number before this
       amendment. The four V3 defects and the voided values are documented in
@@ -272,7 +273,10 @@ stage_a_candidate_v4:
   fallback_retention: 0.995
   fallback_season_retention: 0.75
   # Fold-local promoted-prior estimator. Earlier promoted cohorts only; neutral fallback when
-  # none are eligible. shrinkage_matches fixes the pull toward neutral in match-units.
+  # none are eligible. promoted_prior_min_matches is a per-component threshold on measured
+  # (non-null) observations: attack and defence are counted separately, a missing component is
+  # never zero-filled, and the two sides fall back independently. shrinkage_matches fixes the
+  # pull toward neutral in match-units.
   promoted_prior_source: fold_local_earlier_cohorts
   fallback_attack_prior: 1.0
   fallback_defence_prior: 1.0

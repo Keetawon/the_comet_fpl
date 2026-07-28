@@ -186,13 +186,9 @@ class DynamicTeamGoalsV4(StageABaseline):
         minimum_team_matches: int | None = None,
     ) -> None:
         contract = load_phase1_evaluation()
-        resolved = policy if policy is not None else contract.stage_a_candidate_v4
-        if resolved is None:
-            raise ValueError(
-                "Candidate V4 policy is not configured; stage_a_candidate_v4 is absent from "
-                "the contract. V4 is never the default candidate."
-            )
-        self._policy: Phase1StageACandidateV4Policy = resolved
+        self._policy: Phase1StageACandidateV4Policy = (
+            policy if policy is not None else contract.stage_a_candidate_v4
+        )
         self.name = self._policy.name
         self._minimum_team_matches = (
             minimum_team_matches
@@ -386,9 +382,16 @@ class DynamicTeamGoalsV4(StageABaseline):
 
         Each batch is one observed gameweek. For each batch: apply the summer transition if the
         season changed, snapshot the pre-gameweek state, predict *every* fixture in the batch
-        from that snapshot (so the batch is order-invariant and no same-gameweek result leaks
-        into another fixture's prediction), score them, and only then absorb the whole
-        gameweek's results before advancing counts and state to the next batch.
+        from that snapshot, score them, and only then absorb the whole gameweek's results before
+        advancing counts and state to the next batch.
+
+        Same-gameweek predictions and residuals all use the one pre-gameweek snapshot, so the
+        batch's *scores* are order-invariant. Absorption occurs afterward, and because a
+        double-gameweek club appears more than once the absorption order is observable in the
+        resulting state: it is therefore enforced here in deterministic actual kickoff order
+        (then season/fixture/stable team-code tie-breakers) rather than assumed from the caller.
+        A double-gameweek club still receives one sequential update (and one retention) per
+        appearance -- this fixes the order, it does not aggregate the appearances.
         """
         attack, defence, counts = state.attack, state.defence, state.counts
         cap = self._policy.log_strength_cap
@@ -397,13 +400,18 @@ class DynamicTeamGoalsV4(StageABaseline):
         current_season = previous_season
 
         for batch in batches:
-            batch_season = batch[0].season
+            # Enforce actual chronological order so absorption (unlike prediction) does not
+            # depend on the order the caller passed the fixtures in.
+            ordered = sorted(
+                batch, key=lambda m: (m.kickoff, m.season, m.fixture, m.home_code, m.away_code)
+            )
+            batch_season = ordered[0].season
             if current_season is not None and batch_season != current_season:
                 self._apply_season_transition(
                     attack, defence, counts, batch_season, season_retention
                 )
             current_season = batch_season
-            for match in batch:
+            for match in ordered:
                 self._ensure_club(attack, defence, counts, match.home_code, batch_season)
                 self._ensure_club(attack, defence, counts, match.away_code, batch_season)
 
@@ -412,7 +420,7 @@ class DynamicTeamGoalsV4(StageABaseline):
             snapshot_defence = dict(defence)
             snapshot_counts = dict(counts)
             pending: list[tuple[MatchRow, float, float]] = []
-            for match in batch:
+            for match in ordered:
                 home_rate = self._side_rate(
                     snapshot_attack,
                     snapshot_defence,
@@ -496,7 +504,7 @@ class DynamicTeamGoalsV4(StageABaseline):
         rows = self._rows(frame)
         learning_rate, retention, season_retention = self._params
         if rows:
-            self._state, _ = self._replay(
+            self._state, last_season = self._replay(
                 rows,
                 venue_home=venue_home,
                 venue_away=venue_away,
@@ -504,6 +512,25 @@ class DynamicTeamGoalsV4(StageABaseline):
                 retention=retention,
                 season_retention=season_retention,
             )
+            # Outer season-opening fold: the training window ends in a prior season, so the
+            # replayed state never crossed the summer boundary into the prediction season. Apply
+            # exactly one transition into the prediction season now -- returning promoted clubs
+            # reset to cold and incumbents take their declared summer retention -- so GW1
+            # predicts from the post-summer state. A fold whose training already includes the
+            # prediction season ends with ``last_season == prediction_season`` and takes no
+            # second transition (the replay already crossed the boundary once).
+            if (
+                last_season is not None
+                and self._prediction_season is not None
+                and last_season != self._prediction_season
+            ):
+                self._apply_season_transition(
+                    self._state.attack,
+                    self._state.defence,
+                    self._state.counts,
+                    self._prediction_season,
+                    season_retention,
+                )
         else:
             self._state = DynamicState(
                 venue_home=venue_home, venue_away=venue_away, rate_floor=self._policy.rate_floor
@@ -675,6 +702,12 @@ class DynamicTeamGoalsV4(StageABaseline):
         pooled means); the prior is the cohort mean. With no eligible cohort the declared
         neutral fallback ``1.0 / 1.0`` applies. Appending later seasons cannot move an earlier
         fold's prior, because those rows are outside this frame.
+
+        Attack and defence are counted separately by their *measured* (non-null) observations:
+        ``promoted_prior_min_matches`` is a per-component threshold, not a row count. A club
+        whose defence went unmeasured keeps its attack contribution and simply omits a defence
+        ratio; it is never zero-filled. The two sides therefore fall back independently when no
+        eligible component reaches the minimum.
         """
         fallback_attack = self._policy.fallback_attack_prior
         fallback_defence = self._policy.fallback_defence_prior
@@ -710,24 +743,28 @@ class DynamicTeamGoalsV4(StageABaseline):
                         season_rows.filter(pl.col("team_code").is_in(list(cohort)))
                         .group_by("team_code", maintain_order=True)
                         .agg(
-                            pl.col("goals_for").sum().alias("goals_for"),
-                            pl.col("goals_against").sum().alias("goals_against"),
-                            pl.len().alias("matches"),
+                            pl.col("goals_for").drop_nulls().sum().alias("goals_for"),
+                            pl.col("goals_for").is_not_null().sum().alias("goals_for_n"),
+                            pl.col("goals_against").drop_nulls().sum().alias("goals_against"),
+                            pl.col("goals_against").is_not_null().sum().alias("goals_against_n"),
                         )
                     )
                     for row in per_club.iter_rows(named=True):
-                        matches = int(row["matches"])
-                        if matches < min_matches:
-                            continue
                         mu = league_mean.get(season)
                         if mu is None or mu <= 0:
                             continue
-                        attack_ratios.append(
-                            _shrunk_ratio(float(row["goals_for"]), matches, mu, shrinkage)
-                        )
-                        defence_ratios.append(
-                            _shrunk_ratio(float(row["goals_against"]), matches, mu, shrinkage)
-                        )
+                        attack_n = int(row["goals_for_n"])
+                        defence_n = int(row["goals_against_n"])
+                        # A component contributes only its own measured observations; a missing
+                        # defence never drops the attack ratio nor is it read as zero.
+                        if attack_n >= min_matches:
+                            attack_ratios.append(
+                                _shrunk_ratio(float(row["goals_for"]), attack_n, mu, shrinkage)
+                            )
+                        if defence_n >= min_matches:
+                            defence_ratios.append(
+                                _shrunk_ratio(float(row["goals_against"]), defence_n, mu, shrinkage)
+                            )
 
         prior_attack = sum(attack_ratios) / len(attack_ratios) if attack_ratios else fallback_attack
         prior_defence = (

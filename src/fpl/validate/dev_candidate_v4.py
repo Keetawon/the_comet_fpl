@@ -10,14 +10,21 @@ slices, counts, and fold-local parameters -- but it prints a **DEVELOPMENT ONLY*
 **never** a promotion verdict. The default harness command (`python -m fpl.validate.harness`)
 is untouched and still evaluates Candidate V2.
 
-This runner is pre-registered before any V4 evaluation. Two provenance guarantees are built in
-and fix V3's defect 4:
+This runner is pre-registered before any V4 evaluation. The provenance guarantees that fix
+V3's defect 4 close the time-of-check/time-of-use gap V3 left open:
 
   * It refuses to start when the Git worktree is dirty, so the recorded SHA names the code
     that was actually scored rather than a clean HEAD over uncommitted changes.
+  * The contract is loaded from one snapshotted read of the config bytes, and the recorded
+    config fingerprint is the hash of exactly those bytes -- there is no load-then-hash window
+    in which the file could change between parsing and fingerprinting.
   * It records the exact clean commit SHA, the config fingerprint, the archive/input
     fingerprint, the fixed seed, and a capture timestamp, so a V4 number can be tied back to a
     single frozen (code, config, data) triple.
+  * Immediately before any result is printed -- after the database connection is closed -- it
+    re-checks that the worktree is still clean and that HEAD, the config fingerprint, and the
+    database fingerprint still equal the captured provenance. If any moved during the run the
+    result is suppressed as INVALID/UNPUBLISHABLE rather than printed under a stale triple.
 
 This module is committed before any V4 result exists; running the full evaluation is out of
 scope for the pre-registration change and is not invoked here.
@@ -35,10 +42,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import yaml
+
 from fpl.config import (
     Phase1EvaluationConfig,
     config_dir,
-    load_phase1_evaluation,
     repo_root,
 )
 from fpl.storage.db import connect, default_db_path
@@ -133,6 +141,11 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def hash_bytes(data: bytes) -> str:
+    """SHA-256 of an in-memory byte string (the config bytes already read for loading)."""
+    return hashlib.sha256(data).hexdigest()
+
+
 def config_fingerprint(path: Path | None = None) -> str:
     """SHA-256 of the executable contract the candidate reads."""
     resolved = path or (config_dir() / "phase1_evaluation.yaml")
@@ -144,22 +157,92 @@ def archive_fingerprint(db_path: Path) -> str:
     return file_sha256(db_path)
 
 
+def load_contract_from_bytes(config_path: Path) -> tuple[Phase1EvaluationConfig, str]:
+    """Read the contract bytes once and load the typed contract from those exact bytes.
+
+    Returns the loaded contract and the SHA-256 of the bytes it was parsed from. Fingerprinting
+    the same bytes that were parsed closes the load-then-hash window in which the file could
+    change between parsing and fingerprinting, so the recorded config fingerprint names exactly
+    the contract that was scored.
+    """
+    raw = config_path.read_bytes()
+    loaded = yaml.safe_load(raw)
+    if not isinstance(loaded, dict):
+        raise ValueError(f"{config_path} did not parse to a mapping")
+    return Phase1EvaluationConfig.model_validate(loaded), hash_bytes(raw)
+
+
+class ProvenanceError(RuntimeError):
+    """The (code, config, data) triple changed between capture and print.
+
+    The captured provenance no longer describes what was scored, so the result is not
+    publishable and must be suppressed rather than printed under a stale triple.
+    """
+
+
 def build_provenance(
-    db_path: Path, config: Phase1EvaluationConfig, *, repo: Path | None = None
+    db_path: Path,
+    config: Phase1EvaluationConfig,
+    *,
+    repo: Path | None = None,
+    config_path: Path | None = None,
+    config_fp: str | None = None,
 ) -> Provenance:
-    """Assemble the provenance record. Assumes the worktree is already clean."""
+    """Assemble the provenance record. Assumes the worktree is already clean.
+
+    ``config_fp`` is the fingerprint of the exact config bytes the contract was loaded from;
+    when omitted it is recomputed from ``config_path`` (the real contract by default). The
+    runner passes the snapshotted fingerprint so the record cannot drift from what was scored.
+    """
     resolved_repo = repo or repo_root()
-    policy = config.stage_a_candidate_v4
-    name = policy.name if policy is not None else "dynamic_team_goals_v4"
+    resolved_config = config_path or (config_dir() / "phase1_evaluation.yaml")
     return Provenance(
-        candidate=name,
+        candidate=config.stage_a_candidate_v4.name,
         contract_version=config.contract_version,
         commit_sha=head_commit_sha(resolved_repo),
-        config_fingerprint=config_fingerprint(),
+        config_fingerprint=(
+            config_fp if config_fp is not None else config_fingerprint(resolved_config)
+        ),
         archive_fingerprint=archive_fingerprint(db_path),
         seed=config.training.seed,
         captured_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
+
+
+def verify_provenance(
+    provenance: Provenance,
+    *,
+    db_path: Path,
+    repo: Path | None = None,
+    config_path: Path | None = None,
+) -> None:
+    """Re-check that (code, config, data) still match the captured provenance.
+
+    Called after the database connection is closed and immediately before any result is
+    printed. If anything moved during the run the captured provenance is no longer truthful, so
+    this raises ``ProvenanceError`` and the caller suppresses the result rather than printing
+    numbers under a stale triple. This closes the time-of-check/time-of-use gap: V3 checked
+    cleanliness only before running and never revalidated HEAD, the config fingerprint, or the
+    database fingerprint before printing.
+    """
+    resolved_repo = repo or repo_root()
+    resolved_config = config_path or (config_dir() / "phase1_evaluation.yaml")
+    porcelain = _git(resolved_repo, "status", "--porcelain")
+    if porcelain:
+        raise ProvenanceError(
+            "worktree became dirty during the run, so the recorded commit no longer names the "
+            "scored code:\n" + porcelain
+        )
+    if head_commit_sha(resolved_repo) != provenance.commit_sha:
+        raise ProvenanceError("HEAD changed during the run; the result is INVALID/UNPUBLISHABLE")
+    if config_fingerprint(resolved_config) != provenance.config_fingerprint:
+        raise ProvenanceError(
+            "config fingerprint changed during the run; the result is INVALID/UNPUBLISHABLE"
+        )
+    if archive_fingerprint(db_path) != provenance.archive_fingerprint:
+        raise ProvenanceError(
+            "database fingerprint changed during the run; the result is INVALID/UNPUBLISHABLE"
+        )
 
 
 def format_development_report(
@@ -174,7 +257,7 @@ def format_development_report(
         return f"\n{candidate} did not produce predictions; no development comparison.\n"
 
     policy = config.stage_a_candidate_v4
-    name = policy.name if policy is not None else candidate
+    name = policy.name
     comparator = result.best_baseline()
     baseline = result.overall[comparator]
     scored = result.overall[candidate]
@@ -247,17 +330,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    contract = load_phase1_evaluation()
-    if contract.stage_a_candidate_v4 is None:
-        raise SystemExit(
-            "Candidate V4 is not configured (stage_a_candidate_v4 is absent). Nothing to run."
-        )
+    config_path = config_dir() / "phase1_evaluation.yaml"
+    # Load the contract from one snapshotted read of the config bytes, and fingerprint exactly
+    # those bytes, so the recorded provenance names the contract that was actually scored.
+    contract, config_fp = load_contract_from_bytes(config_path)
 
     # V3 defect 4 fix: refuse to score a dirty worktree so the provenance is truthful.
     require_clean_worktree(repo_root())
 
     db_path = args.db or default_db_path()
-    provenance = build_provenance(db_path, contract)
+    provenance = build_provenance(db_path, contract, config_fp=config_fp)
 
     # Imported here, as the harness imports Candidate V2: the harness must not depend on any
     # particular candidate existing, and this runner must not load V4 into the default path.
@@ -273,6 +355,17 @@ def main(argv: list[str] | None = None) -> int:
         result = run(con, config=contract, seasons=args.seasons, candidates=[candidate])
     finally:
         con.close()
+
+    # Revalidate the (code, config, data) triple before printing. A mid-run change makes the
+    # captured provenance a lie, so the result is suppressed as INVALID/UNPUBLISHABLE rather
+    # than printed under a triple that no longer holds.
+    try:
+        verify_provenance(provenance, db_path=db_path, repo=repo_root(), config_path=config_path)
+    except ProvenanceError as exc:
+        sys.stderr.write(
+            f"Candidate V4 result is INVALID / UNPUBLISHABLE and will not be printed: {exc}\n"
+        )
+        return 1
 
     print(format_report(result))
     print(format_development_report(result, candidate.name, contract, provenance=provenance))

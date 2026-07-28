@@ -497,6 +497,21 @@ class Phase1MetricPolicy(_Frozen):
 # literal `contract_version` currently pins.
 ORIGINAL_PHASE1_CONTRACT_VERSION: str = "1.0"
 
+# The exact, ordered amendment history each contract version freezes: (version, candidates
+# already evaluated before it). A pre-registered contract's value is that it cannot be rewritten
+# between commits and read as if it had always said so, so at a given version the amendment
+# sequence -- not just the current entry -- is pinned. Reordering, dropping, duplicating, or
+# altering a count fails to load. Moving to a new version is an explicit code change here.
+FROZEN_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
+    "1.5": (
+        ("1.1", 0),
+        ("1.2", 0),
+        ("1.3", 1),
+        ("1.4", 2),
+        ("1.5", 3),
+    ),
+}
+
 
 class Phase1Amendment(_Frozen):
     """One recorded change to a pre-registered contract.
@@ -554,10 +569,12 @@ class Phase1EvaluationConfig(_Frozen):
     # historical development result is invalidated (see docs/phase1-candidate-v3-invalidation.md);
     # the block is retained frozen rather than repaired.
     stage_a_candidate_v3: Phase1StageACandidateV3Policy | None = None
-    # Candidate V4 is the leakage-safe successor to the invalidated V3. Optional and additive in
-    # the same way: it shares no field with V2/V3, substitutes for nothing, and is never loaded
-    # by the default harness command. Pre-registered before any V4 evaluation.
-    stage_a_candidate_v4: Phase1StageACandidateV4Policy | None = None
+    # Candidate V4 is the leakage-safe successor to the invalidated V3. Additive in the same way
+    # as V3: it shares no field with V2/V3, substitutes for nothing, and is never loaded by the
+    # default harness command. Pre-registered before any V4 evaluation. Required at contract
+    # version 1.5: the loader only accepts 1.5, so the V4 block it freezes may not be silently
+    # dropped -- a config that deletes it fails to load rather than scoring a different model.
+    stage_a_candidate_v4: Phase1StageACandidateV4Policy
     baselines: Phase1BaselinePolicy
     metrics: Phase1MetricPolicy
     promotion: Phase1PromotionGate
@@ -615,6 +632,31 @@ class Phase1EvaluationConfig(_Frozen):
             raise ValueError(
                 f"Phase 1 contract version {self.contract_version} has no amendment record; "
                 "a pre-registered gate may not change without one"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _amendment_history_is_frozen(self) -> Self:
+        """The whole ordered amendment history is pinned, not just the current version.
+
+        A missing, reordered, duplicated, or count-altered amendment would let a pre-registered
+        contract be rewritten between commits and read back as if it had always said so. Each
+        entry is the (version, candidates_evaluated_before_amendment) pair exactly as frozen for
+        this contract version; any difference fails to load. Bumping the contract version is an
+        explicit code change that adds a new ``FROZEN_AMENDMENT_HISTORY`` entry.
+        """
+        expected = FROZEN_AMENDMENT_HISTORY.get(self.contract_version)
+        if expected is None:
+            return self
+        actual = tuple(
+            (amendment.version, amendment.candidates_evaluated_before_amendment)
+            for amendment in self.amendments
+        )
+        if actual != expected:
+            raise ValueError(
+                f"Phase 1 amendment history for contract {self.contract_version} is not the "
+                f"frozen record: expected {expected}, got {actual}. The ordered amendment "
+                "sequence and candidate counts are pinned and may not be altered."
             )
         return self
 

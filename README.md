@@ -408,11 +408,13 @@ evaluated, which is the only condition under which amending a pre-registered gat
 ### Candidate V3: development-only result, now INVALIDATED
 
 > **INVALIDATED for comparison.** A review after V3's single development run found four
-> defects — two of them leakage: the promoted prior was estimated from full-archive future
-> seasons, and the inner holdout scored all six gameweeks from one frozen state rather than a
-> true walk-forward. V3's number (1.4956) and every slice, CRPS, cold-start, and
-> parameter-selection figure are therefore **void for comparison or promotion** and are kept
-> only as an audit record. Nothing about the Stage A model or any gate changed. Full detail in
+> defects — one of them leakage: the promoted prior was estimated from full-archive future
+> seasons. The inner holdout scored all six gameweeks from one frozen state rather than a true
+> walk-forward, and the six-match cold-start prior / returning-promoted count handling, are
+> specification/fitting defects; the runner's dirty-worktree acceptance is a provenance defect.
+> V3's number (1.4956) and every slice, CRPS, cold-start, and parameter-selection figure are
+> therefore **void for comparison or promotion** and are kept only as an audit record. Nothing
+> about the Stage A model or any gate changed. Full detail in
 > [`docs/phase1-candidate-v3-invalidation.md`](docs/phase1-candidate-v3-invalidation.md). The
 > leakage-safe successor `dynamic_team_goals_v4` is pre-registered separately (contract
 > amendment 1.5) and has not been evaluated. The narrative below is the original record.

@@ -14,12 +14,16 @@ import pytest
 from fpl.config import config_dir, load_phase1_evaluation
 from fpl.validate.dev_candidate_v4 import (
     Provenance,
+    ProvenanceError,
     build_provenance,
     config_fingerprint,
     file_sha256,
     format_development_report,
+    hash_bytes,
     head_commit_sha,
+    load_contract_from_bytes,
     require_clean_worktree,
+    verify_provenance,
     worktree_is_clean,
 )
 from fpl.validate.harness import HarnessResult
@@ -189,3 +193,76 @@ def test_the_development_report_is_labelled_and_never_a_verdict() -> None:
     # Provenance is embedded so the number is tied to a frozen triple.
     assert "deadbeef" in text
     assert "lift" in text
+
+
+# --------------------------------------------------------------------------------------
+# Provenance revalidation: the (code, config, data) triple is re-checked before print
+# --------------------------------------------------------------------------------------
+
+
+def _provenance_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Provenance]:
+    """A clean repo plus sibling (config, db) files and the provenance captured over them.
+
+    The config and db live outside the repo dir so editing them does not dirty the worktree,
+    letting each revalidation failure be isolated to the dimension it simulates.
+    """
+    repo = _init_repo(tmp_path / "repo")
+    config_copy = tmp_path / "phase1_evaluation.yaml"
+    config_copy.write_bytes((config_dir() / "phase1_evaluation.yaml").read_bytes())
+    db = tmp_path / "db.duckdb"
+    db.write_bytes(b"archive-bytes")
+    contract = load_phase1_evaluation()
+    provenance = build_provenance(db, contract, repo=repo, config_path=config_copy)
+    return repo, config_copy, db, provenance
+
+
+def test_verify_provenance_passes_when_unchanged(tmp_path: Path) -> None:
+    repo, config_copy, db, provenance = _provenance_fixture(tmp_path)
+    verify_provenance(provenance, db_path=db, repo=repo, config_path=config_copy)  # must not raise
+
+
+def test_verify_provenance_aborts_on_a_dirty_worktree(tmp_path: Path) -> None:
+    repo, config_copy, db, provenance = _provenance_fixture(tmp_path)
+    (repo / "uncommitted.txt").write_text("change", encoding="utf-8")
+    with pytest.raises(ProvenanceError, match="dirty"):
+        verify_provenance(provenance, db_path=db, repo=repo, config_path=config_copy)
+
+
+def test_verify_provenance_aborts_on_a_head_change(tmp_path: Path) -> None:
+    repo, config_copy, db, provenance = _provenance_fixture(tmp_path)
+    (repo / "new.txt").write_text("second commit", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "second"], cwd=repo, check=True)
+    with pytest.raises(ProvenanceError, match="HEAD"):
+        verify_provenance(provenance, db_path=db, repo=repo, config_path=config_copy)
+
+
+def test_verify_provenance_aborts_on_a_config_change(tmp_path: Path) -> None:
+    repo, config_copy, db, provenance = _provenance_fixture(tmp_path)
+    config_copy.write_bytes(b"# altered contract bytes\n")
+    with pytest.raises(ProvenanceError, match="config"):
+        verify_provenance(provenance, db_path=db, repo=repo, config_path=config_copy)
+
+
+def test_verify_provenance_aborts_on_a_database_change(tmp_path: Path) -> None:
+    repo, config_copy, db, provenance = _provenance_fixture(tmp_path)
+    db.write_bytes(b"rebuilt-bytes")
+    with pytest.raises(ProvenanceError, match="database"):
+        verify_provenance(provenance, db_path=db, repo=repo, config_path=config_copy)
+
+
+def test_load_contract_from_bytes_fingerprints_the_exact_parsed_bytes(tmp_path: Path) -> None:
+    """The config fingerprint is the hash of the exact bytes the contract was parsed from, so
+    there is no load-then-hash window in which the file could change between the two."""
+    config_copy = tmp_path / "phase1_evaluation.yaml"
+    real = (config_dir() / "phase1_evaluation.yaml").read_bytes()
+    config_copy.write_bytes(real)
+    contract, fingerprint = load_contract_from_bytes(config_copy)
+    assert contract.contract_version == "1.5"
+    assert fingerprint == file_sha256(config_copy)
+    assert fingerprint == hash_bytes(real)
+    # Editing the bytes -- even a no-op comment -- changes the fingerprint, so any mid-run
+    # edit is detectable even when it leaves the parsed contract identical.
+    config_copy.write_bytes(real + b"\n# trailing comment\n")
+    _, edited = load_contract_from_bytes(config_copy)
+    assert edited != fingerprint

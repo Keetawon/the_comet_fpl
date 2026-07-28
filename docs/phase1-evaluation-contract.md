@@ -3,8 +3,8 @@
 **Status: contract and harness implemented at version 1.5. Candidates V1 and V2 were evaluated
 and neither promoted. The required trailing-goals baseline remains Stage A. Amendment 1.4
 pre-registered a development-only Candidate V3 (`dynamic_team_goals_v3`); its single historical
-development result is now **invalidated** (two leakage defects plus fitting/provenance defects),
-so its number is void for comparison. Amendment 1.5 pre-registers Candidate V4
+development result is now **invalidated** (one leakage defect plus specification/fitting and
+provenance defects), so its number is void for comparison. Amendment 1.5 pre-registers Candidate V4
 (`dynamic_team_goals_v4`), the leakage-safe structural successor to V3; it is development-only,
 has not been evaluated, and changes no gate.** The machine-readable source is
 `config/phase1_evaluation.yaml`, validated by `Phase1EvaluationConfig` and executed by
@@ -133,8 +133,10 @@ prior boundary is evidence for designing a new hypothesis, not for changing V2 a
 ### Candidate V3: pre-registered for historical development only, result now INVALIDATED
 
 > **The V3 development result is invalidated, not merely non-promoted.** Review after the run
-> found two leakage defects (the promoted prior drew on full-archive future seasons; the inner
-> holdout scored all six gameweeks from one frozen state) plus a fitting/provenance defect,
+> found four defects: one leakage defect (the promoted prior drew on full-archive future
+> seasons), two specification/fitting defects (the inner holdout scored all six gameweeks from
+> one frozen state; the six-match cold-start prior was prediction-only and returning promoted
+> clubs kept old match counts), and one provenance defect (the runner accepted a dirty worktree),
 > so V3's development number carries no information and must not be compared against any
 > baseline or candidate. The Stage A model and every gate are unchanged. The void values are
 > retained as an audit record in
@@ -239,17 +241,19 @@ development result was later invalidated (see 1.5).**
 ### 1.5 -- Candidate V3 invalidation and Candidate V4 pre-registration (2026-07-28, 3 candidates)
 
 Candidate V3's single historical development result is **invalidated**, not merely non-promoted:
-review found four defects (two leakage -- the promoted prior drew on full-archive future seasons,
-and the inner holdout scored all six gameweeks from one frozen state; plus cold-start residual and
-returning-promoted count defects, and a runner that accepted a dirty worktree). V3's number is
+review found four defects (one leakage -- the promoted prior drew on full-archive future seasons;
+plus specification/fitting defects -- the inner holdout scored all six gameweeks from one frozen
+state, the cold-start residual was prediction-only, and returning-promoted clubs kept old match
+counts; and a provenance defect -- the runner accepted a dirty worktree). V3's number is
 therefore void for comparison and is kept only as an audit record; its code is left frozen rather
-than repaired. This amendment adds the optional, additive `stage_a_candidate_v4` block pre-registering
+than repaired. This amendment adds the additive `stage_a_candidate_v4` block pre-registering
 the leakage-safe successor `dynamic_team_goals_v4`, which fixes all four defects with procedure
-pins and a fold-local promoted-prior estimator. Three candidates (V1, V2, the invalidated V3) had
-produced a number before this was made. No baseline, outer row, lift threshold, CRPS rule,
-calibration tolerance, coverage requirement, fold requirement, leakage requirement, the V2
-policy, or the frozen V3 policy changes; V4 is never substituted for V2 or V3 by any default
-command, is judged by no gate, and has not been evaluated.
+pins and a fold-local promoted-prior estimator. The block is required at contract version 1.5
+(the loader accepts no other version), so it may not be silently dropped. Three candidates (V1,
+V2, the invalidated V3) had produced a number before this was made. No baseline, outer row, lift
+threshold, CRPS rule, calibration tolerance, coverage requirement, fold requirement, leakage
+requirement, the V2 policy, or the frozen V3 policy changes; V4 is never substituted for V2 or V3
+by any default command, is judged by no gate, and has not been evaluated.
 
 ## Exit criterion
 

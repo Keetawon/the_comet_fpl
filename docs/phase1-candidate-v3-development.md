@@ -1,10 +1,11 @@
 # Candidate V3 development result
 
 > **INVALIDATED — NOT A PROMOTION RESULT AND NOT A COMPARABLE NUMBER.** A review after this
-> run found four defects, two of them leakage (the promoted prior was estimated from future
-> seasons; the recorded "zero leakage failures" covers only the harness's per-fold checks).
-> Every value below is therefore void for comparison or promotion and is retained **only as an
-> audit record** of what the defective procedure printed. See
+> run found four defects, one of them leakage (the promoted prior was estimated from future
+> seasons, so the recorded "zero leakage failures" -- which covers only the harness's per-fold
+> checks -- is false as a leakage claim). The other three are specification/fitting and
+> provenance defects. Every value below is therefore void for comparison or promotion and is
+> retained **only as an audit record** of what the defective procedure printed. See
 > [`phase1-candidate-v3-invalidation.md`](phase1-candidate-v3-invalidation.md). The content
 > below is unchanged. The leakage-safe successor is the separately pre-registered
 > `dynamic_team_goals_v4` (contract amendment 1.5); it has not been evaluated.

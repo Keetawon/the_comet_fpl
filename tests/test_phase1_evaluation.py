@@ -388,13 +388,54 @@ def test_v4_must_stay_development_only() -> None:
         Phase1EvaluationConfig.model_validate(document)
 
 
-def test_v4_is_optional_and_preserves_v1_v2_v3() -> None:
-    """Removing the V4 block still loads the contract, with V2 and the frozen V3 intact."""
+def test_v4_is_required_and_deletion_is_rejected() -> None:
+    """Contract 1.5 only accepts version 1.5, so the V4 block it freezes may not be silently
+    dropped: deleting it fails to load rather than scoring a different model."""
     document = copy.deepcopy(_document())
     document.pop("stage_a_candidate_v4")
-    contract = Phase1EvaluationConfig.model_validate(document)
-    assert contract.stage_a_candidate_v4 is None
-    assert contract.stage_a_candidate.name == "dixon_coles_team_goals_v2"
-    assert contract.stage_a_candidate_v3 is not None
-    assert contract.stage_a_candidate_v3.name == "dynamic_team_goals_v3"
-    assert "dynamic_team_goals_v4" not in contract.baselines.stage_a
+    with pytest.raises(ValidationError, match=r"stage_a_candidate_v4|required|missing"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+# --------------------------------------------------------------------------------------
+# Amendment history is frozen: the whole ordered sequence, not just the current version
+# --------------------------------------------------------------------------------------
+
+
+def test_amendment_history_is_frozen_for_contract_1_5() -> None:
+    contract = load_phase1_evaluation()
+    history = tuple(
+        (a.version, a.candidates_evaluated_before_amendment) for a in contract.amendments
+    )
+    assert history == (("1.1", 0), ("1.2", 0), ("1.3", 1), ("1.4", 2), ("1.5", 3))
+
+
+def test_amendment_reordering_is_rejected() -> None:
+    document = copy.deepcopy(_document())
+    amendments = document["amendments"]
+    assert isinstance(amendments, list)
+    amendments[0], amendments[1] = amendments[1], amendments[0]  # swap 1.1 and 1.2
+    with pytest.raises(ValueError, match="amendment history"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+def test_amendment_count_alteration_is_rejected() -> None:
+    document = copy.deepcopy(_document())
+    amendments = document["amendments"]
+    assert isinstance(amendments, list)
+    for amendment in amendments:
+        if isinstance(amendment, dict) and amendment.get("version") == "1.5":
+            amendment["candidates_evaluated_before_amendment"] = 2  # frozen value is 3
+    with pytest.raises(ValueError, match="amendment history"):
+        Phase1EvaluationConfig.model_validate(document)
+
+
+def test_dropping_a_non_current_amendment_is_rejected() -> None:
+    document = copy.deepcopy(_document())
+    amendments = document["amendments"]
+    assert isinstance(amendments, list)
+    document["amendments"] = [
+        a for a in amendments if not (isinstance(a, dict) and a.get("version") == "1.3")
+    ]
+    with pytest.raises(ValueError, match="amendment history"):
+        Phase1EvaluationConfig.model_validate(document)

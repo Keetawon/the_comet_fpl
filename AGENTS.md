@@ -16,10 +16,12 @@ pre-registered under contract 1.3 before its single outer evaluation and scored 
 the 1.5003 best baseline, only a 0.4284% lift against the required 1%. Candidate V3
 (`dynamic_team_goals_v3`) is a development-only structural probe pre-registered under contract
 amendment 1.4; its single historical development evaluation is **INVALIDATED** (not merely
-non-promoted) — review found two leakage defects (the promoted prior drew on full-archive
-future seasons; the inner holdout scored all six gameweeks from one frozen state) plus
-fitting/provenance defects, so V3's 1.4956 number and every slice/CRPS/cold-start/parameter
-figure are void for comparison and are kept only as an audit record. Candidate V4
+non-promoted) — review found four defects: one leakage defect (the promoted prior drew on
+full-archive future seasons), two specification/fitting defects (the inner holdout scored all
+six gameweeks from one frozen state; the six-match cold-start prior was prediction-only and
+returning promoted clubs kept old match counts), and one provenance defect (the runner accepted
+a dirty worktree). So V3's 1.4956 number and every slice/CRPS/cold-start/parameter figure are
+void for comparison and are kept only as an audit record. Candidate V4
 (`dynamic_team_goals_v4`, amendment 1.5) is the leakage-safe successor pre-registered before any
 evaluation: it keeps V3's sequential dynamic filter and fixes all four defects with frozen
 procedure pins and a fold-local promoted-prior estimator. No V4 historical score has been run.

@@ -72,13 +72,22 @@ def fixtures_payload_path(fixtures_dir: Path) -> Path:
     return path
 
 
-def make_truncated_db(as_of: datetime) -> duckdb.DuckDBPyConnection:
+def make_truncated_db(
+    as_of: datetime, *, truncate_future_season_dimensions: bool = False
+) -> duckdb.DuckDBPyConnection:
     """An in-memory database holding only rows with `kickoff_time < as_of`.
 
     The other half of the truncation-equivalence test: querying this with a point-in-time
     view must give the same answer as querying the full database with the same `as_of`. If
     an accessor forgets its filter, the full database returns extra rows and the two
     disagree.
+
+    Dimension tables carry no ``kickoff_time``, so by default they are copied unchanged. With
+    ``truncate_future_season_dimensions`` a stricter physical truncation also drops dimension
+    rows whose season has no observed fact yet (seasons later than the latest one with a
+    pre-``as_of`` kickoff): a model that secretly read a future-season dimension row would then
+    diverge from the full-database-with-filter result. The point-in-time layer's own truncation
+    test keeps the default, so it is unaffected.
     """
     # Via the project's own `connect`, not duckdb directly, so this session is pinned to
     # UTC like every other. Otherwise DuckDB tags timestamps with the local zone and the
@@ -102,6 +111,20 @@ def make_truncated_db(as_of: datetime) -> duckdb.DuckDBPyConnection:
         if "kickoff_time" in columns:
             con.execute(
                 f"CREATE TABLE {table} AS SELECT * FROM full_db.{table} WHERE kickoff_time < ?",
+                [as_of],
+            )
+        elif truncate_future_season_dimensions and "season" in columns:
+            # Keep dimension rows only for seasons that have started by as_of (first kickoff
+            # <= as_of), resolved against the full DB. A season-opener fold still keeps the
+            # upcoming season's known club roster (its first kickoff is as_of itself) while
+            # dropping genuinely future seasons, so a model that read a future-season dimension
+            # row would diverge.
+            con.execute(
+                f"CREATE TABLE {table} AS SELECT d.* FROM full_db.{table} d "
+                "WHERE d.season IN ("
+                "  SELECT season FROM full_db.mart_fact_team_match"
+                "  GROUP BY season HAVING min(kickoff_time) <= ?"
+                ")",
                 [as_of],
             )
         else:
