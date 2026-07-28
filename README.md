@@ -42,8 +42,9 @@ uv run pytest
 [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League)
 archive into `data/archive/`, lands them into `data/fpl.duckdb`, and builds every layer.
 It is idempotent — rerunning produces the same database — and failure-atomic. The job clones
-the existing database into a sibling work file so append-only live snapshots survive, rebuilds
-the archive-derived layers there, and uses one atomic replacement only after success. If the
+the existing database into a sibling work file so append-only live snapshots survive, applies
+declared additive schema migrations with new historical values left NULL, rebuilds the
+archive-derived layers there, and uses one atomic replacement only after success. If the
 production database changes during the build, promotion aborts and preserves the newer file.
 Add `--refresh` to re-download.
 

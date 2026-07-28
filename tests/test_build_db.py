@@ -8,6 +8,7 @@ import duckdb
 import pytest
 
 from fpl.jobs import build_db
+from fpl.storage.db import table_columns
 from fpl.transform.crosswalk import CrosswalkReport
 from fpl.transform.facts import FactCounts
 
@@ -120,6 +121,35 @@ def test_success_atomically_replaces_database_and_remains_idempotent(
         assert con.execute(
             "SELECT value FROM build_metadata WHERE key = 'player_fixture_rows'"
         ).fetchone() == ("1",)
+    finally:
+        con.close()
+
+
+def test_rebuild_applies_additive_schema_migrations_to_a_cloned_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cloned pre-Opta database must gain new nullable columns before rebuilding."""
+    target = tmp_path / "fpl.duckdb"
+    migrated_tables = (
+        "stg_player_fixture",
+        "stg_live_player_fixture_version",
+        "mart_fact_player_fixture",
+        "mart_fact_player_fixture_live",
+    )
+    con = duckdb.connect(str(target))
+    try:
+        for table in migrated_tables:
+            con.execute(f"CREATE TABLE {table} (legacy_marker INTEGER)")
+    finally:
+        con.close()
+    _stub_successful_pipeline(monkeypatch)
+
+    assert build_db.build(db_path=target) == 0
+    con = duckdb.connect(str(target), read_only=True)
+    try:
+        for table in migrated_tables:
+            columns = set(table_columns(con, table))
+            assert {"threat", "creativity"} <= columns
     finally:
         con.close()
 
