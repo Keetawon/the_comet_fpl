@@ -15,6 +15,7 @@ import argparse
 import logging
 import sys
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -129,9 +130,16 @@ def run(
     *,
     config: Phase1EvaluationConfig | None = None,
     seasons: list[str] | None = None,
+    candidates: Sequence[StageABaseline] | None = None,
 ) -> HarnessResult:
+    """Score every baseline, plus any candidates, on exactly the same predictions.
+
+    Candidates go through the identical fold loop rather than a parallel one, because
+    `comparison_population: same_eligible_predictions` is only true if the rows are literally
+    the same rows -- a candidate evaluated on its own population is not comparable at all.
+    """
     resolved = config or load_phase1_evaluation()
-    baselines = build_baselines(resolved.training.minimum_team_matches)
+    baselines = [*build_baselines(resolved.training.minimum_team_matches), *(candidates or [])]
     # Which clubs came up is reference data, known before a season starts, so supplying it
     # to the cold-start baseline is not leakage.
     promoted = promoted_team_codes(con)
@@ -236,6 +244,98 @@ def format_report(result: HarnessResult, config: Phase1EvaluationConfig | None =
     return "\n".join(lines)
 
 
+@dataclass(frozen=True, slots=True)
+class GateCheck:
+    name: str
+    passed: bool
+    detail: str
+
+
+def evaluate_gate(
+    result: HarnessResult,
+    candidate: str,
+    config: Phase1EvaluationConfig | None = None,
+) -> list[GateCheck]:
+    """Apply the contract's promotion gate to one candidate.
+
+    Written as code so the verdict is computed rather than argued. The comparator is the best
+    *pre-registered* baseline by overall mean log score -- the candidate never gets to pick
+    which baseline it is measured against, and the same comparator is used in every season.
+    """
+    resolved = config or load_phase1_evaluation()
+    gate = resolved.promotion
+    contracted = set(resolved.baselines.stage_a)
+
+    eligible = {name: report for name, report in result.overall.items() if name in contracted}
+    comparator = min(eligible, key=lambda name: eligible[name].mean_log_score)
+    baseline = eligible[comparator]
+    scored = result.overall[candidate]
+
+    lift = relative_lift(baseline.mean_log_score, scored.mean_log_score)
+    crps_change = relative_lift(baseline.mean_crps, scored.mean_crps)
+    checks = [
+        GateCheck(
+            f"log score lift over {comparator}",
+            lift >= gate.minimum_primary_relative_lift,
+            f"{lift:+.4%} against a required {gate.minimum_primary_relative_lift:.0%} "
+            f"({scored.mean_log_score:.4f} vs {baseline.mean_log_score:.4f})",
+        ),
+        GateCheck(
+            "CRPS does not regress",
+            crps_change >= -gate.maximum_crps_relative_regression,
+            f"{crps_change:+.4%} ({scored.mean_crps:.4f} vs {baseline.mean_crps:.4f})",
+        ),
+        GateCheck(
+            "calibration",
+            passes_calibration_gate(scored, resolved),
+            f"PIT 80% coverage {scored.pit_interval_80_coverage:.3f}, "
+            f"error {scored.pit_interval_80_absolute_error:.3f} "
+            f"<= {gate.pit_interval_80_maximum_absolute_error}",
+        ),
+        GateCheck(
+            "fold count",
+            result.folds_evaluated >= gate.minimum_fold_count,
+            f"{result.folds_evaluated} folds against a required {gate.minimum_fold_count}",
+        ),
+    ]
+
+    if gate.require_each_reported_season_to_pass:
+        failures = []
+        for season in sorted(result.by_season):
+            reports = result.by_season[season]
+            if candidate not in reports or comparator not in reports:
+                continue
+            season_lift = relative_lift(
+                reports[comparator].mean_log_score, reports[candidate].mean_log_score
+            )
+            if season_lift < gate.minimum_primary_relative_lift:
+                failures.append(f"{season} {season_lift:+.2%}")
+        checks.append(
+            GateCheck(
+                "every reported season clears the gate",
+                not failures,
+                "all seasons pass" if not failures else "below the bar in " + ", ".join(failures),
+            )
+        )
+    return checks
+
+
+def format_gate(result: HarnessResult, candidates: Sequence[str]) -> str:
+    lines = ["", "promotion gate", "-" * 78]
+    for candidate in candidates:
+        if candidate not in result.overall:
+            continue
+        checks = evaluate_gate(result, candidate)
+        verdict = "PROMOTE" if all(check.passed for check in checks) else "DO NOT PROMOTE"
+        lines.append(f"{candidate}: {verdict}")
+        for check in checks:
+            mark = "pass" if check.passed else "FAIL"
+            lines.append(f"    [{mark}] {check.name}: {check.detail}")
+    lines.append("")
+    lines.append("A failed gate is a documented non-promotion, not an invitation to move the bar.")
+    return "\n".join(lines)
+
+
 def compare_xg_against_goals(result: HarnessResult) -> str:
     """The specification's open question, answered on the contract's own metric."""
     goals = result.overall.get("trailing_goals_attack_defence")
@@ -271,17 +371,32 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the Stage A walk-forward harness.")
     parser.add_argument("--db", type=Path, default=None)
     parser.add_argument("--season", action="append", dest="seasons", default=None)
+    parser.add_argument(
+        "--baselines-only",
+        action="store_true",
+        help="score only the pre-registered baselines, without the Stage A candidate",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    candidates: list[StageABaseline] = []
+    if not args.baselines_only:
+        # Imported here rather than at module scope: the harness defines the contract the
+        # models are judged against, so it must not depend on any particular model existing.
+        from fpl.models.team_goals import StageATeamModel
+
+        candidates.append(StageATeamModel())
+
     con = connect(args.db, read_only=True)
     try:
-        result = run(con, seasons=args.seasons)
+        result = run(con, seasons=args.seasons, candidates=candidates)
     finally:
         con.close()
 
     print(format_report(result))
     print(compare_xg_against_goals(result))
+    if candidates:
+        print(format_gate(result, [candidate.name for candidate in candidates]))
     return 0
 
 

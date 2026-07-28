@@ -82,7 +82,7 @@ Also preserve these data contracts:
 - `src/fpl/features/`: point-in-time-safe read API and, later, feature construction.
 - `src/fpl/validate/`: walk-forward folds, proper scoring rules, Stage A baselines, harness.
   It reads outcomes, which the feature layer may not -- scoring a prediction needs the label.
-- `src/fpl/models/`: scoring now; statistical models belong here as phases advance.
+- `src/fpl/models/`: scoring and the Stage A team-goals model.
 - `src/fpl/jobs/`: thin orchestration/CLI entry points.
 - `tests/`: executable data contracts; vendored API fixtures keep tests offline.
 - `docs/`: design records and the future static publish contract.
@@ -168,6 +168,16 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   is not bit-reproducible: 16 of 20 repeat aggregations on this archive disagreed, and the
   difference reached the reported log score. Every aggregation feeding a pre-registered
   evaluation must pin the order.
+- The **Dixon-Coles low-score correction cannot change a marginal**. Summing the corrected
+  joint over the opponent's goals, the two cells touching `own = 0` cancel exactly because
+  `q(1) = lambda_opp * q(0)` for a Poisson, and the same holds at `own = 1`; measured shift is
+  under 3e-17. So `rho` cannot improve any Stage A score, and a candidate reporting a gain
+  from it is reporting noise. Fit it for the joint, which Stage D needs, and never apply it to
+  a marginal prediction.
+- The Stage A candidate's edge is **cross-season history and xG, not functional form**. Split
+  by phase of season it gains +2.09% and +2.61% in the opening nine gameweeks of 2022-23 and
+  2023-24, and loses throughout 2021-22, which has neither a preceding season nor any xG.
+  Judge a team model by regime, not by a pooled figure that averages those away.
 
 ## Priorities for upcoming work
 

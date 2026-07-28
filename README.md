@@ -265,7 +265,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | Phase | Deliverable | Status |
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
-| 1 | Stage A team model + validation harness | **harness implemented and run**; model not started |
+| 1 | Stage A team model + validation harness | harness run; **candidate fitted, gate not cleared** |
 | 2 | Stage B minutes model | not started |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
@@ -311,6 +311,40 @@ Nothing is fitted yet; these are the honest comparators a model has to beat.
 
 A candidate must reach **1.4853** to clear the contract's 1% relative-lift gate, without
 regressing CRPS, in every reported season.
+
+### The Stage A candidate: a documented non-promotion
+
+`dixon_coles_team_goals` — schedule-adjusted joint Poisson ratings on `team_code`, exponential
+time decay with the half-life chosen inside each fold, and a promoted-club prior — scores
+**1.4886**, beating every pre-registered baseline. It does not clear the gate:
+
+| gate | result |
+|---|---|
+| log score lift ≥ 1% | **fail** — +0.78% |
+| CRPS does not regress | pass — +1.29% |
+| calibration (PIT 80%) | pass — 0.800, error 0.000 |
+| ≥ 20 folds | pass — 181 |
+| every reported season ≥ 1% | **fail** — 2021-22 −0.24%, 2023-24 +0.80%, 2025-26 +0.47% |
+
+The diagnosis is not "the model is weak", it is *where* its information comes from. Split by
+phase of season, it wins exactly where cross-season history and xG exist and loses where they
+do not:
+
+| season | GW1–9 | GW10–19 | GW20–38 |
+|---|---|---|---|
+| 2021-22 (no prior season, no xG) | −0.40% | −0.07% | −0.30% |
+| 2022-23 | **+2.09%** | +1.35% | +0.54% |
+| 2023-24 | **+2.61%** | +1.04% | −0.12% |
+| 2024-25 | +0.10% | **+2.30%** | +1.86% |
+| 2025-26 | −0.34% | −0.75% | +1.48% |
+
+2021-22 is the archive's first season, so the model's three advantages — cross-season decay,
+the xG signal, and a promoted prior built from earlier seasons — all have nothing to work
+with there. Requiring it to beat a trailing ratio by 1% using strictly less information than
+the trailing ratio uses is a bar it cannot clear by being better at football.
+
+Per the contract, that is a **documented non-promotion, not a reason to move the bar**. The
+gate stays as pre-registered; the baseline ships until a candidate clears it honestly.
 
 **xG or recorded goals as the training signal?** **xG — wherever xG is measured.** Over the
 three seasons with complete coverage it wins by +0.71% relative lift and takes each of them
