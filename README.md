@@ -404,3 +404,24 @@ still reported. Recorded in `config/phase1_evaluation.yaml` under `amendments:` 
 in [`docs/phase1-evaluation-contract.md`](docs/phase1-evaluation-contract.md#amendments); the
 loader rejects a version bump that has no amendment record. Made with zero candidates
 evaluated, which is the only condition under which amending a pre-registered gate is honest.
+
+### Candidate V3: development-only, not a promotion result
+
+`dynamic_team_goals_v3` is a **development-only structural probe**, not a promotion candidate.
+It tests whether team strength is a slowly time-varying latent quantity best estimated
+**sequentially** — a mean-reverting online Poisson filter in log space that carries each
+club's strength forward as a state one match can move, with explicit summer shrinkage —
+rather than V2's batch re-fit on an expanding window. Amendment 1.4 pre-registers it and its
+grid; no baseline, gate, tolerance, eligible row, or the V2 policy changes, and it is never
+substituted for V2 by the default harness command (a separate `fpl.validate.dev_candidate_v3`
+runner reuses the harness but prints a DEVELOPMENT ONLY report).
+
+Its single historical development evaluation scored **1.4956** against the unchanged
+`trailing_goals_attack_defence` baseline (1.5003), a **+0.3128%** lift — better than the
+baseline but short of the 1% promotion gate, and a touch behind V2 (1.4939). It improves CRPS
+(0.6373 vs 0.6393), passes calibration (PIT-80 error 0.002), and regresses only in 2021-22
+and 2025-26. The boundary selections (slowest learning rate in 153/181 folds, strongest
+summer shrinkage in 92/181) are recorded as diagnostics for a future hypothesis, not as
+permission to widen the grid. Full result and caveats in
+[`docs/phase1-candidate-v3-development.md`](docs/phase1-candidate-v3-development.md). The
+trailing-goals baseline remains the Stage A model.

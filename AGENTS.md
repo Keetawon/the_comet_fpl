@@ -13,7 +13,10 @@ HTTPX, YAML configuration, pytest, Ruff, and strict mypy.
 Phase 0b's historical and live data foundation is implemented and tested. Phase 1's Stage A
 harness and Candidates V1/V2 are implemented; neither cleared the fixed promotion gate. V2 was
 pre-registered under contract 1.3 before its single outer evaluation and scored 1.4939 against
-the 1.5003 best baseline, only a 0.4284% lift against the required 1%.
+the 1.5003 best baseline, only a 0.4284% lift against the required 1%. Candidate V3
+(`dynamic_team_goals_v3`) is a development-only structural probe pre-registered under contract
+amendment 1.4; its single historical development evaluation scored 1.4956 (+0.3128% lift), is
+not a promotion result, and changed no gate. The trailing-goals baseline remains Stage A.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -194,11 +197,15 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
 
 Unless the user sets another priority, address prerequisites before model sophistication:
 
-1. Keep `trailing_goals_attack_defence` as the Stage A model. Do not promote either failed
-   candidate and do not reinterpret V2 after seeing its outer result.
-2. Before registering Candidate V3, state a structural hypothesis that addresses the measured
-   season/regime failures. Do not respond to V2's 2-match boundary selection by merely widening
-   its grid; a new candidate needs a separately named, committed policy and regression tests.
+1. Keep `trailing_goals_attack_defence` as the Stage A model. Do not promote any failed
+   candidate (V1, V2) and do not reinterpret one after seeing its outer result. Candidate V3
+   is development-only: its historical result is not a promotion verdict and must not be
+   tuned again after evaluation.
+2. Candidate V3 has now been pre-registered and development-evaluated under a separately
+   named, committed policy (`dynamic_team_goals_v3`, amendment 1.4) with regression tests.
+   Its boundary selections (slowest learning rate in 153/181 folds, strongest summer
+   shrinkage in 92/181) are diagnostics for a *new* structural hypothesis, not permission to
+   widen V3's grid. A further candidate needs its own named policy, not a post-hoc tweak.
 3. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
    `amendments:` record; the loader rejects a bump without one. State how many candidates had
    been evaluated. A pre-registered gate may not be amended after a candidate is judged.
