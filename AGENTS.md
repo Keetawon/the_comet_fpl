@@ -15,8 +15,12 @@ harness and Candidates V1/V2 are implemented; neither cleared the fixed promotio
 pre-registered under contract 1.3 before its single outer evaluation and scored 1.4939 against
 the 1.5003 best baseline, only a 0.4284% lift against the required 1%. Candidate V3
 (`dynamic_team_goals_v3`) is a development-only structural probe pre-registered under contract
-amendment 1.4; its single historical development evaluation scored 1.4956 (+0.3128% lift), is
-not a promotion result, and changed no gate. The trailing-goals baseline remains Stage A.
+amendment 1.4; its single historical development evaluation is **INVALIDATED** (not merely
+non-promoted) — review found two leakage defects (the promoted prior drew on full-archive
+future seasons; the inner holdout scored all six gameweeks from one frozen state) plus
+fitting/provenance defects, so V3's 1.4956 number and every slice/CRPS/cold-start/parameter
+figure are void for comparison and are kept only as an audit record. The trailing-goals
+baseline remains Stage A.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -199,13 +203,15 @@ Unless the user sets another priority, address prerequisites before model sophis
 
 1. Keep `trailing_goals_attack_defence` as the Stage A model. Do not promote any failed
    candidate (V1, V2) and do not reinterpret one after seeing its outer result. Candidate V3
-   is development-only: its historical result is not a promotion verdict and must not be
-   tuned again after evaluation.
-2. Candidate V3 has now been pre-registered and development-evaluated under a separately
-   named, committed policy (`dynamic_team_goals_v3`, amendment 1.4) with regression tests.
-   Its boundary selections (slowest learning rate in 153/181 folds, strongest summer
-   shrinkage in 92/181) are diagnostics for a *new* structural hypothesis, not permission to
-   widen V3's grid. A further candidate needs its own named policy, not a post-hoc tweak.
+   is development-only **and its single historical development result is INVALIDATED** (two
+   leakage defects plus fitting/provenance defects): its number is void for comparison, is
+   kept only as an audit record, and must not be tuned again.
+2. Candidate V3 was pre-registered and development-evaluated under a separately
+   named, committed policy (`dynamic_team_goals_v3`, amendment 1.4) with regression tests, but
+   that result is invalidated (see item 1 and `docs/phase1-candidate-v3-invalidation.md`), so
+   its boundary selections (slowest learning rate in 153/181 folds, strongest summer
+   shrinkage in 92/181) are **void diagnostics**, not evidence. A leakage-safe successor needs
+   its own named policy (Candidate V4, amendment 1.5), not a post-hoc tweak of V3.
 3. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
    `amendments:` record; the loader rejects a bump without one. State how many candidates had
    been evaluated. A pre-registered gate may not be amended after a candidate is judged.

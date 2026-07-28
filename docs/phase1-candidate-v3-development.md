@@ -1,5 +1,14 @@
 # Candidate V3 development result
 
+> **INVALIDATED — NOT A PROMOTION RESULT AND NOT A COMPARABLE NUMBER.** A review after this
+> run found four defects, two of them leakage (the promoted prior was estimated from future
+> seasons; the recorded "zero leakage failures" covers only the harness's per-fold checks).
+> Every value below is therefore void for comparison or promotion and is retained **only as an
+> audit record** of what the defective procedure printed. See
+> [`phase1-candidate-v3-invalidation.md`](phase1-candidate-v3-invalidation.md). The content
+> below is unchanged. The leakage-safe successor is the separately pre-registered
+> `dynamic_team_goals_v4` (contract amendment 1.5); it has not been evaluated.
+
 **DEVELOPMENT ONLY — NOT A PROMOTION RESULT.** This is the single historical development
 evaluation pre-registered for Candidate V3 (`dynamic_team_goals_v3`). It is not a promotion
 evaluation, V3 is judged by no promotion gate, and no number here is a promotion verdict.
@@ -152,6 +161,12 @@ to change V3 after seeing this result:
   any season, as for V2; they are not fold-fitted.
 
 ## Verdict
+
+> **SUPERSEDED — this verdict is void.** The run it describes used a leakage-tainted procedure
+> (see the invalidation banner above and
+> [`phase1-candidate-v3-invalidation.md`](phase1-candidate-v3-invalidation.md)). The
+> "competitive with V2" reading below depended on the now-invalid number and must not be
+> reused. It is left in place as the audit record of what was written at the time.
 
 **DEVELOPMENT ONLY. Do not promote.** Candidate V3 improves on the trailing-goals baseline
 by +0.3128% on mean log score (1.4956 vs 1.5003) and by +0.3016% on CRPS, with good

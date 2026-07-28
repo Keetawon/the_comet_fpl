@@ -128,7 +128,17 @@ in the first 10. Half-life counts for 40/80/160/320/640/no-decay were
 27/43/42/18/16/35; prior-match counts for 2/4/8/16/32 were 72/20/41/24/24. The lower
 prior boundary is evidence for designing a new hypothesis, not for changing V2 after evaluation.
 
-### Candidate V3: pre-registered for historical development only
+### Candidate V3: pre-registered for historical development only, result now INVALIDATED
+
+> **The V3 development result is invalidated, not merely non-promoted.** Review after the run
+> found two leakage defects (the promoted prior drew on full-archive future seasons; the inner
+> holdout scored all six gameweeks from one frozen state) plus a fitting/provenance defect,
+> so V3's development number carries no information and must not be compared against any
+> baseline or candidate. The Stage A model and every gate are unchanged. The void values are
+> retained as an audit record in
+> [`docs/phase1-candidate-v3-invalidation.md`](phase1-candidate-v3-invalidation.md); V3's code
+> is left frozen rather than repaired. Amendment 1.5 pre-registers the leakage-safe successor
+> `dynamic_team_goals_v4`.
 
 Candidate V3 (`dynamic_team_goals_v3`) is a **development-only** structural probe, not a
 promotion candidate. It tests whether a sequential, mean-reverting online Poisson filter in
