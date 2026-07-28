@@ -1,37 +1,44 @@
 # Phase 1 evaluation contract
 
-**Status: contract and harness implemented at version 1.1; Stage A model not started.** The
+**Status: contract and harness implemented at version 1.3. Candidate V1 was evaluated and did
+not promote. Candidate V2 is pre-registered and has not yet been outer-evaluated.** The
 machine-readable source is `config/phase1_evaluation.yaml`, validated by
 `Phase1EvaluationConfig` and executed by `src/fpl/validate/`. This document explains the
 decisions; it does not override that file.
 
 ## Scope and entry gate
 
-Phase 1 predicts a probability distribution for team goals at
-`(season, fixture, team_id)` grain. Team IDs remain season-scoped. It does not yet predict player
-minutes, player events, bonus, or FPL points.
+Phase 1 predicts a probability distribution for team goals at stable
+`(season, fixture, team_code)` grain. Season-scoped `team_id` remains available only for joins
+within a season. Stage A does not predict player minutes, player events, bonus, or FPL points.
 
-Model implementation starts only when all of these are true:
+The four entry contracts are implemented:
 
 1. Phase 0b facts and point-in-time access tests pass.
 2. The seven scoring values omitted by `game_config.scoring` have named authoritative evidence.
-3. Full archive database replacement is failure-atomic, preserves live snapshots, and has
-   failure and concurrent-update tests.
-4. This contract and its tests pass unchanged before the first candidate is fitted.
+3. Full archive replacement is failure-atomic, preserves live snapshots, refuses a concurrent
+   target change, and has failure and concurrent-update tests.
+4. This contract and its executable tests were committed before candidate fitting.
 
-All four entry contracts are now implemented. Stage A work starts with the validation harness,
-not with candidate fitting.
+The remaining two rule replay cases under `verification.unverified` still prevent describing
+the scoring ruleset as fully validated. They do not alter this team-goals target.
 
-## Walk-forward split
+## Walk-forward split and archive cutoff
 
-Each fold predicts one **observed** gameweek at its FPL deadline. The training view contains only
-outcomes with `kickoff_time < as_of` and only live versions with `known_at <= as_of`. It iterates
-gameweeks present in the facts rather than `1..38`; 2022/23 has no GW7.
+Each fold predicts one **observed** gameweek. Gameweeks come from the facts rather than `1..38`;
+2022/23 has no GW7. The window expands after at least eight observed gameweeks. A team needs six
+prior matches for a team-specific estimate; otherwise the candidate uses its declared
+season-scoped cold-start prior and reports the prediction as a cold start.
 
-The window expands after at least eight observed gameweeks. A team needs six prior matches for
-team-specific estimates; otherwise the candidate must use its declared cold-start prior and
-report that prediction as a cold start. Every transform, prior fit, and hyperparameter derived
-from data is fitted inside the fold. NULL remains unavailable, never zero. The seed is fixed.
+The historical archive does not contain authoritative FPL deadline history or versioned
+schedule knowledge. Its cutoff is therefore the first kickoff in the predicted gameweek: the
+latest available proxy that excludes every outcome from that gameweek. Observed outcomes must
+satisfy `kickoff_time < as_of`. This is not evidence that a postponement, availability field, or
+schedule state was known at the real deadline. Any live fact used in a later walk-forward run
+must additionally satisfy `known_at <= as_of` or `captured_at <= as_of`.
+
+Every transform, prior, xG scale, and hyperparameter is fitted within the fold. NULL remains
+unavailable, never zero. The seed is fixed at `202627`.
 
 ## Required comparisons
 
@@ -41,89 +48,117 @@ from data is fitted inside the fold. NULL remains unavailable, never zero. The s
 | Trailing goals attack/defence | Simple observed-goals strength |
 | Trailing xG attack/defence | Tests whether xG adds usable signal |
 | Naive FPL FDR | Product-facing fixture-difficulty baseline |
-| Promoted-team pooled prior | Makes the cold-start policy measurable |
+| Promoted-team pooled prior | Makes cold-start policy measurable |
 
-Goals-trained and xG-trained candidates must be shown separately. A candidate cannot select the
-better one after aggregating folds without also reporting both fold and season results.
+All cross-season club ratings use stable `team_code`. Promoted status is season-specific.
+Goals-trained and xG-trained candidates must be shown separately. A candidate cannot choose a
+more favorable comparator or population after aggregating folds.
 
-The downstream player-points harness is pinned now to three minimum comparisons: legitimate FPL
+The downstream player-points harness is pinned to three minimum comparisons: legitimate FPL
 `ep_next`, trailing-five recorded points, and naive FDR. `ep_next` is evaluated only against
-`total_points_as_recorded`, because it was generated under the contemporary scoring rules. It is
-never used as a model feature or compared as though historical recorded points were denominated
-under the 2026/27 ruleset.
+`total_points_as_recorded`, because it was generated under the contemporary scoring rules. It
+is never a feature and is never compared as if historical points used the 2026/27 ruleset.
 
-## Metrics and promotion
+## Candidate history
 
-The primary metric is mean log score (lower is better), with mean CRPS as a second proper
-distribution score.
-Poisson deviance and goal MAE are diagnostics, not substitutes for distribution scoring.
-Randomized PIT and 80% predictive-interval coverage expose calibration; Spearman correlation is
-reported within gameweek as a ranking diagnostic. Both the raw and PIT-based 80% coverages are
-reported, but only the PIT one is gated -- see amendment 1.1.
+### Candidate V1: documented non-promotion
 
-A Stage A candidate is promoted only if, on every reported season:
+Candidate V1 scored mean log loss **1.4886** against the unchanged best required baseline at
+**1.5003**, a **0.7828%** lift over 181 folds and 3,640 predictions. The gate requires at least
+1% on every reported season, with no CRPS regression and all remaining guardrails. V1 therefore
+did not promote.
 
-- mean log score improves by at least 1% over the best required eligible baseline on the same
-  prediction rows, using `(baseline - candidate) / abs(baseline)`;
+Review also found mechanics that made V1 unsuitable as a base for silent modification:
+
+- its intended six-gameweek inner holdout actually covered 17 to 22 observed gameweeks;
+- an unseen promoted club fell back to a neutral rating;
+- a club promoted in any historical season kept the promoted prior in later seasons;
+- repeated club pairs overwrote matches in the Dixon-Coles rho fit; and
+- the compact report omitted contracted slices, diagnostics, counts, and gate checks.
+
+These findings do not invalidate the non-promotion. They define a separately named V2 candidate
+under the same outer population and promotion bar.
+
+### Candidate V2: pre-registered, not yet evaluated
+
+| Setting | Pre-registered value |
+|---|---|
+| Name | `dixon_coles_team_goals_v2` |
+| Inner holdout | Last 6 observed gameweeks |
+| Minimum inner training history | 12 observed gameweeks |
+| Half-life grid | 40, 80, 160, 320, 640 days, plus no decay |
+| Prior-match grid | 2, 4, 8, 16, 32 |
+| Fallback | No decay, 8 prior matches |
+| Team-specific threshold | 6 prior matches |
+| Promoted attack/defence priors | 0.719 / 1.309, scoped to prediction season |
+| xG policy | Use measured xG, scaled to goals inside the fold |
+| Rate floor | 0.05 |
+| Fit convergence | 60 sweeps, tolerance `1e-10` |
+| Rho grid | -0.20 to 0.20 in steps of 0.01, using every season-fixture match |
+
+The wider search is fixed because V1 selected or defaulted to the 320-day boundary in 73 of 181
+folds and selected the 4-match boundary in 74. V2 may be evaluated once without changing this
+grid after its outer results are observed.
+
+## Metrics, reports, and promotion
+
+Mean log score is primary and mean CRPS is the second proper distribution score. Poisson
+deviance, goal MAE, predictive variance, randomized PIT, raw 80% interval coverage, PIT-based
+80% coverage, and within-gameweek Spearman are diagnostics. Mean log-score standard error is
+the reported uncertainty measure. The raw interval is reported but only PIT-band coverage is
+gated.
+
+The canonical `HarnessResult` contains overall, fold, season, promoted-status, and home/away
+slices. Every score report carries eligible predictions, scored predictions, exclusions, cold
+starts, and fixture coverage. Fold-local selected parameters are retained and summarized by the
+CLI so a result cannot hide boundary selections or fallbacks.
+
+A Stage A candidate is promoted only if the aggregate and every reported season meet the
+machine-readable contract:
+
+- mean log score improves by at least 1% over the best required eligible baseline on the exact
+  same prediction rows, using `(baseline - candidate) / abs(baseline)`;
 - CRPS does not regress relative to that baseline;
-- randomised-PIT 80% band coverage is within five percentage points of 80%;
+- randomized-PIT 80% band coverage is within five percentage points of 80%;
 - at least 98% of eligible team-fixtures receive a prediction;
 - at least 20 walk-forward folds are evaluated; and
-- point-in-time and truncation-equivalence tests have zero failures.
-
-The report must include fold, season, promoted-status, and home/away slices plus counts for
-predictions, exclusions, cold starts, and uncertainty. A headline aggregate without those counts
-does not satisfy the gate.
+- point-in-time and truncation-equivalence checks have zero failures.
 
 ## Amendments
 
-A pre-registered contract that can be edited silently is not pre-registered. Every version
-after 1.0 therefore carries a machine-readable record in `amendments:`, and the loader rejects
-a version bump without one. The record states how many candidates had been evaluated when the
-change was made, because that -- not the wording of the reason -- is what determines whether an
-amendment is legitimate.
+Every contract version after 1.0 has a machine-readable amendment recording the change, reason,
+evidence, and number of candidates already evaluated. A version bump without the matching entry
+is rejected by the loader.
 
-### 1.1 -- the calibration gate names its metric (2026-07-27, 0 candidates evaluated)
+### 1.1 -- calibration gate names its metric (2026-07-27, 0 candidates)
 
-`promotion.interval_80_maximum_absolute_error` becomes
-`promotion.pit_interval_80_maximum_absolute_error` at the same tolerance of 0.05.
-`pit_interval_80_coverage` joins the required calibration outputs. The raw coverage remains
-reported and is no longer gated.
+The ambiguous raw central-interval gate became
+`pit_interval_80_maximum_absolute_error`, at the same 0.05 tolerance. For count distributions,
+integer quantiles make raw interval coverage exceed 0.80 by construction. At a true Poisson rate
+of 1.80 the correct model covers about 0.964 in the raw interval and would fail, while a model
+predicting 2.40 covers about 0.798 and would pass. Randomized PIT is uniform when the model is
+calibrated, so its `[0.1, 0.9]` band measures the intended property. A fuller PIT-uniformity test
+remains a possible future amendment.
 
-The superseded key did not say which interval it meant, and the harness built the obvious one:
-the central interval between integer quantiles, `[q0.1, q0.9]` with `q_p = min{g : F(g) >= p}`.
-For a count distribution that interval covers `F(q0.9) - F(q0.1 - 1)`, which is strictly
-greater than 0.80 by construction. The excess is the discreteness of the pmf, not an error the
-model made, and it does not shrink with more data.
+### 1.2 -- stable baseline identity (2026-07-28, 0 candidates)
 
-The failure is not that the gate is hard. It is that it points the wrong way:
+Stage A baseline ratings changed from bare, reassigned `team_id` to stable `team_code`; promoted
+club identification changed with it. The best baseline moved from 1.5227 to 1.5003 over the same
+181 folds and 3,640 predictions, making the 1% candidate threshold harder at 1.4853. No gate or
+tolerance changed.
 
-| true rate | model rate | raw coverage | \|error\| | old gate | PIT coverage | \|error\| |
-|---|---|---|---|---|---|---|
-| 1.80 | **1.80** (correct) | 0.9636 | 0.164 | **fail** | 0.8000 | 0.000 |
-| 1.80 | 2.40 (33% high) | 0.7983 | 0.002 | **pass** | 0.7832 | 0.017 |
+### 1.3 -- Candidate V2 and complete executable report (2026-07-28, 1 candidate)
 
-Gating the raw figure would have rejected a perfectly specified model and promoted a badly
-biased one. Swept over true rates 1.0, 1.35, 1.6, 1.8 and 2.2, the raw measure is closest to
-nominal at the correct rate in **zero of five** cases. The randomised PIT of a correctly
-specified model is exactly `Uniform(0, 1)`, so its `[0.1, 0.9]` band coverage is exactly 0.80
-at the truth in all five and degrades away from it. On the archive, all five Stage A baselines
-score 0.787-0.804 on the PIT measure and 0.927-0.942 on the superseded one.
-
-The tolerance is carried over unchanged at 0.05. The amendment fixes which quantity is
-measured, not how strict the gate is. Applied per reported season -- 600 to 760 predictions --
-0.05 is roughly 3.1 to 3.4 binomial standard errors: a screen against gross miscalibration
-rather than a precision test.
-
-**Known and deliberately not fixed here.** Band coverage is necessary but not sufficient for
-calibration: a model can hold exactly 0.80 inside the band while being non-uniform within it. A
-Kolmogorov-Smirnov or chi-square test on the PIT histogram would be the stronger check. Adding
-it is a further amendment and remains an owner decision; it is recorded so the weakness is not
-silently inherited.
+Candidate V2 fixes V1's inner holdout, season-scoped promoted priors, six-match cold-start rule,
+season-fixture rho matching, and fold-local xG scaling. The harness now executes every declared
+metric, slice, count, same-population check, per-season guardrail, coverage check, fold check, and
+leakage check. The outer rows, required baselines, 1% lift, CRPS, calibration, coverage, fold, and
+leakage thresholds are unchanged. The archive cutoff is explicitly labeled as a first-kickoff
+proxy rather than an authoritative deadline.
 
 ## Exit criterion
 
-Phase 1 exits when one reproducible Stage A configuration passes the promotion gate, its exact
-config and seed are committed, and the results include all required baselines, metrics, slices,
-coverage, exclusions, and calibration evidence. If no candidate passes, the correct outcome is a
-documented non-promotion, not a relaxed post-hoc threshold.
+Phase 1 exits when one reproducible Stage A configuration passes every promotion gate, its exact
+config and seed are committed, and its result contains the required comparisons, metrics,
+slices, counts, exclusions, uncertainty, calibration, and leakage evidence. If no candidate
+passes, the correct result is another documented non-promotion, never a relaxed post-hoc bar.

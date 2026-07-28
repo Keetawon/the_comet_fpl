@@ -287,7 +287,7 @@ class Phase1TargetPolicy(_Frozen):
 
 class Phase1CutoffPolicy(_Frozen):
     split_unit: Literal["observed_gameweek"]
-    prediction_time: Literal["gameweek_deadline_as_of"]
+    prediction_time: Literal["archive_first_kickoff_proxy_for_gameweek_deadline"]
     observed_results: Literal["kickoff_time < as_of"]
     snapshot_versions: Literal["known_at <= as_of"]
 
@@ -299,6 +299,50 @@ class Phase1TrainingPolicy(_Frozen):
     fit_transforms_within_fold: Literal[True]
     preserve_nulls: Literal[True]
     seed: int = Field(ge=0)
+
+
+class Phase1StageACandidatePolicy(_Frozen):
+    """Pre-registered Candidate V2 search space and numerical fit policy."""
+
+    name: Literal["dixon_coles_team_goals_v2"]
+    inner_holdout_observed_gameweeks: int = Field(ge=1)
+    minimum_inner_training_observed_gameweeks: int = Field(ge=1)
+    half_life_days: tuple[float, ...] = Field(min_length=1)
+    include_no_decay: Literal[True]
+    prior_matches: tuple[float, ...] = Field(min_length=1)
+    fallback_half_life_days: float | None
+    fallback_prior_matches: float = Field(gt=0.0)
+    promoted_attack_prior: float = Field(gt=0.0)
+    promoted_defence_prior: float = Field(gt=0.0)
+    xg_policy: Literal["use_when_measured_scaled_to_goals"]
+    rate_floor: float = Field(gt=0.0)
+    maximum_fit_sweeps: int = Field(ge=1)
+    fit_tolerance: float = Field(gt=0.0)
+    rho_minimum: float
+    rho_maximum: float
+    rho_step: float = Field(gt=0.0)
+
+    @model_validator(mode="after")
+    def _valid_search_space(self) -> Self:
+        if self.minimum_inner_training_observed_gameweeks < self.inner_holdout_observed_gameweeks:
+            raise ValueError("inner training history cannot be shorter than the holdout")
+        if any(value <= 0.0 for value in self.half_life_days):
+            raise ValueError("half-life values must be positive")
+        if tuple(sorted(set(self.half_life_days))) != self.half_life_days:
+            raise ValueError("half-life values must be unique and increasing")
+        if any(value <= 0.0 for value in self.prior_matches):
+            raise ValueError("prior-match values must be positive")
+        if tuple(sorted(set(self.prior_matches))) != self.prior_matches:
+            raise ValueError("prior-match values must be unique and increasing")
+        if self.fallback_half_life_days is not None and (
+            self.fallback_half_life_days not in self.half_life_days
+        ):
+            raise ValueError("fallback half-life must be in the declared grid or null")
+        if self.fallback_prior_matches not in self.prior_matches:
+            raise ValueError("fallback prior strength must be in the declared grid")
+        if self.rho_minimum >= self.rho_maximum:
+            raise ValueError("rho_minimum must be below rho_maximum")
+        return self
 
 
 class Phase1BaselinePolicy(_Frozen):
@@ -366,12 +410,13 @@ class Phase1ReportingPolicy(_Frozen):
 class Phase1EvaluationConfig(_Frozen):
     """Executable entry and promotion contract for the Stage A walk-forward."""
 
-    contract_version: Literal["1.2"]
+    contract_version: Literal["1.3"]
     phase: Literal[1]
     amendments: tuple[Phase1Amendment, ...] = ()
     target: Phase1TargetPolicy
     cutoff: Phase1CutoffPolicy
     training: Phase1TrainingPolicy
+    stage_a_candidate: Phase1StageACandidatePolicy
     baselines: Phase1BaselinePolicy
     metrics: Phase1MetricPolicy
     promotion: Phase1PromotionGate

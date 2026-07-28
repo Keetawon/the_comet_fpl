@@ -10,8 +10,10 @@ This project predicts a full Fantasy Premier League (FPL) points distribution pe
 gameweek. It is a Python 3.12 data and modelling codebase built around DuckDB, Polars, Pydantic,
 HTTPX, YAML configuration, pytest, Ruff, and strict mypy.
 
-Phase 0b's historical and live data foundation is implemented and tested. Phase 1 modelling
-has not started, but its evaluation contract is implemented in `config/phase1_evaluation.yaml`.
+Phase 0b's historical and live data foundation is implemented and tested. Phase 1's Stage A
+harness and Candidate V1 are implemented; V1 did not clear the fixed promotion gate. Candidate
+V2 is pre-registered under contract 1.3 and must be evaluated once without changing its search
+space or the outer gate.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -187,20 +189,18 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
 
 Unless the user sets another priority, address prerequisites before model sophistication:
 
-1. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
-2. Complete the Stage A validation harness exactly against `config/phase1_evaluation.yaml`.
-3. Correct Candidate V1's validation defects as a separately identified Candidate V2, without
-   weakening any promotion gate after observing V1.
-4. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
+1. Evaluate the pre-registered Candidate V2 once after its implementation and regression tests
+   pass; do not change its search space after seeing the result.
+2. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
    `amendments:` record; the loader rejects a bump without one. State how many candidates had
    been evaluated. A pre-registered gate may not be amended after a candidate is judged.
    Amendment 1.1 resolved the calibration gate; the deferred stronger check is a PIT
    uniformity test, which remains an owner decision.
-5. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
+3. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
    observing candidate results. The bar is `trailing_goals_attack_defence` at mean log score
    1.5003 over 181 folds and 3,640 predictions; a candidate needs **1.4853** or better to
    clear the 1% lift gate, and must not lose to that baseline in any reported season.
-6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
+4. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff
 

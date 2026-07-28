@@ -23,10 +23,13 @@ from fpl.validate.metrics import (
     interval_covers,
     log_score,
     normalise,
+    poisson_deviance,
     poisson_pmf,
+    predictive_variance,
     randomised_pit,
     relative_lift,
     score_predictions,
+    spearman_within_groups,
 )
 
 
@@ -100,6 +103,13 @@ def test_normalise_rejects_an_empty_distribution() -> None:
 def test_expected_goals_recovers_the_rate() -> None:
     """Exact only up to the folded tail, which at league rates is far below a rounding step."""
     assert math.isclose(expected_goals(poisson_pmf(1.5)), 1.5, abs_tol=1e-5)
+
+
+def test_distribution_diagnostics_are_finite_and_non_negative() -> None:
+    masses = poisson_pmf(1.5)
+    assert predictive_variance(masses) == pytest.approx(1.5, abs=1e-4)
+    assert poisson_deviance(masses, 0) == pytest.approx(3.0, abs=1e-4)
+    assert poisson_deviance(masses, 3) > 0.0
 
 
 # --------------------------------------------------------------------------------------
@@ -292,6 +302,34 @@ def test_score_predictions_is_reproducible_for_a_fixed_seed() -> None:
     assert first.pit_values == second.pit_values
 
 
+def test_score_predictions_reports_counts_uncertainty_and_within_gameweek_rank() -> None:
+    distributions = [poisson_pmf(rate) for rate in (0.5, 1.0, 1.5, 2.0)]
+    report = score_predictions(
+        "a",
+        distributions,
+        [0, 1, 2, 3],
+        seed=1,
+        eligible_predictions=4,
+        cold_starts=[True, False, False, True],
+        rank_groups=["gw1"] * 4,
+    )
+    assert report.eligible_predictions == 4
+    assert report.exclusions == 0
+    assert report.cold_starts == 2
+    assert report.fixture_coverage == 1.0
+    assert report.mean_log_score_standard_error > 0.0
+    assert report.mean_poisson_deviance > 0.0
+    assert report.mean_predictive_variance > 0.0
+    assert report.spearman_within_gameweek == pytest.approx(1.0)
+
+
+def test_spearman_is_averaged_within_gameweek_not_across_them() -> None:
+    predictions = [1.0, 2.0, 10.0, 9.0]
+    observations = [0, 1, 0, 1]
+    groups = ["gw1", "gw1", "gw2", "gw2"]
+    assert spearman_within_groups(predictions, observations, groups) == pytest.approx(0.0)
+
+
 def test_score_predictions_rejects_misaligned_populations() -> None:
     masses = poisson_pmf(1.4)
     with pytest.raises(ValueError, match="against"):
@@ -306,11 +344,19 @@ def test_as_row_exposes_every_reported_metric() -> None:
     assert set(row) == {
         "baseline",
         "predictions",
+        "eligible_predictions",
+        "exclusions",
+        "cold_starts",
+        "fixture_coverage",
         "mean_log_score",
+        "mean_log_score_standard_error",
         "mean_crps",
+        "poisson_deviance",
         "interval_80_coverage",
         "pit_interval_80_coverage",
         "mae_goals",
+        "mean_predictive_variance",
+        "spearman_within_gameweek",
     }
 
 

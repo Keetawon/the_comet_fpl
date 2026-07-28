@@ -12,7 +12,9 @@ different answers:
 
 A single `xP` answers only the first.
 
-**Current status: Phase 0b (historical and live data foundation) complete.** No models yet.
+**Current status: Phase 0b complete; Phase 1 Stage A is in validation.** Candidate V1 was fitted
+and correctly not promoted. Candidate V2 is pre-registered under evaluation contract 1.3 but
+has not yet been run against the outer walk-forward folds.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
@@ -75,7 +77,7 @@ src/fpl/
   storage/    db.py, schema.sql
   transform/  crosswalk.py, facts.py, quality.py
   features/   pit.py   -- point-in-time access layer (R4)
-  models/     scoring.py
+  models/     scoring.py, team_goals.py
   validate/   metrics.py, folds.py, baselines.py, harness.py -- Stage A evaluation
   jobs/       build_db.py, daily_snapshot.py, load_snapshots.py, verify_rules.py
 tests/
@@ -303,7 +305,7 @@ python -m fpl.validate.harness --season 2025-26
 ```
 
 181 walk-forward folds, 3,640 team-fixture predictions, one fold per *observed* gameweek.
-Nothing is fitted yet; these are the honest comparators a model has to beat.
+These are the fixed comparators both Stage A candidates are judged against.
 
 | baseline | mean log score | mean CRPS | PIT 80% | raw 80% | MAE |
 |---|---|---|---|---|---|
@@ -316,7 +318,7 @@ Nothing is fitted yet; these are the honest comparators a model has to beat.
 A candidate must reach **1.4853** to clear the contract's 1% relative-lift gate, without
 regressing CRPS, in every reported season.
 
-### The Stage A candidate: a documented non-promotion
+### Candidate V1: a documented non-promotion
 
 `dixon_coles_team_goals` — schedule-adjusted joint Poisson ratings on `team_code`, exponential
 time decay with the half-life chosen inside each fold, and a promoted-club prior — scores
@@ -349,6 +351,14 @@ the trailing ratio uses is a bar it cannot clear by being better at football.
 
 Per the contract, that is a **documented non-promotion, not a reason to move the bar**. The
 gate stays as pre-registered; the baseline ships until a candidate clears it honestly.
+
+### Candidate V2: pre-registered, not yet evaluated
+
+Contract 1.3 records V1's implementation defects and fixes them in a separately named
+`dixon_coles_team_goals_v2`. V2 uses exactly six observed gameweeks for inner validation,
+season-scoped promoted priors, the six-match cold-start policy, fixture-level Dixon-Coles
+pairing, and the pre-registered wider half-life/prior grid. Every declared diagnostic, slice,
+count, and gate is executable. No outer baseline or promotion threshold changed.
 
 **xG or recorded goals as the training signal?** **xG — wherever xG is measured.** Over the
 three seasons with complete coverage it wins by +0.71% relative lift and takes each of them

@@ -4,7 +4,7 @@
 # folds, baselines, metrics, or lift gates after seeing its results. The typed loader rejects
 # missing required comparisons and any contiguous gameweek policy.
 
-contract_version: "1.2"
+contract_version: "1.3"
 phase: 1
 
 # Amending a pre-registered contract is only legitimate before a candidate exists to bias the
@@ -72,6 +72,38 @@ amendments:
     deferred: >-
       The baselines remain deliberately simple -- no time decay, no schedule adjustment, no
       joint estimation. That is what makes them baselines. It is not a defect to fix.
+  - version: "1.3"
+    date: "2026-07-28"
+    candidates_evaluated_before_amendment: 1
+    changed: >-
+      Pre-registers dixon_coles_team_goals_v2, corrects Candidate V1's inner holdout,
+      season-scopes promoted priors, applies the declared six-match cold-start rule, keys rho
+      on season and fixture, and makes every metric, slice, count, and promotion check already
+      declared by this contract executable. No baseline, gate, tolerance, or eligible outer
+      prediction row changes.
+    reason: >-
+      Candidate V1 exposed implementation defects rather than evidence for changing the bar.
+      Its six-gameweek inner holdout counted 120 distinct kickoff instants and actually spanned
+      17 to 22 observed gameweeks; an unseen promoted club fell back to a neutral rating; every
+      club ever promoted inherited the promoted prior in later seasons; repeated club pairs
+      overwrote one another in the rho fit; and the compact harness omitted contracted report
+      slices and several gate checks. Candidate V2 fixes those mechanics and is a new candidate,
+      not a reinterpretation of V1.
+    evidence: >-
+      On the five-season archive, Candidate V1 scored 1.4886 against the unchanged 1.5003 best
+      baseline and did not promote. The review measured a 17 to 22 observed-gameweek inner
+      holdout, 303 rho pairs from 1,520 matches in the 2025-26 opening training window, and a
+      neutral fallback for the unseen promoted team_code 56. Its search also selected or
+      defaulted to the 320-day boundary in 73 of 181 folds and selected the 4-match boundary in
+      74, motivating a pre-registered wider V2 grid rather than post-hoc tuning after V2.
+    tolerance_rationale: >-
+      No promotion tolerance changes. Candidate V2 is judged against the same 1% log-score
+      lift, zero CRPS regression, PIT calibration, coverage, fold-count, per-season, and
+      zero-leakage requirements that rejected V1.
+    deferred: >-
+      Historical archive rows do not carry authoritative FPL deadline or schedule knowledge
+      versions. Folds therefore retain first kickoff as the latest defensible archive cutoff
+      and must not claim that historical schedule changes were known at that instant.
 
 target:
   entity: team
@@ -87,7 +119,10 @@ target:
 cutoff:
   # Iterate values actually present in the facts. 2022-23 has no GW7.
   split_unit: observed_gameweek
-  prediction_time: gameweek_deadline_as_of
+  # The archive has no authoritative deadline history. First kickoff is the latest instant
+  # that still excludes every outcome in the predicted gameweek; it is a proxy, not a claim
+  # that schedule/availability fields were known at the real deadline.
+  prediction_time: archive_first_kickoff_proxy_for_gameweek_deadline
   observed_results: "kickoff_time < as_of"
   snapshot_versions: "known_at <= as_of"
 
@@ -98,6 +133,27 @@ training:
   fit_transforms_within_fold: true
   preserve_nulls: true
   seed: 202627
+
+# Candidate V2 was fixed after diagnosing V1 and before evaluating V2 on any outer fold.
+# The outer promotion contract above is unchanged; these values define only the candidate.
+stage_a_candidate:
+  name: dixon_coles_team_goals_v2
+  inner_holdout_observed_gameweeks: 6
+  minimum_inner_training_observed_gameweeks: 12
+  half_life_days: [40.0, 80.0, 160.0, 320.0, 640.0]
+  include_no_decay: true
+  prior_matches: [2.0, 4.0, 8.0, 16.0, 32.0]
+  fallback_half_life_days: null
+  fallback_prior_matches: 8.0
+  promoted_attack_prior: 0.719
+  promoted_defence_prior: 1.309
+  xg_policy: use_when_measured_scaled_to_goals
+  rate_floor: 0.05
+  maximum_fit_sweeps: 60
+  fit_tolerance: 1.0e-10
+  rho_minimum: -0.20
+  rho_maximum: 0.20
+  rho_step: 0.01
 
 baselines:
   stage_a:

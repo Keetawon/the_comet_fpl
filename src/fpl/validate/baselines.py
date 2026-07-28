@@ -21,6 +21,7 @@ downstream that multiplies by it.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import polars as pl
@@ -91,13 +92,26 @@ class StageABaseline(ABC):
     def fit(self, window: TrainingWindow) -> None: ...
 
     @abstractmethod
-    def predict(self, fixtures: pl.DataFrame) -> list[Distribution]: ...
+    def predict(self, fixtures: pl.DataFrame) -> Sequence[Distribution | None]: ...
 
     def rate_for(self, row: Row) -> float:
         raise NotImplementedError
 
     def predict_rates(self, fixtures: pl.DataFrame) -> list[float]:
         return [self.rate_for(row) for row in fixtures.iter_rows(named=True)]
+
+    def set_prediction_season(self, season: str) -> None:
+        """Optional outer-fold context for candidates with season-scoped priors."""
+        del season
+
+    def is_cold_start(self, row: Row) -> bool:
+        """Whether this prediction used a declared prior instead of a team estimate."""
+        del row
+        return False
+
+    def parameters(self) -> dict[str, float | int | str]:
+        """Fold-local selected parameters retained in the validation report."""
+        return {}
 
 
 def _venue_means(frame: pl.DataFrame) -> tuple[float, float]:
@@ -341,6 +355,12 @@ class PromotedTeamPooledPrior(StageABaseline):
 
     def predict(self, fixtures: pl.DataFrame) -> list[Distribution]:
         return [poisson_pmf(rate) for rate in self.predict_rates(fixtures)]
+
+    def is_cold_start(self, row: Row) -> bool:
+        season = _as_str(row, "season")
+        return self._is_cold_start(season, _as_int(row, "team_code")) or self._is_cold_start(
+            season, _as_int(row, "opponent_team_code")
+        )
 
 
 def build_baselines(minimum_team_matches: int = 6) -> list[StageABaseline]:

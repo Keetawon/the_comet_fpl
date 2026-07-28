@@ -24,10 +24,23 @@ def test_phase1_contract_loads_with_point_in_time_cutoffs() -> None:
     assert contract.target.outcome == "goals_distribution"
     assert contract.target.downstream_points_ruleset == "2026_27"
     assert contract.cutoff.split_unit == "observed_gameweek"
+    assert contract.cutoff.prediction_time == "archive_first_kickoff_proxy_for_gameweek_deadline"
     assert contract.cutoff.observed_results == "kickoff_time < as_of"
     assert contract.cutoff.snapshot_versions == "known_at <= as_of"
     assert contract.training.fit_transforms_within_fold is True
     assert contract.training.preserve_nulls is True
+
+
+def test_candidate_v2_search_is_pre_registered() -> None:
+    candidate = load_phase1_evaluation().stage_a_candidate
+    assert candidate.name == "dixon_coles_team_goals_v2"
+    assert candidate.inner_holdout_observed_gameweeks == 6
+    assert candidate.minimum_inner_training_observed_gameweeks == 12
+    assert candidate.half_life_days == (40.0, 80.0, 160.0, 320.0, 640.0)
+    assert candidate.include_no_decay is True
+    assert candidate.prior_matches == (2.0, 4.0, 8.0, 16.0, 32.0)
+    assert candidate.fallback_half_life_days is None
+    assert candidate.fallback_prior_matches == 8.0
 
 
 def test_phase1_contract_pins_honest_baselines() -> None:
@@ -131,7 +144,7 @@ def test_the_calibration_gate_names_the_metric_it_measures() -> None:
 
 def test_the_amendment_is_recorded_with_its_reason_and_evidence() -> None:
     contract = load_phase1_evaluation()
-    assert contract.contract_version == "1.2"
+    assert contract.contract_version == "1.3"
     amendment = next(a for a in contract.amendments if a.version == "1.1")
     assert amendment.candidates_evaluated_before_amendment == 0, (
         "amending a pre-registered gate is only legitimate before a candidate could bias it"
@@ -169,3 +182,24 @@ def test_the_baseline_identity_fix_is_recorded_and_made_the_bar_harder() -> None
     amendment = next(a for a in load_phase1_evaluation().amendments if a.version == "1.2")
     assert amendment.candidates_evaluated_before_amendment == 0
     assert "team_code" in amendment.changed
+
+
+def test_candidate_v2_fixes_are_recorded_without_moving_the_gate() -> None:
+    contract = load_phase1_evaluation()
+    amendment = next(a for a in contract.amendments if a.version == "1.3")
+    assert amendment.candidates_evaluated_before_amendment == 1
+    assert "No baseline, gate, tolerance" in amendment.changed
+    assert "17 to 22 observed gameweeks" in amendment.reason
+    assert contract.promotion.minimum_primary_relative_lift == 0.01
+    assert contract.promotion.maximum_crps_relative_regression == 0.0
+    assert contract.promotion.pit_interval_80_maximum_absolute_error == 0.05
+
+
+def test_candidate_search_grids_must_be_ordered_and_unique() -> None:
+    document = copy.deepcopy(_document())
+    candidate = document["stage_a_candidate"]
+    assert isinstance(candidate, dict)
+    candidate["half_life_days"] = [80.0, 40.0, 80.0]
+
+    with pytest.raises(ValueError, match="unique and increasing"):
+        Phase1EvaluationConfig.model_validate(document)
