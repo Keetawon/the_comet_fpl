@@ -59,10 +59,20 @@ Preserve the R1-R6 rules in `README.md` and their tests.
 
 Also preserve these data contracts:
 
-- Player identity is stable `code`; `element` is season-scoped. Team IDs are season-scoped.
-- Never filter or join a bare team ID across multiple seasons. Require a season-qualified
-  `(season, team_id)` key, or `mart_dim_team.team_code` for cross-season club identity. This
-  rule has been broken once already, inside the Stage A baselines, and it cost 0.022 of mean
+- Player identity is stable `code`; `element_id` (or archive field `element`) is season-scoped
+  and reassigned yearly. Never filter or join a bare `element_id` across multiple seasons.
+  Require a season-qualified `(season, element_id)` key, or `code` for cross-season player
+  tracking. `code` is 1:1 with the player's permanent identity across all seasons. The failure
+  mode is identical to team IDs: `element_id` values are reused across seasons for completely
+  different players. For example, `element_id = 308` resolves to Almiron (2021-22), Aké
+  (2022-23), Salah (2023-24), Ward (2024-25), and Heath (2025-26). Joining on `element_id`
+  across seasons merges five different players into one historical profile. Additionally,
+  `web_name` can drift between seasons (for example, `Salah` to `M.Salah`), making `code` the
+  only valid primary key for tracking players over time.
+- Team IDs are season-scoped. Never filter or join a bare team ID across multiple seasons.
+  Require a season-qualified `(season, team_id)` key, or `mart_dim_team.team_code` for
+  cross-season club identity. This rule has been broken once already, inside the Stage A
+  baselines, and it cost 0.022 of mean
   log score and inverted the xG-versus-goals answer before anyone noticed -- the 26 distinct
   clubs in a four-season window were being compressed into 20 id slots.
   `team_code` is 1:1 with the club (27 codes, 27 names over five seasons) and is the only
