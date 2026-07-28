@@ -17,6 +17,10 @@ the seven thresholds/units absent from it. Two replay edge cases remain explicit
 Do not describe the ruleset as fully validated while either remains under
 `verification.unverified`.
 
+Full archive rebuilds are failure-atomic: `build_db` rebuilds a sibling DuckDB, preserves
+existing live snapshot state, refuses to overwrite a concurrently changed target, and promotes
+with one atomic replacement only after success.
+
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
 publish boundary is a design contract and is not implemented.
@@ -183,17 +187,20 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
 
 Unless the user sets another priority, address prerequisites before model sophistication:
 
-1. Make full archive database rebuilds failure-atomic; live capture is already transactional.
-2. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
-3. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
+1. Reconcile the remaining stale Phase 0 design notes and publish-contract contradictions.
+2. Complete the Stage A validation harness exactly against `config/phase1_evaluation.yaml`.
+3. Correct Candidate V1's validation defects as a separately identified Candidate V2, without
+   weakening any promotion gate after observing V1.
+4. Any further change to `config/phase1_evaluation.yaml` bumps `contract_version` and adds an
    `amendments:` record; the loader rejects a bump without one. State how many candidates had
    been evaluated. A pre-registered gate may not be amended after a candidate is judged.
    Amendment 1.1 resolved the calibration gate; the deferred stronger check is a PIT
    uniformity test, which remains an owner decision.
-4. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
+5. Fit the team model only after its entry gates pass; do not weaken promotion thresholds after
    observing candidate results. The bar is `trailing_goals_attack_defence` at mean log score
    1.5003 over 181 folds and 3,640 predictions; a candidate needs **1.4853** or better to
    clear the 1% lift gate, and must not lose to that baseline in any reported season.
+6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff
 
