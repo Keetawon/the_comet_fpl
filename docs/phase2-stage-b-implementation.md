@@ -6,8 +6,9 @@ candidate model has been fit or judged.** A **baseline-only** full-archive run w
 promotion verdict — see [`phase2-stage-b-baseline-development.md`](phase2-stage-b-baseline-development.md).
 This document pins the owner decisions the harness (`src/fpl/validate/minutes_harness.py`) bakes in.
 These harness decisions were frozen at version `1.0`. Additive amendment `1.1` later
-pre-registered design-only Candidate V1 without changing the harness, baseline names, metrics,
-gates, or dimensions. Candidate V1 still has no implementation or result; see
+pre-registered Candidate V1 without changing the harness, baseline names, metrics, gates, or
+dimensions. Candidate V1 is now implemented and deterministically offline-tested, but still has
+no archive-backed fit, evaluation, result, or runner integration; see
 [`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). The
 machine-readable contract and
 `docs/phase2-evaluation-contract.md` remain the single source of truth; this file explains the
@@ -171,5 +172,5 @@ the required counts, uncertainty, and calibration diagnostics.
 
 `run_minutes_harness(con, *, config=None, seasons=None)` supports optional evaluation-season
 filtering that **restricts folds only, never the prior training history** behind them. It is
-baselines-only; Candidate V1 implementation and gate execution remain deferred to separate
-reviewed slices.
+baselines-only; Candidate V1 runner integration, provenance tests, and gate execution remain
+deferred to separate reviewed slices.

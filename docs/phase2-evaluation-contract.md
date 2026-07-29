@@ -2,10 +2,10 @@
 
 **Status: contract and typed loader implemented at version 1.1.** Version 1.0 froze the
 population, baselines, metrics, calibration, and promotion gate before any candidate existed.
-Additive amendment 1.1 pre-registers design-only Candidate V1
+Additive amendment 1.1 pre-registers Candidate V1
 `shrunk_trailing_5_player_minutes_v1`; it changes none of those version 1.0 policies. Candidate
-V1 has no model code, fit, evaluation, result, gate execution, or verdict. The machine-readable
-source is
+V1 is now implemented and deterministically offline-tested, but it has no archive-backed fit,
+evaluation, result, gate execution, or verdict. The machine-readable source is
 `config/phase2_evaluation.yaml`, validated by `Phase2EvaluationConfig` in `src/fpl/config.py`
 and loaded by `load_phase2_evaluation`, which cross-checks the 60-minute bin boundary against
 the configured downstream ruleset at load time. This document explains the decisions; it does
@@ -26,9 +26,10 @@ target season's scoring rules). Stage B is a **closed-form marginal** over the f
 Monte Carlo is explicitly out of scope here and the minutes model stays separate from
 per-minute event/rate models (repository rule R6).
 
-No candidate model has been fit under this contract. The four Stage B baselines, metrics, and
-baselines-only walk-forward harness are implemented and offline-tested. Their corrected
-baseline-only archive run is recorded in `phase2-stage-b-baseline-development.md`.
+No candidate has been fit or scored on the archive under this contract. The four Stage B
+baselines, metrics, baselines-only walk-forward harness, and Candidate V1 estimator are
+implemented and offline-tested. The corrected baseline-only archive run is recorded in
+`phase2-stage-b-baseline-development.md`.
 
 ## Amendment 1.1: Candidate V1 design only
 
@@ -53,10 +54,10 @@ availability feature, no fixture-specific feature, and no Monte Carlo.
 
 The full formula, point-in-time argument, double-gameweek policy, frozen grid, test plan, and
 future runner provenance requirements are in
-[`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). This amendment
-authorizes no implementation or evaluation. The next slice implements Candidate V1 and its
-deterministic model tests only; a historical development run comes later, from a clean committed
-state.
+[`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). At registration,
+the amendment authorized no evaluation and preceded implementation. The exact estimator and
+deterministic model tests now exist; a separately reviewed runner/provenance slice must be
+committed before any historical development run.
 
 ## Entity, grain, and player identity
 
@@ -306,8 +307,9 @@ NULL, so any `starts`-based slice must exclude that season rather than treat NUL
 
 ## What this contract does not do
 
-- It contains **no Candidate V1 implementation or result**. The baselines, metrics, and
-  baselines-only harness are implemented; Candidate V1 remains a design policy only.
+- It contains **no Candidate V1 result or gate execution**. The estimator is implemented in
+  `src/fpl/models/minutes_v1.py`, but the current harness remains baselines-only and no candidate
+  archive evaluation exists.
 - It runs **no Monte Carlo**. Stage B is a closed-form marginal and stays separate from
   per-minute event/rate models (R6).
 - It does **not** use a hurdle model, availability feature, or fixture-specific Candidate V1

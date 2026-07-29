@@ -333,9 +333,10 @@ terminated attempt produced no scores and is noted only for provenance transpare
   headline number is a development number, not an upper bound.
 - **No candidate was part of this run; no model is promoted.** The run predates Candidate V1's
   additive design-only pre-registration and contains no candidate prediction, fit, or gate
-  execution. Candidate V1 is now pre-registered under amendment 1.1 but still has no model code,
-  fit, evaluation, result, or verdict. Calibration completeness concerns only these frozen
-  baselines under this frozen historical proxy contract.
+  execution. Candidate V1 is now pre-registered under amendment 1.1 and implemented with
+  deterministic offline tests, but still has no archive-backed fit, evaluation, result, gate
+  execution, or verdict. Calibration completeness concerns only these frozen baselines under
+  this frozen historical proxy contract.
 
 ## Verdict and next step
 
@@ -347,10 +348,11 @@ prior leads only on mean log score, while `trailing_5_player_minutes` leads on R
 margins, overall and in every season.
 
 The baseline/calibration record is complete for this frozen historical proxy contract, while
-real-deadline knowledge-time validity remains unproven and no model is promoted. The next Stage B
-step is the **separate reviewed Candidate V1 implementation and deterministic-test slice** recorded
-in [`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). That slice must
-not run the archive, fit a model, or execute a gate. The frozen v1.0 population, target-roster
-knowledge-time policy, bin shape, baseline definitions, metrics, scoring/calibration definitions,
-and promotion gate remain unchanged under additive amendment 1.1, and a gate may never be amended
-after a candidate is judged. Candidate V1 currently has design policy only.
+real-deadline knowledge-time validity remains unproven and no model is promoted. Candidate V1's
+implementation and deterministic-test slice is complete; the next Stage B step is a **separate
+reviewed development-runner and provenance-test slice** recorded in
+[`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). That slice must
+not run the archive or execute a gate. The frozen v1.0 population, target-roster knowledge-time
+policy, bin shape, baseline definitions, metrics, scoring/calibration definitions, and promotion
+gate remain unchanged under additive amendment 1.1, and a gate may never be amended after a
+candidate is judged.

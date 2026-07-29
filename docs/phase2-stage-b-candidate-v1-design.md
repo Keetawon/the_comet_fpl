@@ -1,11 +1,11 @@
 # Stage B Candidate V1 design: shrunk trailing-five player minutes
 
-**Status: frozen pre-registration only, written before implementation or evaluation.**
+**Status: frozen pre-registration record, written before implementation or evaluation.**
 Candidate V1 is named `shrunk_trailing_5_player_minutes_v1` in
-`config/phase2_evaluation.yaml` amendment 1.1. There is no Candidate V1 model code, fitted
-parameter, historical evaluation, result, gate execution, or verdict. The next step is a
-separate reviewed implementation and deterministic-test slice. Only after that slice is
-committed may one clean, committed historical development run be executed.
+`config/phase2_evaluation.yaml` amendment 1.1. The exact estimator and nested selector are now
+implemented in `src/fpl/models/minutes_v1.py` and covered by deterministic offline tests. There
+is no archive-backed fitted parameter, historical evaluation, result, gate execution, verdict,
+or development runner. The pre-registered formula and policy below remain unchanged.
 
 Candidate V1 is **development-only**. The archive already shaped the hypothesis, and the
 historical target roster and first-kickoff cutoff remain unversioned proxies. A later
@@ -157,8 +157,9 @@ The later runner must be implemented and reviewed before use. It must:
 
 ## Next step
 
-Implement Candidate V1 and its deterministic offline tests in a separate, reviewed slice.
-Do not fit it, run the archive, execute a gate, or create a result document during that slice.
-After the implementation is committed and provenance-ready, one clean historical development
-run may be authorized. Any formula, grid, window, fallback, feature, or selection-policy change
-after a V1 number exists is a new named candidate under a new amendment, never a V1 retune.
+Implement Candidate V1's development runner, unchanged-baseline comparison, provenance rechecks,
+and deterministic offline failure-path tests in a separate reviewed slice. Do not run the archive,
+execute a gate, or create a result document during that slice. After the runner is committed and
+provenance-ready, one clean historical development run may be authorized. Any formula, grid,
+window, fallback, feature, or selection-policy change after a V1 number exists is a new named
+candidate under a new amendment, never a V1 retune.

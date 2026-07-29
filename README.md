@@ -81,7 +81,7 @@ src/fpl/
   storage/    db.py, schema.sql
   transform/  crosswalk.py, facts.py, quality.py
   features/   pit.py   -- point-in-time access layer (R4)
-  models/     scoring.py, team_goals.py
+  models/     scoring.py, team_goals.py, minutes_v1.py
   validate/   metrics.py, folds.py, baselines.py, harness.py -- Stage A evaluation
   jobs/       build_db.py, daily_snapshot.py, load_snapshots.py, verify_rules.py
 tests/
@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness + baseline calibration complete; Candidate V1 design pre-registered under additive amendment 1.1; **no candidate code or fit yet** |
+| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness + baseline calibration complete; Candidate V1 pre-registered and offline-tested; **no archive fit/evaluation yet** |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -311,12 +311,14 @@ baseline-only development and calibration record** (position prior = lowest mean
 [`docs/phase2-stage-b-baseline-development.md`](docs/phase2-stage-b-baseline-development.md).
 It is a development number under two unversioned historical proxies (target roster, first-kickoff
 cutoff), so real-deadline knowledge-time validity is unproven. Additive amendment 1.1 now
-pre-registers the design-only Candidate V1 `shrunk_trailing_5_player_minutes_v1` without changing
+pre-registers Candidate V1 `shrunk_trailing_5_player_minutes_v1` without changing
 the frozen v1.0 gate or any comparison policy; see
 [`docs/phase2-stage-b-candidate-v1-design.md`](docs/phase2-stage-b-candidate-v1-design.md).
-Candidate V1 has no model code, fit, evaluation, result, or verdict. The next step is a separate
-reviewed implementation/test slice, with no archive run. The baseline number remains a development
-number, not an upper bound.
+Candidate V1's exact closed-form estimator and true six-observed-gameweek inner selector are now
+implemented and deterministically offline-tested in `src/fpl/models/minutes_v1.py`; there is still
+no archive-backed fit, evaluation, result, gate execution, or verdict. The next step is a separate
+reviewed development-runner/provenance-test slice, still with no archive run. The baseline number
+remains a development number, not an upper bound.
 
 ---
 
