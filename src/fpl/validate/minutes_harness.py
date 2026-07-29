@@ -23,11 +23,11 @@ import argparse
 import logging
 import sys
 from collections import defaultdict
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import duckdb
 import polars as pl
@@ -74,6 +74,31 @@ COHORT_NO_PRIOR = "no_prior_player_fixture"
 COHORT_NO_POSITIVE = "prior_player_fixtures_no_positive_minutes"
 COHORT_PRIOR_POSITIVE = "prior_positive_minutes"
 _COLD_COHORTS = frozenset({COHORT_NO_PRIOR, COHORT_NO_POSITIVE})
+
+# --------------------------------------------------------------------------------------
+# Candidate integration (development-only, opt-in)
+# --------------------------------------------------------------------------------------
+
+
+class MinutesCandidate(Protocol):
+    """A fold-local fitted minutes predictor with the baseline ``predict`` / ``parameters`` shape.
+
+    A Stage B candidate is fitted inside :func:`run_minutes_fold` on the exact validated history
+    the baselines use, so it is scored on the identical eligible rows. The harness never imports a
+    candidate model: a development runner supplies a factory returning an object conforming to this
+    protocol. The default harness path passes no factory and is unchanged.
+    """
+
+    name: str
+
+    def predict(self, target: TargetRow) -> MinutesDistribution: ...
+
+    def parameters(self) -> Mapping[str, float | int | bool | str]: ...
+
+
+# Fits one candidate on a fold's validated history and returns its fitted predictor. Optional and
+# opt-in; the default baselines-only CLI supplies no factory.
+MinutesCandidateFactory = Callable[[tuple[HistoryRow, ...], datetime], MinutesCandidate]
 
 # --------------------------------------------------------------------------------------
 # Folds over observed gameweeks
@@ -392,6 +417,13 @@ class MinutesFoldPredictions:
     home_away: tuple[str, ...]
     positions: tuple[Position, ...]
     rank_groups: tuple[str, ...]
+    # Candidate predictions (development-only). Empty unless a candidate factory was supplied, so
+    # the default baselines-only path is unchanged. Candidate predictions carry the same observed
+    # bin and slice keys as the baselines, so they are scored and sliced on identical eligible rows.
+    by_candidate: dict[str, tuple[MinutesDistribution, ...]] = field(default_factory=dict)
+    candidate_parameters: dict[str, dict[str, float | int | bool | str]] = field(
+        default_factory=dict
+    )
 
 
 def run_minutes_fold(
@@ -400,6 +432,7 @@ def run_minutes_fold(
     *,
     bins: MinuteBins,
     config: Phase2EvaluationConfig,
+    candidate_factory: MinutesCandidateFactory | None = None,
 ) -> MinutesFoldPredictions | None:
     """Fit all four baselines on the fold's training window and predict its gameweek.
 
@@ -461,6 +494,22 @@ def run_minutes_fold(
         rank_groups.append(f"{target.season}-{target.gw}-{target.position}")
         observed_bins.append(bins.index_of(label))
 
+    by_candidate: dict[str, tuple[MinutesDistribution, ...]] = {}
+    candidate_parameters: dict[str, dict[str, float | int | bool | str]] = {}
+    if candidate_factory is not None:
+        # Fit the candidate on the SAME validated history the baselines used and predict the SAME
+        # targets, so identical eligible rows is structural rather than aspirational. The label
+        # never reaches the candidate: validated_targets are label-free TargetRow objects.
+        fitted = candidate_factory(validated_history, fold.as_of)
+        candidate_predicted = tuple(fitted.predict(target) for target in validated_targets)
+        if len(candidate_predicted) != len(validated_targets):
+            raise RuntimeError(
+                f"{fitted.name} returned {len(candidate_predicted)} predictions for "
+                f"{len(validated_targets)} eligible targets"
+            )
+        by_candidate[fitted.name] = candidate_predicted
+        candidate_parameters[fitted.name] = dict(fitted.parameters())
+
     return MinutesFoldPredictions(
         fold=fold,
         targets=validated_targets,
@@ -472,6 +521,8 @@ def run_minutes_fold(
         home_away=tuple(home_away),
         positions=tuple(positions),
         rank_groups=tuple(rank_groups),
+        by_candidate=by_candidate,
+        candidate_parameters=candidate_parameters,
     )
 
 
@@ -495,6 +546,11 @@ class MinutesHarnessResult:
     by_home_away: dict[str, dict[str, MinutesScoreReport]]
     by_transfer_status: dict[str, dict[str, MinutesScoreReport]]
     by_player_history_cohort: dict[str, dict[str, MinutesScoreReport]]
+    # Per-fold candidate parameter provenance (development-only). Empty unless a candidate factory
+    # was supplied; the full per-fold mapping is preserved for independent reconciliation.
+    parameters_by_fold: dict[str, dict[str, dict[str, float | int | bool | str]]] = field(
+        default_factory=dict
+    )
 
     def best_baseline(self) -> str:
         """Lowest mean log score among the required baselines -- the bar a candidate must beat."""
@@ -547,6 +603,7 @@ def run_minutes_harness(
     *,
     config: Phase2EvaluationConfig | None = None,
     seasons: list[str] | None = None,
+    candidate_factory: MinutesCandidateFactory | None = None,
 ) -> MinutesHarnessResult:
     """Score every required Stage B baseline on exactly the same eligible predictions.
 
@@ -566,9 +623,12 @@ def run_minutes_harness(
     folds_by_season: dict[str, int] = defaultdict(int)
     evaluated = 0
     eligible_predictions = 0
+    parameters_by_fold: dict[str, dict[str, dict[str, float | int | bool | str]]] = {}
 
     for fold in folds:
-        result = run_minutes_fold(con, fold, bins=bins, config=resolved)
+        result = run_minutes_fold(
+            con, fold, bins=bins, config=resolved, candidate_factory=candidate_factory
+        )
         if result is None:
             continue
         if len(result.targets) != fold.target_rows:
@@ -580,7 +640,11 @@ def run_minutes_harness(
         eligible_predictions += fold.target_rows
         folds_by_season[fold.season] += 1
         fold_key = f"{fold.season}-GW{fold.gw}"
-        for name, distributions in result.by_baseline.items():
+        # Baselines and any candidate are scored on the identical eligible rows: the candidate
+        # predictions carry the same observed bin and slice keys. The population-equality check
+        # below therefore enforces identical row counts for every model in `records`, candidate
+        # included.
+        for name, distributions in {**result.by_baseline, **result.by_candidate}.items():
             for index, distribution in enumerate(distributions):
                 records[name].append(
                     MinutesPredictionRecord(
@@ -596,6 +660,10 @@ def run_minutes_harness(
                         rank_group=result.rank_groups[index],
                     )
                 )
+        if result.candidate_parameters:
+            parameters_by_fold[fold_key] = {
+                name: dict(parameters) for name, parameters in result.candidate_parameters.items()
+            }
 
     overall = {
         name: _score_records(name, preds, config=resolved) for name, preds in records.items()
@@ -630,6 +698,7 @@ def run_minutes_harness(
         by_home_away=by_home_away,
         by_transfer_status=by_transfer_status,
         by_player_history_cohort=by_player_history_cohort,
+        parameters_by_fold=parameters_by_fold,
     )
 
 

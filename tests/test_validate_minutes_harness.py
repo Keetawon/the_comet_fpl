@@ -20,6 +20,7 @@ import duckdb
 import pytest
 
 from fpl.config import load_phase2_evaluation
+from fpl.models.minutes_v1 import ShrunkTrailing5PlayerMinutesV1
 from fpl.storage.db import connect
 from fpl.types import Position
 from fpl.validate.minutes_baselines import MinuteBins, TargetRow
@@ -692,3 +693,143 @@ def test_duplicate_player_fixture_grain_fails_closed() -> None:
     )
     with pytest.raises(ValueError, match="duplicate target grain"):
         run_minutes_fold(con, fold, bins=_bins(), config=CONFIG)
+
+
+# --------------------------------------------------------------------------------------
+# Opt-in candidate integration (development-only). Default behavior stays unchanged.
+# --------------------------------------------------------------------------------------
+
+CANDIDATE = "shrunk_trailing_5_player_minutes_v1"
+
+
+class _Candidate:
+    """A minimal predictor conforming to the harness MinutesCandidate protocol, wrapping V1."""
+
+    def __init__(self, model: ShrunkTrailing5PlayerMinutesV1) -> None:
+        self.name = model.name
+        self._model = model
+
+    def predict(self, target: TargetRow):  # type: ignore[no-untyped-def]
+        return self._model.predict(target)
+
+    def parameters(self):  # type: ignore[no-untyped-def]
+        return self._model.parameters()
+
+
+def _candidate_factory(history, as_of):  # type: ignore[no-untyped-def]
+    return _Candidate(ShrunkTrailing5PlayerMinutesV1(config=CONFIG).fit(history, as_of=as_of))
+
+
+def test_candidate_and_baselines_score_identical_eligible_rows() -> None:
+    con = _build_db(_two_season_rows(), _TEAM_MAP)
+    result = run_minutes_harness(con, config=CONFIG, candidate_factory=_candidate_factory)
+    eligible = result.eligible_predictions
+    assert result.predictions == eligible
+    # Every model -- the four baselines AND the candidate -- scored exactly the eligible
+    # population at full coverage, so identical eligible rows is structural, not aspirational.
+    for name in (*CONFIG.baselines.stage_b, CANDIDATE):
+        report = result.overall[name]
+        assert report.predictions == eligible
+        assert report.eligible_predictions == eligible
+        assert report.exclusions == 0
+        assert report.prediction_coverage == pytest.approx(1.0)
+
+
+def test_baselines_are_behaviorally_identical_with_candidate_disabled() -> None:
+    # A run with the candidate factory and a run without must score the four baselines identically:
+    # candidate integration is additive and never perturbs a baseline.
+    con_with = _build_db(_two_season_rows(), _TEAM_MAP)
+    con_without = _build_db(_two_season_rows(), _TEAM_MAP)
+    with_factory = run_minutes_harness(
+        con_with, config=CONFIG, candidate_factory=_candidate_factory
+    )
+    without = run_minutes_harness(con_without, config=CONFIG)
+    for name in CONFIG.baselines.stage_b:
+        baseline_with = with_factory.overall[name]
+        baseline_without = without.overall[name]
+        assert baseline_with.mean_log_score == baseline_without.mean_log_score
+        assert baseline_with.pit_values == baseline_without.pit_values
+        assert baseline_with.mean_brier_60_plus == baseline_without.mean_brier_60_plus
+        assert (
+            baseline_with.mean_ranked_probability_score
+            == baseline_without.mean_ranked_probability_score
+        )
+    # The candidate appears only when a factory is supplied; the default run is baseline-only.
+    assert CANDIDATE in with_factory.overall
+    assert CANDIDATE not in without.overall
+    assert with_factory.parameters_by_fold
+    assert without.parameters_by_fold == {}
+
+
+def test_cli_supplies_no_candidate_factory(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # The ordinary minutes_harness CLI is baselines-only: its call to run_minutes_harness carries no
+    # candidate factory, so candidate integration cannot leak into the default command.
+    import fpl.validate.minutes_harness as mh
+
+    real_run = mh.run_minutes_harness
+    captured: dict[str, object] = {}
+
+    class _FakeCon:
+        def close(self) -> None:
+            pass
+
+    def capture_run(con, *, config, seasons, candidate_factory=None):  # type: ignore[no-untyped-def]
+        captured["candidate_factory"] = candidate_factory
+        tiny = _build_db(_two_season_rows(), _TEAM_MAP)
+        return real_run(tiny, config=config, seasons=seasons)
+
+    monkeypatch.setattr(mh, "connect", lambda db, *, read_only=False: _FakeCon())
+    monkeypatch.setattr(mh, "run_minutes_harness", capture_run)
+    rc = mh.main(["--db", str(tmp_path / "unused.duckdb")])
+    assert rc == 0
+    assert captured["candidate_factory"] is None
+
+
+def test_candidate_fold_parameters_are_recorded() -> None:
+    con = _build_db(_two_season_rows(), _TEAM_MAP)
+    result = run_minutes_harness(con, config=CONFIG, candidate_factory=_candidate_factory)
+    assert result.parameters_by_fold
+    for fold_parameters in result.parameters_by_fold.values():
+        candidate_parameters = fold_parameters[CANDIDATE]
+        # The structured fold record carries at least the four required provenance scalars, and the
+        # full per-fold mapping is preserved for independent reconciliation.
+        for key in (
+            "selected_alpha",
+            "used_inner_holdout",
+            "inner_holdout_observed_gameweeks",
+            "inner_training_observed_gameweeks",
+        ):
+            assert key in candidate_parameters
+        assert candidate_parameters["name"] == CANDIDATE
+        assert candidate_parameters["history_window"] == 5
+
+
+def test_candidate_is_never_the_best_baseline() -> None:
+    con = _build_db(_two_season_rows(), _TEAM_MAP)
+    result = run_minutes_harness(con, config=CONFIG, candidate_factory=_candidate_factory)
+    best = result.best_baseline()
+    # The comparator is always one of the four required baselines; the candidate is diagnostic only.
+    assert best in result.required_baselines
+    assert best != CANDIDATE
+
+
+def test_candidate_inner_holdout_runs_with_enough_history() -> None:
+    # Two seasons of ten observed gameweeks each: the later folds carry >=14 prior observed
+    # gameweeks, so Candidate V1's nested alpha selection actually runs (used_inner_holdout=True).
+    rows: list[dict[str, object]] = []
+    for gw in range(1, 11):
+        rows.append(
+            _row(season="2023-24", gw=gw, fixture=gw, kickoff=_kick(8, gw), code=101, minutes=90)
+        )
+    for gw in range(1, 11):
+        rows.append(
+            _row(season="2024-25", gw=gw, fixture=gw, kickoff=_kick(9, gw), code=101, minutes=90)
+        )
+    con = _build_db(rows, _TEAM_MAP)
+    result = run_minutes_harness(con, config=CONFIG, candidate_factory=_candidate_factory)
+    used = [
+        params[CANDIDATE]["used_inner_holdout"] for params in result.parameters_by_fold.values()
+    ]
+    assert any(used)
+    # Earlier folds (fewer than 14 prior observed gameweeks) use the frozen fallback instead.
+    assert not all(used)
