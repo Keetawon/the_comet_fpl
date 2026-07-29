@@ -31,15 +31,18 @@ baseline remains Stage A.
 Phase 2's Stage B (player minutes) prerequisites are implemented and offline-tested at contract
 version 1.0: the pre-registered typed contract (`config/phase2_evaluation.yaml`), exact four
 baselines, distribution metrics/calibration, and the player-fixture walk-forward harness
-(`docs/phase2-stage-b-implementation.md`). The baseline-only full-archive run is complete
-(2026-07-29) as a **headline/provisional development baseline** — 181 folds, 133,964 predictions,
-zero exclusions, zero leakage, position prior `position_minutes_frequency` best at mean log score
-1.04916 (a future 1% aggregate lift would need <= about 1.03867). It is **provisional**, not a
-complete calibration record: a post-processing defect (a temporary script read
-`contract.calibration` instead of `contract.scoring_calibration` after the harness finished) left
-the reliability bucket counts and the explicit assertion block uncaptured, and truncated the
-2024-25/2025-26 per-season rows. See `docs/phase2-stage-b-baseline-development.md`. No Stage B
-candidate has been fitted; the historical number is a development number, not an upper bound.
+(`docs/phase2-stage-b-implementation.md`). The baseline-only full-archive run is **complete as a
+baseline-only development and calibration record** (corrected run, 2026-07-29) — 181 folds,
+133,964 eligible predictions, zero exclusions, zero leakage, 27/27 runner assertions passed, and a
+full independent reconciliation (four overall reports, all 20 season-baseline rows, 48 reliability
+curves / 480 buckets) with zero validation failures. The position prior
+`position_minutes_frequency` is lowest at mean log score 1.04916 (a future 1% aggregate lift would
+need <= about 1.03867), but it leads only on mean log score: `trailing_5_player_minutes` leads on
+RPS and both Brier margins, overall and in every season, so **no baseline dominates**. It is a
+development number under two unversioned historical proxies (target roster, first-kickoff cutoff),
+so real-deadline knowledge-time validity is unproven. See
+`docs/phase2-stage-b-baseline-development.md`. No Stage B candidate has been fitted or judged; the
+historical number is a development number, not an upper bound.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -255,23 +258,25 @@ Unless the user sets another priority, address prerequisites before model sophis
    clear the 1% lift gate, and must not lose to that baseline in any reported season.
 5. The exact Stage B baselines, metrics, and player-grain `(season, code, fixture)` walk-forward
    harness are implemented and offline-tested under `config/phase2_evaluation.yaml` contract
-   1.0. The baseline-only full-archive run is **complete as a headline/provisional development
-   baseline** (2026-07-29): 181 folds by season 30/37/38/38/38, 133,964 eligible predictions, zero
-   exclusions, zero leakage, position prior `position_minutes_frequency` best at mean log score
-   1.04916 (a future 1% aggregate lift would need <= about 1.03867). It is **provisional**, not a
-   complete calibration record or promotion verdict: a post-processing defect (a temporary script
-   read `contract.calibration` instead of `contract.scoring_calibration` after the harness
-   finished) left the reliability bucket counts and explicit assertion block uncaptured and
-   truncated the 2024-25/2025-26 per-season rows; no rerun was authorized in that slice. See
-   `docs/phase2-stage-b-baseline-development.md`. The next Stage B task is **one explicitly
-   authorized corrected run** that re-renders the full calibration output (reliability bucket
-   counts from `scoring_calibration`, the assertion block, and the two per-season rows) against
-   the same frozen contract and archive fingerprint, **before** any candidate is pre-registered or
-   fitted. NO Stage B candidate exists or may be fitted before that prerequisite passes. The
+   1.0. The baseline-only full-archive run is **complete as a baseline-only development and
+   calibration record** (corrected run, 2026-07-29): 181 folds by season 30/37/38/38/38, 133,964
+   eligible predictions, zero exclusions, zero leakage, 27/27 runner assertions passed
+   (`assertions_all_passed = true`), and a full independent reconciliation with zero validation
+   failures (four overall reports, all 20 season-baseline rows, 48 reliability curves / 480 buckets,
+   with per-season and per-curve aggregates reconciling to overall). The position prior
+   `position_minutes_frequency` is lowest at mean log score 1.04916 (a future 1% aggregate lift
+   would need <= about 1.03867) but leads only on mean log score; `trailing_5_player_minutes` leads
+   on RPS and both Brier margins, overall and in every season, so no baseline dominates. It is a
+   development number under two unversioned historical proxies (target roster, first-kickoff
+   cutoff), so real-deadline knowledge-time validity is unproven. The runner assertions assert
+   read-only integrity, contract identity, population, and calibration shape only; they do not
+   exercise a candidate gate. See `docs/phase2-stage-b-baseline-development.md`. The next Stage B
+   step is a **separately named, pre-registered candidate design/contract slice**: it must be
+   reviewed before any implementation or fitting, and it must not weaken the frozen v1.0 gate. The
    contract freezes the population, target-roster knowledge-time policy, bin shape, baseline
    definitions, metrics, scoring/calibration definitions, and promotion gate; the historical number
    is a development number, not an upper bound, and a gate may never be amended after a candidate
-   is judged.
+   is judged. NO Stage B candidate exists or may be fitted before that candidate slice is reviewed.
 6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff

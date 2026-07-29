@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | contract + exact baselines/metrics/walk-forward harness implemented; baseline-only archive run completed (provisional development bar); **no model fitted yet** |
+| 2 | Stage B minutes model | contract + exact baselines/metrics/walk-forward harness implemented; baseline-only archive run + calibration complete (development bar); **no candidate fitted yet** |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -304,13 +304,16 @@ version 1.0 — the registered player population, `(season, code, fixture)` grai
 minute bins whose 60-minute boundary is cross-checked against the scoring rules, required
 baselines, metrics, and promotion gate. The exact baselines, metrics/calibration, and
 baselines-only player-fixture walk-forward harness are implemented and offline-tested; see
-`docs/phase2-stage-b-implementation.md`. The baseline-only full-archive run is complete as a
-**headline/provisional development bar** (position prior = best baseline at mean log score
-1.04916; a future 1% aggregate lift would need ≤ about 1.03867), recorded in
-[`docs/phase2-stage-b-baseline-development.md`](docs/phase2-stage-b-baseline-development.md) —
-it is provisional because a post-processing defect left the reliability bucket counts and two
-per-season rows uncaptured, so a corrected run is required before any candidate. **No Stage B
-model has been fitted**, and the number is a development number, not an upper bound.
+`docs/phase2-stage-b-implementation.md`. The baseline-only full-archive run is **complete as a
+baseline-only development and calibration record** (position prior = lowest mean log score at
+1.04916; a future 1% aggregate lift would need ≤ about 1.03867; no baseline dominates, since
+`trailing_5_player_minutes` leads on RPS and both Brier margins), recorded in
+[`docs/phase2-stage-b-baseline-development.md`](docs/phase2-stage-b-baseline-development.md).
+It is a development number under two unversioned historical proxies (target roster, first-kickoff
+cutoff), so real-deadline knowledge-time validity is unproven. The next Stage B step is a separately
+named, pre-registered candidate design/contract slice that must be reviewed before implementation
+and must not weaken the frozen v1.0 gate. **No Stage B candidate has been fitted**, and the number
+is a development number, not an upper bound.
 
 ---
 
