@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness + baseline calibration complete; Candidate V1 pre-registered and offline-tested; **no archive fit/evaluation yet** |
+| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness + baseline calibration complete; Candidate V1 and provenance-ready development runner offline-tested; **no candidate archive fit/evaluation yet** |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -314,11 +314,14 @@ cutoff), so real-deadline knowledge-time validity is unproven. Additive amendmen
 pre-registers Candidate V1 `shrunk_trailing_5_player_minutes_v1` without changing
 the frozen v1.0 gate or any comparison policy; see
 [`docs/phase2-stage-b-candidate-v1-design.md`](docs/phase2-stage-b-candidate-v1-design.md).
-Candidate V1's exact closed-form estimator and true six-observed-gameweek inner selector are now
-implemented and deterministically offline-tested in `src/fpl/models/minutes_v1.py`; there is still
-no archive-backed fit, evaluation, result, gate execution, or verdict. The next step is a separate
-reviewed development-runner/provenance-test slice, still with no archive run. The baseline number
-remains a development number, not an upper bound.
+Candidate V1's exact closed-form estimator, true six-observed-gameweek inner selector, and dedicated
+development runner are now implemented and deterministically offline-tested. The runner scores the
+candidate and four unchanged baselines on identical rows, records fold parameters, opens DuckDB
+read-only, rechecks clean Git/config/model-source/database provenance, and emits a complete strict-JSON
+reconciliation record only after postflight verification. It has not been run on the archive, so
+there is still no candidate fit, evaluation, result, gate execution, or verdict. The next step may be
+one explicitly authorized clean historical development run. The baseline number remains a
+development number, not an upper bound.
 
 ---
 

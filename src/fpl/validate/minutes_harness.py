@@ -501,6 +501,11 @@ def run_minutes_fold(
         # targets, so identical eligible rows is structural rather than aspirational. The label
         # never reaches the candidate: validated_targets are label-free TargetRow objects.
         fitted = candidate_factory(validated_history, fold.as_of)
+        if fitted.name in by_baseline:
+            raise RuntimeError(
+                f"development candidate name {fitted.name!r} collides with a required "
+                "Stage B baseline"
+            )
         candidate_predicted = tuple(fitted.predict(target) for target in validated_targets)
         if len(candidate_predicted) != len(validated_targets):
             raise RuntimeError(
@@ -608,8 +613,9 @@ def run_minutes_harness(
     """Score every required Stage B baseline on exactly the same eligible predictions.
 
     ``seasons`` restricts the evaluated folds only; it never shortens the prior training history
-    behind a fold, so a season-restricted run stays comparable to a full run. Baselines-only: no
-    candidate is fitted and no promotion gate is executed (deferred).
+    behind a fold, so a season-restricted run stays comparable to a full run. By default this is
+    baselines-only. A separately named development runner may opt in one fold-local candidate via
+    ``candidate_factory``; no promotion gate is executed on either path.
     """
     resolved = config or load_phase2_evaluation()
     bins = MinuteBins.from_config(resolved)
@@ -711,8 +717,14 @@ def format_minutes_report(
     result: MinutesHarnessResult, config: Phase2EvaluationConfig | None = None
 ) -> str:
     resolved = config or load_phase2_evaluation()
+    additional_models = sorted(set(result.overall) - result.required_baselines)
+    run_scope = (
+        "development candidate + frozen baselines; no promotion verdict"
+        if additional_models
+        else "baselines-only; gate deferred"
+    )
     lines = [
-        f"contract       : {resolved.contract_version} (Stage B, baselines-only; gate deferred)",
+        f"contract       : {resolved.contract_version} (Stage B, {run_scope})",
         f"folds evaluated : {result.folds_evaluated}",
         f"predictions     : {result.predictions} / {result.eligible_predictions} eligible",
         f"leakage failures: {result.leakage_failures}",

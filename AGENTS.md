@@ -43,11 +43,13 @@ need <= about 1.03867), but it leads only on mean log score: `trailing_5_player_
 RPS and both Brier margins, overall and in every season, so **no baseline dominates**. It is a
 development number under two unversioned historical proxies (target roster, first-kickoff cutoff),
 so real-deadline knowledge-time validity is unproven. See
-`docs/phase2-stage-b-baseline-development.md`. Candidate V1 is now implemented in
-`src/fpl/models/minutes_v1.py` with deterministic offline tests, but it has no archive-backed fit,
-evaluation, result, gate execution, or verdict and is not wired into a development runner; see
-`docs/phase2-stage-b-candidate-v1-design.md`. The historical number is a development number, not
-an upper bound.
+`docs/phase2-stage-b-baseline-development.md`. Candidate V1 and its dedicated development runner
+are now implemented with deterministic offline tests. The runner integrates Candidate V1 with the
+four unchanged baselines on identical eligible rows, records fold-local parameter selections, and
+rechecks clean Git/config/model-source/database provenance before emitting a complete reconciliation
+record. It has not been run on the archive, so there is still no archive-backed fit, evaluation,
+result, gate execution, or verdict; see `docs/phase2-stage-b-candidate-v1-design.md`. The historical
+number is a development number, not an upper bound.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -280,11 +282,10 @@ Unless the user sets another priority, address prerequisites before model sophis
    read-only integrity, contract identity, population, and calibration shape only; they do not
    exercise a candidate gate. See `docs/phase2-stage-b-baseline-development.md` and
    `docs/phase2-stage-b-candidate-v1-design.md`. Candidate V1's closed-form estimator, true
-   six-observed-gameweek inner walk-forward, and deterministic offline tests are implemented, but
-   no archive-backed fit, evaluation, result, or gate execution exists. The next Stage B step is a
-   **separate reviewed development-runner and provenance-test slice** that integrates Candidate V1
-   with the four unchanged baselines without running the archive. Only after that slice is
-   committed and provenance-ready may one clean historical development run be authorized. The
+   six-observed-gameweek inner walk-forward, dedicated development runner, provenance rechecks, and
+   deterministic offline tests are implemented. No archive-backed fit, evaluation, result, or gate
+   execution exists. The next Stage B step may be one explicitly authorized clean historical
+   development run using the committed provenance-ready runner; it remains development-only. The
    population, target-roster knowledge-time policy, bin shape, baseline definitions, metrics,
    scoring/calibration definitions, and promotion gate remain frozen; the historical number is not
    an upper bound, and a gate may never be amended after a candidate is judged.

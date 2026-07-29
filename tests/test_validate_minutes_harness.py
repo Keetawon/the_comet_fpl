@@ -33,6 +33,7 @@ from fpl.validate.minutes_harness import (
     TRANSFER_SAME,
     MinutesFold,
     assert_no_minutes_leakage,
+    format_minutes_report,
     generate_minutes_folds,
     run_minutes_fold,
     run_minutes_harness,
@@ -735,6 +736,17 @@ def test_candidate_and_baselines_score_identical_eligible_rows() -> None:
         assert report.prediction_coverage == pytest.approx(1.0)
 
 
+def test_candidate_name_cannot_collide_with_a_required_baseline() -> None:
+    def colliding_factory(history, as_of):  # type: ignore[no-untyped-def]
+        candidate = _candidate_factory(history, as_of)
+        candidate.name = sorted(CONFIG.baselines.stage_b)[0]
+        return candidate
+
+    con = _build_db(_two_season_rows(), _TEAM_MAP)
+    with pytest.raises(RuntimeError, match="collides with a required Stage B baseline"):
+        run_minutes_harness(con, config=CONFIG, candidate_factory=colliding_factory)
+
+
 def test_baselines_are_behaviorally_identical_with_candidate_disabled() -> None:
     # A run with the candidate factory and a run without must score the four baselines identically:
     # candidate integration is additive and never perturbs a baseline.
@@ -759,6 +771,10 @@ def test_baselines_are_behaviorally_identical_with_candidate_disabled() -> None:
     assert CANDIDATE not in without.overall
     assert with_factory.parameters_by_fold
     assert without.parameters_by_fold == {}
+    assert "development candidate + frozen baselines; no promotion verdict" in (
+        format_minutes_report(with_factory, CONFIG)
+    )
+    assert "baselines-only; gate deferred" in format_minutes_report(without, CONFIG)
 
 
 def test_cli_supplies_no_candidate_factory(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]

@@ -37,7 +37,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import logging
+import math
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -58,7 +60,11 @@ from fpl.validate.minutes_harness import (
     format_minutes_report,
     run_minutes_harness,
 )
-from fpl.validate.minutes_metrics import MinutesDistribution, MinutesScoreReport
+from fpl.validate.minutes_metrics import (
+    MinutesDistribution,
+    MinutesScoreReport,
+    ReliabilityCurve,
+)
 
 if TYPE_CHECKING:
     from fpl.models.minutes_v1 import ShrunkTrailing5PlayerMinutesV1
@@ -626,6 +632,163 @@ def format_development_report(
 
 
 # --------------------------------------------------------------------------------------
+# Complete machine-readable reconciliation record
+# --------------------------------------------------------------------------------------
+
+
+def _json_float(value: float) -> float | None:
+    """Return a strict-JSON float, mapping undefined report-only metrics to ``null``."""
+    return value if math.isfinite(value) else None
+
+
+def _reliability_record(curve: ReliabilityCurve) -> dict[str, object]:
+    return {
+        "total_n": curve.total_n(),
+        "buckets": [
+            {
+                "lower": bucket.lower,
+                "upper": bucket.upper,
+                "n": bucket.n,
+                "mean_predicted": (
+                    None if bucket.mean_predicted is None else _json_float(bucket.mean_predicted)
+                ),
+                "observed_rate": (
+                    None if bucket.observed_rate is None else _json_float(bucket.observed_rate)
+                ),
+            }
+            for bucket in curve.buckets
+        ],
+    }
+
+
+def _score_record(report: MinutesScoreReport) -> dict[str, object]:
+    """Every shareable score field, including complete calibration buckets but not raw PIT draws."""
+    return {
+        "name": report.name,
+        "predictions": report.predictions,
+        "eligible_predictions": report.eligible_predictions,
+        "exclusions": report.exclusions,
+        "cold_starts": report.cold_starts,
+        "mean_log_score": _json_float(report.mean_log_score),
+        "mean_log_score_standard_error": _json_float(report.mean_log_score_standard_error),
+        "mean_ranked_probability_score": _json_float(report.mean_ranked_probability_score),
+        "mean_brier_any_minutes": _json_float(report.mean_brier_any_minutes),
+        "mean_brier_60_plus": _json_float(report.mean_brier_60_plus),
+        "pit_interval_80_coverage": _json_float(report.pit_interval_80_coverage),
+        "pit_interval_80_absolute_error": _json_float(report.pit_interval_80_absolute_error),
+        "pit_values_count": len(report.pit_values),
+        "reliability_any_minutes": _reliability_record(report.reliability_any_minutes),
+        "reliability_60_plus": _reliability_record(report.reliability_60_plus),
+        "spearman_p60_within_position_gameweek": _json_float(
+            report.spearman_p60_within_position_gameweek
+        ),
+        "prediction_coverage": _json_float(report.prediction_coverage),
+    }
+
+
+def _score_map_record(
+    reports: dict[str, MinutesScoreReport],
+) -> dict[str, dict[str, object]]:
+    return {name: _score_record(reports[name]) for name in sorted(reports)}
+
+
+def _slice_record(
+    slices: dict[str, dict[str, MinutesScoreReport]],
+) -> dict[str, dict[str, dict[str, object]]]:
+    return {key: _score_map_record(slices[key]) for key in sorted(slices)}
+
+
+def build_reconciliation_record(
+    result: MinutesHarnessResult,
+    config: Phase2EvaluationConfig,
+    *,
+    provenance: Provenance,
+    diagnostics: DevelopmentDiagnostics,
+) -> dict[str, object]:
+    """Build the complete result emitted for independent Stage B reconciliation.
+
+    The human report is intentionally concise. This record preserves every configured score
+    slice, both reliability curves and all bucket counts, every fold-local Candidate V1 parameter
+    selection, the provenance fence, and the structured diagnostic assertions. Raw randomized-PIT
+    draws are not duplicated across overlapping slices; their count and the contract-defined
+    aggregate coverage are recorded instead.
+    """
+    return {
+        "schema": "stage_b_candidate_v1_development/v1",
+        "status": "development_only_not_a_promotion_result",
+        "provenance": {
+            "candidate": provenance.candidate,
+            "contract_version": provenance.contract_version,
+            "commit_sha": provenance.commit_sha,
+            "config_sha256": provenance.config_fingerprint,
+            "candidate_source_sha256": provenance.candidate_source_fingerprint,
+            "database_sha256": provenance.archive_fingerprint,
+            "seed": provenance.seed,
+            "started_at_utc": provenance.started_at,
+            "ended_at_utc": provenance.ended_at,
+        },
+        "contract": {
+            "phase": config.phase,
+            "candidate": config.stage_b_candidate_v1.name,
+            "grain": config.target.grain,
+            "identity_policy": config.target.identity_policy,
+            "required_baselines": sorted(result.required_baselines),
+            "best_required_baseline": diagnostics.comparator,
+        },
+        "harness": {
+            "folds_evaluated": result.folds_evaluated,
+            "folds_by_season": dict(sorted(result.folds_by_season.items())),
+            "predictions": result.predictions,
+            "eligible_predictions": result.eligible_predictions,
+            "leakage_failures": result.leakage_failures,
+            "overall": _score_map_record(result.overall),
+            "by_fold": _slice_record(result.by_fold),
+            "by_season": _slice_record(result.by_season),
+            "by_position": _slice_record(result.by_position),
+            "by_home_away": _slice_record(result.by_home_away),
+            "by_transfer_status": _slice_record(result.by_transfer_status),
+            "by_player_history_cohort": _slice_record(result.by_player_history_cohort),
+            "candidate_parameters_by_fold": {
+                fold: {
+                    model: dict(sorted(parameters.items()))
+                    for model, parameters in sorted(models.items())
+                }
+                for fold, models in sorted(result.parameters_by_fold.items())
+            },
+        },
+        "development_diagnostics": {
+            "label": _DEVELOPMENT_DIAGNOSTIC_LABEL,
+            "candidate": diagnostics.candidate,
+            "comparator": diagnostics.comparator,
+            "comparable": diagnostics.comparable,
+            "passed_count": diagnostics.passed_count(),
+            "checks": [
+                {
+                    "name": check.name,
+                    "passed": check.passed,
+                    "detail": check.detail,
+                    "label": check.label,
+                }
+                for check in diagnostics.checks
+            ],
+            "note": diagnostics.note,
+            "combined_promotion_verdict": None,
+        },
+        "historical_proxy_caveats": {
+            "target_roster": config.target_roster.historical_roster_status,
+            "cutoff": config.cutoff.prediction_time,
+            "real_deadline_knowledge_time_validity": "unproven",
+            "archive_result_role": "development_diagnostic_only",
+        },
+    }
+
+
+def format_reconciliation_record(record: dict[str, object]) -> str:
+    """Strict, deterministic JSON suitable for capture without creating a result document."""
+    return json.dumps(record, indent=2, sort_keys=True, allow_nan=False)
+
+
+# --------------------------------------------------------------------------------------
 # Orchestration
 # --------------------------------------------------------------------------------------
 
@@ -695,12 +858,21 @@ def main(argv: list[str] | None = None) -> int:
 
     # The printable provenance is constructed only after the recheck passes.
     provenance = finalize_provenance(snapshot, ended_at=ended_at)
-    print(format_minutes_report(result, config=contract))
-    print(
-        format_development_report(
-            result, snapshot.candidate, contract, provenance=provenance, diagnostics=diagnostics
-        )
+    reconciliation = build_reconciliation_record(
+        result, contract, provenance=provenance, diagnostics=diagnostics
     )
+    standard_report = format_minutes_report(result, config=contract)
+    development_report = format_development_report(
+        result, snapshot.candidate, contract, provenance=provenance, diagnostics=diagnostics
+    )
+    reconciliation_report = format_reconciliation_record(reconciliation)
+    # Construct every output block before printing so a serialization failure cannot leave a
+    # plausible-looking partial result without its reconciliation record.
+    print(standard_report)
+    print(development_report)
+    print("BEGIN_STAGE_B_CANDIDATE_V1_RECONCILIATION_JSON")
+    print(reconciliation_report)
+    print("END_STAGE_B_CANDIDATE_V1_RECONCILIATION_JSON")
     return 0
 
 

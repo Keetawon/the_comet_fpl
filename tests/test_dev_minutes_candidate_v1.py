@@ -7,6 +7,7 @@ result); every other check runs against tiny local files or constructed result o
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -21,12 +22,14 @@ from fpl.validate.dev_minutes_candidate_v1 import (
     PreflightSnapshot,
     Provenance,
     ProvenanceError,
+    build_reconciliation_record,
     candidate_source_path,
     capture_preflight,
     compute_development_diagnostics,
     file_sha256,
     finalize_provenance,
     format_development_report,
+    format_reconciliation_record,
     hash_bytes,
     head_commit_sha,
     load_contract_from_bytes,
@@ -144,9 +147,12 @@ def _canned_result(
     season_candidate = _score(
         CANDIDATE, season_cand_log, rps=candidate_rps, coverage=candidate_coverage
     )
-    by_season = {
-        season: {COMPARATOR: overall[COMPARATOR], CANDIDATE: season_candidate} for season in seasons
-    }
+    by_season = {}
+    for season in seasons:
+        season_reports = dict(overall)
+        season_reports[CANDIDATE] = season_candidate
+        by_season[season] = season_reports
+    by_fold = {f"{season}-GW1": dict(reports) for season, reports in by_season.items()}
     parameters_by_fold = {
         f"{season}-GW1": {
             CANDIDATE: {
@@ -169,12 +175,12 @@ def _canned_result(
         leakage_failures=leakage,
         required_baselines=frozenset(BASELINES),
         overall=overall,
-        by_fold={},
+        by_fold=by_fold,
         by_season=by_season,
-        by_position={},
-        by_home_away={},
-        by_transfer_status={},
-        by_player_history_cohort={},
+        by_position={"MID": dict(overall)},
+        by_home_away={"home": dict(overall)},
+        by_transfer_status={"same_team_code_as_last_observed_fixture": dict(overall)},
+        by_player_history_cohort={"prior_positive_minutes": dict(overall)},
         parameters_by_fold=parameters_by_fold,
     )
 
@@ -517,6 +523,44 @@ def test_report_is_labelled_and_never_a_verdict() -> None:
     assert "PROMOTE" not in text
 
 
+def test_reconciliation_record_preserves_every_slice_calibration_and_parameter() -> None:
+    result = _canned_result(candidate_log=1.028)
+    diagnostics = compute_development_diagnostics(result, CANDIDATE, CONFIG)
+    record = build_reconciliation_record(
+        result, CONFIG, provenance=_provenance(), diagnostics=diagnostics
+    )
+    harness = record["harness"]
+    assert isinstance(harness, dict)
+    for dimension in (
+        "overall",
+        "by_fold",
+        "by_season",
+        "by_position",
+        "by_home_away",
+        "by_transfer_status",
+        "by_player_history_cohort",
+    ):
+        assert harness[dimension]
+    overall = harness["overall"]
+    assert isinstance(overall, dict)
+    candidate = overall[CANDIDATE]
+    assert isinstance(candidate, dict)
+    assert candidate["pit_values_count"] == 0
+    reliability = candidate["reliability_any_minutes"]
+    assert isinstance(reliability, dict)
+    assert len(reliability["buckets"]) == 10
+    parameters = harness["candidate_parameters_by_fold"]
+    assert isinstance(parameters, dict)
+    assert parameters["2025-26-GW1"][CANDIDATE]["selected_alpha"] == 5.0
+
+    parsed = json.loads(format_reconciliation_record(record))
+    assert parsed["schema"] == "stage_b_candidate_v1_development/v1"
+    assert parsed["development_diagnostics"]["combined_promotion_verdict"] is None
+    assert parsed["historical_proxy_caveats"]["real_deadline_knowledge_time_validity"] == (
+        "unproven"
+    )
+
+
 # --------------------------------------------------------------------------------------
 # main() orchestration with monkeypatched offline collaborators
 # --------------------------------------------------------------------------------------
@@ -595,6 +639,8 @@ def test_main_success_path_uses_read_only_and_prints_both_reports(
     assert "contract" in out  # format_minutes_report header
     assert "DEVELOPMENT ONLY" in out
     assert "DEVELOPMENT DIAGNOSTIC ONLY" in out
+    assert "BEGIN_STAGE_B_CANDIDATE_V1_RECONCILIATION_JSON" in out
+    assert '"schema": "stage_b_candidate_v1_development/v1"' in out
     assert CANDIDATE in out
     # The database is opened read-only.
     assert ("connect", True) in events

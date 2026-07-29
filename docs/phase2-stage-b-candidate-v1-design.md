@@ -4,8 +4,10 @@
 Candidate V1 is named `shrunk_trailing_5_player_minutes_v1` in
 `config/phase2_evaluation.yaml` amendment 1.1. The exact estimator and nested selector are now
 implemented in `src/fpl/models/minutes_v1.py` and covered by deterministic offline tests. There
-is no archive-backed fitted parameter, historical evaluation, result, gate execution, verdict,
-or development runner. The pre-registered formula and policy below remain unchanged.
+is now a separately named, offline-tested development runner in
+`src/fpl/validate/dev_minutes_candidate_v1.py`. It has not been run on the archive, so there is no
+archive-backed fitted parameter, historical evaluation, result, gate execution, or verdict. The
+pre-registered formula and policy below remain unchanged.
 
 Candidate V1 is **development-only**. The archive already shaped the hypothesis, and the
 historical target roster and first-kickoff cutoff remain unversioned proxies. A later
@@ -127,7 +129,7 @@ double-gameweek batch isolation.
 
 ## Evaluation and unchanged gate
 
-The future development runner must score Candidate V1 and all four frozen baselines on the
+The implemented development runner scores Candidate V1 and all four frozen baselines on the
 same eligible rows. The frozen version 1.0 gate remains the reference without any change:
 
 - at least 1% aggregate mean-log-score lift over the best eligible required baseline;
@@ -141,9 +143,9 @@ Reliability curves and within-position/gameweek Spearman remain report-only. Bec
 development-only, mechanically comparing these conditions is diagnostic, not a production
 promotion verdict.
 
-## Future runner provenance
+## Implemented runner provenance
 
-The later runner must be implemented and reviewed before use. It must:
+The runner is implemented and offline-reviewed before use. It must continue to:
 
 - refuse a dirty worktree at preflight and require it to remain clean at postflight;
 - record and recheck Git HEAD, Git status, the evaluation-config SHA-256, the Candidate V1
@@ -157,9 +159,9 @@ The later runner must be implemented and reviewed before use. It must:
 
 ## Next step
 
-Implement Candidate V1's development runner, unchanged-baseline comparison, provenance rechecks,
-and deterministic offline failure-path tests in a separate reviewed slice. Do not run the archive,
-execute a gate, or create a result document during that slice. After the runner is committed and
-provenance-ready, one clean historical development run may be authorized. Any formula, grid,
-window, fallback, feature, or selection-policy change after a V1 number exists is a new named
-candidate under a new amendment, never a V1 retune.
+The development runner, unchanged-baseline comparison, provenance rechecks, strict-JSON
+reconciliation record, and deterministic offline failure-path tests are implemented and reviewed.
+No archive run, gate execution, or result document occurred in that slice. The next step may be one
+explicitly authorized clean historical development run using the committed provenance-ready runner.
+Any formula, grid, window, fallback, feature, or selection-policy change after a V1 number exists is
+a new named candidate under a new amendment, never a V1 retune.
