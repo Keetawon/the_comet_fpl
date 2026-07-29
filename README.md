@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | evaluation contract pre-registered/implemented; **no model fitted yet** |
+| 2 | Stage B minutes model | contract + exact baselines/metrics/walk-forward harness implemented; archive baseline run pending; **no model fitted yet** |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -302,8 +302,11 @@ outputs, reporting slices, and promotion gates before the first candidate is fit
 `docs/phase2-evaluation-contract.md` pre-registers the Stage B (player minutes) contract at
 version 1.0 — the registered player population, `(season, code, fixture)` grain, four ordered
 minute bins whose 60-minute boundary is cross-checked against the scoring rules, required
-baselines, metrics, and promotion gate. **No Stage B model has been fitted;** the historical
-number is a development number, not an upper bound.
+baselines, metrics, and promotion gate. The exact baselines, metrics/calibration, and
+baselines-only player-fixture walk-forward harness are implemented and offline-tested; see
+`docs/phase2-stage-b-implementation.md`. The full-archive baseline run is still pending and
+**no Stage B model has been fitted;** its first historical number will be a development number,
+not an upper bound.
 
 ---
 
