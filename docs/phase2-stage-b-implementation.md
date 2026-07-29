@@ -1,11 +1,13 @@
 # Phase 2 Stage B (player minutes) harness — implementation decision record
 
-**Status: implementation record for the Stage B walk-forward harness. No model has been fit,
-no candidate has been judged, and no historical/archive evaluation has been run.** This
-document pins the owner decisions the harness (`src/fpl/validate/minutes_harness.py`) bakes in.
+**Status: implementation record for the Stage B walk-forward harness. No model has been fit and
+no candidate has been judged.** A **baseline-only** full-archive run has now been completed
+(2026-07-29) under contract `1.0`; it is a **headline/provisional development baseline**, not a
+promotion verdict — see [`phase2-stage-b-baseline-development.md`](phase2-stage-b-baseline-development.md).
+This document pins the owner decisions the harness (`src/fpl/validate/minutes_harness.py`) bakes in.
 It does **not** change `config/phase2_evaluation.yaml`: the contract stays at version `1.0`
-because **zero Stage B evaluations and zero candidates precede these decisions**, and the frozen
-baseline names, metrics, gates, and dimensions are unchanged. The machine-readable contract and
+because **zero Stage B candidates precede these decisions**, and the frozen baseline names,
+metrics, gates, and dimensions are unchanged. The machine-readable contract and
 `docs/phase2-evaluation-contract.md` remain the single source of truth; this file explains the
 implementation choices that follow from them, not new policy.
 
@@ -134,7 +136,11 @@ has no training data: it is a configuration error, not a prediction.
 - **Leakage assertion**: `assert_no_minutes_leakage` requires that **no predicted-GW player row
   has `kickoff_time < as_of`**. Because `as_of` is the GW's minimum kickoff, this holds by
   construction; the assertion exists to fail loudly if a fold is ever mis-built.
-- **Archive expectation (not run here)**: 189 observed gameweeks minus 8 warmup = 181 folds.
+- **Archive expectation (confirmed by the baseline run)**: 189 observed gameweeks minus 8
+  warmup = **181 folds** (by season 30/37/38/38/38), 133,964 eligible predictions, zero
+  exclusions, zero leakage failures. The headline development bar and the post-processing caveat
+  are recorded in
+  [`phase2-stage-b-baseline-development.md`](phase2-stage-b-baseline-development.md).
 
 ## Training and target queries
 
