@@ -6,16 +6,46 @@
 # crucially -- any disagreement between the 60-minute bin boundary and the configured
 # downstream ruleset's appearance / clean-sheet thresholds.
 #
-# NO model has been fit under this contract. Zero candidates and zero evaluations precede it.
+# Candidate V1 is pre-registered here as a design-only policy. It has no implementation,
+# fitted parameter, historical evaluation, result, gate execution, or verdict.
 
-contract_version: "1.0"
+contract_version: "1.1"
 phase: 2
 
-# Amending a pre-registered contract is only legitimate before a candidate exists to bias the
-# choice, and only with the reason recorded. The original version (1.0) needs no amendment
-# record; the loader's "a version other than 1.0 requires an amendment record" rule is forward
-# machinery only. This is the original version, so the list is empty.
-amendments: []
+# Amendment 1.1 adds only a separately named candidate policy. The complete version 1.0
+# population, roster policy, bins, baselines, metrics, scoring/calibration, gate, reporting,
+# seed, and Monte Carlo exclusion remain frozen and unchanged.
+amendments:
+  - version: "1.1"
+    date: "2026-07-29"
+    candidates_evaluated_before_amendment: 0
+    changed: >-
+      Adds the separately named Stage B Candidate V1 policy
+      shrunk_trailing_5_player_minutes_v1. This amendment is additive only. The version 1.0
+      population, target-roster knowledge-time policy, minute bins, four baseline names and
+      definitions, metrics, scoring and calibration definitions, promotion gate, reporting,
+      seed, and Monte Carlo exclusion remain unchanged.
+    reason: >-
+      The completed baseline-only development run showed that trailing player history carries
+      useful ordered-distribution and binary-margin signal but raw empirical player
+      distributions assign damaging zero probability under mean log score. Candidate V1 tests
+      the single pre-registered hypothesis that fold-local shrinkage of the last-five player
+      distribution toward the raw current-position prior can retain player signal while
+      controlling log-score failure. The archive already shaped this hypothesis, and the
+      historical target roster and first-kickoff cutoff remain unversioned proxies, so the
+      candidate is development-only.
+    evidence: >-
+      Zero candidates had been evaluated before this amendment; the corrected 2026-07-29 run
+      evaluated only the four frozen baselines and is not a candidate evaluation. Candidate V1
+      has no model code, fitted parameters, historical score, or promotion verdict at the time
+      of registration.
+    tolerance_rationale: >-
+      No tolerance or gate changes. This amendment adds a candidate policy only and cannot
+      weaken or reinterpret the frozen version 1.0 comparison contract.
+    deferred: >-
+      Candidate implementation and deterministic offline tests require a separate reviewed
+      slice. Only after that slice is committed may one clean, committed historical
+      development run be executed with the registered provenance checks.
 
 target:
   entity: player
@@ -107,6 +137,44 @@ training:
   fit_transforms_within_fold: true
   preserve_nulls: true
   seed: 202627
+
+# Candidate V1 is a design-only, closed-form shrinkage candidate. Its implementation and
+# evaluation are separate later slices. Every distinguishing field is typed and pinned.
+stage_b_candidate_v1:
+  name: shrunk_trailing_5_player_minutes_v1
+  development_only: true
+  development_only_reason: archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design
+  grain: season_player_code_fixture
+  identity: stable_code
+  history_population: up_to_5_most_recent_prior_player_fixture_rows_including_zero_minutes
+  history_order: kickoff_time_then_season_then_fixture
+  history_window: 5
+  history_observed_results: "kickoff_time < as_of"
+  position_prior: fold_local_raw_position_minutes_frequency_for_target_current_position
+  position_prior_fallback: existing_unsmoothed_all_position_prior_rows
+  player_bin_counts: c_k_is_history_count_in_bin_k_and_n_equals_sum_k_c_k
+  estimator: "p_k(alpha)=(c_k+alpha*q_k)/(n+alpha)"
+  additional_smoothing: none
+  scoring_floor_role: existing_1e-12_floor_is_scoring_only_not_model_smoothing
+  cold_start_fallback: when_n_equals_0_distribution_is_exactly_q
+  prior_strength_grid: [1.0, 2.0, 5.0, 10.0, 20.0]
+  selected_parameter: alpha_only_history_window_remains_5
+  inner_holdout_observed_gameweeks: 6
+  minimum_earlier_observed_gameweeks: 8
+  inner_walk_forward: most_recent_6_observed_gameweeks_true_per_gameweek_predict_whole_gameweek_from_pre_gameweek_history_then_score_then_absorb
+  inner_objective: pooled_mean_log_score
+  tie_break: smallest_alpha
+  insufficient_inner_history_fallback_alpha: 5.0
+  fit_scope: all_transforms_priors_and_grid_selection_are_fold_local
+  target_label_policy: target_labels_never_enter_model_inputs
+  target_position_source: existing_unversioned_target_roster_proxy_current_position
+  null_policy: preserve_nulls
+  zero_minutes_policy: include_in_history_and_training
+  assistant_manager_policy: excluded_upstream_element_type_5
+  double_gameweek_policy: fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption
+  double_gameweek_same_distribution: same_code_current_position_may_share_distribution_across_target_gameweek_fixtures_intentional_reportable_not_collapsed
+  excluded_features: availability_status_team_opponent_and_home_away_are_not_features
+  monte_carlo: out_of_scope_closed_form
 
 output:
   # Four ORDERED minute bins. The KEYS are frozen; the minute BOUNDARIES are explicit fields

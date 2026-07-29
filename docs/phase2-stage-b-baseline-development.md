@@ -331,14 +331,16 @@ terminated attempt produced no scores and is noted only for provenance transpare
 - **Development evidence, overfit by construction.** The archive has shaped every Stage A candidate
   and now the Stage B baselines; a historical baseline bar is necessary context, not a ceiling. The
   headline number is a development number, not an upper bound.
-- **No candidate exists; no model is promoted.** No Stage B candidate has been pre-registered,
-  fitted, or judged, and no model is promoted by this record. Calibration completeness concerns only
-  these frozen baselines under this frozen historical proxy contract.
+- **No candidate was part of this run; no model is promoted.** The run predates Candidate V1's
+  additive design-only pre-registration and contains no candidate prediction, fit, or gate
+  execution. Candidate V1 is now pre-registered under amendment 1.1 but still has no model code,
+  fit, evaluation, result, or verdict. Calibration completeness concerns only these frozen
+  baselines under this frozen historical proxy contract.
 
 ## Verdict and next step
 
 **Complete baseline-only development and calibration record for the frozen v1.0 historical proxy
-contract. Do not promote, and do not fit a candidate against this number yet.** The position prior
+contract. Do not promote.** The position prior
 (`position_minutes_frequency`, mean log score 1.04916) is the headline development bar; a future
 aggregate 1% lift would require mean log score ≤ about 1.03867. No baseline dominates: the position
 prior leads only on mean log score, while `trailing_5_player_minutes` leads on RPS and both Brier
@@ -346,8 +348,9 @@ margins, overall and in every season.
 
 The baseline/calibration record is complete for this frozen historical proxy contract, while
 real-deadline knowledge-time validity remains unproven and no model is promoted. The next Stage B
-step is a **separately named, pre-registered candidate design/contract slice**: it must be reviewed
-before any implementation or fitting, it must not weaken the frozen v1.0 gate (population, target
-roster knowledge-time policy, bin shape, baseline definitions, metrics, scoring/calibration
-definitions, and promotion gate are all frozen), and a gate may never be amended after a candidate is
-judged. **No Stage B candidate exists.**
+step is the **separate reviewed Candidate V1 implementation and deterministic-test slice** recorded
+in [`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). That slice must
+not run the archive, fit a model, or execute a gate. The frozen v1.0 population, target-roster
+knowledge-time policy, bin shape, baseline definitions, metrics, scoring/calibration definitions,
+and promotion gate remain unchanged under additive amendment 1.1, and a gate may never be amended
+after a candidate is judged. Candidate V1 currently has design policy only.

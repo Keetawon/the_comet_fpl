@@ -42,7 +42,7 @@ def test_phase2_contract_loads_with_point_in_time_cutoffs() -> None:
     load_phase2_evaluation.cache_clear()
     contract = load_phase2_evaluation()
     assert contract.phase == 2
-    assert contract.contract_version == "1.0"
+    assert contract.contract_version == "1.1"
     assert contract.target.entity == "player"
     assert contract.target.grain == "season_player_code_fixture"
     assert contract.target.outcome == "minutes_distribution"
@@ -357,14 +357,190 @@ def test_extra_field_is_rejected() -> None:
 
 
 # --------------------------------------------------------------------------------------
-# The original contract version needs no amendment
+# Amendment 1.1 and Candidate V1 are exact, required pre-registration records
 # --------------------------------------------------------------------------------------
 
 
-def test_original_version_needs_no_amendment_record() -> None:
+def test_phase2_amendment_history_is_exactly_frozen() -> None:
     contract = load_phase2_evaluation()
-    assert contract.contract_version == "1.0"
-    assert contract.amendments == ()
+    assert contract.contract_version == "1.1"
+    assert tuple(
+        (amendment.version, amendment.candidates_evaluated_before_amendment)
+        for amendment in contract.amendments
+    ) == (("1.1", 0),)
+
+
+@pytest.mark.parametrize("version", ["1.0", "1.2", "2.0"])
+def test_only_phase2_contract_version_1_1_is_accepted(version: str) -> None:
+    document = copy.deepcopy(_document())
+    document["contract_version"] = version
+    with pytest.raises((ValidationError, ValueError)):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_phase2_current_amendment_record_is_required() -> None:
+    document = copy.deepcopy(_document())
+    document["amendments"] = []
+    with pytest.raises((ValidationError, ValueError), match=r"amendment record|amendment history"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_phase2_amendment_count_is_frozen() -> None:
+    document = copy.deepcopy(_document())
+    document["amendments"][0]["candidates_evaluated_before_amendment"] = 1
+    with pytest.raises((ValidationError, ValueError), match="amendment history"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_phase2_duplicate_amendment_is_rejected() -> None:
+    document = copy.deepcopy(_document())
+    document["amendments"].append(copy.deepcopy(document["amendments"][0]))
+    with pytest.raises((ValidationError, ValueError), match="amendment history"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_phase2_extra_or_reordered_amendment_is_rejected() -> None:
+    document = copy.deepcopy(_document())
+    extra = copy.deepcopy(document["amendments"][0])
+    extra["version"] = "1.0"
+    document["amendments"].insert(0, extra)
+    with pytest.raises((ValidationError, ValueError), match="amendment history"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_stage_b_candidate_v1_block_is_required() -> None:
+    document = copy.deepcopy(_document())
+    del document["stage_b_candidate_v1"]
+    with pytest.raises(ValidationError, match="stage_b_candidate_v1"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_stage_b_candidate_v1_is_exactly_pre_registered() -> None:
+    candidate = load_phase2_evaluation().stage_b_candidate_v1
+    assert candidate.name == "shrunk_trailing_5_player_minutes_v1"
+    assert candidate.development_only is True
+    assert candidate.development_only_reason == (
+        "archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_"
+        "and_archive_evidence_shaped_the_design"
+    )
+    assert candidate.grain == "season_player_code_fixture"
+    assert candidate.identity == "stable_code"
+    assert candidate.history_population == (
+        "up_to_5_most_recent_prior_player_fixture_rows_including_zero_minutes"
+    )
+    assert candidate.history_order == "kickoff_time_then_season_then_fixture"
+    assert candidate.history_window == 5
+    assert candidate.history_observed_results == "kickoff_time < as_of"
+    assert candidate.position_prior == (
+        "fold_local_raw_position_minutes_frequency_for_target_current_position"
+    )
+    assert candidate.position_prior_fallback == "existing_unsmoothed_all_position_prior_rows"
+    assert candidate.player_bin_counts == ("c_k_is_history_count_in_bin_k_and_n_equals_sum_k_c_k")
+    assert candidate.estimator == "p_k(alpha)=(c_k+alpha*q_k)/(n+alpha)"
+    assert candidate.additional_smoothing == "none"
+    assert candidate.scoring_floor_role == (
+        "existing_1e-12_floor_is_scoring_only_not_model_smoothing"
+    )
+    assert candidate.cold_start_fallback == "when_n_equals_0_distribution_is_exactly_q"
+    assert candidate.prior_strength_grid == (1.0, 2.0, 5.0, 10.0, 20.0)
+    assert candidate.selected_parameter == "alpha_only_history_window_remains_5"
+    assert candidate.inner_holdout_observed_gameweeks == 6
+    assert candidate.minimum_earlier_observed_gameweeks == 8
+    assert candidate.inner_walk_forward == (
+        "most_recent_6_observed_gameweeks_true_per_gameweek_predict_whole_gameweek_"
+        "from_pre_gameweek_history_then_score_then_absorb"
+    )
+    assert candidate.inner_objective == "pooled_mean_log_score"
+    assert candidate.tie_break == "smallest_alpha"
+    assert candidate.insufficient_inner_history_fallback_alpha == 5.0
+    assert candidate.fit_scope == "all_transforms_priors_and_grid_selection_are_fold_local"
+    assert candidate.target_label_policy == "target_labels_never_enter_model_inputs"
+    assert candidate.target_position_source == (
+        "existing_unversioned_target_roster_proxy_current_position"
+    )
+    assert candidate.null_policy == "preserve_nulls"
+    assert candidate.zero_minutes_policy == "include_in_history_and_training"
+    assert candidate.assistant_manager_policy == "excluded_upstream_element_type_5"
+    assert candidate.double_gameweek_policy == (
+        "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+    )
+    assert candidate.double_gameweek_same_distribution == (
+        "same_code_current_position_may_share_distribution_across_target_gameweek_fixtures_"
+        "intentional_reportable_not_collapsed"
+    )
+    assert candidate.excluded_features == (
+        "availability_status_team_opponent_and_home_away_are_not_features"
+    )
+    assert candidate.monte_carlo == "out_of_scope_closed_form"
+
+
+@pytest.mark.parametrize(
+    ("field", "mutated"),
+    [
+        ("name", "renamed_candidate"),
+        ("development_only", False),
+        ("development_only_reason", "historical_data_is_fully_point_in_time"),
+        ("identity", "season_scoped_element"),
+        ("grain", "player_gameweek"),
+        ("history_population", "all_player_history"),
+        ("history_order", "fixture_only"),
+        ("history_window", 4),
+        ("history_observed_results", "kickoff_time <= as_of"),
+        ("position_prior", "full_archive_position_prior"),
+        ("position_prior_fallback", "uniform"),
+        ("player_bin_counts", "zero_minutes_are_not_counted"),
+        ("estimator", "raw_player_frequency"),
+        ("additional_smoothing", "laplace"),
+        ("scoring_floor_role", "candidate_probability_floor"),
+        ("cold_start_fallback", "uniform"),
+        ("selected_parameter", "alpha_and_window"),
+        ("inner_holdout_observed_gameweeks", 5),
+        ("minimum_earlier_observed_gameweeks", 7),
+        ("inner_walk_forward", "one_frozen_state_for_all_holdout_gameweeks"),
+        ("inner_objective", "mean_ranked_probability_score"),
+        ("tie_break", "largest_alpha"),
+        ("fit_scope", "full_archive"),
+        ("target_label_policy", "target_labels_are_features"),
+        ("target_position_source", "end_of_season_dimension"),
+        ("null_policy", "fill_zero"),
+        ("zero_minutes_policy", "exclude"),
+        ("assistant_manager_policy", "include"),
+        ("double_gameweek_policy", "collapse_to_player_gameweek"),
+        ("double_gameweek_same_distribution", "collapse_identical_rows"),
+        ("excluded_features", "availability_is_allowed"),
+        ("monte_carlo", "required"),
+    ],
+)
+def test_stage_b_candidate_v1_literal_policy_cannot_be_weakened(
+    field: str, mutated: object
+) -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v1"][field] = mutated
+    with pytest.raises((ValidationError, ValueError)):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+@pytest.mark.parametrize(
+    "grid",
+    [
+        [1.0, 2.0, 5.0, 10.0],
+        [1.0, 2.0, 5.0, 10.0, 20.0, 40.0],
+        [2.0, 1.0, 5.0, 10.0, 20.0],
+        [1.0, 2.0, 4.0, 10.0, 20.0],
+    ],
+)
+def test_stage_b_candidate_v1_prior_strength_grid_is_exact(grid: list[float]) -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v1"]["prior_strength_grid"] = grid
+    with pytest.raises((ValidationError, ValueError), match="prior_strength_grid"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_stage_b_candidate_v1_fallback_alpha_is_exact() -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v1"]["insufficient_inner_history_fallback_alpha"] = 10.0
+    with pytest.raises((ValidationError, ValueError), match="fallback_alpha"):
+        Phase2EvaluationConfig.model_validate(document)
 
 
 # --------------------------------------------------------------------------------------

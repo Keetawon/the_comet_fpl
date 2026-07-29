@@ -1,7 +1,11 @@
 # Phase 2 evaluation contract (Stage B player minutes)
 
-**Status: contract and typed loader implemented at version 1.0. No model has been fit. Zero
-candidates and zero evaluations precede this contract.** The machine-readable source is
+**Status: contract and typed loader implemented at version 1.1.** Version 1.0 froze the
+population, baselines, metrics, calibration, and promotion gate before any candidate existed.
+Additive amendment 1.1 pre-registers design-only Candidate V1
+`shrunk_trailing_5_player_minutes_v1`; it changes none of those version 1.0 policies. Candidate
+V1 has no model code, fit, evaluation, result, gate execution, or verdict. The machine-readable
+source is
 `config/phase2_evaluation.yaml`, validated by `Phase2EvaluationConfig` in `src/fpl/config.py`
 and loaded by `load_phase2_evaluation`, which cross-checks the 60-minute bin boundary against
 the configured downstream ruleset at load time. This document explains the decisions; it does
@@ -9,9 +13,9 @@ not override that file. It is a pre-registration: the population, grain, identit
 shape, baselines, metrics, and gate values frozen here are what every later Stage B candidate
 is judged against.
 
-**The historical number this contract will eventually produce is a development number on the
-local archive. It is NOT an upper bound of any kind.** Calling it one would misrepresent a
-seen-archive development result as a ceiling on future performance.
+**The completed baseline-only historical number is a development number on the local archive.
+It is NOT an upper bound of any kind.** Calling it one would misrepresent a seen-archive
+development result as a ceiling on future performance.
 
 ## Scope
 
@@ -22,9 +26,37 @@ target season's scoring rules). Stage B is a **closed-form marginal** over the f
 Monte Carlo is explicitly out of scope here and the minutes model stays separate from
 per-minute event/rate models (repository rule R6).
 
-No model has been fit under this contract. The four Stage B baselines are frozen by **exact
-deterministic definition** (identity, population, order, window, smoothing, fallback); their
-implementations are a separate slice.
+No candidate model has been fit under this contract. The four Stage B baselines, metrics, and
+baselines-only walk-forward harness are implemented and offline-tested. Their corrected
+baseline-only archive run is recorded in `phase2-stage-b-baseline-development.md`.
+
+## Amendment 1.1: Candidate V1 design only
+
+Amendment 1.1 was recorded on 2026-07-29 with **zero candidates evaluated before the
+amendment**. The completed version 1.0 run evaluated only the four required baselines and is not
+a candidate evaluation. The amendment adds one required, separately named policy block and no
+new tolerance or comparison rule.
+
+Candidate V1 combines the two signals exposed by the baseline record. For bin `k`, its frozen
+closed-form hypothesis is:
+
+```text
+p_k(alpha) = (c_k + alpha * q_k) / (n + alpha)
+```
+
+Here `c_k` is the player's bin count over up to five most recent prior player-fixture rows,
+`n` is their total, and `q_k` is the fold-local raw current-position prior. Only `alpha` is
+selected, from the exact grid `[1, 2, 5, 10, 20]`, by a six-observed-gameweek nested
+walk-forward with at least eight earlier gameweeks; insufficient inner history uses `alpha =
+5`. No player history returns exactly the position prior. There is no extra smoothing, no
+availability feature, no fixture-specific feature, and no Monte Carlo.
+
+The full formula, point-in-time argument, double-gameweek policy, frozen grid, test plan, and
+future runner provenance requirements are in
+[`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). This amendment
+authorizes no implementation or evaluation. The next slice implements Candidate V1 and its
+deterministic model tests only; a historical development run comes later, from a clean committed
+state.
 
 ## Entity, grain, and player identity
 
@@ -274,11 +306,12 @@ NULL, so any `starts`-based slice must exclude that season rather than treat NUL
 
 ## What this contract does not do
 
-- It fits **no model**. The four baselines are frozen by exact definition (not implemented);
-  the metric functions named under `scoring_calibration` are likewise defined, not implemented.
+- It contains **no Candidate V1 implementation or result**. The baselines, metrics, and
+  baselines-only harness are implemented; Candidate V1 remains a design policy only.
 - It runs **no Monte Carlo**. Stage B is a closed-form marginal and stays separate from
   per-minute event/rate models (R6).
-- It does **not** pre-register a hurdle candidate structure.
+- It does **not** use a hurdle model, availability feature, or fixture-specific Candidate V1
+  input. A future use of versioned availability is a separately named prospective candidate.
 - It does **not** claim the historical score is an upper bound.
 - It does **not** use versioned live availability historically; that is a separately named
   prospective candidate.

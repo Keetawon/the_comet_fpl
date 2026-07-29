@@ -28,11 +28,13 @@ procedure pins and a fold-local promoted-prior estimator. Its single historical 
 evaluation (1.4945 mean log score, +0.3888% lift over the 1.5003 baseline, short of the 1% gate,
 fractionally behind V2) is development-only and not a promotion verdict; the trailing-goals
 baseline remains Stage A.
-Phase 2's Stage B (player minutes) prerequisites are implemented and offline-tested at contract
-version 1.0: the pre-registered typed contract (`config/phase2_evaluation.yaml`), exact four
-baselines, distribution metrics/calibration, and the player-fixture walk-forward harness
-(`docs/phase2-stage-b-implementation.md`). The baseline-only full-archive run is **complete as a
-baseline-only development and calibration record** (corrected run, 2026-07-29) — 181 folds,
+Phase 2's Stage B (player minutes) prerequisites are implemented and offline-tested. Contract
+version 1.0 froze the exact four baselines, distribution metrics/calibration, and player-fixture
+walk-forward harness (`docs/phase2-stage-b-implementation.md`). Additive amendment 1.1 now
+pre-registers the design-only Candidate V1 `shrunk_trailing_5_player_minutes_v1`; it changes none
+of the version 1.0 population, roster, bins, baselines, metrics, gate, or calibration policy. The
+baseline-only full-archive run is **complete as a baseline-only development and calibration
+record** (corrected run, 2026-07-29) — 181 folds,
 133,964 eligible predictions, zero exclusions, zero leakage, 27/27 runner assertions passed, and a
 full independent reconciliation (four overall reports, all 20 season-baseline rows, 48 reliability
 curves / 480 buckets) with zero validation failures. The position prior
@@ -41,8 +43,9 @@ need <= about 1.03867), but it leads only on mean log score: `trailing_5_player_
 RPS and both Brier margins, overall and in every season, so **no baseline dominates**. It is a
 development number under two unversioned historical proxies (target roster, first-kickoff cutoff),
 so real-deadline knowledge-time validity is unproven. See
-`docs/phase2-stage-b-baseline-development.md`. No Stage B candidate has been fitted or judged; the
-historical number is a development number, not an upper bound.
+`docs/phase2-stage-b-baseline-development.md`. Candidate V1 has no model code, fit, evaluation,
+result, or verdict; see `docs/phase2-stage-b-candidate-v1-design.md`. The historical number is a
+development number, not an upper bound.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -257,9 +260,11 @@ Unless the user sets another priority, address prerequisites before model sophis
    1.5003 over 181 folds and 3,640 predictions; a candidate needs **1.4853** or better to
    clear the 1% lift gate, and must not lose to that baseline in any reported season.
 5. The exact Stage B baselines, metrics, and player-grain `(season, code, fixture)` walk-forward
-   harness are implemented and offline-tested under `config/phase2_evaluation.yaml` contract
-   1.0. The baseline-only full-archive run is **complete as a baseline-only development and
-   calibration record** (corrected run, 2026-07-29): 181 folds by season 30/37/38/38/38, 133,964
+   harness are implemented and offline-tested under the frozen version 1.0 policy. Additive
+   amendment 1.1 pre-registers Candidate V1 `shrunk_trailing_5_player_minutes_v1` without changing
+   any version 1.0 comparison rule. The baseline-only full-archive run is **complete as a
+   baseline-only development and calibration record** (corrected run, 2026-07-29): 181 folds by
+   season 30/37/38/38/38, 133,964
    eligible predictions, zero exclusions, zero leakage, 27/27 runner assertions passed
    (`assertions_all_passed = true`), and a full independent reconciliation with zero validation
    failures (four overall reports, all 20 season-baseline rows, 48 reliability curves / 480 buckets,
@@ -270,13 +275,14 @@ Unless the user sets another priority, address prerequisites before model sophis
    development number under two unversioned historical proxies (target roster, first-kickoff
    cutoff), so real-deadline knowledge-time validity is unproven. The runner assertions assert
    read-only integrity, contract identity, population, and calibration shape only; they do not
-   exercise a candidate gate. See `docs/phase2-stage-b-baseline-development.md`. The next Stage B
-   step is a **separately named, pre-registered candidate design/contract slice**: it must be
-   reviewed before any implementation or fitting, and it must not weaken the frozen v1.0 gate. The
-   contract freezes the population, target-roster knowledge-time policy, bin shape, baseline
-   definitions, metrics, scoring/calibration definitions, and promotion gate; the historical number
-   is a development number, not an upper bound, and a gate may never be amended after a candidate
-   is judged. NO Stage B candidate exists or may be fitted before that candidate slice is reviewed.
+   exercise a candidate gate. See `docs/phase2-stage-b-baseline-development.md` and
+   `docs/phase2-stage-b-candidate-v1-design.md`. The next Stage B step is a **separate reviewed
+   Candidate V1 implementation and deterministic-test slice**. Do not fit, evaluate, or run the
+   archive during that slice. Only after it is committed and provenance-ready may one clean
+   historical development run be authorized. The population, target-roster knowledge-time policy,
+   bin shape, baseline definitions, metrics, scoring/calibration definitions, and promotion gate
+   remain frozen; the historical number is not an upper bound, and a gate may never be amended
+   after a candidate is judged.
 6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff

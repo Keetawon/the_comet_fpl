@@ -805,6 +805,76 @@ class Phase2TrainingPolicy(_Frozen):
     seed: Literal[202627]
 
 
+class Phase2StageBCandidateV1Policy(_Frozen):
+    """Frozen pre-registration for the first Stage B minutes candidate.
+
+    Candidate V1 shrinks the player's trailing-five empirical bin counts toward the
+    fold-local current-position prior. Only the prior strength is selected, on a nested
+    observed-gameweek walk-forward inside each outer fold. Every field that distinguishes
+    the candidate is pinned so a result cannot be followed by a silent policy change.
+    """
+
+    name: Literal["shrunk_trailing_5_player_minutes_v1"]
+    development_only: Literal[True]
+    development_only_reason: Literal[
+        "archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design"
+    ]
+    grain: Literal["season_player_code_fixture"]
+    identity: Literal["stable_code"]
+    history_population: Literal[
+        "up_to_5_most_recent_prior_player_fixture_rows_including_zero_minutes"
+    ]
+    history_order: Literal["kickoff_time_then_season_then_fixture"]
+    history_window: Literal[5]
+    history_observed_results: Literal["kickoff_time < as_of"]
+    position_prior: Literal["fold_local_raw_position_minutes_frequency_for_target_current_position"]
+    position_prior_fallback: Literal["existing_unsmoothed_all_position_prior_rows"]
+    player_bin_counts: Literal["c_k_is_history_count_in_bin_k_and_n_equals_sum_k_c_k"]
+    estimator: Literal["p_k(alpha)=(c_k+alpha*q_k)/(n+alpha)"]
+    additional_smoothing: Literal["none"]
+    scoring_floor_role: Literal["existing_1e-12_floor_is_scoring_only_not_model_smoothing"]
+    cold_start_fallback: Literal["when_n_equals_0_distribution_is_exactly_q"]
+    prior_strength_grid: tuple[float, ...] = Field(min_length=1)
+    selected_parameter: Literal["alpha_only_history_window_remains_5"]
+    inner_holdout_observed_gameweeks: Literal[6]
+    minimum_earlier_observed_gameweeks: Literal[8]
+    inner_walk_forward: Literal[
+        "most_recent_6_observed_gameweeks_true_per_gameweek_predict_whole_gameweek_from_pre_gameweek_history_then_score_then_absorb"
+    ]
+    inner_objective: Literal["pooled_mean_log_score"]
+    tie_break: Literal["smallest_alpha"]
+    insufficient_inner_history_fallback_alpha: float = Field(gt=0.0)
+    fit_scope: Literal["all_transforms_priors_and_grid_selection_are_fold_local"]
+    target_label_policy: Literal["target_labels_never_enter_model_inputs"]
+    target_position_source: Literal["existing_unversioned_target_roster_proxy_current_position"]
+    null_policy: Literal["preserve_nulls"]
+    zero_minutes_policy: Literal["include_in_history_and_training"]
+    assistant_manager_policy: Literal["excluded_upstream_element_type_5"]
+    double_gameweek_policy: Literal[
+        "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+    ]
+    double_gameweek_same_distribution: Literal[
+        "same_code_current_position_may_share_distribution_across_target_gameweek_fixtures_intentional_reportable_not_collapsed"
+    ]
+    excluded_features: Literal["availability_status_team_opponent_and_home_away_are_not_features"]
+    monte_carlo: Literal["out_of_scope_closed_form"]
+
+    @model_validator(mode="after")
+    def _exact_candidate_policy(self) -> Self:
+        expected_grid = (1.0, 2.0, 5.0, 10.0, 20.0)
+        if self.prior_strength_grid != expected_grid:
+            raise ValueError(
+                "Stage B Candidate V1 prior_strength_grid is pinned to "
+                f"{expected_grid}; got {self.prior_strength_grid}"
+            )
+        if self.insufficient_inner_history_fallback_alpha != 5.0:
+            raise ValueError(
+                "Stage B Candidate V1 insufficient_inner_history_fallback_alpha is pinned "
+                f"to 5.0; got {self.insufficient_inner_history_fallback_alpha!r}"
+            )
+        return self
+
+
 class Phase2MinuteBin(_Frozen):
     """One ordered minute bin. Keys are frozen; boundaries are explicit config data."""
 
@@ -1147,6 +1217,13 @@ class Phase2MonteCarloPolicy(_Frozen):
 # the original does not. Mirrors the Phase 1 original-version discipline.
 ORIGINAL_PHASE2_CONTRACT_VERSION: str = "1.0"
 
+# The exact ordered Phase 2 amendment record at each supported contract version. A
+# baseline-only run is not a candidate evaluation. Reordering, dropping, duplicating, or
+# changing the count must fail closed.
+FROZEN_PHASE2_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
+    "1.1": (("1.1", 0),),
+}
+
 
 def _require_exact_set(actual: frozenset[str], required: set[str], *, label: str) -> None:
     """Exact-set check: reject additions as well as deletions.
@@ -1171,13 +1248,14 @@ class Phase2EvaluationConfig(_Frozen):
     """Executable entry and promotion contract for the Stage B (player minutes) walk-forward.
 
     Stage B predicts a four-bin minutes distribution over the registered FPL player
-    population. No model is fit by this contract: it freezes the population, grain, identity
-    policy, bin shape, baselines, metrics, and promotion gate before any candidate exists. The
-    60-minute bin boundary is cross-checked against the configured downstream ruleset at load
-    time via :meth:`verify_minutes_boundary`.
+    population. No model is fit by this contract. Version 1.0 froze the population, grain,
+    identity policy, bin shape, baselines, metrics, and promotion gate before any candidate
+    existed; additive amendment 1.1 freezes Candidate V1's design without changing those
+    policies. The 60-minute bin boundary is cross-checked against the configured downstream
+    ruleset at load time via :meth:`verify_minutes_boundary`.
     """
 
-    contract_version: Literal["1.0"]
+    contract_version: Literal["1.1"]
     phase: Literal[2]
     amendments: tuple[Phase2Amendment, ...] = ()
     target: Phase2TargetPolicy
@@ -1185,6 +1263,7 @@ class Phase2EvaluationConfig(_Frozen):
     population: Phase2PopulationPolicy
     cutoff: Phase2CutoffPolicy
     training: Phase2TrainingPolicy
+    stage_b_candidate_v1: Phase2StageBCandidateV1Policy
     output: Phase2OutputPolicy
     baselines: Phase2BaselinePolicy
     metrics: Phase2MetricPolicy
@@ -1266,6 +1345,24 @@ class Phase2EvaluationConfig(_Frozen):
             raise ValueError(
                 f"Phase 2 contract version {self.contract_version} has no amendment record; "
                 "a pre-registered gate may not change without one"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _amendment_history_is_frozen(self) -> Self:
+        """Reject a missing, reordered, duplicated, or count-altered amendment record."""
+        expected = FROZEN_PHASE2_AMENDMENT_HISTORY.get(self.contract_version)
+        if expected is None:
+            return self
+        actual = tuple(
+            (amendment.version, amendment.candidates_evaluated_before_amendment)
+            for amendment in self.amendments
+        )
+        if actual != expected:
+            raise ValueError(
+                f"Phase 2 amendment history for contract {self.contract_version} is not the "
+                f"frozen record: expected {expected}, got {actual}. The ordered amendment "
+                "sequence and candidate counts are pinned and may not be altered."
             )
         return self
 

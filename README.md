@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | contract + exact baselines/metrics/walk-forward harness implemented; baseline-only archive run + calibration complete (development bar); **no candidate fitted yet** |
+| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness + baseline calibration complete; Candidate V1 design pre-registered under additive amendment 1.1; **no candidate code or fit yet** |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -299,8 +299,8 @@ measured values diverged from the original specification and why.
 observed-gameweek walk-forward, required baselines, proper distribution metrics, calibration
 outputs, reporting slices, and promotion gates before the first candidate is fitted.
 
-`docs/phase2-evaluation-contract.md` pre-registers the Stage B (player minutes) contract at
-version 1.0 — the registered player population, `(season, code, fixture)` grain, four ordered
+`docs/phase2-evaluation-contract.md` pre-registers the Stage B (player minutes) contract. Version
+1.0 froze the registered player population, `(season, code, fixture)` grain, four ordered
 minute bins whose 60-minute boundary is cross-checked against the scoring rules, required
 baselines, metrics, and promotion gate. The exact baselines, metrics/calibration, and
 baselines-only player-fixture walk-forward harness are implemented and offline-tested; see
@@ -310,10 +310,13 @@ baseline-only development and calibration record** (position prior = lowest mean
 `trailing_5_player_minutes` leads on RPS and both Brier margins), recorded in
 [`docs/phase2-stage-b-baseline-development.md`](docs/phase2-stage-b-baseline-development.md).
 It is a development number under two unversioned historical proxies (target roster, first-kickoff
-cutoff), so real-deadline knowledge-time validity is unproven. The next Stage B step is a separately
-named, pre-registered candidate design/contract slice that must be reviewed before implementation
-and must not weaken the frozen v1.0 gate. **No Stage B candidate has been fitted**, and the number
-is a development number, not an upper bound.
+cutoff), so real-deadline knowledge-time validity is unproven. Additive amendment 1.1 now
+pre-registers the design-only Candidate V1 `shrunk_trailing_5_player_minutes_v1` without changing
+the frozen v1.0 gate or any comparison policy; see
+[`docs/phase2-stage-b-candidate-v1-design.md`](docs/phase2-stage-b-candidate-v1-design.md).
+Candidate V1 has no model code, fit, evaluation, result, or verdict. The next step is a separate
+reviewed implementation/test slice, with no archive run. The baseline number remains a development
+number, not an upper bound.
 
 ---
 

@@ -1,19 +1,21 @@
 # Phase 2 Stage B (player minutes) harness — implementation decision record
 
-**Status: implementation record for the Stage B walk-forward harness. No model has been fit and
-no candidate has been judged.** A **baseline-only** full-archive run has now been completed
-(2026-07-29) under contract `1.0`; it is a **headline/provisional development baseline**, not a
+**Status: implementation record for the Stage B baselines-only walk-forward harness. No
+candidate model has been fit or judged.** A **baseline-only** full-archive run was completed
+(2026-07-29) under contract `1.0`; it is a **completed development baseline record**, not a
 promotion verdict — see [`phase2-stage-b-baseline-development.md`](phase2-stage-b-baseline-development.md).
 This document pins the owner decisions the harness (`src/fpl/validate/minutes_harness.py`) bakes in.
-It does **not** change `config/phase2_evaluation.yaml`: the contract stays at version `1.0`
-because **zero Stage B candidates precede these decisions**, and the frozen baseline names,
-metrics, gates, and dimensions are unchanged. The machine-readable contract and
+These harness decisions were frozen at version `1.0`. Additive amendment `1.1` later
+pre-registered design-only Candidate V1 without changing the harness, baseline names, metrics,
+gates, or dimensions. Candidate V1 still has no implementation or result; see
+[`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). The
+machine-readable contract and
 `docs/phase2-evaluation-contract.md` remain the single source of truth; this file explains the
 implementation choices that follow from them, not new policy.
 
-The historical number this harness will eventually produce is a development number on the local
-archive. It is **not** an upper bound of any kind. Calling it one would misrepresent a
-seen-archive development result as a ceiling on future performance.
+The completed historical baseline number is a development number on the local archive. It is
+**not** an upper bound of any kind. Calling it one would misrepresent a seen-archive development
+result as a ceiling on future performance.
 
 ## Scope of this slice
 
@@ -169,4 +171,5 @@ the required counts, uncertainty, and calibration diagnostics.
 
 `run_minutes_harness(con, *, config=None, seasons=None)` supports optional evaluation-season
 filtering that **restricts folds only, never the prior training history** behind them. It is
-baselines-only; candidate/gate execution is deferred.
+baselines-only; Candidate V1 implementation and gate execution remain deferred to separate
+reviewed slices.
