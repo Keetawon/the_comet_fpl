@@ -167,6 +167,75 @@ def test_minutes_distribution_2025_26(db: duckdb.DuckDBPyConnection) -> None:
     assert sixty_pct == pytest.approx(26.3, abs=0.1)
 
 
+def test_registered_player_population_strictly_exceeds_appeared(
+    db: duckdb.DuckDBPyConnection,
+) -> None:
+    """The registered FPL player pool per team-fixture strictly exceeds the appeared pool.
+
+    Evidence underpinning the Stage B eligible-population framing. The source carries the
+    broader registered FPL player population (every player-fixture row with a non-NULL minutes
+    outcome), of which only a minority actually play. Registered = count(minutes IS NOT NULL);
+    appeared = count(minutes > 0); registered strictly exceeds appeared for every team-fixture.
+    This is NOT a matchday-squad population.
+    """
+    # (a) 138,707 unique (season, code, fixture) keys, (b) zero NULL minutes, range 0-90.
+    head = db.execute(
+        """
+        SELECT count(*),
+               (SELECT count(*) FROM (
+                   SELECT DISTINCT season, code, fixture FROM mart_fact_player_fixture
+               )),
+               count(*) FILTER (WHERE minutes IS NULL),
+               min(minutes), max(minutes)
+        FROM mart_fact_player_fixture
+        """
+    ).fetchone()
+    assert head is not None
+    total_rows, distinct_keys, null_minutes, min_minutes, max_minutes = head
+    assert total_rows == distinct_keys == 138_707
+    assert null_minutes == 0
+    assert min_minutes == 0
+    assert max_minutes == 90
+
+    # (c) Every team-fixture's registered population strictly exceeds its appeared population.
+    bad = db.execute(
+        """
+        WITH per_team_fixture AS (
+            SELECT season, team_id, fixture,
+                   count(*) AS registered,
+                   count(*) FILTER (WHERE minutes > 0) AS appeared
+            FROM mart_fact_player_fixture
+            GROUP BY season, team_id, fixture
+        )
+        SELECT count(*) FROM per_team_fixture WHERE registered <= appeared
+        """
+    ).fetchone()
+    assert bad is not None and bad[0] == 0
+
+    # (d) Interpretable min/median/max per team-fixture. Medians use approx in case DuckDB
+    # returns a double; min/max are exact integer counts.
+    stats = db.execute(
+        """
+        WITH per_team_fixture AS (
+            SELECT season, team_id, fixture,
+                   count(*) AS registered,
+                   count(*) FILTER (WHERE minutes > 0) AS appeared
+            FROM mart_fact_player_fixture
+            GROUP BY season, team_id, fixture
+        )
+        SELECT min(registered), median(registered), max(registered),
+               min(appeared), median(appeared), max(appeared)
+        FROM per_team_fixture
+        """
+    ).fetchone()
+    assert stats is not None
+    reg_min, reg_med, reg_max, app_min, app_med, app_max = stats
+    assert (reg_min, reg_max) == (23, 59)
+    assert reg_med == pytest.approx(36)
+    assert (app_min, app_max) == (11, 17)
+    assert app_med == pytest.approx(15)
+
+
 def test_appearance_points_dominate_every_position(db: duckdb.DuckDBPyConnection) -> None:
     """Appearance points are 51-60% of all points scored, by position.
 

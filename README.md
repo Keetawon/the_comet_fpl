@@ -81,7 +81,7 @@ src/fpl/
   storage/    db.py, schema.sql
   transform/  crosswalk.py, facts.py, quality.py
   features/   pit.py   -- point-in-time access layer (R4)
-  models/     scoring.py, team_goals.py
+  models/     scoring.py, team_goals.py, minutes_v1.py
   validate/   metrics.py, folds.py, baselines.py, harness.py -- Stage A evaluation
   jobs/       build_db.py, daily_snapshot.py, load_snapshots.py, verify_rules.py
 tests/
@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | not started |
+| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness + baseline calibration complete; Candidate V1 development-evaluated once (development-only, not promoted) |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -298,6 +298,48 @@ measured values diverged from the original specification and why.
 `docs/phase1-evaluation-contract.md` fixes the Stage A entity/grain, point-in-time cutoff,
 observed-gameweek walk-forward, required baselines, proper distribution metrics, calibration
 outputs, reporting slices, and promotion gates before the first candidate is fitted.
+
+`docs/phase2-evaluation-contract.md` pre-registers the Stage B (player minutes) contract. Version
+1.0 froze the registered player population, `(season, code, fixture)` grain, four ordered
+minute bins whose 60-minute boundary is cross-checked against the scoring rules, required
+baselines, metrics, and promotion gate. The exact baselines, metrics/calibration, and
+baselines-only player-fixture walk-forward harness are implemented and offline-tested; see
+`docs/phase2-stage-b-implementation.md`. The baseline-only full-archive run is **complete as a
+baseline-only development and calibration record** (position prior = lowest mean log score at
+1.04916; a future 1% aggregate lift would need ≤ about 1.03867; no baseline dominates, since
+`trailing_5_player_minutes` leads on RPS and both Brier margins), recorded in
+[`docs/phase2-stage-b-baseline-development.md`](docs/phase2-stage-b-baseline-development.md).
+It is a development number under two unversioned historical proxies (target roster, first-kickoff
+cutoff), so real-deadline knowledge-time validity is unproven. Additive amendment 1.1
+pre-registers Candidate V1 `shrunk_trailing_5_player_minutes_v1` without changing
+the frozen v1.0 gate or any comparison policy; see
+[`docs/phase2-stage-b-candidate-v1-design.md`](docs/phase2-stage-b-candidate-v1-design.md).
+Candidate V1's exact closed-form estimator, true six-observed-gameweek inner selector, and dedicated
+development runner are now implemented and deterministically offline-tested. The runner scores the
+candidate and four unchanged baselines on identical rows, records fold parameters, opens DuckDB
+read-only, rechecks clean Git/config/model-source/database provenance, and emits a complete strict-JSON
+reconciliation record only after postflight verification. It has now been run once as a clean
+historical development run: Candidate V1 reaches mean log score 0.74198 (+29.28% over the
+position-prior comparator) and improves on the best baseline value of every metric **except the
+within-position Spearman-p60 starter ranking** (where it regresses, 0.69090 vs 0.70851), but it is
+**development-only and not promoted** — the historical target roster and first-kickoff cutoff are
+unversioned proxies, so real-deadline knowledge-time validity is unproven; see
+[`docs/phase2-stage-b-candidate-v1-development.md`](docs/phase2-stage-b-candidate-v1-development.md).
+The baseline number remains a development number, not an upper bound. Additive amendment 1.2
+(contract v1.2) tightens the promotion gate for **future** candidates only: each bounded guardrail
+(RPS, Brier-any, Brier-60+) is now measured against the best baseline value of its own metric, and a
+new `maximum_spearman_p60_relative_regression: 0.0` starter-ranking gate requires a candidate to rank
+who starts and plays 60+ at least as well as the best baseline. It evaluates nothing, changes no
+v1.0/1.1 policy, and does not re-judge V1. Additive amendment 1.3 (contract v1.3) pre-registers
+Candidate V2 `recency_weighted_trailing_player_minutes_v2` — V1 with a geometric recency weight on
+the same trailing-5 window (it reduces exactly to V1 at decay = 1.0). V2 and its development runner
+are implemented and offline-tested, and V2 has now been run **once** as a clean historical
+development run (2026-07-30, against a pristine rebuilt archive): mean log score 0.72625, the best
+of the five models on all four bounded scored metrics and an improvement on Candidate V1 on all
+five, but it **fails the v1.2 starter-ranking gate** (aggregate Spearman-p60 0.70071 vs the best
+baseline 0.70851, −1.10%; nine of ten diagnostics pass). It is development-only and not promoted
+(unversioned proxies); see
+[`docs/phase2-stage-b-candidate-v2-development.md`](docs/phase2-stage-b-candidate-v2-development.md).
 
 ---
 

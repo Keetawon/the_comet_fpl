@@ -125,6 +125,25 @@ _KEY_COLUMNS: Final[frozenset[str]] = frozenset(
     }
 )
 
+# The versioned live player registry (the contract's `live_prospective_registry`). Identity and
+# registration metadata only -- no outcome column -- so it is the point-in-time-safe way to
+# select WHICH players a live/prospective run predicts, with known_at <= as_of. `pit.py` is the
+# sanctioned access layer and is exempt from the static table-name guard, so naming the table
+# here is permitted; the projection is still checked against OUTCOME_COLUMNS at call time.
+_PLAYER_REGISTRY_TABLE: Final[str] = "stg_live_player_version"
+_PLAYER_REGISTRY_COLUMNS: Final[tuple[str, ...]] = (
+    "code",
+    "season",
+    "element",
+    "web_name",
+    "element_type",
+    "position",
+    "team_id",
+    "now_cost",
+    "status",
+    "capture_id",
+)
+
 
 class FeatureSource:
     """A read-only capability over the component fact tables.
@@ -417,6 +436,56 @@ class PointInTimeView:
     ) -> pl.DataFrame:
         """Schedule rows at or after `as_of` -- the fixtures being predicted."""
         return self.schedule(team_ids=team_ids, seasons=seasons, since=self._as_of.ts)
+
+    # -- versioned player registry: the live/prospective roster-selection path ------------
+
+    def player_registry(
+        self,
+        *,
+        codes: Sequence[int] | None = None,
+        columns: Sequence[str] | None = None,
+    ) -> pl.DataFrame:
+        """Newest player registration per stable `code` whose capture existed at or before as_of.
+
+        The registered `live_prospective_registry` path: one row per stable player `code`,
+        taking the newest `stg_live_player_version` capture with ``known_at <= as_of`` and
+        breaking ties on ``capture_id`` descending. It exposes identity/registration metadata
+        only -- ``code``, position, club, status, cost, and the capture id -- and never an
+        outcome column (guarded by :func:`assert_no_outcome_columns`). This is how a
+        live/prospective Stage B run selects *which players to predict* from a versioned
+        registry before the model sees entity, team, or position; the historical archive's
+        unversioned roster proxy cannot be reused here without forfeiting any real-deadline
+        claim.
+
+        ``status`` is returned as registry metadata but is NOT consumed as a model feature by
+        this path; a versioned-availability candidate would be a separately named, amended
+        policy (see the Stage B contract's `live_availability_prospective_candidate`).
+        """
+        if columns is not None:
+            selected = list(columns)
+        else:
+            available = self._source._columns(_PLAYER_REGISTRY_TABLE)
+            selected = [column for column in _PLAYER_REGISTRY_COLUMNS if column in available]
+        assert_no_outcome_columns(selected)
+        if "code" not in selected:
+            raise ValueError("player_registry projection must include the 'code' identity column")
+        predicates: list[str] = []
+        params: list[object] = []
+        if codes is not None:
+            if codes:
+                placeholders = ", ".join("?" for _ in codes)
+                predicates.append(f"code IN ({placeholders})")
+                params.extend(codes)
+            else:
+                predicates.append("FALSE")
+        return self._source._select_latest_known(
+            _PLAYER_REGISTRY_TABLE,
+            columns=selected,
+            identity_columns=("code",),
+            known_at=self._as_of.ts,
+            predicates=predicates,
+            params=params,
+        )
 
 
 def assert_no_outcome_columns(columns: Sequence[str]) -> None:
