@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2 development-evaluated (development-only, not promoted; V2 fails the v1.2 starter-ranking gate); V3 pre-registered + implemented (amendment 1.4), not yet run |
+| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -345,10 +345,15 @@ Additive amendment 1.4 (contract v1.4) pre-registers Candidate V3
 the concentration of the weighted history (`alpha_eff = alpha·(1 − λ·C)`; reduces exactly to V2 at
 λ = 0). It is diagnosed from V2's by-position evidence: V2's only gate failure (starter ranking) is
 almost entirely goalkeepers, whose near-deterministic histories a uniform shrinkage blurs. V3 and
-its development runner are implemented and offline-tested, judged by the 1.2 gate unchanged, and
-**not yet run** — the single historical development run is the owner's authorised action and
-requires a pristine rebuilt archive; see
-[`docs/phase2-stage-b-candidate-v3-design.md`](docs/phase2-stage-b-candidate-v3-design.md).
+its development runner are implemented and offline-tested, and V3 has now been run **once** as a
+clean historical development run (2026-07-30, against a pristine rebuilt archive whose baselines
+reproduce V1/V2 bit-for-bit): mean log score 0.71205 — the best of all five models on every proper
+score (log/RPS/Brier-any/Brier-60+) — but it **fails the v1.2 starter-ranking gate** (Spearman-p60
+0.69726 vs the best baseline 0.70851, −1.59%, worse than V2). The hypothesis is refuted: goalkeeper
+ranking barely moved (0.8153 → 0.8156) and λ > 0 was selected in all 175 selectable folds, so
+adaptation sharpens the distribution but does not recover ranking. Development-only and not
+promoted; see
+[`docs/phase2-stage-b-candidate-v3-development.md`](docs/phase2-stage-b-candidate-v3-development.md).
 
 ---
 

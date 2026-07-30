@@ -1,14 +1,16 @@
 # Stage B Candidate V3 design: concentration-adaptive shrinkage
 
-**Status: frozen pre-registration record, written before any historical evaluation.**
+**Status: frozen pre-registration record. Candidate V3 has now had its single historical
+development evaluation (2026-07-30) — development-only, NOT promoted (fails the v1.2
+starter-ranking gate); see
+[`phase2-stage-b-candidate-v3-development.md`](phase2-stage-b-candidate-v3-development.md).**
 Candidate V3 is named `concentration_adaptive_shrinkage_player_minutes_v3` in
 `config/phase2_evaluation.yaml` amendment 1.4. The exact estimator and joint three-parameter
 selector are implemented in `src/fpl/models/minutes_v3.py` and covered by deterministic offline
-tests (`tests/test_minutes_v3.py`, `tests/test_dev_minutes_candidate_v3.py`). There is a
-separately named, offline-tested development runner in
-`src/fpl/validate/dev_minutes_candidate_v3.py`. **It has not been run on the archive**, so there
-is no archive-backed fitted parameter, historical evaluation, result, gate execution, or verdict.
-The pre-registered formula and policy below are frozen.
+tests (`tests/test_minutes_v3.py`, `tests/test_dev_minutes_candidate_v3.py`), with a separately
+named development runner in `src/fpl/validate/dev_minutes_candidate_v3.py`. The pre-registered
+formula and policy below are frozen and were **not** retuned after the result. The design section
+below is the pre-registration written before the run.
 
 Candidate V3 is **development-only**. The archive already shaped the hypothesis (see below), and
 the historical target roster and first-kickoff cutoff remain unversioned proxies. A later
