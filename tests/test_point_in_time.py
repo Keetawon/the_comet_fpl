@@ -170,6 +170,7 @@ def test_feature_source_permits_exactly_the_component_tables() -> None:
             "mart_dim_team",
             "mart_fact_player_fixture_live",
             "mart_team_fixture_live",
+            "stg_live_player_version",
         }
         for table in source.readable_tables():
             source._check_table(table)  # must not raise

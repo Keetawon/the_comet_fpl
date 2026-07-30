@@ -33,6 +33,14 @@ FEATURE_READABLE_TABLES: Final[frozenset[str]] = frozenset(
         "mart_dim_team",
         "mart_fact_player_fixture_live",
         "mart_team_fixture_live",
+        # The versioned live player registry: identity/registration metadata only (code,
+        # position, team_id, status, ...) with NO outcome column. This is the contract's
+        # `live_prospective_registry` -- the only point-in-time-safe way to select WHICH
+        # players to predict in a live/prospective run (known_at <= as_of). Unlike the
+        # outcome-carrying staging tables (e.g. stg_player_fixture, which holds total_points),
+        # this stg_ table is safe for the feature layer, and fpl.features.pit guards its
+        # projection with assert_no_outcome_columns.
+        "stg_live_player_version",
     }
 )
 

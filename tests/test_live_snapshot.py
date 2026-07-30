@@ -13,7 +13,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
+from fpl.features.pit import OUTCOME_COLUMNS, AsOf, FeatureSource, LeakageError, PointInTimeView
 from fpl.ingest.live_snapshot import capture_payload, load_capture, write_capture
 from fpl.ingest.snapshot_files import load_directory
 from fpl.storage.db import initialise
@@ -349,5 +349,163 @@ def test_committed_snapshot_checksum_failure_writes_nothing(tmp_path: Path) -> N
         with pytest.raises(ValueError, match="checksum mismatch"):
             load_directory(con, directory)
         assert con.execute("SELECT count(*) FROM snapshot_capture").fetchone() == (0,)
+    finally:
+        con.close()
+
+
+# --------------------------------------------------------------------------------------
+# Versioned player registry (PointInTimeView.player_registry) -- the live/prospective
+# roster-selection path. Offline, in-memory; the loader's idempotency and failure-path
+# atomicity are covered by the tests above.
+# --------------------------------------------------------------------------------------
+
+
+def _registry_bootstrap(*, team: int, status: str = "a") -> dict[str, object]:
+    """A one-player bootstrap whose only variable is the registration club/status."""
+    return {
+        "events": [
+            {
+                "id": 1,
+                "name": "Gameweek 1",
+                "deadline_time": "2026-08-21T17:30:00Z",
+                "finished": True,
+            }
+        ],
+        "teams": [
+            {"id": 1, "name": "Home", "short_name": "HOM"},
+            {"id": 2, "name": "Away", "short_name": "AWY"},
+        ],
+        "elements": [
+            {
+                "id": 10,
+                "code": 10010,
+                "web_name": "Reg",
+                "element_type": 3,
+                "team": team,
+                "now_cost": 55,
+                "status": status,
+            }
+        ],
+    }
+
+
+def _registry_capture(*, team: int, status: str = "a") -> list[object]:
+    return [
+        capture_payload("bootstrap-static", _registry_bootstrap(team=team, status=status)),
+        capture_payload("fixtures", _fixtures()),
+    ]
+
+
+def test_player_registry_picks_newest_capture_at_or_before_as_of() -> None:
+    """One row per code: the newest capture with known_at <= as_of; a later capture is hidden."""
+    con = initialise(":memory:")
+    try:
+        write_capture(
+            con,
+            _registry_capture(team=1),  # type: ignore[arg-type]
+            season="2026-27",
+            gw=1,
+            mode="daily",
+            captured_at=datetime(2026, 8, 23, 12, tzinfo=UTC),
+            capture_id="early",
+        )
+        write_capture(
+            con,
+            _registry_capture(team=2),  # type: ignore[arg-type]
+            season="2026-27",
+            gw=1,
+            mode="daily",
+            captured_at=datetime(2026, 8, 24, 12, tzinfo=UTC),
+            capture_id="late",
+        )
+        source = FeatureSource(con)
+        before = PointInTimeView(
+            source, AsOf(datetime(2026, 8, 23, 11, tzinfo=UTC))
+        ).player_registry()
+        between = PointInTimeView(
+            source, AsOf(datetime(2026, 8, 23, 13, tzinfo=UTC))
+        ).player_registry()
+        after = PointInTimeView(
+            source, AsOf(datetime(2026, 8, 24, 13, tzinfo=UTC))
+        ).player_registry()
+        assert before.is_empty()
+        assert between["team_id"].to_list() == [1]
+        assert after["team_id"].to_list() == [2]
+        assert after["code"].to_list() == [10010]  # one row per code
+    finally:
+        con.close()
+
+
+def test_player_registry_capture_one_second_after_as_of_is_invisible() -> None:
+    """known_at <= as_of is strict: a capture one second after as_of is not yet known."""
+    con = initialise(":memory:")
+    try:
+        write_capture(
+            con,
+            _registry_capture(team=1),  # type: ignore[arg-type]
+            season="2026-27",
+            gw=1,
+            mode="daily",
+            captured_at=datetime(2026, 8, 23, 12, 0, 0, tzinfo=UTC),
+            capture_id="c",
+        )
+        source = FeatureSource(con)
+        too_early = PointInTimeView(source, AsOf(datetime(2026, 8, 23, 11, 59, 59, tzinfo=UTC)))
+        assert too_early.player_registry().is_empty()
+        at_instant = PointInTimeView(source, AsOf(datetime(2026, 8, 23, 12, 0, 0, tzinfo=UTC)))
+        assert at_instant.player_registry()["code"].to_list() == [10010]
+    finally:
+        con.close()
+
+
+def test_player_registry_ties_break_on_capture_id_desc() -> None:
+    """Same known_at: the larger capture_id wins, deterministically.
+
+    write_capture cannot itself produce two captures with identical known_at (snapshot_bootstrap
+    keys on (captured_at, endpoint)), so this exercises the defensive tiebreak in the registry
+    query (`ORDER BY known_at DESC, capture_id DESC`) by inserting tied rows directly.
+    """
+    con = initialise(":memory:")
+    try:
+        tied = datetime(2026, 8, 23, 12, tzinfo=UTC)
+        con.executemany(
+            """
+            INSERT INTO stg_live_player_version
+                (season, element, code, known_at, capture_id, web_name, element_type,
+                 position, team_id, now_cost, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                ("2026-27", 10, 10010, tied, "aaa", "Reg", 3, "MID", 1, 55, "a"),
+                ("2026-27", 10, 10010, tied, "bbb", "Reg", 3, "MID", 2, 55, "a"),
+            ],
+        )
+        source = FeatureSource(con)
+        reg = PointInTimeView(source, AsOf(datetime(2026, 8, 23, 13, tzinfo=UTC))).player_registry()
+        assert reg["team_id"].to_list() == [2]
+        assert reg["capture_id"].to_list() == ["bbb"]
+    finally:
+        con.close()
+
+
+def test_player_registry_exposes_no_outcome_and_rejects_outcome_projection() -> None:
+    """The registry returns identity/registration metadata only and refuses an outcome column."""
+    con = initialise(":memory:")
+    try:
+        write_capture(
+            con,
+            _registry_capture(team=1),  # type: ignore[arg-type]
+            season="2026-27",
+            gw=1,
+            mode="daily",
+            captured_at=datetime(2026, 8, 23, 12, tzinfo=UTC),
+            capture_id="c",
+        )
+        source = FeatureSource(con)
+        view = PointInTimeView(source, AsOf(datetime(2026, 8, 23, 13, tzinfo=UTC)))
+        reg = view.player_registry()
+        assert set(reg.columns) & OUTCOME_COLUMNS == set()
+        with pytest.raises(LeakageError, match="outcome column"):
+            view.player_registry(columns=["code", "minutes"])
     finally:
         con.close()
