@@ -22,6 +22,7 @@ from fpl.validate.dev_minutes_candidate_v1 import (
     PreflightSnapshot,
     Provenance,
     ProvenanceError,
+    best_baseline_metric,
     build_reconciliation_record,
     candidate_source_path,
     capture_preflight,
@@ -98,6 +99,7 @@ def _score(
     coverage: float = 1.0,
     cold: int = 0,
     predictions: int = 760,
+    spearman: float = 0.30,
 ) -> MinutesScoreReport:
     return MinutesScoreReport(
         name=name,
@@ -114,7 +116,7 @@ def _score(
         pit_values=(),
         reliability_any_minutes=_reliability(),
         reliability_60_plus=_reliability(),
-        spearman_p60_within_position_gameweek=0.30,
+        spearman_p60_within_position_gameweek=spearman,
         prediction_coverage=coverage,
     )
 
@@ -188,7 +190,7 @@ def _canned_result(
 def _provenance() -> Provenance:
     return Provenance(
         candidate=CANDIDATE,
-        contract_version="1.1",
+        contract_version=CONFIG.contract_version,
         commit_sha="deadbeef" * 5,
         config_fingerprint="c" * 64,
         candidate_source_fingerprint="s" * 64,
@@ -235,7 +237,7 @@ def test_load_contract_from_bytes_fingerprints_the_exact_parsed_bytes(tmp_path: 
     real = _real_config_bytes()
     config_copy.write_bytes(real)
     contract, fingerprint = load_contract_from_bytes(config_copy)
-    assert contract.contract_version == "1.1"
+    assert contract.contract_version == CONFIG.contract_version
     assert fingerprint == file_sha256(config_copy)
     assert fingerprint == hash_bytes(real)
     # Editing the bytes -- even a no-op comment -- changes the fingerprint.
@@ -293,13 +295,13 @@ def test_capture_preflight_records_every_field_before_evaluation(tmp_path: Path)
     # No ended_at is required to build the preflight snapshot.
     assert not hasattr(snapshot, "ended_at")
     assert snapshot.candidate == CANDIDATE
-    assert snapshot.contract_version == "1.1"
     assert snapshot.commit_sha == head_commit_sha(repo)
     assert snapshot.config_fingerprint == file_sha256(config_copy)
     assert snapshot.candidate_source_fingerprint == file_sha256(source_copy)
     assert snapshot.archive_fingerprint == file_sha256(db)
     assert snapshot.seed == 202627
     assert snapshot.started_at.endswith("Z")
+    assert snapshot.contract_version == CONFIG.contract_version
 
 
 def test_verify_snapshot_passes_when_unchanged(tmp_path: Path) -> None:
@@ -407,7 +409,7 @@ def test_provenance_lines_record_utc_start_and_end() -> None:
 # --------------------------------------------------------------------------------------
 
 
-def test_diagnostics_have_nine_labelled_checks() -> None:
+def test_diagnostics_have_ten_labelled_checks() -> None:
     diagnostics: DevelopmentDiagnostics = compute_development_diagnostics(
         _canned_result(candidate_log=1.028), CANDIDATE, CONFIG
     )
@@ -418,6 +420,7 @@ def test_diagnostics_have_nine_labelled_checks() -> None:
         "no_aggregate_ranked_probability_score_regression",
         "no_aggregate_brier_any_minutes_regression",
         "no_aggregate_brier_60_plus_regression",
+        "no_aggregate_spearman_p60_regression",
         "pit_interval_80_absolute_error_at_most_maximum",
         "prediction_coverage_at_least_minimum",
         "folds_evaluated_at_least_minimum",
@@ -431,9 +434,9 @@ def test_diagnostics_have_nine_labelled_checks() -> None:
 def test_diagnostics_pass_when_candidate_beats_baseline_on_every_condition() -> None:
     result = _canned_result(candidate_log=1.028)  # ~2% lift over the 1.04916 comparator
     diagnostics = compute_development_diagnostics(result, CANDIDATE, CONFIG)
-    assert diagnostics.passed_count() == 9
+    assert diagnostics.passed_count() == 10
     lines = "\n".join(diagnostics.as_lines())
-    assert lines.count("PASS") == 9
+    assert lines.count("PASS") == 10
     assert "NOT combined into a promotion verdict" in lines
 
 
@@ -445,7 +448,7 @@ def test_diagnostics_fail_when_lift_below_one_percent() -> None:
     )
     assert lift_check.passed is False
     # The non-regression / calibration / count checks still pass on this canned result.
-    assert diagnostics.passed_count() == 8
+    assert diagnostics.passed_count() == 9
 
 
 def test_diagnostics_fail_on_a_per_season_regression() -> None:
@@ -501,8 +504,144 @@ def test_diagnostics_not_comparable_when_candidate_absent() -> None:
 
 
 # --------------------------------------------------------------------------------------
-# Report
+# Amendment 1.2: best-per-metric guardrails + starter-ranking gate
 # --------------------------------------------------------------------------------------
+
+
+def _explicit_result(overall: dict[str, MinutesScoreReport]) -> MinutesHarnessResult:
+    """A harness result built from explicit per-model scores (per-baseline metrics controlled)."""
+    season = "2025-26"
+    return MinutesHarnessResult(
+        folds_evaluated=181,
+        folds_by_season={season: 1},
+        predictions=760,
+        eligible_predictions=760,
+        leakage_failures=0,
+        required_baselines=frozenset(BASELINES),
+        overall=overall,
+        by_fold={f"{season}-GW1": dict(overall)},
+        by_season={season: dict(overall)},
+        by_position={"MID": dict(overall)},
+        by_home_away={"home": dict(overall)},
+        by_transfer_status={"same_team_code_as_last_observed_fixture": dict(overall)},
+        by_player_history_cohort={"prior_positive_minutes": dict(overall)},
+        parameters_by_fold={},
+    )
+
+
+def test_best_baseline_metric_picks_min_for_lower_is_better() -> None:
+    result = _explicit_result(
+        {
+            BASELINES[0]: _score(BASELINES[0], 1.04, rps=0.50),
+            BASELINES[1]: _score(BASELINES[1], 1.10, rps=0.45),
+            BASELINES[2]: _score(BASELINES[2], 1.20, rps=0.30),  # lowest RPS
+            BASELINES[3]: _score(BASELINES[3], 1.30, rps=0.55),
+            CANDIDATE: _score(CANDIDATE, 1.02, rps=0.40),
+        }
+    )
+    value, name = best_baseline_metric(
+        result, attr="mean_ranked_probability_score", higher_is_better=False
+    )
+    assert value == 0.30
+    assert name == BASELINES[2]  # trailing_5_player_minutes
+
+
+def test_best_baseline_metric_picks_max_for_higher_is_better_and_skips_nan() -> None:
+    # position_minutes_frequency (BASELINES[0]) is group-constant -> undefined (NaN) Spearman.
+    result = _explicit_result(
+        {
+            BASELINES[0]: _score(BASELINES[0], 1.04, spearman=float("nan")),
+            BASELINES[1]: _score(BASELINES[1], 1.10, spearman=0.70),  # highest
+            BASELINES[2]: _score(BASELINES[2], 1.20, spearman=0.65),
+            BASELINES[3]: _score(BASELINES[3], 1.30, spearman=0.40),
+            CANDIDATE: _score(CANDIDATE, 1.02, spearman=0.80),
+        }
+    )
+    value, name = best_baseline_metric(
+        result, attr="spearman_p60_within_position_gameweek", higher_is_better=True
+    )
+    assert value == 0.70
+    assert name == BASELINES[1]  # last_observed_player_minutes; the NaN baseline excluded
+
+
+def test_best_baseline_metric_raises_when_every_baseline_is_null() -> None:
+    result = _explicit_result(
+        {baseline: _score(baseline, 1.10, spearman=float("nan")) for baseline in BASELINES}
+        | {CANDIDATE: _score(CANDIDATE, 1.02, spearman=0.80)}
+    )
+    with pytest.raises(ValueError, match="no required baseline"):
+        best_baseline_metric(
+            result, attr="spearman_p60_within_position_gameweek", higher_is_better=True
+        )
+
+
+def test_rps_guardrail_now_compares_against_the_best_rps_baseline_not_the_log_comparator() -> None:
+    """The regression amendment 1.2 closes: a candidate that beats the log-comparator's RPS but
+    regresses against the BEST-RPS baseline now FAILS. It passed under the old single-comparator
+    comparison. position_minutes_frequency is the log comparator (lowest log) but trailing_5_player
+    has the best (lowest) RPS."""
+    result = _explicit_result(
+        {
+            BASELINES[0]: _score(BASELINES[0], 1.04, rps=0.50, spearman=0.50),
+            BASELINES[1]: _score(BASELINES[1], 1.10, rps=0.45, spearman=0.70),
+            BASELINES[2]: _score(BASELINES[2], 1.20, rps=0.30, spearman=0.65),  # best RPS
+            BASELINES[3]: _score(BASELINES[3], 1.30, rps=0.55, spearman=0.40),
+            # Candidate beats the comparator's RPS (0.50) but is worse than the best RPS (0.30).
+            CANDIDATE: _score(CANDIDATE, 1.02, rps=0.45, spearman=0.80),
+        }
+    )
+    diagnostics = compute_development_diagnostics(result, CANDIDATE, CONFIG)
+    by_name = {check.name: check for check in diagnostics.checks}
+    rps_check = by_name["no_aggregate_ranked_probability_score_regression"]
+    assert rps_check.passed is False
+    # The bar moved from the log comparator to the best-RPS baseline, and the detail names it.
+    assert BASELINES[2] in rps_check.detail  # trailing_5_player_minutes supplied the bar
+    assert "regression" in rps_check.detail
+    # The candidate still clears the primary log lift (it beats the comparator on log score), so
+    # the failure is specifically the harder RPS bar, not the lift gate.
+    assert by_name["aggregate_mean_log_score_lift_at_least_minimum"].passed is True
+
+
+def test_spearman_gate_fails_when_candidate_ranks_worse_than_best_baseline() -> None:
+    result = _explicit_result(
+        {
+            BASELINES[0]: _score(BASELINES[0], 1.04, spearman=float("nan")),
+            BASELINES[1]: _score(BASELINES[1], 1.10, spearman=0.70),  # best baseline
+            BASELINES[2]: _score(BASELINES[2], 1.20, spearman=0.65),
+            BASELINES[3]: _score(BASELINES[3], 1.30, spearman=0.40),
+            CANDIDATE: _score(CANDIDATE, 1.02, spearman=0.55),  # regresses vs 0.70
+        }
+    )
+    diagnostics = compute_development_diagnostics(result, CANDIDATE, CONFIG)
+    spearman_check = next(
+        check
+        for check in diagnostics.checks
+        if check.name == "no_aggregate_spearman_p60_regression"
+    )
+    assert spearman_check.passed is False
+    assert BASELINES[1] in spearman_check.detail  # last_observed supplied the bar
+
+
+def test_spearman_gate_fails_for_a_group_constant_candidate() -> None:
+    """A candidate whose own Spearman is undefined (group-constant) cannot rank starters and so
+    fails the starter-ranking gate, regardless of its other scores."""
+    result = _explicit_result(
+        {
+            BASELINES[0]: _score(BASELINES[0], 1.04, spearman=float("nan")),
+            BASELINES[1]: _score(BASELINES[1], 1.10, spearman=0.70),
+            BASELINES[2]: _score(BASELINES[2], 1.20, spearman=0.65),
+            BASELINES[3]: _score(BASELINES[3], 1.30, spearman=0.40),
+            CANDIDATE: _score(CANDIDATE, 1.02, spearman=float("nan")),  # cannot rank
+        }
+    )
+    diagnostics = compute_development_diagnostics(result, CANDIDATE, CONFIG)
+    spearman_check = next(
+        check
+        for check in diagnostics.checks
+        if check.name == "no_aggregate_spearman_p60_regression"
+    )
+    assert spearman_check.passed is False
+    assert "undefined" in spearman_check.detail
 
 
 def test_report_is_labelled_and_never_a_verdict() -> None:

@@ -53,7 +53,7 @@ import yaml
 from fpl.config import Phase2EvaluationConfig, config_dir, repo_root
 from fpl.storage.db import connect, default_db_path
 from fpl.validate.metrics import relative_lift
-from fpl.validate.minutes_baselines import HistoryRow, TargetRow
+from fpl.validate.minutes_baselines import STAGE_B_BASELINE_ORDER, HistoryRow, TargetRow
 from fpl.validate.minutes_harness import (
     MinutesCandidateFactory,
     MinutesHarnessResult,
@@ -409,23 +409,111 @@ class DevelopmentDiagnostics:
         return lines
 
 
+def best_baseline_metric(
+    result: MinutesHarnessResult, *, attr: str, higher_is_better: bool
+) -> tuple[float, str]:
+    """The best required-baseline value of one metric, and the baseline that supplied it.
+
+    Amendment 1.2: each bounded guardrail is measured against the best value of ITS OWN metric
+    across the required baselines, not the single best-by-log-score baseline. Lower-is-better
+    metrics (RPS, Brier) take the minimum; higher-is-better (Spearman-p60) takes the maximum. A
+    baseline whose value is ``None``/NaN is skipped -- ``position_minutes_frequency`` emits an
+    undefined (NaN) Spearman because its prediction is group-constant, and a group-constant
+    baseline carries no ranking information to bar against.
+
+    Raises ``ValueError`` if every required baseline is ``None``/NaN for ``attr``: a metric with no
+    baseline bar cannot be silently passed. Ties break on the contract's frozen baseline order
+    (``STAGE_B_BASELINE_ORDER``) so the bar is deterministic.
+    """
+    scored: list[tuple[float, str]] = []
+    for name in STAGE_B_BASELINE_ORDER:
+        if name not in result.required_baselines:
+            continue
+        report = result.overall.get(name)
+        if report is None:
+            continue
+        value = getattr(report, attr)
+        if value is None or (isinstance(value, float) and math.isnan(value)):
+            continue
+        scored.append((float(value), name))
+    if not scored:
+        raise ValueError(
+            f"no required baseline has a finite {attr} value; cannot form a guardrail bar"
+        )
+    # min() over the signed key returns the extreme value, and on a tie the earliest entry in the
+    # frozen baseline order wins -- deterministic for any canned/real result.
+    if higher_is_better:
+        return min(scored, key=lambda value_name: -value_name[0])
+    return min(scored, key=lambda value_name: value_name[0])
+
+
 def _no_regression_check(
-    name: str, baseline_metric: float, candidate_metric: float, *, allowed_regression: float
+    name: str,
+    baseline_metric: float,
+    candidate_metric: float,
+    *,
+    allowed_regression: float,
+    bar: str,
 ) -> DevelopmentCheck:
     """A lower-is-better non-regression check (RPS / Brier): the candidate must not regress.
 
     ``relative_lift`` is positive when the candidate improved; regression is the clamped negative
-    lift. The check passes when the regression is within the gate's allowed amount.
+    lift. The check passes when the regression is within the gate's allowed amount. ``bar`` names
+    the baseline that supplied ``baseline_metric`` (the best baseline for THIS metric, under
+    amendment 1.2) so the evidence is self-explanatory rather than hiding which bar was used.
     """
     lift = relative_lift(baseline_metric, candidate_metric)
     regression = max(0.0, -lift)
     passed = regression <= allowed_regression
     detail = (
         f"lift {lift:+.4%} (regression {regression:.4%}); allowed regression "
-        f"<= {allowed_regression:.2%}; candidate {candidate_metric:.5f} vs baseline "
+        f"<= {allowed_regression:.2%}; candidate {candidate_metric:.5f} vs bar {bar} "
         f"{baseline_metric:.5f}"
     )
     return DevelopmentCheck(name=name, passed=passed, detail=detail)
+
+
+def _no_spearman_regression_check(
+    result: MinutesHarnessResult,
+    candidate_spearman: float,
+    *,
+    allowed_regression: float,
+) -> DevelopmentCheck:
+    """The starter-ranking no-regression gate added by amendment 1.2.
+
+    The whole point of a minutes model is to rank who starts and plays 60+, which is exactly
+    ``spearman_p60_within_position_gameweek``. Higher is better. The candidate must not regress
+    against the best (highest) baseline Spearman; group-constant baselines (undefined Spearman) are
+    excluded from that max. A candidate whose OWN Spearman is ``None``/NaN FAILS: a group-constant
+    prediction cannot rank starters, so it cannot serve the model's purpose regardless of its
+    other scores.
+    """
+    best, best_name = best_baseline_metric(
+        result, attr="spearman_p60_within_position_gameweek", higher_is_better=True
+    )
+    check_name = "no_aggregate_spearman_p60_regression"
+    if candidate_spearman is None or (
+        isinstance(candidate_spearman, float) and math.isnan(candidate_spearman)
+    ):
+        return DevelopmentCheck(
+            name=check_name,
+            passed=False,
+            detail=(
+                f"candidate Spearman-p60 is undefined (group-constant prediction); a candidate "
+                f"that cannot rank starters fails this gate; best baseline {best_name} "
+                f"{best:.5f} (higher is better; group-constant baselines excluded)"
+            ),
+        )
+    # Higher-is-better: regression is the candidate's shortfall below the best baseline.
+    lift = (candidate_spearman - best) / abs(best)
+    regression = max(0.0, -lift)
+    passed = regression <= allowed_regression
+    detail = (
+        f"lift {lift:+.4%} (regression {regression:.4%}); allowed regression "
+        f"<= {allowed_regression:.2%}; candidate {candidate_spearman:.5f} vs bar {best_name} "
+        f"{best:.5f} (higher is better; group-constant baselines excluded)"
+    )
+    return DevelopmentCheck(name=check_name, passed=passed, detail=detail)
 
 
 def compute_development_diagnostics(
@@ -450,65 +538,105 @@ def compute_development_diagnostics(
     cand = result.overall[candidate]
     gate = config.promotion
 
+    # The primary log-score lift stays measured against the best-by-log-score baseline
+    # (``comparator``), unchanged. The bounded guardrails below are each measured against the best
+    # baseline value of THEIR OWN metric (amendment 1.2), so a candidate cannot pass by beating
+    # only the weakest baseline on RPS/Brier.
     log_lift = relative_lift(base.mean_log_score, cand.mean_log_score)
     checks: list[DevelopmentCheck] = [
         DevelopmentCheck(
             name="aggregate_mean_log_score_lift_at_least_minimum",
             passed=log_lift >= gate.minimum_primary_relative_lift,
             detail=(
-                f"lift {log_lift:+.4%} (candidate {cand.mean_log_score:.5f} vs baseline "
+                f"lift {log_lift:+.4%} (candidate {cand.mean_log_score:.5f} vs bar {comparator} "
                 f"{base.mean_log_score:.5f}); required >= {gate.minimum_primary_relative_lift:.2%}"
             ),
         ),
+    ]
+
+    best_rps, best_rps_name = best_baseline_metric(
+        result, attr="mean_ranked_probability_score", higher_is_better=False
+    )
+    checks.append(
         _no_regression_check(
             "no_aggregate_ranked_probability_score_regression",
-            base.mean_ranked_probability_score,
+            best_rps,
             cand.mean_ranked_probability_score,
             allowed_regression=gate.maximum_ranked_probability_score_relative_regression,
-        ),
+            bar=best_rps_name,
+        )
+    )
+    best_brier_any, best_brier_any_name = best_baseline_metric(
+        result, attr="mean_brier_any_minutes", higher_is_better=False
+    )
+    checks.append(
         _no_regression_check(
             "no_aggregate_brier_any_minutes_regression",
-            base.mean_brier_any_minutes,
+            best_brier_any,
             cand.mean_brier_any_minutes,
             allowed_regression=gate.maximum_brier_relative_regression_any_minutes,
-        ),
+            bar=best_brier_any_name,
+        )
+    )
+    best_brier_60, best_brier_60_name = best_baseline_metric(
+        result, attr="mean_brier_60_plus", higher_is_better=False
+    )
+    checks.append(
         _no_regression_check(
             "no_aggregate_brier_60_plus_regression",
-            base.mean_brier_60_plus,
+            best_brier_60,
             cand.mean_brier_60_plus,
             allowed_regression=gate.maximum_brier_relative_regression_60_plus,
-        ),
-        DevelopmentCheck(
-            name="pit_interval_80_absolute_error_at_most_maximum",
-            passed=(
-                cand.pit_interval_80_absolute_error <= gate.pit_interval_80_maximum_absolute_error
+            bar=best_brier_60_name,
+        )
+    )
+
+    # Amendment 1.2: the starter-ranking gate. A candidate that cannot rank starters (undefined
+    # Spearman) fails; a candidate that regresses vs the best baseline Spearman fails.
+    checks.append(
+        _no_spearman_regression_check(
+            result,
+            cand.spearman_p60_within_position_gameweek,
+            allowed_regression=gate.maximum_spearman_p60_relative_regression,
+        )
+    )
+
+    checks.extend(
+        [
+            DevelopmentCheck(
+                name="pit_interval_80_absolute_error_at_most_maximum",
+                passed=(
+                    cand.pit_interval_80_absolute_error
+                    <= gate.pit_interval_80_maximum_absolute_error
+                ),
+                detail=(
+                    f"PIT-80 absolute error {cand.pit_interval_80_absolute_error:.4f}; allowed <= "
+                    f"{gate.pit_interval_80_maximum_absolute_error:.2f}"
+                ),
             ),
-            detail=(
-                f"PIT-80 absolute error {cand.pit_interval_80_absolute_error:.4f}; allowed <= "
-                f"{gate.pit_interval_80_maximum_absolute_error:.2f}"
+            DevelopmentCheck(
+                name="prediction_coverage_at_least_minimum",
+                passed=cand.prediction_coverage >= gate.minimum_prediction_coverage,
+                detail=(
+                    f"coverage {cand.prediction_coverage:.4f}; required >= "
+                    f"{gate.minimum_prediction_coverage:.2f}"
+                ),
             ),
-        ),
-        DevelopmentCheck(
-            name="prediction_coverage_at_least_minimum",
-            passed=cand.prediction_coverage >= gate.minimum_prediction_coverage,
-            detail=(
-                f"coverage {cand.prediction_coverage:.4f}; required >= "
-                f"{gate.minimum_prediction_coverage:.2f}"
+            DevelopmentCheck(
+                name="folds_evaluated_at_least_minimum",
+                passed=result.folds_evaluated >= gate.minimum_fold_count,
+                detail=(
+                    f"{result.folds_evaluated} folds evaluated; required >= "
+                    f"{gate.minimum_fold_count}"
+                ),
             ),
-        ),
-        DevelopmentCheck(
-            name="folds_evaluated_at_least_minimum",
-            passed=result.folds_evaluated >= gate.minimum_fold_count,
-            detail=(
-                f"{result.folds_evaluated} folds evaluated; required >= {gate.minimum_fold_count}"
+            DevelopmentCheck(
+                name="zero_leakage_failures",
+                passed=result.leakage_failures == 0 and gate.require_zero_leakage_failures,
+                detail=f"{result.leakage_failures} leakage failures; required 0",
             ),
-        ),
-        DevelopmentCheck(
-            name="zero_leakage_failures",
-            passed=result.leakage_failures == 0 and gate.require_zero_leakage_failures,
-            detail=f"{result.leakage_failures} leakage failures; required 0",
-        ),
-    ]
+        ]
+    )
 
     seasons = sorted(
         season

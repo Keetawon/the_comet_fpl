@@ -1079,6 +1079,10 @@ class Phase2PromotionGate(_Frozen):
     compare_against: Literal["best_eligible_required_stage_b_baseline"]
     comparison_population: Literal["same_eligible_predictions"]
     relative_lift_formula: Literal["(baseline - candidate) / abs(baseline)"]
+    # Amendment 1.2: each bounded guardrail is measured against the best required baseline value of
+    # its OWN metric (RPS/Brier lower-is-better, Spearman higher-is-better), not the single
+    # best-by-log-score baseline. Pinned in the contract so the runner cannot quietly revert.
+    guardrail_comparison: Literal["best_baseline_per_metric"]
     minimum_primary_relative_lift: float
     # AGGREGATE guardrails only: RPS and Brier non-regression are evaluated on the full
     # prediction set, never per season. ONLY mean log score has a per-season non-regression
@@ -1086,6 +1090,10 @@ class Phase2PromotionGate(_Frozen):
     maximum_ranked_probability_score_relative_regression: float
     maximum_brier_relative_regression_any_minutes: float
     maximum_brier_relative_regression_60_plus: float
+    # Amendment 1.2: the starter-ranking guardrail. Higher Spearman-p60 is better; a candidate must
+    # not regress vs the best baseline Spearman. Group-constant baselines (undefined Spearman) are
+    # excluded from the baseline max, and a candidate whose own Spearman is undefined FAILS.
+    maximum_spearman_p60_relative_regression: float
     pit_interval_80_maximum_absolute_error: float
     minimum_fold_count: Literal[181]
     require_no_season_mean_log_score_regression: Literal[True]
@@ -1127,6 +1135,16 @@ class Phase2PromotionGate(_Frozen):
             raise ValueError(
                 "maximum_brier_relative_regression_60_plus is pinned to 0.0 "
                 f"(aggregate guardrail only; got {value!r})"
+            )
+        return value
+
+    @field_validator("maximum_spearman_p60_relative_regression")
+    @classmethod
+    def _spearman_p60_regression_pinned(cls, value: float) -> float:
+        if value != 0.0:
+            raise ValueError(
+                "maximum_spearman_p60_relative_regression is pinned to 0.0 "
+                f"(starter-ranking no-regression gate, amendment 1.2; got {value!r})"
             )
         return value
 
@@ -1222,6 +1240,7 @@ ORIGINAL_PHASE2_CONTRACT_VERSION: str = "1.0"
 # changing the count must fail closed.
 FROZEN_PHASE2_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
     "1.1": (("1.1", 0),),
+    "1.2": (("1.1", 0), ("1.2", 1)),
 }
 
 
@@ -1255,7 +1274,7 @@ class Phase2EvaluationConfig(_Frozen):
     ruleset at load time via :meth:`verify_minutes_boundary`.
     """
 
-    contract_version: Literal["1.1"]
+    contract_version: Literal["1.2"]
     phase: Literal[2]
     amendments: tuple[Phase2Amendment, ...] = ()
     target: Phase2TargetPolicy

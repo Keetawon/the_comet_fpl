@@ -310,7 +310,7 @@ baseline-only development and calibration record** (position prior = lowest mean
 `trailing_5_player_minutes` leads on RPS and both Brier margins), recorded in
 [`docs/phase2-stage-b-baseline-development.md`](docs/phase2-stage-b-baseline-development.md).
 It is a development number under two unversioned historical proxies (target roster, first-kickoff
-cutoff), so real-deadline knowledge-time validity is unproven. Additive amendment 1.1 now
+cutoff), so real-deadline knowledge-time validity is unproven. Additive amendment 1.1
 pre-registers Candidate V1 `shrunk_trailing_5_player_minutes_v1` without changing
 the frozen v1.0 gate or any comparison policy; see
 [`docs/phase2-stage-b-candidate-v1-design.md`](docs/phase2-stage-b-candidate-v1-design.md).
@@ -320,11 +320,17 @@ candidate and four unchanged baselines on identical rows, records fold parameter
 read-only, rechecks clean Git/config/model-source/database provenance, and emits a complete strict-JSON
 reconciliation record only after postflight verification. It has now been run once as a clean
 historical development run: Candidate V1 reaches mean log score 0.74198 (+29.28% over the
-position-prior comparator) and improves on the best baseline value of every metric, but it is
+position-prior comparator) and improves on the best baseline value of every metric **except the
+within-position Spearman-p60 starter ranking** (where it regresses, 0.69090 vs 0.70851), but it is
 **development-only and not promoted** — the historical target roster and first-kickoff cutoff are
 unversioned proxies, so real-deadline knowledge-time validity is unproven; see
 [`docs/phase2-stage-b-candidate-v1-development.md`](docs/phase2-stage-b-candidate-v1-development.md).
-The baseline number remains a development number, not an upper bound.
+The baseline number remains a development number, not an upper bound. Additive amendment 1.2
+(contract v1.2) tightens the promotion gate for **future** candidates only: each bounded guardrail
+(RPS, Brier-any, Brier-60+) is now measured against the best baseline value of its own metric, and a
+new `maximum_spearman_p60_relative_regression: 0.0` starter-ranking gate requires a candidate to rank
+who starts and plays 60+ at least as well as the best baseline. It evaluates nothing, changes no
+v1.0/1.1 policy, and does not re-judge V1.
 
 ---
 

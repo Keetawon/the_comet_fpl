@@ -42,7 +42,7 @@ def test_phase2_contract_loads_with_point_in_time_cutoffs() -> None:
     load_phase2_evaluation.cache_clear()
     contract = load_phase2_evaluation()
     assert contract.phase == 2
-    assert contract.contract_version == "1.1"
+    assert contract.contract_version == "1.2"
     assert contract.target.entity == "player"
     assert contract.target.grain == "season_player_code_fixture"
     assert contract.target.outcome == "minutes_distribution"
@@ -245,10 +245,13 @@ def test_promotion_gate_is_measurable_and_cannot_relax_coverage() -> None:
     assert gate.compare_against == "best_eligible_required_stage_b_baseline"
     assert gate.comparison_population == "same_eligible_predictions"
     assert gate.relative_lift_formula == "(baseline - candidate) / abs(baseline)"
+    # Amendment 1.2: bounded guardrails measured best-per-metric; new starter-ranking gate.
+    assert gate.guardrail_comparison == "best_baseline_per_metric"
     assert gate.minimum_primary_relative_lift == 0.01
     assert gate.maximum_ranked_probability_score_relative_regression == 0.0
     assert gate.maximum_brier_relative_regression_any_minutes == 0.0
     assert gate.maximum_brier_relative_regression_60_plus == 0.0
+    assert gate.maximum_spearman_p60_relative_regression == 0.0
     assert gate.pit_interval_80_maximum_absolute_error == 0.05
     assert gate.minimum_prediction_coverage == 1.0
     assert gate.minimum_fold_count == 181
@@ -363,15 +366,15 @@ def test_extra_field_is_rejected() -> None:
 
 def test_phase2_amendment_history_is_exactly_frozen() -> None:
     contract = load_phase2_evaluation()
-    assert contract.contract_version == "1.1"
+    assert contract.contract_version == "1.2"
     assert tuple(
         (amendment.version, amendment.candidates_evaluated_before_amendment)
         for amendment in contract.amendments
-    ) == (("1.1", 0),)
+    ) == (("1.1", 0), ("1.2", 1))
 
 
-@pytest.mark.parametrize("version", ["1.0", "1.2", "2.0"])
-def test_only_phase2_contract_version_1_1_is_accepted(version: str) -> None:
+@pytest.mark.parametrize("version", ["1.0", "1.1", "2.0"])
+def test_only_phase2_contract_version_1_2_is_accepted(version: str) -> None:
     document = copy.deepcopy(_document())
     document["contract_version"] = version
     with pytest.raises((ValidationError, ValueError)):
@@ -806,6 +809,49 @@ def test_promotion_pit_interval_error_is_frozen() -> None:
     document = copy.deepcopy(_document())
     document["promotion"]["pit_interval_80_maximum_absolute_error"] = 0.06  # pinned to 0.05
     with pytest.raises((ValidationError, ValueError), match=r"pinned to 0\.05"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+# --------------------------------------------------------------------------------------
+# Amendment 1.2: best-per-metric guardrails + starter-ranking gate (additive, harder only)
+# --------------------------------------------------------------------------------------
+
+
+def test_amendment_1_2_spearman_regression_is_pinned_to_zero() -> None:
+    """The new starter-ranking gate may not be relaxed away."""
+    document = copy.deepcopy(_document())
+    document["promotion"]["maximum_spearman_p60_relative_regression"] = 0.01
+    with pytest.raises((ValidationError, ValueError), match="spearman_p60_relative_regression"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_amendment_1_2_guardrail_comparison_is_pinned() -> None:
+    """The best-per-metric comparison is part of the contract, not implicit in code."""
+    contract = load_phase2_evaluation()
+    assert contract.promotion.guardrail_comparison == "best_baseline_per_metric"
+    document = copy.deepcopy(_document())
+    document["promotion"]["guardrail_comparison"] = "single_log_score_comparator"
+    with pytest.raises((ValidationError, ValueError)):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_amendment_1_2_missing_spearman_gate_is_rejected() -> None:
+    """extra='forbid' on the gate means a 1.2 file that drops the new key fails to load."""
+    document = copy.deepcopy(_document())
+    del document["promotion"]["maximum_spearman_p60_relative_regression"]
+    with pytest.raises(
+        (ValidationError, ValueError), match="maximum_spearman_p60_relative_regression"
+    ):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_amendment_1_2_count_is_frozen_at_one_candidate_evaluated() -> None:
+    """The amendment honestly records that one candidate (V1) had been evaluated before it."""
+    document = copy.deepcopy(_document())
+    for amendment in document["amendments"]:
+        if amendment["version"] == "1.2":
+            amendment["candidates_evaluated_before_amendment"] = 0  # wrong: V1 was evaluated
+    with pytest.raises((ValidationError, ValueError), match="amendment history"):
         Phase2EvaluationConfig.model_validate(document)
 
 

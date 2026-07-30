@@ -49,10 +49,16 @@ four unchanged baselines on identical eligible rows, records fold-local paramete
 rechecks clean Git/config/model-source/database provenance before emitting a complete reconciliation
 record. It has now been run **once** as a clean historical development run: Candidate V1 reaches
 mean log score 0.74198 (+29.28% over the position-prior comparator) and improves on the best
-baseline value of every metric, but it is **development-only and not promoted** — the historical
+baseline value of every metric **except the within-position Spearman-p60 starter ranking** (where
+it regresses, 0.69090 vs 0.70851), but it is **development-only and not promoted** — the historical
 target roster and first-kickoff cutoff are unversioned proxies, so real-deadline knowledge-time
 validity is unproven; see `docs/phase2-stage-b-candidate-v1-development.md`. The historical number
-is a development number, not an upper bound.
+is a development number, not an upper bound. Additive amendment 1.2 (contract v1.2) tightens the
+promotion gate for **future** candidates only — each bounded guardrail (RPS, Brier-any, Brier-60+)
+is measured against the best baseline value of its own metric, and a new
+`maximum_spearman_p60_relative_regression: 0.0` starter-ranking gate requires a candidate to rank
+who starts and plays 60+ at least as well as the best baseline; it evaluates nothing, changes no
+v1.0/1.1 policy, and does not re-judge V1.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -288,13 +294,20 @@ Unless the user sets another priority, address prerequisites before model sophis
    six-observed-gameweek inner walk-forward, dedicated development runner, provenance rechecks, and
    deterministic offline tests are implemented, and Candidate V1 has been development-evaluated
    once on the archive (mean log score 0.74198, +29.28% over the comparator; improves on the best
-   baseline value of every metric; all nine development diagnostics pass; see
+   baseline value of every metric except the within-position Spearman-p60 starter ranking, where it
+   regresses 0.69090 vs 0.70851; all nine development diagnostics pass under contract v1.1; see
    `docs/phase2-stage-b-candidate-v1-development.md`). It is **development-only and not promoted**:
    the historical target roster and first-kickoff cutoff are unversioned proxies, so real-deadline
    knowledge-time validity is unproven, and a second historical evaluation is not permitted. The
    population, target-roster knowledge-time policy, bin shape, baseline definitions, metrics,
-   scoring/calibration definitions, and promotion gate remain frozen; the historical number is not
-   an upper bound, and a gate may never be amended after a candidate is judged.
+   scoring/calibration definitions remain frozen; the historical number is not an upper bound, and a
+   gate may never be amended to re-judge a candidate after it is judged. Additive amendment 1.2
+   (contract v1.2) tightens the gate for **future** candidates only — best-per-metric guardrails
+   (each RPS/Brier guardrail vs the best baseline value of its own metric) plus a new
+   `maximum_spearman_p60_relative_regression: 0.0` starter-ranking gate (candidate must rank starters
+   at least as well as the best baseline; group-constant candidates fail). It evaluates nothing,
+   changes no v1.0/1.1 comparison policy, and does not re-judge V1 (V1 would additionally fail the
+   new Spearman gate under 1.2, which does not change its development-only verdict).
 6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff

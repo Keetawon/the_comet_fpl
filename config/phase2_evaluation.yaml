@@ -9,12 +9,14 @@
 # Candidate V1 is pre-registered here as a design-only policy. It has no implementation,
 # fitted parameter, historical evaluation, result, gate execution, or verdict.
 
-contract_version: "1.1"
+contract_version: "1.2"
 phase: 2
 
-# Amendment 1.1 adds only a separately named candidate policy. The complete version 1.0
+# Amendment 1.1 added only a separately named candidate policy. The complete version 1.0
 # population, roster policy, bins, baselines, metrics, scoring/calibration, gate, reporting,
-# seed, and Monte Carlo exclusion remain frozen and unchanged.
+# seed, and Monte Carlo exclusion remain frozen and unchanged. Amendment 1.2 tightens the
+# guardrails and adds a starter-ranking gate for FUTURE candidates; it evaluates nothing and
+# changes no version 1.0 / 1.1 policy.
 amendments:
   - version: "1.1"
     date: "2026-07-29"
@@ -46,6 +48,43 @@ amendments:
       Candidate implementation and deterministic offline tests require a separate reviewed
       slice. Only after that slice is committed may one clean, committed historical
       development run be executed with the registered provenance checks.
+  - version: "1.2"
+    date: "2026-07-30"
+    candidates_evaluated_before_amendment: 1
+    changed: >-
+      Tightens the Stage B promotion guardrails and adds a starter-ranking gate, judged against
+      FUTURE candidates only. (1) Each bounded non-regression guardrail (RPS, Brier-any,
+      Brier-60+) is now compared against the BEST required baseline value of THAT metric, not the
+      single best-by-log-score baseline, so a candidate can no longer pass by beating only the
+      weakest baseline on RPS/Brier. (2) Adds maximum_spearman_p60_relative_regression: 0.0: the
+      candidate's aggregate within-(season, gw, position) Spearman-p60 must be >= the best
+      (highest) baseline Spearman; a group-constant baseline (position_minutes_frequency) emits
+      undefined Spearman and is excluded from that max, and a candidate that itself emits
+      undefined Spearman FAILS the gate because it cannot rank starters. The primary log-score
+      lift, the per-season log no-regression rule, PIT-80, coverage, fold count, and leakage
+      rules are unchanged. Pins guardrail_comparison: best_baseline_per_metric so the semantics
+      live in the contract, not only in code.
+    reason: >-
+      Candidate V1's development run showed position_minutes_frequency is the best-by-log-score
+      baseline but the WORST on RPS and both Brier margins; the old code measured every guardrail
+      against that one easy bar. The whole purpose of a minutes model is to rank who starts and
+      plays 60+, which is exactly spearman_p60_within_position_gameweek, yet it sat in no gate.
+      Amendment 1.2 closes both gaps for candidates judged after it.
+    evidence: >-
+      Exactly one candidate (shrunk_trailing_5_player_minutes_v1) had been development-evaluated
+      before this amendment, and that evaluation is development-only and not a promotion. The
+      amendment does not re-run, re-score, or re-judge V1; V1's frozen verdict (development-only,
+      not promoted for the unversioned-proxy reason) is unchanged, and V1's frozen evidence stands
+      byte-identical. A separately written note records how V1 would additionally fail the new
+      Spearman gate and be measured against harder bars UNDER the later amendment, without changing
+      V1's own verdict.
+    tolerance_rationale: >-
+      This amendment may not weaken any gate. Every change makes a guardrail HARDER (each is now
+      measured against the best baseline value of its own metric, not the easiest baseline) or
+      adds a NEW criterion (the Spearman-p60 starter-ranking no-regression gate). No threshold is
+      relaxed and no population, roster, bin, baseline, metric, or calibration policy changes.
+      Tightening-for-the-future with the prior candidate's verdict untouched is the legitimate
+      direction; retroactive re-judging is not done.
 
 target:
   entity: player
@@ -285,6 +324,10 @@ promotion:
   compare_against: best_eligible_required_stage_b_baseline
   comparison_population: same_eligible_predictions
   relative_lift_formula: "(baseline - candidate) / abs(baseline)"
+  # Amendment 1.2: each bounded guardrail (RPS, Brier-any, Brier-60+) is compared against the BEST
+  # required baseline value of THAT metric, never the single log-score comparator. Pinned here so
+  # the semantics are part of the contract, not implicit in the runner code.
+  guardrail_comparison: best_baseline_per_metric
   # Aggregate mean-log-score lift required against the best eligible required baseline.
   minimum_primary_relative_lift: 0.01
   # No ranked-probability-score regression tolerated (AGGREGATE guardrail only; there is NO
@@ -294,6 +337,12 @@ promotion:
   # NO per-season Brier gate). Evaluated independently per margin.
   maximum_brier_relative_regression_any_minutes: 0.0
   maximum_brier_relative_regression_60_plus: 0.0
+  # Amendment 1.2: the minutes model's purpose is to rank who starts and plays 60+. The
+  # candidate's aggregate within-(season, gw, position) Spearman-p60 must be >= the best (highest)
+  # baseline Spearman. position_minutes_frequency emits undefined Spearman (group-constant) and is
+  # EXCLUDED from the baseline max; a candidate that itself emits undefined Spearman FAILS, because
+  # a group-constant prediction cannot rank starters.
+  maximum_spearman_p60_relative_regression: 0.0
   pit_interval_80_maximum_absolute_error: 0.05
   # Pinned to exactly 1.0: every eligible row must receive a prediction. This gate may NOT be
   # relaxed; the loader rejects any other value.

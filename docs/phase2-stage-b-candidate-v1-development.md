@@ -124,14 +124,18 @@ ordered-distribution accuracy. The honest test is therefore the candidate agains
 | Brier 60-plus | 0.1068163524088986 | 0.1088506158124824 (`trailing_5_player_minutes`) | **+1.8689%** |
 | Mean log score | 0.7419767497490626 | 1.0491566551300036 (`position_minutes_frequency`) | +29.2787% |
 
-Candidate V1 improves on the **best** baseline value of every metric, including the three bounded
-guardrails. The improvement over the strongest player-history baseline (`trailing_5_player`) is
-small on RPS/Brier (+0.13% to +1.87%) but real and in the same direction on all three: the
-shrinkage retains the player signal while removing the log-score catastrophe. Against the
-position prior it improves on all four metrics simultaneously. So V1 is not merely a
-numerically-finite `trailing_5_player`; it is a genuine, if modest, improvement on the strongest
-ordered-distribution baseline, and the shrinkage hypothesis is supported on this development
-archive — **as a development diagnostic, not a promotion verdict.**
+Candidate V1 improves on the **best** baseline value of every metric **except the
+within-position Spearman-p60 starter ranking, where it regresses (0.69090 vs 0.70851 best
+baseline, −2.49%)**, including the three bounded guardrails. The improvement over the strongest
+player-history baseline (`trailing_5_player`) is small on RPS/Brier (+0.13% to +1.87%) but real
+and in the same direction on all three: the shrinkage retains the player signal while removing the
+log-score catastrophe. Against the position prior it improves on all four metrics simultaneously.
+So V1 is not merely a numerically-finite `trailing_5_player`; it is a genuine, if modest,
+improvement on the strongest ordered-distribution baseline, and the shrinkage hypothesis is
+supported on this development archive — **as a development diagnostic, not a promotion verdict.**
+The Spearman regression is the one place V1 gives back signal: it ranks who starts and plays 60+
+slightly worse than `last_observed_player_minutes`, and that is exactly the dimension a later
+amendment (1.2) makes into a gate.
 
 ## Gate criteria (each a development diagnostic; never combined into a verdict)
 
@@ -348,11 +352,13 @@ rule is respected by omission here.
 ## Verdict
 
 **DEVELOPMENT ONLY. Do not promote.** On this historical archive Candidate V1 improves on the
-best required baseline value of every metric: mean log score 0.74198 (best baseline 1.04916,
-+29.28%), RPS 0.31396 (best baseline 0.31901, +1.58%), Brier-any 0.11537 (best baseline 0.11552,
-+0.13%), Brier-60+ 0.10682 (best baseline 0.10885, +1.87%), with PIT-80 band coverage 0.8249
-(|error| 0.0249), full prediction coverage (133,964/133,964), zero leakage failures, and no
-per-season mean-log-score regression. All nine development diagnostics pass.
+best required baseline value of every metric **except the within-position Spearman-p60 starter
+ranking, where it regresses (0.69090 vs 0.70851 best baseline, −2.49%)**: mean log score 0.74198
+(best baseline 1.04916, +29.28%), RPS 0.31396 (best baseline 0.31901, +1.58%), Brier-any 0.11537
+(best baseline 0.11552, +0.13%), Brier-60+ 0.10682 (best baseline 0.10885, +1.87%), with PIT-80
+band coverage 0.8249 (|error| 0.0249), full prediction coverage (133,964/133,964), zero leakage
+failures, and no per-season mean-log-score regression. All nine development diagnostics pass under
+the contract version (1.1) this run was scored against.
 
 **The reason it is not promoted is not the score — it is the unversioned proxies.** The
 historical target roster is `archive_proxy_unversioned_at_real_deadline` and the cutoff is the
@@ -369,3 +375,32 @@ promotion attempt would be a separately pre-registered candidate evaluated again
 2026/27 data as it accrues under the unchanged promotion gate, selected from a versioned player
 registry — that confirmation set was not consumed here and remains the only honest path to
 promotion. Per the pre-registration, V1 is left as committed and is not tuned again.
+
+## Note added under amendment 1.2 (not a re-run)
+
+> This note records how a later contract amendment would view V1's frozen numbers. It does **not**
+> re-run, re-score, or re-judge Candidate V1. V1 was scored once, under contract version 1.1, and
+> its evidence
+> ([`evidence/phase2-stage-b-candidate-v1-2026-07-30.json`](evidence/phase2-stage-b-candidate-v1-2026-07-30.json))
+> is byte-identical. V1's verdict — development-only, not promoted — is unchanged, and its reason
+> is still the unversioned proxies, not any score.
+
+Amendment 1.2 (contract version 1.2) tightens the Stage B guardrails for **future** candidates
+only. Two changes are relevant to how V1's frozen numbers would be read under the later gate:
+
+1. **Each bounded guardrail is now measured against the best baseline value of its own metric.**
+   Under 1.1 the RPS/Brier guardrails were measured against the single best-by-log-score baseline
+   (`position_minutes_frequency`), which is the *worst* baseline on RPS and both Brier margins.
+   Under 1.2 V1's still-passing RPS/Brier guardrails would be measured against the harder
+   `trailing_5_player_minutes` bar — RPS +1.58%, Brier-any +0.13%, Brier-60+ +1.87% — and they
+   remain improvements, so those three would still pass.
+2. **A new starter-ranking gate (`maximum_spearman_p60_relative_regression: 0.0`) exists.** V1's
+   aggregate Spearman-p60 is 0.69090 against the best baseline 0.70851 (`last_observed_player_minutes`;
+   `position_minutes_frequency` is group-constant and excluded), a −2.49% regression. Under 1.2 V1
+   would **additionally fail** this one new gate.
+
+This changes nothing about V1: it was never a promotion (the block is the unversioned proxies, not
+any score), it is not re-evaluated, and `candidates_evaluated_before_amendment` for 1.2 is honestly
+recorded as 1. The annotation exists so the frozen 1.1 record is not misread as "V1 would pass a
+later, harder gate" — on starter ranking it would not, and that regression is the diagnostic
+motivation for the recency-weighted successor.
