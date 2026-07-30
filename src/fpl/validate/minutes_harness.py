@@ -315,8 +315,13 @@ def _target_rows(frame: pl.DataFrame) -> tuple[list[TargetRow], list[int]]:
     return rows, labels
 
 
-def _training_history(con: duckdb.DuckDBPyConnection, fold: MinutesFold) -> list[HistoryRow]:
-    """Every eligible prior player-fixture (minutes non-null, kickoff < as_of), including zeros."""
+def player_fixture_history(con: duckdb.DuckDBPyConnection, *, as_of: datetime) -> list[HistoryRow]:
+    """Every eligible prior player-fixture (minutes non-null, kickoff < as_of), including zeros.
+
+    The single builder for a fold's (or a prospective run's) training history: prior eligible
+    rows under the strict cutoff, with the minutes label. Shared by the walk-forward folds and
+    the prospective minutes job so the two cannot drift on what "history" means.
+    """
     select = ", ".join((*_TARGET_COLUMNS, "minutes"))
     frame = con.execute(
         f"""
@@ -324,9 +329,13 @@ def _training_history(con: duckdb.DuckDBPyConnection, fold: MinutesFold) -> list
         WHERE minutes IS NOT NULL AND kickoff_time < ?
         ORDER BY kickoff_time, season, fixture, code
         """,
-        [fold.as_of],
+        [as_of],
     ).pl()
     return _history_rows(frame)
+
+
+def _training_history(con: duckdb.DuckDBPyConnection, fold: MinutesFold) -> list[HistoryRow]:
+    return player_fixture_history(con, as_of=fold.as_of)
 
 
 def _fold_targets(
