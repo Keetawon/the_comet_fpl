@@ -116,16 +116,17 @@ def worktree_is_clean(repo: Path) -> bool:
     return _git(repo, "status", "--porcelain") == ""
 
 
-def require_clean_worktree(repo: Path) -> None:
+def require_clean_worktree(repo: Path, *, candidate: str = "Candidate V1") -> None:
     """Refuse to score unless the worktree is clean.
 
     Recording a clean HEAD SHA over a modified tree would name the wrong code, so a dirty
-    worktree is a hard stop with an explicit diagnostic rather than a warning.
+    worktree is a hard stop with an explicit diagnostic rather than a warning. ``candidate`` names
+    the candidate in the message (shared by the V1 and V2 development runners).
     """
     porcelain = _git(repo, "status", "--porcelain")
     if porcelain:
         raise SystemExit(
-            "Candidate V1 refuses to run on a dirty worktree. The recorded commit SHA must name "
+            f"{candidate} refuses to run on a dirty worktree. The recorded commit SHA must name "
             "the exact code that was scored, and uncommitted changes would make it a lie. Commit "
             "or stash the following before re-running:\n" + porcelain
         )
@@ -234,15 +235,20 @@ def capture_preflight(
     config_fp: str | None = None,
     candidate_source_path: Path,
     candidate_source_fp: str | None = None,
+    candidate_name: str | None = None,
 ) -> PreflightSnapshot:
     """Capture every fingerprint, HEAD, seed, and ``started_at`` BEFORE the evaluation runs.
 
     ``config_fp`` / ``candidate_source_fp`` let the caller pass an already-computed hash of the
     exact bytes parsed / scored (the runner passes the config hash from
     :func:`load_contract_from_bytes`); when omitted they are recomputed from the path.
+    ``candidate_name`` overrides the snapshot's candidate label (the V2 runner passes the V2
+    name); it defaults to the V1 candidate name for backward compatibility.
     """
     return PreflightSnapshot(
-        candidate=config.stage_b_candidate_v1.name,
+        candidate=(
+            candidate_name if candidate_name is not None else config.stage_b_candidate_v1.name
+        ),
         contract_version=config.contract_version,
         commit_sha=head_commit_sha(repo),
         config_fingerprint=config_fp if config_fp is not None else file_sha256(config_path),
@@ -705,13 +711,18 @@ def format_development_report(
     *,
     provenance: Provenance,
     diagnostics: DevelopmentDiagnostics,
+    banner: str = _DEVELOPMENT_BANNER,
 ) -> str:
-    """The DEVELOPMENT ONLY comparison block, printed after the standard score report."""
-    lines = [_DEVELOPMENT_BANNER]
+    """The DEVELOPMENT ONLY comparison block, printed after the standard score report.
+
+    ``banner`` lets the V2 runner reuse this formatter with its own candidate banner; the candidate
+    name comes from the ``candidate`` argument (not hardcoded to V1).
+    """
+    lines = [banner]
     lines += provenance.as_lines()
     lines += [
         "",
-        f"model                  : {config.stage_b_candidate_v1.name} (development-only)",
+        f"model                  : {candidate} (development-only)",
         "primary metric         : mean log score (lower is better); RPS/Brier are guardrails",
         "comparator baseline    : "
         f"{diagnostics.comparator} (best required baseline by mean log score)",
@@ -743,7 +754,7 @@ def format_development_report(
 
     selections = _parameter_selections(result, candidate)
     if selections:
-        lines += ["", "Candidate V1 fold-local parameter selections:"]
+        lines += ["", f"{candidate} fold-local parameter selections:"]
         for key in sorted(selections):
             counts = ", ".join(
                 f"{value}={count}" for value, count in sorted(selections[key].items())
@@ -832,17 +843,19 @@ def build_reconciliation_record(
     *,
     provenance: Provenance,
     diagnostics: DevelopmentDiagnostics,
+    schema: str = "stage_b_candidate_v1_development/v1",
 ) -> dict[str, object]:
     """Build the complete result emitted for independent Stage B reconciliation.
 
     The human report is intentionally concise. This record preserves every configured score
-    slice, both reliability curves and all bucket counts, every fold-local Candidate V1 parameter
+    slice, both reliability curves and all bucket counts, every fold-local candidate parameter
     selection, the provenance fence, and the structured diagnostic assertions. Raw randomized-PIT
     draws are not duplicated across overlapping slices; their count and the contract-defined
-    aggregate coverage are recorded instead.
+    aggregate coverage are recorded instead. ``schema`` lets the V2 runner emit its own schema name
+    while sharing this builder; the candidate name comes from ``provenance.candidate``.
     """
     return {
-        "schema": "stage_b_candidate_v1_development/v1",
+        "schema": schema,
         "status": "development_only_not_a_promotion_result",
         "provenance": {
             "candidate": provenance.candidate,
@@ -857,7 +870,7 @@ def build_reconciliation_record(
         },
         "contract": {
             "phase": config.phase,
-            "candidate": config.stage_b_candidate_v1.name,
+            "candidate": provenance.candidate,
             "grain": config.target.grain,
             "identity_policy": config.target.identity_policy,
             "required_baselines": sorted(result.required_baselines),

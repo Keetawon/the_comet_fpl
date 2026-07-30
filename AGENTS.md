@@ -58,7 +58,12 @@ promotion gate for **future** candidates only — each bounded guardrail (RPS, B
 is measured against the best baseline value of its own metric, and a new
 `maximum_spearman_p60_relative_regression: 0.0` starter-ranking gate requires a candidate to rank
 who starts and plays 60+ at least as well as the best baseline; it evaluates nothing, changes no
-v1.0/1.1 policy, and does not re-judge V1.
+v1.0/1.1 policy, and does not re-judge V1. Additive amendment 1.3 (contract v1.3) pre-registers
+Candidate V2 `recency_weighted_trailing_player_minutes_v2` — V1 with a geometric recency weight on
+the same trailing-5 window (reduces exactly to V1 at decay = 1.0), selected jointly with alpha on
+the same nested walk-forward, judged by the 1.2 gate unchanged. V2 and its development runner are
+implemented and offline-tested; **V2 has not been evaluated**, and a one-shot historical run must
+use a pristine rebuilt archive (the working DB now carries Step-2 live rows).
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -307,7 +312,13 @@ Unless the user sets another priority, address prerequisites before model sophis
    `maximum_spearman_p60_relative_regression: 0.0` starter-ranking gate (candidate must rank starters
    at least as well as the best baseline; group-constant candidates fail). It evaluates nothing,
    changes no v1.0/1.1 comparison policy, and does not re-judge V1 (V1 would additionally fail the
-   new Spearman gate under 1.2, which does not change its development-only verdict).
+   new Spearman gate under 1.2, which does not change its development-only verdict). Additive
+   amendment 1.3 (contract v1.3) pre-registers Candidate V2
+   `recency_weighted_trailing_player_minutes_v2` (recency-weighted V1; reduces to V1 at decay = 1.0)
+   without changing any comparison rule; it is judged by the 1.2 gate. V2 and its development runner
+   are implemented and offline-tested but **not evaluated**; a one-shot historical run is the owner's
+   authorized action against a pristine rebuilt archive, and like V1 it cannot be promoted on
+   historical data (unversioned proxies).
 6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff

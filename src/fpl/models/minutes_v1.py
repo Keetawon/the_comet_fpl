@@ -17,7 +17,7 @@ layer owns outcome access; the public prediction boundary accepts only the label
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import overload
@@ -106,6 +106,114 @@ def _as_target(row: HistoryRow) -> TargetRow:
     )
 
 
+def _observed_gameweeks(history: Sequence[HistoryRow]) -> tuple[tuple[str, int], ...]:
+    first_kickoff: dict[tuple[str, int], datetime] = {}
+    for row in history:
+        key = (row.season, row.gw)
+        kickoff = row.kickoff_time.astimezone(UTC)
+        current = first_kickoff.get(key)
+        if current is None or kickoff < current:
+            first_kickoff[key] = kickoff
+    return tuple(
+        key
+        for key, _ in sorted(
+            first_kickoff.items(),
+            key=lambda item: (item[1], item[0][0], item[0][1]),
+        )
+    )
+
+
+def _fit_state(history: Sequence[HistoryRow], bins: MinuteBins) -> _FittedState:
+    """Position prior + per-code recent-first history -- the shared fold-local state.
+
+    Candidate V1 and the recency-weighted successor (``minutes_v2``) both read only
+    ``state.prior`` and ``state.by_code``, so this state shape is model-agnostic and built once.
+    """
+    ordered = sorted(history, key=_recency_key, reverse=True)
+    by_code: dict[int, list[HistoryRow]] = {}
+    for row in ordered:
+        by_code.setdefault(row.code, []).append(row)
+    return _FittedState(
+        prior=PositionPrior.from_history(history, bins),
+        by_code={code: tuple(rows) for code, rows in by_code.items()},
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _InnerHoldoutPlan:
+    """The nested six-observed-gameweek walk-forward structure, shared by candidate selection.
+
+    ``batches`` pairs each holdout gameweek's labelled rows with the ``_FittedState`` built from
+    only the rows observed before that gameweek's first kickoff. ``used_inner_holdout`` is False
+    when there are too few earlier observed gameweeks; the caller then takes its frozen fallback.
+    """
+
+    used_inner_holdout: bool
+    holdout_keys: tuple[tuple[str, int], ...]
+    training_observed_gameweeks: int
+    batches: tuple[tuple[tuple[HistoryRow, ...], _FittedState], ...]
+
+
+def _build_inner_holdout_plan(
+    history: Sequence[HistoryRow],
+    *,
+    holdout_count: int,
+    minimum_earlier: int,
+    fit_state: Callable[[Sequence[HistoryRow]], _FittedState],
+) -> _InnerHoldoutPlan:
+    """Build the inner-holdout batches once, independent of any parameter grid.
+
+    The candidate state is raw history and therefore independent of the selected parameter, so
+    every grid point is scored against the SAME pre-gameweek snapshots. Building the snapshots
+    once here -- and letting each candidate score its own grid against them -- is what keeps V1
+    and the recency-weighted V2 from duplicating the walk-forward machinery.
+    """
+    gameweeks = _observed_gameweeks(history)
+    required = holdout_count + minimum_earlier
+    if len(gameweeks) < required:
+        return _InnerHoldoutPlan(
+            used_inner_holdout=False,
+            holdout_keys=(),
+            training_observed_gameweeks=max(len(gameweeks) - holdout_count, 0),
+            batches=(),
+        )
+
+    holdout_keys = gameweeks[-holdout_count:]
+    training_keys = frozenset(gameweeks[:-holdout_count])
+    batches_map = {
+        key: tuple(
+            sorted(
+                (row for row in history if (row.season, row.gw) == key),
+                key=_target_order,
+            )
+        )
+        for key in holdout_keys
+    }
+
+    completed_keys = set(training_keys)
+    batches: list[tuple[tuple[HistoryRow, ...], _FittedState]] = []
+    for key in holdout_keys:
+        batch = batches_map[key]
+        batch_as_of = min(row.kickoff_time.astimezone(UTC) for row in batch)
+        available = tuple(
+            row
+            for row in history
+            if (row.season, row.gw) in completed_keys
+            and row.kickoff_time.astimezone(UTC) < batch_as_of
+        )
+        if not available:
+            raise ValueError(f"empty inner training history before holdout gameweek {key}")
+        batches.append((batch, fit_state(available)))
+        completed_keys.add(key)
+
+    return _InnerHoldoutPlan(
+        used_inner_holdout=True,
+        holdout_keys=holdout_keys,
+        training_observed_gameweeks=len(training_keys),
+        batches=tuple(batches),
+    )
+
+
 class ShrunkTrailing5PlayerMinutesV1:
     """The pre-registered Stage B Candidate V1 estimator.
 
@@ -114,6 +222,10 @@ class ShrunkTrailing5PlayerMinutesV1:
     observed gameweeks are available, then refits the position prior and player histories on
     the complete outer history.  ``predict`` accepts one target or a sequence of targets.
     """
+
+    # Candidate name is a runtime string (each Stage B candidate carries its own); annotated ``str``
+    # rather than the narrow literal so the recency-weighted subclass can set its own name.
+    name: str
 
     def __init__(
         self,
@@ -150,7 +262,7 @@ class ShrunkTrailing5PlayerMinutesV1:
             raise ValueError("Candidate V1 requires at least one eligible prior minutes row")
 
         self._metadata = self._select_alpha(rows)
-        self._state = self._fit_state(rows)
+        self._state = _fit_state(rows, self._bins)
         self._as_of = as_of_utc
         return self
 
@@ -237,16 +349,6 @@ class ShrunkTrailing5PlayerMinutesV1:
         if not isinstance(target.position, Position):
             raise TypeError("target position must be a Position")
 
-    def _fit_state(self, history: Sequence[HistoryRow]) -> _FittedState:
-        ordered = sorted(history, key=_recency_key, reverse=True)
-        by_code: dict[int, list[HistoryRow]] = {}
-        for row in ordered:
-            by_code.setdefault(row.code, []).append(row)
-        return _FittedState(
-            prior=PositionPrior.from_history(history, self._bins),
-            by_code={code: tuple(rows) for code, rows in by_code.items()},
-        )
-
     def _distribution(
         self, state: _FittedState, target: TargetRow, *, alpha: float
     ) -> MinutesDistribution:
@@ -272,74 +374,29 @@ class ShrunkTrailing5PlayerMinutesV1:
             raise RuntimeError("Candidate V1 must be fitted before prediction")
         return self._distribution(self._state, target, alpha=self._metadata.selected_alpha)
 
-    def _observed_gameweeks(self, history: Sequence[HistoryRow]) -> tuple[tuple[str, int], ...]:
-        first_kickoff: dict[tuple[str, int], datetime] = {}
-        for row in history:
-            key = (row.season, row.gw)
-            kickoff = row.kickoff_time.astimezone(UTC)
-            current = first_kickoff.get(key)
-            if current is None or kickoff < current:
-                first_kickoff[key] = kickoff
-        return tuple(
-            key
-            for key, _ in sorted(
-                first_kickoff.items(),
-                key=lambda item: (item[1], item[0][0], item[0][1]),
-            )
-        )
-
     def _select_alpha(self, history: Sequence[HistoryRow]) -> MinutesV1Metadata:
-        gameweeks = self._observed_gameweeks(history)
-        holdout_count = self._policy.inner_holdout_observed_gameweeks
-        minimum_earlier = self._policy.minimum_earlier_observed_gameweeks
-        required = holdout_count + minimum_earlier
+        plan = _build_inner_holdout_plan(
+            history,
+            holdout_count=self._policy.inner_holdout_observed_gameweeks,
+            minimum_earlier=self._policy.minimum_earlier_observed_gameweeks,
+            fit_state=lambda rows: _fit_state(rows, self._bins),
+        )
         fallback = self._policy.insufficient_inner_history_fallback_alpha
-        if len(gameweeks) < required:
+        if not plan.used_inner_holdout:
             return MinutesV1Metadata(
                 selected_alpha=fallback,
                 used_inner_holdout=False,
                 inner_holdout_gameweeks=(),
-                inner_training_observed_gameweeks=max(len(gameweeks) - holdout_count, 0),
+                inner_training_observed_gameweeks=plan.training_observed_gameweeks,
                 alpha_scores=(),
             )
 
-        holdout_keys = gameweeks[-holdout_count:]
-        training_keys = frozenset(gameweeks[:-holdout_count])
-        batches = {
-            key: tuple(
-                sorted(
-                    (row for row in history if (row.season, row.gw) == key),
-                    key=_target_order,
-                )
-            )
-            for key in holdout_keys
-        }
-
-        # Candidate state is raw history and therefore independent of alpha. Build each
-        # pre-gameweek snapshot once, after adding only rows whose outcomes were available at
-        # that gameweek's first kickoff. Every alpha is then scored against the same snapshots.
-        completed_keys = set(training_keys)
-        walk_forward: list[tuple[tuple[HistoryRow, ...], _FittedState]] = []
-        for key in holdout_keys:
-            batch = batches[key]
-            batch_as_of = min(row.kickoff_time.astimezone(UTC) for row in batch)
-            available = tuple(
-                row
-                for row in history
-                if (row.season, row.gw) in completed_keys
-                and row.kickoff_time.astimezone(UTC) < batch_as_of
-            )
-            if not available:
-                raise ValueError(f"empty inner training history before holdout gameweek {key}")
-            walk_forward.append((batch, self._fit_state(available)))
-            completed_keys.add(key)
-
+        # Every alpha is scored against the same pre-gameweek snapshots built by the plan. The
+        # label is retained separately and never reaches _distribution through TargetRow.
         scores: list[AlphaScore] = []
         for alpha in self._policy.prior_strength_grid:
             log_scores: list[float] = []
-            for batch, state in walk_forward:
-                # Predict the complete gameweek from one pre-gameweek state.  The label is
-                # retained separately and never reaches _distribution through TargetRow.
+            for batch, state in plan.batches:
                 for labelled in batch:
                     target = _as_target(labelled)
                     distribution = self._distribution(state, target, alpha=alpha)
@@ -357,8 +414,8 @@ class ShrunkTrailing5PlayerMinutesV1:
         return MinutesV1Metadata(
             selected_alpha=best.alpha,
             used_inner_holdout=True,
-            inner_holdout_gameweeks=holdout_keys,
-            inner_training_observed_gameweeks=len(training_keys),
+            inner_holdout_gameweeks=plan.holdout_keys,
+            inner_training_observed_gameweeks=plan.training_observed_gameweeks,
             alpha_scores=tuple(scores),
         )
 

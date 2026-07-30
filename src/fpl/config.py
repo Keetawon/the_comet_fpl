@@ -875,6 +875,95 @@ class Phase2StageBCandidateV1Policy(_Frozen):
         return self
 
 
+class Phase2StageBCandidateV2Policy(_Frozen):
+    """Frozen pre-registration for the recency-weighted Stage B minutes candidate.
+
+    Candidate V2 is Candidate V1 with exactly ONE change: a geometric recency weight on the same
+    trailing-5 window. For the i-th most-recent row (i = 0 newest) the weight is ``decay ** i``;
+    weighted bin mass ``w_k = sum of decay**i over trailing rows in bin k``; ``W = sum_k w_k``;
+    and ``p_k(decay, alpha) = (w_k + alpha*q_k) / (W + alpha)``. At ``decay = 1.0`` this is
+    bit-identical to V1 (``w_k = c_k``, ``W = n``), so V2 is a strict generalisation. ``decay``
+    and ``alpha`` are selected jointly by the same nested six-observed-gameweek walk-forward V1
+    uses. Every distinguishing field is pinned so a result cannot be followed by a silent change.
+    """
+
+    name: Literal["recency_weighted_trailing_player_minutes_v2"]
+    development_only: Literal[True]
+    development_only_reason: Literal[
+        "archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design"
+    ]
+    grain: Literal["season_player_code_fixture"]
+    identity: Literal["stable_code"]
+    history_population: Literal[
+        "up_to_5_most_recent_prior_player_fixture_rows_including_zero_minutes"
+    ]
+    history_order: Literal["kickoff_time_then_season_then_fixture"]
+    history_window: Literal[5]
+    history_observed_results: Literal["kickoff_time < as_of"]
+    position_prior: Literal["fold_local_raw_position_minutes_frequency_for_target_current_position"]
+    position_prior_fallback: Literal["existing_unsmoothed_all_position_prior_rows"]
+    recency_weight: Literal["geometric_decay_power_i_on_trailing_window_i_zero_is_newest"]
+    player_bin_mass: Literal["w_k_is_sum_of_decay_to_the_i_over_trailing_rows_in_bin_k"]
+    total_weight: Literal["W_equals_sum_k_w_k"]
+    estimator: Literal["p_k(decay,alpha)=(w_k+alpha*q_k)/(W+alpha)"]
+    reduces_to_v1_when_decay_is_one: Literal[True]
+    additional_smoothing: Literal["none"]
+    scoring_floor_role: Literal["existing_1e-12_floor_is_scoring_only_not_model_smoothing"]
+    cold_start_fallback: Literal["when_W_equals_0_distribution_is_exactly_q"]
+    decay_grid: tuple[float, ...] = Field(min_length=1)
+    prior_strength_grid: tuple[float, ...] = Field(min_length=1)
+    selected_parameter: Literal["decay_and_alpha_history_window_remains_5"]
+    inner_holdout_observed_gameweeks: Literal[6]
+    minimum_earlier_observed_gameweeks: Literal[8]
+    inner_walk_forward: Literal[
+        "most_recent_6_observed_gameweeks_true_per_gameweek_predict_whole_gameweek_from_pre_gameweek_history_then_score_then_absorb"
+    ]
+    inner_objective: Literal["pooled_mean_log_score"]
+    tie_break: Literal["largest_decay_then_smallest_alpha"]
+    insufficient_inner_history_fallback_decay: float = Field(gt=0.0, le=1.0)
+    insufficient_inner_history_fallback_alpha: float = Field(gt=0.0)
+    fit_scope: Literal["all_transforms_priors_and_grid_selection_are_fold_local"]
+    target_label_policy: Literal["target_labels_never_enter_model_inputs"]
+    target_position_source: Literal["existing_unversioned_target_roster_proxy_current_position"]
+    null_policy: Literal["preserve_nulls"]
+    zero_minutes_policy: Literal["include_in_history_and_training"]
+    assistant_manager_policy: Literal["excluded_upstream_element_type_5"]
+    double_gameweek_policy: Literal[
+        "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+    ]
+    double_gameweek_same_distribution: Literal[
+        "same_code_current_position_may_share_distribution_across_target_gameweek_fixtures_intentional_reportable_not_collapsed"
+    ]
+    excluded_features: Literal["availability_status_team_opponent_and_home_away_are_not_features"]
+    monte_carlo: Literal["out_of_scope_closed_form"]
+
+    @model_validator(mode="after")
+    def _exact_candidate_policy(self) -> Self:
+        expected_decay = (1.0, 0.9, 0.7, 0.5, 0.3)
+        if self.decay_grid != expected_decay:
+            raise ValueError(
+                "Stage B Candidate V2 decay_grid is pinned to "
+                f"{expected_decay}; got {self.decay_grid}"
+            )
+        expected_alpha = (1.0, 2.0, 5.0, 10.0, 20.0)
+        if self.prior_strength_grid != expected_alpha:
+            raise ValueError(
+                "Stage B Candidate V2 prior_strength_grid is pinned to "
+                f"{expected_alpha}; got {self.prior_strength_grid}"
+            )
+        if self.insufficient_inner_history_fallback_decay != 1.0:
+            raise ValueError(
+                "Stage B Candidate V2 insufficient_inner_history_fallback_decay is pinned "
+                f"to 1.0 (== V1); got {self.insufficient_inner_history_fallback_decay!r}"
+            )
+        if self.insufficient_inner_history_fallback_alpha != 5.0:
+            raise ValueError(
+                "Stage B Candidate V2 insufficient_inner_history_fallback_alpha is pinned "
+                f"to 5.0; got {self.insufficient_inner_history_fallback_alpha!r}"
+            )
+        return self
+
+
 class Phase2MinuteBin(_Frozen):
     """One ordered minute bin. Keys are frozen; boundaries are explicit config data."""
 
@@ -1241,6 +1330,7 @@ ORIGINAL_PHASE2_CONTRACT_VERSION: str = "1.0"
 FROZEN_PHASE2_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
     "1.1": (("1.1", 0),),
     "1.2": (("1.1", 0), ("1.2", 1)),
+    "1.3": (("1.1", 0), ("1.2", 1), ("1.3", 1)),
 }
 
 
@@ -1274,7 +1364,7 @@ class Phase2EvaluationConfig(_Frozen):
     ruleset at load time via :meth:`verify_minutes_boundary`.
     """
 
-    contract_version: Literal["1.2"]
+    contract_version: Literal["1.3"]
     phase: Literal[2]
     amendments: tuple[Phase2Amendment, ...] = ()
     target: Phase2TargetPolicy
@@ -1283,6 +1373,10 @@ class Phase2EvaluationConfig(_Frozen):
     cutoff: Phase2CutoffPolicy
     training: Phase2TrainingPolicy
     stage_b_candidate_v1: Phase2StageBCandidateV1Policy
+    # Candidate V2 (recency-weighted trailing minutes) is required at contract version 1.3. It is
+    # additive: it changes no population/roster/bin/baseline/metric/gate and is judged by the 1.2
+    # gate unchanged. Required here so a 1.3 config that silently drops it fails to load.
+    stage_b_candidate_v2: Phase2StageBCandidateV2Policy
     output: Phase2OutputPolicy
     baselines: Phase2BaselinePolicy
     metrics: Phase2MetricPolicy

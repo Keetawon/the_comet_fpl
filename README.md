@@ -330,7 +330,12 @@ The baseline number remains a development number, not an upper bound. Additive a
 (RPS, Brier-any, Brier-60+) is now measured against the best baseline value of its own metric, and a
 new `maximum_spearman_p60_relative_regression: 0.0` starter-ranking gate requires a candidate to rank
 who starts and plays 60+ at least as well as the best baseline. It evaluates nothing, changes no
-v1.0/1.1 policy, and does not re-judge V1.
+v1.0/1.1 policy, and does not re-judge V1. Additive amendment 1.3 (contract v1.3) pre-registers
+Candidate V2 `recency_weighted_trailing_player_minutes_v2` — V1 with a geometric recency weight on
+the same trailing-5 window (it reduces exactly to V1 at decay = 1.0). V2 and its development runner
+are implemented and offline-tested; **V2 has not been evaluated**, and a future one-shot historical
+run must use a pristine rebuilt archive; see
+[`docs/phase2-stage-b-candidate-v2-design.md`](docs/phase2-stage-b-candidate-v2-design.md).
 
 ---
 

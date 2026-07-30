@@ -42,7 +42,7 @@ def test_phase2_contract_loads_with_point_in_time_cutoffs() -> None:
     load_phase2_evaluation.cache_clear()
     contract = load_phase2_evaluation()
     assert contract.phase == 2
-    assert contract.contract_version == "1.2"
+    assert contract.contract_version == "1.3"
     assert contract.target.entity == "player"
     assert contract.target.grain == "season_player_code_fixture"
     assert contract.target.outcome == "minutes_distribution"
@@ -366,15 +366,15 @@ def test_extra_field_is_rejected() -> None:
 
 def test_phase2_amendment_history_is_exactly_frozen() -> None:
     contract = load_phase2_evaluation()
-    assert contract.contract_version == "1.2"
+    assert contract.contract_version == "1.3"
     assert tuple(
         (amendment.version, amendment.candidates_evaluated_before_amendment)
         for amendment in contract.amendments
-    ) == (("1.1", 0), ("1.2", 1))
+    ) == (("1.1", 0), ("1.2", 1), ("1.3", 1))
 
 
-@pytest.mark.parametrize("version", ["1.0", "1.1", "2.0"])
-def test_only_phase2_contract_version_1_2_is_accepted(version: str) -> None:
+@pytest.mark.parametrize("version", ["1.0", "1.1", "1.2", "2.0"])
+def test_only_phase2_contract_version_1_3_is_accepted(version: str) -> None:
     document = copy.deepcopy(_document())
     document["contract_version"] = version
     with pytest.raises((ValidationError, ValueError)):
@@ -543,6 +543,114 @@ def test_stage_b_candidate_v1_fallback_alpha_is_exact() -> None:
     document = copy.deepcopy(_document())
     document["stage_b_candidate_v1"]["insufficient_inner_history_fallback_alpha"] = 10.0
     with pytest.raises((ValidationError, ValueError), match="fallback_alpha"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+# --------------------------------------------------------------------------------------
+# Amendment 1.3: Candidate V2 (recency-weighted trailing minutes) is exactly pre-registered
+# --------------------------------------------------------------------------------------
+
+
+def test_stage_b_candidate_v2_block_is_required() -> None:
+    document = copy.deepcopy(_document())
+    del document["stage_b_candidate_v2"]
+    with pytest.raises(ValidationError, match="stage_b_candidate_v2"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_stage_b_candidate_v2_is_exactly_pre_registered() -> None:
+    candidate = load_phase2_evaluation().stage_b_candidate_v2
+    assert candidate.name == "recency_weighted_trailing_player_minutes_v2"
+    assert candidate.development_only is True
+    assert candidate.history_window == 5  # window unchanged from V1; only the weight is new
+    assert candidate.recency_weight == "geometric_decay_power_i_on_trailing_window_i_zero_is_newest"
+    assert candidate.player_bin_mass == "w_k_is_sum_of_decay_to_the_i_over_trailing_rows_in_bin_k"
+    assert candidate.total_weight == "W_equals_sum_k_w_k"
+    assert candidate.estimator == "p_k(decay,alpha)=(w_k+alpha*q_k)/(W+alpha)"
+    assert candidate.reduces_to_v1_when_decay_is_one is True  # the nesting property, pinned
+    assert candidate.cold_start_fallback == "when_W_equals_0_distribution_is_exactly_q"
+    assert candidate.decay_grid == (1.0, 0.9, 0.7, 0.5, 0.3)
+    assert candidate.prior_strength_grid == (1.0, 2.0, 5.0, 10.0, 20.0)
+    assert candidate.selected_parameter == "decay_and_alpha_history_window_remains_5"
+    assert candidate.inner_holdout_observed_gameweeks == 6
+    assert candidate.minimum_earlier_observed_gameweeks == 8
+    assert candidate.inner_objective == "pooled_mean_log_score"
+    assert candidate.tie_break == "largest_decay_then_smallest_alpha"
+    assert candidate.insufficient_inner_history_fallback_decay == 1.0  # == V1
+    assert candidate.insufficient_inner_history_fallback_alpha == 5.0
+    assert candidate.excluded_features == (
+        "availability_status_team_opponent_and_home_away_are_not_features"
+    )
+    assert candidate.monte_carlo == "out_of_scope_closed_form"
+
+
+@pytest.mark.parametrize(
+    ("field", "mutated"),
+    [
+        ("name", "renamed_v2"),
+        ("development_only", False),
+        ("history_window", 4),
+        ("recency_weight", "linear_weight"),
+        ("reduces_to_v1_when_decay_is_one", False),
+        ("cold_start_fallback", "uniform"),
+        ("selected_parameter", "alpha_only"),
+        ("inner_holdout_observed_gameweeks", 5),
+        ("inner_objective", "mean_ranked_probability_score"),
+        ("tie_break", "smallest_alpha"),
+        ("null_policy", "fill_zero"),
+        ("excluded_features", "availability_is_allowed"),
+        ("monte_carlo", "required"),
+    ],
+)
+def test_stage_b_candidate_v2_literal_policy_cannot_be_weakened(
+    field: str, mutated: object
+) -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v2"][field] = mutated
+    with pytest.raises((ValidationError, ValueError)):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+@pytest.mark.parametrize(
+    "grid",
+    [
+        [1.0, 0.9, 0.7, 0.5],
+        [1.0, 0.9, 0.7, 0.5, 0.3, 0.1],
+        [0.9, 1.0, 0.7, 0.5, 0.3],
+        [1.0, 0.9, 0.7, 0.5, 0.4],
+    ],
+)
+def test_stage_b_candidate_v2_decay_grid_is_exact(grid: list[float]) -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v2"]["decay_grid"] = grid
+    with pytest.raises((ValidationError, ValueError), match="decay_grid"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_stage_b_candidate_v2_fallback_decay_is_exact() -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v2"]["insufficient_inner_history_fallback_decay"] = (
+        0.9  # pinned to 1.0 (== V1)
+    )
+    with pytest.raises((ValidationError, ValueError), match="fallback_decay"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_stage_b_candidate_v2_fallback_alpha_is_exact() -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v2"]["insufficient_inner_history_fallback_alpha"] = 10.0
+    with pytest.raises((ValidationError, ValueError), match="fallback_alpha"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_amendment_1_3_count_is_frozen_at_one_candidate_evaluated() -> None:
+    """The amendment records that one candidate (V1) had been evaluated before it (V2 evaluates
+    nothing). 1.2 also evaluated nothing -- its count is 1, and 1.3's count is 1 too."""
+    document = copy.deepcopy(_document())
+    for amendment in document["amendments"]:
+        if amendment["version"] == "1.3":
+            amendment["candidates_evaluated_before_amendment"] = 2  # wrong: only V1 was evaluated
+    with pytest.raises((ValidationError, ValueError), match="amendment history"):
         Phase2EvaluationConfig.model_validate(document)
 
 

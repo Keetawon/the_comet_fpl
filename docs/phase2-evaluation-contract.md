@@ -1,13 +1,17 @@
 # Phase 2 evaluation contract (Stage B player minutes)
 
-**Status: contract and typed loader implemented at version 1.2.** Version 1.0 froze the
+**Status: contract and typed loader implemented at version 1.3.** Version 1.0 froze the
 population, baselines, metrics, calibration, and promotion gate before any candidate existed.
 Additive amendment 1.1 pre-registers Candidate V1
 `shrunk_trailing_5_player_minutes_v1`; it changes none of those version 1.0 policies. Amendment
 1.2 tightens the guardrails and adds a starter-ranking gate for **future** candidates only — it
 evaluates nothing, changes no version 1.0 / 1.1 population/baseline/metric/calibration policy, and
-does not re-judge V1. Candidate V1 and its provenance-guarded development runner are implemented
-and deterministically offline-tested. The runner has been executed **once** as a clean historical
+does not re-judge V1. Additive amendment 1.3 pre-registers Candidate V2
+`recency_weighted_trailing_player_minutes_v2` (recency-weighted V1; reduces to V1 at decay = 1.0);
+it changes no version 1.0 / 1.2 comparison policy and is judged by the 1.2 gate unchanged. V2 and
+its provenance-guarded development runner are implemented and deterministically offline-tested;
+**V2 has not been evaluated.** Candidate V1 and its provenance-guarded development runner are
+implemented and deterministically offline-tested. The runner has been executed **once** as a clean historical
 development run; the result is recorded in
 [`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md) and is
 **development-only — not a promotion verdict or a gate execution** (the historical target roster
@@ -101,6 +105,26 @@ is honestly recorded as 1. A separately written note in
 that V1 would additionally fail the new Spearman gate (0.69090 vs 0.70851, −2.49%) and be measured
 against the harder `trailing_5_player_minutes` RPS/Brier bars under 1.2, without changing V1's own
 verdict.
+
+## Amendment 1.3: Candidate V2 design only (recency-weighted V1)
+
+Amendment 1.3 was recorded on 2026-07-30 with **one candidate evaluated before the amendment**
+(Candidate V1, development-only). It adds one required, separately named policy block
+(`stage_b_candidate_v2`) and no new tolerance or comparison rule. Candidate V2 is V1 with a
+geometric recency weight on the same trailing-5 window: weight `decay ** i` for the `i`-th
+most-recent row (`i = 0` newest), `p_k(decay, alpha) = (w_k + alpha*q_k)/(W + alpha)`. It reduces
+**exactly** to V1 at `decay = 1.0` (`w_k = c_k`, `W = n`), so it is a strict generalisation.
+`decay ∈ {1.0, 0.9, 0.7, 0.5, 0.3}` and `alpha ∈ {1.0, 2.0, 5.0, 10.0, 20.0}` are selected jointly
+by the same nested six-observed-gameweek walk-forward V1 uses; the tie-break prefers the largest
+`decay` then the smallest `alpha` (bias toward the null / V1). The window stays pinned at 5; every
+other V1 choice is unchanged.
+
+V2 is judged by the **1.2 gate unchanged** (best-per-metric guardrails + starter-ranking gate). The
+full formula, nesting argument, double-gameweek policy, frozen grids, test plan, and the one-shot
+run command with its pristine-archive precondition are in
+[`phase2-stage-b-candidate-v2-design.md`](phase2-stage-b-candidate-v2-design.md). At registration
+the amendment authorized no evaluation and preceded implementation; V2 and its runner now exist
+with deterministic offline tests and **no historical evaluation has been run**.
 
 ## Entity, grain, and player identity
 

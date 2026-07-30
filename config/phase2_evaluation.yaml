@@ -9,7 +9,7 @@
 # Candidate V1 is pre-registered here as a design-only policy. It has no implementation,
 # fitted parameter, historical evaluation, result, gate execution, or verdict.
 
-contract_version: "1.2"
+contract_version: "1.3"
 phase: 2
 
 # Amendment 1.1 added only a separately named candidate policy. The complete version 1.0
@@ -85,6 +85,32 @@ amendments:
       relaxed and no population, roster, bin, baseline, metric, or calibration policy changes.
       Tightening-for-the-future with the prior candidate's verdict untouched is the legitimate
       direction; retroactive re-judging is not done.
+  - version: "1.3"
+    date: "2026-07-30"
+    candidates_evaluated_before_amendment: 1
+    changed: >-
+      Adds the separately named Stage B Candidate V2 policy
+      recency_weighted_trailing_player_minutes_v2. This amendment is additive only. The version 1.0
+      population, target-roster knowledge-time policy, minute bins, four baseline names and
+      definitions, metrics, scoring and calibration definitions, and the version 1.2 promotion gate
+      remain unchanged. V2 is judged by the 1.2 gate (best-per-metric guardrails + starter-ranking
+      gate) with no further gate change.
+    reason: >-
+      Candidate V1 counts the trailing-5 window with equal weight, so it cannot distinguish a
+      starter being dropped (90,90,90,0,0) from a substitute breaking in (0,0,90,90,90): both yield
+      the same bin counts and the same prediction. That discarded ordering is exactly the
+      starter-ranking signal amendment 1.2 now gates, and V1 regresses it (0.69090 vs 0.70851).
+      Candidate V2 tests one hypothesis: a geometric recency weight on the same trailing-5 window
+      improves starter ranking without regressing the proper scores. It reduces EXACTLY to V1 when
+      decay = 1.0, so it is a strict generalisation and the comparison is honest.
+    evidence: >-
+      Exactly one candidate (shrunk_trailing_5_player_minutes_v1) had been evaluated before this
+      amendment; that evaluation is development-only and not a promotion. Candidate V2 has no
+      fitted parameters, historical score, or promotion verdict at the time of registration. The
+      amendment adds a candidate policy only and evaluates nothing.
+    tolerance_rationale: >-
+      No tolerance or gate changes. This amendment adds a candidate policy only; it changes none of
+      the frozen version 1.0 / 1.2 comparison rules and cannot weaken or reinterpret the gate.
 
 target:
   entity: player
@@ -203,6 +229,54 @@ stage_b_candidate_v1:
   inner_walk_forward: most_recent_6_observed_gameweeks_true_per_gameweek_predict_whole_gameweek_from_pre_gameweek_history_then_score_then_absorb
   inner_objective: pooled_mean_log_score
   tie_break: smallest_alpha
+  insufficient_inner_history_fallback_alpha: 5.0
+  fit_scope: all_transforms_priors_and_grid_selection_are_fold_local
+  target_label_policy: target_labels_never_enter_model_inputs
+  target_position_source: existing_unversioned_target_roster_proxy_current_position
+  null_policy: preserve_nulls
+  zero_minutes_policy: include_in_history_and_training
+  assistant_manager_policy: excluded_upstream_element_type_5
+  double_gameweek_policy: fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption
+  double_gameweek_same_distribution: same_code_current_position_may_share_distribution_across_target_gameweek_fixtures_intentional_reportable_not_collapsed
+  excluded_features: availability_status_team_opponent_and_home_away_are_not_features
+  monte_carlo: out_of_scope_closed_form
+
+# Candidate V2 is a design-only, closed-form recency-weighted shrinkage candidate. It is V1 with a
+# geometric recency weight on the same trailing-5 window; it reduces EXACTLY to V1 at decay = 1.0.
+# Its implementation and evaluation are separate later slices. Every distinguishing field is pinned.
+stage_b_candidate_v2:
+  name: recency_weighted_trailing_player_minutes_v2
+  development_only: true
+  development_only_reason: archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design
+  grain: season_player_code_fixture
+  identity: stable_code
+  history_population: up_to_5_most_recent_prior_player_fixture_rows_including_zero_minutes
+  history_order: kickoff_time_then_season_then_fixture
+  history_window: 5
+  history_observed_results: "kickoff_time < as_of"
+  position_prior: fold_local_raw_position_minutes_frequency_for_target_current_position
+  position_prior_fallback: existing_unsmoothed_all_position_prior_rows
+  # The single change vs V1: the i-th most-recent trailing row (i = 0 newest) carries weight
+  # decay**i. At decay = 1.0 every weight is 1 and the prediction is bit-identical to V1.
+  recency_weight: geometric_decay_power_i_on_trailing_window_i_zero_is_newest
+  player_bin_mass: w_k_is_sum_of_decay_to_the_i_over_trailing_rows_in_bin_k
+  total_weight: W_equals_sum_k_w_k
+  estimator: "p_k(decay,alpha)=(w_k+alpha*q_k)/(W+alpha)"
+  reduces_to_v1_when_decay_is_one: true
+  additional_smoothing: none
+  scoring_floor_role: existing_1e-12_floor_is_scoring_only_not_model_smoothing
+  cold_start_fallback: when_W_equals_0_distribution_is_exactly_q
+  decay_grid: [1.0, 0.9, 0.7, 0.5, 0.3]
+  prior_strength_grid: [1.0, 2.0, 5.0, 10.0, 20.0]
+  selected_parameter: decay_and_alpha_history_window_remains_5
+  inner_holdout_observed_gameweeks: 6
+  minimum_earlier_observed_gameweeks: 8
+  inner_walk_forward: most_recent_6_observed_gameweeks_true_per_gameweek_predict_whole_gameweek_from_pre_gameweek_history_then_score_then_absorb
+  inner_objective: pooled_mean_log_score
+  # On equal inner log score, prefer the LARGEST decay (closest to no-decay / V1) then the SMALLEST
+  # alpha: bias toward the null (V1) on ties.
+  tie_break: largest_decay_then_smallest_alpha
+  insufficient_inner_history_fallback_decay: 1.0
   insufficient_inner_history_fallback_alpha: 5.0
   fit_scope: all_transforms_priors_and_grid_selection_are_fold_local
   target_label_policy: target_labels_never_enter_model_inputs
