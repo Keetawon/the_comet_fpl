@@ -42,7 +42,7 @@ def test_phase2_contract_loads_with_point_in_time_cutoffs() -> None:
     load_phase2_evaluation.cache_clear()
     contract = load_phase2_evaluation()
     assert contract.phase == 2
-    assert contract.contract_version == "1.3"
+    assert contract.contract_version == "1.4"
     assert contract.target.entity == "player"
     assert contract.target.grain == "season_player_code_fixture"
     assert contract.target.outcome == "minutes_distribution"
@@ -366,15 +366,15 @@ def test_extra_field_is_rejected() -> None:
 
 def test_phase2_amendment_history_is_exactly_frozen() -> None:
     contract = load_phase2_evaluation()
-    assert contract.contract_version == "1.3"
+    assert contract.contract_version == "1.4"
     assert tuple(
         (amendment.version, amendment.candidates_evaluated_before_amendment)
         for amendment in contract.amendments
-    ) == (("1.1", 0), ("1.2", 1), ("1.3", 1))
+    ) == (("1.1", 0), ("1.2", 1), ("1.3", 1), ("1.4", 2))
 
 
-@pytest.mark.parametrize("version", ["1.0", "1.1", "1.2", "2.0"])
-def test_only_phase2_contract_version_1_3_is_accepted(version: str) -> None:
+@pytest.mark.parametrize("version", ["1.0", "1.1", "1.2", "1.3", "2.0"])
+def test_only_phase2_contract_version_1_4_is_accepted(version: str) -> None:
     document = copy.deepcopy(_document())
     document["contract_version"] = version
     with pytest.raises((ValidationError, ValueError)):
@@ -650,6 +650,116 @@ def test_amendment_1_3_count_is_frozen_at_one_candidate_evaluated() -> None:
     for amendment in document["amendments"]:
         if amendment["version"] == "1.3":
             amendment["candidates_evaluated_before_amendment"] = 2  # wrong: only V1 was evaluated
+    with pytest.raises((ValidationError, ValueError), match="amendment history"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+# --------------------------------------------------------------------------------------
+# Amendment 1.4: Candidate V3 (concentration-adaptive shrinkage) is exactly pre-registered
+# --------------------------------------------------------------------------------------
+
+
+def test_stage_b_candidate_v3_block_is_required() -> None:
+    document = copy.deepcopy(_document())
+    del document["stage_b_candidate_v3"]
+    with pytest.raises(ValidationError, match="stage_b_candidate_v3"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_stage_b_candidate_v3_is_exactly_pre_registered() -> None:
+    candidate = load_phase2_evaluation().stage_b_candidate_v3
+    assert candidate.name == "concentration_adaptive_shrinkage_player_minutes_v3"
+    assert candidate.development_only is True
+    assert candidate.history_window == 5  # window unchanged from V1/V2; only shrinkage adapts
+    assert candidate.weighted_share == "s_k_equals_w_k_over_W"
+    assert candidate.concentration == (
+        "C_equals_(sum_k_s_k_squared_minus_one_quarter)_over_three_quarters"
+    )
+    assert candidate.effective_prior_strength == (
+        "alpha_eff_equals_alpha_times_(1_minus_lambda_times_C)"
+    )
+    assert candidate.effective_prior_strength_floor == "alpha_eff_clamped_at_zero"
+    assert candidate.estimator == "p_k(decay,alpha,lambda)=(w_k+alpha_eff*q_k)/(W+alpha_eff)"
+    assert candidate.reduces_to_v2_when_lambda_is_zero is True  # the nesting property, pinned
+    assert candidate.cold_start_fallback == "when_W_equals_0_distribution_is_exactly_q"
+    assert candidate.decay_grid == (1.0, 0.9, 0.7, 0.5, 0.3)
+    assert candidate.prior_strength_grid == (1.0, 2.0, 5.0, 10.0, 20.0)
+    assert candidate.adaptation_grid == (0.0, 0.25, 0.5, 0.75, 1.0)
+    assert candidate.selected_parameter == "decay_and_alpha_and_lambda_history_window_remains_5"
+    assert candidate.inner_holdout_observed_gameweeks == 6
+    assert candidate.minimum_earlier_observed_gameweeks == 8
+    assert candidate.inner_objective == "pooled_mean_log_score"  # NOT the ranking metric it targets
+    assert candidate.tie_break == "smallest_lambda_then_largest_decay_then_smallest_alpha"
+    assert candidate.insufficient_inner_history_fallback_decay == 1.0  # == V1/V2
+    assert candidate.insufficient_inner_history_fallback_alpha == 5.0
+    assert candidate.insufficient_inner_history_fallback_lambda == 0.0  # == V2, no adaptation
+    assert candidate.excluded_features == (
+        "availability_status_team_opponent_and_home_away_are_not_features"
+    )
+    assert candidate.monte_carlo == "out_of_scope_closed_form"
+
+
+@pytest.mark.parametrize(
+    ("field", "mutated"),
+    [
+        ("name", "renamed_v3"),
+        ("development_only", False),
+        ("history_window", 4),
+        ("concentration", "gini"),
+        ("effective_prior_strength", "alpha_eff_equals_alpha"),
+        ("reduces_to_v2_when_lambda_is_zero", False),
+        ("cold_start_fallback", "uniform"),
+        ("selected_parameter", "decay_and_alpha"),
+        ("inner_holdout_observed_gameweeks", 5),
+        ("inner_objective", "spearman_p60_within_position_gameweek"),
+        ("tie_break", "largest_lambda"),
+        ("null_policy", "fill_zero"),
+        ("excluded_features", "availability_is_allowed"),
+        ("monte_carlo", "required"),
+    ],
+)
+def test_stage_b_candidate_v3_literal_policy_cannot_be_weakened(
+    field: str, mutated: object
+) -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v3"][field] = mutated
+    with pytest.raises((ValidationError, ValueError)):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+@pytest.mark.parametrize(
+    "grid",
+    [
+        [0.0, 0.25, 0.5, 0.75],
+        [0.0, 0.25, 0.5, 0.75, 1.0, 1.25],
+        [0.25, 0.0, 0.5, 0.75, 1.0],
+        [0.0, 0.25, 0.5, 0.75, 0.9],
+    ],
+)
+def test_stage_b_candidate_v3_adaptation_grid_is_exact(grid: list[float]) -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v3"]["adaptation_grid"] = grid
+    with pytest.raises((ValidationError, ValueError), match="adaptation_grid"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_stage_b_candidate_v3_fallback_lambda_is_exact() -> None:
+    document = copy.deepcopy(_document())
+    document["stage_b_candidate_v3"]["insufficient_inner_history_fallback_lambda"] = (
+        0.25  # pinned to 0.0 (== V2, no adaptation)
+    )
+    with pytest.raises((ValidationError, ValueError), match="fallback_lambda"):
+        Phase2EvaluationConfig.model_validate(document)
+
+
+def test_amendment_1_4_count_is_frozen_at_two_candidates_evaluated() -> None:
+    """The 1.4 amendment records that two candidates (V1, V2) had been evaluated before it (V3
+    evaluates nothing)."""
+    document = copy.deepcopy(_document())
+    for amendment in document["amendments"]:
+        if amendment["version"] == "1.4":
+            # wrong: both V1 and V2 were evaluated before 1.4
+            amendment["candidates_evaluated_before_amendment"] = 1
     with pytest.raises((ValidationError, ValueError), match="amendment history"):
         Phase2EvaluationConfig.model_validate(document)
 

@@ -67,7 +67,16 @@ run (2026-07-30, against a pristine rebuilt archive): mean log score 0.72625, im
 baseline on all four bounded scored metrics and on Candidate V1 on all five, but **failing the
 v1.2 starter-ranking gate** (aggregate Spearman-p60 0.70071 vs the best baseline 0.70851, −1.10%;
 nine of ten diagnostics pass). It is development-only and not promoted (unversioned proxies); see
-`docs/phase2-stage-b-candidate-v2-development.md`.
+`docs/phase2-stage-b-candidate-v2-development.md`. Additive amendment 1.4 (contract v1.4)
+pre-registers Candidate V3 `concentration_adaptive_shrinkage_player_minutes_v3` — V2 with a
+concentration-adaptive shrinkage strength `alpha_eff = alpha*(1 - lambda*C)`, where `C` is the
+normalised Herfindahl concentration of the weighted trailing history (reduces exactly to V2 at
+lambda = 0). It is diagnosed from V2's by-position evidence: V2's only gate failure (starter
+ranking) is almost entirely goalkeepers (V2 0.8153 vs `last_observed` 0.8650), whose
+near-deterministic histories a uniform shrinkage blurs. V3 and its provenance-guarded development
+runner are implemented and deterministically offline-tested, judged by the 1.2 gate unchanged, and
+**not yet run** — the single historical development evaluation is the owner's authorised action and
+requires a pristine rebuilt archive; see `docs/phase2-stage-b-candidate-v3-design.md`.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -330,6 +339,19 @@ Unless the user sets another priority, address prerequisites before model sophis
    not promoted — like V1 it cannot be promoted on historical data (unversioned proxies), the reason
    stated even though four of five scored criteria pass; see
    `docs/phase2-stage-b-candidate-v2-development.md`. V2 is left as committed and is not retuned.
+   Additive amendment 1.4 (contract v1.4) pre-registers Candidate V3
+   `concentration_adaptive_shrinkage_player_minutes_v3` — V2 with a concentration-adaptive shrinkage
+   strength `alpha_eff = alpha*(1 - lambda*C)` (`C` the normalised Herfindahl concentration of the
+   weighted trailing history; reduces exactly to V2 at lambda = 0), selected jointly with
+   `(decay, alpha)` on the same nested walk-forward, judged by the 1.2 gate unchanged. It is
+   diagnosed from V2's by-position evidence (V2's only gate failure is almost entirely goalkeepers,
+   0.8153 vs `last_observed` 0.8650). The inner selector still optimises pooled mean log score, NOT
+   the ranking metric V3 targets, so the candidate cannot be gamed toward the gate — a pre-registered
+   risk recorded in the design doc. V3 and its provenance-guarded development runner are implemented
+   and deterministically offline-tested, but V3 has **not been run**: the single historical
+   development evaluation is the owner's authorised action and requires a pristine rebuilt archive
+   (the `build_db`-rebuilt facts must reproduce V1/V2's baselines bit-for-bit). See
+   `docs/phase2-stage-b-candidate-v3-design.md`. Do not run or retune V3 without that authorised step.
 6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff

@@ -1,6 +1,6 @@
 # Phase 2 evaluation contract (Stage B player minutes)
 
-**Status: contract and typed loader implemented at version 1.3.** Version 1.0 froze the
+**Status: contract and typed loader implemented at version 1.4.** Version 1.0 froze the
 population, baselines, metrics, calibration, and promotion gate before any candidate existed.
 Additive amendment 1.1 pre-registers Candidate V1
 `shrunk_trailing_5_player_minutes_v1`; it changes none of those version 1.0 policies. Amendment
@@ -16,7 +16,17 @@ starter-ranking gate fails — aggregate Spearman-p60 0.70071 vs the best baseli
 the result is recorded in
 [`phase2-stage-b-candidate-v2-development.md`](phase2-stage-b-candidate-v2-development.md) and is
 **development-only — not a promotion verdict** (the historical target roster and first-kickoff
-cutoff are unversioned proxies). Candidate V1 and its provenance-guarded development runner are
+cutoff are unversioned proxies). Additive amendment 1.4 pre-registers Candidate V3
+`concentration_adaptive_shrinkage_player_minutes_v3` (V2 with a concentration-adaptive shrinkage
+strength `alpha_eff = alpha * (1 - lambda*C)`; reduces to V2 at lambda = 0); it changes no version
+1.0 / 1.2 comparison policy and is judged by the 1.2 gate unchanged. It is diagnosed from V2's
+by-position evidence: V2's only gate failure (starter ranking) is almost entirely goalkeepers,
+whose near-deterministic histories are blurred by a uniform shrinkage. V3 and its
+provenance-guarded development runner are implemented and deterministically offline-tested; **V3
+has not yet been run on the archive** (the single historical development run is the owner's
+authorised action, pending, and requires a pristine rebuilt archive). Design and pre-registration
+in [`phase2-stage-b-candidate-v3-design.md`](phase2-stage-b-candidate-v3-design.md). Candidate V1
+and its provenance-guarded development runner are
 implemented and deterministically offline-tested. The runner has been executed **once** as a clean historical
 development run; the result is recorded in
 [`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md) and is
@@ -131,6 +141,32 @@ run command with its pristine-archive precondition are in
 [`phase2-stage-b-candidate-v2-design.md`](phase2-stage-b-candidate-v2-design.md). At registration
 the amendment authorized no evaluation and preceded implementation; V2 and its runner now exist
 with deterministic offline tests and **no historical evaluation has been run**.
+
+## Amendment 1.4: Candidate V3 design only (concentration-adaptive V2)
+
+Amendment 1.4 was recorded on 2026-07-30 with **two candidates evaluated before the amendment**
+(V1 and V2, both development-only). It adds one required, separately named policy block
+(`stage_b_candidate_v3`) and no new tolerance or comparison rule. Candidate V3 is V2 with a
+shrinkage strength that adapts to the concentration of the weighted history: with weighted shares
+`s_k = w_k/W`, the normalised Herfindahl `C = (sum_k s_k^2 - 1/4)/(1 - 1/4)` and
+`alpha_eff = max(0, alpha*(1 - lambda*C))`, so `p_k = (w_k + alpha_eff*q_k)/(W + alpha_eff)`. It
+reduces **exactly** to V2 at `lambda = 0`, so it is a strict generalisation. `decay`, `alpha`, and
+`lambda ∈ {0.0, 0.25, 0.5, 0.75, 1.0}` are selected jointly by the same nested walk-forward, with a
+tie-break biased toward the null (smallest `lambda`, then largest `decay`, then smallest `alpha`).
+The window stays pinned at 5; every other V2 choice is unchanged.
+
+The motivation is diagnosed from V2's by-position evidence: V2's only gate failure (starter
+ranking) is almost entirely goalkeepers, whose near-deterministic (concentrated) histories are
+blurred by a uniform shrinkage, while midfielders benefit from it. Shrinking less where the
+history is concentrated sharpens both log score and ranking on exactly those rows. The inner
+selector still optimises pooled mean log score — **not** the ranking metric V3 targets — so the
+candidate cannot be gamed toward the gate; that pre-registered risk is recorded in the design doc.
+
+V3 is judged by the **1.2 gate unchanged**. The full formula, concentration definition, frozen
+grids, test plan, design risk, and the one-shot run command with its pristine-archive precondition
+are in [`phase2-stage-b-candidate-v3-design.md`](phase2-stage-b-candidate-v3-design.md). At
+registration the amendment authorized no evaluation; V3 and its runner exist with deterministic
+offline tests and **no historical evaluation has been run**.
 
 ## Entity, grain, and player identity
 
