@@ -5,9 +5,12 @@ Candidate V1 is named `shrunk_trailing_5_player_minutes_v1` in
 `config/phase2_evaluation.yaml` amendment 1.1. The exact estimator and nested selector are now
 implemented in `src/fpl/models/minutes_v1.py` and covered by deterministic offline tests. There
 is now a separately named, offline-tested development runner in
-`src/fpl/validate/dev_minutes_candidate_v1.py`. It has not been run on the archive, so there is no
-archive-backed fitted parameter, historical evaluation, result, gate execution, or verdict. The
-pre-registered formula and policy below remain unchanged.
+`src/fpl/validate/dev_minutes_candidate_v1.py`. It has now been run **once** as a clean historical
+development run; the result is recorded in
+[`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md) and is
+**development-only — not a promotion verdict**, because the historical target roster and
+first-kickoff cutoff remain unversioned proxies. The pre-registered formula and policy below
+remain unchanged.
 
 Candidate V1 is **development-only**. The archive already shaped the hypothesis, and the
 historical target roster and first-kickoff cutoff remain unversioned proxies. A later

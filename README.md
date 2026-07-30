@@ -276,7 +276,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 |---|---|---|
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
-| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness + baseline calibration complete; Candidate V1 and provenance-ready development runner offline-tested; **no candidate archive fit/evaluation yet** |
+| 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness + baseline calibration complete; Candidate V1 development-evaluated once (development-only, not promoted) |
 | 3 | Stages C/D player events + simulation | not started |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
@@ -318,10 +318,13 @@ Candidate V1's exact closed-form estimator, true six-observed-gameweek inner sel
 development runner are now implemented and deterministically offline-tested. The runner scores the
 candidate and four unchanged baselines on identical rows, records fold parameters, opens DuckDB
 read-only, rechecks clean Git/config/model-source/database provenance, and emits a complete strict-JSON
-reconciliation record only after postflight verification. It has not been run on the archive, so
-there is still no candidate fit, evaluation, result, gate execution, or verdict. The next step may be
-one explicitly authorized clean historical development run. The baseline number remains a
-development number, not an upper bound.
+reconciliation record only after postflight verification. It has now been run once as a clean
+historical development run: Candidate V1 reaches mean log score 0.74198 (+29.28% over the
+position-prior comparator) and improves on the best baseline value of every metric, but it is
+**development-only and not promoted** — the historical target roster and first-kickoff cutoff are
+unversioned proxies, so real-deadline knowledge-time validity is unproven; see
+[`docs/phase2-stage-b-candidate-v1-development.md`](docs/phase2-stage-b-candidate-v1-development.md).
+The baseline number remains a development number, not an upper bound.
 
 ---
 

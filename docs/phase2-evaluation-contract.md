@@ -5,8 +5,11 @@ population, baselines, metrics, calibration, and promotion gate before any candi
 Additive amendment 1.1 pre-registers Candidate V1
 `shrunk_trailing_5_player_minutes_v1`; it changes none of those version 1.0 policies. Candidate
 V1 and its provenance-guarded development runner are now implemented and deterministically
-offline-tested, but the runner has not been executed on the archive, so there is no candidate fit,
-evaluation, result, gate execution, or verdict. The machine-readable source is
+offline-tested. The runner has now been executed **once** as a clean historical development run;
+the result is recorded in
+[`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md) and is
+**development-only — not a promotion verdict or a gate execution** (the historical target roster
+and first-kickoff cutoff are unversioned proxies). The machine-readable source is
 `config/phase2_evaluation.yaml`, validated by `Phase2EvaluationConfig` in `src/fpl/config.py`
 and loaded by `load_phase2_evaluation`, which cross-checks the 60-minute bin boundary against
 the configured downstream ruleset at load time. This document explains the decisions; it does
@@ -27,7 +30,10 @@ target season's scoring rules). Stage B is a **closed-form marginal** over the f
 Monte Carlo is explicitly out of scope here and the minutes model stays separate from
 per-minute event/rate models (repository rule R6).
 
-No candidate has been fit or scored on the archive under this contract. The four Stage B
+Candidate V1 has been development-evaluated **once** on the archive (development-only, not
+promoted; see
+[`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md)).
+No candidate has been **promoted** under this contract. The four Stage B
 baselines, metrics, baselines-only walk-forward harness, Candidate V1 estimator, and separately
 named Candidate V1 development runner are implemented and offline-tested. The corrected
 baseline-only archive run is recorded in
@@ -309,9 +315,12 @@ NULL, so any `starts`-based slice must exclude that season rather than treat NUL
 
 ## What this contract does not do
 
-- It contains **no Candidate V1 result or gate execution**. The default harness remains
-  baselines-only. `src/fpl/validate/dev_minutes_candidate_v1.py` is an explicit development-only
-  opt-in path, implemented and provenance-tested but not yet run on the archive.
+- It contains **no Candidate V1 promotion verdict**. Candidate V1 has been development-evaluated
+  once (development-only, not promoted; see
+  [`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md)); no
+  gate has been executed as a promotion judgement. The default harness remains baselines-only.
+  `src/fpl/validate/dev_minutes_candidate_v1.py` is an explicit development-only opt-in path,
+  implemented and provenance-tested.
 - It runs **no Monte Carlo**. Stage B is a closed-form marginal and stays separate from
   per-minute event/rate models (R6).
 - It does **not** use a hurdle model, availability feature, or fixture-specific Candidate V1

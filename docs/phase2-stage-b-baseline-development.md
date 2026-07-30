@@ -334,10 +334,12 @@ terminated attempt produced no scores and is noted only for provenance transpare
 - **No candidate was part of this run; no model is promoted.** The run predates Candidate V1's
   additive design-only pre-registration and contains no candidate prediction, fit, or gate
   execution. Candidate V1 is now pre-registered under amendment 1.1, implemented, and wired to a
-  separately named provenance-ready development runner with deterministic offline tests. The runner
-  has not been executed on the archive, so there is still no candidate fit, evaluation, result,
-  gate execution, or verdict. Calibration completeness concerns only these frozen baselines under
-  this frozen historical proxy contract.
+  separately named provenance-ready development runner with deterministic offline tests. That
+  runner has since been executed once as a clean historical development run; the result is
+  development-only and not promoted (see
+  [`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md)).
+  Calibration completeness here concerns only these frozen baselines under this frozen historical
+  proxy contract.
 
 ## Verdict and next step
 

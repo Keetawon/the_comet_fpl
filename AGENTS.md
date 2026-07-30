@@ -44,12 +44,15 @@ RPS and both Brier margins, overall and in every season, so **no baseline domina
 development number under two unversioned historical proxies (target roster, first-kickoff cutoff),
 so real-deadline knowledge-time validity is unproven. See
 `docs/phase2-stage-b-baseline-development.md`. Candidate V1 and its dedicated development runner
-are now implemented with deterministic offline tests. The runner integrates Candidate V1 with the
+are implemented with deterministic offline tests. The runner integrates Candidate V1 with the
 four unchanged baselines on identical eligible rows, records fold-local parameter selections, and
 rechecks clean Git/config/model-source/database provenance before emitting a complete reconciliation
-record. It has not been run on the archive, so there is still no archive-backed fit, evaluation,
-result, gate execution, or verdict; see `docs/phase2-stage-b-candidate-v1-design.md`. The historical
-number is a development number, not an upper bound.
+record. It has now been run **once** as a clean historical development run: Candidate V1 reaches
+mean log score 0.74198 (+29.28% over the position-prior comparator) and improves on the best
+baseline value of every metric, but it is **development-only and not promoted** — the historical
+target roster and first-kickoff cutoff are unversioned proxies, so real-deadline knowledge-time
+validity is unproven; see `docs/phase2-stage-b-candidate-v1-development.md`. The historical number
+is a development number, not an upper bound.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -283,9 +286,12 @@ Unless the user sets another priority, address prerequisites before model sophis
    exercise a candidate gate. See `docs/phase2-stage-b-baseline-development.md` and
    `docs/phase2-stage-b-candidate-v1-design.md`. Candidate V1's closed-form estimator, true
    six-observed-gameweek inner walk-forward, dedicated development runner, provenance rechecks, and
-   deterministic offline tests are implemented. No archive-backed fit, evaluation, result, or gate
-   execution exists. The next Stage B step may be one explicitly authorized clean historical
-   development run using the committed provenance-ready runner; it remains development-only. The
+   deterministic offline tests are implemented, and Candidate V1 has been development-evaluated
+   once on the archive (mean log score 0.74198, +29.28% over the comparator; improves on the best
+   baseline value of every metric; all nine development diagnostics pass; see
+   `docs/phase2-stage-b-candidate-v1-development.md`). It is **development-only and not promoted**:
+   the historical target roster and first-kickoff cutoff are unversioned proxies, so real-deadline
+   knowledge-time validity is unproven, and a second historical evaluation is not permitted. The
    population, target-roster knowledge-time policy, bin shape, baseline definitions, metrics,
    scoring/calibration definitions, and promotion gate remain frozen; the historical number is not
    an upper bound, and a gate may never be amended after a candidate is judged.

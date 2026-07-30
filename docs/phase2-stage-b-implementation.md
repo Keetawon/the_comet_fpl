@@ -7,8 +7,10 @@ promotion verdict — see [`phase2-stage-b-baseline-development.md`](phase2-stag
 This document pins the owner decisions the harness (`src/fpl/validate/minutes_harness.py`) bakes in.
 These harness decisions were frozen at version `1.0`. Additive amendment `1.1` later
 pre-registered Candidate V1 without changing the harness, baseline names, metrics, gates, or
-dimensions. Candidate V1 is now implemented and deterministically offline-tested, but still has
-no archive-backed fit, evaluation, or result. Its separately named development runner integrates
+dimensions. Candidate V1 is now implemented, deterministically offline-tested, and has been
+development-evaluated once (development-only, not promoted; see
+[`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md)). Its
+separately named development runner integrates
 through an explicit opt-in candidate factory while leaving the default harness baselines-only; see
 [`phase2-stage-b-candidate-v1-design.md`](phase2-stage-b-candidate-v1-design.md). The
 machine-readable contract and
