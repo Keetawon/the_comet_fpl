@@ -333,9 +333,13 @@ who starts and plays 60+ at least as well as the best baseline. It evaluates not
 v1.0/1.1 policy, and does not re-judge V1. Additive amendment 1.3 (contract v1.3) pre-registers
 Candidate V2 `recency_weighted_trailing_player_minutes_v2` — V1 with a geometric recency weight on
 the same trailing-5 window (it reduces exactly to V1 at decay = 1.0). V2 and its development runner
-are implemented and offline-tested; **V2 has not been evaluated**, and a future one-shot historical
-run must use a pristine rebuilt archive; see
-[`docs/phase2-stage-b-candidate-v2-design.md`](docs/phase2-stage-b-candidate-v2-design.md).
+are implemented and offline-tested, and V2 has now been run **once** as a clean historical
+development run (2026-07-30, against a pristine rebuilt archive): mean log score 0.72625, the best
+of the five models on all four bounded scored metrics and an improvement on Candidate V1 on all
+five, but it **fails the v1.2 starter-ranking gate** (aggregate Spearman-p60 0.70071 vs the best
+baseline 0.70851, −1.10%; nine of ten diagnostics pass). It is development-only and not promoted
+(unversioned proxies); see
+[`docs/phase2-stage-b-candidate-v2-development.md`](docs/phase2-stage-b-candidate-v2-development.md).
 
 ---
 

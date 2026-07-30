@@ -1,13 +1,16 @@
 # Stage B Candidate V2 design: recency-weighted trailing player minutes
 
-**Status: frozen pre-registration record, written before any evaluation.** Candidate V2 is named
+**Status: frozen pre-registration record, written before any evaluation; now executed once (2026-07-30) — see [`phase2-stage-b-candidate-v2-development.md`](phase2-stage-b-candidate-v2-development.md).** Candidate V2 is named
 `recency_weighted_trailing_player_minutes_v2` in `config/phase2_evaluation.yaml` amendment 1.3.
 The exact estimator and joint nested selector are implemented in
 `src/fpl/models/minutes_v2.py` and covered by deterministic offline tests. There is a separately
 named, offline-tested development runner in `src/fpl/validate/dev_minutes_candidate_v2.py` that
 reuses the V1 runner's provenance machinery and the shared best-per-metric + starter-ranking gate.
-**No historical evaluation has been run.** V2 is judged by the contract version 1.2 gate unchanged
-(this amendment adds a candidate policy only).
+**The single historical development evaluation has now been run once** (2026-07-30, mean log score
+0.72625; V2 improves on every baseline on all four bounded scored metrics and on Candidate V1 on
+all five, but **fails the v1.2 starter-ranking gate**, aggregate Spearman-p60 0.70071 vs the best
+baseline 0.70851, −1.10%; nine of ten diagnostics pass). V2 is judged by the contract version 1.2
+gate unchanged (this amendment adds a candidate policy only).
 
 Candidate V2 is **development-only**. The archive already shaped the hypothesis, and the historical
 target roster and first-kickoff cutoff remain unversioned proxies. A later historical number can
@@ -103,11 +106,12 @@ it supplies only the V2 candidate factory, the V2 model-source path, the V2 bann
 reconciliation schema (`stage_b_candidate_v2_development/v1`). There is no second copy of the gate
 or the provenance machinery.
 
-## The one-shot historical development run (NOT executed here)
+## The one-shot historical development run (executed once, 2026-07-30)
 
-V2 is pre-registered and implemented but **has not been evaluated**. The single development
-evaluation is the owner's authorized action (exactly as V1 was handled) and is out of scope for this
-slice. When it is authorized, the exact command is:
+V2 has now been evaluated **once** as the owner's authorized action (exactly as V1 was handled),
+against a pristine rebuilt archive; the result is recorded in
+[`phase2-stage-b-candidate-v2-development.md`](phase2-stage-b-candidate-v2-development.md). Per the
+pre-registration it is run **exactly once** and is not retuned afterwards. The exact command was:
 
 ```powershell
 python -m fpl.validate.dev_minutes_candidate_v2

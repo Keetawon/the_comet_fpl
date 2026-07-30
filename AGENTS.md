@@ -62,8 +62,12 @@ v1.0/1.1 policy, and does not re-judge V1. Additive amendment 1.3 (contract v1.3
 Candidate V2 `recency_weighted_trailing_player_minutes_v2` — V1 with a geometric recency weight on
 the same trailing-5 window (reduces exactly to V1 at decay = 1.0), selected jointly with alpha on
 the same nested walk-forward, judged by the 1.2 gate unchanged. V2 and its development runner are
-implemented and offline-tested; **V2 has not been evaluated**, and a one-shot historical run must
-use a pristine rebuilt archive (the working DB now carries Step-2 live rows).
+implemented and offline-tested, and V2 has now been run **once** as a clean historical development
+run (2026-07-30, against a pristine rebuilt archive): mean log score 0.72625, improving on every
+baseline on all four bounded scored metrics and on Candidate V1 on all five, but **failing the
+v1.2 starter-ranking gate** (aggregate Spearman-p60 0.70071 vs the best baseline 0.70851, −1.10%;
+nine of ten diagnostics pass). It is development-only and not promoted (unversioned proxies); see
+`docs/phase2-stage-b-candidate-v2-development.md`.
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -316,9 +320,16 @@ Unless the user sets another priority, address prerequisites before model sophis
    amendment 1.3 (contract v1.3) pre-registers Candidate V2
    `recency_weighted_trailing_player_minutes_v2` (recency-weighted V1; reduces to V1 at decay = 1.0)
    without changing any comparison rule; it is judged by the 1.2 gate. V2 and its development runner
-   are implemented and offline-tested but **not evaluated**; a one-shot historical run is the owner's
-   authorized action against a pristine rebuilt archive, and like V1 it cannot be promoted on
-   historical data (unversioned proxies).
+   are implemented and offline-tested, and V2 has now been run **once** as a clean historical
+   development run (2026-07-30, against a pristine rebuilt archive): mean log score 0.72625, the best
+   of the five models on all four bounded scored metrics (log/RPS/Brier-any/Brier-60+) and an
+   improvement on Candidate V1 on all five, but it **fails the v1.2 starter-ranking gate**
+   (`maximum_spearman_p60_relative_regression: 0.0`; aggregate Spearman-p60 0.70071 vs the best
+   baseline 0.70851, −1.10%; nine of ten diagnostics pass). Recency (`decay < 1.0`) was genuinely
+   selected in all 175 selectable folds (modal decay = 0.7, alpha = 1.0). It is development-only and
+   not promoted — like V1 it cannot be promoted on historical data (unversioned proxies), the reason
+   stated even though four of five scored criteria pass; see
+   `docs/phase2-stage-b-candidate-v2-development.md`. V2 is left as committed and is not retuned.
 6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
 
 ## Sub-agent coordination and handoff

@@ -9,8 +9,14 @@ evaluates nothing, changes no version 1.0 / 1.1 population/baseline/metric/calib
 does not re-judge V1. Additive amendment 1.3 pre-registers Candidate V2
 `recency_weighted_trailing_player_minutes_v2` (recency-weighted V1; reduces to V1 at decay = 1.0);
 it changes no version 1.0 / 1.2 comparison policy and is judged by the 1.2 gate unchanged. V2 and
-its provenance-guarded development runner are implemented and deterministically offline-tested;
-**V2 has not been evaluated.** Candidate V1 and its provenance-guarded development runner are
+its provenance-guarded development runner are implemented and deterministically offline-tested.
+The runner has been executed **once** as a clean historical development run (2026-07-30, against a
+pristine rebuilt archive; mean log score 0.72625; nine of ten v1.2 diagnostics pass, the
+starter-ranking gate fails — aggregate Spearman-p60 0.70071 vs the best baseline 0.70851, −1.10%);
+the result is recorded in
+[`phase2-stage-b-candidate-v2-development.md`](phase2-stage-b-candidate-v2-development.md) and is
+**development-only — not a promotion verdict** (the historical target roster and first-kickoff
+cutoff are unversioned proxies). Candidate V1 and its provenance-guarded development runner are
 implemented and deterministically offline-tested. The runner has been executed **once** as a clean historical
 development run; the result is recorded in
 [`phase2-stage-b-candidate-v1-development.md`](phase2-stage-b-candidate-v1-development.md) and is
