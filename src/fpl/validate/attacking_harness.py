@@ -48,6 +48,11 @@ class AttackingCandidate(Protocol):
     baselines use, so it is scored on the identical eligible rows. The harness never imports a
     candidate model: a development runner supplies a factory returning an object conforming to this
     protocol. The default harness path passes no factory and is unchanged.
+
+    A fixture-coupled candidate may additionally define ``prepare(self, *, targets, con, as_of)``;
+    the harness calls it (duck-typed) after fitting so the candidate can read the fold's full
+    scored roster and a read-only connection. It is optional: a candidate without it (Candidate V1)
+    is fitted and predicted unchanged.
     """
 
     name: str
@@ -230,6 +235,16 @@ def run_attacking_fold(
                 "Stage C attacking baseline"
             )
         candidate_parameters[fitted_candidate.name] = dict(fitted_candidate.parameters())
+
+    # A fixture-coupled candidate (e.g. Stage C Candidate V2) needs the fold's full target roster
+    # and a per-fixture context that the one-target ``predict(target)`` protocol cannot supply. If
+    # the candidate defines an optional ``prepare(targets, con, as_of)`` hook it is called now with
+    # the exact scored targets and the read-only connection. A candidate that defines no
+    # ``prepare`` (Candidate V1) is untouched, so V1's path and the baselines-only path are
+    # unchanged and the scored population is unchanged (``prepare`` only reads already-scored
+    # targets). Duck-typed via ``hasattr`` so the protocol below adds no required method.
+    if fitted_candidate is not None and hasattr(fitted_candidate, "prepare"):
+        fitted_candidate.prepare(targets=targets, con=con, as_of=as_of)
 
     # Predict
     records: list[TargetPredictionRecord] = []

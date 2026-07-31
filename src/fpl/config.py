@@ -2008,9 +2008,7 @@ class Phase3StageCCandidateV2Policy(_Frozen):
     history_observed_results: Literal["kickoff_time < as_of"]
     share_normalization: Literal["club_roster_signals_normalised_to_sum_to_one"]
     rate: Literal["rate_i_equals_lambda_team_times_share_i"]
-    conservation: Literal[
-        "poisson_thinning_sum_i_rate_i_equals_lambda_team_on_the_coupled_path"
-    ]
+    conservation: Literal["poisson_thinning_sum_i_rate_i_equals_lambda_team_on_the_coupled_path"]
     cold_start_share: Literal[
         "when_no_appeared_prior_row_signal_is_fold_local_positional_goal_mean_equal_to_v1_baseline"
     ]
