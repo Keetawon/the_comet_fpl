@@ -135,32 +135,44 @@ def mean_trailing_signal(
     return sum(values) / len(values)
 
 
+def coupled_shares(roster: Sequence[_RosterEntry]) -> dict[int, tuple[float, str]]:
+    """Pure share allocation over a fixture's roster: ``signal / sum(signal)`` per player.
+
+    Shares sum to 1.0 (the conservation primitive). A roster whose signals sum to zero takes equal
+    shares. Returns ``{code: (share, path)}``. This is the share primitive both V2 (which forms
+    rates as ``lambda_team * share``) and V3 (which minutes-gates the share) build on.
+    """
+    if not roster:
+        return {}
+    total = sum(entry.signal for entry in roster)
+    shares: dict[int, tuple[float, str]] = {}
+    if total <= 0.0:
+        share = 1.0 / len(roster)
+        for entry in roster:
+            shares[entry.code] = (share, PATH_EQUAL_SHARE)
+        return shares
+    for entry in roster:
+        shares[entry.code] = (
+            entry.signal / total,
+            PATH_COLD_START_SHARE if entry.cold_start else PATH_COUPLED,
+        )
+    return shares
+
+
 def allocate_coupled_rates(
     roster: Sequence[_RosterEntry],
     lambda_team: float,
 ) -> dict[int, tuple[float, str]]:
     """Pure Poisson-thinning allocation of ``lambda_team`` over a fixture's roster.
 
-    Shares are ``signal / sum(signal)`` and rates are ``lambda_team * share``; on the coupled
-    path the rates sum to ``lambda_team`` by construction (the conservation / thinning identity).
-    A roster whose signals sum to zero takes equal shares (still summing to ``lambda_team``).
-    Returns ``{code: (rate, path)}``.
+    Shares are ``signal / sum(signal)`` (see :func:`coupled_shares`) and rates are
+    ``lambda_team * share``; on the coupled path the rates sum to ``lambda_team`` by construction
+    (the conservation / thinning identity). A roster whose signals sum to zero takes equal shares
+    (still summing to ``lambda_team``). Returns ``{code: (rate, path)}``.
     """
-    if not roster:
-        return {}
-    total = sum(entry.signal for entry in roster)
-    rates: dict[int, tuple[float, str]] = {}
-    if total <= 0.0:
-        share = 1.0 / len(roster)
-        for entry in roster:
-            rates[entry.code] = (lambda_team * share, PATH_EQUAL_SHARE)
-        return rates
-    for entry in roster:
-        rates[entry.code] = (
-            lambda_team * (entry.signal / total),
-            PATH_COLD_START_SHARE if entry.cold_start else PATH_COUPLED,
-        )
-    return rates
+    return {
+        code: (lambda_team * share, path) for code, (share, path) in coupled_shares(roster).items()
+    }
 
 
 class CoupledTeamShareAttackingGoalsV2:
