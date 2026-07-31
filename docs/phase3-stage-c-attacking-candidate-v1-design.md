@@ -5,7 +5,12 @@ Candidate V1 is named `xg_informed_trailing_player_goals_v1` in
 `config/phase3_evaluation.yaml` amendment 1.1 (contract version `1.1`). The exact estimator is
 pinned in the contract's `stage_c_candidate_v1` block and implemented in
 `src/fpl/models/attacking_v1.py`, covered by deterministic offline tests. A separately named,
-provenance-guarded development runner lives in `src/fpl/validate/dev_attacking_candidate_v1.py`.
+provenance-guarded development runner lives in `src/fpl/validate/dev_attacking_candidate_v1.py`. It
+has now been run **once** as a clean historical development run (2026-07-31); the result is recorded
+in [`phase3-stage-c-attacking-candidate-v1-development.md`](phase3-stage-c-attacking-candidate-v1-development.md)
+and is **development-only — not a promotion verdict**, because the historical target roster and
+first-kickoff cutoff remain unversioned proxies. The pre-registered formula and policy below remain
+unchanged.
 
 Candidate V1 is **development-only**. The archive already shaped the hypothesis (the xG-beats-goals
 and finishing-does-not-persist measurements in [`docs/research-adaptation.md`](research-adaptation.md)),
