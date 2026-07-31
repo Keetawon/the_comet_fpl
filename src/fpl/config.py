@@ -1720,3 +1720,400 @@ def load_phase2_evaluation(
     )
     scoring = load_scoring_rules(contract.target.downstream_points_ruleset, path=scoring_path)
     return contract.verify_minutes_boundary(scoring)
+
+
+# --------------------------------------------------------------------------------------
+# Phase 3 evaluation contract (Stage C player attacking goals)
+# --------------------------------------------------------------------------------------
+
+
+class Phase3Amendment(_Frozen):
+    """One recorded change to the Phase 3 contract. Mirrors Phase 1 & 2 discipline."""
+
+    version: str = Field(min_length=1)
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    candidates_evaluated_before_amendment: int = Field(ge=0)
+    changed: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    evidence: str = Field(min_length=1)
+    tolerance_rationale: str | None = None
+    deferred: str | None = None
+
+
+class Phase3TargetPolicy(_Frozen):
+    entity: Literal["player"]
+    grain: Literal["season_player_code_fixture"]
+    outcome: Literal["goals_distribution"]
+    downstream_points_ruleset: Literal["2026_27"]
+    identity_policy: Literal["code_is_cross_season_player_key"]
+
+
+class Phase3PopulationPolicy(_Frozen):
+    include_zero_minutes: Literal[True]
+    eligible_outcome: Literal["minutes_not_null"]
+    registered_population: Literal["mart_fact_player_fixture_minutes_not_null"]
+
+
+PHASE3_TARGET_ROSTER_PROXY_COLUMNS: frozenset[str] = frozenset(
+    {
+        "season",
+        "gw",
+        "fixture",
+        "kickoff_time",
+        "code",
+        "position",
+        "team_id",
+        "opponent_team_id",
+        "was_home",
+    }
+)
+PHASE3_TARGET_ROSTER_FORBIDDEN_COLUMNS: frozenset[str] = frozenset(
+    {"element_id", "element", "goals_scored", "goals"}
+)
+
+
+class Phase3TargetRosterPolicy(_Frozen):
+    historical_roster_status: Literal["archive_proxy_unversioned_at_real_deadline"]
+    historical_source: Literal[
+        "archive_player_fixture_identity_schedule_proxy_projected_from_target_rows"
+    ]
+    proxy_columns: frozenset[str]
+    minutes_role: Literal["label_outside_model_facing_projection"]
+    live_prospective_registry: Literal[
+        "versioned_player_registry_selected_known_at_le_as_of_before_model_sees_entity_team_position"
+    ]
+    cross_season_team_identity: Literal["season_qualified_team_id_resolved_to_stable_team_code"]
+    point_in_time_disclaimer: Literal["not_fully_reconstructable_pit_at_real_deadline"]
+
+    @model_validator(mode="after")
+    def _proxy_columns_pinned(self) -> Self:
+        if self.proxy_columns != PHASE3_TARGET_ROSTER_PROXY_COLUMNS:
+            missing = PHASE3_TARGET_ROSTER_PROXY_COLUMNS - self.proxy_columns
+            extra = self.proxy_columns - PHASE3_TARGET_ROSTER_PROXY_COLUMNS
+            parts: list[str] = []
+            if missing:
+                parts.append(f"missing required proxy columns: {sorted(missing)}")
+            if extra:
+                parts.append(f"unexpected proxy columns: {sorted(extra)}")
+            raise ValueError(
+                "Phase 3 target roster proxy columns must be exactly "
+                f"{sorted(PHASE3_TARGET_ROSTER_PROXY_COLUMNS)}; " + "; ".join(parts)
+            )
+        overlap = PHASE3_TARGET_ROSTER_FORBIDDEN_COLUMNS & self.proxy_columns
+        if overlap:
+            raise ValueError(
+                "Phase 3 target roster proxy columns must be disjoint from forbidden "
+                f"outcome/alias columns {sorted(PHASE3_TARGET_ROSTER_FORBIDDEN_COLUMNS)}; "
+                f"overlap: {sorted(overlap)}"
+            )
+        if "code" not in self.proxy_columns:
+            raise ValueError(
+                "Phase 3 target roster proxy columns must include 'code' (stable "
+                "cross-season player key)"
+            )
+        return self
+
+
+class Phase3CutoffPolicy(_Frozen):
+    split_unit: Literal["observed_gameweek"]
+    prediction_time: Literal["archive_first_kickoff_proxy_for_gameweek_deadline"]
+    observed_results: Literal["kickoff_time < as_of"]
+    snapshot_versions: Literal["known_at <= as_of"]
+
+
+class Phase3TrainingPolicy(_Frozen):
+    window: Literal["expanding"]
+    minimum_observed_gameweeks: Literal[8]
+    no_minimum_player_history_exclusion: Literal[True]
+    cold_start_policy: Literal["every_eligible_row_receives_fallback_distribution"]
+    fit_transforms_within_fold: Literal[True]
+    preserve_nulls: Literal[True]
+    seed: Literal[202627]
+
+
+class Phase3XgSignalPolicy(_Frozen):
+    xg_handling: Literal["use_when_measured_within_covered_seasons"]
+    xg_covered_seasons_judging: Literal[True]
+    xg_covered_seasons: tuple[Season, ...]
+    finishing_persistence: Literal["shrink_almost_fully_to_positional_mean"]
+    fallback_signal: Literal["threat"]
+
+
+_PHASE3_BASELINE_PINS: dict[str, dict[str, str | int | None]] = {
+    "positional_goal_rate_poisson": {
+        "identity": "target_position",
+        "population": "all_prior_eligible_rows_at_target_position",
+        "order": "none_applicable_all_rows",
+        "window": None,
+        "fallback": "unsmoothed_all_position_prior_rows",
+        "estimator": "positional_mean_goals_per_appearance_poisson",
+    },
+    "trailing_player_goal_rate_poisson": {
+        "identity": "stable_code",
+        "population": "up_to_5_most_recent_prior_player_fixture_rows_including_zero",
+        "order": "kickoff_time_then_season_then_fixture",
+        "window": 5,
+        "fallback": "positional_goal_rate_poisson",
+        "estimator": "player_goals_per_appearance_shrunk_to_positional_mean_poisson",
+    },
+}
+
+
+class Phase3BaselineDefinition(_Frozen):
+    name: Literal[
+        "positional_goal_rate_poisson",
+        "trailing_player_goal_rate_poisson",
+    ]
+    identity: Literal["target_position", "stable_code"]
+    population: Literal[
+        "all_prior_eligible_rows_at_target_position",
+        "up_to_5_most_recent_prior_player_fixture_rows_including_zero",
+    ]
+    order: Literal[
+        "none_applicable_all_rows",
+        "kickoff_time_then_season_then_fixture",
+    ]
+    window: int | None
+    additive_smoothing: Literal["none"]
+    fallback: Literal[
+        "unsmoothed_all_position_prior_rows",
+        "positional_goal_rate_poisson",
+    ]
+    estimator: Literal[
+        "positional_mean_goals_per_appearance_poisson",
+        "player_goals_per_appearance_shrunk_to_positional_mean_poisson",
+    ]
+
+    @model_validator(mode="after")
+    def _pinned_to_name(self) -> Self:
+        pinned = _PHASE3_BASELINE_PINS[self.name]
+        for field_name, expected_value in pinned.items():
+            actual = getattr(self, field_name)
+            if actual != expected_value:
+                raise ValueError(
+                    f'Stage C baseline "{self.name}" has {field_name}={actual!r} but frozen '
+                    f"definition pins it to {expected_value!r}"
+                )
+        return self
+
+
+class Phase3BaselinePolicy(_Frozen):
+    stage_c_attacking: frozenset[str]
+    definitions: tuple[Phase3BaselineDefinition, ...]
+    excluded: frozenset[str]
+
+    @model_validator(mode="after")
+    def _definitions_match_stage_c(self) -> Self:
+        names = [definition.name for definition in self.definitions]
+        if len(names) != len(set(names)):
+            raise ValueError(f"Stage C baseline definitions have duplicate names: {names}")
+        if set(names) != self.stage_c_attacking:
+            expected_set = sorted(self.stage_c_attacking)
+            actual_set = sorted(set(names))
+            raise ValueError(
+                f"Stage C baseline definition names {actual_set} "
+                f"must match stage_c_attacking {expected_set}"
+            )
+        return self
+
+
+class Phase3MetricPolicy(_Frozen):
+    primary: Literal["mean_log_score"]
+    primary_direction: Literal["lower_is_better"]
+    proper_distribution: frozenset[str]
+    binary_guardrails: frozenset[str]
+    calibration: frozenset[str]
+    reliability_buckets_carry_n: Literal[True]
+
+
+class Phase3PromotionGate(_Frozen):
+    compare_against: Literal["best_eligible_required_stage_c_attacking_baseline"]
+    comparison_population: Literal["same_eligible_predictions"]
+    relative_lift_formula: Literal["(baseline - candidate) / abs(baseline)"]
+    guardrail_comparison: Literal["best_baseline_per_metric"]
+    minimum_primary_relative_lift: float
+    maximum_ranked_probability_score_relative_regression: float
+    maximum_brier_relative_regression_at_least_one_goal: float
+    pit_interval_80_maximum_absolute_error: float
+    minimum_fold_count: Literal[181]
+    minimum_prediction_coverage: float
+    require_no_season_mean_log_score_regression: Literal[True]
+    require_zero_leakage_failures: Literal[True]
+
+    @field_validator("minimum_primary_relative_lift")
+    @classmethod
+    def _lift_pinned(cls, value: float) -> float:
+        if value != 0.01:
+            raise ValueError(f"minimum_primary_relative_lift is pinned to 0.01; got {value!r}")
+        return value
+
+    @field_validator("maximum_ranked_probability_score_relative_regression")
+    @classmethod
+    def _rps_regression_pinned(cls, value: float) -> float:
+        if value != 0.0:
+            raise ValueError(
+                "maximum_ranked_probability_score_relative_regression is pinned to 0.0"
+            )
+        return value
+
+    @field_validator("maximum_brier_relative_regression_at_least_one_goal")
+    @classmethod
+    def _brier_pinned(cls, value: float) -> float:
+        if value != 0.0:
+            raise ValueError("maximum_brier_relative_regression_at_least_one_goal is pinned to 0.0")
+        return value
+
+    @field_validator("pit_interval_80_maximum_absolute_error")
+    @classmethod
+    def _pit_error_pinned(cls, value: float) -> float:
+        if value != 0.05:
+            raise ValueError("pit_interval_80_maximum_absolute_error is pinned to 0.05")
+        return value
+
+    @field_validator("minimum_prediction_coverage")
+    @classmethod
+    def _coverage_is_total(cls, value: float) -> float:
+        if value != 1.0:
+            raise ValueError("minimum_prediction_coverage is pinned to 1.0")
+        return value
+
+
+class Phase3ReportingPolicy(_Frozen):
+    dimensions: frozenset[str]
+    counts: frozenset[str]
+
+
+class Phase3HistoricalFeaturePolicy(_Frozen):
+    availability_status: Literal["excluded_unavailable_in_archive"]
+    point_in_time_only: Literal["reconstructable_fields_only"]
+    live_availability_prospective_candidate: Literal["separately_named_prospective_only"]
+    historical_score_is: Literal["development_number_not_upper_bound"]
+
+
+class Phase3ScoringCalibrationPolicy(_Frozen):
+    log_probability_floor: float
+    ranked_probability_score: Literal[
+        "sum_of_squared_ordered_category_cdf_errors_not_physical_minute_distance"
+    ]
+    brier: Literal["squared_binary_probability_error"]
+    randomized_pit_band: tuple[float, float]
+    randomized_pit_seed: Literal[202627]
+    reliability_edges: tuple[float, ...]
+    reliability_buckets: Literal["left_closed_right_open_except_final_bucket_right_closed"]
+    reliability_bucket_n: Literal[True]
+
+    @field_validator("log_probability_floor")
+    @classmethod
+    def _log_floor_pinned(cls, value: float) -> float:
+        if value != 1e-12:
+            raise ValueError("log_probability_floor is pinned to 1e-12")
+        return value
+
+
+class Phase3MonteCarloPolicy(_Frozen):
+    scope: Literal["out_of_scope_closed_form_marginal"]
+
+
+ORIGINAL_PHASE3_CONTRACT_VERSION: str = "1.0"
+FROZEN_PHASE3_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
+    "1.0": (),
+}
+
+
+class Phase3EvaluationConfig(_Frozen):
+    contract_version: str
+    phase: Literal[3]
+    amendments: tuple[Phase3Amendment, ...] = ()
+    target: Phase3TargetPolicy
+    target_roster: Phase3TargetRosterPolicy
+    population: Phase3PopulationPolicy
+    cutoff: Phase3CutoffPolicy
+    training: Phase3TrainingPolicy
+    xg_signal_policy: Phase3XgSignalPolicy
+    baselines: Phase3BaselinePolicy
+    metrics: Phase3MetricPolicy
+    promotion: Phase3PromotionGate
+    reporting: Phase3ReportingPolicy
+    historical_features: Phase3HistoricalFeaturePolicy
+    scoring_calibration: Phase3ScoringCalibrationPolicy
+    monte_carlo: Phase3MonteCarloPolicy
+
+    @model_validator(mode="after")
+    def _required_baselines_metrics_and_outputs(self) -> Self:
+        _require_exact_set(
+            self.baselines.stage_c_attacking,
+            {
+                "positional_goal_rate_poisson",
+                "trailing_player_goal_rate_poisson",
+            },
+            label="Stage C attacking baselines",
+        )
+        _require_exact_set(
+            self.baselines.excluded,
+            {"fpl_ep_next_recorded_rules"},
+            label="excluded baselines",
+        )
+        _require_exact_set(
+            self.metrics.proper_distribution,
+            {"mean_log_score", "mean_ranked_probability_score"},
+            label="proper distribution metrics",
+        )
+        _require_exact_set(
+            self.metrics.binary_guardrails,
+            {"mean_brier_at_least_one_goal"},
+            label="binary guardrail metrics",
+        )
+        _require_exact_set(
+            self.metrics.calibration,
+            {
+                "randomized_pit",
+                "pit_interval_80_coverage",
+                "reliability_at_least_one_goal",
+            },
+            label="calibration outputs",
+        )
+        _require_exact_set(
+            self.reporting.dimensions,
+            {"fold", "season", "position", "home_away"},
+            label="report dimensions",
+        )
+        _require_exact_set(
+            self.reporting.counts,
+            {"predictions", "exclusions", "cold_starts", "uncertainty"},
+            label="report counts",
+        )
+        return self
+
+    @model_validator(mode="after")
+    def _version_needs_amendment_record_unless_original(self) -> Self:
+        if self.contract_version != ORIGINAL_PHASE3_CONTRACT_VERSION and not any(
+            amendment.version == self.contract_version for amendment in self.amendments
+        ):
+            raise ValueError(
+                f"Phase 3 contract version {self.contract_version} has no amendment record; "
+                "a pre-registered gate may not change without one"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _amendment_history_is_frozen(self) -> Self:
+        expected = FROZEN_PHASE3_AMENDMENT_HISTORY.get(self.contract_version)
+        if expected is None:
+            return self
+        actual = tuple(
+            (amendment.version, amendment.candidates_evaluated_before_amendment)
+            for amendment in self.amendments
+        )
+        if actual != expected:
+            raise ValueError(
+                f"Phase 3 amendment history for contract {self.contract_version} is not the "
+                f"frozen record: expected {expected}, got {actual}."
+            )
+        return self
+
+
+@functools.cache
+def load_phase3_evaluation(path: Path | None = None) -> Phase3EvaluationConfig:
+    return Phase3EvaluationConfig.model_validate(
+        _read_yaml(path or config_dir() / "phase3_evaluation.yaml")
+    )
