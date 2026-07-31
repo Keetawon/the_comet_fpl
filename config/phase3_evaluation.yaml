@@ -4,7 +4,7 @@
 # populations, bin shapes, baselines, metrics, or lift gates after seeing its
 # results.
 
-contract_version: "1.1"
+contract_version: "1.2"
 phase: 3
 
 amendments:
@@ -25,6 +25,30 @@ amendments:
       measured, judged within xG-covered seasons 2023-24+; finishing does not persist within
       position FWD 0.138 / MID 0.060 / DEF -0.103 so it is shrunk almost fully to the positional
       mean); config xg_signal_policy.use_when_measured_within_covered_seasons.
+  - version: "1.2"
+    date: "2026-08-01"
+    candidates_evaluated_before_amendment: 1
+    changed: >
+      additive_stage_c_attacking_candidate_v2_pre_registration_only_no_population_roster_baseline_metric_or_gate_field_changed
+    reason: >
+      Pre-register Candidate V2 coupled_team_share_attacking_goals_v2: a structural change from
+      V1 that allocates the frozen Stage A team-goal expectation among a club's players by a
+      trailing attacking share (Poisson thinning, rate_i = lambda_team * share_i) instead of
+      predicting each player independently. The Stage A model is the frozen
+      trailing_goals_attack_defence baseline refit fold-local (kickoff_time < as_of) and reused
+      not reimplemented; club identity is stable team_code resolved from the season-qualified
+      team_id via mart_dim_team, never a bare cross-season team_id. The R6 appearance-vs-rate
+      correction computes each player's trailing attacking signal (expected_goals where measured
+      else threat) over APPEARED prior rows only (minutes > 0) and normalises the club's eligible
+      roster in the fixture to sum to one; zero-minute target rows stay scored. This block is
+      additive: it changes no v1.0/1.1 population, target roster, baseline, metric, gate, seed, or
+      calibration field and is judged by the unchanged v1.0 promotion gate.
+    evidence: >
+      docs/research-adaptation.md (team strength combines multiplicatively attack x opponent
+      defence corr 0.439 vs subtractive 0.070, so a team-goal expectation is the right scale to
+      allocate; xG and threat both persist within position and threat is measured for every season
+      incl. 2021-22 which has no xG); config stage_c_candidate_v2.stage_a_model and
+      appeared_rows_filter.
 
 target:
   entity: player
@@ -114,6 +138,44 @@ stage_c_candidate_v1:
   target_position_source: existing_unversioned_target_roster_proxy_current_position
   null_policy: preserve_nulls
   zero_minutes_policy: include_in_history_and_training
+  assistant_manager_policy: excluded_upstream_element_type_5
+  double_gameweek_policy: "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+  monte_carlo: out_of_scope_closed_form
+
+stage_c_candidate_v2:
+  name: coupled_team_share_attacking_goals_v2
+  development_only: true
+  development_only_reason: archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design
+  grain: season_player_code_fixture
+  identity: stable_code
+  stage_a_model: frozen_trailing_goals_attack_defence_reused_not_reimplemented
+  stage_a_fit: fold_local_on_team_match_history_kickoff_time_lt_as_of
+  team_identity: team_code_resolved_from_season_qualified_team_id_via_mart_dim_team_never_bare_team_id
+  share_denominator: club_eligible_players_in_fixture_the_existing_unversioned_target_roster_proxy_shared_with_baselines_not_new_leakage
+  share_signal: trailing_expected_goals_where_measured_else_threat_over_appeared_prior_rows
+  appeared_rows_filter: prior_rows_with_minutes_gt_0_only_did_not_play_prior_rows_excluded_from_rate
+  signal_per_appearance: mean_signal_over_trailing_appeared_rows
+  history_window: 5
+  history_order: kickoff_time_then_season_then_fixture
+  history_observed_results: "kickoff_time < as_of"
+  share_normalization: club_roster_signals_normalised_to_sum_to_one
+  rate: rate_i_equals_lambda_team_times_share_i
+  conservation: poisson_thinning_sum_i_rate_i_equals_lambda_team_on_the_coupled_path
+  cold_start_share: when_no_appeared_prior_row_signal_is_fold_local_positional_goal_mean_equal_to_v1_baseline
+  equal_share_fallback: when_club_roster_signal_sum_is_zero_equal_shares_among_roster
+  stage_a_uninformative_fallback: when_stage_a_training_window_empty_rate_is_exact_v1_trailing_baseline_per_player
+  reduces_to_baseline: where_stage_a_is_uninformative_candidate_equals_v1_trailing_player_goal_rate_poisson_bit_for_bit
+  alpha: 5.0
+  poisson_max_goals: 10
+  estimator: poisson_goal_count_distribution_over_0_to_10
+  additional_smoothing: none
+  scoring_floor_role: existing_1e-12_floor_is_scoring_only_not_a_model_rate_floor
+  selected_parameter: none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward
+  fit_scope: stage_a_and_player_shares_fitted_within_each_fold_on_kickoff_time_lt_as_of
+  target_label_policy: target_labels_never_enter_model_inputs
+  target_position_source: existing_unversioned_target_roster_proxy_current_position
+  null_policy: preserve_nulls_xg_threat_null_means_unmeasured_never_zero_filled
+  zero_minutes_policy: target_zero_minute_rows_scored_roster_is_the_eligible_population
   assistant_manager_policy: excluded_upstream_element_type_5
   double_gameweek_policy: "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
   monte_carlo: out_of_scope_closed_form
