@@ -1,0 +1,2037 @@
+{
+  "contract_version": "1.0",
+  "phase": 3,
+  "stage": "C_attacking_goals",
+  "total_predictions": 133964,
+  "leakage_failures": 0,
+  "folds_by_season": {
+    "2021-22": 30,
+    "2022-23": 37,
+    "2023-24": 38,
+    "2024-25": 38,
+    "2025-26": 38
+  },
+  "best_baseline": "trailing_player_goal_rate_poisson",
+  "overall": {
+    "positional_goal_rate_poisson": {
+      "predictions": 133964,
+      "exclusions": 0,
+      "cold_starts": 1207,
+      "uncertainty": 0.001786,
+      "mean_log_score": 0.154512,
+      "mean_ranked_probability_score": 0.03665,
+      "mean_brier_at_least_one_goal": 0.032843,
+      "pit_interval_80_coverage": 0.804373,
+      "pit_interval_80_error": 0.004373,
+      "reliability_at_least_one_goal": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "n": 133628,
+          "mean_predicted": 0.03899831909048513,
+          "observed_rate": 0.03454365851468255
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "n": 336,
+          "mean_predicted": 0.10282309635636333,
+          "observed_rate": 0.0744047619047619
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        }
+      ]
+    },
+    "trailing_player_goal_rate_poisson": {
+      "predictions": 133964,
+      "exclusions": 0,
+      "cold_starts": 1207,
+      "uncertainty": 0.001724,
+      "mean_log_score": 0.143547,
+      "mean_ranked_probability_score": 0.035129,
+      "mean_brier_at_least_one_goal": 0.031384,
+      "pit_interval_80_coverage": 0.801977,
+      "pit_interval_80_error": 0.001977,
+      "reliability_at_least_one_goal": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "n": 117035,
+          "mean_predicted": 0.0190794985119879,
+          "observed_rate": 0.019720596402785492
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "n": 11749,
+          "mean_predicted": 0.1211291193386796,
+          "observed_rate": 0.1026470337901098
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "n": 4414,
+          "mean_predicted": 0.23022122940986847,
+          "observed_rate": 0.19800634345265067
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "n": 477,
+          "mean_predicted": 0.3538637782710163,
+          "observed_rate": 0.3081761006289308
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "n": 253,
+          "mean_predicted": 0.4333414414615102,
+          "observed_rate": 0.34782608695652173
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "n": 25,
+          "mean_predicted": 0.5298845757162066,
+          "observed_rate": 0.52
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "n": 11,
+          "mean_predicted": 0.6233648882114514,
+          "observed_rate": 0.45454545454545453
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        }
+      ]
+    }
+  },
+  "by_season": {
+    "2021-22": {
+      "positional_goal_rate_poisson": {
+        "predictions": 20704,
+        "exclusions": 0,
+        "cold_starts": 139,
+        "uncertainty": 0.004713,
+        "mean_log_score": 0.162451,
+        "mean_ranked_probability_score": 0.03849,
+        "mean_brier_at_least_one_goal": 0.034301,
+        "pit_interval_80_coverage": 0.805835,
+        "pit_interval_80_error": 0.005835,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 20368,
+            "mean_predicted": 0.040208470412574956,
+            "observed_rate": 0.03539866457187745
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 336,
+            "mean_predicted": 0.10282309635636333,
+            "observed_rate": 0.0744047619047619
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 20704,
+        "exclusions": 0,
+        "cold_starts": 139,
+        "uncertainty": 0.004599,
+        "mean_log_score": 0.152725,
+        "mean_ranked_probability_score": 0.037273,
+        "mean_brier_at_least_one_goal": 0.033106,
+        "pit_interval_80_coverage": 0.803758,
+        "pit_interval_80_error": 0.003758,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 17934,
+            "mean_predicted": 0.020018337282769142,
+            "observed_rate": 0.021690643470502955
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 1983,
+            "mean_predicted": 0.12183858598282735,
+            "observed_rate": 0.09934442763489662
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 689,
+            "mean_predicted": 0.23251006376014488,
+            "observed_rate": 0.19158200290275762
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 64,
+            "mean_predicted": 0.3515858689429171,
+            "observed_rate": 0.25
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 33,
+            "mean_predicted": 0.4366446949346492,
+            "observed_rate": 0.36363636363636365
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 1,
+            "mean_predicted": 0.5181346196097896,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "2022-23": {
+      "positional_goal_rate_poisson": {
+        "predictions": 26505,
+        "exclusions": 0,
+        "cold_starts": 326,
+        "uncertainty": 0.003977,
+        "mean_log_score": 0.155079,
+        "mean_ranked_probability_score": 0.037199,
+        "mean_brier_at_least_one_goal": 0.033068,
+        "pit_interval_80_coverage": 0.804565,
+        "pit_interval_80_error": 0.004565,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 26505,
+            "mean_predicted": 0.039269460082994624,
+            "observed_rate": 0.035012261837389175
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 26505,
+        "exclusions": 0,
+        "cold_starts": 326,
+        "uncertainty": 0.003831,
+        "mean_log_score": 0.143548,
+        "mean_ranked_probability_score": 0.035415,
+        "mean_brier_at_least_one_goal": 0.031361,
+        "pit_interval_80_coverage": 0.80249,
+        "pit_interval_80_error": 0.00249,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 23132,
+            "mean_predicted": 0.01924716196071748,
+            "observed_rate": 0.019626491440428842
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2317,
+            "mean_predicted": 0.12070750821795945,
+            "observed_rate": 0.10099266292619767
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 850,
+            "mean_predicted": 0.23021819570186972,
+            "observed_rate": 0.18941176470588236
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 142,
+            "mean_predicted": 0.35285919330203275,
+            "observed_rate": 0.36619718309859156
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 55,
+            "mean_predicted": 0.4261906193978149,
+            "observed_rate": 0.4
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 5,
+            "mean_predicted": 0.5325880373171652,
+            "observed_rate": 0.4
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 4,
+            "mean_predicted": 0.6295809120295315,
+            "observed_rate": 0.75
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "2023-24": {
+      "positional_goal_rate_poisson": {
+        "predictions": 29725,
+        "exclusions": 0,
+        "cold_starts": 302,
+        "uncertainty": 0.003946,
+        "mean_log_score": 0.161035,
+        "mean_ranked_probability_score": 0.038376,
+        "mean_brier_at_least_one_goal": 0.034086,
+        "pit_interval_80_coverage": 0.802994,
+        "pit_interval_80_error": 0.002994,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 29725,
+            "mean_predicted": 0.039462303295845394,
+            "observed_rate": 0.035929352396972244
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 29725,
+        "exclusions": 0,
+        "cold_starts": 302,
+        "uncertainty": 0.003768,
+        "mean_log_score": 0.148799,
+        "mean_ranked_probability_score": 0.036695,
+        "mean_brier_at_least_one_goal": 0.032486,
+        "pit_interval_80_coverage": 0.801447,
+        "pit_interval_80_error": 0.001447,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 25916,
+            "mean_predicted": 0.019368390815546126,
+            "observed_rate": 0.019794721407624633
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2567,
+            "mean_predicted": 0.12046723226583929,
+            "observed_rate": 0.11219322165952474
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 1070,
+            "mean_predicted": 0.22831482442184017,
+            "observed_rate": 0.20093457943925233
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 89,
+            "mean_predicted": 0.3554981335379909,
+            "observed_rate": 0.2696629213483146
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 73,
+            "mean_predicted": 0.43461575236615346,
+            "observed_rate": 0.3424657534246575
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 7,
+            "mean_predicted": 0.5241063219716736,
+            "observed_rate": 0.42857142857142855
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 3,
+            "mean_predicted": 0.6167174719165812,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "2024-25": {
+      "positional_goal_rate_poisson": {
+        "predictions": 27283,
+        "exclusions": 0,
+        "cold_starts": 201,
+        "uncertainty": 0.003968,
+        "mean_log_score": 0.157072,
+        "mean_ranked_probability_score": 0.037551,
+        "mean_brier_at_least_one_goal": 0.034118,
+        "pit_interval_80_coverage": 0.801488,
+        "pit_interval_80_error": 0.001488,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 27283,
+            "mean_predicted": 0.03872527991064718,
+            "observed_rate": 0.03617637356595682
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 27283,
+        "exclusions": 0,
+        "cold_starts": 201,
+        "uncertainty": 0.003738,
+        "mean_log_score": 0.144386,
+        "mean_ranked_probability_score": 0.035722,
+        "mean_brier_at_least_one_goal": 0.032366,
+        "pit_interval_80_coverage": 0.799582,
+        "pit_interval_80_error": 0.000418,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 23737,
+            "mean_predicted": 0.018695813911516968,
+            "observed_rate": 0.01954754181236045
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2412,
+            "mean_predicted": 0.12131387311486563,
+            "observed_rate": 0.10945273631840796
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 968,
+            "mean_predicted": 0.23139397311552493,
+            "observed_rate": 0.2097107438016529
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 101,
+            "mean_predicted": 0.3547999681952371,
+            "observed_rate": 0.3069306930693069
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 52,
+            "mean_predicted": 0.4362830477105809,
+            "observed_rate": 0.3269230769230769
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 9,
+            "mean_predicted": 0.5299433030744788,
+            "observed_rate": 0.6666666666666666
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 4,
+            "mean_predicted": 0.6221344266145241,
+            "observed_rate": 0.5
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "2025-26": {
+      "positional_goal_rate_poisson": {
+        "predictions": 29747,
+        "exclusions": 0,
+        "cold_starts": 239,
+        "uncertainty": 0.003549,
+        "mean_log_score": 0.139614,
+        "mean_ranked_probability_score": 0.032329,
+        "mean_brier_at_least_one_goal": 0.029217,
+        "pit_interval_80_coverage": 0.808283,
+        "pit_interval_80_error": 0.008283,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 29747,
+            "mean_predicted": 0.037714910454467905,
+            "observed_rate": 0.030658553803744916
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 29747,
+        "exclusions": 0,
+        "cold_starts": 239,
+        "uncertainty": 0.003529,
+        "mean_log_score": 0.131139,
+        "mean_ranked_probability_score": 0.031273,
+        "mean_brier_at_least_one_goal": 0.028204,
+        "pit_interval_80_coverage": 0.802804,
+        "pit_interval_80_error": 0.002804,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 26316,
+            "mean_predicted": 0.018353896711226385,
+            "observed_rate": 0.018543851649186805
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2470,
+            "mean_predicted": 0.12146249529786338,
+            "observed_rate": 0.0902834008097166
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 837,
+            "mean_predicted": 0.22942100147029068,
+            "observed_rate": 0.19474313022700118
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 81,
+            "mean_predicted": 0.3544616111288802,
+            "observed_rate": 0.2962962962962963
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 40,
+            "mean_predicted": 0.43429893215898546,
+            "observed_rate": 0.3
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 3,
+            "mean_predicted": 0.5426018684125088,
+            "observed_rate": 0.6666666666666666
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    }
+  },
+  "by_position": {
+    "DEF": {
+      "positional_goal_rate_poisson": {
+        "predictions": 44678,
+        "exclusions": 0,
+        "cold_starts": 375,
+        "uncertainty": 0.002457,
+        "mean_log_score": 0.077324,
+        "mean_ranked_probability_score": 0.014566,
+        "mean_brier_at_least_one_goal": 0.014208,
+        "pit_interval_80_coverage": 0.802431,
+        "pit_interval_80_error": 0.002431,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 44678,
+            "mean_predicted": 0.015406331713627507,
+            "observed_rate": 0.014414253099959713
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 44678,
+        "exclusions": 0,
+        "cold_starts": 375,
+        "uncertainty": 0.00263,
+        "mean_log_score": 0.079771,
+        "mean_ranked_probability_score": 0.014954,
+        "mean_brier_at_least_one_goal": 0.014593,
+        "pit_interval_80_coverage": 0.800595,
+        "pit_interval_80_error": 0.000595,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 41755,
+            "mean_predicted": 0.007896581239670006,
+            "observed_rate": 0.012621242964914382
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2894,
+            "mean_predicted": 0.11098704657753299,
+            "observed_rate": 0.04008293020041465
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 29,
+            "mean_predicted": 0.26293433146803513,
+            "observed_rate": 0.034482758620689655
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "FWD": {
+      "positional_goal_rate_poisson": {
+        "predictions": 16010,
+        "exclusions": 0,
+        "cold_starts": 168,
+        "uncertainty": 0.007051,
+        "mean_log_score": 0.341352,
+        "mean_ranked_probability_score": 0.092684,
+        "mean_brier_at_least_one_goal": 0.078346,
+        "pit_interval_80_coverage": 0.804247,
+        "pit_interval_80_error": 0.004247,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 15674,
+            "mean_predicted": 0.092497678936518,
+            "observed_rate": 0.08587469695036366
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 336,
+            "mean_predicted": 0.10282309635636333,
+            "observed_rate": 0.0744047619047619
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 16010,
+        "exclusions": 0,
+        "cold_starts": 168,
+        "uncertainty": 0.006352,
+        "mean_log_score": 0.301939,
+        "mean_ranked_probability_score": 0.085212,
+        "mean_brier_at_least_one_goal": 0.071249,
+        "pit_interval_80_coverage": 0.802561,
+        "pit_interval_80_error": 0.002561,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 11757,
+            "mean_predicted": 0.04888164569201974,
+            "observed_rate": 0.03972101726630943
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2198,
+            "mean_predicted": 0.13872134122974672,
+            "observed_rate": 0.15605095541401273
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 1639,
+            "mean_predicted": 0.24340391862979022,
+            "observed_rate": 0.24771201952410007
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 232,
+            "mean_predicted": 0.3604020200866469,
+            "observed_rate": 0.3448275862068966
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 156,
+            "mean_predicted": 0.4365494411491368,
+            "observed_rate": 0.3717948717948718
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 20,
+            "mean_predicted": 0.5331452806272401,
+            "observed_rate": 0.6
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 8,
+            "mean_predicted": 0.6258576693220278,
+            "observed_rate": 0.625
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "GK": {
+      "positional_goal_rate_poisson": {
+        "predictions": 14890,
+        "exclusions": 0,
+        "cold_starts": 137,
+        "uncertainty": 0.0,
+        "mean_log_score": 0.0,
+        "mean_ranked_probability_score": 0.0,
+        "mean_brier_at_least_one_goal": 0.0,
+        "pit_interval_80_coverage": 0.802552,
+        "pit_interval_80_error": 0.002552,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 14890,
+            "mean_predicted": 9.999999717180685e-10,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 14890,
+        "exclusions": 0,
+        "cold_starts": 137,
+        "uncertainty": 0.0,
+        "mean_log_score": 0.0,
+        "mean_ranked_probability_score": 0.0,
+        "mean_brier_at_least_one_goal": 0.0,
+        "pit_interval_80_coverage": 0.802552,
+        "pit_interval_80_error": 0.002552,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 14890,
+            "mean_predicted": 9.999999717180685e-10,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "MID": {
+      "positional_goal_rate_poisson": {
+        "predictions": 58386,
+        "exclusions": 0,
+        "cold_starts": 527,
+        "uncertainty": 0.003024,
+        "mean_log_score": 0.201748,
+        "mean_ranked_probability_score": 0.047531,
+        "mean_brier_at_least_one_goal": 0.043002,
+        "pit_interval_80_coverage": 0.807009,
+        "pit_interval_80_error": 0.007009,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 58386,
+            "mean_predicted": 0.05263478677389982,
+            "observed_rate": 0.04497653547083205
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 58386,
+        "exclusions": 0,
+        "cold_starts": 527,
+        "uncertainty": 0.002877,
+        "mean_log_score": 0.185525,
+        "mean_ranked_probability_score": 0.045793,
+        "mean_brier_at_least_one_goal": 0.041305,
+        "pit_interval_80_coverage": 0.801887,
+        "pit_interval_80_error": 0.001887,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 48633,
+            "mean_predicted": 0.027317784948430224,
+            "observed_rate": 0.027018691012275615
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 6657,
+            "mean_predicted": 0.11972960827576729,
+            "observed_rate": 0.11221270842721946
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 2746,
+            "mean_predicted": 0.22200742475176993,
+            "observed_rate": 0.17006554989075018
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 245,
+            "mean_predicted": 0.34767246357213344,
+            "observed_rate": 0.27346938775510204
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 97,
+            "mean_predicted": 0.42818218423192506,
+            "observed_rate": 0.30927835051546393
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 5,
+            "mean_predicted": 0.5168417560720732,
+            "observed_rate": 0.2
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 3,
+            "mean_predicted": 0.6167174719165812,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    }
+  },
+  "by_home_away": {
+    "home": {
+      "positional_goal_rate_poisson": {
+        "predictions": 66979,
+        "exclusions": 0,
+        "cold_starts": 650,
+        "uncertainty": 0.002633,
+        "mean_log_score": 0.163689,
+        "mean_ranked_probability_score": 0.03952,
+        "mean_brier_at_least_one_goal": 0.035163,
+        "pit_interval_80_coverage": 0.802042,
+        "pit_interval_80_error": 0.002042,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 66816,
+            "mean_predicted": 0.03901022612150508,
+            "observed_rate": 0.03722162356321839
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 163,
+            "mean_predicted": 0.1028472065746608,
+            "observed_rate": 0.0736196319018405
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 66979,
+        "exclusions": 0,
+        "cold_starts": 650,
+        "uncertainty": 0.002527,
+        "mean_log_score": 0.150946,
+        "mean_ranked_probability_score": 0.037488,
+        "mean_brier_at_least_one_goal": 0.033228,
+        "pit_interval_80_coverage": 0.799624,
+        "pit_interval_80_error": 0.000376,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 58579,
+            "mean_predicted": 0.019103824572023708,
+            "observed_rate": 0.020826576076751053
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 5838,
+            "mean_predicted": 0.12119438989979804,
+            "observed_rate": 0.10979787598492634
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 2174,
+            "mean_predicted": 0.23012823601479263,
+            "observed_rate": 0.22723091076356947
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 241,
+            "mean_predicted": 0.3537644485677486,
+            "observed_rate": 0.34854771784232363
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 127,
+            "mean_predicted": 0.43072189613306355,
+            "observed_rate": 0.3779527559055118
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 14,
+            "mean_predicted": 0.5271862795205993,
+            "observed_rate": 0.5714285714285714
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 6,
+            "mean_predicted": 0.6228736998862315,
+            "observed_rate": 0.6666666666666666
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "away": {
+      "positional_goal_rate_poisson": {
+        "predictions": 66985,
+        "exclusions": 0,
+        "cold_starts": 557,
+        "uncertainty": 0.002415,
+        "mean_log_score": 0.145336,
+        "mean_ranked_probability_score": 0.033781,
+        "mean_brier_at_least_one_goal": 0.030523,
+        "pit_interval_80_coverage": 0.806897,
+        "pit_interval_80_error": 0.006897,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 66812,
+            "mean_predicted": 0.038986411346597374,
+            "observed_rate": 0.03186553313775969
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 173,
+            "mean_predicted": 0.1028003797923027,
+            "observed_rate": 0.07514450867052024
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_goal_rate_poisson": {
+        "predictions": 66985,
+        "exclusions": 0,
+        "cold_starts": 557,
+        "uncertainty": 0.002346,
+        "mean_log_score": 0.136148,
+        "mean_ranked_probability_score": 0.03277,
+        "mean_brier_at_least_one_goal": 0.02954,
+        "pit_interval_80_coverage": 0.803284,
+        "pit_interval_80_error": 0.003284,
+        "reliability_at_least_one_goal": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 58456,
+            "mean_predicted": 0.019055121266352934,
+            "observed_rate": 0.018612289585329136
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 5911,
+            "mean_predicted": 0.12106465485960506,
+            "observed_rate": 0.0955845034681103
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 2240,
+            "mean_predicted": 0.23031148282098224,
+            "observed_rate": 0.16964285714285715
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 236,
+            "mean_predicted": 0.3539652124171499,
+            "observed_rate": 0.2669491525423729
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 126,
+            "mean_predicted": 0.43598177683224604,
+            "observed_rate": 0.31746031746031744
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 11,
+            "mean_predicted": 0.5333187708742524,
+            "observed_rate": 0.45454545454545453
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 5,
+            "mean_predicted": 0.6239543142017154,
+            "observed_rate": 0.2
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    }
+  }
+}
