@@ -12,6 +12,20 @@ and is **development-only — not a promotion verdict**, because the historical 
 first-kickoff cutoff remain unversioned proxies. The pre-registered formula and policy below remain
 unchanged.
 
+**Audit reclassification (post-run).** V1 is a **historical xG-signal probe, not a production Stage C
+architecture.** Its player goal distributions are independent Poisson marginals: there is **no Stage
+A team-goal input, no Stage B minutes input, and no team-goal-total allocation or conservation**, its
+zero-minute player-fixture history conflates availability/minutes with attack rate, and it carries
+**no destination-team, opponent, or venue context and no transfer rescaling**. So the only conclusion
+the result supports is narrow — **xG beats recent recorded goals as the attacking signal where xG is
+measured on this archive** — and the end-to-end team-coupled Stage C architecture remains unvalidated;
+the next model work is a **separately named, separately pre-registered team-coupled candidate
+composing Stage A + Stage B** (not pre-registered here). A separate code audit found that
+`poisson_pmf` had floored every model rate below `1e-9`, now corrected so a zero rate degenerates to
+an exact point mass on zero goals and every positive rate uses its actual value; this is a
+forward-looking correction only — **the historical record stays pinned to its original commit SHA
+and is not rerun or rejudged**.
+
 Candidate V1 is **development-only**. The archive already shaped the hypothesis (the xG-beats-goals
 and finishing-does-not-persist measurements in [`docs/research-adaptation.md`](research-adaptation.md)),
 and the historical target roster and first-kickoff cutoff remain unversioned proxies (the same reason
@@ -196,10 +210,13 @@ and must continue to:
 - emit the full folds, seasons, positions, venues, coverage, calibration, xG/fallback path split, and
   assertion record needed for independent reconciliation.
 
-## Next step
+## Status of this candidate
 
-The development runner, unchanged-baseline comparison, provenance rechecks, strict-JSON reconciliation
-record, and deterministic offline tests are implemented and reviewed. The next step is one explicitly
-authorized clean historical development run using the committed provenance-ready runner. Any formula,
-constant, window, fallback, feature, or selection-policy change after a V1 number exists is a new
-named candidate under a new amendment, never a V1 retune.
+The single authorized clean historical development run is **complete** (2026-07-31); see
+[`phase3-stage-c-attacking-candidate-v1-development.md`](phase3-stage-c-attacking-candidate-v1-development.md).
+V1 is **development-only and not promoted**, and — per the audit reclassification above — it is a
+historical xG-signal probe, not production Stage C architecture. It is **not retuned or rejudged**:
+the `poisson_pmf` zero-rate-floor correction is forward-looking, and a second historical evaluation
+is not permitted. The next model work is a **separately named, separately pre-registered team-coupled
+candidate composing Stage A + Stage B**; any formula, constant, window, fallback, feature, or
+selection-policy change is that new candidate under a new amendment, never a V1 retune.

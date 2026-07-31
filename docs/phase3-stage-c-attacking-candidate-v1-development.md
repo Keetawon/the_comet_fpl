@@ -36,6 +36,11 @@ frozen in [`config/phase3_evaluation.yaml`](file:///d:/Personal/workspace/the_co
 - **Preflight/postflight:** the worktree was clean at preflight and remained clean at postflight; the
   commit SHA, config SHA-256, candidate-source SHA-256, and database SHA-256 were unchanged between
   capture and emit.
+- **Post-run audit (not a re-run):** a code audit after this record found that `poisson_pmf` had
+  floored every model rate below `1e-9` (including replacing a zero rate with `1e-9`) rather than
+  preserving the requested rate; it is corrected forward-looking only. **This record is not rerun
+  or rejudged** — it stays pinned to commit `17918ca`, the exact code that was scored, so the
+  corrected `poisson_pmf` does not alter the evidence below.
 
 ---
 
@@ -180,3 +185,25 @@ coverage (+2.1% → +5.2% → +5.7% → +6.0%). That the gain appears precisely 
 nowhere it is not — is the strongest available evidence that the improvement is the xG signal rather
 than an artefact of the shrinkage form, since α = 5.0 is unchanged from the baseline. It is still
 development evidence under unversioned proxies, not a confirmation.
+
+---
+
+## 9. Audit reclassification: a historical xG-signal probe, not production architecture
+
+This candidate is a **historical xG-signal probe, not a production Stage C architecture.** Its player
+goal distributions are independent Poisson marginals, so the headline numbers above measure one thing
+only: **xG beats recent recorded goals as the attacking signal where xG is measured on this archive.**
+They do **not** validate end-to-end Stage C, because the estimator:
+
+- takes **no Stage A team-goal input** and **no Stage B minutes input**;
+- allocates **no team-goal total** — each player's marginal is predicted independently, and the
+  players' goal probabilities are not conserved against any team total;
+- conflates **zero-minute player-fixture history** (availability/minutes) with attack rate, since a
+  zero-minute registered player-fixture row counts the same as a 90-minute row in the trailing
+  window;
+- carries **no destination-team, opponent, or venue context and no transfer rescaling**.
+
+The end-to-end team-coupled Stage C architecture (distributing a Stage A team-goal total among
+coupled player shares, conditioned on Stage B minutes) is therefore **unvalidated**. The next model
+work is a **separately named, separately pre-registered team-coupled candidate composing Stage A +
+Stage B**; this V1 result is not retuned or rejudged, and is not extended into that role.

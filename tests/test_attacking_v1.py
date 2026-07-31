@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import math
 
+import pytest
+
 from fpl.models.attacking_baselines import (
     PlayerHistoryRow,
     TargetRowProjection,
@@ -157,8 +159,31 @@ def test_parameters_report_pinned_constants() -> None:
     assert candidate.name == "xg_informed_trailing_player_goals_v1"
 
 
-def test_poisson_floor_handles_zero_rate() -> None:
-    """A clamped-to-zero rate still yields a valid normalised distribution (no NaN)."""
+def test_zero_rate_is_exact_point_mass_on_zero_goals() -> None:
+    """A rate of exactly zero is the degenerate Poisson: certain zero goals, no rate floor.
+
+    There is no implicit 1e-9 model-rate floor; rate == 0 returns the exact point mass, so a
+    defender/goalkeeper estimated at zero attack rate is modelled as certain not to score
+    rather than carrying a spurious tiny chance of goals.
+    """
     dist = poisson_pmf(0.0)
-    assert len(dist) == 11
-    assert abs(sum(dist) - 1.0) < 1e-9
+    assert dist == (1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    assert abs(sum(dist) - 1.0) < 1e-12
+    assert len(dist) == 11  # goals 0..10 at the default truncation
+
+
+def test_tiny_positive_rate_uses_its_actual_value_not_a_floor() -> None:
+    """A strictly positive rate below 1e-9 is NOT floored up to 1e-9 and is not degenerate."""
+    tiny = poisson_pmf(1e-12)
+    assert tiny != poisson_pmf(0.0)  # nonzero mass leaks off zero goals
+    assert tiny != poisson_pmf(1e-9)  # the old implicit 1e-9 model-rate floor is gone
+    assert tiny[0] < 1.0
+    assert tiny[1] > 0.0
+    assert abs(sum(tiny) - 1.0) < 1e-9
+    # P(1)/P(0) == rate for a Poisson, so the tiny rate is reflected exactly.
+    assert math.isclose(tiny[1] / tiny[0], 1e-12, rel_tol=1e-6)
+
+
+def test_negative_rate_still_raises() -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        poisson_pmf(-0.1)

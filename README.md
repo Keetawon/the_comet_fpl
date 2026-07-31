@@ -12,12 +12,18 @@ different answers:
 
 A single `xP` answers only the first.
 
-**Current status: Phase 0b complete; Phase 1 Stage A is in validation.** Candidates V1 and V2
+**Current status: the data foundation is complete; Stages A, B, and C are in model validation.**
+Phase 1 Candidates V1 and V2
 were fitted under the fixed walk-forward contract and correctly not promoted. V2 scored 1.4939
 against the 1.5003 best baseline, a 0.4284% lift against the required 1%. Candidate V3's
 development result was invalidated (a leakage defect); its leakage-safe successor Candidate V4
 was evaluated once as development-only — 1.4945, a +0.39% lift short of the 1% gate and not a
 promotion verdict — so the trailing-goals baseline remains the Stage A model.
+Phase 2's minutes baselines and Candidates V1/V2/V3 have been development-evaluated; none is
+promoted, and V2/V3 fail the fixed starter-ranking gate. Phase 3's attacking-goals baselines,
+harness, and Candidate V1 are implemented, but V1 is only a historical xG-signal probe: it does
+not compose Stage A team goals with Stage B minutes or conserve a team goal total. The production
+team-coupled Stage C architecture and Stage D simulation remain unimplemented.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
@@ -75,14 +81,14 @@ against vendored fixtures. See [Snapshots (R5)](#snapshots-r5).
 ## Layout
 
 ```
-config/       sources, scoring, data quality, and Phase 1 evaluation contracts
+config/       sources, scoring, data quality, and versioned evaluation contracts
 src/fpl/
   ingest/     archive.py, fpl_api.py, live_snapshot.py, snapshot_files.py
   storage/    db.py, schema.sql
   transform/  crosswalk.py, facts.py, quality.py
   features/   pit.py   -- point-in-time access layer (R4)
-  models/     scoring.py, team_goals.py, minutes_v1.py
-  validate/   metrics.py, folds.py, baselines.py, harness.py -- Stage A evaluation
+  models/     scoring plus Stage A team, Stage B minutes, and Stage C attacking models
+  validate/   walk-forward folds, metrics, baselines, harnesses, and guarded dev runners
   jobs/       build_db.py, daily_snapshot.py, load_snapshots.py, verify_rules.py
 tests/
 .github/workflows/               -- CI plus daily and finalized-history R5 capture
@@ -277,7 +283,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
-| 3 | Stages C/D player events + simulation | not started |
+| 3 | Stages C/D player events + simulation | attacking-goals baselines/harness and historical V1 xG-signal probe complete; production team-coupled Stage C and Stage D not implemented |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
