@@ -84,6 +84,28 @@ so concentration-adaptive shrinkage sharpens the distribution but does not recov
 sharpening a concentrated distribution compresses P(60+) among nailed starters and reduces rank
 resolution. It is development-only and not promoted (unversioned proxies); see
 `docs/phase2-stage-b-candidate-v3-development.md`. V3 is left as committed and is not retuned.
+
+Phase 3's Stage C (player attacking goals) attacking Candidate V1
+`xg_informed_trailing_player_goals_v1` has been development-evaluated **once** as a clean
+historical run (2026-07-31, contract version 1.1 / amendment 1.1): mean log score 0.137813, a
++3.99% lift over the best baseline `trailing_player_goal_rate_poisson` (0.143547), improving on
+every proper distribution metric overall and in every season with zero per-season regression.
+It is **development-only and not promoted**, and an audit reclassifies it as a **historical
+xG-signal probe, not a production Stage C architecture**: its player goal distributions are
+independent Poisson marginals with **no Stage A team-goal input, no Stage B minutes input, and
+no team-goal-total allocation or conservation**, its zero-minute player-fixture history
+conflates availability/minutes with attack rate, and it carries **no destination-team,
+opponent, or venue context and no transfer rescaling**. So the only conclusion it supports is
+narrow — **xG beats recent recorded goals as the attacking signal where xG is measured on this
+archive** — and the end-to-end team-coupled Stage C architecture remains unvalidated. A
+post-run code audit also found that `poisson_pmf` had carried an implicit `1e-9` model-rate
+floor (now corrected: a zero rate degenerates to an exact point mass on zero goals, and any
+positive rate uses its actual value); the historical record stays pinned to its original commit
+SHA and is **not rerun or rejudged**. The next model work is a **separately named, separately
+pre-registered team-coupled candidate composing Stage A + Stage B**, which is not pre-registered
+here. See `docs/phase3-stage-c-attacking-candidate-v1-development.md` and
+`docs/phase3-stage-c-design.md`.
+
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -168,8 +190,8 @@ Also preserve these data contracts:
 - `src/fpl/features/`: point-in-time-safe read API and, later, feature construction.
 - `src/fpl/validate/`: walk-forward folds, proper scoring rules, Stage A baselines, harness.
   It reads outcomes, which the feature layer may not -- scoring a prediction needs the label.
-- `src/fpl/models/`: scoring, the Stage A team-goals models, and the offline-tested Stage B
-  Candidate V1 estimator.
+- `src/fpl/models/`: scoring, the Stage A team-goals models, Stage B minutes candidates, and
+  Stage C attacking-goals baselines/probes.
 - `src/fpl/jobs/`: thin orchestration/CLI entry points.
 - `tests/`: executable data contracts; vendored API fixtures keep tests offline.
 - `docs/`: design records and the future static publish contract.
@@ -368,6 +390,19 @@ Unless the user sets another priority, address prerequisites before model sophis
    ranking-targeted successor needs a different structure (e.g. a crisp last-observed component),
    not more shrinkage tuning.
 6. Keep archive and live rebuild/capture failure-path tests aligned as schema roles evolve.
+7. Phase 3 Stage C attacking Candidate V1 `xg_informed_trailing_player_goals_v1` is
+   **development-only and reclassified as a historical xG-signal probe, not production Stage C
+   architecture** (independent player Poisson marginals; no Stage A team-goal or Stage B minutes
+   input; no team-goal-total allocation or conservation; zero-minute history conflates
+   availability/minutes with attack rate; no destination-team/opponent/venue context or transfer
+   rescaling). Its single historical development result (mean log score 0.137813, +3.99% over
+   `trailing_player_goal_rate_poisson`) is development-only and not a promotion verdict, and is
+   **not retuned or rejudged**: the `poisson_pmf` zero-rate-floor audit correction is
+   forward-looking, and the historical record stays pinned to its original commit SHA. The valid
+   conclusion is narrow — xG beats recent goals where xG is measured on this archive — and
+   end-to-end Stage C is unvalidated. The next candidate must be **separately named and
+   pre-registered, team-coupled (composing Stage A team goals with Stage B minutes)**, and is not
+   pre-registered here; do not extend V1 into that role.
 
 ## Sub-agent coordination and handoff
 

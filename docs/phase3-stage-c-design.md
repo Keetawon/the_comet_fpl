@@ -1,10 +1,19 @@
 # Phase 3 Stage C design: player event components
 
-**Status: design / pre-registration PROPOSAL, for review before any contract is frozen or any
-model is fit.** This is the mandated first step of a new stage — define the target decomposition,
-population, grain, baselines, metrics, walk-forward, and gate before fitting — exactly as Phase 1
-(Stage A) and Phase 2 (Stage B) began. Nothing here is implemented or evaluated. The frozen
-`config/phase3_evaluation.yaml` contract and its typed loader come *after* this design is agreed.
+**Status: original design proposal, annotated after Stage C Increment 1 and the Candidate V1
+audit.** Contract v1.0, the attacking-goals baselines, and the walk-forward harness are now
+implemented; amendment 1.1 pre-registered Candidate V1, which has been evaluated once as
+development-only evidence. The team-coupled architecture described here is **not yet implemented
+or evaluated**. The attacking-goals *rate* has been probed once by a separately named
+Candidate V1 (`xg_informed_trailing_player_goals_v1`, a development-only **historical xG-signal
+probe, not this architecture** — independent player Poisson goal marginals with no Stage A
+team-goal input, no Stage B minutes input, and no team-goal-total allocation or conservation; see
+[`phase3-stage-c-attacking-candidate-v1-development.md`](phase3-stage-c-attacking-candidate-v1-development.md)).
+Its only valid conclusion is narrow — **xG beats recent recorded goals where xG is measured on this
+archive** — and the end-to-end team-coupled Stage C architecture (distributing a Stage A team-goal
+total among coupled player shares, conditioned on Stage B minutes) remains **unvalidated**. The
+frozen `config/phase3_evaluation.yaml` contract covers the implemented baseline/harness slice; it
+does not make the proposed coupling architecture implemented.
 
 Stage C converts the Stage A team-goal distribution and the Stage B player-minutes distribution
 into each player's **scoring event components** for a fixture. Stage D (later) aggregates those
@@ -136,5 +145,14 @@ rate; trailing player goal/xG share) and its proper-score gate would be frozen f
 component implemented and development-evaluated under the same one-authorized-run discipline as
 every prior candidate.
 
-Everything above is a proposal. On agreement it becomes the frozen `config/phase3_evaluation.yaml`
-(contract version 1.0) plus this document's as-built counterpart, before any component is fit.
+> **Audit note (developed slice vs this proposal).** Candidate V1 as developed is narrower than this
+> slice: it predicts independent player Poisson goal *marginals* from trailing xG/goals only and does
+> **not** distribute a Stage A team-goal total among coupled shares, takes no Stage B minutes input,
+> and applies no team/opponent/venue or transfer-rescaling context (it also conflates zero-minute
+> player-fixture history with attack rate). So the team-coupling mechanic that this design makes the
+> point of the first slice is **not yet exercised**; it is the unvalidated next step, to be
+> pre-registered as a separately named candidate composing Stage A + Stage B.
+
+The original proposal above led to the frozen v1.0 baseline/harness contract, but Candidate V1 did
+not implement its team-coupled first slice. Any successor must be separately named and
+pre-registered in a new additive amendment before implementation or evaluation.

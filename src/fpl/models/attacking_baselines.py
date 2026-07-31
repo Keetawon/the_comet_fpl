@@ -25,14 +25,22 @@ from fpl.types import Position
 type GoalCountDistribution = tuple[float, ...]
 
 MAX_GOALS = 10
-_PROBABILITY_FLOOR = 1e-12
 
 
 def poisson_pmf(rate: float, max_goals: int = MAX_GOALS) -> GoalCountDistribution:
-    """A Poisson distribution truncated at `max_goals`, with tail folded into the end."""
+    """A Poisson distribution truncated at `max_goals`, with tail folded into the end.
+
+    A rate of exactly zero degenerates to a point mass on zero goals (P(0)=1, P(k>0)=0):
+    the honest representation of a player modelled as certain not to score. There is NO
+    model-rate floor; any strictly positive rate, however small, uses its actual value. Only
+    the scoring layer applies a numeric floor (`scoring_calibration.log_probability_floor`),
+    which is scoring-only numerics and not model smoothing.
+    """
     if rate < 0:
         raise ValueError(f"rate must be non-negative, got {rate}")
-    rate = max(rate, 1e-9)
+    if rate == 0.0:
+        # Degenerate Poisson at rate 0: certain zero goals. Exact, not floored.
+        return (1.0,) + (0.0,) * max_goals
     masses = []
     log_rate = math.log(rate)
     for goals in range(max_goals):
