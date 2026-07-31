@@ -38,6 +38,7 @@ The signals available to Stage C are not uniform across the five seasons. Measur
 | threat, creativity | 100% | 100% | 100% | 100% | 100% | yes |
 | expected_goals / expected_assists / expected_goals_conceded (xG/xA/xGC) | **0%** | **68%** | 100% | 100% | 100% | **partial** — absent 2021-22, 64–68% in 2022-23 |
 | **defensive_contribution (DC)** | **0%** | **0%** | **0%** | **0%** | **100%** | **NO** — exists in exactly one season |
+| DC raw inputs: `tackles`, `recoveries`, `clearances_blocks_interceptions` | **0%** | **0%** | **0%** | **0%** | **100%** | **NO** — FPL never recorded them before 2025-26 (verified) |
 
 Two coverage facts shape the whole stage:
 
@@ -46,16 +47,32 @@ Two coverage facts shape the whole stage:
    judged *within the seasons that measure xG*, never on a pooled five-season figure (which reads
    xG's absence as a result). `threat`/`creativity` are the all-season fallback signals.
 
-2. **DC is present in exactly one season (2025-26)** — yet it is a **2026/27 scoring element**
-   (defenders/midfielders earn points for defensive contributions). This is the Stage-C analogue of
-   the availability problem in Stage B: **the DC component cannot be walk-forward-validated on
-   history** — four of five seasons carry no DC label at all. It must be a **separately named,
-   single-season-development / prospective-only component** that may **not** claim historical lift,
-   exactly like the availability adjustment was carved out of the minutes model. Its underlying
-   inputs (`tackles`, `recoveries`, `clearances_blocks_interceptions`) *are* present earlier, so a
-   proxy DC target can be *reconstructed* for earlier seasons — but whether that reconstruction
-   matches the official DC definition is unverified and must be treated as an assumption, not a
-   fact.
+2. **DC — and every raw defensive action feeding it — is present in exactly one season
+   (2025-26)** — yet DC is a **2026/27 scoring element** (defenders/midfielders earn points for
+   defensive contributions). Correction to an earlier draft of this design: the raw inputs
+   `tackles`, `recoveries`, and `clearances_blocks_interceptions` are **not** present in earlier
+   seasons — verified 0% non-null for 2021-22..2024-25 in `mart_fact_player_fixture`. The FPL
+   archive simply never recorded defensive actions before 2025-26. **DC therefore cannot be
+   reconstructed from FPL data alone**, and the component cannot be walk-forward-validated on FPL
+   history — four of five seasons carry neither the DC label nor its inputs.
+
+   There are two, non-exclusive ways to treat this:
+
+   a. **Prospective-only from FPL alone.** A **separately named, single-season-development /
+      prospective-only** DC component that may **not** claim historical lift, exactly like the
+      availability adjustment carved out of the minutes model.
+
+   b. **Backfill the defensive actions from an external per-match source** (e.g. FBref, which
+      records tackles / interceptions / blocks / clearances per player per match back to 2017-18).
+      This is the only path that makes DC backtestable across seasons. It is admissible **only if
+      the external definition is proven to match FPL's**, and the archive gives us the exact test
+      for that: **2025-26 is an overlap season carrying both FPL's own DC (and its raw inputs) and
+      the external source's**. Reconstruct DC from the external actions on 2025-26 and require it
+      to reproduce FPL's recorded DC before trusting the external backfill for 2021-22..2024-25.
+      Until that agreement is demonstrated it is an assumption, not a fact. Identity is joined by
+      **full name + club + season** (not `web_name`, which drifts), anchored/validated by
+      `opta_code` where it exists — but note `opta_code` itself is only present for 2024-25 and
+      2025-26, so it validates the recent join, not the seasons being backfilled.
 
 ## Component decomposition (proposed)
 
