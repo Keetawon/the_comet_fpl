@@ -43,3 +43,19 @@ paths:
   database: "data/fpl.duckdb"
   archive_cache: "data/archive"
   snapshots: "snapshots"
+
+# Locally-pulled FBref defensive-actions dump (B-path; see
+# docs/phase3-stage-c-fbref-recipe.md). fbref.com is unreachable from the build environment,
+# so this is a CSV the operator pulls where FBref is reachable and commits -- never fetched
+# here. No secret is needed; if one ever is, load it from the environment and keep it out of
+# the repo. Treated as an unverified assumption until the 2025-26 overlap gate passes.
+defensive_actions_dump:
+  # Relative to the repository root; points at the canonical-column CSV.
+  csv_path: "data/fbref_defensive_actions.csv"
+  overlap_season: "2025-26"
+  provenance:
+    source: "FBref (StatsBomb)"
+    license: "non-commercial use; attribution required"
+    pulled_with: "soccerdata (FBref match logs: defense + misc) -- see recipe"
+    # ISO date the operator pulled it; null until a dump is actually committed.
+    pulled_on: null

@@ -212,11 +212,34 @@ class Paths(_Frozen):
     snapshots: str
 
 
+class DefensiveActionsDumpProvenance(_Frozen):
+    """Provenance for a locally-pulled external defensive-actions dump (B-path).
+
+    FBref is unreachable from the build environment, so this records a CSV the operator
+    pulled where it is reachable. It is treated as an unverified assumption until the
+    2025-26 overlap gate passes -- never promoted to confirmed facts. FBref is not versioned,
+    so there is no pinned commit; `pulled_on` is the provenance anchor instead.
+    """
+
+    source: str
+    license: str
+    pulled_with: str
+    pulled_on: datetime | None = None
+
+
+class DefensiveActionsDump(_Frozen):
+    csv_path: str
+    overlap_season: Season
+    provenance: DefensiveActionsDumpProvenance
+
+
 class SourcesConfig(_Frozen):
     archive: ArchiveSource
     live_api: LiveApiSource
     current_season: CurrentSeason
     paths: Paths
+    # Optional until a B-path dump is committed. Absent => the backfill job needs --csv.
+    defensive_actions_dump: DefensiveActionsDump | None = None
 
 
 # --------------------------------------------------------------------------------------
