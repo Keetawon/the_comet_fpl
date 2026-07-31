@@ -131,7 +131,7 @@ def run_baseline_development(
 
     verify_provenance(initial_provenance, config_path, db_path)
 
-    payload = serialize_result(harness_res)
+    payload = serialize_result(harness_res, contract_version=config.contract_version)
     payload["provenance"] = asdict(initial_provenance)
 
     if out_json:
