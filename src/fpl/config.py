@@ -1862,6 +1862,93 @@ class Phase3XgSignalPolicy(_Frozen):
     fallback_signal: Literal["threat"]
 
 
+class Phase3StageCCandidateV1Policy(_Frozen):
+    """Frozen pre-registration for the first Stage C attacking candidate.
+
+    Candidate V1 is the v1.0 ``trailing_player_goal_rate_poisson`` baseline with one
+    change: where xG (``expected_goals``) is measured, the player's recent GOALS signal
+    is replaced by recent xG, and the player's own finishing (goals - xG) is shrunk
+    almost fully to the positional mean (within-position finishing persistence is at the
+    noise floor: FWD 0.138 / MID 0.060 / DEF -0.103 in ``docs/research-adaptation.md``).
+    Where xG is unmeasured the candidate falls back to the EXACT v1.0 trailing-player
+    baseline, so it reduces to that baseline bit-for-bit in 2021-22 (no xG) and partially
+    in 2022-23 (xG measured only from GW16). Unlike the Stage B candidates this is a
+    FIXED closed-form estimator: no parameter grid, no inner walk-forward selection, so
+    ``selected_parameter`` is pinned to ``none``. ``alpha`` mirrors the v1.0 trailing
+    baseline's shrinkage (5.0) so the only change is goals -> xG; ``finishing_keep`` is
+    pinned to 0.05 (finishing shrunk 95% to the positional mean). Every distinguishing
+    field is pinned so a result cannot be followed by a silent policy change. The block
+    is additive: it changes no v1.0 population, target roster, baseline, metric, gate,
+    seed, or calibration field.
+    """
+
+    name: Literal["xg_informed_trailing_player_goals_v1"]
+    development_only: Literal[True]
+    development_only_reason: Literal[
+        "archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design"
+    ]
+    grain: Literal["season_player_code_fixture"]
+    identity: Literal["stable_code"]
+    history_population: Literal["up_to_5_most_recent_prior_player_fixture_rows_including_zero"]
+    history_order: Literal["kickoff_time_then_season_then_fixture"]
+    history_window: Literal[5]
+    history_observed_results: Literal["kickoff_time < as_of"]
+    signal: Literal["expected_goals_where_measured_else_fallback_to_v1_trailing_baseline"]
+    xg_handling: Literal["use_when_measured_per_row_null_is_unmeasured"]
+    positional_goal_mean: Literal[
+        "fold_local_mean_goals_per_appearance_at_target_position_equal_to_v1_positional_baseline"
+    ]
+    positional_xg_mean: Literal[
+        "fold_local_mean_expected_goals_per_appearance_over_xg_measured_prior_rows_at_target_position"
+    ]
+    trailing_xg_shrinkage: Literal[
+        "shrunk_xg_equals_(sum_x_plus_alpha_times_pos_x)_over_(m_plus_alpha)"
+    ]
+    finishing_policy: Literal["finishing_shrunk_almost_fully_to_positional_mean_keep_0.05"]
+    finishing_term: Literal["0.05_times_player_finishing_plus_0.95_times_positional_finishing"]
+    rate: Literal["rate_equals_shrunk_xg_plus_finishing_term_clamped_at_zero"]
+    fallback_to_v1: Literal[
+        "when_no_xg_measured_trailing_row_or_no_positional_xg_mean_rate_is_exact_v1_trailing_shrunk_goals_rate"
+    ]
+    cold_start_fallback: Literal[
+        "when_n_equals_0_rate_is_positional_goal_mean_equal_to_v1_baseline"
+    ]
+    reduces_to_v1_baseline: Literal[
+        "when_all_trailing_xg_unmeasured_candidate_equals_v1_trailing_baseline_bit_for_bit"
+    ]
+    alpha: float
+    finishing_keep: float
+    poisson_max_goals: Literal[10]
+    estimator: Literal["poisson_goal_count_distribution_over_0_to_10"]
+    additional_smoothing: Literal["none"]
+    scoring_floor_role: Literal["existing_1e-12_floor_is_scoring_only_not_model_smoothing"]
+    selected_parameter: Literal["none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward"]
+    fit_scope: Literal["positional_means_and_player_histories_recomputed_within_each_fold"]
+    target_label_policy: Literal["target_labels_never_enter_model_inputs"]
+    target_position_source: Literal["existing_unversioned_target_roster_proxy_current_position"]
+    null_policy: Literal["preserve_nulls"]
+    zero_minutes_policy: Literal["include_in_history_and_training"]
+    assistant_manager_policy: Literal["excluded_upstream_element_type_5"]
+    double_gameweek_policy: Literal[
+        "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+    ]
+    monte_carlo: Literal["out_of_scope_closed_form"]
+
+    @model_validator(mode="after")
+    def _exact_candidate_policy(self) -> Self:
+        if self.alpha != 5.0:
+            raise ValueError(
+                f"Stage C Candidate V1 alpha is pinned to 5.0 (== v1.0 trailing baseline); "
+                f"got {self.alpha!r}"
+            )
+        if self.finishing_keep != 0.05:
+            raise ValueError(
+                "Stage C Candidate V1 finishing_keep is pinned to 0.05 (finishing shrunk 95% "
+                f"to the positional mean); got {self.finishing_keep!r}"
+            )
+        return self
+
+
 _PHASE3_BASELINE_PINS: dict[str, dict[str, str | int | None]] = {
     "positional_goal_rate_poisson": {
         "identity": "target_position",
@@ -2040,6 +2127,7 @@ class Phase3MonteCarloPolicy(_Frozen):
 ORIGINAL_PHASE3_CONTRACT_VERSION: str = "1.0"
 FROZEN_PHASE3_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
     "1.0": (),
+    "1.1": (("1.1", 0),),
 }
 
 
@@ -2053,6 +2141,11 @@ class Phase3EvaluationConfig(_Frozen):
     cutoff: Phase3CutoffPolicy
     training: Phase3TrainingPolicy
     xg_signal_policy: Phase3XgSignalPolicy
+    # Candidate V1 (xG-informed trailing player goals) is required at contract version 1.1. It is
+    # additive: it changes no v1.0 population/roster/baseline/metric/gate and is judged by the
+    # unchanged v1.0 promotion gate. Required here so a 1.1 config that silently drops it fails to
+    # load rather than scoring a different model.
+    stage_c_candidate_v1: Phase3StageCCandidateV1Policy
     baselines: Phase3BaselinePolicy
     metrics: Phase3MetricPolicy
     promotion: Phase3PromotionGate

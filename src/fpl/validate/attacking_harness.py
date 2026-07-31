@@ -14,10 +14,10 @@ import argparse
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import duckdb
 
@@ -41,12 +41,38 @@ STAGE_C_ATTACKING_BASELINE_ORDER: tuple[str, ...] = (
 )
 
 
+class AttackingCandidate(Protocol):
+    """A fold-local fitted attacking-goals predictor with the baseline predict/parameters shape.
+
+    A Stage C candidate is fitted inside :func:`run_attacking_fold` on the exact history the
+    baselines use, so it is scored on the identical eligible rows. The harness never imports a
+    candidate model: a development runner supplies a factory returning an object conforming to this
+    protocol. The default harness path passes no factory and is unchanged.
+    """
+
+    name: str
+
+    def predict(self, target: TargetRowProjection) -> GoalCountDistribution: ...
+
+    def parameters(self) -> Mapping[str, float | int | bool | str]: ...
+
+    def path_for(self, target: TargetRowProjection) -> str:
+        """The estimator path taken for one target (development diagnostic, never a gate)."""
+
+
+# Fits one candidate on a fold's history and returns its fitted predictor. Optional and opt-in; the
+# default baselines-only CLI supplies no factory.
+AttackingCandidateFactory = Callable[[Sequence[PlayerHistoryRow]], AttackingCandidate]
+
+
 @dataclass(frozen=True, slots=True)
 class TargetPredictionRecord:
     target: TargetRowProjection
     observed_goals: int
     predictions: dict[str, GoalCountDistribution]
     is_cold_start: bool
+    # Per-candidate estimator path label (development diagnostic). Empty when no candidate runs.
+    candidate_paths: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +87,18 @@ class AttackingHarnessResult:
     total_predictions: int
     leakage_failures: int
     best_baseline_name: str
+    # Candidate names scored alongside the baselines (development-only). Empty on the baselines-only
+    # path, so the default harness command is unchanged.
+    candidate_names: tuple[str, ...] = ()
+    # Per-fold candidate parameter provenance and per-target estimator-path tallies
+    # (development-only). Empty unless a candidate factory was supplied.
+    parameters_by_fold: dict[str, dict[str, dict[str, float | int | bool | str]]] = field(
+        default_factory=dict
+    )
+    candidate_path_counts: dict[str, dict[str, int]] = field(default_factory=dict)
+    candidate_path_counts_by_season: dict[str, dict[str, dict[str, int]]] = field(
+        default_factory=dict
+    )
 
 
 def assert_no_attacking_leakage(targets: Sequence[TargetRowProjection], as_of: str) -> None:
@@ -79,8 +117,15 @@ def run_attacking_fold(
     con: duckdb.DuckDBPyConnection,
     season: str,
     gw: int,
-) -> tuple[str, list[TargetPredictionRecord]]:
-    """Run fit and prediction for one (season, gw) fold."""
+    *,
+    candidate_factory: AttackingCandidateFactory | None = None,
+) -> tuple[str, list[TargetPredictionRecord], dict[str, dict[str, float | int | bool | str]]]:
+    """Run fit and prediction for one (season, gw) fold.
+
+    When ``candidate_factory`` is supplied the candidate is fitted on the same ``history_rows`` the
+    baselines use and predicts the same ``targets``, so identical eligible rows is structural. The
+    candidate's per-fold parameters are returned alongside the records for reconciliation.
+    """
     # 1. Determine as_of (minimum kickoff_time in predicted observed GW)
     as_of_row = con.sql(
         """
@@ -94,12 +139,15 @@ def run_attacking_fold(
         raise ValueError(f"No valid kickoff_time found for fold {season} GW{gw}")
     as_of: str = as_of_row[0]
 
-    # 2. Query prior training history (kickoff_time < as_of)
+    # 2. Query prior training history (kickoff_time < as_of). `expected_goals` (xG) is selected
+    # raw -- NULL means unmeasured and is preserved (never zero-filled); the v1.0 baselines ignore
+    # it and Candidate V1 reads it.
     history_df = con.sql(
         """
         SELECT season, gw, fixture,
                strftime(kickoff_time, '%Y-%m-%dT%H:%M:%SZ') AS kickoff_time,
-               code, position, COALESCE(goals_scored, 0) AS goals
+               code, position, COALESCE(goals_scored, 0) AS goals,
+               expected_goals
         FROM mart_fact_player_fixture
         WHERE minutes IS NOT NULL AND kickoff_time < ?
         ORDER BY kickoff_time, season, fixture, code
@@ -118,6 +166,7 @@ def run_attacking_fold(
             code=r["code"],
             position=Position.from_archive_label(r["position"]),
             goals=r["goals"],
+            expected_goals=r["expected_goals"],
         )
         for r in history_df.iter_rows(named=True)
     ]
@@ -167,6 +216,21 @@ def run_attacking_fold(
     b_trail = TrailingPlayerGoalRateBaseline(alpha=5.0)
     b_trail.fit(history_rows)
 
+    # Fit the development candidate (if any) on the SAME history the baselines used.
+    candidate_parameters: dict[str, dict[str, float | int | bool | str]] = {}
+    fitted_candidate: AttackingCandidate | None = None
+    if candidate_factory is not None:
+        fitted_candidate = candidate_factory(history_rows)
+        if fitted_candidate.name in {
+            "positional_goal_rate_poisson",
+            "trailing_player_goal_rate_poisson",
+        }:
+            raise RuntimeError(
+                f"development candidate name {fitted_candidate.name!r} collides with a required "
+                "Stage C attacking baseline"
+            )
+        candidate_parameters[fitted_candidate.name] = dict(fitted_candidate.parameters())
+
     # Predict
     records: list[TargetPredictionRecord] = []
     for target, goals in zip(targets, observed_goals, strict=True):
@@ -174,21 +238,26 @@ def run_attacking_fold(
         p_trail = b_trail.predict(target)
 
         is_cold = target.code not in prior_codes
-        preds = {
+        preds: dict[str, GoalCountDistribution] = {
             "positional_goal_rate_poisson": p_pos,
             "trailing_player_goal_rate_poisson": p_trail,
         }
+        cand_paths: dict[str, str] = {}
+        if fitted_candidate is not None:
+            preds[fitted_candidate.name] = fitted_candidate.predict(target)
+            cand_paths[fitted_candidate.name] = fitted_candidate.path_for(target)
         records.append(
             TargetPredictionRecord(
                 target=target,
                 observed_goals=goals,
                 predictions=preds,
                 is_cold_start=is_cold,
+                candidate_paths=cand_paths,
             )
         )
 
     fold_label = f"{season}-GW{gw:02d}"
-    return fold_label, records
+    return fold_label, records, candidate_parameters
 
 
 def run_attacking_harness(
@@ -196,8 +265,15 @@ def run_attacking_harness(
     *,
     config: Phase3EvaluationConfig | None = None,
     seasons: Sequence[str] | None = None,
+    candidate_factory: AttackingCandidateFactory | None = None,
 ) -> AttackingHarnessResult:
-    """Run the 181-fold Stage C attacking goals walk-forward evaluation."""
+    """Run the 181-fold Stage C attacking goals walk-forward evaluation.
+
+    By default this is baselines-only. A separately named development runner may opt in one
+    fold-local candidate via ``candidate_factory``; the candidate is fitted on the identical fold
+    history and predicts the identical targets, so identical eligible rows is structural. No
+    promotion gate is executed on either path.
+    """
     if config is None:
         config = load_phase3_evaluation()
 
@@ -223,19 +299,36 @@ def run_attacking_harness(
 
     all_records_by_fold: dict[str, list[TargetPredictionRecord]] = {}
     folds_by_season: dict[str, int] = defaultdict(int)
+    parameters_by_fold: dict[str, dict[str, dict[str, float | int | bool | str]]] = {}
 
     for ssn, gw in scoring_folds:
-        fold_label, records = run_attacking_fold(con, ssn, gw)
+        fold_label, records, fold_cand_params = run_attacking_fold(
+            con, ssn, gw, candidate_factory=candidate_factory
+        )
         all_records_by_fold[fold_label] = records
         folds_by_season[ssn] += 1
+        if fold_cand_params:
+            parameters_by_fold[fold_label] = fold_cand_params
 
     baseline_names = STAGE_C_ATTACKING_BASELINE_ORDER
 
-    # Helper to score a collection of records for a given baseline
+    # Candidate names are the model names present in the records beyond the baselines. Constant
+    # across folds (one factory -> one candidate name), so the union is a singleton; empty on the
+    # baselines-only path, in which case `all_model_names == baseline_names`.
+    cand_name_set: set[str] = set()
+    for recs in all_records_by_fold.values():
+        for record in recs:
+            cand_name_set.update(record.predictions.keys())
+    candidate_names: tuple[str, ...] = tuple(
+        name for name in sorted(cand_name_set) if name not in baseline_names
+    )
+    all_model_names: tuple[str, ...] = (*baseline_names, *candidate_names)
+
+    # Helper to score a collection of records for a given model (baseline or candidate)
     def score_collection(
-        recs: Sequence[TargetPredictionRecord], b_name: str
+        recs: Sequence[TargetPredictionRecord], model_name: str
     ) -> AttackingScoreReport:
-        preds = [r.predictions[b_name] for r in recs]
+        preds = [r.predictions[model_name] for r in recs]
         targets = [r.observed_goals for r in recs]
         cold_count = sum(1 for r in recs if r.is_cold_start)
         return score_attacking_predictions(
@@ -248,15 +341,26 @@ def run_attacking_harness(
     ]
     total_preds = len(all_recs)
 
+    # Population equality: every model (baselines and any candidate) scored the same eligible rows.
+    if all_model_names:
+        per_model_counts = {
+            name: sum(1 for r in all_recs if name in r.predictions) for name in all_model_names
+        }
+        if set(per_model_counts.values()) != {total_preds}:
+            raise RuntimeError(
+                "Stage C attacking models did not score the same eligible population: "
+                f"{per_model_counts}, eligible={total_preds}"
+            )
+
     # Slices
     overall: dict[str, AttackingScoreReport] = {
-        b_name: score_collection(all_recs, b_name) for b_name in baseline_names
+        name: score_collection(all_recs, name) for name in all_model_names
     }
 
     # by_fold
     by_fold: dict[str, dict[str, AttackingScoreReport]] = {}
     for f_label, recs in all_records_by_fold.items():
-        by_fold[f_label] = {b_name: score_collection(recs, b_name) for b_name in baseline_names}
+        by_fold[f_label] = {name: score_collection(recs, name) for name in all_model_names}
 
     # by_season
     recs_by_season: dict[str, list[TargetPredictionRecord]] = defaultdict(list)
@@ -266,7 +370,7 @@ def run_attacking_harness(
     by_season: dict[str, dict[str, AttackingScoreReport]] = {}
     for ssn in sorted(recs_by_season.keys()):
         s_recs = recs_by_season[ssn]
-        by_season[ssn] = {b_name: score_collection(s_recs, b_name) for b_name in baseline_names}
+        by_season[ssn] = {name: score_collection(s_recs, name) for name in all_model_names}
 
     # by_position
     recs_by_pos: dict[str, list[TargetPredictionRecord]] = defaultdict(list)
@@ -276,7 +380,7 @@ def run_attacking_harness(
     by_position: dict[str, dict[str, AttackingScoreReport]] = {}
     for pos in sorted(recs_by_pos.keys()):
         p_recs = recs_by_pos[pos]
-        by_position[pos] = {b_name: score_collection(p_recs, b_name) for b_name in baseline_names}
+        by_position[pos] = {name: score_collection(p_recs, name) for name in all_model_names}
 
     # by_home_away
     recs_by_ha: dict[str, list[TargetPredictionRecord]] = defaultdict(list)
@@ -287,8 +391,29 @@ def run_attacking_harness(
     by_home_away: dict[str, dict[str, AttackingScoreReport]] = {}
     for ha in ("home", "away"):
         ha_recs = recs_by_ha[ha]
-        by_home_away[ha] = {b_name: score_collection(ha_recs, b_name) for b_name in baseline_names}
+        by_home_away[ha] = {name: score_collection(ha_recs, name) for name in all_model_names}
 
+    # Candidate estimator-path tallies (development diagnostics, never a gate). Overall and by
+    # season; empty on the baselines-only path.
+    candidate_path_counts: dict[str, dict[str, int]] = {name: {} for name in candidate_names}
+    for r in all_recs:
+        for cname, path in r.candidate_paths.items():
+            tally = candidate_path_counts[cname]
+            tally[path] = tally.get(path, 0) + 1
+    candidate_path_counts_by_season: dict[str, dict[str, dict[str, int]]] = {
+        name: {} for name in candidate_names
+    }
+    for ssn, s_recs in recs_by_season.items():
+        for cname in candidate_names:
+            season_tally: dict[str, int] = {}
+            for r in s_recs:
+                path_label = r.candidate_paths.get(cname)
+                if path_label is not None:
+                    season_tally[path_label] = season_tally.get(path_label, 0) + 1
+            if season_tally:
+                candidate_path_counts_by_season[cname][ssn] = season_tally
+
+    # The comparator is the best required BASELINE only (never a development candidate).
     best_b_name = min(baseline_names, key=lambda b: overall[b].mean_log_score)
 
     return AttackingHarnessResult(
@@ -302,6 +427,10 @@ def run_attacking_harness(
         total_predictions=total_preds,
         leakage_failures=0,
         best_baseline_name=best_b_name,
+        candidate_names=candidate_names,
+        parameters_by_fold=parameters_by_fold,
+        candidate_path_counts=candidate_path_counts,
+        candidate_path_counts_by_season=candidate_path_counts_by_season,
     )
 
 
@@ -330,15 +459,19 @@ def serialize_report(rep: AttackingScoreReport) -> dict[str, Any]:
     }
 
 
-def serialize_result(res: AttackingHarnessResult) -> dict[str, Any]:
+def serialize_result(
+    res: AttackingHarnessResult, *, contract_version: str = "1.0"
+) -> dict[str, Any]:
     return {
-        "contract_version": "1.0",
+        "contract_version": contract_version,
         "phase": 3,
         "stage": "C_attacking_goals",
         "total_predictions": res.total_predictions,
         "leakage_failures": res.leakage_failures,
         "folds_by_season": res.folds_by_season,
         "best_baseline": res.best_baseline_name,
+        "candidate_names": list(res.candidate_names),
+        "candidate_path_counts": res.candidate_path_counts,
         "overall": {b: serialize_report(rep) for b, rep in res.overall.items()},
         "by_season": {
             ssn: {b: serialize_report(rep) for b, rep in b_dict.items()}
@@ -365,6 +498,7 @@ def main() -> None:
     try:
         seasons_filter = [args.season] if args.season else None
         res = run_attacking_harness(con, seasons=seasons_filter)
+        contract = load_phase3_evaluation()
         print("=== Stage C Attacking Goals Baseline Walk-Forward Results ===")
         print(f"Total predictions: {res.total_predictions}")
         print(f"Folds by season: {res.folds_by_season}")
@@ -386,7 +520,7 @@ def main() -> None:
                 line.append(f"{b_name}={b_map[b_name].mean_log_score:.5f}")
             print("  " + " | ".join(line))
 
-        data = serialize_result(res)
+        data = serialize_result(res, contract_version=contract.contract_version)
         if args.save_json:
             out_path = Path(args.save_json)
             out_path.parent.mkdir(parents=True, exist_ok=True)
