@@ -31,7 +31,7 @@ def test_phase3_contract_loads_with_point_in_time_cutoffs() -> None:
     load_phase3_evaluation.cache_clear()
     contract = load_phase3_evaluation()
     assert contract.phase == 3
-    assert contract.contract_version == "1.2"
+    assert contract.contract_version == "1.3"
     assert contract.target.entity == "player"
     assert contract.target.grain == "season_player_code_fixture"
     assert contract.target.outcome == "goals_distribution"
@@ -86,7 +86,7 @@ def test_phase3_metrics_and_promotion_gates() -> None:
 
 def test_version_bump_without_amendment_is_rejected() -> None:
     document = copy.deepcopy(_document())
-    document["contract_version"] = "1.3"
+    document["contract_version"] = "1.4"
     with pytest.raises(ValidationError, match="no amendment record"):
         Phase3EvaluationConfig.model_validate(document)
 
@@ -188,5 +188,52 @@ def test_phase3_v2_is_additive_to_v1_0_comparison_rules() -> None:
     assert contract.promotion.maximum_ranked_probability_score_relative_regression == 0.0
     assert contract.promotion.maximum_brier_relative_regression_at_least_one_goal == 0.0
     assert contract.promotion.pit_interval_80_maximum_absolute_error == 0.05
+    assert contract.promotion.minimum_fold_count == 181
+    assert contract.promotion.require_no_season_mean_log_score_regression is True
+
+
+def test_phase3_candidate_v3_policy_is_frozen_and_additive() -> None:
+    contract = load_phase3_evaluation()
+    cand = contract.stage_c_candidate_v3
+    assert cand.name == "minutes_gated_coupled_team_share_attacking_goals_v3"
+    assert cand.development_only is True
+    assert cand.alpha == 5.0
+    assert cand.history_window == 5
+    assert cand.minutes_baseline == "trailing_5_player_minutes"
+    assert cand.appearance_probability == (
+        "p_play_equals_one_minus_trailing5_minutes_distribution_bin_zero"
+    )
+    assert cand.conservation == (
+        "renormalise_share_i_times_p_play_i_to_sum_to_one_so_sum_i_rate_i_equals_lambda_team"
+    )
+    assert cand.reduces_to_v2_when_gating_off is True
+    assert (
+        cand.selected_parameter == "none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward"
+    )
+
+
+def test_phase3_candidate_v3_alpha_is_pinned() -> None:
+    document = copy.deepcopy(_document())
+    document["stage_c_candidate_v3"]["alpha"] = 7.0
+    with pytest.raises(ValidationError, match=r"alpha is pinned to 5\.0"):
+        Phase3EvaluationConfig.model_validate(document)
+
+
+def test_phase3_amendment_1_3_record_is_frozen() -> None:
+    """The 1.3 amendment record (candidates_evaluated_before_amendment: 2) is pinned."""
+    document = copy.deepcopy(_document())
+    document["amendments"][2]["candidates_evaluated_before_amendment"] = 1
+    with pytest.raises(ValidationError, match="not the frozen record"):
+        Phase3EvaluationConfig.model_validate(document)
+
+
+def test_phase3_v3_is_additive_to_v1_0_comparison_rules() -> None:
+    """Amendment 1.3 changes no v1.0/1.1/1.2 baseline/metric/gate field."""
+    contract = load_phase3_evaluation()
+    assert {defn.name for defn in contract.baselines.definitions} == {
+        "positional_goal_rate_poisson",
+        "trailing_player_goal_rate_poisson",
+    }
+    assert contract.promotion.minimum_primary_relative_lift == 0.01
     assert contract.promotion.minimum_fold_count == 181
     assert contract.promotion.require_no_season_mean_log_score_regression is True
