@@ -1,0 +1,245 @@
+{
+  "components": {
+    "assists": "xa_informed_trailing_player_assists_v1",
+    "defensive_contribution": "trailing_dc_threshold_hit_bernoulli_v1",
+    "goals": "xg_informed_trailing_player_goals_v1",
+    "minutes": "concentration_adaptive_shrinkage_player_minutes_v3",
+    "saves": "gk_saves_poisson_from_team_conceded_v1",
+    "team_clean_sheet": "trailing_goals_attack_defence"
+  },
+  "harness": {
+    "by_position": {
+      "DEF": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 44678,
+        "exclusions": 0,
+        "mean_absolute_error": 1.0236991136577287,
+        "mean_crps": 0.6285800101839831,
+        "mean_log_score": 1.065966130749245,
+        "mean_log_score_standard_error": 0.009713273702864619,
+        "mean_poisson_deviance": 1.7062425384639093,
+        "pit_interval_80_absolute_error": 0.0035050808003939116,
+        "pit_interval_80_coverage": 0.803505080800394,
+        "predictions": 44678
+      },
+      "FWD": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 16010,
+        "exclusions": 0,
+        "mean_absolute_error": 0.9010572142410993,
+        "mean_crps": 0.6231282462523423,
+        "mean_log_score": 1.1248267278282202,
+        "mean_log_score_standard_error": 0.01907193503734117,
+        "mean_poisson_deviance": 1.4978105202989676,
+        "pit_interval_80_absolute_error": 0.007370393504059991,
+        "pit_interval_80_coverage": 0.79262960649594,
+        "predictions": 16010
+      },
+      "GK": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 14890,
+        "exclusions": 0,
+        "mean_absolute_error": 0.6619831430490262,
+        "mean_crps": 0.38136450480188044,
+        "mean_log_score": 0.6757945094958263,
+        "mean_log_score_standard_error": 0.013934903344501431,
+        "mean_poisson_deviance": 1.0113010698870972,
+        "pit_interval_80_absolute_error": 0.020013431833445172,
+        "pit_interval_80_coverage": 0.8200134318334452,
+        "predictions": 14890
+      },
+      "MID": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 58386,
+        "exclusions": 0,
+        "mean_absolute_error": 0.8875137961155072,
+        "mean_crps": 0.604379556738773,
+        "mean_log_score": 1.1832732702382418,
+        "mean_log_score_standard_error": 0.00852475899354967,
+        "mean_poisson_deviance": 1.4076245002173329,
+        "pit_interval_80_absolute_error": 0.005237556948583633,
+        "pit_interval_80_coverage": 0.7947624430514164,
+        "predictions": 58386
+      }
+    },
+    "by_season": {
+      "2021-22": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 20704,
+        "exclusions": 0,
+        "mean_absolute_error": 1.0089964016615147,
+        "mean_crps": 0.6403050392315495,
+        "mean_log_score": 1.1488731365104088,
+        "mean_log_score_standard_error": 0.01547526008109073,
+        "mean_poisson_deviance": 1.6907522508102926,
+        "pit_interval_80_absolute_error": 0.002984930448222567,
+        "pit_interval_80_coverage": 0.8029849304482226,
+        "predictions": 20704
+      },
+      "2022-23": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 26505,
+        "exclusions": 0,
+        "mean_absolute_error": 0.9266228070175438,
+        "mean_crps": 0.6056160858045652,
+        "mean_log_score": 1.1161096110055109,
+        "mean_log_score_standard_error": 0.013096735089395403,
+        "mean_poisson_deviance": 1.4822897864544404,
+        "pit_interval_80_absolute_error": 0.0036974155819656795,
+        "pit_interval_80_coverage": 0.7963025844180344,
+        "predictions": 26505
+      },
+      "2023-24": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 29725,
+        "exclusions": 0,
+        "mean_absolute_error": 0.8582617661900757,
+        "mean_crps": 0.5523549780319597,
+        "mean_log_score": 1.0228270808940751,
+        "mean_log_score_standard_error": 0.011961735970266412,
+        "mean_poisson_deviance": 1.4136406412309372,
+        "pit_interval_80_absolute_error": 0.0011438183347349806,
+        "pit_interval_80_coverage": 0.801143818334735,
+        "predictions": 29725
+      },
+      "2024-25": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 27283,
+        "exclusions": 0,
+        "mean_absolute_error": 0.8867340651687865,
+        "mean_crps": 0.5829956346351207,
+        "mean_log_score": 1.0723481204729886,
+        "mean_log_score_standard_error": 0.011832515956070495,
+        "mean_poisson_deviance": 1.41786844604111,
+        "pit_interval_80_absolute_error": 0.002617014257962902,
+        "pit_interval_80_coverage": 0.7973829857420371,
+        "predictions": 27283
+      },
+      "2025-26": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 29747,
+        "exclusions": 0,
+        "mean_absolute_error": 0.8970003361683531,
+        "mean_crps": 0.5846791839681312,
+        "mean_log_score": 1.067459599160047,
+        "mean_log_score_standard_error": 0.011713707810498969,
+        "mean_poisson_deviance": 1.4272931488588643,
+        "pit_interval_80_absolute_error": 0.001902712878609658,
+        "pit_interval_80_coverage": 0.7980972871213904,
+        "predictions": 29747
+      }
+    },
+    "by_xg_coverage_regime": {
+      "no_xg_2021_22": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 20704,
+        "exclusions": 0,
+        "mean_absolute_error": 1.0089964016615147,
+        "mean_crps": 0.6403050392315495,
+        "mean_log_score": 1.1488731365104088,
+        "mean_log_score_standard_error": 0.01547526008109073,
+        "mean_poisson_deviance": 1.6907522508102926,
+        "pit_interval_80_absolute_error": 0.002984930448222567,
+        "pit_interval_80_coverage": 0.8029849304482226,
+        "predictions": 20704
+      },
+      "xg_present": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 113260,
+        "exclusions": 0,
+        "mean_absolute_error": 0.8912926275825535,
+        "mean_crps": 0.580689808065513,
+        "mean_log_score": 1.068308446815786,
+        "mean_log_score_standard_error": 0.006070166901115762,
+        "mean_poisson_deviance": 1.4343100208635775,
+        "pit_interval_80_absolute_error": 0.0009800459120608007,
+        "pit_interval_80_coverage": 0.7990199540879392,
+        "predictions": 113260
+      }
+    },
+    "folds_by_season": {
+      "2021-22": 30,
+      "2022-23": 37,
+      "2023-24": 38,
+      "2024-25": 38,
+      "2025-26": 38
+    },
+    "folds_evaluated": 181,
+    "headline_xg_present": {
+      "cold_starts_stage_a_fallback": 0,
+      "eligible_predictions": 113260,
+      "exclusions": 0,
+      "mean_absolute_error": 0.8912926275825535,
+      "mean_crps": 0.580689808065513,
+      "mean_log_score": 1.068308446815786,
+      "mean_log_score_standard_error": 0.006070166901115762,
+      "mean_poisson_deviance": 1.4343100208635775,
+      "pit_interval_80_absolute_error": 0.0009800459120608007,
+      "pit_interval_80_coverage": 0.7990199540879392,
+      "predictions": 113260
+    },
+    "monte_carlo_draws": 2000,
+    "overall": {
+      "cold_starts_stage_a_fallback": 0,
+      "eligible_predictions": 133964,
+      "exclusions": 0,
+      "mean_absolute_error": 0.909483626198083,
+      "mean_crps": 0.5899032814319519,
+      "mean_log_score": 1.0807596376986908,
+      "mean_log_score_standard_error": 0.005662503086771301,
+      "mean_poisson_deviance": 1.4739429067793217,
+      "pit_interval_80_absolute_error": 0.0012675047027559394,
+      "pit_interval_80_coverage": 0.801267504702756,
+      "predictions": 133964
+    },
+    "points_support_max": 30,
+    "predictions": 133964,
+    "stage_a_fallbacks": 0
+  },
+  "historical_proxy_caveats": {
+    "archive_result_role": "development_diagnostic_only",
+    "no_xg_season_excluded_from_headline": "2021-22",
+    "real_deadline_knowledge_time_validity": "unproven"
+  },
+  "limitations": {
+    "bonus": "bonus excluded from prediction and from the label (total_points - bonus)",
+    "component_independence": "components composed independently per player; no team-coupling or conservation",
+    "defensive_contribution": "prospective-only: DC data exists only for 2025-26, so p_hit is 0 for every earlier fold; estimated over appearances, not conditioned on the drawn minute bin (minutes-independence approximation)",
+    "negative_points": "folded into the 0 bin on the TOTAL, after adding saves and DC",
+    "saves": "goalkeeper-only; derived from the fixture's expected team-conceded rate via the fold-local league save rate (no per-keeper saves history)",
+    "unmodelled_components": "penalties, own goals, cards not drawn (label still includes them)"
+  },
+  "model": "stage_d_points_composition_v2",
+  "provenance": {
+    "commit_sha": "0960c48a3ab58a95d03f096922dfcee297701755",
+    "config_sha256": {
+      "phase2_evaluation.yaml": "1c57edc55e20083250c8c94c3718c21d6ee63ffa529d89be73c8bc7cf82b6082",
+      "phase3_evaluation.yaml": "9e2e22325bb44a64acdddc4d00bb4f7c06380194a98b32794ee220ccf1996be0",
+      "phase3_stage_c_assists_evaluation.yaml": "1953c815d3c21fcf81893f3ec9e84ddfac8c3e3a70c0e0cc9921ec25f236aafd",
+      "scoring_2026_27.yaml": "857e332fbf4b4339ce2f8a89a180d19eea854c2713131d20740fa5751e46872a"
+    },
+    "database_sha256": "fd2bceca53fb4789df5fcd9a05c68576c23e68cd15f22d84c961876cf9ff4ec3",
+    "ended_at_utc": "2026-08-01T18:43:23Z",
+    "monte_carlo_draws": 2000,
+    "seed": 202627,
+    "source_sha256": {
+      "src/fpl/models/attacking_assists_v1.py": "f06865a03f7f1427d9c9e3aa73dca3bba09b6e2e7de24592870561e94d9d7bb3",
+      "src/fpl/models/attacking_v1.py": "11a0791cbfb61ef3b64214aa4db60ece330757e88a68bc0478486cb3ca4f3364",
+      "src/fpl/models/defensive_contribution_v1.py": "58d348ba01aba32f48575fb38dc01eef72765671bfdb7db030016b48ad5724b0",
+      "src/fpl/models/gk_saves_v1.py": "38e0d612a116a360f67fe797dd39e3219400d4002c01875543fde77edb892894",
+      "src/fpl/models/minutes_v3.py": "2777082c7931a9299657c1173ff96ebf4df91ed35a6e5b4c4b83b9b68c2a8170",
+      "src/fpl/models/points_composition.py": "5faa1ab5b62c07d49e77db3c26f00e2d352e4c3d5e24300f4c25038f562adb7d",
+      "src/fpl/validate/baselines.py": "4cdeed82f76bf6b72401197716e79d49927a9fbbc4f19a3126be534d6b2e6869",
+      "src/fpl/validate/points_harness.py": "e1f44ea8f34c2af03dc36ab8364b519fa656f1732b7d3b2fd8c3bbdee0f02eec"
+    },
+    "started_at_utc": "2026-08-01T18:18:34Z"
+  },
+  "schema": "stage_d_points_composition_v2_development/v1",
+  "status": "development_only_exploratory_not_a_promotion_result",
+  "v2_component_diagnostics": {
+    "dc_folds_with_history": 37,
+    "dc_targets_with_positive_hit_probability": 24822,
+    "gk_save_rate_fold_local_max": 0.6833657587548638,
+    "gk_save_rate_fold_local_min": 0.667060212514758
+  }
+}
