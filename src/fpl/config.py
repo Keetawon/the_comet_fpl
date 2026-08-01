@@ -1949,6 +1949,103 @@ class Phase3StageCCandidateV1Policy(_Frozen):
         return self
 
 
+class Phase3StageCCandidateV2Policy(_Frozen):
+    """Frozen pre-registration for Stage C attacking Candidate V2 (coupled team share).
+
+    Candidate V2 is a STRUCTURAL change from V1: instead of predicting each player's goals
+    independently from their own trailing history, it allocates the frozen Stage A team-goal
+    expectation among a club's players by a trailing attacking share (Poisson thinning). For a
+    fixture whose club has Stage A expected goals ``lambda_team`` and whose player ``i`` has
+    share ``p_i`` (summing to 1 over the club's eligible roster in the fixture), the per-player
+    rate is ``rate_i = lambda_team * p_i`` and the prediction is ``Poisson(rate_i)``; the
+    per-player marginals are exact independent Poissons whose rates sum to ``lambda_team``
+    (structural conservation).
+
+    The Stage A model is the FROZEN ``trailing_goals_attack_defence`` baseline, refit fold-local
+    on team-match history with ``kickoff_time < as_of`` -- reused, never reimplemented. Club
+    identity is the stable ``team_code`` (resolved from the season-qualified ``team_id`` via
+    ``mart_dim_team``); a bare ``team_id`` is never joined across seasons (R data contract).
+
+    R6 appearance-vs-rate correction (V2's defining change over V1): each player's trailing
+    attacking signal is computed over their APPEARED prior rows only (``minutes > 0``), so a
+    did-not-play prior row cannot dilute a per-appearance rate; availability is separated from
+    rate. The signal is trailing ``expected_goals`` where measured, else trailing ``threat``
+    (NULL means unmeasured and is never zero-filled). Zero-minute TARGET rows stay in the
+    eligible scored population; a player with no attacking output contributes a near-zero share.
+
+    Like V1 this is a FIXED closed-form estimator (no parameter grid, no inner walk-forward):
+    ``selected_parameter`` is pinned to ``none`` and ``alpha`` mirrors the v1.0 trailing
+    baseline (5.0) so the only structural change is the team-share coupling. Every distinguishing
+    field is pinned so a result cannot be followed by a silent policy change. The block is
+    additive: it changes no v1.0/1.1 population, target roster, baseline, metric, gate, seed, or
+    calibration field, and is judged by the unchanged v1.0 promotion gate.
+    """
+
+    name: Literal["coupled_team_share_attacking_goals_v2"]
+    development_only: Literal[True]
+    development_only_reason: Literal[
+        "archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design"
+    ]
+    grain: Literal["season_player_code_fixture"]
+    identity: Literal["stable_code"]
+    stage_a_model: Literal["frozen_trailing_goals_attack_defence_reused_not_reimplemented"]
+    stage_a_fit: Literal["fold_local_on_team_match_history_kickoff_time_lt_as_of"]
+    team_identity: Literal[
+        "team_code_resolved_from_season_qualified_team_id_via_mart_dim_team_never_bare_team_id"
+    ]
+    share_denominator: Literal[
+        "club_eligible_players_in_fixture_the_existing_unversioned_target_roster_proxy_shared_with_baselines_not_new_leakage"
+    ]
+    share_signal: Literal[
+        "trailing_expected_goals_where_measured_else_threat_over_appeared_prior_rows"
+    ]
+    appeared_rows_filter: Literal[
+        "prior_rows_with_minutes_gt_0_only_did_not_play_prior_rows_excluded_from_rate"
+    ]
+    signal_per_appearance: Literal["mean_signal_over_trailing_appeared_rows"]
+    history_window: Literal[5]
+    history_order: Literal["kickoff_time_then_season_then_fixture"]
+    history_observed_results: Literal["kickoff_time < as_of"]
+    share_normalization: Literal["club_roster_signals_normalised_to_sum_to_one"]
+    rate: Literal["rate_i_equals_lambda_team_times_share_i"]
+    conservation: Literal["poisson_thinning_sum_i_rate_i_equals_lambda_team_on_the_coupled_path"]
+    cold_start_share: Literal[
+        "when_no_appeared_prior_row_signal_is_fold_local_positional_goal_mean_equal_to_v1_baseline"
+    ]
+    equal_share_fallback: Literal["when_club_roster_signal_sum_is_zero_equal_shares_among_roster"]
+    stage_a_uninformative_fallback: Literal[
+        "when_stage_a_training_window_empty_rate_is_exact_v1_trailing_baseline_per_player"
+    ]
+    reduces_to_baseline: Literal[
+        "where_stage_a_is_uninformative_candidate_equals_v1_trailing_player_goal_rate_poisson_bit_for_bit"
+    ]
+    poisson_max_goals: Literal[10]
+    estimator: Literal["poisson_goal_count_distribution_over_0_to_10"]
+    additional_smoothing: Literal["none"]
+    scoring_floor_role: Literal["existing_1e-12_floor_is_scoring_only_not_a_model_rate_floor"]
+    selected_parameter: Literal["none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward"]
+    fit_scope: Literal["stage_a_and_player_shares_fitted_within_each_fold_on_kickoff_time_lt_as_of"]
+    target_label_policy: Literal["target_labels_never_enter_model_inputs"]
+    target_position_source: Literal["existing_unversioned_target_roster_proxy_current_position"]
+    null_policy: Literal["preserve_nulls_xg_threat_null_means_unmeasured_never_zero_filled"]
+    zero_minutes_policy: Literal["target_zero_minute_rows_scored_roster_is_the_eligible_population"]
+    assistant_manager_policy: Literal["excluded_upstream_element_type_5"]
+    double_gameweek_policy: Literal[
+        "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+    ]
+    monte_carlo: Literal["out_of_scope_closed_form"]
+    alpha: float
+
+    @model_validator(mode="after")
+    def _exact_candidate_policy(self) -> Self:
+        if self.alpha != 5.0:
+            raise ValueError(
+                "Stage C Candidate V2 alpha is pinned to 5.0 (== v1.0 trailing baseline, used by "
+                f"the stage_a_uninformative fallback); got {self.alpha!r}"
+            )
+        return self
+
+
 _PHASE3_BASELINE_PINS: dict[str, dict[str, str | int | None]] = {
     "positional_goal_rate_poisson": {
         "identity": "target_position",
@@ -2128,6 +2225,7 @@ ORIGINAL_PHASE3_CONTRACT_VERSION: str = "1.0"
 FROZEN_PHASE3_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
     "1.0": (),
     "1.1": (("1.1", 0),),
+    "1.2": (("1.1", 0), ("1.2", 1)),
 }
 
 
@@ -2146,6 +2244,11 @@ class Phase3EvaluationConfig(_Frozen):
     # unchanged v1.0 promotion gate. Required here so a 1.1 config that silently drops it fails to
     # load rather than scoring a different model.
     stage_c_candidate_v1: Phase3StageCCandidateV1Policy
+    # Candidate V2 (coupled team-share attacking goals) is required at contract version 1.2. It is
+    # additive: it changes no v1.0/1.1 population/roster/baseline/metric/gate and is judged by the
+    # unchanged v1.0 promotion gate. Required here so a 1.2 config that silently drops it fails to
+    # load rather than scoring a different model.
+    stage_c_candidate_v2: Phase3StageCCandidateV2Policy
     baselines: Phase3BaselinePolicy
     metrics: Phase3MetricPolicy
     promotion: Phase3PromotionGate
