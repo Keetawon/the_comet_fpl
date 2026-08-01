@@ -139,3 +139,17 @@ structurally correct but does not help scoring: it anchors the team total while 
 between-player differences that drive goal-scoring accuracy. A share-based successor would need to
 preserve per-player rate resolution (e.g. a residual individual finishing term on top of the share)
 rather than allocate the team mean wholesale. V2 is left as committed and is **not retuned**.
+
+## 9. Signal-substitution caveat — `threat` is an unvalidated ICT proxy for xG
+
+The trailing attacking share uses `expected_goals` (xG) only in the xG-covered seasons (2023-24+);
+everywhere xG is unmeasured — all of 2021-22 and the uncovered part of 2022-23 — it substitutes
+`threat`, FPL/Opta's shot-threat index, rescaled onto the same share. `threat` is a proprietary
+proxy for the same quantity xG measures and has **never been validated as a model signal** in this
+project. So the candidate's "xG-informed" framing holds only where xG exists; the threat-signal
+seasons' contribution is an **ICT result, not an xG result**, and must not be quoted as evidence for
+xG. This is a signal-substitution defect, not a knowledge-time leak (all archive stats are
+post-match and `kickoff_time < as_of` still holds) — recorded here only so the number is not
+misread. It does not change the not-promoted verdict above (V2 is refuted regardless). The clean
+pattern is goals Candidate V1, which where xG is unmeasured falls back **bit-for-bit to the
+recorded-goals baseline, never to `threat`**; any threat-free successor must do the same.

@@ -141,3 +141,17 @@ season and clearing the full frozen gate. V3 nonetheless remains 1.95% behind V1
 xG-informed candidate), so among gate-clearing Stage C attacking candidates V1 is still the best on
 the archive; the coupled, appearance-aware allocation is viable and gate-clearing but not yet
 superior to the independent approach. V3 is left as committed and is **not retuned**.
+
+## 9. Signal-substitution caveat — `threat` is an unvalidated ICT proxy for xG
+
+V3 inherits V2's trailing attacking share unchanged: `expected_goals` (xG) in the xG-covered seasons
+(2023-24+), and `threat` — FPL/Opta's shot-threat index, rescaled onto the same share — everywhere
+xG is unmeasured (all of 2021-22, the uncovered part of 2022-23). `threat` is a proprietary proxy
+for the same quantity xG measures and has **never been validated as a model signal** here. The
+"xG-informed" framing therefore holds only where xG exists; the threat-signal seasons' contribution
+is an **ICT result, not an xG result**, and must not be quoted as xG evidence (§5 already notes the
+lift grows with xG-history depth and is smallest in the threat-only/partial seasons). This is a
+signal-substitution defect, not a knowledge-time leak (archive stats are post-match; `kickoff_time <
+as_of` holds) — recorded so the number is not misread. It does not change the not-promoted verdict
+above. The clean pattern is goals Candidate V1, which falls back **bit-for-bit to the recorded-goals
+baseline where xG is unmeasured, never to `threat`**; any threat-free successor must do the same.

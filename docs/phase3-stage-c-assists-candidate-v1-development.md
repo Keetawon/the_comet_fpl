@@ -210,3 +210,21 @@ creativity fill for NULL-xA rows) rather than an artefact of the shrinkage form,
 unchanged from the baseline. The DEF slice improving +1.99% independently confirms the measured
 hypothesis that xA is the correct attacking signal for defenders. It is still development evidence
 under unversioned proxies, not a confirmation.
+
+---
+
+## 10. Signal-substitution caveat — `creativity` is an unvalidated ICT proxy for xA
+
+On the xA path (§2), a NULL-`expected_assists` row inside an otherwise xA-covered trailing window is
+filled by rescaled `creativity` (FPL/Opta's chance-creation index), not dropped. `creativity` is a
+proprietary proxy for the same quantity xA measures and has **never been validated as a model
+signal** in this project. The fill is bounded — exactly zero in 2021-22 (0% xA-informed → the
+candidate is bit-identical to the baseline) and concentrated in the 2022-23 transition and the
+early-2023-24 coverage boundary — but where it acts, that season's lift is **partly a creativity
+result, not purely an xA result**, and must not be quoted as pure xA evidence. This is a
+signal-substitution defect, not a knowledge-time leak (all archive stats are post-match and
+`kickoff_time < as_of` holds) — recorded so the number is not misread. It does not change the
+not-promoted verdict above. The clean pattern is goals Candidate V1's xG fallback (the recorded-count
+baseline, never ICT); a creativity-free assists successor should use only the measured-xA rows in the
+window — or the recorded-assist baseline when too few remain — never `creativity`. Such a successor
+would be a **new named candidate under a new amendment**, not a V1 retune.
