@@ -52,6 +52,7 @@ from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.models.minutes_v1 import ShrunkTrailing5PlayerMinutesV1
 from fpl.storage.db import connect, default_db_path
 from fpl.types import Position
+from fpl.validate.freshness import FreshnessError, require_prospective_freshness
 from fpl.validate.minutes_baselines import TargetRow
 from fpl.validate.minutes_harness import player_fixture_history
 
@@ -107,6 +108,10 @@ class ProspectiveProvenance:
     config_sha256: str | None
     archive_sha256: str | None
     label: str
+    freshness_most_recent_completed_season: str | None
+    freshness_most_recent_completed_gw: int | None
+    freshness_cold_start: bool
+    freshness_capture_known_at: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +159,11 @@ def predict_prospective_minutes(
     fields are ``None``.
     """
     resolved = config or load_phase2_evaluation()
+
+    # 0. Freshness gate (Phase 0b P1): refuse to emit before any model work if the current
+    #    season's most-recent-completed gameweek is not yet captured into the versioned live
+    #    table. Season start is a legitimate cold start and passes. Recorded in provenance below.
+    freshness = require_prospective_freshness(con, as_of=as_of)
 
     # 1. Roster from the versioned registry (known_at <= as_of), before the model sees anything.
     source = FeatureSource(con)
@@ -252,6 +262,10 @@ def predict_prospective_minutes(
         config_sha256=_file_sha256(config_path),
         archive_sha256=_file_sha256(Path(db_path)) if db_path is not None else None,
         label=_DISCLAIMER,
+        freshness_most_recent_completed_season=freshness.most_recent_completed_season,
+        freshness_most_recent_completed_gw=freshness.most_recent_completed_gw,
+        freshness_cold_start=freshness.cold_start,
+        freshness_capture_known_at=freshness.capture_known_at,
     )
     return ProspectiveResult(
         provenance=provenance, predictions=tuple(predictions), bin_means=bin_means
@@ -281,6 +295,14 @@ def result_to_record(result: ProspectiveResult) -> dict[str, object]:
             "commit_sha": prov.commit_sha,
             "config_sha256": prov.config_sha256,
             "archive_sha256": prov.archive_sha256,
+            "freshness_most_recent_completed_season": prov.freshness_most_recent_completed_season,
+            "freshness_most_recent_completed_gw": prov.freshness_most_recent_completed_gw,
+            "freshness_cold_start": prov.freshness_cold_start,
+            "freshness_capture_known_at": (
+                prov.freshness_capture_known_at.isoformat()
+                if prov.freshness_capture_known_at is not None
+                else None
+            ),
         },
         "bin_means": {
             "0": result.bin_means[0],
@@ -330,6 +352,9 @@ def main(argv: list[str] | None = None) -> int:
         result = predict_prospective_minutes(
             con, as_of=as_of, season=args.season, gw=args.gw, db_path=db_path, repo=repo
         )
+    except FreshnessError as exc:
+        logger.error(str(exc))
+        return 1
     finally:
         con.close()
 
