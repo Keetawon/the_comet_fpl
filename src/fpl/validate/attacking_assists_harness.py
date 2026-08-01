@@ -149,7 +149,7 @@ def run_assists_fold(
         SELECT season, gw, fixture,
                strftime(kickoff_time, '%Y-%m-%dT%H:%M:%SZ') AS kickoff_time,
                code, position, COALESCE(assists, 0) AS assists,
-               expected_assists, creativity
+               minutes, expected_assists, creativity
         FROM mart_fact_player_fixture
         WHERE minutes IS NOT NULL AND kickoff_time < ?
         ORDER BY kickoff_time, season, fixture, code
@@ -167,6 +167,7 @@ def run_assists_fold(
             code=r["code"],
             position=Position.from_archive_label(r["position"]),
             assists=r["assists"],
+            minutes=r["minutes"],
             expected_assists=r["expected_assists"],
             creativity=r["creativity"],
         )

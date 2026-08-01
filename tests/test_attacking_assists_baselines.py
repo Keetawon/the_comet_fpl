@@ -17,10 +17,10 @@ from fpl.validate.attacking_metrics import score_attacking_predictions
 
 def test_positional_assist_rate_baseline() -> None:
     history = [
-        AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 101, Position.FWD, 2),
-        AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 102, Position.FWD, 0),
-        AssistHistoryRow("2021-22", 1, 2, "2021-08-14T14:00:00Z", 201, Position.MID, 1),
-        AssistHistoryRow("2021-22", 1, 2, "2021-08-14T14:00:00Z", 301, Position.DEF, 0),
+        AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 101, Position.FWD, 2, 90),
+        AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 102, Position.FWD, 0, 90),
+        AssistHistoryRow("2021-22", 1, 2, "2021-08-14T14:00:00Z", 201, Position.MID, 1, 90),
+        AssistHistoryRow("2021-22", 1, 2, "2021-08-14T14:00:00Z", 301, Position.DEF, 0, 90),
     ]
 
     base = PositionalAssistRateBaseline()
@@ -44,10 +44,10 @@ def test_positional_assist_rate_baseline() -> None:
 def test_trailing_player_assist_rate_baseline_shrunk() -> None:
     history = [
         # FWD positional total: 1 assist across 4 app rows = 0.25 rate
-        AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 101, Position.FWD, 1),
-        AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 102, Position.FWD, 0),
-        AssistHistoryRow("2021-22", 2, 2, "2021-08-20T19:00:00Z", 102, Position.FWD, 0),
-        AssistHistoryRow("2021-22", 3, 3, "2021-08-27T19:00:00Z", 102, Position.FWD, 0),
+        AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 101, Position.FWD, 1, 90),
+        AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 102, Position.FWD, 0, 90),
+        AssistHistoryRow("2021-22", 2, 2, "2021-08-20T19:00:00Z", 102, Position.FWD, 0, 90),
+        AssistHistoryRow("2021-22", 3, 3, "2021-08-27T19:00:00Z", 102, Position.FWD, 0, 90),
     ]
 
     base = TrailingPlayerAssistRateBaseline(alpha=5.0)
@@ -69,12 +69,15 @@ def test_trailing_player_assist_rate_baseline_shrunk() -> None:
 
 def test_baseline_history_row_carries_xa_and_creativity() -> None:
     """The history row preserves xA / creativity for Candidate V1; v1.0 baselines ignore them."""
-    row = AssistHistoryRow("2023-24", 1, 1, "2023-08-11T19:00:00Z", 101, Position.FWD, 1, 0.4, 12.5)
+    row = AssistHistoryRow(
+        "2023-24", 1, 1, "2023-08-11T19:00:00Z", 101, Position.FWD, 1, 90, 0.4, 12.5
+    )
     assert row.assists == 1
+    assert row.minutes == 90
     assert row.expected_assists == 0.4
     assert row.creativity == 12.5
     # NULL means unmeasured and is preserved (never zero-filled).
-    row_null = AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 101, Position.FWD, 0)
+    row_null = AssistHistoryRow("2021-22", 1, 1, "2021-08-13T19:00:00Z", 101, Position.FWD, 0, 90)
     assert row_null.expected_assists is None
     assert row_null.creativity is None
 

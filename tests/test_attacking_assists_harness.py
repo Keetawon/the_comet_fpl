@@ -83,3 +83,103 @@ def test_assists_harness_xa_absent_is_handled_by_baselines() -> None:
     # Full coverage: every eligible row scored by both baselines.
     for name in result.baseline_names:
         assert result.overall[name].predictions == result.total_predictions
+
+
+# --- Candidate V1 integration ----------------------------------------------------------
+
+
+def _candidate_factory(history):  # type: ignore[no-untyped-def]
+    from fpl.models.attacking_assists_v1 import XaInformedTrailingPlayerAssistsV1
+
+    model = XaInformedTrailingPlayerAssistsV1(alpha=5.0, finishing_keep=0.05)
+    model.fit(list(history))
+    return model
+
+
+def test_assists_candidate_scored_on_identical_rows_with_path_split() -> None:
+    from fpl.models.attacking_assists_v1 import PATH_FALLBACK_V1, PATH_XA_INFORMED
+
+    load_phase3_stage_c_assists_evaluation.cache_clear()
+    config = load_phase3_stage_c_assists_evaluation()
+    con = _make_assists_db(xa_from_gw=1)  # xA measured everywhere
+    try:
+        result = run_assists_harness(con, config=config, candidate_factory=_candidate_factory)
+    finally:
+        con.close()
+
+    assert result.leakage_failures == 0
+    assert sum(result.folds_by_season.values()) == 2
+    assert "xa_informed_trailing_player_assists_v1" in result.overall
+    counts = {name: rep.predictions for name, rep in result.overall.items()}
+    assert len(set(counts.values())) == 1  # candidate + baselines on identical rows
+    paths = result.candidate_path_counts["xa_informed_trailing_player_assists_v1"]
+    assert paths.get(PATH_XA_INFORMED, 0) + paths.get(PATH_FALLBACK_V1, 0) > 0
+    assert PATH_XA_INFORMED in paths
+
+
+def test_assists_candidate_reduces_to_baseline_when_no_xa_in_fold() -> None:
+    """When no prior row carries xA, every prediction falls back / cold-starts and the candidate
+    equals the trailing baseline bit-for-bit."""
+    load_phase3_stage_c_assists_evaluation.cache_clear()
+    config = load_phase3_stage_c_assists_evaluation()
+    con = _make_assists_db(xa_from_gw=99)  # xA NULL everywhere
+    try:
+        result = run_assists_harness(con, config=config, candidate_factory=_candidate_factory)
+    finally:
+        con.close()
+
+    cand_name = "xa_informed_trailing_player_assists_v1"
+    paths = result.candidate_path_counts[cand_name]
+    from fpl.models.attacking_assists_v1 import PATH_XA_INFORMED
+
+    assert paths.get(PATH_XA_INFORMED, 0) == 0
+    cand = result.overall[cand_name]
+    base = result.overall["trailing_player_assist_rate_poisson"]
+    assert cand.mean_log_score == base.mean_log_score
+    assert cand.mean_ranked_probability_score == base.mean_ranked_probability_score
+
+
+def test_assists_runner_diagnostics_and_reconciliation_offline() -> None:
+    """The runner's development-diagnostics + reconciliation build a valid record (pure functions,
+    no git/fingerprint). De-risks the single authorized archive run."""
+    from fpl.validate.dev_assists_candidate_v1 import (
+        Provenance,
+        build_reconciliation_record,
+        compute_development_diagnostics,
+    )
+
+    load_phase3_stage_c_assists_evaluation.cache_clear()
+    config = load_phase3_stage_c_assists_evaluation()
+    con = _make_assists_db(xa_from_gw=1)  # xA measured everywhere
+    try:
+        result = run_assists_harness(con, config=config, candidate_factory=_candidate_factory)
+    finally:
+        con.close()
+
+    cand_name = "xa_informed_trailing_player_assists_v1"
+    diagnostics = compute_development_diagnostics(result, cand_name, config)
+    assert diagnostics.comparable is True
+    assert diagnostics.comparator in result.baseline_names
+    assert len(diagnostics.checks) == 8  # one per frozen gate condition
+    assert all(isinstance(c.passed, bool) for c in diagnostics.checks)
+
+    provenance = Provenance(
+        candidate=cand_name,
+        contract_version="1.1",
+        commit_sha="deadbeef",
+        config_fingerprint="cfg",
+        candidate_source_fingerprint="src",
+        archive_fingerprint="db",
+        seed=config.training.seed,
+        started_at="2026-08-01T00:00:00Z",
+        ended_at="2026-08-01T00:00:01Z",
+    )
+    record = build_reconciliation_record(
+        result, config, provenance=provenance, diagnostics=diagnostics
+    )
+    assert record["schema"] == "stage_c_assists_candidate_v1_development/v1"
+    assert record["status"] == "development_only_not_a_promotion_result"
+    assert record["development_diagnostics"]["combined_promotion_verdict"] is None
+    assert record["development_diagnostics"]["passed_count"] == diagnostics.passed_count()
+    assert cand_name in record["harness"]["overall"]
+    assert record["contract"]["required_baselines"] == list(result.baseline_names)

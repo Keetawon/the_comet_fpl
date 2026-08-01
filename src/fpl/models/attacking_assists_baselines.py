@@ -41,8 +41,9 @@ class AssistHistoryRow:
     ``expected_assists`` (xA) and ``creativity`` are NULL where unmeasured. xA shares the goals-xG
     measured-coverage profile (NULL in 2021-22, partial in 2022-23, 100% in 2023-24+);
     ``creativity`` (the FPL-native creative index) is measured 100% every season and is the xA
-    fallback. The v1.0 baselines ignore both; Candidate V1 reads them. Defaulted so a positional
-    construction (8 args) keeps working.
+    fallback. ``minutes`` is carried so Candidate V1 can restrict its per-appearance signal to
+    APPEARED rows (minutes > 0, R6); the v1.0 baselines ignore it. ``expected_assists`` /
+    ``creativity`` default to None so the v1.0 baseline construction keeps working.
     """
 
     __slots__ = (
@@ -53,6 +54,7 @@ class AssistHistoryRow:
         "fixture",
         "gw",
         "kickoff_time",
+        "minutes",
         "position",
         "season",
     )
@@ -66,6 +68,7 @@ class AssistHistoryRow:
         code: int,
         position: Position,
         assists: int,
+        minutes: int,
         expected_assists: float | None = None,
         creativity: float | None = None,
     ) -> None:
@@ -76,6 +79,7 @@ class AssistHistoryRow:
         self.code = code
         self.position = position
         self.assists = assists
+        self.minutes = minutes
         self.expected_assists = expected_assists
         self.creativity = creativity
 
