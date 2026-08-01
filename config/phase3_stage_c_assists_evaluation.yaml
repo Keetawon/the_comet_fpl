@@ -1,0 +1,210 @@
+# Phase 3 Stage C (player attacking assists) evaluation and promotion contract.
+#
+# A SEPARATE frozen contract from the Stage C goals contract (config/phase3_evaluation.yaml):
+# assists are a distinct FPL label with their own signal (expected_assists / creativity) and
+# their own version counter, so this file never perturbs the goals contract. Defined before any
+# Stage C assists model code. A candidate cannot choose easier folds, populations, bin shapes,
+# baselines, metrics, or lift gates after seeing its results.
+
+contract_version: "1.1"
+phase: 3
+
+amendments:
+  - version: "1.1"
+    date: "2026-08-01"
+    candidates_evaluated_before_amendment: 0
+    changed: >
+      additive_stage_c_assists_candidate_v1_pre_registration_only_no_population_roster_baseline_metric_or_gate_field_changed
+    reason: >
+      Pre-register Candidate V1 xa_informed_trailing_player_assists_v1: the v1.0 trailing-player
+      assist-rate baseline with its recent ASSISTS signal replaced by recent expected_assists (xA)
+      where xA is measured (per row, NULL filled by creativity rescaled to the assist-rate scale) and
+      the assist residual (assists minus xA) shrunk almost fully to the positional mean, falling back
+      to the exact v1.0 trailing-player baseline where xA is unmeasured. The per-appearance signal is
+      over trailing-5 APPEARED prior rows (minutes > 0) so availability never dilutes the rate (R6).
+      This block is additive: it changes no v1.0 population, target roster, baseline, metric, gate,
+      seed, or calibration field and is judged by the unchanged v1.0 promotion gate.
+    evidence: >
+      docs/research-adaptation.md (the attacking signal for DEF is xA not xG, persistence 0.784 vs
+      0.319; xA shares the goals-xG measured-coverage profile); docs/phase3-stage-c-assists-baseline-
+      development.md §7 (assists-minus-xA within-position persistence DEF +0.01 / MID +0.16 / FWD +0.19
+      / GK -0.07, modest, supports shrinking the assist residual almost fully to the positional mean);
+      config xa_signal_policy.fallback_signal creativity and stage_c_assists_candidate_v1.creativity_
+      rescale.
+
+target:
+  entity: player
+  grain: season_player_code_fixture
+  outcome: assists_distribution
+  downstream_points_ruleset: "2026_27"
+  identity_policy: code_is_cross_season_player_key
+
+target_roster:
+  historical_roster_status: archive_proxy_unversioned_at_real_deadline
+  historical_source: archive_player_fixture_identity_schedule_proxy_projected_from_target_rows
+  proxy_columns:
+    - season
+    - gw
+    - fixture
+    - kickoff_time
+    - code
+    - position
+    - team_id
+    - opponent_team_id
+    - was_home
+  minutes_role: label_outside_model_facing_projection
+  live_prospective_registry: versioned_player_registry_selected_known_at_le_as_of_before_model_sees_entity_team_position
+  cross_season_team_identity: season_qualified_team_id_resolved_to_stable_team_code
+  point_in_time_disclaimer: not_fully_reconstructable_pit_at_real_deadline
+
+population:
+  include_zero_minutes: true
+  eligible_outcome: minutes_not_null
+  registered_population: mart_fact_player_fixture_minutes_not_null
+
+cutoff:
+  split_unit: observed_gameweek
+  prediction_time: archive_first_kickoff_proxy_for_gameweek_deadline
+  observed_results: "kickoff_time < as_of"
+  snapshot_versions: "known_at <= as_of"
+
+training:
+  window: expanding
+  minimum_observed_gameweeks: 8
+  no_minimum_player_history_exclusion: true
+  cold_start_policy: every_eligible_row_receives_fallback_distribution
+  fit_transforms_within_fold: true
+  preserve_nulls: true
+  seed: 202627
+
+xa_signal_policy:
+  xa_handling: use_when_measured_within_covered_seasons
+  xa_covered_seasons_judging: true
+  xa_covered_seasons:
+    - "2023-24"
+    - "2024-25"
+    - "2025-26"
+  residual_persistence: shrink_almost_fully_to_positional_mean
+  fallback_signal: creativity
+
+stage_c_assists_candidate_v1:
+  name: xa_informed_trailing_player_assists_v1
+  development_only: true
+  development_only_reason: archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design
+  grain: season_player_code_fixture
+  identity: stable_code
+  history_population: up_to_5_most_recent_prior_appeared_player_fixture_rows_minutes_gt_0
+  appeared_rows_filter: signal_window_is_trailing_5_appeared_prior_rows_minutes_gt_0_did_not_play_rows_excluded_R6
+  history_order: kickoff_time_then_season_then_fixture
+  history_window: 5
+  history_observed_results: "kickoff_time < as_of"
+  signal: expected_assists_where_measured_else_creativity_rescaled_to_assist_rate_scale_per_row
+  xa_handling: use_when_measured_per_row_null_is_unmeasured_filled_by_rescaled_creativity
+  positional_assist_mean: fold_local_mean_assists_per_appearance_at_target_position_equal_to_v1_positional_baseline
+  positional_xa_mean: fold_local_mean_expected_assists_per_appearance_over_xa_measured_appeared_prior_rows_at_target_position
+  creativity_rescale: fold_local_positional_factor_pos_assist_mean_over_mean_creativity_per_appearance
+  trailing_xa_shrinkage: "shrunk_xa_equals_(sum_xa_plus_alpha_times_pos_xa)_over_(n_plus_alpha)"
+  residual_policy: assist_residual_shrunk_almost_fully_to_positional_mean_keep_0.05
+  residual_term: "0.05_times_player_assist_residual_plus_0.95_times_positional_assist_residual"
+  rate: rate_equals_shrunk_xa_plus_residual_term_clamped_at_zero
+  fallback_to_v1: when_no_xa_measured_appeared_trailing_row_or_no_positional_xa_mean_rate_is_exact_v1_trailing_shrunk_assists_rate_over_all_rows_window
+  cold_start_fallback: when_no_prior_player_row_rate_is_positional_assist_mean_equal_to_v1_baseline
+  reduces_to_v1_baseline: when_all_trailing_xa_unmeasured_candidate_equals_v1_trailing_assist_baseline_bit_for_bit
+  alpha: 5.0
+  finishing_keep: 0.05
+  poisson_max_assists: 10
+  estimator: poisson_assist_count_distribution_over_0_to_10
+  additional_smoothing: none
+  scoring_floor_role: existing_1e-12_floor_is_scoring_only_not_model_smoothing
+  selected_parameter: none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward
+  fit_scope: positional_means_and_player_histories_recomputed_within_each_fold
+  target_label_policy: target_labels_never_enter_model_inputs
+  target_position_source: existing_unversioned_target_roster_proxy_current_position
+  null_policy: preserve_nulls_xa_creativity_null_means_unmeasured_never_zero_filled
+  zero_minutes_policy: zero_minute_prior_rows_excluded_from_appeared_signal_window_but_scored_as_targets
+  assistant_manager_policy: excluded_upstream_element_type_5
+  double_gameweek_policy: "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+  monte_carlo: out_of_scope_closed_form
+
+baselines:
+  stage_c_attacking_assists:
+    - positional_assist_rate_poisson
+    - trailing_player_assist_rate_poisson
+  definitions:
+    - name: positional_assist_rate_poisson
+      identity: target_position
+      population: all_prior_eligible_rows_at_target_position
+      order: none_applicable_all_rows
+      window: null
+      additive_smoothing: none
+      fallback: unsmoothed_all_position_prior_rows
+      estimator: positional_mean_assists_per_appearance_poisson
+    - name: trailing_player_assist_rate_poisson
+      identity: stable_code
+      population: up_to_5_most_recent_prior_player_fixture_rows_including_zero
+      order: kickoff_time_then_season_then_fixture
+      window: 5
+      additive_smoothing: none
+      fallback: positional_assist_rate_poisson
+      estimator: player_assists_per_appearance_shrunk_to_positional_mean_poisson
+  excluded:
+    - fpl_ep_next_recorded_rules
+
+metrics:
+  primary: mean_log_score
+  primary_direction: lower_is_better
+  proper_distribution:
+    - mean_log_score
+    - mean_ranked_probability_score
+  binary_guardrails:
+    - mean_brier_at_least_one_assist
+  calibration:
+    - randomized_pit
+    - pit_interval_80_coverage
+    - reliability_at_least_one_assist
+  reliability_buckets_carry_n: true
+
+promotion:
+  compare_against: best_eligible_required_stage_c_attacking_assists_baseline
+  comparison_population: same_eligible_predictions
+  relative_lift_formula: "(baseline - candidate) / abs(baseline)"
+  guardrail_comparison: best_baseline_per_metric
+  minimum_primary_relative_lift: 0.01
+  maximum_ranked_probability_score_relative_regression: 0.0
+  maximum_brier_relative_regression_at_least_one_assist: 0.0
+  pit_interval_80_maximum_absolute_error: 0.05
+  minimum_fold_count: 181
+  minimum_prediction_coverage: 1.0
+  require_no_season_mean_log_score_regression: true
+  require_zero_leakage_failures: true
+
+reporting:
+  dimensions:
+    - fold
+    - season
+    - position
+    - home_away
+  counts:
+    - predictions
+    - exclusions
+    - cold_starts
+    - uncertainty
+
+historical_features:
+  availability_status: excluded_unavailable_in_archive
+  point_in_time_only: reconstructable_fields_only
+  live_availability_prospective_candidate: separately_named_prospective_only
+  historical_score_is: development_number_not_upper_bound
+
+scoring_calibration:
+  log_probability_floor: 1.0e-12
+  ranked_probability_score: sum_of_squared_ordered_category_cdf_errors_not_physical_minute_distance
+  brier: squared_binary_probability_error
+  randomized_pit_band: [0.1, 0.9]
+  randomized_pit_seed: 202627
+  reliability_edges: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+  reliability_buckets: left_closed_right_open_except_final_bucket_right_closed
+  reliability_bucket_n: true
+
+monte_carlo:
+  scope: out_of_scope_closed_form_marginal

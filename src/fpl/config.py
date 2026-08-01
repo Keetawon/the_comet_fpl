@@ -2448,3 +2448,459 @@ def load_phase3_evaluation(path: Path | None = None) -> Phase3EvaluationConfig:
     return Phase3EvaluationConfig.model_validate(
         _read_yaml(path or config_dir() / "phase3_evaluation.yaml")
     )
+
+
+# --------------------------------------------------------------------------------------
+# Phase 3 Stage C (player attacking assists) evaluation contract
+#
+# A SEPARATE frozen contract from the Stage C goals contract above. Assists are a distinct FPL
+# label with their own signal (expected_assists / creativity) and their own version counter, so
+# this contract never perturbs the goals contract. It mirrors the goals loader's frozen
+# pre-registration discipline. The generic Phase 3 policy classes with no label-specific Literal
+# (amendment record, population, cutoff, training, metric set shape, reporting, historical
+# features, scoring calibration, Monte Carlo) are reused unchanged; only the label-specific
+# policies (target outcome, target roster forbidden columns, xA signal, baseline names, gate
+# field name) are mirrored here.
+# --------------------------------------------------------------------------------------
+
+
+class Phase3StageCAssistsTargetPolicy(_Frozen):
+    entity: Literal["player"]
+    grain: Literal["season_player_code_fixture"]
+    outcome: Literal["assists_distribution"]
+    downstream_points_ruleset: Literal["2026_27"]
+    identity_policy: Literal["code_is_cross_season_player_key"]
+
+
+# The assist label column and its aliases are forbidden as target-roster proxy columns (the
+# label stays outside the model-facing projection). Same nine label-free proxy columns as the
+# goals contract are required.
+PHASE3_STAGE_C_ASSISTS_TARGET_ROSTER_FORBIDDEN_COLUMNS: frozenset[str] = frozenset(
+    {"element_id", "element", "assists"}
+)
+
+
+class Phase3StageCAssistsTargetRosterPolicy(_Frozen):
+    historical_roster_status: Literal["archive_proxy_unversioned_at_real_deadline"]
+    historical_source: Literal[
+        "archive_player_fixture_identity_schedule_proxy_projected_from_target_rows"
+    ]
+    proxy_columns: frozenset[str]
+    minutes_role: Literal["label_outside_model_facing_projection"]
+    live_prospective_registry: Literal[
+        "versioned_player_registry_selected_known_at_le_as_of_before_model_sees_entity_team_position"
+    ]
+    cross_season_team_identity: Literal["season_qualified_team_id_resolved_to_stable_team_code"]
+    point_in_time_disclaimer: Literal["not_fully_reconstructable_pit_at_real_deadline"]
+
+    @model_validator(mode="after")
+    def _proxy_columns_pinned(self) -> Self:
+        if self.proxy_columns != PHASE3_TARGET_ROSTER_PROXY_COLUMNS:
+            missing = PHASE3_TARGET_ROSTER_PROXY_COLUMNS - self.proxy_columns
+            extra = self.proxy_columns - PHASE3_TARGET_ROSTER_PROXY_COLUMNS
+            parts: list[str] = []
+            if missing:
+                parts.append(f"missing required proxy columns: {sorted(missing)}")
+            if extra:
+                parts.append(f"unexpected proxy columns: {sorted(extra)}")
+            raise ValueError(
+                "Stage C assists target roster proxy columns must be exactly "
+                f"{sorted(PHASE3_TARGET_ROSTER_PROXY_COLUMNS)}; " + "; ".join(parts)
+            )
+        overlap = PHASE3_STAGE_C_ASSISTS_TARGET_ROSTER_FORBIDDEN_COLUMNS & self.proxy_columns
+        if overlap:
+            forbidden = sorted(PHASE3_STAGE_C_ASSISTS_TARGET_ROSTER_FORBIDDEN_COLUMNS)
+            raise ValueError(
+                "Stage C assists target roster proxy columns must be disjoint from forbidden "
+                f"outcome/alias columns {forbidden}; overlap: {sorted(overlap)}"
+            )
+        return self
+
+
+class Phase3StageCAssistsXaSignalPolicy(_Frozen):
+    """The expected_assists (xA) signal policy, the assists analogue of the goals xG policy.
+
+    ``expected_assists`` has the SAME measured-coverage profile as ``expected_goals`` (NULL in
+    2021-22, partial in 2022-23, 100% in 2023-24+) and is judged within the xA-covered seasons.
+    ``creativity`` (the FPL-native creative index) is measured 100% every season and is the
+    fallback signal where xA is absent, exactly as ``threat`` is the goals fallback.
+    """
+
+    xa_handling: Literal["use_when_measured_within_covered_seasons"]
+    xa_covered_seasons_judging: Literal[True]
+    xa_covered_seasons: tuple[Season, ...]
+    residual_persistence: Literal["shrink_almost_fully_to_positional_mean"]
+    fallback_signal: Literal["creativity"]
+
+
+_PHASE3_STAGE_C_ASSISTS_BASELINE_PINS: dict[str, dict[str, str | int | None]] = {
+    "positional_assist_rate_poisson": {
+        "identity": "target_position",
+        "population": "all_prior_eligible_rows_at_target_position",
+        "order": "none_applicable_all_rows",
+        "window": None,
+        "fallback": "unsmoothed_all_position_prior_rows",
+        "estimator": "positional_mean_assists_per_appearance_poisson",
+    },
+    "trailing_player_assist_rate_poisson": {
+        "identity": "stable_code",
+        "population": "up_to_5_most_recent_prior_player_fixture_rows_including_zero",
+        "order": "kickoff_time_then_season_then_fixture",
+        "window": 5,
+        "fallback": "positional_assist_rate_poisson",
+        "estimator": "player_assists_per_appearance_shrunk_to_positional_mean_poisson",
+    },
+}
+
+
+class Phase3StageCAssistsBaselineDefinition(_Frozen):
+    name: Literal[
+        "positional_assist_rate_poisson",
+        "trailing_player_assist_rate_poisson",
+    ]
+    identity: Literal["target_position", "stable_code"]
+    population: Literal[
+        "all_prior_eligible_rows_at_target_position",
+        "up_to_5_most_recent_prior_player_fixture_rows_including_zero",
+    ]
+    order: Literal[
+        "none_applicable_all_rows",
+        "kickoff_time_then_season_then_fixture",
+    ]
+    window: int | None
+    additive_smoothing: Literal["none"]
+    fallback: Literal[
+        "unsmoothed_all_position_prior_rows",
+        "positional_assist_rate_poisson",
+    ]
+    estimator: Literal[
+        "positional_mean_assists_per_appearance_poisson",
+        "player_assists_per_appearance_shrunk_to_positional_mean_poisson",
+    ]
+
+    @model_validator(mode="after")
+    def _pinned_to_name(self) -> Self:
+        pinned = _PHASE3_STAGE_C_ASSISTS_BASELINE_PINS[self.name]
+        for field_name, expected_value in pinned.items():
+            actual = getattr(self, field_name)
+            if actual != expected_value:
+                raise ValueError(
+                    f'Stage C assists baseline "{self.name}" has {field_name}={actual!r} but '
+                    f"frozen definition pins it to {expected_value!r}"
+                )
+        return self
+
+
+class Phase3StageCAssistsBaselinePolicy(_Frozen):
+    stage_c_attacking_assists: frozenset[str]
+    definitions: tuple[Phase3StageCAssistsBaselineDefinition, ...]
+    excluded: frozenset[str]
+
+    @model_validator(mode="after")
+    def _definitions_match_stage_c(self) -> Self:
+        names = [definition.name for definition in self.definitions]
+        if len(names) != len(set(names)):
+            raise ValueError(f"Stage C assists baseline definitions have duplicate names: {names}")
+        if set(names) != self.stage_c_attacking_assists:
+            expected_set = sorted(self.stage_c_attacking_assists)
+            actual_set = sorted(set(names))
+            raise ValueError(
+                f"Stage C assists baseline definition names {actual_set} "
+                f"must match stage_c_attacking_assists {expected_set}"
+            )
+        return self
+
+
+class Phase3StageCAssistsPromotionGate(_Frozen):
+    compare_against: Literal["best_eligible_required_stage_c_attacking_assists_baseline"]
+    comparison_population: Literal["same_eligible_predictions"]
+    relative_lift_formula: Literal["(baseline - candidate) / abs(baseline)"]
+    guardrail_comparison: Literal["best_baseline_per_metric"]
+    minimum_primary_relative_lift: float
+    maximum_ranked_probability_score_relative_regression: float
+    maximum_brier_relative_regression_at_least_one_assist: float
+    pit_interval_80_maximum_absolute_error: float
+    minimum_fold_count: Literal[181]
+    minimum_prediction_coverage: float
+    require_no_season_mean_log_score_regression: Literal[True]
+    require_zero_leakage_failures: Literal[True]
+
+    @field_validator("minimum_primary_relative_lift")
+    @classmethod
+    def _lift_pinned(cls, value: float) -> float:
+        if value != 0.01:
+            raise ValueError(f"minimum_primary_relative_lift is pinned to 0.01; got {value!r}")
+        return value
+
+    @field_validator("maximum_ranked_probability_score_relative_regression")
+    @classmethod
+    def _rps_regression_pinned(cls, value: float) -> float:
+        if value != 0.0:
+            raise ValueError(
+                "maximum_ranked_probability_score_relative_regression is pinned to 0.0"
+            )
+        return value
+
+    @field_validator("maximum_brier_relative_regression_at_least_one_assist")
+    @classmethod
+    def _brier_pinned(cls, value: float) -> float:
+        if value != 0.0:
+            raise ValueError(
+                "maximum_brier_relative_regression_at_least_one_assist is pinned to 0.0"
+            )
+        return value
+
+    @field_validator("pit_interval_80_maximum_absolute_error")
+    @classmethod
+    def _pit_error_pinned(cls, value: float) -> float:
+        if value != 0.05:
+            raise ValueError("pit_interval_80_maximum_absolute_error is pinned to 0.05")
+        return value
+
+    @field_validator("minimum_prediction_coverage")
+    @classmethod
+    def _coverage_is_total(cls, value: float) -> float:
+        if value != 1.0:
+            raise ValueError("minimum_prediction_coverage is pinned to 1.0")
+        return value
+
+
+class Phase3StageCAssistsCandidateV1Policy(_Frozen):
+    """Frozen pre-registration for the first Stage C attacking assists candidate.
+
+    Candidate V1 is the v1.0 ``trailing_player_assist_rate_poisson`` baseline with one change:
+    where xA (``expected_assists``) is measured, the player's recent ASSISTS signal is replaced by
+    recent xA (per row, NULL xA filled by ``creativity`` rescaled to the assist-rate scale), and
+    the player's own assist residual (assists - xA) is shrunk almost fully to the positional mean.
+    The supporting measurement (assists-minus-xA within-position persistence DEF +0.01 / MID +0.16
+    / FWD +0.19 / GK -0.07) is modest, so the residual is shrunk 95% to the positional mean. Where
+    xA is unmeasured the candidate falls back to the EXACT v1.0 trailing-player baseline, so it
+    reduces to that baseline bit-for-bit in 2021-22 (no xA) and partially in 2022-23 (xA measured
+    only from GW16).
+
+    The per-appearance signal is over trailing-5 APPEARED prior rows (``minutes > 0``) only (R6
+    appearance-vs-rate), while the fallback uses the baseline's all-rows window so it stays
+    bit-identical. Unlike the Stage B candidates this is a FIXED closed-form estimator: no
+    parameter grid, no inner walk-forward selection, so ``selected_parameter`` is pinned to
+    ``none``. ``alpha`` mirrors the v1.0 trailing baseline's shrinkage (5.0) so the only structural
+    change is assists -> xA; ``finishing_keep`` is pinned to 0.05. Every distinguishing field is
+    pinned so a result cannot be followed by a silent policy change. The block is additive: it
+    changes no v1.0 population, target roster, baseline, metric, gate, seed, or calibration field.
+    """
+
+    name: Literal["xa_informed_trailing_player_assists_v1"]
+    development_only: Literal[True]
+    development_only_reason: Literal[
+        "archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design"
+    ]
+    grain: Literal["season_player_code_fixture"]
+    identity: Literal["stable_code"]
+    history_population: Literal[
+        "up_to_5_most_recent_prior_appeared_player_fixture_rows_minutes_gt_0"
+    ]
+    appeared_rows_filter: Literal[
+        "signal_window_is_trailing_5_appeared_prior_rows_minutes_gt_0_did_not_play_rows_excluded_R6"
+    ]
+    history_order: Literal["kickoff_time_then_season_then_fixture"]
+    history_window: Literal[5]
+    history_observed_results: Literal["kickoff_time < as_of"]
+    signal: Literal[
+        "expected_assists_where_measured_else_creativity_rescaled_to_assist_rate_scale_per_row"
+    ]
+    xa_handling: Literal[
+        "use_when_measured_per_row_null_is_unmeasured_filled_by_rescaled_creativity"
+    ]
+    positional_assist_mean: Literal[
+        "fold_local_mean_assists_per_appearance_at_target_position_equal_to_v1_positional_baseline"
+    ]
+    positional_xa_mean: Literal[
+        "fold_local_mean_expected_assists_per_appearance_over_xa_measured_appeared_prior_rows_at_target_position"
+    ]
+    creativity_rescale: Literal[
+        "fold_local_positional_factor_pos_assist_mean_over_mean_creativity_per_appearance"
+    ]
+    trailing_xa_shrinkage: Literal[
+        "shrunk_xa_equals_(sum_xa_plus_alpha_times_pos_xa)_over_(n_plus_alpha)"
+    ]
+    residual_policy: Literal["assist_residual_shrunk_almost_fully_to_positional_mean_keep_0.05"]
+    residual_term: Literal[
+        "0.05_times_player_assist_residual_plus_0.95_times_positional_assist_residual"
+    ]
+    rate: Literal["rate_equals_shrunk_xa_plus_residual_term_clamped_at_zero"]
+    fallback_to_v1: Literal[
+        "when_no_xa_measured_appeared_trailing_row_or_no_positional_xa_mean_rate_is_exact_v1_trailing_shrunk_assists_rate_over_all_rows_window"
+    ]
+    cold_start_fallback: Literal[
+        "when_no_prior_player_row_rate_is_positional_assist_mean_equal_to_v1_baseline"
+    ]
+    reduces_to_v1_baseline: Literal[
+        "when_all_trailing_xa_unmeasured_candidate_equals_v1_trailing_assist_baseline_bit_for_bit"
+    ]
+    alpha: float
+    finishing_keep: float
+    poisson_max_assists: Literal[10]
+    estimator: Literal["poisson_assist_count_distribution_over_0_to_10"]
+    additional_smoothing: Literal["none"]
+    scoring_floor_role: Literal["existing_1e-12_floor_is_scoring_only_not_model_smoothing"]
+    selected_parameter: Literal["none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward"]
+    fit_scope: Literal["positional_means_and_player_histories_recomputed_within_each_fold"]
+    target_label_policy: Literal["target_labels_never_enter_model_inputs"]
+    target_position_source: Literal["existing_unversioned_target_roster_proxy_current_position"]
+    null_policy: Literal["preserve_nulls_xa_creativity_null_means_unmeasured_never_zero_filled"]
+    zero_minutes_policy: Literal[
+        "zero_minute_prior_rows_excluded_from_appeared_signal_window_but_scored_as_targets"
+    ]
+    assistant_manager_policy: Literal["excluded_upstream_element_type_5"]
+    double_gameweek_policy: Literal[
+        "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+    ]
+    monte_carlo: Literal["out_of_scope_closed_form"]
+
+    @model_validator(mode="after")
+    def _exact_candidate_policy(self) -> Self:
+        if self.alpha != 5.0:
+            raise ValueError(
+                f"Stage C assists Candidate V1 alpha is pinned to 5.0 (== v1.0 trailing baseline); "
+                f"got {self.alpha!r}"
+            )
+        if self.finishing_keep != 0.05:
+            raise ValueError(
+                "Stage C assists Candidate V1 finishing_keep is pinned to 0.05 (assist residual "
+                f"shrunk 95% to the positional mean); got {self.finishing_keep!r}"
+            )
+        return self
+
+
+ORIGINAL_PHASE3_STAGE_C_ASSISTS_CONTRACT_VERSION: str = "1.0"
+FROZEN_PHASE3_STAGE_C_ASSISTS_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
+    "1.0": (),
+    "1.1": (("1.1", 0),),
+}
+
+
+class Phase3StageCAssistsEvaluationConfig(_Frozen):
+    """Executable entry and promotion contract for the Stage C attacking-assists walk-forward.
+
+    Stage C assists predicts a discrete Poisson count distribution over player assists (0..10)
+    at ``(season, code, fixture)`` grain. Version 1.0 freezes the population, grain, identity
+    policy, xA-signal policy, two baselines, metrics, and promotion gate before any candidate
+    exists; this is the baseline-only Stage 1 contract. It carries no candidate block: a
+    candidate is pre-registered by a later additive amendment that bumps ``contract_version``
+    and adds a matching pinned policy, judged by the unchanged v1.0 gate.
+    """
+
+    contract_version: str
+    phase: Literal[3]
+    amendments: tuple[Phase3Amendment, ...] = ()
+    target: Phase3StageCAssistsTargetPolicy
+    target_roster: Phase3StageCAssistsTargetRosterPolicy
+    population: Phase3PopulationPolicy
+    cutoff: Phase3CutoffPolicy
+    training: Phase3TrainingPolicy
+    xa_signal_policy: Phase3StageCAssistsXaSignalPolicy
+    # Candidate V1 (xA-informed trailing player assists) is required from contract version 1.1.
+    # It is additive: changes no v1.0 population/roster/baseline/metric/gate; judged by the
+    # unchanged v1.0 gate. Optional (None) at v1.0 (baseline-only); required after.
+    stage_c_assists_candidate_v1: Phase3StageCAssistsCandidateV1Policy | None = None
+    baselines: Phase3StageCAssistsBaselinePolicy
+    metrics: Phase3MetricPolicy
+    promotion: Phase3StageCAssistsPromotionGate
+    reporting: Phase3ReportingPolicy
+    historical_features: Phase3HistoricalFeaturePolicy
+    scoring_calibration: Phase3ScoringCalibrationPolicy
+    monte_carlo: Phase3MonteCarloPolicy
+
+    @model_validator(mode="after")
+    def _required_baselines_metrics_and_outputs(self) -> Self:
+        _require_exact_set(
+            self.baselines.stage_c_attacking_assists,
+            {"positional_assist_rate_poisson", "trailing_player_assist_rate_poisson"},
+            label="Stage C attacking assists baselines",
+        )
+        _require_exact_set(
+            self.baselines.excluded,
+            {"fpl_ep_next_recorded_rules"},
+            label="excluded baselines",
+        )
+        _require_exact_set(
+            self.metrics.proper_distribution,
+            {"mean_log_score", "mean_ranked_probability_score"},
+            label="proper distribution metrics",
+        )
+        _require_exact_set(
+            self.metrics.binary_guardrails,
+            {"mean_brier_at_least_one_assist"},
+            label="binary guardrail metrics",
+        )
+        _require_exact_set(
+            self.metrics.calibration,
+            {
+                "randomized_pit",
+                "pit_interval_80_coverage",
+                "reliability_at_least_one_assist",
+            },
+            label="calibration outputs",
+        )
+        _require_exact_set(
+            self.reporting.dimensions,
+            {"fold", "season", "position", "home_away"},
+            label="report dimensions",
+        )
+        _require_exact_set(
+            self.reporting.counts,
+            {"predictions", "exclusions", "cold_starts", "uncertainty"},
+            label="report counts",
+        )
+        return self
+
+    @model_validator(mode="after")
+    def _candidate_required_after_v1_0(self) -> Self:
+        """v1.0 is baseline-only (no candidate); any later version requires Candidate V1."""
+        if self.contract_version == ORIGINAL_PHASE3_STAGE_C_ASSISTS_CONTRACT_VERSION:
+            if self.stage_c_assists_candidate_v1 is not None:
+                raise ValueError(
+                    "Stage C assists contract v1.0 is baseline-only and must not carry a "
+                    "stage_c_assists_candidate_v1 block"
+                )
+        elif self.stage_c_assists_candidate_v1 is None:
+            raise ValueError(
+                f"Stage C assists contract version {self.contract_version} requires a "
+                "stage_c_assists_candidate_v1 block; it is missing"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _version_needs_amendment_record_unless_original(self) -> Self:
+        if self.contract_version != ORIGINAL_PHASE3_STAGE_C_ASSISTS_CONTRACT_VERSION and not any(
+            amendment.version == self.contract_version for amendment in self.amendments
+        ):
+            raise ValueError(
+                f"Stage C assists contract version {self.contract_version} has no amendment "
+                "record; a pre-registered gate may not change without one"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _amendment_history_is_frozen(self) -> Self:
+        expected = FROZEN_PHASE3_STAGE_C_ASSISTS_AMENDMENT_HISTORY.get(self.contract_version)
+        if expected is None:
+            return self
+        actual = tuple(
+            (amendment.version, amendment.candidates_evaluated_before_amendment)
+            for amendment in self.amendments
+        )
+        if actual != expected:
+            raise ValueError(
+                f"Stage C assists amendment history for contract {self.contract_version} is not "
+                f"the frozen record: expected {expected}, got {actual}."
+            )
+        return self
+
+
+@functools.cache
+def load_phase3_stage_c_assists_evaluation(
+    path: Path | None = None,
+) -> Phase3StageCAssistsEvaluationConfig:
+    return Phase3StageCAssistsEvaluationConfig.model_validate(
+        _read_yaml(path or config_dir() / "phase3_stage_c_assists_evaluation.yaml")
+    )

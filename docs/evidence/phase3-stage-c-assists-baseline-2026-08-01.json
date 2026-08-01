@@ -1,0 +1,2039 @@
+{
+  "contract_version": "1.0",
+  "phase": 3,
+  "stage": "C_attacking_assists",
+  "total_predictions": 133964,
+  "leakage_failures": 0,
+  "folds_by_season": {
+    "2021-22": 30,
+    "2022-23": 37,
+    "2023-24": 38,
+    "2024-25": 38,
+    "2025-26": 38
+  },
+  "best_baseline": "trailing_player_assist_rate_poisson",
+  "candidate_names": [],
+  "candidate_path_counts": {},
+  "overall": {
+    "positional_assist_rate_poisson": {
+      "predictions": 133964,
+      "exclusions": 0,
+      "cold_starts": 1207,
+      "uncertainty": 0.001777,
+      "mean_log_score": 0.148409,
+      "mean_ranked_probability_score": 0.03355,
+      "mean_brier_at_least_one_assist": 0.030927,
+      "pit_interval_80_coverage": 0.803611,
+      "pit_interval_80_error": 0.003611,
+      "reliability_at_least_one_assist": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "n": 133964,
+          "mean_predicted": 0.03577677525548478,
+          "observed_rate": 0.032165357857334806
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        }
+      ]
+    },
+    "trailing_player_assist_rate_poisson": {
+      "predictions": 133964,
+      "exclusions": 0,
+      "cold_starts": 1207,
+      "uncertainty": 0.001781,
+      "mean_log_score": 0.14273,
+      "mean_ranked_probability_score": 0.033145,
+      "mean_brier_at_least_one_assist": 0.030522,
+      "pit_interval_80_coverage": 0.801409,
+      "pit_interval_80_error": 0.001409,
+      "reliability_at_least_one_assist": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "n": 116910,
+          "mean_predicted": 0.018044171189769795,
+          "observed_rate": 0.021666238987255153
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "n": 13343,
+          "mean_predicted": 0.11880315082208207,
+          "observed_rate": 0.09120887356666417
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "n": 3376,
+          "mean_predicted": 0.22053219374175562,
+          "observed_rate": 0.14336492890995262
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "n": 239,
+          "mean_predicted": 0.34577951504234294,
+          "observed_rate": 0.20502092050209206
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "n": 93,
+          "mean_predicted": 0.41652822925459204,
+          "observed_rate": 0.27956989247311825
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "n": 3,
+          "mean_predicted": 0.5160356399413061,
+          "observed_rate": 0.0
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "n": 0,
+          "mean_predicted": null,
+          "observed_rate": null
+        }
+      ]
+    }
+  },
+  "by_season": {
+    "2021-22": {
+      "positional_assist_rate_poisson": {
+        "predictions": 20704,
+        "exclusions": 0,
+        "cold_starts": 139,
+        "uncertainty": 0.004549,
+        "mean_log_score": 0.15243,
+        "mean_ranked_probability_score": 0.034622,
+        "mean_brier_at_least_one_assist": 0.031681,
+        "pit_interval_80_coverage": 0.80598,
+        "pit_interval_80_error": 0.00598,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 20704,
+            "mean_predicted": 0.0378451949280409,
+            "observed_rate": 0.03294049459041731
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 20704,
+        "exclusions": 0,
+        "cold_starts": 139,
+        "uncertainty": 0.004582,
+        "mean_log_score": 0.147536,
+        "mean_ranked_probability_score": 0.034391,
+        "mean_brier_at_least_one_assist": 0.031455,
+        "pit_interval_80_coverage": 0.802502,
+        "pit_interval_80_error": 0.002502,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 17962,
+            "mean_predicted": 0.018958224314172614,
+            "observed_rate": 0.02299298519095869
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2196,
+            "mean_predicted": 0.12002493508175767,
+            "observed_rate": 0.08743169398907104
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 500,
+            "mean_predicted": 0.2198861892684906,
+            "observed_rate": 0.132
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 32,
+            "mean_predicted": 0.3458900999546832,
+            "observed_rate": 0.28125
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 11,
+            "mean_predicted": 0.4089051836290013,
+            "observed_rate": 0.18181818181818182
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 3,
+            "mean_predicted": 0.5160356399413061,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "2022-23": {
+      "positional_assist_rate_poisson": {
+        "predictions": 26505,
+        "exclusions": 0,
+        "cold_starts": 326,
+        "uncertainty": 0.003957,
+        "mean_log_score": 0.148101,
+        "mean_ranked_probability_score": 0.03365,
+        "mean_brier_at_least_one_assist": 0.031164,
+        "pit_interval_80_coverage": 0.804188,
+        "pit_interval_80_error": 0.004188,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 26505,
+            "mean_predicted": 0.03584579544811302,
+            "observed_rate": 0.03248443689869836
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 26505,
+        "exclusions": 0,
+        "cold_starts": 326,
+        "uncertainty": 0.003984,
+        "mean_log_score": 0.143119,
+        "mean_ranked_probability_score": 0.033373,
+        "mean_brier_at_least_one_assist": 0.030873,
+        "pit_interval_80_coverage": 0.801056,
+        "pit_interval_80_error": 0.001056,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 23089,
+            "mean_predicted": 0.018188369539746025,
+            "observed_rate": 0.021785265710944607
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2625,
+            "mean_predicted": 0.11842240723995276,
+            "observed_rate": 0.09447619047619048
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 742,
+            "mean_predicted": 0.21977676602766377,
+            "observed_rate": 0.1347708894878706
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 32,
+            "mean_predicted": 0.34556850895091423,
+            "observed_rate": 0.1875
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 17,
+            "mean_predicted": 0.4203344350885494,
+            "observed_rate": 0.23529411764705882
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "2023-24": {
+      "positional_assist_rate_poisson": {
+        "predictions": 29725,
+        "exclusions": 0,
+        "cold_starts": 302,
+        "uncertainty": 0.003931,
+        "mean_log_score": 0.152611,
+        "mean_ranked_probability_score": 0.034748,
+        "mean_brier_at_least_one_assist": 0.03139,
+        "pit_interval_80_coverage": 0.804138,
+        "pit_interval_80_error": 0.004138,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 29725,
+            "mean_predicted": 0.035422547317515894,
+            "observed_rate": 0.03266610597140454
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 29725,
+        "exclusions": 0,
+        "cold_starts": 302,
+        "uncertainty": 0.00392,
+        "mean_log_score": 0.145182,
+        "mean_ranked_probability_score": 0.034023,
+        "mean_brier_at_least_one_assist": 0.030664,
+        "pit_interval_80_coverage": 0.800336,
+        "pit_interval_80_error": 0.000336,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 25959,
+            "mean_predicted": 0.017888038587080466,
+            "observed_rate": 0.02091760083208136
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2856,
+            "mean_predicted": 0.11835184363057626,
+            "observed_rate": 0.09488795518207283
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 824,
+            "mean_predicted": 0.22302539310142167,
+            "observed_rate": 0.17233009708737865
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 66,
+            "mean_predicted": 0.3453749213886973,
+            "observed_rate": 0.13636363636363635
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 20,
+            "mean_predicted": 0.41877307533709107,
+            "observed_rate": 0.3
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "2024-25": {
+      "positional_assist_rate_poisson": {
+        "predictions": 27283,
+        "exclusions": 0,
+        "cold_starts": 201,
+        "uncertainty": 0.004023,
+        "mean_log_score": 0.152066,
+        "mean_ranked_probability_score": 0.034495,
+        "mean_brier_at_least_one_assist": 0.03186,
+        "pit_interval_80_coverage": 0.802111,
+        "pit_interval_80_error": 0.002111,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 27283,
+            "mean_predicted": 0.03561243361726661,
+            "observed_rate": 0.03320749184473848
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 27283,
+        "exclusions": 0,
+        "cold_starts": 201,
+        "uncertainty": 0.003942,
+        "mean_log_score": 0.144603,
+        "mean_ranked_probability_score": 0.033906,
+        "mean_brier_at_least_one_assist": 0.031275,
+        "pit_interval_80_coverage": 0.799032,
+        "pit_interval_80_error": 0.000968,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 23749,
+            "mean_predicted": 0.01793886819965334,
+            "observed_rate": 0.021179839151122152
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2673,
+            "mean_predicted": 0.11784244904959315,
+            "observed_rate": 0.09988776655443322
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 773,
+            "mean_predicted": 0.22122226122068325,
+            "observed_rate": 0.1500646830530401
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 64,
+            "mean_predicted": 0.3462630277762559,
+            "observed_rate": 0.203125
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 24,
+            "mean_predicted": 0.41119105147424806,
+            "observed_rate": 0.2916666666666667
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "2025-26": {
+      "positional_assist_rate_poisson": {
+        "predictions": 29747,
+        "exclusions": 0,
+        "cold_starts": 239,
+        "uncertainty": 0.003542,
+        "mean_log_score": 0.138331,
+        "mean_ranked_probability_score": 0.030652,
+        "mean_brier_at_least_one_assist": 0.028874,
+        "pit_interval_80_coverage": 0.805459,
+        "pit_interval_80_error": 0.005459,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 29747,
+            "mean_predicted": 0.03478034594380355,
+            "observed_rate": 0.02988536659158907
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 29747,
+        "exclusions": 0,
+        "cold_starts": 239,
+        "uncertainty": 0.00363,
+        "mean_log_score": 0.134871,
+        "mean_ranked_probability_score": 0.030497,
+        "mean_brier_at_least_one_assist": 0.028728,
+        "pit_interval_80_coverage": 0.800686,
+        "pit_interval_80_error": 0.000686,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 26151,
+            "mean_predicted": 0.01753965010156526,
+            "observed_rate": 0.021834729073457994
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 2993,
+            "mean_predicted": 0.11952927940398826,
+            "observed_rate": 0.07985299031072503
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 537,
+            "mean_predicted": 0.21735847151999166,
+            "observed_rate": 0.11173184357541899
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 45,
+            "mean_predicted": 0.3457566671290322,
+            "observed_rate": 0.26666666666666666
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 21,
+            "mean_predicted": 0.4214017220061394,
+            "observed_rate": 0.3333333333333333
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    }
+  },
+  "by_position": {
+    "DEF": {
+      "positional_assist_rate_poisson": {
+        "predictions": 44678,
+        "exclusions": 0,
+        "cold_starts": 375,
+        "uncertainty": 0.002807,
+        "mean_log_score": 0.111707,
+        "mean_ranked_probability_score": 0.022813,
+        "mean_brier_at_least_one_assist": 0.021739,
+        "pit_interval_80_coverage": 0.803886,
+        "pit_interval_80_error": 0.003886,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 44678,
+            "mean_predicted": 0.024613645121056394,
+            "observed_rate": 0.022225703925869554
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 44678,
+        "exclusions": 0,
+        "cold_starts": 375,
+        "uncertainty": 0.002886,
+        "mean_log_score": 0.10976,
+        "mean_ranked_probability_score": 0.022891,
+        "mean_brier_at_least_one_assist": 0.021812,
+        "pit_interval_80_coverage": 0.801021,
+        "pit_interval_80_error": 0.001021,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 40456,
+            "mean_predicted": 0.012646818043808503,
+            "observed_rate": 0.017129721178564365
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 4062,
+            "mean_predicted": 0.118923796811445,
+            "observed_rate": 0.06868537666174299
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 132,
+            "mean_predicted": 0.26592479432896055,
+            "observed_rate": 0.11363636363636363
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 21,
+            "mean_predicted": 0.33826534022261623,
+            "observed_rate": 0.19047619047619047
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 7,
+            "mean_predicted": 0.4172839068443177,
+            "observed_rate": 0.2857142857142857
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "FWD": {
+      "positional_assist_rate_poisson": {
+        "predictions": 16010,
+        "exclusions": 0,
+        "cold_starts": 168,
+        "uncertainty": 0.005546,
+        "mean_log_score": 0.180807,
+        "mean_ranked_probability_score": 0.041346,
+        "mean_brier_at_least_one_assist": 0.037356,
+        "pit_interval_80_coverage": 0.809244,
+        "pit_interval_80_error": 0.009244,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 16010,
+            "mean_predicted": 0.048051099763686496,
+            "observed_rate": 0.038788257339163024
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 16010,
+        "exclusions": 0,
+        "cold_starts": 168,
+        "uncertainty": 0.005547,
+        "mean_log_score": 0.174159,
+        "mean_ranked_probability_score": 0.041168,
+        "mean_brier_at_least_one_assist": 0.037185,
+        "pit_interval_80_coverage": 0.803685,
+        "pit_interval_80_error": 0.003685,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 13477,
+            "mean_predicted": 0.02496774181902398,
+            "observed_rate": 0.027528381687319137
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 1951,
+            "mean_predicted": 0.12029887074392717,
+            "observed_rate": 0.09072270630445925
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 528,
+            "mean_predicted": 0.2192552290432638,
+            "observed_rate": 0.12121212121212122
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 36,
+            "mean_predicted": 0.3461536264167235,
+            "observed_rate": 0.2222222222222222
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 15,
+            "mean_predicted": 0.4153123011828087,
+            "observed_rate": 0.06666666666666667
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 3,
+            "mean_predicted": 0.5160356399413061,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "GK": {
+      "positional_assist_rate_poisson": {
+        "predictions": 14890,
+        "exclusions": 0,
+        "cold_starts": 137,
+        "uncertainty": 0.002187,
+        "mean_log_score": 0.012083,
+        "mean_ranked_probability_score": 0.00161,
+        "mean_brier_at_least_one_assist": 0.00161,
+        "pit_interval_80_coverage": 0.802351,
+        "pit_interval_80_error": 0.002351,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 14890,
+            "mean_predicted": 0.0013642028982834846,
+            "observed_rate": 0.0016118200134318335
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 14890,
+        "exclusions": 0,
+        "cold_starts": 137,
+        "uncertainty": 0.002371,
+        "mean_log_score": 0.012956,
+        "mean_ranked_probability_score": 0.00167,
+        "mean_brier_at_least_one_assist": 0.00167,
+        "pit_interval_80_coverage": 0.802485,
+        "pit_interval_80_error": 0.002485,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 14887,
+            "mean_predicted": 0.001380131177797522,
+            "observed_rate": 0.0016121448243433868
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 3,
+            "mean_predicted": 0.18190110673866303,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "MID": {
+      "positional_assist_rate_poisson": {
+        "predictions": 58386,
+        "exclusions": 0,
+        "cold_starts": 527,
+        "uncertainty": 0.003039,
+        "mean_log_score": 0.202377,
+        "mean_ranked_probability_score": 0.047775,
+        "mean_brier_at_least_one_assist": 0.043673,
+        "pit_interval_80_coverage": 0.804131,
+        "pit_interval_80_error": 0.004131,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 58386,
+            "mean_predicted": 0.04972939395120652,
+            "observed_rate": 0.04574726818072826
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 58386,
+        "exclusions": 0,
+        "cold_starts": 527,
+        "uncertainty": 0.003003,
+        "mean_log_score": 0.192437,
+        "mean_ranked_probability_score": 0.046817,
+        "mean_brier_at_least_one_assist": 0.042718,
+        "pit_interval_80_coverage": 0.800192,
+        "pit_interval_80_error": 0.000192,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 48090,
+            "mean_predicted": 0.025803038338049738,
+            "observed_rate": 0.030047826991058433
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 7327,
+            "mean_predicted": 0.11831215758555118,
+            "observed_rate": 0.10386242664119012
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 2716,
+            "mean_predicted": 0.2185743196928943,
+            "observed_rate": 0.14911634756995581
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 182,
+            "mean_predicted": 0.34657253516177455,
+            "observed_rate": 0.2032967032967033
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 71,
+            "mean_predicted": 0.41671061204260146,
+            "observed_rate": 0.323943661971831
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    }
+  },
+  "by_home_away": {
+    "home": {
+      "positional_assist_rate_poisson": {
+        "predictions": 66979,
+        "exclusions": 0,
+        "cold_starts": 650,
+        "uncertainty": 0.002649,
+        "mean_log_score": 0.159302,
+        "mean_ranked_probability_score": 0.036515,
+        "mean_brier_at_least_one_assist": 0.033445,
+        "pit_interval_80_coverage": 0.801535,
+        "pit_interval_80_error": 0.001535,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 66979,
+            "mean_predicted": 0.03578282399079044,
+            "observed_rate": 0.034891533167112077
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 66979,
+        "exclusions": 0,
+        "cold_starts": 650,
+        "uncertainty": 0.002671,
+        "mean_log_score": 0.153684,
+        "mean_ranked_probability_score": 0.035974,
+        "mean_brier_at_least_one_assist": 0.032911,
+        "pit_interval_80_coverage": 0.79837,
+        "pit_interval_80_error": 0.00163,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 58531,
+            "mean_predicted": 0.018068167189412895,
+            "observed_rate": 0.023850609078949616
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 6623,
+            "mean_predicted": 0.11871724771293037,
+            "observed_rate": 0.09859580250641703
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 1657,
+            "mean_predicted": 0.22092779173721763,
+            "observed_rate": 0.15208207604103802
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 116,
+            "mean_predicted": 0.3458284081590184,
+            "observed_rate": 0.19827586206896552
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 50,
+            "mean_predicted": 0.4157748656727796,
+            "observed_rate": 0.26
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 2,
+            "mean_predicted": 0.5160462643716336,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    },
+    "away": {
+      "positional_assist_rate_poisson": {
+        "predictions": 66985,
+        "exclusions": 0,
+        "cold_starts": 557,
+        "uncertainty": 0.002369,
+        "mean_log_score": 0.137517,
+        "mean_ranked_probability_score": 0.030586,
+        "mean_brier_at_least_one_assist": 0.02841,
+        "pit_interval_80_coverage": 0.806285,
+        "pit_interval_80_error": 0.006285,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 66985,
+            "mean_predicted": 0.03577072706197821,
+            "observed_rate": 0.029439426737329254
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      },
+      "trailing_player_assist_rate_poisson": {
+        "predictions": 66985,
+        "exclusions": 0,
+        "cold_starts": 557,
+        "uncertainty": 0.002357,
+        "mean_log_score": 0.131778,
+        "mean_ranked_probability_score": 0.030316,
+        "mean_brier_at_least_one_assist": 0.028133,
+        "pit_interval_80_coverage": 0.803225,
+        "pit_interval_80_error": 0.003225,
+        "reliability_at_least_one_assist": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "n": 58379,
+            "mean_predicted": 0.018020112712318816,
+            "observed_rate": 0.019476181503622878
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "n": 6720,
+            "mean_predicted": 0.11888781396075941,
+            "observed_rate": 0.08392857142857142
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "n": 1719,
+            "mean_predicted": 0.2201508639695156,
+            "observed_rate": 0.13496218731820825
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "n": 123,
+            "mean_predicted": 0.3457334044607629,
+            "observed_rate": 0.21138211382113822
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "n": 43,
+            "mean_predicted": 0.41740423341949023,
+            "observed_rate": 0.3023255813953488
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "n": 1,
+            "mean_predicted": 0.5160143910806512,
+            "observed_rate": 0.0
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "n": 0,
+            "mean_predicted": null,
+            "observed_rate": null
+          }
+        ]
+      }
+    }
+  }
+}
