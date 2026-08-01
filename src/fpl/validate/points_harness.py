@@ -20,7 +20,15 @@ Components (swappable -- the harness is component-agnostic via :class:`PointsCom
   log score of the three attacking candidates, and a per-player independent rate);
 * assists  -- Stage C assists Candidate V1 ``xa_informed_trailing_player_assists_v1`` (only one);
 * team clean sheet / goals conceded -- derived from the promoted Stage A model
-  ``trailing_goals_attack_defence`` (the OPPONENT's scored-goals distribution), fit fold-locally.
+  ``trailing_goals_attack_defence`` (the OPPONENT's scored-goals distribution), fit fold-locally;
+* saves    -- Stage D **v2** GK saves ``gk_saves_poisson_from_team_conceded_v1``: for a goalkeeper,
+  ``Poisson(k * lambda_conceded)`` with ``k`` from the fold-local league save rate (67.3% constant),
+  zero for outfielders;
+* defensive contribution -- Stage D **v2** ``trailing_dc_threshold_hit_bernoulli_v1``: a per-player
+  ``P(DC >= threshold)``, PROSPECTIVE-ONLY (DC data exists only in 2025-26; 0 for earlier folds).
+
+Stage D v2 adds saves and DC to the v1 composer. Penalties, own goals, and cards remain unmodelled
+(a documented support gap); the realised label still includes them.
 """
 
 from __future__ import annotations
@@ -30,7 +38,7 @@ import hashlib
 import logging
 import sys
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,9 +54,12 @@ from fpl.config import (
 )
 from fpl.models.attacking_assists_baselines import AssistHistoryRow
 from fpl.models.attacking_baselines import PlayerHistoryRow, TargetRowProjection
+from fpl.models.defensive_contribution_v1 import DcHistoryRow
+from fpl.models.gk_saves_v1 import GkSavesHistoryRow
 from fpl.models.points_composition import (
     DEFAULT_MAX_POINTS,
     ComponentDistributions,
+    ExtraScoring,
     PointsLookup,
     compose_points_distribution,
     representative_minutes,
@@ -105,23 +116,47 @@ class CountPredictor(Protocol):
     def predict(self, target: TargetRowProjection) -> Distribution: ...
 
 
+class SavesPredictor(Protocol):
+    name: str
+
+    def predict(self, position: Position, lambda_conceded: float) -> Distribution: ...
+
+
+class DcPredictor(Protocol):
+    name: str
+
+    def predict(self, code: int, position: Position) -> float: ...
+
+
 @dataclass(frozen=True)
 class PointsComponentSuite:
     """The swappable component set. Each callable fits ONE fold-local predictor on that fold's
-    point-in-time history; swapping a component is a one-line change here."""
+    point-in-time history; swapping a component is a one-line change here.
+
+    Stage D v2 adds the goalkeeper-saves and defensive-contribution fitters. ``fit_dc`` also gets
+    the rules' per-position DC thresholds, which the DC hit-probability estimate is defined against.
+    """
 
     minutes_name: str
     goals_name: str
     assists_name: str
+    saves_name: str
+    dc_name: str
     fit_minutes: Callable[[tuple[HistoryRow, ...], datetime], MinutesPredictor]
     fit_goals: Callable[[Sequence[PlayerHistoryRow]], CountPredictor]
     fit_assists: Callable[[Sequence[AssistHistoryRow]], CountPredictor]
+    fit_saves: Callable[[Sequence[GkSavesHistoryRow]], SavesPredictor]
+    fit_dc: Callable[[Sequence[DcHistoryRow], Mapping[Position, int]], DcPredictor]
 
 
 def default_component_suite() -> PointsComponentSuite:
-    """The first-run suite: minutes V3, attacking-goals V1, assists V1 (see module docstring)."""
+    """The v2 suite: minutes V3, goals V1, assists V1, GK saves V1, DC V1 (see module docstring)."""
     from fpl.models.attacking_assists_v1 import XaInformedTrailingPlayerAssistsV1
     from fpl.models.attacking_v1 import XgInformedTrailingPlayerGoalsV1
+    from fpl.models.defensive_contribution_v1 import NAME as DC_NAME
+    from fpl.models.defensive_contribution_v1 import DefensiveContributionV1
+    from fpl.models.gk_saves_v1 import NAME as SAVES_NAME
+    from fpl.models.gk_saves_v1 import GkSavesV1
     from fpl.models.minutes_v3 import fit_minutes_v3
 
     def fit_minutes(history: tuple[HistoryRow, ...], as_of: datetime) -> MinutesPredictor:
@@ -137,13 +172,27 @@ def default_component_suite() -> PointsComponentSuite:
         model.fit(history)
         return model
 
+    def fit_saves(history: Sequence[GkSavesHistoryRow]) -> SavesPredictor:
+        model = GkSavesV1()
+        model.fit(history)
+        return model
+
+    def fit_dc(history: Sequence[DcHistoryRow], thresholds: Mapping[Position, int]) -> DcPredictor:
+        model = DefensiveContributionV1(thresholds)
+        model.fit(history)
+        return model
+
     return PointsComponentSuite(
         minutes_name="concentration_adaptive_shrinkage_player_minutes_v3",
         goals_name="xg_informed_trailing_player_goals_v1",
         assists_name="xa_informed_trailing_player_assists_v1",
+        saves_name=SAVES_NAME,
+        dc_name=DC_NAME,
         fit_minutes=fit_minutes,
         fit_goals=fit_goals,
         fit_assists=fit_assists,
+        fit_saves=fit_saves,
+        fit_dc=fit_dc,
     )
 
 
@@ -205,6 +254,22 @@ class PointsPredictionRecord:
     position: Position
     regime: str
     stage_a_fallback: bool
+
+
+@dataclass(frozen=True, slots=True)
+class FoldDiagnostics:
+    """Development diagnostics for one fold's v2 components (never a gate).
+
+    ``save_rate`` is the fold-local derived goalkeeper save rate; ``dc_history_present`` is True if
+    the fold's training window carried any DC-measured position prior (only 2025-26 folds do);
+    ``dc_positive_predictions`` counts target rows given a strictly positive DC hit probability.
+    """
+
+    fold: str
+    save_rate: float
+    dc_history_present: bool
+    dc_positive_predictions: int
+    predictions: int
 
 
 def assert_no_points_leakage(
@@ -307,10 +372,11 @@ def run_points_fold(
     lookup: PointsLookup,
     rules: ScoringRules,
     team_codes: TeamCodeMap,
+    extra: ExtraScoring,
     base_seed: int,
     draws: int,
     max_points: int,
-) -> tuple[str, list[PointsPredictionRecord]]:
+) -> tuple[str, list[PointsPredictionRecord], FoldDiagnostics]:
     """Fit every component on the fold's point-in-time history and compose xP for its gameweek."""
     as_of_row = con.execute(
         """
@@ -326,12 +392,17 @@ def run_points_fold(
 
     # --- Point-in-time component histories.
     minutes_history = tuple(player_fixture_history(con, as_of=as_of))
+    # ``saves`` and ``goals_conceded`` are required components (present all five seasons for played
+    # rows); ``defensive_contribution`` is selected RAW and never coalesced -- it is NULL before
+    # 2025-26 and a NULL must not become a zero (R: NULL != 0). The DC history builder below skips
+    # NULL rows so they carry no signal instead of a fabricated zero.
     player_history_frame = con.execute(
         """
         SELECT season, gw, fixture,
                strftime(kickoff_time, '%Y-%m-%dT%H:%M:%SZ') AS kickoff_time,
                code, position, COALESCE(goals_scored, 0) AS goals,
                COALESCE(assists, 0) AS assists, minutes,
+               saves, goals_conceded, defensive_contribution,
                expected_goals, expected_assists, creativity
         FROM mart_fact_player_fixture
         WHERE minutes IS NOT NULL AND kickoff_time < ?
@@ -344,6 +415,8 @@ def run_points_fold(
     )
     goals_history: list[PlayerHistoryRow] = []
     assists_history: list[AssistHistoryRow] = []
+    saves_history: list[GkSavesHistoryRow] = []
+    dc_history: list[DcHistoryRow] = []
     for r in player_history_frame.iter_rows(named=True):
         position = Position.from_archive_label(r["position"])
         goals_history.append(
@@ -372,10 +445,31 @@ def run_points_fold(
                 creativity=r["creativity"],
             )
         )
+        saves_history.append(
+            GkSavesHistoryRow(
+                position=position,
+                minutes=r["minutes"],
+                saves=r["saves"],
+                goals_conceded=r["goals_conceded"],
+            )
+        )
+        # Preserve NULL DC (unmeasured before 2025-26); never zero-fill. Only measured rows carry a
+        # DC signal, so a NULL row is simply not added to the DC history.
+        if r["defensive_contribution"] is not None:
+            dc_history.append(
+                DcHistoryRow(
+                    code=r["code"],
+                    position=position,
+                    minutes=r["minutes"],
+                    defensive_contribution=r["defensive_contribution"],
+                )
+            )
 
     minutes_model = suite.fit_minutes(minutes_history, as_of)
     goals_model = suite.fit_goals(goals_history)
     assists_model = suite.fit_assists(assists_history)
+    saves_model = suite.fit_saves(saves_history)
+    dc_model = suite.fit_dc(dc_history, rules.defensive_contribution.thresholds)
     conceded_by_team, league_conceded = _team_conceded_distributions(con, season, gw, as_of)
     league_conceded_dist = poisson_pmf(max(league_conceded, 1e-6))
 
@@ -403,6 +497,7 @@ def run_points_fold(
         as_of,
     )
     records: list[PointsPredictionRecord] = []
+    dc_positive_predictions = 0
     for r in targets_frame.iter_rows(named=True):
         position = Position.from_archive_label(r["position"])
         code = int(r["code"])
@@ -445,12 +540,24 @@ def run_points_fold(
         if conceded_dist is None:
             conceded_dist = league_conceded_dist
 
+        # Stage D v2: saves are derived from the fixture's expected team-conceded rate (a per-match
+        # team quantity, wired explicitly rather than through the generic per-player protocol), and
+        # DC is a per-player threshold-hit probability. lambda_conceded = sum(i * p_i) over the
+        # ordered conceded distribution (fixed length, so the float sum is order-stable).
+        lambda_conceded = sum(index * mass for index, mass in enumerate(conceded_dist))
+        saves_dist = saves_model.predict(position, lambda_conceded)
+        dc_probability = dc_model.predict(code, position)
+        if dc_probability > 0.0:
+            dc_positive_predictions += 1
+
         components = ComponentDistributions(
             position=position,
             minutes=minutes_dist,
             goals=goals_dist,
             assists=assists_dist,
             team_goals_conceded=conceded_dist,
+            saves=saves_dist,
+            dc_hit_probability=dc_probability,
         )
         points_dist = compose_points_distribution(
             components,
@@ -458,6 +565,7 @@ def run_points_fold(
             seed=_stable_seed(base_seed, season, code, fixture),
             draws=draws,
             max_points=max_points,
+            extra=extra,
         )
         label = non_bonus_points(r, position, rules)
         records.append(
@@ -471,7 +579,14 @@ def run_points_fold(
                 stage_a_fallback=stage_a_fallback,
             )
         )
-    return fold_label, records
+    diagnostics = FoldDiagnostics(
+        fold=fold_label,
+        save_rate=float(getattr(saves_model, "save_rate", float("nan"))),
+        dc_history_present=len(dc_history) > 0,
+        dc_positive_predictions=dc_positive_predictions,
+        predictions=len(records),
+    )
+    return fold_label, records, diagnostics
 
 
 # --------------------------------------------------------------------------------------
@@ -494,6 +609,10 @@ class PointsHarnessResult:
     by_position: dict[str, ScoreReport]
     by_regime: dict[str, ScoreReport]
     component_names: dict[str, str]
+    save_rate_min: float
+    save_rate_max: float
+    folds_with_dc_history: int
+    dc_positive_predictions: int
 
 
 def _score(name: str, records: Sequence[PointsPredictionRecord], *, seed: int) -> ScoreReport:
@@ -527,6 +646,14 @@ def run_points_harness(
     rules = load_scoring_rules(TARGET_RULESET)
     bins = MinuteBins.from_config(load_phase2_evaluation())
     lookup = PointsLookup(rules, bin_minutes=representative_minutes(bins.ranges))
+    # Stage D v2 saves / DC scoring constants, resolved once from the rules (the composer is
+    # config-free and receives these explicitly).
+    extra = ExtraScoring(
+        saves_unit=rules.saves.unit,
+        dc_points=rules.defensive_contribution.points,
+        saves_positions=rules.saves.positions,
+        dc_positions=frozenset(rules.defensive_contribution.thresholds),
+    )
     team_codes = team_code_map(con)
 
     folds = observed_folds(con, warmup=warmup)
@@ -536,9 +663,10 @@ def run_points_harness(
 
     all_records: list[PointsPredictionRecord] = []
     folds_by_season: dict[str, int] = defaultdict(int)
+    fold_diagnostics: list[FoldDiagnostics] = []
     evaluated = 0
     for season, gw in folds:
-        _, records = run_points_fold(
+        _, records, diagnostics = run_points_fold(
             con,
             season,
             gw,
@@ -546,6 +674,7 @@ def run_points_harness(
             lookup=lookup,
             rules=rules,
             team_codes=team_codes,
+            extra=extra,
             base_seed=base_seed,
             draws=draws,
             max_points=max_points,
@@ -555,6 +684,7 @@ def run_points_harness(
         evaluated += 1
         folds_by_season[season] += 1
         all_records.extend(records)
+        fold_diagnostics.append(diagnostics)
         logger.info("fold %s: %d predictions", f"{season}-GW{gw:02d}", len(records))
 
     if not all_records:
@@ -571,8 +701,9 @@ def run_points_harness(
         if record.season != NO_XG_SEASON:
             headline_records.append(record)
 
+    save_rates = [d.save_rate for d in fold_diagnostics]
     return PointsHarnessResult(
-        model_name="stage_d_points_composition_v1",
+        model_name="stage_d_points_composition_v2",
         folds_evaluated=evaluated,
         folds_by_season=dict(folds_by_season),
         predictions=len(all_records),
@@ -597,17 +728,27 @@ def run_points_harness(
             "goals": resolved_suite.goals_name,
             "assists": resolved_suite.assists_name,
             "team_clean_sheet": "trailing_goals_attack_defence",
+            "saves": resolved_suite.saves_name,
+            "defensive_contribution": resolved_suite.dc_name,
         },
+        save_rate_min=min(save_rates) if save_rates else float("nan"),
+        save_rate_max=max(save_rates) if save_rates else float("nan"),
+        folds_with_dc_history=sum(1 for d in fold_diagnostics if d.dc_history_present),
+        dc_positive_predictions=sum(d.dc_positive_predictions for d in fold_diagnostics),
     )
 
 
 def format_points_report(result: PointsHarnessResult) -> str:
     lines = [
-        "=== Stage D v1 points composition walk-forward (DEVELOPMENT ONLY) ===",
+        "=== Stage D v2 points composition walk-forward (DEVELOPMENT ONLY) ===",
         f"folds evaluated : {result.folds_evaluated}",
         f"predictions     : {result.predictions}",
         f"Monte-Carlo     : {result.draws} draws, points support 0..{result.max_points}",
         f"Stage A fallbacks: {result.stage_a_fallbacks}",
+        f"GK save_rate    : fold-local range [{result.save_rate_min:.4f}, "
+        f"{result.save_rate_max:.4f}]",
+        f"DC (prospective): folds with DC history {result.folds_with_dc_history}, "
+        f"targets with p_hit>0 {result.dc_positive_predictions}",
         "components      : " + ", ".join(f"{k}={v}" for k, v in result.component_names.items()),
         "",
         f"{'slice':<22}{'log':>9}{'CRPS':>9}{'PIT80':>9}{'MAE':>9}{'n':>9}",
@@ -639,15 +780,15 @@ def format_points_report(result: PointsHarnessResult) -> str:
     lines += [
         "",
         "DEVELOPMENT ONLY -- exploratory, not a promotion verdict. The 2021-22 no-xG season is",
-        "reported separately and kept out of the headline. See "
-        "docs/phase4-stage-d-points-composition-v1-development.md.",
+        "reported separately and kept out of the headline. DC is prospective-only (2025-26 data). "
+        "See docs/phase4-stage-d-points-composition-v2-development.md.",
     ]
     return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Run the Stage D v1 points-composition walk-forward (development-only)."
+        description="Run the Stage D v2 points-composition walk-forward (development-only)."
     )
     parser.add_argument("--db", type=Path, default=None)
     parser.add_argument("--season", action="append", dest="seasons", default=None)

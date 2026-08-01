@@ -6,10 +6,13 @@ component distributions.
 
 from __future__ import annotations
 
+import pytest
+
 from fpl.config import load_phase2_evaluation, load_scoring_rules
 from fpl.models.attacking_baselines import poisson_pmf as count_poisson_pmf
 from fpl.models.points_composition import (
     ComponentDistributions,
+    ExtraScoring,
     PointsLookup,
     compose_points_distribution,
     representative_minutes,
@@ -21,6 +24,15 @@ BINS = load_phase2_evaluation().output
 BIN_RANGES = tuple((b.minutes_min, b.minutes_max) for b in BINS.bins)
 BIN_MINUTES = representative_minutes(BIN_RANGES)
 LOOKUP = PointsLookup(RULES, bin_minutes=BIN_MINUTES)
+
+# The v2 extra-scoring bundle, resolved from the real 2026/27 rules (saves +1 per 3 GK-only; DC +2
+# for DEF/MID/FWD).
+EXTRA = ExtraScoring(
+    saves_unit=RULES.saves.unit,
+    dc_points=RULES.defensive_contribution.points,
+    saves_positions=RULES.saves.positions,
+    dc_positions=frozenset(RULES.defensive_contribution.thresholds),
+)
 
 # Bin indices for the frozen four-bin minutes shape.
 BIN_ZERO = 0
@@ -165,3 +177,162 @@ def test_negative_concede_points_fold_into_zero_bin() -> None:
     components = _components(Position.DEF, BIN_1_59, goals=0, assists=0, conceded=6)
     pmf = compose_points_distribution(components, LOOKUP, seed=1, draws=200)
     assert pmf[0] == 1.0
+
+
+# --------------------------------------------------------------------------------------
+# Stage D v2: saves + defensive contribution
+# --------------------------------------------------------------------------------------
+
+
+def _saves_one_hot(value: int) -> tuple[float, ...]:
+    masses = [0.0] * 11
+    masses[value] = 1.0
+    return tuple(masses)
+
+
+def test_v1_reproduced_bit_for_bit_when_saves_and_dc_absent() -> None:
+    # With saves=None and dc_hit_probability=0.0 (the defaults), the two extra uniforms are NOT
+    # drawn, so passing an ExtraScoring must not change the pmf: the v1 four-uniform stream is
+    # reproduced bit-for-bit.
+    components = ComponentDistributions(
+        position=Position.MID,
+        minutes=(0.1, 0.2, 0.3, 0.4),
+        goals=count_poisson_pmf(0.5),
+        assists=count_poisson_pmf(0.4),
+        team_goals_conceded=count_poisson_pmf(1.3),
+    )
+    without_extra = compose_points_distribution(components, LOOKUP, seed=202627, draws=1000)
+    with_extra = compose_points_distribution(
+        components, LOOKUP, seed=202627, draws=1000, extra=EXTRA
+    )
+    assert without_extra == with_extra
+
+
+def test_saves_add_points_only_for_goalkeepers() -> None:
+    # A degenerate 3-saves distribution: GK earns 3 // 3 = 1 save point on top of a 60+ clean sheet.
+    saves = _saves_one_hot(3)
+    gk = ComponentDistributions(
+        position=Position.GK,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        saves=saves,
+    )
+    # GK, 90', 0 conceded -> appearance 2 + GK clean sheet 4 + saves 1 = 7.
+    assert compose_points_distribution(gk, LOOKUP, seed=1, draws=200, extra=EXTRA)[7] == 1.0
+    # A MID handed the same saves distribution earns NO save points (saves are GK-only).
+    mid = ComponentDistributions(
+        position=Position.MID,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        saves=saves,
+    )
+    # MID, 90', 0 conceded -> appearance 2 + MID clean sheet 1 + saves 0 = 3.
+    assert compose_points_distribution(mid, LOOKUP, seed=1, draws=200, extra=EXTRA)[3] == 1.0
+
+
+def test_saves_points_are_integer_divided_by_the_unit() -> None:
+    # 8 saves -> 8 // 3 = 2 save points; GK 90', 0 conceded -> 2 + 4 + 2 = 8.
+    gk = ComponentDistributions(
+        position=Position.GK,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        saves=_saves_one_hot(8),
+    )
+    assert compose_points_distribution(gk, LOOKUP, seed=2, draws=200, extra=EXTRA)[8] == 1.0
+    # 2 saves -> 2 // 3 = 0 save points; GK 90', 0 conceded -> 2 + 4 + 0 = 6.
+    gk_low = ComponentDistributions(
+        position=Position.GK,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        saves=_saves_one_hot(2),
+    )
+    assert compose_points_distribution(gk_low, LOOKUP, seed=2, draws=200, extra=EXTRA)[6] == 1.0
+
+
+def test_gk_concede_penalty_nets_against_saves_on_the_total() -> None:
+    # GK, 90', 6 conceded -> appearance 2 + concede penalty (6//2)*-1 = -3, no clean sheet: base -1.
+    # With a certain 6 saves (6 // 3 = 2) the TOTAL is -1 + 2 = 1 -- proving the fold-to-zero is on
+    # the TOTAL, not on the (negative) base before saves are added.
+    gk = ComponentDistributions(
+        position=Position.GK,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(6),
+        saves=_saves_one_hot(6),
+    )
+    assert compose_points_distribution(gk, LOOKUP, seed=3, draws=200, extra=EXTRA)[1] == 1.0
+
+
+def test_dc_hit_adds_two_only_for_outfield_and_gated_by_probability() -> None:
+    # DEF, 90', 0 conceded, DC certain (p_hit = 1.0) -> appearance 2 + clean sheet 4 + DC 2 = 8.
+    defender = ComponentDistributions(
+        position=Position.DEF,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        saves=None,
+        dc_hit_probability=1.0,
+    )
+    assert compose_points_distribution(defender, LOOKUP, seed=4, draws=200, extra=EXTRA)[8] == 1.0
+    # p_hit = 0.0 -> DC never fires: back to 2 + 4 = 6.
+    no_dc = ComponentDistributions(
+        position=Position.DEF,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        saves=_saves_one_hot(0),
+        dc_hit_probability=0.0,
+    )
+    assert compose_points_distribution(no_dc, LOOKUP, seed=4, draws=200, extra=EXTRA)[6] == 1.0
+    # A GK with a certain DC hit earns NOTHING extra (GK is absent from the DC threshold map): the
+    # composer gates DC on dc_positions. GK 90', 0 conceded -> 2 + 4 = 6, no DC.
+    gk = ComponentDistributions(
+        position=Position.GK,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        saves=_saves_one_hot(0),
+        dc_hit_probability=1.0,
+    )
+    assert compose_points_distribution(gk, LOOKUP, seed=4, draws=200, extra=EXTRA)[6] == 1.0
+
+
+def test_extended_components_require_extra_scoring() -> None:
+    components = ComponentDistributions(
+        position=Position.GK,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        saves=_saves_one_hot(3),
+    )
+    with pytest.raises(ValueError, match="ExtraScoring"):
+        compose_points_distribution(components, LOOKUP, seed=1, draws=10)
+
+
+def test_dc_probability_is_respected_as_a_frequency() -> None:
+    # DEF, 90', 0 conceded, p_hit = 0.5 -> half the draws add DC (bin 8), half do not (bin 6).
+    defender = ComponentDistributions(
+        position=Position.DEF,
+        minutes=_minutes_one_hot(BIN_90),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(0),
+        dc_hit_probability=0.5,
+    )
+    pmf = compose_points_distribution(defender, LOOKUP, seed=99, draws=4000, extra=EXTRA)
+    assert abs(pmf[6] - 0.5) < 0.05
+    assert abs(pmf[8] - 0.5) < 0.05
+    assert abs(pmf[6] + pmf[8] - 1.0) < 1e-9
