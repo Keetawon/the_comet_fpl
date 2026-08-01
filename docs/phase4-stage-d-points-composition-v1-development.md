@@ -82,15 +82,43 @@ silently dropped or zeroed.
 
 ## Result
 
-<!-- RESULTS: filled from the single clean archive dev run; see the reconciliation JSON. -->
+_Single clean historical development run at commit `7357c45`, Monte-Carlo 2000 draws, points
+support 0..30. 181 folds (30/37/38/38/38 by season), 133,964 predictions, **0 Stage A join
+fallbacks** (every fixture matched a Stage A team prediction resolved through `team_code`). The
+reconciliation JSON is at `docs/results/phase4-stage-d-points-composition-v1-development.json`
+(schema `stage_d_points_composition_v1_development/v1`); an independent recompute reproduces the
+overall and headline mean log scores to 0.0 and the by-season / by-position prediction counts each
+sum to 133,964 exactly._
 
-_The single clean historical development run is recorded below. The reconciliation JSON is at
-`docs/results/phase4-stage-d-points-composition-v1-development.json` (schema
-`stage_d_points_composition_v1_development/v1`)._
+| slice | mean log | CRPS | PIT-80 | MAE | n |
+|---|---|---|---|---|---|
+| **overall (all seasons)** | 1.3106 | 0.5959 | 0.795 | 0.903 | 133,964 |
+| **headline (xG-present, excl 2021-22)** | 1.3019 | 0.5871 | 0.793 | 0.884 | 113,260 |
+| 2021-22 *(no-xG, excluded from headline)* | 1.3583 | 0.6437 | 0.800 | 1.005 | 20,704 |
+| 2022-23 | 1.3219 | 0.6092 | 0.794 | 0.923 | 26,505 |
+| 2023-24 | 1.2119 | 0.5549 | 0.798 | 0.854 | 29,725 |
+| 2024-25 | 1.2735 | 0.5863 | 0.795 | 0.883 | 27,283 |
+| 2025-26 | 1.4002 | 0.6006 | 0.782 | 0.879 | 29,747 |
+| FWD | 1.1104 | 0.6236 | 0.791 | 0.901 | 16,010 |
+| DEF | 1.1505 | 0.6332 | 0.799 | 1.017 | 44,678 |
+| MID | 1.2119 | 0.6077 | 0.790 | 0.885 | 58,386 |
+| GK | 2.3936 | 0.4079 | 0.797 | 0.629 | 14,890 |
 
-Headline (xG-present seasons, 2022-23…2025-26), all-seasons overall, per-season, by-position, and
-by-xG-regime figures are in the JSON. **Every figure is development-only and exploratory; it is not a
-promotion verdict and is not an upper bound.**
+**Reading — development-only, exploratory; not a promotion verdict and not an upper bound.**
+
+- First end-to-end reading, **no comparator in the run**. The composed points log score is on the
+  0..30 points support and is not comparable to any single component stage's own number.
+- **Outfield calibration is reasonable:** FWD/DEF/MID mean log 1.11–1.21 with PIT-80 0.790–0.799
+  against the nominal 0.80.
+- **Goalkeeper is badly miscalibrated (log 2.39), the single largest defect** — because **saves are
+  not modelled** (held at 0) yet dominate GK scoring. Its low CRPS/MAE (0.41 / 0.63) is the flip
+  side: GK points have little spread, so the distribution *shape* is wrong, not its mean. Fixing GK
+  needs a saves component, not a change to the composer.
+- **2025-26 is the worst season (1.40).** It is the DC-scoring season, and DC is held at 0 while the
+  realised label includes DC (and the other unmodelled saves / cards), widening the support gap
+  precisely where the 2026/27 rules added points.
+- **0 Stage A fallbacks** confirms the `team_code` join covered every fixture — the conceded side is
+  fully plumbed, no league-mean substitution was needed.
 
 ## How to reproduce
 
