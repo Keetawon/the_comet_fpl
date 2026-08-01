@@ -6,10 +6,31 @@
 # Stage C assists model code. A candidate cannot choose easier folds, populations, bin shapes,
 # baselines, metrics, or lift gates after seeing its results.
 
-contract_version: "1.0"
+contract_version: "1.1"
 phase: 3
 
-amendments: []
+amendments:
+  - version: "1.1"
+    date: "2026-08-01"
+    candidates_evaluated_before_amendment: 0
+    changed: >
+      additive_stage_c_assists_candidate_v1_pre_registration_only_no_population_roster_baseline_metric_or_gate_field_changed
+    reason: >
+      Pre-register Candidate V1 xa_informed_trailing_player_assists_v1: the v1.0 trailing-player
+      assist-rate baseline with its recent ASSISTS signal replaced by recent expected_assists (xA)
+      where xA is measured (per row, NULL filled by creativity rescaled to the assist-rate scale) and
+      the assist residual (assists minus xA) shrunk almost fully to the positional mean, falling back
+      to the exact v1.0 trailing-player baseline where xA is unmeasured. The per-appearance signal is
+      over trailing-5 APPEARED prior rows (minutes > 0) so availability never dilutes the rate (R6).
+      This block is additive: it changes no v1.0 population, target roster, baseline, metric, gate,
+      seed, or calibration field and is judged by the unchanged v1.0 promotion gate.
+    evidence: >
+      docs/research-adaptation.md (the attacking signal for DEF is xA not xG, persistence 0.784 vs
+      0.319; xA shares the goals-xG measured-coverage profile); docs/phase3-stage-c-assists-baseline-
+      development.md §7 (assists-minus-xA within-position persistence DEF +0.01 / MID +0.16 / FWD +0.19
+      / GK -0.07, modest, supports shrinking the assist residual almost fully to the positional mean);
+      config xa_signal_policy.fallback_signal creativity and stage_c_assists_candidate_v1.creativity_
+      rescale.
 
 target:
   entity: player
@@ -65,6 +86,45 @@ xa_signal_policy:
     - "2025-26"
   residual_persistence: shrink_almost_fully_to_positional_mean
   fallback_signal: creativity
+
+stage_c_assists_candidate_v1:
+  name: xa_informed_trailing_player_assists_v1
+  development_only: true
+  development_only_reason: archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design
+  grain: season_player_code_fixture
+  identity: stable_code
+  history_population: up_to_5_most_recent_prior_appeared_player_fixture_rows_minutes_gt_0
+  appeared_rows_filter: signal_window_is_trailing_5_appeared_prior_rows_minutes_gt_0_did_not_play_rows_excluded_R6
+  history_order: kickoff_time_then_season_then_fixture
+  history_window: 5
+  history_observed_results: "kickoff_time < as_of"
+  signal: expected_assists_where_measured_else_creativity_rescaled_to_assist_rate_scale_per_row
+  xa_handling: use_when_measured_per_row_null_is_unmeasured_filled_by_rescaled_creativity
+  positional_assist_mean: fold_local_mean_assists_per_appearance_at_target_position_equal_to_v1_positional_baseline
+  positional_xa_mean: fold_local_mean_expected_assists_per_appearance_over_xa_measured_appeared_prior_rows_at_target_position
+  creativity_rescale: fold_local_positional_factor_pos_assist_mean_over_mean_creativity_per_appearance
+  trailing_xa_shrinkage: "shrunk_xa_equals_(sum_xa_plus_alpha_times_pos_xa)_over_(n_plus_alpha)"
+  residual_policy: assist_residual_shrunk_almost_fully_to_positional_mean_keep_0.05
+  residual_term: "0.05_times_player_assist_residual_plus_0.95_times_positional_assist_residual"
+  rate: rate_equals_shrunk_xa_plus_residual_term_clamped_at_zero
+  fallback_to_v1: when_no_xa_measured_appeared_trailing_row_or_no_positional_xa_mean_rate_is_exact_v1_trailing_shrunk_assists_rate_over_all_rows_window
+  cold_start_fallback: when_no_prior_player_row_rate_is_positional_assist_mean_equal_to_v1_baseline
+  reduces_to_v1_baseline: when_all_trailing_xa_unmeasured_candidate_equals_v1_trailing_assist_baseline_bit_for_bit
+  alpha: 5.0
+  finishing_keep: 0.05
+  poisson_max_assists: 10
+  estimator: poisson_assist_count_distribution_over_0_to_10
+  additional_smoothing: none
+  scoring_floor_role: existing_1e-12_floor_is_scoring_only_not_model_smoothing
+  selected_parameter: none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward
+  fit_scope: positional_means_and_player_histories_recomputed_within_each_fold
+  target_label_policy: target_labels_never_enter_model_inputs
+  target_position_source: existing_unversioned_target_roster_proxy_current_position
+  null_policy: preserve_nulls_xa_creativity_null_means_unmeasured_never_zero_filled
+  zero_minutes_policy: zero_minute_prior_rows_excluded_from_appeared_signal_window_but_scored_as_targets
+  assistant_manager_policy: excluded_upstream_element_type_5
+  double_gameweek_policy: "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+  monte_carlo: out_of_scope_closed_form
 
 baselines:
   stage_c_attacking_assists:
