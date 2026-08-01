@@ -13,7 +13,7 @@ team mapping, duplicate grain, empty archive).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import duckdb
@@ -23,8 +23,9 @@ from fpl.config import load_phase2_evaluation
 from fpl.models.minutes_v1 import ShrunkTrailing5PlayerMinutesV1
 from fpl.storage.db import connect
 from fpl.types import Position
-from fpl.validate.minutes_baselines import MinuteBins, TargetRow
+from fpl.validate.minutes_baselines import HistoryRow, MinuteBins, TargetRow
 from fpl.validate.minutes_harness import (
+    _TARGET_COLUMNS,
     COHORT_NO_POSITIVE,
     COHORT_NO_PRIOR,
     COHORT_PRIOR_POSITIVE,
@@ -32,9 +33,11 @@ from fpl.validate.minutes_harness import (
     TRANSFER_NO_PRIOR,
     TRANSFER_SAME,
     MinutesFold,
+    _history_rows,
     assert_no_minutes_leakage,
     format_minutes_report,
     generate_minutes_folds,
+    player_fixture_history,
     run_minutes_fold,
     run_minutes_harness,
     team_code_map,
@@ -849,3 +852,262 @@ def test_candidate_inner_holdout_runs_with_enough_history() -> None:
     assert any(used)
     # Earlier folds (fewer than 14 prior observed gameweeks) use the frozen fallback instead.
     assert not all(used)
+
+
+# --------------------------------------------------------------------------------------
+# Knowledge-time feature sourcing (Phase 0b P0): the live union behind player_fixture_history
+# --------------------------------------------------------------------------------------
+#
+# player_fixture_history now sources through PointInTimeView.observed_player_fixtures: prior
+# seasons from the archive by kickoff_time < as_of, current season from the versioned live table
+# by the newest known_at <= as_of version per (season, code, fixture). These tests pin the three
+# guarantees the change must hold: (1) a historical backtest with no live rows is byte-identical
+# to the archive-only read, (2) live rows are gated by known_at and kickoff_time with no leak,
+# (3) a current-season fixture present only in the live table flows into the trailing window, and
+# (4) the minutes-not-null / zero-inclusion rule is mirrored for live rows.
+
+
+def _archive_only_history(con: duckdb.DuckDBPyConnection, *, as_of: datetime) -> list[HistoryRow]:
+    """The pre-P0 archive-only builder, retained as the bit-for-bit regression oracle.
+
+    Both this and the new ``player_fixture_history`` run the frame through ``_history_rows``, so
+    the comparison isolates the *sourcing* change (archive-only vs the live union) rather than any
+    row-building idiosyncrasy.
+    """
+    select = ", ".join((*_TARGET_COLUMNS, "minutes"))
+    frame = con.execute(
+        f"""
+        SELECT {select} FROM mart_fact_player_fixture
+        WHERE minutes IS NOT NULL AND kickoff_time < ?
+        ORDER BY kickoff_time, season, fixture, code
+        """,
+        [as_of],
+    ).pl()
+    return _history_rows(frame)
+
+
+def _create_live_table(con: duckdb.DuckDBPyConnection) -> None:
+    """The versioned live table with exactly the columns player_fixture_history reads."""
+    con.execute(
+        """
+        CREATE TABLE mart_fact_player_fixture_live (
+            season           VARCHAR,
+            gw               INTEGER,
+            fixture          INTEGER,
+            kickoff_time     TIMESTAMPTZ,
+            code             INTEGER,
+            position         VARCHAR,
+            team_id          INTEGER,
+            opponent_team_id INTEGER,
+            was_home         BOOLEAN,
+            minutes          INTEGER,
+            known_at         TIMESTAMPTZ,
+            capture_id       VARCHAR
+        )
+        """
+    )
+
+
+def _live(
+    *,
+    season: str,
+    gw: int,
+    fixture: int,
+    kickoff: datetime,
+    code: int,
+    minutes: int | None,
+    known_at: datetime,
+    capture_id: str,
+    position: Literal["GK", "DEF", "MID", "FWD"] = "DEF",
+    team_id: int = 1,
+    opponent_team_id: int = 2,
+    was_home: bool = True,
+) -> tuple[object, ...]:
+    return (
+        season,
+        gw,
+        fixture,
+        kickoff,
+        code,
+        position,
+        team_id,
+        opponent_team_id,
+        was_home,
+        minutes,
+        known_at,
+        capture_id,
+    )
+
+
+def _insert_live(con: duckdb.DuckDBPyConnection, rows: list[tuple[object, ...]]) -> None:
+    con.executemany(
+        """
+        INSERT INTO mart_fact_player_fixture_live (
+            season, gw, fixture, kickoff_time, code, position, team_id,
+            opponent_team_id, was_home, minutes, known_at, capture_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        rows,
+    )
+
+
+def test_history_is_archive_only_when_live_table_is_absent() -> None:
+    # Historical-backtest case: no live table exists, so the union is a provable no-op and the
+    # rows are byte-identical to the pre-P0 archive-only read.
+    con = _build_db(_two_season_rows(), _TEAM_MAP)
+    as_of = datetime(2024, 9, 6, 12, 0, tzinfo=UTC)  # after every 2024-25 GW5 kickoff
+    reference = _archive_only_history(con, as_of=as_of)
+    assert reference  # non-empty, so the equality below is not vacuous
+    assert player_fixture_history(con, as_of=as_of) == reference
+
+
+def test_history_is_archive_only_when_live_table_is_present_but_empty() -> None:
+    # Production historical state per the Phase 0b audit: the live table EXISTS with zero rows
+    # (daily captures load only roster/schedule; player-history populates it). Concatenating an
+    # empty frame must still be a no-op.
+    con = _build_db(_two_season_rows(), _TEAM_MAP)
+    _create_live_table(con)
+    as_of = datetime(2024, 9, 6, 12, 0, tzinfo=UTC)
+    reference = _archive_only_history(con, as_of=as_of)
+    assert reference
+    assert player_fixture_history(con, as_of=as_of) == reference
+
+
+def test_live_rows_enter_by_known_at_and_kickoff_boundary() -> None:
+    # Current-season (2026-27) history lives ONLY in the live table. Three completed fixtures:
+    #   A: captured (known_at <= as_of) and played (kickoff < as_of) -> INCLUDED.
+    #   B: played but captured AFTER as_of (known_at > as_of)       -> EXCLUDED (no leak).
+    #   C: captured but not yet played (kickoff >= as_of)           -> EXCLUDED by kickoff.
+    # Fixture A also carries a bitemporal revision: the newest known_at <= as_of version wins,
+    # so the minutes reflect the revision rather than the first capture.
+    con = _build_db([], _TEAM_MAP)
+    _create_live_table(con)
+    as_of = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
+    _insert_live(
+        con,
+        [
+            _live(
+                season="2026-27",
+                gw=1,
+                fixture=1,
+                kickoff=datetime(2026, 8, 15, 12, tzinfo=UTC),
+                code=1001,
+                minutes=80,
+                known_at=datetime(2026, 8, 16, tzinfo=UTC),
+                capture_id="c1",
+            ),
+            _live(
+                season="2026-27",
+                gw=1,
+                fixture=1,
+                kickoff=datetime(2026, 8, 15, 12, tzinfo=UTC),
+                code=1001,
+                minutes=82,
+                known_at=datetime(2026, 8, 19, tzinfo=UTC),
+                capture_id="c2",
+            ),
+            _live(
+                season="2026-27",
+                gw=2,
+                fixture=2,
+                kickoff=datetime(2026, 8, 17, 12, tzinfo=UTC),
+                code=1001,
+                minutes=70,
+                known_at=datetime(2026, 8, 25, tzinfo=UTC),
+                capture_id="c3",
+            ),
+            _live(
+                season="2026-27",
+                gw=3,
+                fixture=3,
+                kickoff=datetime(2026, 8, 22, 12, tzinfo=UTC),
+                code=1001,
+                minutes=60,
+                known_at=datetime(2026, 8, 19, tzinfo=UTC),
+                capture_id="c4",
+            ),
+        ],
+    )
+
+    by_fixture = {(r.season, r.fixture): r for r in player_fixture_history(con, as_of=as_of)}
+
+    # Only fixture A is eligible; its newest pre-as_of version (minutes=82) is selected.
+    assert set(by_fixture) == {("2026-27", 1)}
+    assert by_fixture[("2026-27", 1)].minutes == 82
+    # No returned row leaks a not-yet-captured or not-yet-played fixture, and the kickoff
+    # boundary still holds for every row.
+    assert ("2026-27", 2) not in by_fixture  # known_at leak guard
+    assert ("2026-27", 3) not in by_fixture  # kickoff boundary
+    assert all(row.kickoff_time < as_of for row in by_fixture.values())
+
+
+def test_live_only_completed_fixture_flows_into_trailing_history() -> None:
+    # A player whose entire current-season history exists ONLY in the live table (the archive
+    # holds no 2026-27 rows) must have those fixtures flow into the trailing window the model
+    # consumes. Six live fixtures; a trailing-5 takes the five most recent by kickoff.
+    con = _build_db([], _TEAM_MAP)
+    _create_live_table(con)
+    as_of = datetime(2026, 9, 20, 12, 0, tzinfo=UTC)
+    rows: list[tuple[object, ...]] = []
+    for gw in range(1, 7):
+        kickoff = datetime(2026, 7, 31, tzinfo=UTC) + timedelta(days=7 * gw)
+        rows.append(
+            _live(
+                season="2026-27",
+                gw=gw,
+                fixture=gw,
+                kickoff=kickoff,
+                code=2001,
+                minutes=90,
+                known_at=kickoff + timedelta(days=1),
+                capture_id=f"gw{gw}",
+            )
+        )
+    _insert_live(con, rows)
+
+    player = [r for r in player_fixture_history(con, as_of=as_of) if r.code == 2001]
+    # All six live-only fixtures flow into the returned history.
+    assert {(r.season, r.fixture) for r in player} == {("2026-27", gw) for gw in range(1, 7)}
+    # Returned in chronological order, so a downstream trailing-5 is the last five by kickoff.
+    kickoffs = [r.kickoff_time for r in player]
+    assert kickoffs == sorted(kickoffs)
+    assert {r.gw for r in player[-5:]} == {2, 3, 4, 5, 6}
+
+
+def test_live_zero_minute_rows_kept_and_null_minute_rows_dropped() -> None:
+    # The archive rule `minutes IS NOT NULL` keeps zero-minute rows (cold-start signal) and drops
+    # NULLs. The live union must mirror it exactly.
+    con = _build_db([], _TEAM_MAP)
+    _create_live_table(con)
+    as_of = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
+    _insert_live(
+        con,
+        [
+            _live(
+                season="2026-27",
+                gw=1,
+                fixture=1,
+                kickoff=datetime(2026, 8, 15, 12, tzinfo=UTC),
+                code=3001,
+                minutes=0,
+                known_at=datetime(2026, 8, 16, tzinfo=UTC),
+                capture_id="zero",
+            ),
+            _live(
+                season="2026-27",
+                gw=1,
+                fixture=2,
+                kickoff=datetime(2026, 8, 15, 14, tzinfo=UTC),
+                code=3001,
+                minutes=None,
+                known_at=datetime(2026, 8, 16, tzinfo=UTC),
+                capture_id="null",
+            ),
+        ],
+    )
+
+    by_fixture = {
+        (r.season, r.fixture): r.minutes for r in player_fixture_history(con, as_of=as_of)
+    }
+    assert by_fixture == {("2026-27", 1): 0}  # zero-minute kept, NULL-minute dropped
+    assert ("2026-27", 2) not in by_fixture

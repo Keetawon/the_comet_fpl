@@ -33,6 +33,7 @@ import duckdb
 import polars as pl
 
 from fpl.config import Phase2EvaluationConfig, load_phase2_evaluation
+from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.storage.db import connect
 from fpl.types import Position
 from fpl.validate.minutes_baselines import (
@@ -63,6 +64,11 @@ _TARGET_COLUMNS = (
     "opponent_team_id",
     "was_home",
 )
+
+# The chronological key every history frame is sorted on. The tuple is unique per player-fixture
+# (a shared season+fixture implies distinct codes), so the order is deterministic without relying
+# on sort stability -- which matters because the live union concatenates two sources.
+_HISTORY_ORDER = ("kickoff_time", "season", "fixture", "code")
 
 # transfer_status values: fold-local, PIT-safe comparisons against the most recent PRIOR row's club.
 TRANSFER_NO_PRIOR = "no_prior_player_fixture"
@@ -321,16 +327,18 @@ def player_fixture_history(con: duckdb.DuckDBPyConnection, *, as_of: datetime) -
     The single builder for a fold's (or a prospective run's) training history: prior eligible
     rows under the strict cutoff, with the minutes label. Shared by the walk-forward folds and
     the prospective minutes job so the two cannot drift on what "history" means.
+
+    Sourced through the point-in-time union (`PointInTimeView.observed_player_fixtures`): prior
+    seasons come from the archive by `kickoff_time < as_of`, and the current season comes from
+    the versioned live table as the newest `known_at <= as_of` version per `(season, code,
+    fixture)`. When the live table is absent or empty -- the historical-backtest case -- the
+    union is a no-op and the rows are byte-identical to the archive-only read. `as_of` must be
+    timezone-aware (enforced by `AsOf`), matching what both callers already pass.
     """
-    select = ", ".join((*_TARGET_COLUMNS, "minutes"))
-    frame = con.execute(
-        f"""
-        SELECT {select} FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND kickoff_time < ?
-        ORDER BY kickoff_time, season, fixture, code
-        """,
-        [as_of],
-    ).pl()
+    columns = (*_TARGET_COLUMNS, "minutes")
+    view = PointInTimeView(FeatureSource(con), AsOf(as_of))
+    frame = view.observed_player_fixtures(columns=columns)
+    frame = frame.filter(pl.col("minutes").is_not_null()).sort(_HISTORY_ORDER)
     return _history_rows(frame)
 
 
