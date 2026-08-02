@@ -283,7 +283,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
-| 3 | Stages C/D player events + simulation | attacking-goals baselines/harness and historical V1 xG-signal probe complete; production team-coupled Stage C and Stage D not implemented |
+| 3 | Stages C/D player events + simulation | attacking-goals baselines/harness and historical V1 xG-signal probe complete; Stage D composer (v1 core → v2 saves/DC → v3 full-points incl. bonus) and a prospective GW-horizon xP job are implemented and development-evaluated (development-only, none promoted); production team-coupled Stage C not implemented |
 | 3b | Stage E squad optimiser + `publish` static export | not started |
 | 4 | Dashboard v1 | not started |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
