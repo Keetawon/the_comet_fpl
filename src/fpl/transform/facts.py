@@ -48,6 +48,7 @@ _COMPONENT_COLUMNS: tuple[str, ...] = (
     "expected_goals_conceded",
     "threat",
     "creativity",
+    "influence",
     "defensive_contribution",
     "tackles",
     "recoveries",

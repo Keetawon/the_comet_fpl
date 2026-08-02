@@ -144,6 +144,7 @@ CREATE TABLE IF NOT EXISTS stg_player_fixture (
     -- They are also present for 2021-22, which has no xG at all.
     threat                          DOUBLE,
     creativity                      DOUBLE,
+    influence                       DOUBLE,
     defensive_contribution          INTEGER,
     tackles                         INTEGER,
     recoveries                      INTEGER,
@@ -263,6 +264,7 @@ CREATE TABLE IF NOT EXISTS stg_live_player_fixture_version (
     -- They are also present for 2021-22, which has no xG at all.
     threat                          DOUBLE,
     creativity                      DOUBLE,
+    influence                       DOUBLE,
     defensive_contribution          INTEGER,
     tackles                         INTEGER,
     recoveries                      INTEGER,
@@ -373,6 +375,7 @@ CREATE TABLE IF NOT EXISTS mart_fact_player_fixture (
     -- They are also present for 2021-22, which has no xG at all.
     threat                          DOUBLE,
     creativity                      DOUBLE,
+    influence                       DOUBLE,
     defensive_contribution          INTEGER,
     tackles                         INTEGER,
     recoveries                      INTEGER,
@@ -420,6 +423,7 @@ CREATE TABLE IF NOT EXISTS mart_fact_player_fixture_live (
     -- They are also present for 2021-22, which has no xG at all.
     threat                          DOUBLE,
     creativity                      DOUBLE,
+    influence                       DOUBLE,
     defensive_contribution          INTEGER,
     tackles                         INTEGER,
     recoveries                      INTEGER,
@@ -519,17 +523,25 @@ ALTER TABLE stg_player_fixture
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE stg_player_fixture
     ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE stg_player_fixture
+    ADD COLUMN IF NOT EXISTS influence DOUBLE;
 ALTER TABLE stg_live_player_fixture_version
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE stg_live_player_fixture_version
     ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE stg_live_player_fixture_version
+    ADD COLUMN IF NOT EXISTS influence DOUBLE;
 ALTER TABLE mart_fact_player_fixture
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE mart_fact_player_fixture
     ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE mart_fact_player_fixture
+    ADD COLUMN IF NOT EXISTS influence DOUBLE;
 ALTER TABLE mart_fact_player_fixture_live
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE mart_fact_player_fixture_live
     ADD COLUMN IF NOT EXISTS creativity DOUBLE;
+ALTER TABLE mart_fact_player_fixture_live
+    ADD COLUMN IF NOT EXISTS influence DOUBLE;
 ALTER TABLE mart_dim_team
     ADD COLUMN IF NOT EXISTS team_code INTEGER;

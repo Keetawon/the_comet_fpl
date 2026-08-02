@@ -80,6 +80,7 @@ OUTCOME_COLUMNS: Final[frozenset[str]] = frozenset(
         # Opta match indices, recorded post-hoc per fixture like the expected_* metrics.
         "threat",
         "creativity",
+        "influence",
         "defensive_contribution",
         "tackles",
         "recoveries",
