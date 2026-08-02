@@ -101,7 +101,44 @@ across the archive is **26**, so no realised observation is ever clamped.
 
 ## Result
 
-<!-- RESULTS_TABLE -->
+_Single clean provenance-guarded archive dev run: Monte-Carlo 2000 draws, full-points support
+0..34 (v2's 0..30 non-bonus plus up to 3 bonus, 1 headroom), 181 folds, 133,964 predictions,
+**0 Stage A join fallbacks**. Independent recompute reproduces the overall/headline mean log
+scores (diff < 1e-15) and the by-season / by-position prediction counts each sum to 133,964._
+
+| slice | mean log | CRPS | PIT-80 | MAE | n |
+|---|---|---|---|---|---|
+| **overall (all seasons)** | 1.0988 | 0.6511 | 0.808 | 0.998 | 133,964 |
+| **headline (xG-present, excl 2021-22)** | 1.0835 | 0.6409 | 0.807 | 0.978 | 113,260 |
+| 2021-22 *(no-xG, excluded from headline)* | 1.1824 | 0.7072 | 0.811 | 1.103 | 20,704 |
+| 2022-23 | 1.1374 | 0.6727 | 0.804 | 1.025 | 26,505 |
+| 2023-24 | 1.0386 | 0.6101 | 0.808 | 0.943 | 29,725 |
+| 2024-25 | 1.0941 | 0.6440 | 0.808 | 0.976 | 27,283 |
+| 2025-26 | 1.0706 | 0.6404 | 0.808 | 0.975 | 29,747 |
+| GK | 0.6967 | 0.4211 | 0.833 | 0.730 | 14,890 |
+| DEF | 1.0807 | 0.6757 | 0.816 | 1.102 | 44,678 |
+| MID | 1.1928 | 0.6644 | 0.797 | 0.967 | 58,386 |
+| FWD | 1.1806 | 0.7481 | 0.795 | 1.069 | 16,010 |
+
+**Reading — development-only, exploratory; not a promotion verdict.**
+
+- This is the FULL-points xP (appearance + goals + assists + clean sheet + conceded + saves + DC +
+  **bonus**), scored against realised full `total_points` (recomputed non-bonus, R1-safe, plus the
+  realised `bonus` component). It is **not like-for-like** with the v2 non-bonus number (1.0683
+  headline) — v2 scored non-bonus xP against non-bonus points; v3 adds bonus on both sides.
+- **Calibration holds with bonus added:** PIT-80 0.795–0.833 across slices against the nominal
+  0.80, so the joint match-level bonus simulation does not blow up the distribution.
+- **Goalkeeper stays the best-calibrated position** (log 0.6967, PIT-80 0.833) — saves + clean
+  sheet + bonus are all modelled, and GK points have low spread.
+- **Attackers (FWD 1.1806, MID 1.1928) carry the most residual** — high-variance returns plus the
+  bonus rank adding variance where it is hardest to place.
+- **0 Stage A fallbacks** confirms the `team_code` join covered every fixture.
+- Bonus is added by **joint per-fixture Monte-Carlo**: each world draws every player's components
+  once, computes both non-bonus points and BPS from that same draw, ranks the fixture, and awards
+  3/2/1 — so a player's own bonus is correlated with their own scoring, and only one player wins
+  the fixture's 3 in each world. The BPS exact part uses the drawn components; the hidden-Opta
+  residual (~3.5% of bonus) is a fold-local point-in-time Gaussian, unchanged from the standalone
+  BPS study. The v2 per-player non-bonus path is retained and reproduces bit-for-bit.
 
 ## How to reproduce
 

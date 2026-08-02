@@ -1,0 +1,266 @@
+{
+  "bonus_diagnostics": {
+    "expected_bonus_by_position": {
+      "DEF": 4514.665000000237,
+      "FWD": 1574.4595000000086,
+      "GK": 1549.7150000000076,
+      "MID": 4056.849000000308
+    },
+    "expected_bonus_total": 11695.6885,
+    "realised_bonus_by_position": {
+      "DEF": 3303.0,
+      "FWD": 2390.0,
+      "GK": 957.0,
+      "MID": 4968.0
+    },
+    "realised_bonus_total": 11618.0
+  },
+  "components": {
+    "assists": "xa_informed_trailing_player_assists_v1",
+    "bonus": "hybrid_bps_bonus_match_simulator (exact_bps + fold-local residual)",
+    "defensive_contribution": "trailing_dc_threshold_hit_bernoulli_v1",
+    "goals": "xg_informed_trailing_player_goals_v1",
+    "minutes": "concentration_adaptive_shrinkage_player_minutes_v3",
+    "saves": "gk_saves_poisson_from_team_conceded_v1",
+    "team_clean_sheet": "trailing_goals_attack_defence"
+  },
+  "harness": {
+    "by_position": {
+      "DEF": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 44678,
+        "exclusions": 0,
+        "mean_absolute_error": 1.1015906710237702,
+        "mean_crps": 0.675708524407986,
+        "mean_log_score": 1.0807205014408552,
+        "mean_log_score_standard_error": 0.008873107118981816,
+        "mean_poisson_deviance": 1.7971007633653444,
+        "pit_interval_80_absolute_error": 0.015815390124893636,
+        "pit_interval_80_coverage": 0.8158153901248937,
+        "predictions": 44678
+      },
+      "FWD": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 16010,
+        "exclusions": 0,
+        "mean_absolute_error": 1.0685818238600875,
+        "mean_crps": 0.7481018911305434,
+        "mean_log_score": 1.180596145395389,
+        "mean_log_score_standard_error": 0.01878560429509128,
+        "mean_poisson_deviance": 1.8595807114326808,
+        "pit_interval_80_absolute_error": 0.0049344159900063245,
+        "pit_interval_80_coverage": 0.7950655840099937,
+        "predictions": 16010
+      },
+      "GK": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 14890,
+        "exclusions": 0,
+        "mean_absolute_error": 0.7295913028878441,
+        "mean_crps": 0.42109460337474813,
+        "mean_log_score": 0.6967030145874579,
+        "mean_log_score_standard_error": 0.013358821587586384,
+        "mean_poisson_deviance": 1.0830346507003625,
+        "pit_interval_80_absolute_error": 0.03250503693754192,
+        "pit_interval_80_coverage": 0.832505036937542,
+        "predictions": 14890
+      },
+      "MID": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 58386,
+        "exclusions": 0,
+        "mean_absolute_error": 0.9668455794197239,
+        "mean_crps": 0.6643731181190696,
+        "mean_log_score": 1.1927522388309508,
+        "mean_log_score_standard_error": 0.008257526223056675,
+        "mean_poisson_deviance": 1.5530387681649152,
+        "pit_interval_80_absolute_error": 0.002891104031788494,
+        "pit_interval_80_coverage": 0.7971088959682116,
+        "predictions": 58386
+      }
+    },
+    "by_season": {
+      "2021-22": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 20704,
+        "exclusions": 0,
+        "mean_absolute_error": 1.1033642532843895,
+        "mean_crps": 0.7072471758718122,
+        "mean_log_score": 1.1824254135903731,
+        "mean_log_score_standard_error": 0.01552043220669125,
+        "mean_poisson_deviance": 1.855612651866924,
+        "pit_interval_80_absolute_error": 0.011340803709428138,
+        "pit_interval_80_coverage": 0.8113408037094282,
+        "predictions": 20704
+      },
+      "2022-23": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 26505,
+        "exclusions": 0,
+        "mean_absolute_error": 1.024751877004339,
+        "mean_crps": 0.6727173411903415,
+        "mean_log_score": 1.137369298595324,
+        "mean_log_score_standard_error": 0.012269082215805669,
+        "mean_poisson_deviance": 1.6457031730826297,
+        "pit_interval_80_absolute_error": 0.004150160347104248,
+        "pit_interval_80_coverage": 0.8041501603471043,
+        "predictions": 26505
+      },
+      "2023-24": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 29725,
+        "exclusions": 0,
+        "mean_absolute_error": 0.9425341631623213,
+        "mean_crps": 0.6100501043061396,
+        "mean_log_score": 1.038630062078779,
+        "mean_log_score_standard_error": 0.011406637520885471,
+        "mean_poisson_deviance": 1.5543423040819824,
+        "pit_interval_80_absolute_error": 0.008242220353237961,
+        "pit_interval_80_coverage": 0.808242220353238,
+        "predictions": 29725
+      },
+      "2024-25": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 27283,
+        "exclusions": 0,
+        "mean_absolute_error": 0.9755181798189348,
+        "mean_crps": 0.6439794909559067,
+        "mean_log_score": 1.0941219844681875,
+        "mean_log_score_standard_error": 0.011387099203688562,
+        "mean_poisson_deviance": 1.5571550141401866,
+        "pit_interval_80_absolute_error": 0.0075724810321444735,
+        "pit_interval_80_coverage": 0.8075724810321445,
+        "predictions": 27283
+      },
+      "2025-26": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 29747,
+        "exclusions": 0,
+        "mean_absolute_error": 0.974946414764514,
+        "mean_crps": 0.6403991592261404,
+        "mean_log_score": 1.0706490481381128,
+        "mean_log_score_standard_error": 0.010729434635316476,
+        "mean_poisson_deviance": 1.551087853438924,
+        "pit_interval_80_absolute_error": 0.007980636702860755,
+        "pit_interval_80_coverage": 0.8079806367028608,
+        "predictions": 29747
+      }
+    },
+    "by_xg_coverage_regime": {
+      "no_xg_2021_22": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 20704,
+        "exclusions": 0,
+        "mean_absolute_error": 1.1033642532843895,
+        "mean_crps": 0.7072471758718122,
+        "mean_log_score": 1.1824254135903731,
+        "mean_log_score_standard_error": 0.01552043220669125,
+        "mean_poisson_deviance": 1.855612651866924,
+        "pit_interval_80_absolute_error": 0.011340803709428138,
+        "pit_interval_80_coverage": 0.8113408037094282,
+        "predictions": 20704
+      },
+      "xg_present": {
+        "cold_starts_stage_a_fallback": 0,
+        "eligible_predictions": 113260,
+        "exclusions": 0,
+        "mean_absolute_error": 0.9782330037082818,
+        "mean_crps": 0.6408596037435987,
+        "mean_log_score": 1.0835138547745962,
+        "mean_log_score_standard_error": 0.0057167809548118636,
+        "mean_poisson_deviance": 1.5755452782838284,
+        "pit_interval_80_absolute_error": 0.007125198657955134,
+        "pit_interval_80_coverage": 0.8071251986579552,
+        "predictions": 113260
+      }
+    },
+    "fixtures": 1820,
+    "folds_by_season": {
+      "2021-22": 30,
+      "2022-23": 37,
+      "2023-24": 38,
+      "2024-25": 38,
+      "2025-26": 38
+    },
+    "folds_evaluated": 181,
+    "headline_xg_present": {
+      "cold_starts_stage_a_fallback": 0,
+      "eligible_predictions": 113260,
+      "exclusions": 0,
+      "mean_absolute_error": 0.9782330037082818,
+      "mean_crps": 0.6408596037435987,
+      "mean_log_score": 1.0835138547745962,
+      "mean_log_score_standard_error": 0.0057167809548118636,
+      "mean_poisson_deviance": 1.5755452782838284,
+      "pit_interval_80_absolute_error": 0.007125198657955134,
+      "pit_interval_80_coverage": 0.8071251986579552,
+      "predictions": 113260
+    },
+    "monte_carlo_draws": 2000,
+    "overall": {
+      "cold_starts_stage_a_fallback": 0,
+      "eligible_predictions": 133964,
+      "exclusions": 0,
+      "mean_absolute_error": 0.9975719111104475,
+      "mean_crps": 0.6511197355203636,
+      "mean_log_score": 1.098800535627078,
+      "mean_log_score_standard_error": 0.00539659750965267,
+      "mean_poisson_deviance": 1.6188294061291033,
+      "pit_interval_80_absolute_error": 0.0077916455167059695,
+      "pit_interval_80_coverage": 0.807791645516706,
+      "predictions": 133964
+    },
+    "points_support_max": 34,
+    "predictions": 133964,
+    "stage_a_fallbacks": 0
+  },
+  "historical_proxy_caveats": {
+    "archive_result_role": "development_diagnostic_only",
+    "no_xg_season_excluded_from_headline": "2021-22",
+    "not_a_like_for_like_delta_against_v2": "v2 scores non-bonus points; v3 scores full points incl. bonus",
+    "real_deadline_knowledge_time_validity": "unproven"
+  },
+  "limitations": {
+    "bonus_residual_proxy": "the BPS residual's influence/creativity correction reads the target row's realised ICT values (development-only, exactly as the standalone BPS study does); the player's own realised BPS/bonus for the predicted row is never a model input",
+    "cross_player_component_independence": "components are drawn independently ACROSS players; the ONLY joint coupling added by v3 is the within-match bonus rank. No team-goal-total conservation.",
+    "defensive_contribution": "prospective-only: DC data exists only for 2025-26, so p_hit is 0 for every earlier fold",
+    "negative_points": "folded into the 0 bin on the TOTAL, after saves, DC, and bonus",
+    "unmodelled_components": "penalties, own goals, cards not drawn (label still includes them)"
+  },
+  "model": "stage_d_points_composition_v3_full_points",
+  "provenance": {
+    "commit_sha": "91dd3f37e29805d782194ae8ad6295c5733c82c5",
+    "config_sha256": {
+      "phase2_evaluation.yaml": "1c57edc55e20083250c8c94c3718c21d6ee63ffa529d89be73c8bc7cf82b6082",
+      "phase3_evaluation.yaml": "9e2e22325bb44a64acdddc4d00bb4f7c06380194a98b32794ee220ccf1996be0",
+      "phase3_stage_c_assists_evaluation.yaml": "1953c815d3c21fcf81893f3ec9e84ddfac8c3e3a70c0e0cc9921ec25f236aafd",
+      "scoring_2026_27.yaml": "7aca188231a85339e1f57fe7e3b4dd93bb982e2fb6c1101e808bef8281e2241b"
+    },
+    "database_sha256": "7cadde8c1381e2a1fdbef4d6e64627f532e89a7e78eada51c42b27b791eb1a00",
+    "ended_at_utc": "2026-08-02T15:03:04Z",
+    "monte_carlo_draws": 2000,
+    "seed": 202627,
+    "source_sha256": {
+      "src/fpl/models/attacking_assists_v1.py": "f06865a03f7f1427d9c9e3aa73dca3bba09b6e2e7de24592870561e94d9d7bb3",
+      "src/fpl/models/attacking_v1.py": "11a0791cbfb61ef3b64214aa4db60ece330757e88a68bc0478486cb3ca4f3364",
+      "src/fpl/models/bps_bonus.py": "209b3d2b120187407e17b120beaebfd238fd707d56796c4b15790399f57afcdb",
+      "src/fpl/models/defensive_contribution_v1.py": "58d348ba01aba32f48575fb38dc01eef72765671bfdb7db030016b48ad5724b0",
+      "src/fpl/models/gk_saves_v1.py": "38e0d612a116a360f67fe797dd39e3219400d4002c01875543fde77edb892894",
+      "src/fpl/models/minutes_v3.py": "2777082c7931a9299657c1173ff96ebf4df91ed35a6e5b4c4b83b9b68c2a8170",
+      "src/fpl/models/points_composition.py": "8f6fb706764062915b4be66b552680b3e6457d8ee6295d42762d0b650e6debf2",
+      "src/fpl/validate/baselines.py": "4cdeed82f76bf6b72401197716e79d49927a9fbbc4f19a3126be534d6b2e6869",
+      "src/fpl/validate/points_harness.py": "e1f44ea8f34c2af03dc36ab8364b519fa656f1732b7d3b2fd8c3bbdee0f02eec",
+      "src/fpl/validate/points_harness_v3.py": "1caadca8b7e0e5fcdf8e4ba216a16f50f09206dc48cc8e49568735ae5bbe47f8"
+    },
+    "started_at_utc": "2026-08-02T14:32:16Z"
+  },
+  "schema": "stage_d_points_composition_v3_development/v1",
+  "scored_label": "full_points_incl_bonus (non-bonus under 2026/27 + realised bonus)",
+  "status": "development_only_exploratory_not_a_promotion_result",
+  "v2_component_diagnostics": {
+    "dc_folds_with_history": 37,
+    "dc_targets_with_positive_hit_probability": 24822,
+    "gk_save_rate_fold_local_max": 0.6833657587548638,
+    "gk_save_rate_fold_local_min": 0.667060212514758
+  }
+}
