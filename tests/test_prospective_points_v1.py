@@ -159,6 +159,7 @@ def _seed_history(con, *, players: list[tuple[int, str, int, int, bool]], n_gw: 
                     gw % 3,
                     20.0 + gw,
                     15.0 + gw,
+                    10.0 + gw,
                 )
             )
             key = (team, fixture)
@@ -172,8 +173,8 @@ def _seed_history(con, *, players: list[tuple[int, str, int, int, bool]], n_gw: 
         INSERT INTO mart_fact_player_fixture
             (season, gw, fixture, kickoff_time, code, position, team_id, opponent_team_id,
              was_home, minutes, goals_scored, assists, clean_sheets, goals_conceded, saves,
-             penalties_saved, bps, bonus, influence, creativity)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             penalties_saved, bps, bonus, influence, creativity, threat)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         pf_rows,
     )
@@ -328,6 +329,66 @@ def test_multi_gameweek_horizon_totals() -> None:
         # Totals are ranked descending by raw expected points.
         ordered = [t.expected_points for t in result.player_totals]
         assert ordered == sorted(ordered, reverse=True)
+    finally:
+        con.close()
+
+
+def test_team_coupled_v3_is_default_and_differs_from_independent_v1() -> None:
+    # A club with two attackers: the team-coupled path (V3, default) allocates the Stage A team
+    # total between them, so at least one player's distribution differs from the independent V1.
+    def run(attacking: str):
+        con = _basic_db(
+            players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 1), _player(13, 1003, 4, 2)],
+            fixtures=[_fixture(501, 1, 2)],
+            history=[
+                (1001, "MID", 1, 2, True),
+                (1002, "FWD", 1, 2, True),
+                (1003, "FWD", 2, 1, False),
+            ],
+        )
+        try:
+            return predict_prospective_points(
+                con,
+                as_of=AS_OF,
+                season="2026-27",
+                gw_from=1,
+                gw_to=1,
+                attacking=attacking,
+                db_path=None,
+                repo=None,
+            )
+        finally:
+            con.close()
+
+    v3 = run("v3")
+    v1 = run("v1")
+    assert v3.attacking_mode == "v3"
+    assert v1.attacking_mode == "v1"
+    # Default is the team-coupled path.
+    default = run("v3")
+    assert default.attacking_mode == "v3"
+    v3_pts = {r.code: r.expected_points for r in v3.records}
+    v1_pts = {r.code: r.expected_points for r in v1.records}
+    assert v3_pts.keys() == v1_pts.keys()
+    assert any(abs(v3_pts[c] - v1_pts[c]) > 1e-9 for c in v3_pts)
+    # Both modes still produce valid distributions.
+    for r in list(v3.records) + list(v1.records):
+        assert abs(sum(r.distribution) - 1.0) < 1e-9
+
+
+def test_rejects_unknown_attacking_mode() -> None:
+    con = _basic_db(
+        players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 2)],
+        fixtures=[_fixture(501, 1, 2)],
+        history=[(1001, "MID", 1, 2, True), (1002, "FWD", 2, 1, False)],
+    )
+    try:
+        import pytest
+
+        with pytest.raises(ValueError, match="attacking must be"):
+            predict_prospective_points(
+                con, as_of=AS_OF, season="2026-27", attacking="v2", db_path=None, repo=None
+            )
     finally:
         con.close()
 

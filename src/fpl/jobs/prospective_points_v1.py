@@ -4,15 +4,16 @@
     python -m fpl.jobs.prospective_points_v1 --gw-from 1 --gw-to 6  # extend the planning horizon
 
 This is the **prospective sibling** of the Stage D v3 walk-forward (`points_harness_v3`). It fits
-the identical best-development component suite (minutes V3, goals V1, assists V1, team
-goals-conceded from the promoted Stage A `trailing_goals_attack_defence`, GK saves V1, DC V1) plus
-the fold-local point-in-time BPS residual, all on the archive under the strict cutoff
-``kickoff_time < as_of``, then composes a per-player-fixture **full points** distribution (including
-bonus) for every fixture in the requested *future* gameweeks. It scores nothing -- those gameweeks
-have not been played -- and emits the distribution, its expected points, and an aggregate
-expected-points total per player across the horizon. The multi-gameweek horizon is the FPL
-transfer-planning use case: an extra transfer costs a -4 hit, so a squad is planned several
-gameweeks ahead against one *current-form* information set.
+the best-development component suite (minutes V3; the **team-coupled minutes-gated goals Candidate
+V3** by default, or the independent goals V1 via ``--attacking v1``; assists V1; team goals-conceded
+from the promoted Stage A `trailing_goals_attack_defence`; GK saves V1; DC V1) plus the fold-local
+point-in-time BPS residual, all on the archive under the strict cutoff ``kickoff_time < as_of``,
+then composes a per-player-fixture **full points** distribution (including bonus) for every fixture
+in the requested *future* gameweeks. It scores nothing -- those gameweeks have not been played --
+and emits the distribution, its expected points, and an aggregate expected-points total per player
+across the horizon. The multi-gameweek horizon is the FPL transfer-planning use case: an extra
+transfer costs a -4 hit, so a squad is planned several gameweeks ahead against one *current-form*
+information set.
 
 **Everything here is DEVELOPMENT-ONLY and NOT a validated production forecast.** Every component is
 an unpromoted development-stage estimator carrying the unversioned historical proxies of its stage,
@@ -25,9 +26,16 @@ Prospective-specific behaviour, all documented in the output record:
 
   * **Current-form / frozen horizon.** All trailing windows are frozen at ``as_of``; GW2..N reuse
     the same information set as GW1 (no in-season update) -- the correct forecast at one deadline.
-  * **Attacking side is fixture-blind.** Goals/assists are per-player Poisson rates with no opponent
-    coupling (a documented Stage C V1 limitation), so only the conceded / clean-sheet side varies by
-    opponent across the horizon. Team-coupled Stage C is a separate unbuilt candidate.
+  * **Goals are team-coupled and opponent-aware by default (Candidate V3).** The Stage A team-goal
+    expectation ``lambda_team`` (itself opponent/venue-modulated) is allocated among a club's
+    players by a minutes-gated trailing attacking share, conserving the team total -- so a player's
+    goals respond to the opponent across the horizon. Assists remain the independent Candidate V1
+    (per-player, fixture-blind); ``--attacking v1`` reverts goals to the independent V1 too.
+  * **Appearance at the season boundary is the dominant caveat.** Appearance probability comes from
+    the trailing-minutes model, whose window at the GW1 deadline is the END of the prior season; a
+    nailed starter rested in dead-rubber final fixtures reads as a rotation risk, suppressing his
+    appearance points AND (via the minutes gate) his goal share. The live ``status`` /
+    ``chance_of_playing`` signal is only the availability OVERLAY here, not an input to appearance.
   * **Promoted clubs get league-average team strength.** ``trailing_goals_attack_defence`` keys
     attack and defence on ``team_code``; a club with no archive history (a genuine cold-start
     promotion) falls back to the league-average multiplier (1.0), not the promoted prior. Flagged.
@@ -57,10 +65,24 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from fpl.config import config_dir, load_phase2_evaluation, load_scoring_rules, repo_root
+from fpl.config import (
+    config_dir,
+    load_phase2_evaluation,
+    load_phase3_evaluation,
+    load_scoring_rules,
+    repo_root,
+)
 from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.models.attacking_assists_baselines import AssistHistoryRow
-from fpl.models.attacking_baselines import PlayerHistoryRow, TargetRowProjection
+from fpl.models.attacking_baselines import (
+    PlayerHistoryRow,
+    TargetRowProjection,
+)
+from fpl.models.attacking_baselines import (
+    poisson_pmf as goal_poisson_pmf,
+)
+from fpl.models.attacking_v2 import _RosterEntry, mean_trailing_signal, season_signal_kind
+from fpl.models.attacking_v3 import allocate_minutes_gated_rates
 from fpl.models.bps_bonus import BpsSimConfig, fit_residual_model
 from fpl.models.defensive_contribution_v1 import DcHistoryRow
 from fpl.models.gk_saves_v1 import GkSavesHistoryRow
@@ -109,8 +131,10 @@ _DISCLAIMER = (
     "DEVELOPMENT-ONLY: prospective full-points xP composed from unpromoted development-stage "
     "components. NOT a validated production forecast; it claims no historical lift. Point-in-time "
     "safe (versioned registry + schedule, kickoff_time < as_of), but validity is established "
-    "prospectively as 2026/27 accrues, not here. Attacking side is fixture-blind; promoted clubs "
-    "use league-average team strength; no transfer rescaling; availability is a reported overlay."
+    "prospectively as 2026/27 accrues, not here. Goals are team-coupled/opponent-aware (V3 "
+    "default) but assists are not; appearance probability is trailing-minutes at the season "
+    "boundary (a nailed starter rested at season end reads as a rotation risk); promoted clubs use "
+    "league-average team strength; no transfer rescaling; availability is a reported overlay."
 )
 
 
@@ -251,6 +275,44 @@ def last_team_code(con: duckdb.DuckDBPyConnection, as_of: datetime) -> dict[int,
     return {int(r["code"]): int(r["team_code"]) for r in frame.iter_rows(named=True)}
 
 
+def appeared_attack_signals(
+    con: duckdb.DuckDBPyConnection, as_of: datetime, *, kind: str
+) -> tuple[dict[int, list[tuple[float, float | None, float | None]]], float]:
+    """Trailing attacking-signal history for the team-coupled (V3) goals allocation.
+
+    Returns ``{code: [(kickoff_epoch, expected_goals, threat), ...]}`` over APPEARED prior rows
+    (``minutes > 0``, ``kickoff_time < as_of``, chronological) and the pooled mean of the chosen
+    ``kind`` signal (the cold-start share fill). NULL signal values are preserved as ``None`` (never
+    zero-filled). Mirrors Candidate V3's appeared-signal construction so the share primitive is the
+    committed one.
+    """
+    frame = con.execute(
+        """
+        SELECT season, gw, fixture, kickoff_time, code, expected_goals, threat
+        FROM mart_fact_player_fixture
+        WHERE minutes IS NOT NULL AND minutes > 0 AND kickoff_time < ?
+        ORDER BY kickoff_time, season, fixture, code
+        """,
+        [as_of],
+    ).pl()
+    if not frame.is_empty():
+        frame = frame.sort(["kickoff_time", "season", "fixture", "code"], maintain_order=True)
+    appeared: dict[int, list[tuple[float, float | None, float | None]]] = {}
+    sig_sum = 0.0
+    sig_n = 0
+    for r in frame.iter_rows(named=True):
+        epoch = float(r["kickoff_time"].timestamp())
+        xg = None if r["expected_goals"] is None else float(r["expected_goals"])
+        threat = None if r["threat"] is None else float(r["threat"])
+        appeared.setdefault(int(r["code"]), []).append((epoch, xg, threat))
+        value = xg if kind == "expected_goals" else threat
+        if value is not None:
+            sig_sum += value
+            sig_n += 1
+    pos_signal_mean = (sig_sum / sig_n) if sig_n > 0 else 0.0
+    return appeared, pos_signal_mean
+
+
 def prospective_team_scored(
     con: duckdb.DuckDBPyConnection,
     *,
@@ -378,6 +440,8 @@ class ProspectivePointsResult:
     max_points: int
     roster_size: int
     fixture_count: int
+    attacking_mode: str
+    share_signal_kind: str
     freshness_cold_start: bool
     records: tuple[ProspectivePointsRecord, ...]
     player_totals: tuple[ProspectivePlayerTotal, ...]
@@ -394,6 +458,7 @@ def predict_prospective_points(
     season: str = DEFAULT_SEASON,
     gw_from: int = DEFAULT_GW_FROM,
     gw_to: int = DEFAULT_GW_TO,
+    attacking: str = "v3",
     suite: PointsComponentSuite | None = None,
     draws: int = DEFAULT_DRAWS,
     base_seed: int = BASE_SEED,
@@ -404,6 +469,8 @@ def predict_prospective_points(
     """Compose prospective full-points xP for ``season`` GW ``gw_from``..``gw_to`` at ``as_of``."""
     if gw_to < gw_from:
         raise ValueError(f"gw_to ({gw_to}) < gw_from ({gw_from})")
+    if attacking not in {"v1", "v3"}:
+        raise ValueError(f"attacking must be 'v1' or 'v3', got {attacking!r}")
     resolved_suite = suite or default_component_suite()
 
     # 0. Freshness gate: refuse to emit if the current season's most-recent-completed gameweek is
@@ -541,6 +608,23 @@ def predict_prospective_points(
     )
     league_conceded_dist = poisson_pmf(max(league_conceded, 1e-6))
 
+    # 3b. Team-coupled (V3) goals allocation inputs. `share_signal` is trailing xG where the frozen
+    #     Stage C contract covers the target season else threat (an all-season signal); a future
+    #     season not in the covered set uses threat, faithfully to `season_signal_kind`. Only built
+    #     for the coupled path.
+    share_window = 5
+    signal_kind = season_signal_kind(
+        season, frozenset(load_phase3_evaluation().xg_signal_policy.xg_covered_seasons)
+    )
+    signal_by_code: dict[int, float | None] = {}
+    pos_signal_mean = 0.0
+    if attacking == "v3":
+        appeared, pos_signal_mean = appeared_attack_signals(con, as_of, kind=signal_kind)
+        signal_by_code = {
+            code: mean_trailing_signal(rows, kind=signal_kind, window=share_window)
+            for code, rows in appeared.items()
+        }
+
     # 4. Assemble targets: registry players x their scheduled fixtures, grouped by fixture (the
     #    whole-fixture population is both teams -- exactly the bonus-ranking population).
     fixtures_by_team: dict[int, list[dict[str, Any]]] = defaultdict(list)
@@ -555,8 +639,13 @@ def predict_prospective_points(
             }
         )
 
+    # A pending target carries every component EXCEPT goals, plus the V1 goals fallback and the
+    # coupling inputs (team_code, trailing share signal, appearance probability). The goals
+    # component is finalised per fixture in phase 5, because the team-coupled (V3) path allocates a
+    # whole club's Stage A team-goal total among its players and so cannot be decided one row at a
+    # time.
     @dataclass(frozen=True, slots=True)
-    class _Target:
+    class _Pending:
         code: int
         position: Position
         team_id: int
@@ -565,12 +654,22 @@ def predict_prospective_points(
         was_home: bool
         gw: int
         kickoff_time: datetime
-        player: FixturePlayer
+        minutes: tuple[float, float, float, float]
+        assists: Distribution
+        team_goals_conceded: Distribution
+        saves: Distribution
+        dc_hit_probability: float
+        residual_mean: float
+        residual_sigma: float
+        v1_goals: Distribution
+        signal: float
+        signal_cold_start: bool
+        p_play: float
         stage_a_league_average: bool
         cold_start: bool
         transferred: bool
 
-    by_fixture: dict[int, list[_Target]] = defaultdict(list)
+    by_fixture: dict[int, list[_Pending]] = defaultdict(list)
     for index in range(len(reg_codes)):
         code = int(reg_codes[index])
         position = Position(str(reg_positions[index]))
@@ -581,6 +680,9 @@ def predict_prospective_points(
             (not cold_start) and team_code is not None and last_team.get(code) != team_code
         )
         influence, creativity = trailing.get(code, (0.0, 0.0))
+        raw_signal = signal_by_code.get(code)
+        signal_cold_start = raw_signal is None
+        signal_value = pos_signal_mean if raw_signal is None else raw_signal
         for fx in fixtures_by_team.get(team_id, ()):
             fixture = fx["fixture"]
             opponent_team_id = fx["opponent_team_id"]
@@ -610,7 +712,7 @@ def predict_prospective_points(
                 was_home=was_home,
             )
             minutes_dist = minutes_model.predict(minutes_target)
-            goals_dist = goals_model.predict(stage_c_target)
+            v1_goals = goals_model.predict(stage_c_target)
             assists_dist = assists_model.predict(stage_c_target)
 
             opponent_code = team_map.get(opponent_team_id)
@@ -623,16 +725,6 @@ def predict_prospective_points(
             lambda_conceded = sum(i * mass for i, mass in enumerate(conceded_dist))
             saves_dist = saves_model.predict(position, lambda_conceded)
             dc_probability = dc_model.predict(code, position)
-
-            components = ComponentDistributions(
-                position=position,
-                minutes=minutes_dist,
-                goals=goals_dist,
-                assists=assists_dist,
-                team_goals_conceded=conceded_dist,
-                saves=saves_dist,
-                dc_hit_probability=dc_probability,
-            )
             residual_mean = _residual_prediction(
                 residual_model,
                 code=code,
@@ -640,8 +732,10 @@ def predict_prospective_points(
                 influence=influence,
                 creativity=creativity,
             )
+            # Appearance probability from the composer's own minutes component (P(minutes >= 1)).
+            p_play = max(0.0, min(1.0, 1.0 - minutes_dist[0]))
             by_fixture[fixture].append(
-                _Target(
+                _Pending(
                     code=code,
                     position=position,
                     team_id=team_id,
@@ -650,24 +744,75 @@ def predict_prospective_points(
                     was_home=was_home,
                     gw=gw,
                     kickoff_time=kickoff_ts,
-                    player=FixturePlayer(
-                        code=code,
-                        components=components,
-                        residual_mean=residual_mean,
-                        residual_sigma=residual_model.sigma(position.value),
-                    ),
+                    minutes=minutes_dist,
+                    assists=assists_dist,
+                    team_goals_conceded=conceded_dist,
+                    saves=saves_dist,
+                    dc_hit_probability=dc_probability,
+                    residual_mean=residual_mean,
+                    residual_sigma=residual_model.sigma(position.value),
+                    v1_goals=v1_goals,
+                    signal=signal_value,
+                    signal_cold_start=signal_cold_start,
+                    p_play=p_play,
                     stage_a_league_average=stage_a_league_average,
                     cold_start=cold_start,
                     transferred=transferred,
                 )
             )
 
+    def _fixture_goals(pending: list[_Pending], fixture: int) -> dict[int, Distribution]:
+        """Goals distribution per code for one fixture: team-coupled (V3) or independent (V1)."""
+        if attacking != "v3":
+            return {p.code: p.v1_goals for p in pending}
+        goals: dict[int, Distribution] = {}
+        by_team: dict[int, list[_Pending]] = defaultdict(list)
+        for p in pending:
+            if p.team_code is None:
+                goals[p.code] = p.v1_goals  # unresolved club -> fall back to the independent rate
+            else:
+                by_team[p.team_code].append(p)
+        for team_code, roster_pending in by_team.items():
+            own_scored = team_scored.get((fixture, team_code))
+            if own_scored is None:  # Stage A uninformative for this club -> independent fallback
+                for p in roster_pending:
+                    goals[p.code] = p.v1_goals
+                continue
+            lambda_team = sum(i * mass for i, mass in enumerate(own_scored))
+            roster = [_RosterEntry(p.code, p.signal, p.signal_cold_start) for p in roster_pending]
+            p_play_map = {p.code: p.p_play for p in roster_pending}
+            allocated = allocate_minutes_gated_rates(
+                roster, p_play_map, lambda_team, minutes_gating=True
+            )
+            for p in roster_pending:
+                rate, _path = allocated[p.code]
+                goals[p.code] = goal_poisson_pmf(rate)
+        return goals
+
     # 5. Joint per-fixture composition -> full-points distribution per player.
     records: list[ProspectivePointsRecord] = []
     for fixture in sorted(by_fixture):
         targets = by_fixture[fixture]
+        goals_by_code = _fixture_goals(targets, fixture)
+        players = [
+            FixturePlayer(
+                code=t.code,
+                components=ComponentDistributions(
+                    position=t.position,
+                    minutes=t.minutes,
+                    goals=goals_by_code[t.code],
+                    assists=t.assists,
+                    team_goals_conceded=t.team_goals_conceded,
+                    saves=t.saves,
+                    dc_hit_probability=t.dc_hit_probability,
+                ),
+                residual_mean=t.residual_mean,
+                residual_sigma=t.residual_sigma,
+            )
+            for t in targets
+        ]
         composed = compose_fixture_full_points(
-            [t.player for t in targets],
+            players,
             lookup,
             bps_lookup,
             extra,
@@ -753,12 +898,18 @@ def predict_prospective_points(
         max_points=max_points,
         roster_size=registry.height,
         fixture_count=fixture_count,
+        attacking_mode=attacking,
+        share_signal_kind=signal_kind if attacking == "v3" else "not_applicable",
         freshness_cold_start=freshness.cold_start,
         records=tuple(records),
         player_totals=player_totals,
         component_names={
             "minutes": resolved_suite.minutes_name,
-            "goals": resolved_suite.goals_name,
+            "goals": (
+                "minutes_gated_coupled_team_share_attacking_goals_v3 (team-coupled)"
+                if attacking == "v3"
+                else resolved_suite.goals_name
+            ),
             "assists": resolved_suite.assists_name,
             "team_clean_sheet": "trailing_goals_attack_defence",
             "saves": resolved_suite.saves_name,
@@ -788,6 +939,8 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             "roster_size": result.roster_size,
             "fixture_count": result.fixture_count,
             "row_count": len(result.records),
+            "attacking_mode": result.attacking_mode,
+            "share_signal_kind": result.share_signal_kind,
             "freshness_cold_start": result.freshness_cold_start,
             "commit_sha": result.commit_sha,
             "config_sha256": result.config_sha256,
@@ -846,6 +999,8 @@ def format_top_table(result: ProspectivePointsResult, *, top: int = 20) -> str:
         header,
         f"as_of={result.as_of.isoformat()}  roster={result.roster_size}  "
         f"fixtures={result.fixture_count}  rows={len(result.records)}  draws={result.draws}",
+        f"attacking={result.attacking_mode}"
+        + (f" (share signal: {result.share_signal_kind})" if result.attacking_mode == "v3" else ""),
         "",
         f"{'code':>7} {'pos':>3} {'tm':>3} {'gws':>3} {'xP':>7} {'xP_adj':>7} {'st':>3}  flags",
     ]
@@ -874,6 +1029,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--season", default=DEFAULT_SEASON)
     parser.add_argument("--gw-from", type=int, default=DEFAULT_GW_FROM)
     parser.add_argument("--gw-to", type=int, default=DEFAULT_GW_TO)
+    parser.add_argument(
+        "--attacking",
+        choices=("v1", "v3"),
+        default="v3",
+        help="attacking-goals component: v3 team-coupled (default) or v1 independent per-player",
+    )
     parser.add_argument("--draws", type=int, default=DEFAULT_DRAWS)
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument("--output", type=Path, default=None, help="write JSON record to this path")
@@ -892,6 +1053,7 @@ def main(argv: list[str] | None = None) -> int:
             season=args.season,
             gw_from=args.gw_from,
             gw_to=args.gw_to,
+            attacking=args.attacking,
             draws=args.draws,
             db_path=db_path,
             repo=repo,

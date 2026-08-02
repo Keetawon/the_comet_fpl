@@ -25,8 +25,8 @@ not re-optimised every week. GW1-5 is that planning window.
 |---|---|
 | team goals / clean sheet | promoted Stage A `trailing_goals_attack_defence`, predicted over the scheduled fixtures |
 | minutes (xMin) | Stage B Candidate V3 `concentration_adaptive_shrinkage_player_minutes_v3` |
-| attacking goals | Stage C Candidate V1 `xg_informed_trailing_player_goals_v1` |
-| assists | Stage C assists Candidate V1 `xa_informed_trailing_player_assists_v1` |
+| attacking goals | Stage C Candidate V3 `minutes_gated_coupled_team_share_attacking_goals_v3` (**team-coupled, default**); `--attacking v1` reverts to the independent V1 `xg_informed_trailing_player_goals_v1` |
+| assists | Stage C assists Candidate V1 `xa_informed_trailing_player_assists_v1` (independent, not yet team-coupled) |
 | GK saves | `gk_saves_v1` (Poisson on the fold-local point-in-time save rate) |
 | defensive contribution | `defensive_contribution_v1` (prospective P(≥ threshold)) |
 | bonus | hybrid BPS match simulator (`exact_bps` + fold-local point-in-time residual), joint per fixture |
@@ -52,10 +52,18 @@ not re-optimised every week. GW1-5 is that planning window.
 - **Current-form / frozen horizon.** All trailing windows are frozen at `as_of`; GW2..N reuse the
   GW1 information set (no in-season update). This is the correct forecast at one deadline, but it
   does not chase form within the window.
-- **The attacking side is fixture-blind.** Goals/assists are per-player Poisson rates with no
-  opponent coupling (a documented Stage C V1 limitation), so within the horizon only the conceded /
-  clean-sheet side varies by opponent. A striker against a weak defence in GW3 and a strong one in
-  GW1 gets the same attacking distribution. Team-coupled Stage C is a separate, unbuilt candidate.
+- **Goals are team-coupled and opponent-aware (default); assists are not.** By default goals use
+  Stage C Candidate V3: the Stage A team-goal expectation `lambda_team` (opponent/venue-modulated)
+  is allocated among a club's players by a minutes-gated trailing attacking share, conserving the
+  team total, so a striker's goal distribution responds to the opponent across the horizon.
+  **Assists remain the independent Candidate V1** (fixture-blind), and `--attacking v1` reverts
+  goals to the independent V1 too.
+- **Appearance at the season boundary is the dominant remaining ceiling.** Appearance probability
+  comes from the trailing-minutes model, whose window at the GW1 deadline is the *end of the prior
+  season*. A nailed starter rested in dead-rubber final fixtures reads as a rotation risk, which
+  suppresses both his appearance points and — through the minutes gate on the coupled goal share —
+  his goals. The live `status` / `chance_of_playing` signal is only the reported availability
+  overlay here, not yet an input to appearance, so it cannot rescue an available-but-rested starter.
 - **Promoted clubs get league-average team strength.** `trailing_goals_attack_defence` returns the
   league-average multiplier (1.0) for a `team_code` with no archive history, not the measured
   promoted prior. Flagged per record (`stage_a_league_average_team`).
@@ -80,36 +88,47 @@ Run at `as_of = 2026-08-21T17:30Z` (GW1 deadline), season `2026-27`, gameweeks 1
   A fit had ratings for, except the two genuine promotions (Coventry, Hull) which by construction
   take the league-average multiplier.
 
-### Horizon leaderboard (raw expected points, GW1-5)
+### Horizon leaderboard (raw expected points, GW1-5, team-coupled V3 default)
 
-| player | pos | team | fixtures | xP | xP (avail.) | status | flags |
+| player | pos | team | fixtures | xP | xP (avail.) | status | V1 rank |
 |---|---|---|---|---|---|---|---|
-| Virgil | DEF | LIV | 5 | 23.0 | 23.0 | a | |
-| B.Fernandes | MID | MUN | 5 | 22.6 | 22.6 | a | |
-| Mbeumo | MID | MUN | 5 | 21.1 | 21.1 | a | |
-| Tarkowski | DEF | EVE | 5 | 20.6 | 20.6 | a | |
-| Szoboszlai | MID | LIV | 5 | 19.9 | 19.9 | a | |
-| Pedro Porro | DEF | TOT | 5 | 19.9 | 19.9 | a | |
-| E.Le Fée | MID | SUN | 5 | 19.7 | 19.7 | a | |
-| Botman | DEF | NEW | 5 | 19.0 | 19.0 | a | |
-| Fernandes | MID | TOT | 5 | 18.2 | 18.2 | a | transfer |
-| Senesi | DEF | TOT | 5 | 18.2 | 18.2 | a | transfer |
+| Virgil | DEF | LIV | 5 | 27.0 | 27.0 | a | 1 |
+| Szoboszlai | MID | LIV | 5 | 26.0 | 26.0 | a | 5 |
+| B.Fernandes | MID | MUN | 5 | 25.3 | 25.3 | a | 2 |
+| Tarkowski | DEF | EVE | 5 | 25.2 | 25.2 | a | 4 |
+| E.Le Fée | MID | SUN | 5 | 21.8 | 21.8 | a | 7 |
+| Mac Allister | MID | LIV | 5 | 21.1 | 21.1 | a | 23 |
+| Maguire | DEF | MUN | 5 | 20.8 | 20.8 | a | 11 |
+| Watkins | FWD | AVL | 5 | 20.7 | 20.7 | a | 14 |
+| Pedro Porro | DEF | TOT | 5 | 20.7 | 20.7 | a | 6 |
+| Danso | DEF | TOT | 5 | 20.6 | 20.6 | a | 18 |
 
-Position leaders: **GK** Leno 17.1 · **DEF** Virgil 23.0 · **MID** B.Fernandes 22.6 ·
-**FWD** Watkins 17.9.
+The `V1 rank` column shows where the independent-goals V1 placed each player; the coupled path lifts
+LIV/MUN attackers on strong sides. `--attacking v1` reproduces the earlier independent-goals board
+(Virgil 23.0, B.Fernandes 22.6, Mbeumo 21.1, …).
 
 ## Reading — development-only
 
 - **The pipeline runs forward end to end.** A point-in-time-safe, availability-aware xP distribution
   is produced for every player across a five-gameweek planning horizon from a real 2026/27 roster and
   schedule. That is the deliverable.
-- **The leaderboard tilts toward defenders**, and the recognised attacking premiums (e.g. the top
-  strikers) do not top it. This is the known Stage C V1 limitation surfacing, not a bug: attacking
-  goals/assists are independent Poisson rates with no team-goal coupling, no opponent modulation, and
-  no set-piece / penalty weighting, while defenders additionally bank the 2026/27 defensive-
-  contribution points and clean-sheet points that *are* opponent-coupled. Per-fixture mean expected
-  points: DEF 1.40 > MID 1.36 > FWD 1.26 > GK 1.09. Closing this needs the team-coupled Stage C
-  candidate, not a change to the composer.
+- **Team-coupling (default V3) re-ranks mid-tier attackers correctly.** Switching goals from the
+  independent V1 to the team-coupled, opponent-aware V3 lifts nailed attackers in strong sides and
+  favourable fixtures — e.g. Szoboszlai (LIV) 19.9 → 26.0 (rank 5 → 2), Semenyo +75 places,
+  Mac Allister +17, Watkins 17.9 → 20.7 — because their goal share now scales with an
+  opponent-modulated `lambda_team`. The leaderboard still leans defensive, which is partly the
+  genuine 2026/27 rules (defensive-contribution + clean-sheet points are large and opponent-coupled)
+  and partly that assists remain uncoupled and the share signal for a not-yet-covered future season
+  is `threat`, not xG.
+- **The elite-striker suppression is an appearance defect, not an attacking one.** Haaland (8.8 xP
+  over five gameweeks, ~1.8/gw — below the 2-pt appearance floor) and Isak (3.1) sit far too low.
+  The cause is the trailing-minutes window at the deadline: Haaland's last six 2025-26 appearances
+  were `[0, 90, 0, 90, 90, 90]` (rested in dead rubbers) → the minutes model reads a 0.55 chance he
+  does *not* play, halving his appearance and gating his goal share; Isak's injury-hit tail gives
+  0.32. Nailed ever-presents (Virgil, Szoboszlai: `[90 × 6]`) score 0.91 and dominate. The fix is
+  to let the live availability signal inform appearance probability at the season boundary, rather
+  than reading it purely from end-of-prior-season minutes — a separate change from the goals
+  coupling, and the next ceiling to address.
 - **It is not a production forecast.** The historical proxies are unversioned, the components are
   unpromoted, and accuracy is established only as 2026/27 results accrue.
 
