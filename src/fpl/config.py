@@ -89,6 +89,101 @@ class BonusRules(_Frozen):
     ranked_points: tuple[int, int, int]
 
 
+class BpsUnitRule(_Frozen):
+    """A "N BPS per K events" rule inside the Bonus Points System (e.g. CBI: 1 per 3)."""
+
+    points: int
+    unit: int = Field(ge=1)
+
+
+class BpsCleanSheetRules(_Frozen):
+    """Clean-sheet BPS. GK and DEF only; MID/FWD earn no clean-sheet BPS (omit them)."""
+
+    points: dict[Position, int]
+
+    @field_validator("points")
+    @classmethod
+    def _only_gk_def(cls, value: dict[Position, int]) -> dict[Position, int]:
+        allowed = {Position.GK, Position.DEF}
+        if set(value) - allowed:
+            raise ValueError("clean-sheet BPS is awarded to GK and DEF only")
+        return value
+
+
+class BpsSource(_Frozen):
+    """One official Premier League source that confirms named BPS values.
+
+    Unlike :class:`AuthoritativeRuleSource`, a byte-level ``sha256`` capture is NOT required:
+    the official BPS pages returned HTTP 403 to the build environment's fetcher, so a
+    reproducible byte capture could not be taken here. ``capture_status`` records that gap
+    honestly rather than fabricating a hash. The host is still constrained to an official
+    Premier League domain, and ``confirmed`` names exactly which values the source backs.
+    """
+
+    source_id: str
+    title: str
+    url: str
+    published_on: date | None = None
+    confirmed: frozenset[str]
+    capture_status: Literal[
+        "byte_capture_unavailable_network_blocked_403",
+        "byte_captured",
+    ]
+    notes: str | None = None
+
+    @field_validator("url")
+    @classmethod
+    def _official_https_source(cls, value: str) -> str:
+        parsed = urlparse(value)
+        official_hosts = {"fantasy.premierleague.com", "www.premierleague.com"}
+        if parsed.scheme != "https" or parsed.hostname not in official_hosts:
+            raise ValueError("BPS source must be an official Premier League URL")
+        return value
+
+
+class BpsVerification(_Frozen):
+    """Provenance for the BPS block. Verified values are cited; gaps are named explicitly.
+
+    ``residual_gaps`` is the honest counterpart to the confirmed values: every BPS component
+    the hybrid simulator cannot compute exactly from the data (either because the value is not
+    byte-verifiable here, or because the required Opta input is absent) is listed so the
+    documented hidden-BPS gap is visible in config, not only in prose.
+    """
+
+    sources: list[BpsSource] = Field(default_factory=list)
+    residual_gaps: list[str] = Field(default_factory=list)
+
+    def confirmed_paths(self) -> frozenset[str]:
+        return frozenset(path for source in self.sources for path in source.confirmed)
+
+
+class BpsRules(_Frozen):
+    """The exactly-computable part of the 2026/27 Bonus Points System.
+
+    ONLY values verified against an official Premier League source live here. Every other BPS
+    component (minutes tiers, saves, cards, own goals, penalties missed, goals conceded, and all
+    hidden Opta metrics) is deliberately absent and is modelled by the empirical residual instead
+    -- see :class:`BpsVerification.residual_gaps`. This block is never consumed by
+    ``calculate_points``; it feeds the development-only BPS/bonus simulator.
+    """
+
+    goals: dict[Position, int]
+    penalty_goal: int
+    assists: int
+    clean_sheets: BpsCleanSheetRules
+    penalties_saved: int
+    clearances_blocks_interceptions: BpsUnitRule
+    verification: BpsVerification = Field(default_factory=BpsVerification)
+
+    @field_validator("goals")
+    @classmethod
+    def _all_positions_priced(cls, value: dict[Position, int]) -> dict[Position, int]:
+        missing = set(Position) - set(value)
+        if missing:
+            raise ValueError(f"BPS goals missing positions: {sorted(missing)}")
+        return value
+
+
 class AuthoritativeRuleSource(_Frozen):
     """One captured official source that confirms named scoring fields."""
 
@@ -166,6 +261,9 @@ class ScoringRules(_Frozen):
     red_cards: int
     defensive_contribution: DefensiveContributionRules
     bonus: BonusRules
+    # The exactly-computable BPS values, verified and cited. Optional and additive: rulesets
+    # without a bps block (e.g. 2025-26) load unchanged, and calculate_points never reads it.
+    bps: BpsRules | None = None
     verification: VerificationBlock = Field(default_factory=VerificationBlock)
 
     @field_validator("goals_scored")

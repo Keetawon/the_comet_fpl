@@ -69,6 +69,88 @@ bonus:
   mode: "passthrough"
   ranked_points: [3, 2, 1]
 
+# --------------------------------------------------------------------------------------
+# Bonus Points System (BPS) -- the EXACTLY-COMPUTABLE part only.
+#
+# BPS is an Opta-driven per-player score; bonus (3/2/1) goes to the top three BPS players in
+# each match. The full BPS formula depends on Opta inputs this repository does not hold (key
+# passes, big chances, crosses, pass-completion %, fouls, dribbles, CBI inside/outside split,
+# saves inside/outside box, big-chance saves), so it cannot be reconstructed exactly. An archive
+# measurement shows ~96% of awarded bonus goes to players with a goal/assist (75.5%) or a clean
+# sheet (20.9%) -- all computable here -- and only ~3.5% is pure hidden Opta.
+#
+# ONLY BPS values verified against an official Premier League source are recorded below. Every
+# other BPS component is modelled by the development-only hybrid simulator's empirical residual
+# and is named under verification.residual_gaps. calculate_points NEVER reads this block; it
+# feeds fpl.models.bps_bonus only.
+#
+# Values are the OFFICIAL 2026/27 BPS: goals GK/DEF 12, MID 18, FWD 24; assist 9; clean sheet
+# GK/DEF 12; penalty save 7 (dropped from 8 for 2026/27); CBI +1 per 3 (was per 2). Penalty
+# goal is a flat 12 in the BPS, but the archive carries no penalties-scored flag, so penalty
+# goals cannot be distinguished from open-play goals -- the delta folds into the residual.
+bps:
+  goals:
+    GK: 12
+    DEF: 12
+    MID: 18
+    FWD: 24
+  penalty_goal: 12
+  assists: 9
+  clean_sheets:
+    points:
+      GK: 12
+      DEF: 12
+  penalties_saved: 7
+  clearances_blocks_interceptions:
+    points: 1
+    unit: 3
+  verification:
+    sources:
+      - source_id: premier_league_bps_explainer
+        title: "How the FPL Bonus Points System works"
+        url: "https://www.premierleague.com/en/news/106533"
+        confirmed:
+          - goals.GK
+          - goals.DEF
+          - goals.MID
+          - goals.FWD
+          - penalty_goal
+          - assists
+          - clean_sheets.points.GK
+          - clean_sheets.points.DEF
+        capture_status: "byte_capture_unavailable_network_blocked_403"
+        notes: >
+          Official BPS explainer. States the base BPS values: goalkeepers and defenders 12,
+          midfielders 18 and forwards 24 for a goal; 9 for an assist; 12 for a GK/DEF clean
+          sheet; a flat 12 for a penalty goal. The page returned HTTP 403 to the build
+          environment's fetcher, so a reproducible sha256 byte capture could not be taken here;
+          the values are transcribed from the official source and recorded for later capture.
+      - source_id: premier_league_2026_27_bps_changes
+        title: "What's new in 2026/27 Fantasy: Changes to Bonus Points System"
+        url: "https://www.premierleague.com/en/news/4679946/whats-new-in-202627-fantasy-changes-to-bonus-points-system"
+        confirmed:
+          - penalties_saved
+          - clearances_blocks_interceptions.points
+          - clearances_blocks_interceptions.unit
+        capture_status: "byte_capture_unavailable_network_blocked_403"
+        notes: >
+          Official 2026/27 BPS-change article. Confirms: the penalty-save BPS drops from 8 to 7
+          (the goalkeeper earns the extra BPS back through a new big-chance-save metric this
+          repository cannot observe); CBI now scores +1 BPS per 3 actions (was per 2); the
+          tackle-penalty metric is removed; and the save inside/outside-box split is removed so
+          only inside-box saves score +1 BPS each. Because the data has neither the inside/outside
+          location nor the big-chance flag, saves are NOT uniform per recorded save and are folded
+          into the residual rather than guessed. Page returned HTTP 403 to the fetcher; no sha256.
+    # BPS components deliberately NOT in the exact part -- modelled by the empirical residual.
+    # Each is either not byte-verifiable here or requires an Opta input the data lacks.
+    residual_gaps:
+      - "minutes/appearance BPS tiers (not byte-verified here)"
+      - "saves BPS (inside/outside-box + big-chance split absent; not a uniform per-save value)"
+      - "yellow_cards, red_cards, own_goals, penalties_missed, goals_conceded BPS (not byte-verified here)"
+      - "penalty-goal vs open-play-goal delta (archive has no penalties-scored flag)"
+      - "clearances_blocks_interceptions before 2025-26 (unmeasured; NULL, never zero-filled)"
+      - "hidden Opta BPS: key passes, big chances, crosses, pass-completion %, fouls, dribbles, tackles-won, recoveries, errors, dispossessions, offsides (~3.5% of awarded bonus)"
+
 verification:
   payload_captured_at: "2026-07-27T01:46:09Z"
   payload_sha256: "79203f6828a610953c0508acc1687df558347d28c997652c14b8bf072a36ab30"
