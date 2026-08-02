@@ -1,0 +1,152 @@
+{
+  "by_position": {
+    "DEF": {
+      "bonus_correctly_assigned": 0.61562,
+      "fixtures": 1820,
+      "mean_log_score": 0.23876,
+      "mean_log_score_se": 0.00716,
+      "mean_rps": 0.08797,
+      "predictions": 18184,
+      "slice": "DEF",
+      "total_realised_bonus": 3303.0
+    },
+    "FWD": {
+      "bonus_correctly_assigned": 0.77375,
+      "fixtures": 1815,
+      "mean_log_score": 0.20943,
+      "mean_log_score_se": 0.00985,
+      "mean_rps": 0.08118,
+      "predictions": 6717,
+      "slice": "FWD",
+      "total_realised_bonus": 2390.0
+    },
+    "GK": {
+      "bonus_correctly_assigned": 0.643,
+      "fixtures": 1820,
+      "mean_log_score": 0.284,
+      "mean_log_score_se": 0.01818,
+      "mean_rps": 0.09696,
+      "predictions": 3686,
+      "slice": "GK",
+      "total_realised_bonus": 957.0
+    },
+    "MID": {
+      "bonus_correctly_assigned": 0.74182,
+      "fixtures": 1820,
+      "mean_log_score": 0.18354,
+      "mean_log_score_se": 0.00618,
+      "mean_rps": 0.06233,
+      "predictions": 25483,
+      "slice": "MID",
+      "total_realised_bonus": 4968.0
+    }
+  },
+  "by_season": {
+    "2021-22": {
+      "bonus_correctly_assigned": 0.70319,
+      "bonus_correctly_assigned_hard": 0.7015,
+      "exact_podium_rate": 0.14333,
+      "fixtures": 300,
+      "mean_log_score": 0.23317,
+      "mean_log_score_se": 0.01142,
+      "mean_rps": 0.08249,
+      "predictions": 8283,
+      "slice": "2021-22",
+      "top1_hit_rate": 0.69667,
+      "top3_overlap_rate": 0.77444,
+      "total_realised_bonus": 1933.0
+    },
+    "2022-23": {
+      "bonus_correctly_assigned": 0.70221,
+      "bonus_correctly_assigned_hard": 0.69922,
+      "exact_podium_rate": 0.18947,
+      "fixtures": 380,
+      "mean_log_score": 0.20853,
+      "mean_log_score_se": 0.00895,
+      "mean_rps": 0.07576,
+      "predictions": 11345,
+      "slice": "2022-23",
+      "top1_hit_rate": 0.71053,
+      "top3_overlap_rate": 0.77456,
+      "total_realised_bonus": 2437.0
+    },
+    "2023-24": {
+      "bonus_correctly_assigned": 0.71994,
+      "bonus_correctly_assigned_hard": 0.72821,
+      "exact_podium_rate": 0.20263,
+      "fixtures": 380,
+      "mean_log_score": 0.20599,
+      "mean_log_score_se": 0.00928,
+      "mean_rps": 0.07087,
+      "predictions": 11384,
+      "slice": "2023-24",
+      "top1_hit_rate": 0.73947,
+      "top3_overlap_rate": 0.78596,
+      "total_realised_bonus": 2432.0
+    },
+    "2024-25": {
+      "bonus_correctly_assigned": 0.71191,
+      "bonus_correctly_assigned_hard": 0.71803,
+      "exact_podium_rate": 0.18158,
+      "fixtures": 380,
+      "mean_log_score": 0.20376,
+      "mean_log_score_se": 0.00879,
+      "mean_rps": 0.07187,
+      "predictions": 11566,
+      "slice": "2024-25",
+      "top1_hit_rate": 0.68158,
+      "top3_overlap_rate": 0.78333,
+      "total_realised_bonus": 2401.0
+    },
+    "2025-26": {
+      "bonus_correctly_assigned": 0.68431,
+      "bonus_correctly_assigned_hard": 0.69482,
+      "exact_podium_rate": 0.14474,
+      "fixtures": 380,
+      "mean_log_score": 0.21524,
+      "mean_log_score_se": 0.00867,
+      "mean_rps": 0.07918,
+      "predictions": 11492,
+      "slice": "2025-26",
+      "top1_hit_rate": 0.70263,
+      "top3_overlap_rate": 0.75702,
+      "total_realised_bonus": 2415.0
+    }
+  },
+  "counts": {
+    "cold_starts": 827,
+    "fixtures": 1820,
+    "folds": 181,
+    "leakage_failures": 0,
+    "predictions": 54070
+  },
+  "deliverable": "phase4-bps-bonus-simulator",
+  "description": "Hybrid BPS/bonus match-simulator. Exact part from verified 2026/27 BPS values applied to recorded components + fold-local point-in-time empirical residual; per-fixture Monte-Carlo bonus ranking. Scored against realised bonus (0-3). Not integrated into the Stage D points composer.",
+  "hidden_opta_share_of_realised_bonus": 0.0353,
+  "overall": {
+    "bonus_correctly_assigned": 0.70437,
+    "bonus_correctly_assigned_hard": 0.70864,
+    "exact_podium_rate": 0.17363,
+    "fixtures": 1820,
+    "mean_log_score": 0.21218,
+    "mean_log_score_se": 0.00416,
+    "mean_rps": 0.07565,
+    "predictions": 54070,
+    "slice": "overall",
+    "top1_hit_rate": 0.70659,
+    "top3_overlap_rate": 0.77509,
+    "total_realised_bonus": 11618.0
+  },
+  "provenance": {
+    "commit_sha": "9668014ecae2960418dce4336f55deab5a70b00d",
+    "config_sha256": "7aca188231a85339e1f57fe7e3b4dd93bb982e2fb6c1101e808bef8281e2241b",
+    "database_sha256": "4778f16f8141d4523ed84aa67711421e157db5079dd19291851b6e6a30422839",
+    "ended_at_utc": "2026-08-02T12:20:27Z",
+    "model_source_sha256": "209b3d2b120187407e17b120beaebfd238fd707d56796c4b15790399f57afcdb",
+    "monte_carlo_draws": 500,
+    "seed": 202627,
+    "started_at_utc": "2026-08-02T12:20:06Z"
+  },
+  "reconciliation_failures": [],
+  "status": "DEVELOPMENT ONLY -- NOT A PROMOTION RESULT"
+}
