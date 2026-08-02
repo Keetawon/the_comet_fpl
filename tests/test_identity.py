@@ -251,30 +251,34 @@ def test_threat_and_creativity_are_present_in_every_season(
 
     `threat` is the closest available proxy for shot volume -- there is no shot count in any
     source available to this project -- and it out-persists xG at every outfield position.
+    `influence` is the third ICT index, wired through identically as an all-round (including
+    defensive) BPS proxy; it too is recorded every season.
     """
     rows = db.execute(
         """
-        SELECT season, count(*), count(threat), count(creativity)
+        SELECT season, count(*), count(threat), count(creativity), count(influence)
         FROM mart_fact_player_fixture GROUP BY season ORDER BY season
         """
     ).fetchall()
     assert len(rows) == 5
-    for season, total, threat, creativity in rows:
+    for season, total, threat, creativity, influence in rows:
         assert threat == total, f"{season}: threat missing on {total - threat} row(s)"
         assert creativity == total, f"{season}: creativity missing"
+        assert influence == total, f"{season}: influence missing on {total - influence} row(s)"
 
 
 def test_threat_is_not_a_disguised_zero_column(db: duckdb.DuckDBPyConnection) -> None:
     """The 2022-23 expected_* defect was a column of literal zeros. Check this is not one."""
     rows = db.execute(
         """
-        SELECT season, sum(threat), sum(creativity)
+        SELECT season, sum(threat), sum(creativity), sum(influence)
         FROM mart_fact_player_fixture GROUP BY season ORDER BY season
         """
     ).fetchall()
-    for season, threat_sum, creativity_sum in rows:
+    for season, threat_sum, creativity_sum, influence_sum in rows:
         assert threat_sum > 1000, f"{season}: threat sums to {threat_sum}, suspiciously low"
         assert creativity_sum > 1000, f"{season}: creativity sums to {creativity_sum}"
+        assert influence_sum > 1000, f"{season}: influence sums to {influence_sum}, too low"
 
 
 def test_opta_indices_are_components_not_points(db: duckdb.DuckDBPyConnection) -> None:

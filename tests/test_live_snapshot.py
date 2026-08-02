@@ -84,6 +84,9 @@ def _summary(*, minutes: int, bonus: int) -> dict[str, object]:
                 "goals_conceded": 0,
                 "bonus": bonus,
                 "bps": 24,
+                "threat": 55.0,
+                "creativity": 12.3,
+                "influence": 44.2,
                 "value": 75,
                 "selected": 1000,
                 "transfers_in": 5,
@@ -215,6 +218,98 @@ def test_point_in_time_uses_latest_version_known_at_as_of() -> None:
         assert before_known.is_empty()
         assert early["minutes"].to_list() == [60]
         assert late["minutes"].to_list() == [90]
+    finally:
+        con.close()
+
+
+def test_live_projection_carries_influence_and_preserves_null() -> None:
+    """`influence` flows through the element-summary projection exactly like threat/creativity.
+
+    When the ICT index is present it must land as its measured value; when the source omits it
+    the fact must stay NULL, never a silent zero (gotcha 5). Asserted on both the versioned
+    staging row and the live fact.
+    """
+    con = initialise(":memory:")
+    try:
+        # Present: `_summary` sets influence = 44.2 for element 10, fixture 501.
+        write_capture(
+            con,
+            _capture(minutes=90, bonus=2),  # type: ignore[arg-type]
+            season="2026-27",
+            gw=1,
+            mode="player-history",
+            captured_at=datetime(2026, 8, 23, 12, tzinfo=UTC),
+            capture_id="with-influence",
+        )
+        row = con.execute(
+            "SELECT influence FROM mart_fact_player_fixture_live "
+            "WHERE code = 10010 AND fixture = 501"
+        ).fetchone()
+        assert row is not None and row[0] == 44.2
+        staged = con.execute(
+            "SELECT influence FROM stg_live_player_fixture_version "
+            "WHERE fixture = 501 AND capture_id = 'with-influence'"
+        ).fetchone()
+        assert staged is not None and staged[0] == 44.2
+
+        # Absent: an element-summary history row without an `influence` key must stay NULL.
+        # Fixture 502 (player away, opponent = home team 2) must exist in the capture's own
+        # fixtures payload or the loader quarantines the history row.
+        fixtures_with_502 = [
+            {
+                "id": 502,
+                "code": 9002,
+                "event": 2,
+                "finished": True,
+                "kickoff_time": "2026-08-29T14:00:00Z",
+                "team_h": 2,
+                "team_a": 1,
+                "team_h_difficulty": 3,
+                "team_a_difficulty": 3,
+                "pulse_id": 7002,
+            }
+        ]
+        summary_without = {
+            "fixtures": [],
+            "history": [
+                {
+                    "element": 10,
+                    "fixture": 502,
+                    "opponent_team": 2,
+                    "total_points": 3,
+                    "was_home": False,
+                    "kickoff_time": "2026-08-29T14:00:00Z",
+                    "round": 2,
+                    "minutes": 90,
+                    "starts": 1,
+                    "bonus": 0,
+                    "bps": 10,
+                    "value": 75,
+                }
+            ],
+            "history_past": [],
+        }
+        capture_without = [
+            capture_payload("bootstrap-static", _bootstrap()),
+            capture_payload("fixtures", fixtures_with_502),
+            capture_payload("element-summary", summary_without, parameter="10"),
+        ]
+        write_capture(
+            con,
+            capture_without,  # type: ignore[arg-type]
+            season="2026-27",
+            gw=2,
+            mode="player-history",
+            captured_at=datetime(2026, 8, 30, 12, tzinfo=UTC),
+            capture_id="without-influence",
+        )
+        null_row = con.execute(
+            "SELECT count(*), count(influence) FROM mart_fact_player_fixture_live "
+            "WHERE code = 10010 AND fixture = 502"
+        ).fetchone()
+        assert null_row is not None
+        total, non_null = null_row
+        assert total == 1 and non_null == 0, "absent influence must be NULL, never zero-filled"
     finally:
         con.close()
 

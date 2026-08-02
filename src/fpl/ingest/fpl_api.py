@@ -182,6 +182,7 @@ class ElementHistory(_Payload):
     expected_goals_conceded: float | None = None
     threat: float | None = None
     creativity: float | None = None
+    influence: float | None = None
     defensive_contribution: int | None = None
     tackles: int | None = None
     recoveries: int | None = None
