@@ -29,8 +29,10 @@ Prospective-specific behaviour, all documented in the output record:
   * **Goals are team-coupled and opponent-aware by default (Candidate V3).** The Stage A team-goal
     expectation ``lambda_team`` (itself opponent/venue-modulated) is allocated among a club's
     players by a minutes-gated trailing attacking share, conserving the team total -- so a player's
-    goals respond to the opponent across the horizon. Assists remain the independent Candidate V1
-    (per-player, fixture-blind); ``--attacking v1`` reverts goals to the independent V1 too.
+    goals respond to the opponent across the horizon. The share signal is **xG in the xG era by
+    default** (``--share-signal auto``; FPL xG embeds penalty xG, so a clinical finisher / penalty
+    taker takes a larger, grounded share), overridable with ``--share-signal threat``. Assists
+    remain the independent Candidate V1 (per-player, fixture-blind); ``--attacking v1`` reverts.
   * **Season-boundary appearance correction (default).** The trailing-minutes window at a GW1
     deadline is the END of the prior season -- its least representative phase, since a nailed
     starter rested in dead-rubber final fixtures reads as a rotation risk. By default
@@ -398,6 +400,26 @@ def appeared_attack_signals(
     return appeared, pos_signal_mean
 
 
+def resolve_share_signal_kind(season: str, xg_covered: frozenset[str], mode: str) -> str:
+    """The team-share signal for the coupled goals path: ``expected_goals`` or ``threat``.
+
+    ``mode='xg'``/``'threat'`` force it. ``mode='auto'`` uses xG for an xG-era target season -- one
+    in the frozen ``xg_covered_seasons`` OR a future season after the latest covered one -- because
+    a future season's trailing rows come from xG-covered seasons and FPL ``expected_goals`` embeds
+    penalty xG, so an xG-share captures both chance quality and the penalty-taker premium (which the
+    archive cannot separate from open-play goals) on one scale. It falls back to the frozen
+    per-season rule (threat) only for a genuinely pre-xG season. Kept per season (never per player):
+    xG and threat are different scales and must not be mixed within one club roster.
+    """
+    if mode == "xg":
+        return "expected_goals"
+    if mode == "threat":
+        return "threat"
+    if season in xg_covered or (xg_covered and season > max(xg_covered)):
+        return "expected_goals"
+    return season_signal_kind(season, xg_covered)
+
+
 def prospective_team_scored(
     con: duckdb.DuckDBPyConnection,
     *,
@@ -546,6 +568,7 @@ def predict_prospective_points(
     gw_to: int = DEFAULT_GW_TO,
     attacking: str = "v3",
     appearance: str = "seasonal",
+    share_signal: str = "auto",
     suite: PointsComponentSuite | None = None,
     draws: int = DEFAULT_DRAWS,
     base_seed: int = BASE_SEED,
@@ -560,6 +583,8 @@ def predict_prospective_points(
         raise ValueError(f"attacking must be 'v1' or 'v3', got {attacking!r}")
     if appearance not in {"model", "seasonal"}:
         raise ValueError(f"appearance must be 'model' or 'seasonal', got {appearance!r}")
+    if share_signal not in {"auto", "xg", "threat"}:
+        raise ValueError(f"share_signal must be 'auto', 'xg', or 'threat', got {share_signal!r}")
     resolved_suite = suite or default_component_suite()
 
     # 0. Freshness gate: refuse to emit if the current season's most-recent-completed gameweek is
@@ -698,13 +723,15 @@ def predict_prospective_points(
     )
     league_conceded_dist = poisson_pmf(max(league_conceded, 1e-6))
 
-    # 3b. Team-coupled (V3) goals allocation inputs. `share_signal` is trailing xG where the frozen
-    #     Stage C contract covers the target season else threat (an all-season signal); a future
-    #     season not in the covered set uses threat, faithfully to `season_signal_kind`. Only built
-    #     for the coupled path.
+    # 3b. Team-coupled (V3) goals allocation inputs. The share signal (xG vs threat) is resolved per
+    #     season on one scale: `--share-signal auto` uses xG for an xG-era target (default), so a
+    #     clinical finisher / penalty taker takes a larger, grounded share (xG embeds penalty xG).
+    #     Only built for the coupled path.
     share_window = 5
-    signal_kind = season_signal_kind(
-        season, frozenset(load_phase3_evaluation().xg_signal_policy.xg_covered_seasons)
+    signal_kind = resolve_share_signal_kind(
+        season,
+        frozenset(load_phase3_evaluation().xg_signal_policy.xg_covered_seasons),
+        share_signal,
     )
     signal_by_code: dict[int, float | None] = {}
     pos_signal_mean = 0.0
@@ -1142,6 +1169,12 @@ def main(argv: list[str] | None = None) -> int:
         default="seasonal",
         help="appearance probability: seasonal season-boundary fix (default) or raw model minutes",
     )
+    parser.add_argument(
+        "--share-signal",
+        choices=("auto", "xg", "threat"),
+        default="auto",
+        help="team-coupled goal share signal: auto (xG in the xG era, default) / xg / threat",
+    )
     parser.add_argument("--draws", type=int, default=DEFAULT_DRAWS)
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument("--output", type=Path, default=None, help="write JSON record to this path")
@@ -1162,6 +1195,7 @@ def main(argv: list[str] | None = None) -> int:
             gw_to=args.gw_to,
             attacking=args.attacking,
             appearance=args.appearance,
+            share_signal=args.share_signal,
             draws=args.draws,
             db_path=db_path,
             repo=repo,

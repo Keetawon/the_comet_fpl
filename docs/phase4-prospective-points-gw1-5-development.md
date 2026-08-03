@@ -25,7 +25,7 @@ not re-optimised every week. GW1-5 is that planning window.
 |---|---|
 | team goals / clean sheet | promoted Stage A `trailing_goals_attack_defence`, predicted over the scheduled fixtures |
 | minutes (xMin) | Stage B Candidate V3 `concentration_adaptive_shrinkage_player_minutes_v3` |
-| attacking goals | Stage C Candidate V3 `minutes_gated_coupled_team_share_attacking_goals_v3` (**team-coupled, default**); `--attacking v1` reverts to the independent V1 `xg_informed_trailing_player_goals_v1` |
+| attacking goals | Stage C Candidate V3 `minutes_gated_coupled_team_share_attacking_goals_v3` (**team-coupled, default**), share signal xG in the xG era (`--share-signal auto`); `--attacking v1` reverts to the independent V1, `--share-signal threat` reverts the share signal |
 | assists | Stage C assists Candidate V1 `xa_informed_trailing_player_assists_v1` (independent, not yet team-coupled) |
 | GK saves | `gk_saves_v1` (Poisson on the fold-local point-in-time save rate) |
 | defensive contribution | `defensive_contribution_v1` (prospective P(≥ threshold)) |
@@ -138,6 +138,15 @@ rotation without inventing certainty for the genuinely uncertain:
   genuine 2026/27 rules (defensive-contribution + clean-sheet points are large and opponent-coupled)
   and partly that assists remain uncoupled and the share signal for a not-yet-covered future season
   is `threat`, not xG.
+- **xG-share (default in the xG era) allocates goals to true finishers, embedding the penalty
+  premium.** The team-coupled share signal is xG rather than threat for an xG-era target season
+  (`--share-signal auto`). Measured on the roster: designated penalty takers (`penalties_order = 1`)
+  gain +2.43pp of their club's goal share under xG vs threat (others −0.13pp) because FPL
+  `expected_goals` includes penalty xG — and the archive cannot separate penalty goals from
+  open-play, so xG-share is the *grounded* way to capture the penalty premium rather than an
+  unmeasurable explicit term. Effect on GW1-5: Haaland rank 21 → 5, Watkins → 2, Mbeumo 62 → 3,
+  Gyökeres 95 → 39, rebalancing the top toward finishers; Saka / Semenyo fall (lower xG — their
+  value is in assists, still uncoupled). Isak is unmoved (appearance-limited, not share-limited).
 - **The elite-striker suppression is an appearance defect, not an attacking one.** Haaland (8.8 xP
   over five gameweeks, ~1.8/gw — below the 2-pt appearance floor) and Isak (3.1) sit far too low.
   The cause is the trailing-minutes window at the deadline: Haaland's last six 2025-26 appearances

@@ -18,9 +18,12 @@ from fpl.jobs.prospective_points_v1 import (
     _expected_points,
     availability_multiplier,
     predict_prospective_points,
+    resolve_share_signal_kind,
     season_boundary_minutes,
 )
 from fpl.storage.db import initialise
+
+_XG_COVERED = frozenset({"2023-24", "2024-25", "2025-26"})
 
 AS_OF = GW1_2026_27_DEADLINE
 CAPTURE_ID = "cap-2026-08-02"
@@ -447,6 +450,53 @@ def test_appearance_seasonal_is_default_and_mode_is_validated() -> None:
         with pytest.raises(ValueError, match="appearance must be"):
             predict_prospective_points(
                 con, as_of=AS_OF, season="2026-27", appearance="nope", db_path=None, repo=None
+            )
+    finally:
+        con.close()
+
+
+def test_resolve_share_signal_kind() -> None:
+    # auto: a future season (after the latest covered) uses xG, as does a covered season.
+    assert resolve_share_signal_kind("2026-27", _XG_COVERED, "auto") == "expected_goals"
+    assert resolve_share_signal_kind("2024-25", _XG_COVERED, "auto") == "expected_goals"
+    # auto: a genuinely pre-xG season falls back to threat.
+    assert resolve_share_signal_kind("2021-22", _XG_COVERED, "auto") == "threat"
+    # forced modes ignore the season.
+    assert resolve_share_signal_kind("2026-27", _XG_COVERED, "threat") == "threat"
+    assert resolve_share_signal_kind("2021-22", _XG_COVERED, "xg") == "expected_goals"
+    # empty covered set: auto cannot claim an xG era, falls back to threat.
+    assert resolve_share_signal_kind("2026-27", frozenset(), "auto") == "threat"
+
+
+def test_share_signal_mode_is_validated_and_recorded() -> None:
+    con = _basic_db(
+        players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 2)],
+        fixtures=[_fixture(501, 1, 2)],
+        history=[(1001, "MID", 1, 2, True), (1002, "FWD", 2, 1, False)],
+    )
+    try:
+        # Default auto on a future season resolves to xG and is recorded.
+        default = predict_prospective_points(
+            con, as_of=AS_OF, season="2026-27", gw_from=1, gw_to=1, db_path=None, repo=None
+        )
+        assert default.share_signal_kind == "expected_goals"
+        threat = predict_prospective_points(
+            con,
+            as_of=AS_OF,
+            season="2026-27",
+            gw_from=1,
+            gw_to=1,
+            share_signal="threat",
+            db_path=None,
+            repo=None,
+        )
+        assert threat.share_signal_kind == "threat"
+
+        import pytest
+
+        with pytest.raises(ValueError, match="share_signal must be"):
+            predict_prospective_points(
+                con, as_of=AS_OF, season="2026-27", share_signal="bad", db_path=None, repo=None
             )
     finally:
         con.close()
