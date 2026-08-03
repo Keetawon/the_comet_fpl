@@ -18,6 +18,7 @@ from fpl.jobs.prospective_points_v1 import (
     _expected_points,
     availability_multiplier,
     predict_prospective_points,
+    resolve_assist_signal_kind,
     resolve_share_signal_kind,
     season_boundary_minutes,
 )
@@ -141,6 +142,7 @@ def _seed_history(con, *, players: list[tuple[int, str, int, int, bool]], n_gw: 
             minutes = 90 if gw % 2 == 0 else 60
             goals = 1 if (position in {"MID", "FWD"} and gw % 3 == 0) else 0
             assists = 1 if (position == "MID" and gw % 4 == 0) else 0
+            xa = {"MID": 0.30, "FWD": 0.10, "DEF": 0.15, "GK": 0.0}[position]
             pf_rows.append(
                 (
                     "2025-26",
@@ -164,6 +166,7 @@ def _seed_history(con, *, players: list[tuple[int, str, int, int, bool]], n_gw: 
                     20.0 + gw,
                     15.0 + gw,
                     10.0 + gw,
+                    xa,
                 )
             )
             key = (team, fixture)
@@ -177,8 +180,8 @@ def _seed_history(con, *, players: list[tuple[int, str, int, int, bool]], n_gw: 
         INSERT INTO mart_fact_player_fixture
             (season, gw, fixture, kickoff_time, code, position, team_id, opponent_team_id,
              was_home, minutes, goals_scored, assists, clean_sheets, goals_conceded, saves,
-             penalties_saved, bps, bonus, influence, creativity, threat)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             penalties_saved, bps, bonus, influence, creativity, threat, expected_assists)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         pf_rows,
     )
@@ -497,6 +500,71 @@ def test_share_signal_mode_is_validated_and_recorded() -> None:
         with pytest.raises(ValueError, match="share_signal must be"):
             predict_prospective_points(
                 con, as_of=AS_OF, season="2026-27", share_signal="bad", db_path=None, repo=None
+            )
+    finally:
+        con.close()
+
+
+def test_resolve_assist_signal_kind() -> None:
+    assert resolve_assist_signal_kind("2026-27", _XG_COVERED, "auto") == "expected_assists"
+    assert resolve_assist_signal_kind("2024-25", _XG_COVERED, "auto") == "expected_assists"
+    assert resolve_assist_signal_kind("2021-22", _XG_COVERED, "auto") == "creativity"
+    assert resolve_assist_signal_kind("2026-27", _XG_COVERED, "threat") == "creativity"
+    assert resolve_assist_signal_kind("2021-22", _XG_COVERED, "xg") == "expected_assists"
+    assert resolve_assist_signal_kind("2026-27", frozenset(), "auto") == "creativity"
+
+
+def test_assists_coupled_is_default_and_differs_from_v1() -> None:
+    # Two players of different xA on one club: the coupled path allocates the club's assisted-goal
+    # total by xA-share, so at least one player's distribution differs from independent V1.
+    def run(mode: str):
+        con = _basic_db(
+            players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 1), _player(13, 1003, 4, 2)],
+            fixtures=[_fixture(501, 1, 2)],
+            history=[
+                (1001, "MID", 1, 2, True),
+                (1002, "FWD", 1, 2, True),
+                (1003, "FWD", 2, 1, False),
+            ],
+        )
+        try:
+            return predict_prospective_points(
+                con,
+                as_of=AS_OF,
+                season="2026-27",
+                gw_from=1,
+                gw_to=1,
+                assists=mode,
+                db_path=None,
+                repo=None,
+            )
+        finally:
+            con.close()
+
+    coupled = run("coupled")
+    v1 = run("v1")
+    assert coupled.assists_mode == "coupled"
+    assert v1.assists_mode == "v1"
+    default = run("coupled")
+    assert default.assists_mode == "coupled"
+    c_pts = {r.code: r.expected_points for r in coupled.records}
+    v_pts = {r.code: r.expected_points for r in v1.records}
+    assert c_pts.keys() == v_pts.keys()
+    assert any(abs(c_pts[c] - v_pts[c]) > 1e-9 for c in c_pts)
+    for r in list(coupled.records) + list(v1.records):
+        assert abs(sum(r.distribution) - 1.0) < 1e-9
+
+    import pytest
+
+    con = _basic_db(
+        players=[_player(11, 1001, 3, 1)],
+        fixtures=[_fixture(501, 1, 2)],
+        history=[(1001, "MID", 1, 2, True)],
+    )
+    try:
+        with pytest.raises(ValueError, match="assists must be"):
+            predict_prospective_points(
+                con, as_of=AS_OF, season="2026-27", assists="nope", db_path=None, repo=None
             )
     finally:
         con.close()

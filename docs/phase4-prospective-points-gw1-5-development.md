@@ -26,7 +26,7 @@ not re-optimised every week. GW1-5 is that planning window.
 | team goals / clean sheet | promoted Stage A `trailing_goals_attack_defence`, predicted over the scheduled fixtures |
 | minutes (xMin) | Stage B Candidate V3 `concentration_adaptive_shrinkage_player_minutes_v3` |
 | attacking goals | Stage C Candidate V3 `minutes_gated_coupled_team_share_attacking_goals_v3` (**team-coupled, default**), share signal xG in the xG era (`--share-signal auto`); `--attacking v1` reverts to the independent V1, `--share-signal threat` reverts the share signal |
-| assists | Stage C assists Candidate V1 `xa_informed_trailing_player_assists_v1` (independent, not yet team-coupled) |
+| assists | **team-coupled by default**: the club's assisted-goal expectation (`lambda_team * measured assist_rate`, ~0.90) allocated by an xA-share (creativity pre-xG), minutes-gated; `--assists v1` reverts to the independent V1 `xa_informed_trailing_player_assists_v1` |
 | GK saves | `gk_saves_v1` (Poisson on the fold-local point-in-time save rate) |
 | defensive contribution | `defensive_contribution_v1` (prospective P(≥ threshold)) |
 | bonus | hybrid BPS match simulator (`exact_bps` + fold-local point-in-time residual), joint per fixture |
@@ -138,6 +138,14 @@ rotation without inventing certainty for the genuinely uncertain:
   genuine 2026/27 rules (defensive-contribution + clean-sheet points are large and opponent-coupled)
   and partly that assists remain uncoupled and the share signal for a not-yet-covered future season
   is `threat`, not xG.
+- **Assists are team-coupled by default, lifting genuine creators honestly.** An assist requires a
+  team goal, so the club's assisted-goal expectation is `lambda_team * assist_rate` (measured
+  `sum(assists)/sum(goals)` ~0.90, stable 0.89-0.94 across seasons) allocated by an xA-share
+  (creativity pre-xG), minutes-gated and conserving — the exact mirror of the goals coupling.
+  Effect on GW1-5: assist-dependent premiums rise on their own merit — B.Fernandes rank 10 → 6
+  (MUN's dominant creator: xA 0.36 vs the roster's next 0.17), Szoboszlai 4 → 1, Saka 79 → 50,
+  Enzo 30 → 20. This is structural, not a nudge: a player's assist share is his measured xA-share of
+  a team total, and the effect on any individual is incidental to getting the structure right.
 - **xG-share (default in the xG era) allocates goals to true finishers, embedding the penalty
   premium.** The team-coupled share signal is xG rather than threat for an xG-era target season
   (`--share-signal auto`). Measured on the roster: designated penalty takers (`penalties_order = 1`)
