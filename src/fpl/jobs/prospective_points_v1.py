@@ -31,11 +31,15 @@ Prospective-specific behaviour, all documented in the output record:
     players by a minutes-gated trailing attacking share, conserving the team total -- so a player's
     goals respond to the opponent across the horizon. Assists remain the independent Candidate V1
     (per-player, fixture-blind); ``--attacking v1`` reverts goals to the independent V1 too.
-  * **Appearance at the season boundary is the dominant caveat.** Appearance probability comes from
-    the trailing-minutes model, whose window at the GW1 deadline is the END of the prior season; a
-    nailed starter rested in dead-rubber final fixtures reads as a rotation risk, suppressing his
-    appearance points AND (via the minutes gate) his goal share. The live ``status`` /
-    ``chance_of_playing`` signal is only the availability OVERLAY here, not an input to appearance.
+  * **Season-boundary appearance correction (default).** The trailing-minutes window at a GW1
+    deadline is the END of the prior season -- its least representative phase, since a nailed
+    starter rested in dead-rubber final fixtures reads as a rotation risk. By default
+    (``--appearance seasonal``) an early-season target blends the model's recent appearance with the
+    player's full prior-season appearance rate (measured: the boundary-robust nailed-ness signal
+    predicts a next-season opener better than the last five rows), preserving the model's when-
+    playing minute shape; ``--appearance model`` uses the raw trailing distribution. Even so,
+    cross-season appearance is genuinely uncertain (measured MAE ~0.22; nailed-last-season players
+    average ~0.78 early next season), so this lifts rested starters without pretending to certainty.
   * **Promoted clubs get league-average team strength.** ``trailing_goals_attack_defence`` keys
     attack and defence on ``team_code``; a club with no archive history (a genuine cold-start
     promotion) falls back to the league-average multiplier (1.0), not the promoted prior. Flagged.
@@ -132,9 +136,10 @@ _DISCLAIMER = (
     "components. NOT a validated production forecast; it claims no historical lift. Point-in-time "
     "safe (versioned registry + schedule, kickoff_time < as_of), but validity is established "
     "prospectively as 2026/27 accrues, not here. Goals are team-coupled/opponent-aware (V3 "
-    "default) but assists are not; appearance probability is trailing-minutes at the season "
-    "boundary (a nailed starter rested at season end reads as a rotation risk); promoted clubs use "
-    "league-average team strength; no transfer rescaling; availability is a reported overlay."
+    "default) but assists are not; appearance uses a season-boundary correction (prior-season "
+    "nailed-ness blended in early season) yet cross-season appearance stays uncertain; promoted "
+    "clubs use league-average team strength; no transfer rescaling; availability is a reported "
+    "overlay."
 )
 
 
@@ -273,6 +278,86 @@ def last_team_code(con: duckdb.DuckDBPyConnection, as_of: datetime) -> dict[int,
         [as_of],
     ).pl()
     return {int(r["code"]): int(r["team_code"]) for r in frame.iter_rows(named=True)}
+
+
+# Minimum prior-season appearances for the long-window rate to be trusted over the model estimate.
+_MIN_PRIOR_SEASON_ROWS = 10
+
+
+def prior_season_appearance_rate(
+    con: duckdb.DuckDBPyConnection, as_of: datetime
+) -> dict[int, tuple[float, int]]:
+    """``code -> (appearance rate, n)`` over the player's most-recent completed season before as_of.
+
+    The season-boundary appearance fix. A prediction at a season-start deadline has a trailing
+    window that is the END of the prior season -- the least representative phase (measured: nailed
+    players fall from ~0.876 appearance in Aug-Nov to ~0.804 in May, dead-rubber rotation). The full
+    prior-season appearance rate ``P(minutes >= 1)`` is the boundary-robust nailed-ness signal
+    (measured: it predicts next-season GW1-6 appearance better than the last-five rows). Point in
+    time: only ``kickoff_time < as_of``; the "most recent season" is per ``code``.
+    """
+    frame = con.execute(
+        """
+        WITH elig AS (
+            SELECT code, season,
+                   CASE WHEN minutes >= 1 THEN 1.0 ELSE 0.0 END AS played
+            FROM mart_fact_player_fixture
+            WHERE minutes IS NOT NULL AND kickoff_time < ?
+        ),
+        latest AS (SELECT code, max(season) AS season FROM elig GROUP BY code)
+        SELECT e.code, avg(e.played) AS rate, count(*) AS n
+        FROM elig AS e
+        JOIN latest AS l ON l.code = e.code AND l.season = e.season
+        GROUP BY e.code
+        """,
+        [as_of],
+    ).pl()
+    return {int(r["code"]): (float(r["rate"]), int(r["n"])) for r in frame.iter_rows(named=True)}
+
+
+def _season_boundary_long_weight(month: int) -> float:
+    """Weight on the long (prior-season) appearance rate vs the recent model estimate, by month.
+
+    The trailing window only straddles the summer break for early-season targets, so the long-window
+    correction is applied there and fades to zero in-season (where the recent estimate is reliable).
+    Grounded in the measured phase effect (Aug-Nov fullest, May worst) and the measured blend that
+    best predicts a next-season opener (~0.7 long + 0.3 recent).
+    """
+    if month in (8, 9):
+        return 0.7
+    if month in (10, 11):
+        return 0.5
+    return 0.0
+
+
+def season_boundary_minutes(
+    minutes: tuple[float, float, float, float],
+    *,
+    prior_rate: float | None,
+    prior_n: int,
+    target_month: int,
+) -> tuple[float, float, float, float]:
+    """Reshape a 4-bin minutes distribution so appearance probability reflects nailed-ness at a
+    season boundary, preserving the model's conditional (when-playing) minute shape.
+
+    ``p_play`` is blended ``w * prior_rate + (1 - w) * recent`` (``w`` from
+    :func:`_season_boundary_long_weight`); the freed/added mass is redistributed across the playing
+    bins in the model's own proportions, so a nailed starter rested in dead rubbers regains his
+    appearance points AND his coupled goal share without inventing a minute shape. Availability is
+    NOT applied here (it stays the separate reported overlay, never double-counted).
+    """
+    p0, p1, p2, p3 = minutes
+    p_recent = 1.0 - p0
+    weight = _season_boundary_long_weight(target_month)
+    if prior_rate is None or prior_n < _MIN_PRIOR_SEASON_ROWS or weight <= 0.0:
+        return minutes
+    p_play = max(0.0, min(1.0, weight * prior_rate + (1.0 - weight) * p_recent))
+    play_model = p1 + p2 + p3
+    if play_model <= 1e-12:
+        # The model gives no when-playing shape; default a re-confirmed starter toward a full match.
+        return (1.0 - p_play, 0.0, p_play * 0.15, p_play * 0.85)
+    scale = p_play / play_model
+    return (1.0 - p_play, p1 * scale, p2 * scale, p3 * scale)
 
 
 def appeared_attack_signals(
@@ -442,6 +527,7 @@ class ProspectivePointsResult:
     fixture_count: int
     attacking_mode: str
     share_signal_kind: str
+    appearance_mode: str
     freshness_cold_start: bool
     records: tuple[ProspectivePointsRecord, ...]
     player_totals: tuple[ProspectivePlayerTotal, ...]
@@ -459,6 +545,7 @@ def predict_prospective_points(
     gw_from: int = DEFAULT_GW_FROM,
     gw_to: int = DEFAULT_GW_TO,
     attacking: str = "v3",
+    appearance: str = "seasonal",
     suite: PointsComponentSuite | None = None,
     draws: int = DEFAULT_DRAWS,
     base_seed: int = BASE_SEED,
@@ -471,6 +558,8 @@ def predict_prospective_points(
         raise ValueError(f"gw_to ({gw_to}) < gw_from ({gw_from})")
     if attacking not in {"v1", "v3"}:
         raise ValueError(f"attacking must be 'v1' or 'v3', got {attacking!r}")
+    if appearance not in {"model", "seasonal"}:
+        raise ValueError(f"appearance must be 'model' or 'seasonal', got {appearance!r}")
     resolved_suite = suite or default_component_suite()
 
     # 0. Freshness gate: refuse to emit if the current season's most-recent-completed gameweek is
@@ -515,6 +604,7 @@ def predict_prospective_points(
     trailing = trailing_ict(con, as_of)
     last_team = last_team_code(con, as_of)
     codes_with_history = set(last_team)
+    prior_appearance = prior_season_appearance_rate(con, as_of) if appearance == "seasonal" else {}
 
     # 2. Point-in-time component histories + fitted models (identical construction to the v3 fold).
     minutes_history = tuple(player_fixture_history(con, as_of=as_of))
@@ -712,6 +802,14 @@ def predict_prospective_points(
                 was_home=was_home,
             )
             minutes_dist = minutes_model.predict(minutes_target)
+            if appearance == "seasonal":
+                prior_rate, prior_n = prior_appearance.get(code, (None, 0))
+                minutes_dist = season_boundary_minutes(
+                    minutes_dist,
+                    prior_rate=prior_rate,
+                    prior_n=prior_n,
+                    target_month=kickoff_ts.month,
+                )
             v1_goals = goals_model.predict(stage_c_target)
             assists_dist = assists_model.predict(stage_c_target)
 
@@ -900,6 +998,7 @@ def predict_prospective_points(
         fixture_count=fixture_count,
         attacking_mode=attacking,
         share_signal_kind=signal_kind if attacking == "v3" else "not_applicable",
+        appearance_mode=appearance,
         freshness_cold_start=freshness.cold_start,
         records=tuple(records),
         player_totals=player_totals,
@@ -941,6 +1040,7 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             "row_count": len(result.records),
             "attacking_mode": result.attacking_mode,
             "share_signal_kind": result.share_signal_kind,
+            "appearance_mode": result.appearance_mode,
             "freshness_cold_start": result.freshness_cold_start,
             "commit_sha": result.commit_sha,
             "config_sha256": result.config_sha256,
@@ -1000,7 +1100,8 @@ def format_top_table(result: ProspectivePointsResult, *, top: int = 20) -> str:
         f"as_of={result.as_of.isoformat()}  roster={result.roster_size}  "
         f"fixtures={result.fixture_count}  rows={len(result.records)}  draws={result.draws}",
         f"attacking={result.attacking_mode}"
-        + (f" (share signal: {result.share_signal_kind})" if result.attacking_mode == "v3" else ""),
+        + (f" (share signal: {result.share_signal_kind})" if result.attacking_mode == "v3" else "")
+        + f"  appearance={result.appearance_mode}",
         "",
         f"{'code':>7} {'pos':>3} {'tm':>3} {'gws':>3} {'xP':>7} {'xP_adj':>7} {'st':>3}  flags",
     ]
@@ -1035,6 +1136,12 @@ def main(argv: list[str] | None = None) -> int:
         default="v3",
         help="attacking-goals component: v3 team-coupled (default) or v1 independent per-player",
     )
+    parser.add_argument(
+        "--appearance",
+        choices=("seasonal", "model"),
+        default="seasonal",
+        help="appearance probability: seasonal season-boundary fix (default) or raw model minutes",
+    )
     parser.add_argument("--draws", type=int, default=DEFAULT_DRAWS)
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument("--output", type=Path, default=None, help="write JSON record to this path")
@@ -1054,6 +1161,7 @@ def main(argv: list[str] | None = None) -> int:
             gw_from=args.gw_from,
             gw_to=args.gw_to,
             attacking=args.attacking,
+            appearance=args.appearance,
             draws=args.draws,
             db_path=db_path,
             repo=repo,

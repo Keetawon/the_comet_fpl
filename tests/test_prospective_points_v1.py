@@ -18,6 +18,7 @@ from fpl.jobs.prospective_points_v1 import (
     _expected_points,
     availability_multiplier,
     predict_prospective_points,
+    season_boundary_minutes,
 )
 from fpl.storage.db import initialise
 
@@ -388,6 +389,64 @@ def test_rejects_unknown_attacking_mode() -> None:
         with pytest.raises(ValueError, match="attacking must be"):
             predict_prospective_points(
                 con, as_of=AS_OF, season="2026-27", attacking="v2", db_path=None, repo=None
+            )
+    finally:
+        con.close()
+
+
+def test_season_boundary_minutes_lifts_rested_nailed_starter() -> None:
+    # Model says a 0.55 chance of not playing (rested in dead rubbers), but the player was nailed
+    # last season (0.92). At an August target the correction blends 0.7*long + 0.3*recent.
+    dist = (0.55, 0.05, 0.10, 0.30)
+    out = season_boundary_minutes(dist, prior_rate=0.92, prior_n=38, target_month=8)
+    assert abs(sum(out) - 1.0) < 1e-12
+    p_play = 1.0 - out[0]
+    assert abs(p_play - (0.7 * 0.92 + 0.3 * 0.45)) < 1e-9
+    # The when-playing minute shape (ratios among the playing bins) is preserved.
+    assert abs(out[3] / out[2] - dist[3] / dist[2]) < 1e-9
+    assert abs(out[2] / out[1] - dist[2] / dist[1]) < 1e-9
+
+
+def test_season_boundary_minutes_is_a_noop_off_boundary_or_without_history() -> None:
+    dist = (0.55, 0.05, 0.10, 0.30)
+    # In-season month: weight is zero, distribution unchanged.
+    assert season_boundary_minutes(dist, prior_rate=0.92, prior_n=38, target_month=1) == dist
+    # Too few prior-season rows to trust the long rate.
+    assert season_boundary_minutes(dist, prior_rate=0.92, prior_n=3, target_month=8) == dist
+    # No prior-season rate at all.
+    assert season_boundary_minutes(dist, prior_rate=None, prior_n=0, target_month=8) == dist
+
+
+def test_appearance_seasonal_is_default_and_mode_is_validated() -> None:
+    con = _basic_db(
+        players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 2)],
+        fixtures=[_fixture(501, 1, 2)],
+        history=[(1001, "MID", 1, 2, True), (1002, "FWD", 2, 1, False)],
+    )
+    try:
+        default = predict_prospective_points(
+            con, as_of=AS_OF, season="2026-27", gw_from=1, gw_to=1, db_path=None, repo=None
+        )
+        assert default.appearance_mode == "seasonal"
+        model = predict_prospective_points(
+            con,
+            as_of=AS_OF,
+            season="2026-27",
+            gw_from=1,
+            gw_to=1,
+            appearance="model",
+            db_path=None,
+            repo=None,
+        )
+        assert model.appearance_mode == "model"
+        for r in list(default.records) + list(model.records):
+            assert abs(sum(r.distribution) - 1.0) < 1e-9
+
+        import pytest
+
+        with pytest.raises(ValueError, match="appearance must be"):
+            predict_prospective_points(
+                con, as_of=AS_OF, season="2026-27", appearance="nope", db_path=None, repo=None
             )
     finally:
         con.close()

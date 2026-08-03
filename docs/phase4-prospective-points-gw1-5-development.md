@@ -58,12 +58,21 @@ not re-optimised every week. GW1-5 is that planning window.
   team total, so a striker's goal distribution responds to the opponent across the horizon.
   **Assists remain the independent Candidate V1** (fixture-blind), and `--attacking v1` reverts
   goals to the independent V1 too.
-- **Appearance at the season boundary is the dominant remaining ceiling.** Appearance probability
-  comes from the trailing-minutes model, whose window at the GW1 deadline is the *end of the prior
-  season*. A nailed starter rested in dead-rubber final fixtures reads as a rotation risk, which
-  suppresses both his appearance points and — through the minutes gate on the coupled goal share —
-  his goals. The live `status` / `chance_of_playing` signal is only the reported availability
-  overlay here, not yet an input to appearance, so it cannot rescue an available-but-rested starter.
+- **Season-boundary appearance correction (default `--appearance seasonal`).** The trailing-minutes
+  window at a GW1 deadline is the *end of the prior season* — its least representative phase: a
+  nailed starter rested in dead-rubber final fixtures reads as a rotation risk, suppressing both his
+  appearance points and, through the minutes gate on the coupled goal share, his goals. Measured on
+  the archive: nailed players fall from ~0.876 appearance in Aug-Nov to ~0.804 in May, and the full
+  prior-season appearance rate predicts a next-season opener better than the last five rows
+  (MAE 0.244 vs 0.252; a 0.7·long + 0.3·recent blend is best at 0.237). So for early-season targets
+  the layer blends the model's recent appearance probability with the player's full prior-season
+  appearance rate (weight 0.7 in Aug-Sep, 0.5 in Oct-Nov, 0 in-season), reshaping the minutes
+  distribution while preserving the model's when-playing minute shape. **This is not a source of
+  false certainty**: cross-season appearance is genuinely hard (MAE ~0.22; nailed-last-season
+  players average ~0.78 early next season, not ~0.88, because of transfers / injuries / lost spots),
+  so it lifts rested-but-nailed starters without pretending every "available" player starts. Live
+  `status` / `chance_of_playing` stays the separate reported overlay, never double-counted.
+  `--appearance model` uses the raw trailing distribution.
 - **Promoted clubs get league-average team strength.** `trailing_goals_attack_defence` returns the
   league-average multiplier (1.0) for a `team_code` with no archive history, not the measured
   promoted prior. Flagged per record (`stage_a_league_average_team`).
@@ -88,24 +97,33 @@ Run at `as_of = 2026-08-21T17:30Z` (GW1 deadline), season `2026-27`, gameweeks 1
   A fit had ratings for, except the two genuine promotions (Coventry, Hull) which by construction
   take the league-average multiplier.
 
-### Horizon leaderboard (raw expected points, GW1-5, team-coupled V3 default)
+### Horizon leaderboard (raw expected points, GW1-5, team-coupled V3 + seasonal appearance, defaults)
 
-| player | pos | team | fixtures | xP | xP (avail.) | status | V1 rank |
-|---|---|---|---|---|---|---|---|
-| Virgil | DEF | LIV | 5 | 27.0 | 27.0 | a | 1 |
-| Szoboszlai | MID | LIV | 5 | 26.0 | 26.0 | a | 5 |
-| B.Fernandes | MID | MUN | 5 | 25.3 | 25.3 | a | 2 |
-| Tarkowski | DEF | EVE | 5 | 25.2 | 25.2 | a | 4 |
-| E.Le Fée | MID | SUN | 5 | 21.8 | 21.8 | a | 7 |
-| Mac Allister | MID | LIV | 5 | 21.1 | 21.1 | a | 23 |
-| Maguire | DEF | MUN | 5 | 20.8 | 20.8 | a | 11 |
-| Watkins | FWD | AVL | 5 | 20.7 | 20.7 | a | 14 |
-| Pedro Porro | DEF | TOT | 5 | 20.7 | 20.7 | a | 6 |
-| Danso | DEF | TOT | 5 | 20.6 | 20.6 | a | 18 |
+| player | pos | team | xP | rank w/o appearance fix |
+|---|---|---|---|---|
+| Virgil | DEF | LIV | 28.2 | 1 |
+| Tarkowski | DEF | EVE | 26.3 | 4 |
+| Szoboszlai | MID | LIV | 25.5 | 2 |
+| B.Fernandes | MID | MUN | 24.6 | 3 |
+| Watkins | FWD | AVL | 23.3 | 8 |
+| Gibbs-White | MID | NFO | 22.1 | 44 |
+| E.Le Fée | MID | SUN | 21.8 | 5 |
+| O'Reilly | DEF | MCI | 21.8 | 115 |
+| Mac Allister | MID | LIV | 21.4 | 6 |
+| Groß | MID | BHA | 21.3 | 13 |
 
-The `V1 rank` column shows where the independent-goals V1 placed each player; the coupled path lifts
-LIV/MUN attackers on strong sides. `--attacking v1` reproduces the earlier independent-goals board
-(Virgil 23.0, B.Fernandes 22.6, Mbeumo 21.1, …).
+The last column is each player's rank under `--appearance model` (V3 goals, no season-boundary
+correction). The correction rescues nailed starters whose *trailing-five* window was end-of-season
+rotation without inventing certainty for the genuinely uncertain:
+
+| player | model rank / xP | seasonal rank / xP | reading |
+|---|---|---|---|
+| Haaland | 183 / 8.8 | 21 / 18.5 | rested in dead rubbers (`[0,90,0,90,90,90]`) → restored |
+| Ekitiké | 518 / 0.7 | 214 / 8.0 | low recent minutes → restored toward his prior-season level |
+| Saka | 126 / 11.4 | 55 / 15.9 | nailed, lifted |
+| Isak | 389 / 3.1 | 408 / 3.4 | genuinely injury-hit last season → correctly stays low |
+
+`--attacking v1 --appearance model` reproduces the original independent-goals, raw-minutes board.
 
 ## Reading — development-only
 
