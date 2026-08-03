@@ -106,6 +106,33 @@ pre-registered team-coupled candidate composing Stage A + Stage B**, which is no
 here. See `docs/phase3-stage-c-attacking-candidate-v1-development.md` and
 `docs/phase3-stage-c-design.md`.
 
+Stage C's team-coupled successors are now pre-registered and development-evaluated (both left as
+committed, not retuned). Candidate V2 (`coupled_team_share_attacking_goals_v2`, amendment 1.2)
+allocates the frozen Stage A team-goal expectation among a club's players by a trailing attacking
+share (Poisson thinning, `rate_i = lambda_team * share_i`) — **refuted**: worse than the baseline
+and than V1 on every metric (−6.75% log). Candidate V3
+(`minutes_gated_coupled_team_share_attacking_goals_v3`, amendment 1.3) gates V2's shares by the
+frozen Stage B `trailing_5_player_minutes` baseline and is the **best attacking candidate** (mean
+log 0.140500, +2.12% over the best baseline, passes all eight frozen gate diagnostics, improves in
+every season) but stays **development-only, not promoted** (unversioned proxies plus a development
+minutes proxy). See `docs/phase3-stage-c-attacking-candidate-v{2,3}-development.md`.
+
+Stage D (composition) and a prospective forecasting path are implemented and **development-only**.
+The composer (`models/points_composition.py`) draws the fitted component distributions and applies
+the 2026/27 rules by seeded Monte-Carlo: v1 (core five components), v2 (+ saves + DC), v3 (full
+points including bonus, via a joint per-fixture BPS simulation so own-scoring/own-bonus and the
+one-winner-per-fixture couplings are represented). The prospective job
+(`jobs/prospective_points_v1.py`) forecasts a full-points xP distribution per player over a future
+gameweek horizon (default GW1-5) from the versioned live registry + schedule: **goals are
+team-coupled Candidate V3 by default** (opponent-aware via `lambda_team`, minutes-gated;
+`--attacking v1` reverts to independent per-player), **appearance uses a season-boundary correction
+by default** (`--appearance seasonal`, blending prior-season nailed-ness in early season;
+`--appearance model` reverts), and live availability is a reported overlay never folded into the
+distribution. It is point-in-time safe but carries every stage's development caveats and is not a
+production forecast. Running it needs the live snapshots loaded (`jobs/load_snapshots`); the loaded
+bootstrap also carries prices (`now_cost`), penalty/set-piece order, per-player xG, and ownership,
+which the future optimiser and further attacking work can use. See `docs/phase4-*`.
+
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
 Do not describe the ruleset as fully validated while either remains under
@@ -292,6 +319,21 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   aggregate log lift and the per-season log gate in four seasons; CRPS regresses in 2021-22,
   2022-23, and 2025-26. Its 2-match prior-grid boundary was selected in 72 of 181 folds. This
   is diagnostic evidence for a new structural hypothesis, not permission to widen V2 post hoc.
+- **Appearance at a season boundary is measured-uncertain and the trailing window is its worst
+  phase.** For nailed players (season minutes >= 1800), appearance `P(min>=1)` is 0.876 in Aug-Nov
+  and only 0.804 in May (dead-rubber rotation); a prediction at a GW1 deadline whose trailing-five
+  window is those May rows underrates a nailed starter by ~7pp. The full prior-season appearance
+  rate predicts a next-season opener better than the last five rows (MAE 0.244 vs 0.252; a
+  0.7*long + 0.3*recent blend is best, 0.237). But do not over-trust it: a player nailed last
+  season (0.913) appears only **0.776** early next season on average — transfers, injuries, and lost
+  spots make cross-season appearance genuinely hard (MAE ~0.22 for every method). Lift rested-but-
+  nailed starters at the boundary; never treat "available" (`status`) as "starts".
+- **`rest_days` cannot see cup or European congestion.** The archive is Premier League only (380
+  fixtures per season, no competition field), and `rest_days` is the gap between a team's
+  consecutive PL fixtures — so a midweek FA Cup / League Cup / Champions/Europa fixture is invisible
+  and a truly-congested player reads as fully rested. No minutes model uses `rest_days` today, and
+  true congestion is not computable from this data without an external all-competitions fixture
+  feed. Month / phase-of-season is the only available congestion proxy.
 
 ## Priorities for upcoming work
 
@@ -400,9 +442,20 @@ Unless the user sets another priority, address prerequisites before model sophis
    **not retuned or rejudged**: the `poisson_pmf` zero-rate-floor audit correction is
    forward-looking, and the historical record stays pinned to its original commit SHA. The valid
    conclusion is narrow — xG beats recent goals where xG is measured on this archive — and
-   end-to-end Stage C is unvalidated. The next candidate must be **separately named and
-   pre-registered, team-coupled (composing Stage A team goals with Stage B minutes)**, and is not
-   pre-registered here; do not extend V1 into that role.
+   end-to-end Stage C is unvalidated. The team-coupled successors (Candidate V2 refuted, V3 the
+   best attacking candidate but development-only) are now pre-registered and evaluated under
+   amendments 1.2/1.3; both are left as committed and are not retuned. Do not extend V1 into that
+   role.
+8. The prospective forecasting path (`jobs/prospective_points_v1.py`) and Stage D composer are
+   development-only forward tooling, not gated candidates. Two tracks improve them: a
+   **prospective-forecast track** using live-snapshot fields (prices `now_cost`, penalty/set-piece
+   order, per-player xG, ownership) that improves the GW-horizon board directly with **no historical
+   gate** — highest-leverage next steps are a penalty/set-piece premium and xG-share (rather than
+   threat-share) in Stage C goals, and a price-informed starter prior in the appearance layer, all
+   measured before wiring; and a heavier **historical track** (new pre-registered Stage A/B/C
+   candidates) needed only to claim measured lift. The Stage E squad optimiser is not started; it
+   consumes this xP plus the live prices/ownership already loaded. Prospective changes must stay
+   point-in-time safe and must not silently re-run or re-judge any frozen historical evaluation.
 
 ## Sub-agent coordination and handoff
 
