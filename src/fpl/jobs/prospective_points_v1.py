@@ -39,12 +39,15 @@ Prospective-specific behaviour, all documented in the output record:
   * **Season-boundary appearance correction (default).** The trailing-minutes window at a GW1
     deadline is the END of the prior season -- its least representative phase, since a nailed
     starter rested in dead-rubber final fixtures reads as a rotation risk. By default
-    (``--appearance seasonal``) an early-season target blends the model's recent appearance with the
-    player's full prior-season appearance rate (measured: the boundary-robust nailed-ness signal
-    predicts a next-season opener better than the last five rows), preserving the model's when-
-    playing minute shape; ``--appearance model`` uses the raw trailing distribution. Even so,
-    cross-season appearance is genuinely uncertain (measured MAE ~0.22; nailed-last-season players
-    average ~0.78 early next season), so this lifts rested starters without pretending to certainty.
+    (``--appearance seasonal``) the recent appearance is the *equal-weighted* average of the last
+    five matches -- no recency weight, which would otherwise land hardest on the dead-rubber final
+    gameweek (measured: equal weighting predicts a next-season opener better than a recency-weighted
+    window, overall MAE 0.223 vs 0.234, goalkeepers 0.181 vs 0.195) -- then an early-season target
+    blends that with the player's full prior-season appearance rate (measured: the boundary-robust
+    nailed-ness signal predicts an opener better than any five-match window), preserving the when-
+    playing minute shape; ``--appearance model`` uses the raw recency-weighted model distribution.
+    Even so, cross-season appearance is genuinely uncertain (measured MAE ~0.22; nailed-last-season
+    players average ~0.78 early next season), so this lifts rested starters without false certainty.
   * **Promoted clubs get league-average team strength.** ``trailing_goals_attack_defence`` keys
     attack and defence on ``team_code``; a club with no archive history (a genuine cold-start
     promotion) falls back to the league-average multiplier (1.0), not the promoted prior. Flagged.
@@ -70,7 +73,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 
@@ -320,8 +323,58 @@ def prior_season_appearance_rate(
     return {int(r["code"]): (float(r["rate"]), int(r["n"])) for r in frame.iter_rows(named=True)}
 
 
+# Minimum trailing rows for the equal-weighted recent estimate to be used over the fitted model.
+_MIN_TRAILING5_ROWS = 3
+
+
+def trailing5_minute_bins(
+    con: duckdb.DuckDBPyConnection,
+    as_of: datetime,
+    bins: MinuteBins,
+    *,
+    window: int = 5,
+) -> dict[int, tuple[tuple[float, float, float, float], int]]:
+    """``code -> (equal-weighted minute-bin distribution, n)`` over the most recent ``window`` rows.
+
+    The recent appearance estimate as a *plain average of the last five matches* -- no recency
+    weight. Measured against three historical season boundaries, equal-weighting the trailing five
+    predicts next-season GW1-6 appearance strictly better than a recency-weighted window (overall
+    MAE 0.223 vs 0.234; goalkeepers 0.181 vs 0.195): at a season boundary the most recent match is
+    the dead-rubber final gameweek, where nailed starters are rested (measured: start rate falls
+    from ~0.95 to 0.73, with 21% not playing), so weighting it heaviest is exactly wrong. The
+    boundary blend with the prior-season rate (:func:`season_boundary_minutes`) then lifts a nailed
+    starter the contaminated window still under-rates. Point in time: only ``kickoff_time < as_of``,
+    most-recent ``window`` rows per ``code``, equal weight.
+    """
+    frame = con.execute(
+        """
+        WITH ranked AS (
+            SELECT code, minutes,
+                   row_number() OVER (PARTITION BY code ORDER BY kickoff_time DESC) AS rn
+            FROM mart_fact_player_fixture
+            WHERE minutes IS NOT NULL AND kickoff_time < ?
+        )
+        SELECT code, minutes FROM ranked WHERE rn <= ?
+        """,
+        [as_of, window],
+    ).pl()
+    n_bins = bins.n_bins()
+    by_code: dict[int, list[int]] = defaultdict(list)
+    for r in frame.iter_rows(named=True):
+        by_code[int(r["code"])].append(int(r["minutes"]))
+    out: dict[int, tuple[tuple[float, float, float, float], int]] = {}
+    for code, mins in by_code.items():
+        counts = [0.0] * n_bins
+        for m in mins:
+            counts[bins.index_of(m)] += 1.0
+        total = float(len(mins))
+        dist = cast(tuple[float, float, float, float], tuple(c / total for c in counts))
+        out[code] = (dist, len(mins))
+    return out
+
+
 def _season_boundary_long_weight(month: int) -> float:
-    """Weight on the long (prior-season) appearance rate vs the recent model estimate, by month.
+    """Weight on the long (prior-season) appearance rate vs the recent estimate, by month.
 
     The trailing window only straddles the summer break for early-season targets, so the long-window
     correction is applied there and fades to zero in-season (where the recent estimate is reliable).
@@ -346,10 +399,11 @@ def season_boundary_minutes(
     season boundary, preserving the model's conditional (when-playing) minute shape.
 
     ``p_play`` is blended ``w * prior_rate + (1 - w) * recent`` (``w`` from
-    :func:`_season_boundary_long_weight`); the freed/added mass is redistributed across the playing
-    bins in the model's own proportions, so a nailed starter rested in dead rubbers regains his
-    appearance points AND his coupled goal share without inventing a minute shape. Availability is
-    NOT applied here (it stays the separate reported overlay, never double-counted).
+    :func:`_season_boundary_long_weight`, ``recent = 1 - p0`` of the passed distribution); the
+    freed/added mass is redistributed across the playing bins in that distribution's own
+    proportions, so a nailed starter rested in dead rubbers regains his appearance points AND his
+    coupled goal share without inventing a minute shape. Availability is NOT applied here (it stays
+    the separate reported overlay, never double-counted).
     """
     p0, p1, p2, p3 = minutes
     p_recent = 1.0 - p0
@@ -712,6 +766,7 @@ def predict_prospective_points(
     last_team = last_team_code(con, as_of)
     codes_with_history = set(last_team)
     prior_appearance = prior_season_appearance_rate(con, as_of) if appearance == "seasonal" else {}
+    trailing5_bins = trailing5_minute_bins(con, as_of, bins) if appearance == "seasonal" else {}
 
     # 2. Point-in-time component histories + fitted models (identical construction to the v3 fold).
     minutes_history = tuple(player_fixture_history(con, as_of=as_of))
@@ -943,9 +998,17 @@ def predict_prospective_points(
             )
             minutes_dist = minutes_model.predict(minutes_target)
             if appearance == "seasonal":
+                # Recent appearance is the equal-weighted trailing-5 (no recency weight); the fitted
+                # model is the fallback only when there are too few trailing rows to average.
+                recent = trailing5_bins.get(code)
+                base_dist = (
+                    recent[0]
+                    if recent is not None and recent[1] >= _MIN_TRAILING5_ROWS
+                    else minutes_dist
+                )
                 prior_rate, prior_n = prior_appearance.get(code, (None, 0))
                 minutes_dist = season_boundary_minutes(
-                    minutes_dist,
+                    base_dist,
                     prior_rate=prior_rate,
                     prior_n=prior_n,
                     target_month=kickoff_ts.month,

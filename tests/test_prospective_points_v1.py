@@ -11,7 +11,7 @@ from __future__ import annotations
 import subprocess
 from datetime import UTC, datetime, timedelta
 
-from fpl.config import repo_root
+from fpl.config import load_phase2_evaluation, repo_root
 from fpl.ingest.live_snapshot import capture_payload, write_capture
 from fpl.jobs.prospective_points_v1 import (
     GW1_2026_27_DEADLINE,
@@ -21,8 +21,10 @@ from fpl.jobs.prospective_points_v1 import (
     resolve_assist_signal_kind,
     resolve_share_signal_kind,
     season_boundary_minutes,
+    trailing5_minute_bins,
 )
 from fpl.storage.db import initialise
+from fpl.validate.minutes_baselines import MinuteBins
 
 _XG_COVERED = frozenset({"2023-24", "2024-25", "2025-26"})
 
@@ -421,6 +423,29 @@ def test_season_boundary_minutes_is_a_noop_off_boundary_or_without_history() -> 
     assert season_boundary_minutes(dist, prior_rate=0.92, prior_n=3, target_month=8) == dist
     # No prior-season rate at all.
     assert season_boundary_minutes(dist, prior_rate=None, prior_n=0, target_month=8) == dist
+
+
+def test_trailing5_minute_bins_equal_weights_the_last_five() -> None:
+    # _seed_history alternates 90 (even gw) / 60 (odd gw); with n_gw=14 the last five rows by
+    # kickoff are gw10..14 = [90, 60, 90, 60, 90] -> three 90s (bin 3), two 60s (bin 2).
+    con = _basic_db(
+        players=[_player(11, 1001, 3, 1)],
+        fixtures=[_fixture(501, 1, 2)],
+        history=[(1001, "MID", 1, 2, True)],
+    )
+    try:
+        bins = MinuteBins.from_config(load_phase2_evaluation())
+        result = trailing5_minute_bins(con, AS_OF, bins)
+        dist, n = result[1001]
+        assert n == 5
+        assert abs(sum(dist) - 1.0) < 1e-12
+        # Equal weight (not recency): 3/5 at the 90 bin, 2/5 at the 60-89 bin, no DNP mass. A
+        # recency weight would push the 90 bin above 0.6 (the most recent row is a 90); equal
+        # weighting fixes it at exactly 0.6 -- the mechanism that stops a dead-rubber final
+        # gameweek from dominating the appearance estimate.
+        assert dist == (0.0, 0.0, 0.4, 0.6)
+    finally:
+        con.close()
 
 
 def test_appearance_seasonal_is_default_and_mode_is_validated() -> None:

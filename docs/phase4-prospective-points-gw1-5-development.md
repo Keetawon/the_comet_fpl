@@ -61,18 +61,35 @@ not re-optimised every week. GW1-5 is that planning window.
 - **Season-boundary appearance correction (default `--appearance seasonal`).** The trailing-minutes
   window at a GW1 deadline is the *end of the prior season* — its least representative phase: a
   nailed starter rested in dead-rubber final fixtures reads as a rotation risk, suppressing both his
-  appearance points and, through the minutes gate on the coupled goal share, his goals. Measured on
-  the archive: nailed players fall from ~0.876 appearance in Aug-Nov to ~0.804 in May, and the full
-  prior-season appearance rate predicts a next-season opener better than the last five rows
-  (MAE 0.244 vs 0.252; a 0.7·long + 0.3·recent blend is best at 0.237). So for early-season targets
-  the layer blends the model's recent appearance probability with the player's full prior-season
-  appearance rate (weight 0.7 in Aug-Sep, 0.5 in Oct-Nov, 0 in-season), reshaping the minutes
-  distribution while preserving the model's when-playing minute shape. **This is not a source of
-  false certainty**: cross-season appearance is genuinely hard (MAE ~0.22; nailed-last-season
-  players average ~0.78 early next season, not ~0.88, because of transfers / injuries / lost spots),
-  so it lifts rested-but-nailed starters without pretending every "available" player starts. Live
-  `status` / `chance_of_playing` stays the separate reported overlay, never double-counted.
-  `--appearance model` uses the raw trailing distribution.
+  appearance points and, through the minutes gate on the coupled goal share, his goals. Two measured
+  fixes stack here:
+  - **Recent appearance is the equal-weighted average of the last five matches, not a
+    recency-weighted one.** The fitted minutes model (Stage B V3) is recency-weighted, so it lands
+    its *heaviest* weight on the single most recent match — which at a season boundary is the
+    dead-rubber final gameweek, exactly where nailed starters are rested. Measured across three
+    historical boundaries, the final gameweek collapses nailed starters from a ~0.92–0.97 start rate
+    to **0.73 started / 0.21 did-not-play** (goalkeepers 0.97 → 0.75 / 0.25), and the recency weight
+    drives an ever-present like Raya (37/38 at a full 90) to a raw p_play of **0.51**. Equal-
+    weighting the five predicts next-season GW1-6 appearance strictly better than recency-weighting
+    everywhere (overall MAE 0.223 vs 0.234; goalkeepers 0.181 vs 0.195), so `seasonal` builds the
+    recent estimate as the plain last-five minute-bin histogram (falling back to the fitted model
+    only when there are fewer than three trailing rows to average). The frozen Stage B V3 model
+    itself is untouched; this is a Phase-4 composer choice.
+  - **Blend that recent estimate with the full prior-season appearance rate** for early-season
+    targets (weight 0.7 in Aug-Sep, 0.5 in Oct-Nov, 0 in-season), reshaping the minutes distribution
+    while preserving the when-playing minute shape. The prior-season rate is the boundary-robust
+    nailed-ness signal (measured: it predicts an opener better than *any* five-match window; for
+    nailed players the best-measured scheme overall is equal-5 blended with the prior at 0.7, MAE
+    0.215 vs 0.223 for equal-5 alone — pure equal-5 would actually *lower* a nailed keeper below the
+    old number). Together these lift Raya from a raw 0.51 (or 0.834 under the old recency-weighted
+    blend) to **0.922**.
+
+  **This is not a source of false certainty**: cross-season appearance is genuinely hard (MAE ~0.22;
+  nailed-last-season players average ~0.78 early next season, not ~0.88, because of transfers /
+  injuries / lost spots), so it lifts rested-but-nailed starters without pretending every
+  "available" player starts. Live `status` / `chance_of_playing` stays the separate reported
+  overlay, never double-counted. `--appearance model` uses the raw recency-weighted model
+  distribution.
 - **Promoted clubs get league-average team strength.** `trailing_goals_attack_defence` returns the
   league-average multiplier (1.0) for a `team_code` with no archive history, not the measured
   promoted prior. Flagged per record (`stage_a_league_average_team`).
