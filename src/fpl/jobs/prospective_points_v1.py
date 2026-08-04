@@ -73,10 +73,20 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import polars as pl
 
+from fpl.artifacts.prospective_points import (
+    ArtifactFixtureInput,
+    ArtifactPlayerInput,
+    ContractIdentity,
+    ForecastArtifactManifest,
+    LiveInputProvenance,
+    ProspectivePointsArtifact,
+    build_artifact_rows,
+    write_artifact_atomic,
+)
 from fpl.config import (
     config_dir,
     load_phase2_evaluation,
@@ -143,8 +153,8 @@ _DISCLAIMER = (
     "DEVELOPMENT-ONLY: prospective full-points xP composed from unpromoted development-stage "
     "components. NOT a validated production forecast; it claims no historical lift. Point-in-time "
     "safe (versioned registry + schedule, kickoff_time < as_of), but validity is established "
-    "prospectively as 2026/27 accrues, not here. Goals are team-coupled/opponent-aware (V3 "
-    "default) but assists are not; appearance uses a season-boundary correction (prior-season "
+    "prospectively as 2026/27 accrues, not here. Goals and assists are team-coupled/opponent-aware "
+    "by default; appearance uses a season-boundary correction (prior-season "
     "nailed-ness blended in early season) yet cross-season appearance stays uncertain; promoted "
     "clubs use league-average team strength; no transfer rescaling; availability is a reported "
     "overlay."
@@ -161,6 +171,20 @@ def _git_head(repo: Path) -> str | None:
         return None
 
 
+def _git_worktree_clean(repo: Path) -> bool:
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return not result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
 def _file_sha256(path: Path) -> str | None:
     if not path.is_file():
         return None
@@ -175,62 +199,91 @@ def _expected_points(distribution: Distribution) -> float:
     return sum(index * mass for index, mass in enumerate(distribution))
 
 
-def team_code_map_live(con: duckdb.DuckDBPyConnection, season: str) -> dict[int, int]:
-    """Season-scoped ``team_id -> team_code`` for a live season, from the stored bootstrap payload.
+@dataclass(frozen=True, slots=True)
+class LiveBootstrapSnapshot:
+    capture_id: str
+    known_at: datetime
+    payload_sha256: str
+    data: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class LivePlayerMetadata:
+    code: int
+    web_name: str | None
+    element_type: int
+    team_id: int
+    now_cost: int | None
+    selected_by_percent: float | None
+    status: str
+    chance_of_playing: float | None
+
+
+def live_bootstrap_snapshot(
+    con: duckdb.DuckDBPyConnection, season: str, as_of: datetime
+) -> LiveBootstrapSnapshot:
+    bind = chr(63)
+    query = "SELECT c.capture_id, c.captured_at AS known_at, p.payload, p.sha256 "
+    query += "FROM snapshot_payload AS p JOIN snapshot_capture AS c USING (capture_id) "
+    query += f"WHERE p.endpoint = 'bootstrap-static' AND c.season = {bind} "
+    query += f"AND c.captured_at <= {bind} "
+    query += "ORDER BY c.captured_at DESC, c.capture_id DESC LIMIT 1"
+    frame = con.execute(query, [season, as_of]).pl()
+    return _bootstrap_snapshot_from_frame(frame, season=season, as_of=as_of)
+
+
+def _bootstrap_snapshot_from_frame(
+    frame: pl.DataFrame, *, season: str, as_of: datetime
+) -> LiveBootstrapSnapshot:
+    if frame.is_empty():
+        raise ValueError(f"no bootstrap-static payload known by {as_of.isoformat()} for {season}")
+    row = next(frame.iter_rows(named=True))
+    payload = row["payload"]
+    data = json.loads(payload) if isinstance(payload, str) else payload
+    if not isinstance(data, dict):
+        raise ValueError("bootstrap-static payload is not a JSON object")
+    return LiveBootstrapSnapshot(
+        capture_id=str(row["capture_id"]),
+        known_at=cast(datetime, row["known_at"]),
+        payload_sha256=str(row["sha256"]),
+        data=data,
+    )
+
+
+def team_code_map_live(snapshot: LiveBootstrapSnapshot) -> dict[int, int]:
+    """Season-scoped ``team_id -> team_code`` from the deadline-known bootstrap payload.
 
     The live snapshot loader does not populate ``stg_team``/``mart_dim_team`` for the live season,
-    so the (season-scoped) team id to permanent ``team_code`` map is read from the most-recent
+    so the (season-scoped) team id to permanent ``team_code`` map is read from the selected
     ``bootstrap-static`` payload. ``team_code`` is the only cross-season club key
     ``trailing_goals_attack_defence`` accepts.
     """
-    row = con.execute(
-        """
-        SELECT p.payload
-        FROM snapshot_payload AS p
-        JOIN snapshot_capture AS c ON c.capture_id = p.capture_id
-        WHERE p.endpoint = 'bootstrap-static' AND c.season = ?
-        ORDER BY c.captured_at DESC
-        LIMIT 1
-        """,
-        [season],
-    ).fetchone()
-    if row is None or row[0] is None:
-        raise ValueError(f"no bootstrap-static payload captured for season {season}")
-    payload = row[0]
-    data = json.loads(payload) if isinstance(payload, str) else payload
-    return {int(team["id"]): int(team["code"]) for team in data["teams"]}
+    return {int(team["id"]): int(team["code"]) for team in snapshot.data["teams"]}
 
 
-def player_availability(
-    con: duckdb.DuckDBPyConnection, season: str
-) -> dict[int, tuple[str, float | None]]:
-    """``code -> (status, chance_of_playing_next_round)`` from the most-recent bootstrap payload.
+def player_metadata_live(snapshot: LiveBootstrapSnapshot) -> dict[int, LivePlayerMetadata]:
+    """Deadline-known bootstrap metadata keyed by stable player ``code``.
 
-    ``status`` is the FPL flag (``a`` available, ``d`` doubtful, ``i`` injured, ``s`` suspended,
-    ``u`` unavailable, ``n`` not in squad). ``chance`` is a percentage in ``[0, 100]`` or ``None``.
-    This feeds the reported availability OVERLAY only; it is never a model input.
+    Nullable ownership and chance values stay nullable. They feed the artifact and the reported
+    availability overlay only; neither changes a stored raw points distribution.
     """
-    row = con.execute(
-        """
-        SELECT p.payload
-        FROM snapshot_payload AS p
-        JOIN snapshot_capture AS c ON c.capture_id = p.capture_id
-        WHERE p.endpoint = 'bootstrap-static' AND c.season = ?
-        ORDER BY c.captured_at DESC
-        LIMIT 1
-        """,
-        [season],
-    ).fetchone()
-    if row is None or row[0] is None:
-        return {}
-    payload = row[0]
-    data = json.loads(payload) if isinstance(payload, str) else payload
-    out: dict[int, tuple[str, float | None]] = {}
-    for element in data["elements"]:
+    out: dict[int, LivePlayerMetadata] = {}
+    for element in snapshot.data["elements"]:
         chance = element.get("chance_of_playing_next_round")
-        out[int(element["code"])] = (
-            str(element.get("status", "a")),
-            None if chance is None else float(chance),
+        selected = element.get("selected_by_percent")
+        cost = element.get("now_cost")
+        code = int(element["code"])
+        if code in out:
+            raise ValueError(f"bootstrap-static payload contains duplicate player code {code}")
+        out[code] = LivePlayerMetadata(
+            code=code,
+            web_name=None if element.get("web_name") is None else str(element["web_name"]),
+            element_type=int(element["element_type"]),
+            team_id=int(element["team"]),
+            now_cost=None if cost is None else int(cost),
+            selected_by_percent=None if selected is None else float(selected),
+            status=str(element.get("status", "a")),
+            chance_of_playing=None if chance is None else float(chance),
         )
     return out
 
@@ -244,6 +297,36 @@ def availability_multiplier(status: str, chance: float | None) -> float:
     if status in {"i", "s", "u", "n"}:
         return 0.0
     return 0.5  # doubtful with no published percentage
+
+
+def schedule_capture_ids(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    season: str,
+    as_of: datetime,
+    gw_from: int,
+    gw_to: int,
+) -> tuple[str, ...]:
+    """Sorted capture ids of the schedule versions selected for this horizon."""
+    rows = con.execute(
+        """
+        WITH ranked AS (
+            SELECT season, fixture, gw, capture_id,
+                   row_number() OVER (
+                       PARTITION BY season, fixture
+                       ORDER BY known_at DESC, capture_id DESC
+                   ) AS version_rank
+            FROM stg_live_fixture_version
+            WHERE known_at <= ?
+        )
+        SELECT DISTINCT capture_id
+        FROM ranked
+        WHERE version_rank = 1 AND season = ? AND gw BETWEEN ? AND ?
+        ORDER BY capture_id
+        """,
+        [as_of, season, gw_from, gw_to],
+    ).fetchall()
+    return tuple(str(row[0]) for row in rows)
 
 
 def trailing_ict(con: duckdb.DuckDBPyConnection, as_of: datetime) -> dict[int, tuple[float, float]]:
@@ -670,12 +753,33 @@ class ProspectivePlayerTotal:
 
 
 @dataclass(frozen=True, slots=True)
+class ProspectivePlayerMetadata:
+    """Deadline-known metadata and forecast flags for one stable player identity."""
+
+    code: int
+    web_name: str | None
+    position: str
+    team_id: int
+    team_code: int | None
+    now_cost: int | None
+    selected_by_percent: float | None
+    availability_status: str
+    chance_of_playing: float | None
+    availability_multiplier: float
+    cold_start_player: bool
+    attacking_signal_cold_start: bool
+    assist_signal_cold_start: bool
+    transferred_no_rescale: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ProspectivePointsResult:
     as_of: datetime
     season: str
     gw_from: int
     gw_to: int
     draws: int
+    base_seed: int
     max_points: int
     roster_size: int
     fixture_count: int
@@ -685,11 +789,21 @@ class ProspectivePointsResult:
     assists_mode: str
     freshness_cold_start: bool
     records: tuple[ProspectivePointsRecord, ...]
+    players: tuple[ProspectivePlayerMetadata, ...]
     player_totals: tuple[ProspectivePlayerTotal, ...]
     component_names: dict[str, str]
     commit_sha: str | None
+    worktree_clean: bool
     config_sha256: str | None
     archive_sha256: str | None
+    phase2_contract_version: str
+    phase2_config_sha256: str | None
+    phase3_contract_version: str
+    phase3_config_sha256: str | None
+    bootstrap_capture_id: str
+    bootstrap_known_at: datetime
+    bootstrap_payload_sha256: str
+    schedule_capture_ids: tuple[str, ...]
 
 
 def predict_prospective_points(
@@ -732,7 +846,9 @@ def predict_prospective_points(
         raise SystemExit("scoring_2026_27.yaml has no bps block; nothing to compose bonus from")
     bps = rules.bps
     bps_config = BpsSimConfig()
-    bins = MinuteBins.from_config(load_phase2_evaluation())
+    phase2_config = load_phase2_evaluation()
+    phase3_config = load_phase3_evaluation()
+    bins = MinuteBins.from_config(phase2_config)
     bin_minutes = representative_minutes(bins.ranges)
     lookup = PointsLookup(rules, bin_minutes=bin_minutes)
     bps_lookup = BpsExactLookup(
@@ -760,8 +876,16 @@ def predict_prospective_points(
     )
     fixture_count = int(schedule["fixture"].n_unique()) if schedule.height else 0
 
-    team_map = team_code_map_live(con, season)
-    availability = player_availability(con, season)
+    bootstrap = live_bootstrap_snapshot(con, season, as_of)
+    team_map = team_code_map_live(bootstrap)
+    live_metadata = player_metadata_live(bootstrap)
+    selected_schedule_capture_ids = schedule_capture_ids(
+        con,
+        season=season,
+        as_of=as_of,
+        gw_from=gw_from,
+        gw_to=gw_to,
+    )
     trailing = trailing_ict(con, as_of)
     last_team = last_team_code(con, as_of)
     codes_with_history = set(last_team)
@@ -867,7 +991,7 @@ def predict_prospective_points(
     share_window = 5
     signal_kind = resolve_share_signal_kind(
         season,
-        frozenset(load_phase3_evaluation().xg_signal_policy.xg_covered_seasons),
+        frozenset(phase3_config.xg_signal_policy.xg_covered_seasons),
         share_signal,
     )
     signal_by_code: dict[int, float | None] = {}
@@ -886,7 +1010,7 @@ def predict_prospective_points(
     #     `mean_trailing_signal` window is reused via the slot-mapped kind below.
     assist_kind = resolve_assist_signal_kind(
         season,
-        frozenset(load_phase3_evaluation().xg_signal_policy.xg_covered_seasons),
+        frozenset(phase3_config.xg_signal_policy.xg_covered_seasons),
         share_signal,
     )
     assist_slot_kind = "expected_goals" if assist_kind == "expected_assists" else "threat"
@@ -950,10 +1074,18 @@ def predict_prospective_points(
         transferred: bool
 
     by_fixture: dict[int, list[_Pending]] = defaultdict(list)
+    player_metadata: list[ProspectivePlayerMetadata] = []
     for index in range(len(reg_codes)):
         code = int(reg_codes[index])
         position = Position(str(reg_positions[index]))
         team_id = int(reg_teams[index])
+        metadata = live_metadata.get(code)
+        if metadata is None:
+            raise ValueError(f"registry code {code} is absent from deadline-known bootstrap")
+        if metadata.team_id != team_id:
+            raise ValueError(
+                f"registry/bootstrap team mismatch for code {code}: {team_id} != {metadata.team_id}"
+            )
         team_code = team_map.get(team_id)
         cold_start = code not in codes_with_history
         transferred = (
@@ -967,6 +1099,27 @@ def predict_prospective_points(
         assist_signal_cold_start = raw_assist_signal is None
         assist_signal_value = (
             pos_assist_signal_mean if raw_assist_signal is None else raw_assist_signal
+        )
+        status = metadata.status
+        chance = metadata.chance_of_playing
+        mult = availability_multiplier(status, chance)
+        player_metadata.append(
+            ProspectivePlayerMetadata(
+                code=code,
+                web_name=metadata.web_name,
+                position=position.value,
+                team_id=team_id,
+                team_code=team_code,
+                now_cost=metadata.now_cost,
+                selected_by_percent=metadata.selected_by_percent,
+                availability_status=status,
+                chance_of_playing=chance,
+                availability_multiplier=mult,
+                cold_start_player=cold_start,
+                attacking_signal_cold_start=attacking == "v3" and signal_cold_start,
+                assist_signal_cold_start=assists == "coupled" and assist_signal_cold_start,
+                transferred_no_rescale=transferred,
+            )
         )
         for fx in fixtures_by_team.get(team_id, ()):
             fixture = fx["fixture"]
@@ -1160,7 +1313,9 @@ def predict_prospective_points(
         for t in targets:
             result = by_code[t.code]
             expected = _expected_points(result.distribution)
-            status, chance = availability.get(t.code, ("a", None))
+            metadata = live_metadata[t.code]
+            status = metadata.status
+            chance = metadata.chance_of_playing
             mult = availability_multiplier(status, chance)
             records.append(
                 ProspectivePointsRecord(
@@ -1220,7 +1375,7 @@ def predict_prospective_points(
             transferred_no_rescale=acc["transferred_no_rescale"],
         )
         for code, acc in sorted(
-            totals_acc.items(), key=lambda kv: kv[1]["expected_points"], reverse=True
+            totals_acc.items(), key=lambda kv: (-kv[1]["expected_points"], kv[0])
         )
     )
 
@@ -1231,6 +1386,7 @@ def predict_prospective_points(
         gw_from=gw_from,
         gw_to=gw_to,
         draws=draws,
+        base_seed=base_seed,
         max_points=max_points,
         roster_size=registry.height,
         fixture_count=fixture_count,
@@ -1239,7 +1395,8 @@ def predict_prospective_points(
         appearance_mode=appearance,
         assists_mode=assists,
         freshness_cold_start=freshness.cold_start,
-        records=tuple(records),
+        records=tuple(sorted(records, key=lambda row: (row.fixture, row.code))),
+        players=tuple(sorted(player_metadata, key=lambda player: player.code)),
         player_totals=player_totals,
         component_names={
             "minutes": resolved_suite.minutes_name,
@@ -1259,8 +1416,17 @@ def predict_prospective_points(
             "bonus": "hybrid_bps_bonus_match_simulator (exact_bps + fold-local residual)",
         },
         commit_sha=_git_head(repo_path),
+        worktree_clean=_git_worktree_clean(repo_path),
         config_sha256=_file_sha256(config_dir() / "scoring_2026_27.yaml"),
         archive_sha256=_file_sha256(Path(db_path)) if db_path is not None else None,
+        phase2_contract_version=phase2_config.contract_version,
+        phase2_config_sha256=_file_sha256(config_dir() / "phase2_evaluation.yaml"),
+        phase3_contract_version=phase3_config.contract_version,
+        phase3_config_sha256=_file_sha256(config_dir() / "phase3_evaluation.yaml"),
+        bootstrap_capture_id=bootstrap.capture_id,
+        bootstrap_known_at=bootstrap.known_at,
+        bootstrap_payload_sha256=bootstrap.payload_sha256,
+        schedule_capture_ids=selected_schedule_capture_ids,
     )
 
 
@@ -1277,7 +1443,7 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             "gw_to": result.gw_to,
             "monte_carlo_draws": result.draws,
             "points_support_max": result.max_points,
-            "base_seed": BASE_SEED,
+            "base_seed": result.base_seed,
             "roster_size": result.roster_size,
             "fixture_count": result.fixture_count,
             "row_count": len(result.records),
@@ -1287,6 +1453,7 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             "assists_mode": result.assists_mode,
             "freshness_cold_start": result.freshness_cold_start,
             "commit_sha": result.commit_sha,
+            "worktree_clean": result.worktree_clean,
             "config_sha256": result.config_sha256,
             "archive_sha256": result.archive_sha256,
             "components": result.component_names,
@@ -1331,6 +1498,111 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             for r in result.records
         ],
     }
+
+
+def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePointsArtifact:
+    """Build the stable player-gameweek boundary consumed by downstream planning."""
+    required = {
+        "commit_sha": result.commit_sha,
+        "database_sha256": result.archive_sha256,
+        "scoring_config_sha256": result.config_sha256,
+        "phase2_config_sha256": result.phase2_config_sha256,
+        "phase3_config_sha256": result.phase3_config_sha256,
+    }
+    missing = sorted(name for name, value in required.items() if value is None)
+    if missing:
+        raise ValueError(f"artifact provenance is incomplete: {', '.join(missing)}")
+    if not result.worktree_clean:
+        raise ValueError("artifact provenance requires a clean Git worktree")
+
+    players = tuple(
+        ArtifactPlayerInput(
+            code=player.code,
+            web_name=player.web_name,
+            position=cast(Literal["GK", "DEF", "MID", "FWD"], player.position),
+            team_id=player.team_id,
+            team_code=player.team_code,
+            now_cost=player.now_cost,
+            selected_by_percent=player.selected_by_percent,
+            availability_status=player.availability_status,
+            chance_of_playing=player.chance_of_playing,
+            availability_multiplier=player.availability_multiplier,
+            cold_start_player=player.cold_start_player,
+            attacking_signal_cold_start=player.attacking_signal_cold_start,
+            assist_signal_cold_start=player.assist_signal_cold_start,
+            transferred_no_rescale=player.transferred_no_rescale,
+        )
+        for player in result.players
+    )
+    fixture_inputs = tuple(
+        ArtifactFixtureInput(
+            season=record.season,
+            gw=record.gw,
+            fixture=record.fixture,
+            kickoff_time=record.kickoff_time,
+            code=record.code,
+            expected_bonus=record.expected_bonus,
+            distribution=record.distribution,
+            stage_a_league_average_team=record.stage_a_league_average_team,
+        )
+        for record in result.records
+    )
+    rows = build_artifact_rows(
+        season=result.season,
+        gw_from=result.gw_from,
+        gw_to=result.gw_to,
+        players=players,
+        fixtures=fixture_inputs,
+    )
+    contracts = {
+        "phase2_minutes": ContractIdentity(
+            name="phase2_evaluation",
+            version=result.phase2_contract_version,
+            sha256=cast(str, result.phase2_config_sha256),
+        ),
+        "phase3_attacking": ContractIdentity(
+            name="phase3_evaluation",
+            version=result.phase3_contract_version,
+            sha256=cast(str, result.phase3_config_sha256),
+        ),
+        "scoring": ContractIdentity(
+            name="scoring_2026_27",
+            version=TARGET_RULESET,
+            sha256=cast(str, result.config_sha256),
+        ),
+    }
+    component_modes = {
+        "appearance_mode": result.appearance_mode,
+        "assists_mode": result.assists_mode,
+        "attacking_mode": result.attacking_mode,
+        "share_signal_kind": result.share_signal_kind,
+        **{f"component.{name}": value for name, value in result.component_names.items()},
+    }
+    manifest = ForecastArtifactManifest(
+        as_of=result.as_of,
+        season=result.season,
+        gw_from=result.gw_from,
+        gw_to=result.gw_to,
+        row_count=len(rows),
+        roster_size=result.roster_size,
+        fixture_count=result.fixture_count,
+        monte_carlo_draws=result.draws,
+        base_seed=result.base_seed,
+        fixture_points_support_max=result.max_points,
+        freshness_cold_start=result.freshness_cold_start,
+        worktree_clean=True,
+        commit_sha=cast(str, result.commit_sha),
+        database_sha256=cast(str, result.archive_sha256),
+        contracts=contracts,
+        component_modes=component_modes,
+        live_inputs=LiveInputProvenance(
+            bootstrap_capture_id=result.bootstrap_capture_id,
+            bootstrap_known_at=result.bootstrap_known_at,
+            bootstrap_payload_sha256=result.bootstrap_payload_sha256,
+            schedule_capture_ids=result.schedule_capture_ids,
+        ),
+    )
+    return ProspectivePointsArtifact(manifest=manifest, rows=rows)
 
 
 def format_top_table(result: ProspectivePointsResult, *, top: int = 20) -> str:
@@ -1400,13 +1672,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--draws", type=int, default=DEFAULT_DRAWS)
     parser.add_argument("--top", type=int, default=20)
-    parser.add_argument("--output", type=Path, default=None, help="write JSON record to this path")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="atomically write the versioned JSONL artifact to this path",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     as_of = datetime.fromisoformat(args.as_of) if args.as_of else GW1_2026_27_DEADLINE
     db_path = args.db or default_db_path()
     repo = repo_root()
+
+    if args.output is not None and not _git_worktree_clean(repo):
+        logger.error("refusing artifact output from a dirty Git worktree")
+        return 1
 
     con = connect(db_path, read_only=True)
     try:
@@ -1430,11 +1711,15 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         con.close()
 
-    record = result_to_record(result)
-    payload = json.dumps(record, indent=2, sort_keys=True, allow_nan=False)
     if args.output is not None:
-        args.output.write_text(payload + "\n", encoding="utf-8")
-        logger.info("wrote %d record(s) to %s", len(result.records), args.output)
+        artifact = build_prospective_artifact(result)
+        digest = write_artifact_atomic(args.output, artifact)
+        logger.info(
+            "wrote %d player-gameweek rows to %s (sha256=%s)",
+            len(artifact.rows),
+            args.output,
+            digest,
+        )
     print(_DISCLAIMER)
     print()
     print(format_top_table(result, top=args.top))

@@ -1,0 +1,55 @@
+# Stage E squad-selection rules and bounded-search policy for the live 2026/27 game.
+#
+# Official captured values come from the versioned bootstrap payload named below. The transfer,
+# captain, vice-captain, and bench semantics are also confirmed by the official FPL help pages.
+# Prices and budget are stored in tenths of a million pounds, matching bootstrap `now_cost`.
+contract_version: "1.0"
+season: "2026-27"
+
+squad:
+  size: 15
+  budget_tenths: 1000
+  maximum_per_club: 3
+  positions:
+    GK: {squad: 2, minimum_starters: 1, maximum_starters: 1}
+    DEF: {squad: 5, minimum_starters: 3, maximum_starters: 5}
+    MID: {squad: 5, minimum_starters: 2, maximum_starters: 5}
+    FWD: {squad: 3, minimum_starters: 1, maximum_starters: 3}
+
+lineup:
+  starters: 11
+  captain_multiplier: 2
+  vice_captain_enabled: true
+  outfield_bench_slots: 3
+  goalkeeper_bench_slots: 1
+
+transfers:
+  initial_squad_unlimited_free: true
+  free_per_gameweek_after_first_deadline: 1
+  free_transfer_bank_cap: 5
+  hit_cost_points: 4
+  maximum_transfers_per_gameweek: 20
+
+search:
+  candidate_pool_per_position: 10
+  maximum_planned_transfers_per_gameweek: 2
+  transition_limit_per_state: 200
+  beam_width: 30
+
+provenance:
+  bootstrap_snapshot: snapshots/daily/2026-08-03/2026-08-03T094022Z/bootstrap-static.json.gz
+  bootstrap_captured_at: "2026-08-03T09:40:22Z"
+  bootstrap_payload_sha256: 6065e100c0b040b27d866e2473ba18c1c8404f59a3b870a5d9d5223010bbcef0
+  payload_confirmed:
+    - squad.size
+    - squad.budget_tenths
+    - squad.maximum_per_club
+    - squad.positions
+    - lineup.starters
+    - lineup.vice_captain_enabled
+    - transfers.free_transfer_bank_cap
+    - transfers.maximum_transfers_per_gameweek
+  authoritative_sources:
+    - https://fantasy.premierleague.com/help/
+    - https://www.premierleague.com/en/news/2174899/fpl-basics-managing-your-team
+    - https://www.premierleague.com/en/news/2174907/fpl-basics-making-transfers

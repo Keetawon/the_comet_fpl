@@ -10,13 +10,20 @@ from __future__ import annotations
 
 import subprocess
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
 
 from fpl.config import load_phase2_evaluation, repo_root
 from fpl.ingest.live_snapshot import capture_payload, write_capture
+from fpl.jobs import prospective_points_v1 as prospective_job
 from fpl.jobs.prospective_points_v1 import (
     GW1_2026_27_DEADLINE,
     _expected_points,
+    _git_worktree_clean,
     availability_multiplier,
+    live_bootstrap_snapshot,
+    player_metadata_live,
     predict_prospective_points,
     resolve_assist_signal_kind,
     resolve_share_signal_kind,
@@ -50,6 +57,7 @@ def _player(
     *,
     status: str = "a",
     chance: int | None = None,
+    selected_by_percent: str | None = None,
 ) -> dict[str, object]:
     return {
         "id": pid,
@@ -58,6 +66,7 @@ def _player(
         "element_type": element_type,
         "team": team,
         "now_cost": 55,
+        "selected_by_percent": selected_by_percent,
         "status": status,
         "chance_of_playing_next_round": chance,
     }
@@ -255,6 +264,7 @@ def test_emits_full_distribution_per_player_fixture() -> None:
             check=True,
         ).stdout.strip()
         assert result.commit_sha == expected_head
+        assert result.worktree_clean is _git_worktree_clean(repo_root())
         assert result.config_sha256 is not None and len(result.config_sha256) == 64
         assert result.archive_sha256 is None
     finally:
@@ -605,3 +615,44 @@ def test_availability_multiplier_rules() -> None:
     assert availability_multiplier("d", 75.0) == 0.75  # an explicit chance always wins
     assert availability_multiplier("a", 0.0) == 0.0
     assert availability_multiplier("i", 100.0) == 1.0
+
+
+def test_bootstrap_metadata_is_selected_at_or_before_forecast_cutoff() -> None:
+    con = initialise(":memory:")
+    teams = _teams(1, 2)
+    before = [_player(11, 1001, 3, 1, selected_by_percent="12.3")]
+    _load_registry(con, teams, before, [_fixture(1, 1, 2)])
+    future = [_player(11, 1001, 3, 2, status="i", selected_by_percent="99.9")]
+    write_capture(
+        con,
+        [capture_payload("bootstrap-static", _bootstrap(teams, future))],
+        season="2026-27",
+        gw=1,
+        mode="daily",
+        captured_at=AS_OF + timedelta(hours=1),
+        capture_id="future-capture",
+    )
+    try:
+        snapshot = live_bootstrap_snapshot(con, "2026-27", AS_OF)
+        metadata = player_metadata_live(snapshot)[1001]
+        assert snapshot.capture_id == CAPTURE_ID
+        assert snapshot.known_at == CAPTURED_AT
+        assert metadata.team_id == 1
+        assert metadata.status == "a"
+        assert metadata.selected_by_percent == 12.3
+    finally:
+        con.close()
+
+
+def test_cli_refuses_artifact_output_from_dirty_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(prospective_job, "_git_worktree_clean", lambda _repo: False)
+
+    def unexpected_connect(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("dirty-worktree refusal must happen before opening DuckDB")
+
+    monkeypatch.setattr(prospective_job, "connect", unexpected_connect)
+    output = tmp_path / "must-not-exist.jsonl"
+    assert prospective_job.main(["--output", str(output)]) == 1
+    assert not output.exists()
