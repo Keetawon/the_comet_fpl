@@ -126,9 +126,15 @@ one-winner-per-fixture couplings are represented). The prospective job
 gameweek horizon (default GW1-5) from the versioned live registry + schedule: **goals are
 team-coupled Candidate V3 by default** (opponent-aware via `lambda_team`, minutes-gated;
 `--attacking v1` reverts to independent per-player), **appearance uses a season-boundary correction
-by default** (`--appearance seasonal`, blending prior-season nailed-ness in early season;
-`--appearance model` reverts), and live availability is a reported overlay never folded into the
-distribution. It is point-in-time safe but carries every stage's development caveats and is not a
+by default** (`--appearance seasonal`; `--appearance model` reverts), and live availability is a
+reported overlay never folded into the distribution. The `seasonal` appearance recent estimate is
+the **equal-weighted average of the last five matches (no recency weight)**, then blended with the
+full prior-season appearance rate in early season; a recency weight (as the Stage B V3 minutes model
+carries) lands hardest on the dead-rubber final gameweek and is measurably wrong at the boundary
+(see the measured constant below). A recency audit of the whole composer confirmed appearance was
+the **only** recency-weighted signal: xG-share and xA-share (`mean_trailing_signal`), the DC hit
+rate, and the pooled GK save rate are all equal-weighted or league-pooled and were left unchanged.
+It is point-in-time safe but carries every stage's development caveats and is not a
 production forecast. Running it needs the live snapshots loaded (`jobs/load_snapshots`); the loaded
 bootstrap also carries prices (`now_cost`), penalty/set-piece order, per-player xG, and ownership,
 which the future optimiser and further attacking work can use. See `docs/phase4-*`.
@@ -328,6 +334,18 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   season (0.913) appears only **0.776** early next season on average — transfers, injuries, and lost
   spots make cross-season appearance genuinely hard (MAE ~0.22 for every method). Lift rested-but-
   nailed starters at the boundary; never treat "available" (`status`) as "starts".
+- **The trailing-appearance window must be equal-weighted, never recency-weighted, at a season
+  boundary.** The final gameweek is a dead rubber: measured over three boundaries, nailed starters
+  (>= 0.85 start rate over GW1-37) collapse to **0.73 started / 0.21 did-not-play** in GW38
+  (goalkeepers 0.97 -> 0.75 / 0.25), so it is the single least representative match of the season —
+  yet a geometric recency weight lands its heaviest weight there. Raya, an ever-present (37/38 at a
+  full 90), reads as a raw p_play of **0.51** under the Stage B V3 recency weight. Equal-weighting
+  the last five predicts a next-season opener strictly better than recency-weighting everywhere
+  (overall MAE 0.223 vs 0.234; goalkeepers 0.181 vs 0.195). This is why the prospective composer's
+  `seasonal` appearance uses a plain last-five average, not the model's recency-weighted estimate.
+  The same audit measured that recency does **not** help the xG signal either (equal-5 MAE 0.0944
+  vs recency-5 0.0957 predicting next-season xG/appearance for attackers) — but the xG/xA/DC signals
+  already equal-weight appeared rows, so only appearance needed the fix.
 - **`rest_days` cannot see cup or European congestion.** The archive is Premier League only (380
   fixtures per season, no competition field), and `rest_days` is the gap between a team's
   consecutive PL fixtures — so a midweek FA Cup / League Cup / Champions/Europa fixture is invisible
@@ -450,12 +468,21 @@ Unless the user sets another priority, address prerequisites before model sophis
    development-only forward tooling, not gated candidates. Two tracks improve them: a
    **prospective-forecast track** using live-snapshot fields (prices `now_cost`, penalty/set-piece
    order, per-player xG, ownership) that improves the GW-horizon board directly with **no historical
-   gate** — highest-leverage next steps are a penalty/set-piece premium and xG-share (rather than
-   threat-share) in Stage C goals, and a price-informed starter prior in the appearance layer, all
-   measured before wiring; and a heavier **historical track** (new pre-registered Stage A/B/C
-   candidates) needed only to claim measured lift. The Stage E squad optimiser is not started; it
-   consumes this xP plus the live prices/ownership already loaded. Prospective changes must stay
-   point-in-time safe and must not silently re-run or re-judge any frozen historical evaluation.
+   gate**, all measured before wiring; and a heavier **historical track** (new pre-registered Stage
+   A/B/C candidates) needed only to claim measured lift. Shipped on the prospective track so far:
+   penalty/set-piece premium, xG-share (embedding the penalty premium) and coupled xA-share for
+   assists, the season-boundary appearance correction, and (latest) the **equal-weighted trailing-5
+   appearance window** replacing the recency-weighted estimate at the boundary. A whole-composer
+   recency audit is complete: appearance was the only recency-weighted signal (now fixed); xG-share,
+   xA-share, the DC hit rate, and the pooled GK save rate are equal-weighted or league-pooled and
+   were confirmed correct as-is. Still open on this track and measured-but-not-yet-built: a
+   price-informed starter prior in the appearance layer, and a Stage A team-goals recency/time-decay
+   audit (its `lambda_conceded` drives both goal allocation and GK saves). The **Stage E squad
+   optimiser is not started**; it consumes this xP plus the live prices/ownership already loaded and
+   must respect the FPL squad rules (15 players, 100.0m budget, <= 3 per club, valid formation,
+   captain/vice, bench order) and the -4 hit for transfers beyond the free one, planning over the
+   GW-horizon. Prospective changes must stay point-in-time safe and must not silently re-run or
+   re-judge any frozen historical evaluation.
 
 ## Sub-agent coordination and handoff
 
