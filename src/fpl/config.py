@@ -9,6 +9,7 @@ validation error rather than a silently ignored key.
 from __future__ import annotations
 
 import functools
+import hashlib
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -1843,6 +1844,28 @@ def load_phase2_evaluation(
     return contract.verify_minutes_boundary(scoring)
 
 
+def load_phase2_from_bytes(
+    path: Path | None = None,
+    *,
+    scoring_path: Path | None = None,
+) -> tuple[Phase2EvaluationConfig, str]:
+    """Parse the Phase 2 contract from its exact file bytes and hash those same bytes.
+
+    Closes the time-of-check / time-of-use gap a development runner cares about: the recorded
+    sha256 is of the EXACT bytes that were parsed into the object ``MinuteBins`` is built from --
+    there is no second, cached read of the file that could hash different bytes. The 60-minute bin
+    boundary is still cross-checked against the configured scoring ruleset (same as
+    :func:`load_phase2_evaluation`). Returns ``(contract, sha256_hex_of_raw_bytes)``.
+    """
+    raw = (path or config_dir() / "phase2_evaluation.yaml").read_bytes()
+    loaded = yaml.safe_load(raw)
+    if not isinstance(loaded, dict):
+        raise ValueError(f"{path or 'phase2_evaluation.yaml'} did not parse to a mapping")
+    contract = Phase2EvaluationConfig.model_validate(loaded)
+    scoring = load_scoring_rules(contract.target.downstream_points_ruleset, path=scoring_path)
+    return contract.verify_minutes_boundary(scoring), hashlib.sha256(raw).hexdigest()
+
+
 # --------------------------------------------------------------------------------------
 # Phase 3 evaluation contract (Stage C player attacking goals)
 # --------------------------------------------------------------------------------------
@@ -2250,6 +2273,133 @@ class Phase3StageCCandidateV3Policy(_Frozen):
         return self
 
 
+class Phase3StageCCandidateV4Policy(_Frozen):
+    """Frozen pre-registration for Stage C attacking Candidate V4 (exposure-weighted xG share).
+
+    Candidate V4 is the controlled test of whether **per-minute attacking productivity times
+    predicted exposure** beats V3's raw per-appearance xG share. It keeps V3's team-coupling /
+    conservation skeleton and changes THREE things at once: (i) the per-player allocation signal
+    becomes ``shrunk_xg_per_min * E[minutes]`` (per-minute productivity times predicted exposure;
+    a high-xG/90 substitute is not tied to a 90-minute starter) instead of V3's mean trailing xG
+    per appearance; (ii) the cold-start prior changes from V3's committed POOLED all-position
+    signal mean to a fold-local POSITION-SPECIFIC xG/min prior; and (iii) the signal is xG-ONLY
+    with NO threat fallback (V3 reads ``expected_goals_else_threat``; V4 never reads ``threat``).
+    The team scale ``lambda_team`` is allocated by those weights so
+    ``sum_i goal_lambda_i == lambda_team`` (**underlying Poisson-rate conservation in
+    expectation**; not per-draw realised-count conservation, and never fed to the composer here).
+
+    Distinguishing choices, all locked before any V4 evaluation: **xG-only** (no threat fallback;
+    NULL xG excluded from both signal and minutes sums); **Option-A window** (last five appeared
+    rows, measured-signal rows among them); **position-specific** fold-local xG/min cold-start
+    prior (a deliberate change beyond per-minute normalization -- frozen V3's committed
+    cold-start fill is a pooled all-position mean despite its contract; V4 does not modify V3,
+    it explicitly chooses position-specific); **E[minutes]** from the frozen
+    ``trailing_5_player_minutes`` distribution via fold-local GLOBAL bin means (bin 0 exactly 0;
+    deterministic empty-bin fallbacks 30/75/90), never from
+    ``points_composition.representative_minutes``; **fixed ``prior_minutes = 90``** (one
+    full-match equivalent; a fixed development choice, never tuned); the **frozen
+    ``trailing_5_player_minutes``** baseline (not Stage B Candidate V3) so productivity and
+    minutes are not changed simultaneously. Like V1/V2/V3 this is a FIXED closed-form estimator
+    (no grid, no inner walk-forward); ``alpha`` mirrors the v1.0 trailing baseline (5.0) and is
+    used only by the stage-A-uninformative fallback. The block is additive: it changes no
+    v1.0/1.1/1.2/1.3 population/roster/baseline/metric/gate and is judged by the unchanged gate.
+    """
+
+    name: Literal["exposure_weighted_xg_team_share_attacking_goals_v4"]
+    development_only: Literal[True]
+    development_only_reason: Literal[
+        "archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_stage_b_minutes_input_is_a_development_proxy"
+    ]
+    grain: Literal["season_player_code_fixture"]
+    identity: Literal["stable_code"]
+    hypothesis: Literal[
+        "per_minute_attacking_productivity_times_predicted_exposure_beats_raw_per_appearance_xg_share"
+    ]
+    stage_a_model: Literal["frozen_trailing_goals_attack_defence_reused_not_reimplemented"]
+    stage_a_fit: Literal["fold_local_on_team_match_history_kickoff_time_lt_as_of"]
+    team_identity: Literal[
+        "team_code_resolved_from_season_qualified_team_id_via_mart_dim_team_never_bare_team_id"
+    ]
+    share_denominator: Literal[
+        "club_eligible_players_in_fixture_the_existing_unversioned_target_roster_proxy_shared_with_baselines_not_new_leakage"
+    ]
+    signal: Literal["expected_goals_only_no_fallback"]
+    appeared_rows_filter: Literal[
+        "prior_rows_with_minutes_gt_0_only_did_not_play_prior_rows_excluded_from_rate"
+    ]
+    window: Literal["option_a_last_five_appeared_rows_then_measured_signal_rows_among_them"]
+    history_window: Literal[5]
+    history_order: Literal["kickoff_time_then_season_then_fixture"]
+    history_observed_results: Literal["kickoff_time < as_of"]
+    # UNITS: the per-minute productivity is a per-MINUTE rate (sum_xg / sum_minutes). Per-90 is a
+    # reporting conversion only (90 * rate_per_min); it is NOT how the rate is defined or stored.
+    per_minute_productivity: Literal[
+        "xg_per_min_equals_sum_xg_over_sum_minutes_over_window_measured_rows"
+    ]
+    rate_per_90: Literal["per_90_is_reporting_only_equals_90_times_per_minute_rate"]
+    positional_prior: str
+    cold_start_prior: str
+    prior_minutes: float
+    prior_minutes_derivation: str
+    expected_minutes: str
+    expected_minutes_bin_zero: str
+    expected_minutes_empty_bin_fallbacks: tuple[float, float, float, float]
+    expected_minutes_never_uses: str
+    minutes_source: Literal[
+        "frozen_stage_b_baseline_trailing_5_player_minutes_development_proxy_not_a_candidate"
+    ]
+    minutes_baseline: Literal["trailing_5_player_minutes"]
+    minutes_fit: Literal["fold_local_on_player_fixture_history_kickoff_time_lt_as_of"]
+    weight: str
+    rate: str
+    conservation: str
+    equal_share_fallback: str
+    stage_a_uninformative_fallback: str
+    no_composer_integration_this_slice: str
+    alpha: float
+    poisson_max_goals: Literal[10]
+    estimator: Literal["poisson_goal_count_distribution_over_0_to_10"]
+    additional_smoothing: Literal["none"]
+    scoring_floor_role: Literal["existing_1e-12_floor_is_scoring_only_not_a_model_rate_floor"]
+    selected_parameter: Literal[
+        "none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward_prior_minutes_is_fixed_not_selected"
+    ]
+    fit_scope: Literal[
+        "stage_a_player_rates_and_stage_b_minutes_all_fitted_within_each_fold_on_kickoff_time_lt_as_of"
+    ]
+    target_label_policy: Literal["target_labels_never_enter_model_inputs"]
+    target_position_source: Literal["existing_unversioned_target_roster_proxy_current_position"]
+    null_policy: Literal[
+        "preserve_nulls_xg_null_means_unmeasured_never_zero_filled_excluded_from_signal_and_minutes_sums"
+    ]
+    zero_minutes_policy: Literal["target_zero_minute_rows_scored_roster_is_the_eligible_population"]
+    assistant_manager_policy: Literal["excluded_upstream_element_type_5"]
+    double_gameweek_policy: Literal[
+        "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+    ]
+    monte_carlo: Literal["out_of_scope_closed_form"]
+
+    @model_validator(mode="after")
+    def _exact_candidate_policy(self) -> Self:
+        if self.alpha != 5.0:
+            raise ValueError(
+                "Stage C Candidate V4 alpha is pinned to 5.0 (== v1.0 trailing baseline, used by "
+                f"the stage_a_uninformative fallback); got {self.alpha!r}"
+            )
+        if self.prior_minutes != 90.0:
+            raise ValueError(
+                "Stage C Candidate V4 prior_minutes is pinned to 90.0 (one full-match equivalent; "
+                f"a fixed development choice, never tuned); got {self.prior_minutes!r}"
+            )
+        if self.expected_minutes_empty_bin_fallbacks != (0.0, 30.0, 75.0, 90.0):
+            raise ValueError(
+                "Stage C Candidate V4 expected_minutes_empty_bin_fallbacks is pinned to "
+                "(0.0, 30.0, 75.0, 90.0); got "
+                f"{self.expected_minutes_empty_bin_fallbacks!r}"
+            )
+        return self
+
+
 _PHASE3_BASELINE_PINS: dict[str, dict[str, str | int | None]] = {
     "positional_goal_rate_poisson": {
         "identity": "target_position",
@@ -2431,6 +2581,7 @@ FROZEN_PHASE3_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
     "1.1": (("1.1", 0),),
     "1.2": (("1.1", 0), ("1.2", 1)),
     "1.3": (("1.1", 0), ("1.2", 1), ("1.3", 2)),
+    "1.4": (("1.1", 0), ("1.2", 1), ("1.3", 2), ("1.4", 3)),
 }
 
 
@@ -2459,6 +2610,11 @@ class Phase3EvaluationConfig(_Frozen):
     # the unchanged v1.0 promotion gate. Required here so a 1.3 config that silently drops it fails
     # to load rather than scoring a different model.
     stage_c_candidate_v3: Phase3StageCCandidateV3Policy
+    # Candidate V4 (exposure-weighted xG team share) is required at contract version 1.4. It is
+    # additive: it changes no v1.0/1.1/1.2/1.3 population/roster/baseline/metric/gate and is judged
+    # by the unchanged v1.0 promotion gate. Required here so a 1.4 config that silently drops it
+    # fails to load rather than scoring a different model.
+    stage_c_candidate_v4: Phase3StageCCandidateV4Policy
     baselines: Phase3BaselinePolicy
     metrics: Phase3MetricPolicy
     promotion: Phase3PromotionGate
@@ -2869,10 +3025,215 @@ class Phase3StageCAssistsCandidateV1Policy(_Frozen):
         return self
 
 
+class Phase3StageCAssistsCandidateV2Policy(_Frozen):
+    """Frozen pre-registration for assists Candidate V2 (exposure-weighted xA share).
+
+    The assists analogue of the goals Candidate V4: per-minute assist productivity (xA/min)
+    times predicted exposure, allocated by the team's assisted-goal expectation
+    ``lambda_team * fold_local_assist_rate`` (``sum(assists)/sum(goals_scored)`` ~0.90). It keeps
+    the goals candidates' team-coupling / conservation skeleton and changes THREE things versus
+    the raw per-appearance xA allocation it is tested against: (i) the per-player allocation
+    signal is ``shrunk_xa_per_min * E[minutes]`` (per-minute productivity times predicted
+    exposure) instead of a mean trailing xA per appearance; (ii) the cold-start prior is a
+    fold-local POSITION-SPECIFIC xA/min prior (the same deliberate choice as goals V4 -- assists
+    has no prior coupled candidate with a committed pooled behavior to inherit); and (iii) the
+    signal is xA-ONLY with NO creativity fallback (assists V1 reads
+    ``expected_assists_else_creativity``; V2 never reads ``creativity``). Distinguishing
+    choices, all locked before any V2 evaluation: **xA-only** (NO creativity fallback; this
+    candidate never reads ``creativity``; NULL xA excluded from both signal and minutes sums);
+    **Option-A window**; **position-specific** fold-local xA/min cold-start prior; **E[minutes]**
+    from the frozen ``trailing_5_player_minutes`` distribution via fold-local GLOBAL bin means
+    (bin 0 exactly 0; deterministic empty-bin fallbacks 30/75/90), never
+    ``points_composition.representative_minutes``; **fixed ``prior_minutes = 90``**; the frozen
+    ``trailing_5_player_minutes`` baseline (not Stage B Candidate V3). Like V1 this is a FIXED
+    closed-form estimator (no grid, no inner walk-forward); ``alpha`` mirrors the v1.0 trailing
+    assists baseline (5.0) and is used only by the stage-A-uninformative fallback. Conservation
+    is **underlying Poisson-rate conservation in expectation**
+    (``sum_i assist_lambda_i == team_assist_lambda``); not per-draw realised-count conservation,
+    and never fed to the composer in this slice. The block is additive: it changes no
+    v1.0/1.1 population/roster/baseline/metric/gate and is judged by the unchanged v1.0 gate.
+    """
+
+    name: Literal["exposure_weighted_xa_team_share_assists_v2"]
+    development_only: Literal[True]
+    development_only_reason: Literal[
+        "archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_stage_b_minutes_input_is_a_development_proxy"
+    ]
+    grain: Literal["season_player_code_fixture"]
+    identity: Literal["stable_code"]
+    hypothesis: Literal[
+        "per_minute_assist_productivity_times_predicted_exposure_beats_raw_per_appearance_xa_share"
+    ]
+    stage_a_model: Literal["frozen_trailing_goals_attack_defence_reused_not_reimplemented"]
+    stage_a_fit: Literal["fold_local_on_team_match_history_kickoff_time_lt_as_of"]
+    team_identity: Literal[
+        "team_code_resolved_from_season_qualified_team_id_via_mart_dim_team_never_bare_team_id"
+    ]
+    share_denominator: Literal[
+        "club_eligible_players_in_fixture_the_existing_unversioned_target_roster_proxy_shared_with_baselines_not_new_leakage"
+    ]
+    signal: Literal["expected_assists_only_no_fallback_never_reads_creativity"]
+    appeared_rows_filter: Literal[
+        "prior_rows_with_minutes_gt_0_only_did_not_play_prior_rows_excluded_from_rate"
+    ]
+    window: Literal["option_a_last_five_appeared_rows_then_measured_signal_rows_among_them"]
+    history_window: Literal[5]
+    history_order: Literal["kickoff_time_then_season_then_fixture"]
+    history_observed_results: Literal["kickoff_time < as_of"]
+    # UNITS: the per-minute productivity is a per-MINUTE rate (sum_xa / sum_minutes). Per-90 is a
+    # reporting conversion only (90 * rate_per_min); it is NOT how the rate is defined or stored.
+    per_minute_productivity: Literal[
+        "xa_per_min_equals_sum_xa_over_sum_minutes_over_window_measured_rows"
+    ]
+    rate_per_90: Literal["per_90_is_reporting_only_equals_90_times_per_minute_rate"]
+    positional_prior: str
+    cold_start_prior: str
+    prior_minutes: float
+    prior_minutes_derivation: str
+    expected_minutes: str
+    expected_minutes_bin_zero: str
+    expected_minutes_empty_bin_fallbacks: tuple[float, float, float, float]
+    expected_minutes_never_uses: str
+    minutes_source: Literal[
+        "frozen_stage_b_baseline_trailing_5_player_minutes_development_proxy_not_a_candidate"
+    ]
+    minutes_baseline: Literal["trailing_5_player_minutes"]
+    minutes_fit: Literal["fold_local_on_player_fixture_history_kickoff_time_lt_as_of"]
+    team_assist_scale: str
+    weight: str
+    rate: str
+    conservation: str
+    equal_share_fallback: str
+    stage_a_uninformative_fallback: str
+    no_composer_integration_this_slice: str
+    alpha: float
+    poisson_max_assists: Literal[10]
+    estimator: Literal["poisson_assist_count_distribution_over_0_to_10"]
+    additional_smoothing: Literal["none"]
+    scoring_floor_role: Literal["existing_1e-12_floor_is_scoring_only_not_a_model_rate_floor"]
+    selected_parameter: Literal[
+        "none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward_prior_minutes_is_fixed_not_selected"
+    ]
+    fit_scope: Literal[
+        "stage_a_player_rates_assist_rate_and_stage_b_minutes_all_fitted_within_each_fold_on_kickoff_time_lt_as_of"
+    ]
+    target_label_policy: Literal["target_labels_never_enter_model_inputs"]
+    target_position_source: Literal["existing_unversioned_target_roster_proxy_current_position"]
+    null_policy: Literal[
+        "preserve_nulls_xa_null_means_unmeasured_never_zero_filled_excluded_from_signal_and_minutes_sums"
+    ]
+    zero_minutes_policy: Literal["target_zero_minute_rows_scored_roster_is_the_eligible_population"]
+    assistant_manager_policy: Literal["excluded_upstream_element_type_5"]
+    double_gameweek_policy: Literal[
+        "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+    ]
+    monte_carlo: Literal["out_of_scope_closed_form"]
+
+    @model_validator(mode="after")
+    def _exact_candidate_policy(self) -> Self:
+        if self.alpha != 5.0:
+            raise ValueError(
+                "Stage C assists Candidate V2 alpha is pinned to 5.0 (== v1.0 trailing assists "
+                f"baseline, used by the stage_a_uninformative fallback); got {self.alpha!r}"
+            )
+        if self.prior_minutes != 90.0:
+            raise ValueError(
+                "Stage C assists Candidate V2 prior_minutes is pinned to 90.0 (one full-match "
+                "equivalent; a fixed development choice, never tuned); got "
+                f"{self.prior_minutes!r}"
+            )
+        if self.expected_minutes_empty_bin_fallbacks != (0.0, 30.0, 75.0, 90.0):
+            raise ValueError(
+                "Stage C assists Candidate V2 expected_minutes_empty_bin_fallbacks is pinned to "
+                "(0.0, 30.0, 75.0, 90.0); got "
+                f"{self.expected_minutes_empty_bin_fallbacks!r}"
+            )
+        return self
+
+
+class Phase3StageCAssistsDiagnosticComparatorPolicy(_Frozen):
+    """Frozen pre-registration for the assists DEVELOPMENT DIAGNOSTIC comparator.
+
+    The assists mirror of the controlled goals V3 architecture: mean raw xA per appearance gated by
+    the frozen ``trailing_5_player_minutes`` appearance probability and renormalised to the club's
+    assisted-goal expectation. It is NOT a candidate and NOT a required baseline; it does not alter
+    the promotion gate. Candidate V2 is compared against it (plus Candidate V1 and the two frozen
+    baselines) so the experiment can answer whether per-minute exposure beats raw per-appearance xA
+    allocation. xA-only (no creativity fallback); exact underlying Poisson-rate conservation in
+    expectation; never fed to the composer.
+    """
+
+    name: Literal["raw_per_appearance_xa_team_share_times_p_play"]
+    role: Literal[
+        "development_diagnostic_only_not_a_candidate_not_a_required_baseline_does_not_alter_the_gate"
+    ]
+    mirrors: Literal["controlled_goals_v3_architecture_applied_to_assists"]
+    grain: Literal["season_player_code_fixture"]
+    identity: Literal["stable_code"]
+    stage_a_model: Literal["frozen_trailing_goals_attack_defence_reused_not_reimplemented"]
+    stage_a_fit: Literal["fold_local_on_team_match_history_kickoff_time_lt_as_of"]
+    team_identity: Literal[
+        "team_code_resolved_from_season_qualified_team_id_via_mart_dim_team_never_bare_team_id"
+    ]
+    signal: Literal[
+        "mean_raw_expected_assists_per_appearance_over_last_five_appeared_measured_rows"
+    ]
+    signal_fallback: Literal["none_xa_only_never_reads_creativity"]
+    appeared_rows_filter: Literal[
+        "prior_rows_with_minutes_gt_0_only_did_not_play_prior_rows_excluded_from_signal"
+    ]
+    window: Literal["option_a_last_five_appeared_rows_then_measured_signal_rows_among_them"]
+    history_window: Literal[5]
+    history_order: Literal["kickoff_time_then_season_then_fixture"]
+    history_observed_results: Literal["kickoff_time < as_of"]
+    minutes_source: Literal["frozen_stage_b_baseline_trailing_5_player_minutes"]
+    minutes_baseline: Literal["trailing_5_player_minutes"]
+    minutes_fit: Literal["fold_local_on_player_fixture_history_kickoff_time_lt_as_of"]
+    appearance_probability: Literal[
+        "p_play_equals_one_minus_trailing5_minutes_distribution_bin_zero"
+    ]
+    team_assist_scale: Literal[
+        "lambda_team_times_fold_local_assist_rate_sum_assists_over_sum_goals_fallback_0_90"
+    ]
+    weight: Literal["mean_xa_per_appearance_times_p_play"]
+    rate: Literal["assist_lambda_i_equals_team_assist_lambda_times_weight_i_over_sum_team_weight"]
+    conservation: Literal[
+        "underlying_poisson_rate_conservation_in_expectation_sum_i_assist_lambda_i_equals_team_assist_lambda_NOT_per_draw_realised_count"
+    ]
+    cold_start_prior: Literal[
+        "fold_local_position_specific_xa_per_appearance_else_pooled_xa_per_appearance"
+    ]
+    equal_share_fallback: Literal[
+        "when_roster_weights_sum_to_zero_equal_shares_conserve_team_assist_lambda"
+    ]
+    stage_a_uninformative_fallback: Literal[
+        "when_stage_a_training_window_empty_rate_is_exact_v1_trailing_assists_baseline_per_player"
+    ]
+    no_composer_integration: Literal[
+        "diagnostic_scores_component_level_assists_only_never_fed_to_points_composition"
+    ]
+    alpha: float
+    poisson_max_assists: Literal[10]
+    estimator: Literal["poisson_assist_count_distribution_over_0_to_10"]
+    null_policy: Literal[
+        "preserve_nulls_xa_null_means_unmeasured_never_zero_filled_excluded_from_signal_sums"
+    ]
+
+    @model_validator(mode="after")
+    def _exact_comparator_policy(self) -> Self:
+        if self.alpha != 5.0:
+            raise ValueError(
+                "Stage C assists diagnostic comparator alpha is pinned to 5.0 (== v1.0 trailing "
+                f"assists baseline, used by the stage_a_uninformative fallback); got {self.alpha!r}"
+            )
+        return self
+
+
 ORIGINAL_PHASE3_STAGE_C_ASSISTS_CONTRACT_VERSION: str = "1.0"
 FROZEN_PHASE3_STAGE_C_ASSISTS_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
     "1.0": (),
     "1.1": (("1.1", 0),),
+    "1.2": (("1.1", 0), ("1.2", 1)),
 }
 
 
@@ -2900,6 +3261,16 @@ class Phase3StageCAssistsEvaluationConfig(_Frozen):
     # It is additive: changes no v1.0 population/roster/baseline/metric/gate; judged by the
     # unchanged v1.0 gate. Optional (None) at v1.0 (baseline-only); required after.
     stage_c_assists_candidate_v1: Phase3StageCAssistsCandidateV1Policy | None = None
+    # Candidate V2 (exposure-weighted xA team share) is required from contract version 1.2. It is
+    # additive: changes no v1.0/1.1 population/roster/baseline/metric/gate; judged by the unchanged
+    # v1.0 gate. Optional (None) at v1.0/1.1; required from 1.2.
+    stage_c_assists_candidate_v2: Phase3StageCAssistsCandidateV2Policy | None = None
+    # The assists DEVELOPMENT DIAGNOSTIC comparator (raw per-appearance xA x P(play), the goals-V3
+    # architecture applied to assists). Optional at every version; present from v1.2. It is NOT a
+    # candidate and NOT a required baseline and does not alter the promotion gate.
+    stage_c_assists_diagnostic_comparator: Phase3StageCAssistsDiagnosticComparatorPolicy | None = (
+        None
+    )
     baselines: Phase3StageCAssistsBaselinePolicy
     metrics: Phase3MetricPolicy
     promotion: Phase3StageCAssistsPromotionGate
@@ -2953,17 +3324,37 @@ class Phase3StageCAssistsEvaluationConfig(_Frozen):
 
     @model_validator(mode="after")
     def _candidate_required_after_v1_0(self) -> Self:
-        """v1.0 is baseline-only (no candidate); any later version requires Candidate V1."""
+        """v1.0 is baseline-only (no candidate); any later version requires Candidate V1, and from
+        v1.2 also Candidate V2."""
         if self.contract_version == ORIGINAL_PHASE3_STAGE_C_ASSISTS_CONTRACT_VERSION:
             if self.stage_c_assists_candidate_v1 is not None:
                 raise ValueError(
                     "Stage C assists contract v1.0 is baseline-only and must not carry a "
                     "stage_c_assists_candidate_v1 block"
                 )
-        elif self.stage_c_assists_candidate_v1 is None:
+            if self.stage_c_assists_candidate_v2 is not None:
+                raise ValueError(
+                    "Stage C assists contract v1.0 is baseline-only and must not carry a "
+                    "stage_c_assists_candidate_v2 block"
+                )
+            return self
+        # After v1.0, Candidate V1 is always required.
+        if self.stage_c_assists_candidate_v1 is None:
             raise ValueError(
                 f"Stage C assists contract version {self.contract_version} requires a "
                 "stage_c_assists_candidate_v1 block; it is missing"
+            )
+        # Candidate V2 is required from v1.2; it must be absent before then.
+        v2_expected = self.contract_version >= "1.2"
+        if v2_expected and self.stage_c_assists_candidate_v2 is None:
+            raise ValueError(
+                f"Stage C assists contract version {self.contract_version} requires a "
+                "stage_c_assists_candidate_v2 block; it is missing"
+            )
+        if not v2_expected and self.stage_c_assists_candidate_v2 is not None:
+            raise ValueError(
+                f"Stage C assists contract version {self.contract_version} must not carry a "
+                "stage_c_assists_candidate_v2 block (added at v1.2)"
             )
         return self
 
@@ -3001,4 +3392,147 @@ def load_phase3_stage_c_assists_evaluation(
 ) -> Phase3StageCAssistsEvaluationConfig:
     return Phase3StageCAssistsEvaluationConfig.model_validate(
         _read_yaml(path or config_dir() / "phase3_stage_c_assists_evaluation.yaml")
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Phase 4 Stage D / Prospective EV Walk-forward Backtest contract
+# --------------------------------------------------------------------------------------
+
+
+class Phase4HorizonPolicy(_Frozen):
+    season: Literal["2025-26"]
+    start_gw: Literal[29]
+    end_gw: Literal[38]
+    expected_selected_gws: Literal[10]
+    expected_fixtures: Literal[99]
+    expected_player_fixture_rows: Literal[8224]
+    split_unit: Literal["observed_gameweek"]
+    cutoff_proxy: Literal["first_kickoff_of_gameweek"]
+
+    @property
+    def expected_gws(self) -> tuple[int, ...]:
+        return tuple(range(self.start_gw, self.end_gw + 1))
+
+
+class Phase4SupportPolicy(_Frozen):
+    max_fixture_points: Literal[34]
+
+
+class Phase4ComponentsPolicy(_Frozen):
+    stage_a: Literal["trailing_goals_attack_defence"]
+    minutes: Literal["concentration_adaptive_shrinkage_player_minutes_v3"]
+    saves: Literal["league_constant_save_rate_v1"]
+    defensive_contribution: Literal["team_rescaled_dc_v1"]
+    bps_residual: Literal["trailing_ict_ridge_residual_v1"]
+
+
+class Phase4PrimaryArchitecturePolicy(_Frozen):
+    name: Literal["prospective_v3_coupled_seasonal_bonus"]
+    attacking: Literal["minutes_gated_coupled_team_share_attacking_goals_v3"]
+    assists: Literal["coupled_team_share_assists"]
+    appearance: Literal["seasonal_equal_weighted_trailing_5"]
+    seasonal_appearance_min_rows: Literal[3]
+    prior_season_blend_weight: float
+    historical_availability_multiplier: float
+    scoring_rules: Literal["2026_27"]
+    bonus_simulation: Literal["joint_fixture_bps_monte_carlo"]
+
+    @field_validator("prior_season_blend_weight")
+    @classmethod
+    def _check_blend(cls, v: float) -> float:
+        if v != 0.0:
+            raise ValueError(f"prior_season_blend_weight {v} != 0.0")
+        return v
+
+    @field_validator("historical_availability_multiplier")
+    @classmethod
+    def _check_avail(cls, v: float) -> float:
+        if v != 1.0:
+            raise ValueError(f"historical_availability_multiplier {v} != 1.0")
+        return v
+
+
+class Phase4DiagnosticComparatorPolicy(_Frozen):
+    name: Literal["prospective_v1_independent_seasonal_bonus"]
+    attacking: Literal["xg_informed_trailing_player_goals_v1"]
+    assists: Literal["xa_informed_trailing_player_assists_v1"]
+    role: Literal["development_diagnostic_only_not_a_promotion_gate"]
+
+
+class Phase4MonteCarloPolicy(_Frozen):
+    draws: Literal[2000]
+    seed: Literal[202627]
+
+
+class Phase4TargetPopulationPolicy(_Frozen):
+    eligible: Literal["minutes_not_null"]
+    include_zero_minutes: Literal[True]
+    scoring_ruleset: Literal["2026_27"]
+
+
+class Phase4MetricsPolicy(_Frozen):
+    ranking: tuple[
+        Literal["ndcg_at_20"],
+        Literal["top_20_actual_points_capture_ratio"],
+        Literal["top_20_overlap"],
+        Literal["spearman_ev_vs_actual_within_gw_position"],
+        Literal["spearman_ev_vs_actual_cumulative"],
+    ]
+    calibration: tuple[
+        Literal["ev_total_vs_actual_total"],
+        Literal["signed_bias"],
+        Literal["ev_actual_ratio"],
+        Literal["mae"],
+        Literal["rmse"],
+    ]
+    proper_distribution: tuple[
+        Literal["mean_log_score"],
+        Literal["mean_ranked_probability_score"],
+        Literal["randomized_pit_80"],
+    ]
+
+
+class Phase4ScoringCalibrationPolicy(_Frozen):
+    log_probability_floor: float
+    randomized_pit_band: tuple[float, float]
+    randomized_pit_seed: Literal[202627]
+
+    @field_validator("log_probability_floor")
+    @classmethod
+    def _check_floor(cls, v: float) -> float:
+        if abs(v - 1.0e-12) > 1e-18:
+            raise ValueError(f"log_probability_floor {v} != 1.0e-12")
+        return v
+
+    @field_validator("randomized_pit_band")
+    @classmethod
+    def _check_band(cls, v: tuple[float, float]) -> tuple[float, float]:
+        if v != (0.1, 0.9):
+            raise ValueError(f"randomized_pit_band {v} != (0.1, 0.9)")
+        return v
+
+
+class Phase4EVBacktestConfig(_Frozen):
+    """Executable evaluation contract for the Phase 4 EV Walk-forward Backtest."""
+
+    contract_version: Literal["1.0"]
+    phase: Literal[4]
+    horizon: Phase4HorizonPolicy
+    support: Phase4SupportPolicy
+    components: Phase4ComponentsPolicy
+    primary_architecture: Phase4PrimaryArchitecturePolicy
+    diagnostic_comparator: Phase4DiagnosticComparatorPolicy
+    monte_carlo: Phase4MonteCarloPolicy
+    target_population: Phase4TargetPopulationPolicy
+    metrics: Phase4MetricsPolicy
+    scoring_calibration: Phase4ScoringCalibrationPolicy
+
+
+@functools.cache
+def load_phase4_ev_backtest_evaluation(
+    path: Path | None = None,
+) -> Phase4EVBacktestConfig:
+    return Phase4EVBacktestConfig.model_validate(
+        _read_yaml(path or config_dir() / "phase4_ev_backtest_evaluation.yaml")
     )

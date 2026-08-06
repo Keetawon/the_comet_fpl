@@ -3,6 +3,11 @@
 Status: implemented, development-only. The artifact is a reliable transport contract, not a
 claim that the component forecasts have been prospectively validated at real deadlines.
 
+This file is one immutable forecast snapshot, not yet a multi-run prediction ledger. The next
+production layer must retain every pre-deadline artifact/run identity rather than replacing an older
+forecast, and must join actuals only after fixture finalisation. BI and model-monitoring consumers
+need both player-fixture and player-gameweek grains; the current public artifact exposes the latter.
+
 ## Purpose and format
 
 `fpl.jobs.prospective_points_v1` emits a versioned JSON Lines file when `--output` is supplied.
@@ -56,6 +61,12 @@ JSON `null` is preserved. It is never converted to zero. The distribution must b
 finite, sum to one within `1e-9`, and reconcile to `expected_points`. Availability is a separate
 reported overlay: it changes the adjusted expectation but never the stored distribution.
 
+The current multiplier comes from the deadline bootstrap's
+`chance_of_playing_next_round`/status and is repeated on every gameweek row in the horizon. That
+next-round-to-horizon assumption is not prospectively validated. It must be replaced by a measured
+per-GW availability policy or explicitly excluded from later-GW decision utility before operational
+use; the raw distribution remains unchanged either way.
+
 An abbreviated row looks like this:
 
 ```json
@@ -87,3 +98,8 @@ Two identical runs from the same Git commit, database, configuration, live captu
 seed must produce identical bytes and therefore the same SHA-256. Artifact emission refuses a dirty
 worktree because a commit SHA alone cannot reproduce uncommitted source. Put generated output
 outside the repository (as in the recipe) so it does not itself dirty the checkout.
+
+Before this contract is accepted as an external BI source, harden the reader to assert UTC-aware
+timestamps, `bootstrap_known_at <= as_of`, exactly `roster_size` stable codes in every gameweek,
+and the required contract/component identity keys. The current saved artifact satisfies those
+conditions; the remaining work is fail-closed validation for malformed future inputs.

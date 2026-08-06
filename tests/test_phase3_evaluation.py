@@ -31,7 +31,7 @@ def test_phase3_contract_loads_with_point_in_time_cutoffs() -> None:
     load_phase3_evaluation.cache_clear()
     contract = load_phase3_evaluation()
     assert contract.phase == 3
-    assert contract.contract_version == "1.3"
+    assert contract.contract_version == "1.4"
     assert contract.target.entity == "player"
     assert contract.target.grain == "season_player_code_fixture"
     assert contract.target.outcome == "goals_distribution"
@@ -86,7 +86,7 @@ def test_phase3_metrics_and_promotion_gates() -> None:
 
 def test_version_bump_without_amendment_is_rejected() -> None:
     document = copy.deepcopy(_document())
-    document["contract_version"] = "1.4"
+    document["contract_version"] = "1.5"
     with pytest.raises(ValidationError, match="no amendment record"):
         Phase3EvaluationConfig.model_validate(document)
 
@@ -237,3 +237,64 @@ def test_phase3_v3_is_additive_to_v1_0_comparison_rules() -> None:
     assert contract.promotion.minimum_primary_relative_lift == 0.01
     assert contract.promotion.minimum_fold_count == 181
     assert contract.promotion.require_no_season_mean_log_score_regression is True
+
+
+def test_phase3_candidate_v4_policy_is_frozen_and_additive() -> None:
+    contract = load_phase3_evaluation()
+    cand = contract.stage_c_candidate_v4
+    assert cand.name == "exposure_weighted_xg_team_share_attacking_goals_v4"
+    assert cand.development_only is True
+    assert cand.alpha == 5.0
+    assert cand.prior_minutes == 90.0
+    assert cand.history_window == 5
+    assert cand.signal == "expected_goals_only_no_fallback"
+    assert cand.minutes_baseline == "trailing_5_player_minutes"
+    assert cand.window == "option_a_last_five_appeared_rows_then_measured_signal_rows_among_them"
+    expected_selected = (
+        "none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward_"
+        "prior_minutes_is_fixed_not_selected"
+    )
+    assert cand.selected_parameter == expected_selected
+    assert cand.null_policy == (
+        "preserve_nulls_xg_null_means_unmeasured_never_zero_filled_excluded_from_signal_and_minutes_sums"
+    )
+
+
+def test_phase3_candidate_v4_constants_are_pinned() -> None:
+    """alpha and prior_minutes cannot be changed without failing to load."""
+    document = copy.deepcopy(_document())
+    document["stage_c_candidate_v4"]["alpha"] = 7.0
+    with pytest.raises(ValidationError, match=r"alpha is pinned to 5\.0"):
+        Phase3EvaluationConfig.model_validate(document)
+    document2 = copy.deepcopy(_document())
+    document2["stage_c_candidate_v4"]["prior_minutes"] = 270.0
+    with pytest.raises(ValidationError, match=r"prior_minutes is pinned to 90\.0"):
+        Phase3EvaluationConfig.model_validate(document2)
+
+
+def test_phase3_amendment_1_4_record_is_frozen() -> None:
+    """The 1.4 amendment record (candidates_evaluated_before_amendment: 3) is pinned."""
+    document = copy.deepcopy(_document())
+    document["amendments"][3]["candidates_evaluated_before_amendment"] = 2
+    with pytest.raises(ValidationError, match="not the frozen record"):
+        Phase3EvaluationConfig.model_validate(document)
+
+
+def test_phase3_v4_is_additive_to_v1_0_comparison_rules() -> None:
+    """Amendment 1.4 changes no v1.0/1.1/1.2/1.3 baseline/metric/gate field."""
+    contract = load_phase3_evaluation()
+    assert {defn.name for defn in contract.baselines.definitions} == {
+        "positional_goal_rate_poisson",
+        "trailing_player_goal_rate_poisson",
+    }
+    assert contract.promotion.minimum_primary_relative_lift == 0.01
+    assert contract.promotion.minimum_fold_count == 181
+    assert contract.promotion.require_no_season_mean_log_score_regression is True
+
+
+def test_phase3_v4_block_is_required_at_1_4() -> None:
+    """A 1.4 config that drops the V4 block fails to load rather than scoring a different model."""
+    document = copy.deepcopy(_document())
+    document.pop("stage_c_candidate_v4", None)
+    with pytest.raises(ValidationError):
+        Phase3EvaluationConfig.model_validate(document)

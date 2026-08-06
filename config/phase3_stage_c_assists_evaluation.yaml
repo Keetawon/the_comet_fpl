@@ -6,7 +6,7 @@
 # Stage C assists model code. A candidate cannot choose easier folds, populations, bin shapes,
 # baselines, metrics, or lift gates after seeing its results.
 
-contract_version: "1.1"
+contract_version: "1.2"
 phase: 3
 
 amendments:
@@ -31,6 +31,46 @@ amendments:
       / GK -0.07, modest, supports shrinking the assist residual almost fully to the positional mean);
       config xa_signal_policy.fallback_signal creativity and stage_c_assists_candidate_v1.creativity_
       rescale.
+  - version: "1.2"
+    date: "2026-08-06"
+    candidates_evaluated_before_amendment: 1
+    changed: >
+      additive_stage_c_assists_candidate_v2_pre_registration_only_no_population_roster_baseline_metric_or_gate_field_changed
+    reason: >
+      Pre-register Candidate V2 exposure_weighted_xa_team_share_assists_v2: the assists analogue of
+      the goals Candidate V4, testing whether separating per-minute assist productivity from
+      predicted exposure beats the raw per-appearance xA share. It keeps the team-coupling /
+      conservation skeleton and changes THREE things versus the raw per-appearance xA allocation it
+      is tested against: (i) the per-player allocation signal is shrunk_xa_per_min * E[minutes] where
+      shrunk_xa_per_min is a per-MINUTE rate (sum(xA) / sum(minutes) over the Option-A trailing
+      appeared window -- per-90 is only a reporting conversion, 90 * rate_per_min, and is not how the
+      rate is defined); (ii) the cold-start prior is a fold-local POSITION-SPECIFIC xA/min prior (the
+      same deliberate choice as goals V4; assists has no prior coupled candidate with a committed
+      pooled behavior to inherit); and (iii) the signal is xA-ONLY with NO creativity fallback
+      (assists V1 reads expected_assists_else_creativity; V2 never reads creativity). The club's
+      assisted-goal expectation is lambda_team * fold_local_assist_rate (sum(assists)/sum(goals_scored),
+      ~0.90) allocated by an xA-exposure weight. NULL xA is unmeasured and never zero-filled and
+      contributes neither to the signal sum nor to the minutes sum. It uses the Option-A trailing
+      window, fold-local GLOBAL bin means for E[minutes] (never
+      points_composition.representative_minutes), FIXED prior_minutes = 90, and the frozen
+      trailing_5_player_minutes baseline (NOT Stage B Candidate V3) as the goals V4 candidate.
+      Conservation is underlying Poisson-rate conservation in expectation
+      (sum_i assist_lambda_i == team_assist_lambda), NOT per-draw realised-count conservation, and the
+      candidate is never fed to the full-points composer in this slice. This amendment also
+      pre-registers a DEVELOPMENT DIAGNOSTIC comparator
+      raw_per_appearance_xa_team_share_times_p_play (the stage_c_assists_diagnostic_comparator
+      block): the assists mirror of the controlled goals V3 architecture (mean raw xA per appearance
+      gated by the frozen trailing_5_player_minutes P(play) and renormalised to
+      lambda_team * fold_local_assist_rate; xA-only, no creativity fallback; exact underlying
+      Poisson-rate conservation). It is NOT a candidate and NOT a required baseline; it does not
+      alter the promotion gate. Candidate V2 is compared against it, Candidate V1, and the two frozen
+      baselines so the experiment can answer whether per-minute exposure beats raw per-appearance xA
+      allocation. This block is additive: it changes no v1.0/1.1 population, target roster, baseline,
+      metric, gate, seed, or calibration field and is judged by the unchanged v1.0 promotion gate.
+    evidence: >
+      docs/phase3-stage-c-assists-candidate-v2-design.md (the exposure hypothesis applied to assists;
+      xA shares the xG measured-coverage profile); config stage_c_assists_candidate_v2.signal
+      (expected_assists_only_no_fallback), .prior_minutes, and .team_assist_scale.
 
 target:
   entity: player
@@ -125,6 +165,91 @@ stage_c_assists_candidate_v1:
   assistant_manager_policy: excluded_upstream_element_type_5
   double_gameweek_policy: "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
   monte_carlo: out_of_scope_closed_form
+
+stage_c_assists_candidate_v2:
+  name: exposure_weighted_xa_team_share_assists_v2
+  development_only: true
+  development_only_reason: archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_stage_b_minutes_input_is_a_development_proxy
+  grain: season_player_code_fixture
+  identity: stable_code
+  hypothesis: per_minute_assist_productivity_times_predicted_exposure_beats_raw_per_appearance_xa_share
+  stage_a_model: frozen_trailing_goals_attack_defence_reused_not_reimplemented
+  stage_a_fit: fold_local_on_team_match_history_kickoff_time_lt_as_of
+  team_identity: team_code_resolved_from_season_qualified_team_id_via_mart_dim_team_never_bare_team_id
+  share_denominator: club_eligible_players_in_fixture_the_existing_unversioned_target_roster_proxy_shared_with_baselines_not_new_leakage
+  signal: expected_assists_only_no_fallback_never_reads_creativity
+  appeared_rows_filter: prior_rows_with_minutes_gt_0_only_did_not_play_prior_rows_excluded_from_rate
+  window: option_a_last_five_appeared_rows_then_measured_signal_rows_among_them
+  history_window: 5
+  history_order: kickoff_time_then_season_then_fixture
+  history_observed_results: "kickoff_time < as_of"
+  per_minute_productivity: "xa_per_min_equals_sum_xa_over_sum_minutes_over_window_measured_rows"
+  rate_per_90: "per_90_is_reporting_only_equals_90_times_per_minute_rate"
+  positional_prior: fold_local_position_specific_xa_per_min_over_appeared_measured_prior_rows
+  cold_start_prior: when_no_measured_trailing_row_rate_is_fold_local_position_specific_xa_per_min_NOT_pooled
+  prior_minutes: 90.0
+  prior_minutes_derivation: one_full_match_equivalent_own_rate_equals_prior_weight_at_90_measured_minutes_fixed_development_choice_never_tuned
+  expected_minutes: fold_local_global_empirical_bin_means_from_trailing_5_player_minutes_distribution
+  expected_minutes_bin_zero: exactly_zero
+  expected_minutes_empty_bin_fallbacks: [0.0, 30.0, 75.0, 90.0]
+  expected_minutes_never_uses: points_composition_representative_minutes
+  minutes_source: frozen_stage_b_baseline_trailing_5_player_minutes_development_proxy_not_a_candidate
+  minutes_baseline: trailing_5_player_minutes
+  minutes_fit: fold_local_on_player_fixture_history_kickoff_time_lt_as_of
+  team_assist_scale: lambda_team_times_fold_local_assist_rate_sum_assists_over_sum_goals_fallback_0_90
+  weight: assist_weight_i_equals_shrunk_xa_per_min_i_times_E_minutes_i_no_extra_p_play_factor_avoiding_double_counted_availability
+  rate: assist_lambda_i_equals_team_assist_lambda_times_assist_weight_i_over_sum_team_assist_weight
+  conservation: underlying_poisson_rate_conservation_in_expectation_sum_i_assist_lambda_i_equals_team_assist_lambda_NOT_per_draw_realised_count
+  equal_share_fallback: when_a_position_has_no_measured_signal_prior_or_roster_weights_sum_to_zero_equal_shares_conserve_team_assist_lambda
+  stage_a_uninformative_fallback: when_stage_a_training_window_empty_rate_is_exact_v1_trailing_assists_baseline_per_player
+  no_composer_integration_this_slice: candidate_scores_component_level_assists_only_never_fed_to_points_composition
+  alpha: 5.0
+  poisson_max_assists: 10
+  estimator: poisson_assist_count_distribution_over_0_to_10
+  additional_smoothing: none
+  scoring_floor_role: existing_1e-12_floor_is_scoring_only_not_a_model_rate_floor
+  selected_parameter: none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward_prior_minutes_is_fixed_not_selected
+  fit_scope: stage_a_player_rates_assist_rate_and_stage_b_minutes_all_fitted_within_each_fold_on_kickoff_time_lt_as_of
+  target_label_policy: target_labels_never_enter_model_inputs
+  target_position_source: existing_unversioned_target_roster_proxy_current_position
+  null_policy: preserve_nulls_xa_null_means_unmeasured_never_zero_filled_excluded_from_signal_and_minutes_sums
+  zero_minutes_policy: target_zero_minute_rows_scored_roster_is_the_eligible_population
+  assistant_manager_policy: excluded_upstream_element_type_5
+  double_gameweek_policy: "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+  monte_carlo: out_of_scope_closed_form
+
+stage_c_assists_diagnostic_comparator:
+  name: raw_per_appearance_xa_team_share_times_p_play
+  role: development_diagnostic_only_not_a_candidate_not_a_required_baseline_does_not_alter_the_gate
+  mirrors: controlled_goals_v3_architecture_applied_to_assists
+  grain: season_player_code_fixture
+  identity: stable_code
+  stage_a_model: frozen_trailing_goals_attack_defence_reused_not_reimplemented
+  stage_a_fit: fold_local_on_team_match_history_kickoff_time_lt_as_of
+  team_identity: team_code_resolved_from_season_qualified_team_id_via_mart_dim_team_never_bare_team_id
+  signal: mean_raw_expected_assists_per_appearance_over_last_five_appeared_measured_rows
+  signal_fallback: none_xa_only_never_reads_creativity
+  appeared_rows_filter: prior_rows_with_minutes_gt_0_only_did_not_play_prior_rows_excluded_from_signal
+  window: option_a_last_five_appeared_rows_then_measured_signal_rows_among_them
+  history_window: 5
+  history_order: kickoff_time_then_season_then_fixture
+  history_observed_results: "kickoff_time < as_of"
+  minutes_source: frozen_stage_b_baseline_trailing_5_player_minutes
+  minutes_baseline: trailing_5_player_minutes
+  minutes_fit: fold_local_on_player_fixture_history_kickoff_time_lt_as_of
+  appearance_probability: p_play_equals_one_minus_trailing5_minutes_distribution_bin_zero
+  team_assist_scale: lambda_team_times_fold_local_assist_rate_sum_assists_over_sum_goals_fallback_0_90
+  weight: mean_xa_per_appearance_times_p_play
+  rate: assist_lambda_i_equals_team_assist_lambda_times_weight_i_over_sum_team_weight
+  conservation: underlying_poisson_rate_conservation_in_expectation_sum_i_assist_lambda_i_equals_team_assist_lambda_NOT_per_draw_realised_count
+  cold_start_prior: fold_local_position_specific_xa_per_appearance_else_pooled_xa_per_appearance
+  equal_share_fallback: when_roster_weights_sum_to_zero_equal_shares_conserve_team_assist_lambda
+  stage_a_uninformative_fallback: when_stage_a_training_window_empty_rate_is_exact_v1_trailing_assists_baseline_per_player
+  no_composer_integration: diagnostic_scores_component_level_assists_only_never_fed_to_points_composition
+  alpha: 5.0
+  poisson_max_assists: 10
+  estimator: poisson_assist_count_distribution_over_0_to_10
+  null_policy: preserve_nulls_xa_null_means_unmeasured_never_zero_filled_excluded_from_signal_sums
 
 baselines:
   stage_c_attacking_assists:

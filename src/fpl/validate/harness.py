@@ -87,7 +87,11 @@ def _training_window(con: duckdb.DuckDBPyConnection, fold: Fold) -> TrainingWind
     any prior at all at the start of a season.
     """
     frame = con.execute(
-        f"SELECT {_TEAM_MATCH_SELECT} {_TEAM_MATCH_FROM} WHERE m.kickoff_time < ?",
+        f"""
+        SELECT {_TEAM_MATCH_SELECT} {_TEAM_MATCH_FROM}
+        WHERE m.kickoff_time < ?
+        ORDER BY m.kickoff_time, m.season, m.fixture, club.team_code, opponent.team_code
+        """,
         [fold.as_of],
     ).pl()
     return TrainingWindow(frame)

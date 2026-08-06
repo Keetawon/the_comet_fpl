@@ -1,8 +1,10 @@
 # The publish contract
 
-**Status: agreed design, not yet implemented.** Phase 3b builds the Stage E optimiser and this
-static export; Phase 4 builds the first dashboard consumer. Recorded now so Phases 1–3 write
-towards a fixed boundary rather than being retrofitted.
+**Status: agreed application-export design, not yet implemented.** The development-only Stage E
+optimiser and its stable prospective-points input artifact are implemented. Phase 3b still needs the
+append-only prediction ledger, BI semantic/star-schema export, and this static application export;
+Phase 4 builds the first dashboard consumer. Recorded now so upstream work targets a fixed boundary
+rather than being retrofitted.
 
 ## Why this exists
 
@@ -16,9 +18,14 @@ React app would consume. Swapping frontends later is a frontend-only change with
 re-plumbing, so the choice stops being one that has to be right today. The export also
 doubles as a public read-only API.
 
-**Nothing downstream of `publish` may query DuckDB.** The dashboard reads `public/data/`
-only. A dashboard that reaches into the database re-couples the two and reintroduces
-request-time inference.
+**Nothing downstream of `publish` may query the mutable production DuckDB.** Internal prediction
+and outcome marts may live in DuckDB, but the dashboard reads `public/data/` only and BI tools read
+an atomic, versioned columnar export. A consumer that reaches into the production database
+re-couples the layers, loses reproducible forecast vintages, and reintroduces request-time work.
+
+The BI extension is intentionally not specified by the JSON examples below. It needs its own
+versioned star-schema contract, with immutable forecast runs, player-fixture actuals, team-fixture
+difficulty, and pivot-ready dimensions. Do not silently overload this application schema.
 
 ## Layout
 
@@ -231,7 +238,7 @@ Baselines are named in the file, not assumed by the frontend, so adding a fourth
 pipeline change only. `n` accompanies every reliability bucket — a calibration curve without
 bin counts hides that the tail bins are three observations.
 
-## Implementation notes for Phase 3b
+## Remaining implementation notes for Phase 3b
 
 - Artefacts are written by `src/fpl/publish/export.py`, with **pydantic models defining every
   payload**. The models are the contract; the JSON is their serialisation.
@@ -241,7 +248,12 @@ bin counts hides that the tail bins are three observations.
   `total_points`.
 - Write atomically — build into a temp directory and move, so a partially-written export is
   never served. Same reasoning as the snapshot job's all-or-nothing rule.
-- `publish` reads `mart_target_*` and the prediction tables. It is the boundary where target
-  data is *allowed*; the feature builder's restriction does not apply here.
+- `publish` reads `mart_target_*` and the future append-only prediction ledger. It is the boundary
+  where target data is *allowed*; the feature builder's restriction does not apply here. A
+  prediction vintage is never updated when actuals arrive: joins and derived evaluation views sit
+  downstream of the immutable run and forecast facts.
+- Build the complete application JSON and BI columnar export in sibling temporary locations and
+  promote them atomically only after schema, row-accounting, distribution, identity, and provenance
+  checks pass.
 - Serve `public/data/` from Pages or any CDN. Streamlit reads the same files from disk, so
   local and deployed rendering are identical.

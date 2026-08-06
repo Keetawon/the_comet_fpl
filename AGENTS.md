@@ -136,8 +136,17 @@ the **only** recency-weighted signal: xG-share and xA-share (`mean_trailing_sign
 rate, and the pooled GK save rate are all equal-weighted or league-pooled and were left unchanged.
 It is point-in-time safe but carries every stage's development caveats and is not a
 production forecast. Running it needs the live snapshots loaded (`jobs/load_snapshots`); the loaded
-bootstrap also carries prices (`now_cost`), penalty/set-piece order, per-player xG, and ownership,
-which the future optimiser and further attacking work can use. See `docs/phase4-*`.
+bootstrap also carries prices (`now_cost`), penalty/set-piece order, per-player xG, and ownership.
+The prospective job now emits a canonical, provenance-bearing JSONL artifact with one full-points
+distribution per `(season, gw, code)`. Stage E consumes only that artifact and implements an exact
+fixed-squad ILP plus a deterministic bounded transfer planner under the verified 2026/27 squad
+rules. It is development-only, not a validated recommendation. A 2026-08-04 review found four
+operational gaps that must be resolved or explicitly contracted before use: transition pruning can
+drop the legal no-transfer action; `chance_of_playing_next_round` is currently repeated across the
+whole horizon; optimiser output does not yet carry its own complete code/config/solver provenance;
+and future transfers use the deadline's static prices with no price-change or selling-value model.
+See `docs/phase4-*`, `docs/prospective-points-artifact.md`, and
+`docs/stage-e-squad-optimizer.md`.
 
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
@@ -150,7 +159,9 @@ with one atomic replacement only after success.
 
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
-publish boundary is a design contract and is not implemented.
+append-only prediction ledger, BI semantic export, and publish boundary remain design work and are
+not implemented; the prospective artifact and Stage E optimiser immediately upstream of them are
+implemented development-only.
 
 ## Non-negotiable correctness rules
 
@@ -225,6 +236,8 @@ Also preserve these data contracts:
   It reads outcomes, which the feature layer may not -- scoring a prediction needs the label.
 - `src/fpl/models/`: scoring, the Stage A team-goals models, Stage B minutes candidates, and
   Stage C attacking-goals baselines/probes.
+- `src/fpl/artifacts/`: stable, typed transport contracts such as the prospective-points JSONL.
+- `src/fpl/optimize/`: Stage E squad, lineup, captain, and bounded transfer planning.
 - `src/fpl/jobs/`: thin orchestration/CLI entry points.
 - `tests/`: executable data contracts; vendored API fixtures keep tests offline.
 - `docs/`: design records and the future static publish contract.
@@ -251,6 +264,15 @@ DuckDB.
    a contract or roadmap status changes.
 7. Keep tests deterministic and network-free. Use the local stub and clearly-labelled vendored
    fixtures. Archive-backed tests may be marked `archive`.
+8. Prediction runs are immutable facts. A future ledger must retain every run and forecast vintage
+   with `as_of`, creation time, input hashes, component/contract identities, and stable run ID.
+   Never update an old forecast row with a newer prediction.
+9. Keep predictions and outcomes separate. Attach actuals only after the fixture is final, at
+   player-fixture grain `(season, code, fixture)`; aggregate to gameweek only downstream. Recorded
+   points and points replayed under `scoring_2026_27` must remain separately named.
+10. Internal marts or a ledger may use DuckDB, but BI, dashboard, and public consumers receive an
+    atomic read-only export (prefer pivot-friendly Parquet plus versioned application JSON). They
+    never query the mutable production database.
 
 Run the smallest relevant tests while iterating, then use the full local gate before handoff:
 
@@ -477,12 +499,24 @@ Unless the user sets another priority, address prerequisites before model sophis
    xA-share, the DC hit rate, and the pooled GK save rate are equal-weighted or league-pooled and
    were confirmed correct as-is. Still open on this track and measured-but-not-yet-built: a
    price-informed starter prior in the appearance layer, and a Stage A team-goals recency/time-decay
-   audit (its `lambda_conceded` drives both goal allocation and GK saves). The **Stage E squad
-   optimiser is not started**; it consumes this xP plus the live prices/ownership already loaded and
-   must respect the FPL squad rules (15 players, 100.0m budget, <= 3 per club, valid formation,
-   captain/vice, bench order) and the -4 hit for transfers beyond the free one, planning over the
-   GW-horizon. Prospective changes must stay point-in-time safe and must not silently re-run or
-   re-judge any frozen historical evaluation.
+   audit (its `lambda_conceded` drives both goal allocation and GK saves). The Stage E squad
+   optimiser and its stable prospective-points input artifact are now implemented
+   **development-only**. The fixed-squad ILP is exact; the multi-GW transfer search is bounded and
+   makes no global-optimality claim. Before another decision run, fix the confirmed no-transfer
+   pruning defect (always reserve the current squad in every successor set and add a dense
+   regression test). Before operational use, measure and contract the horizon semantics of the
+   next-round availability overlay, add independent optimiser code/config/solver provenance, and
+   state that future prices and selling values are static/unknown. Prospective changes must stay
+   point-in-time safe and must not silently re-run or re-judge any frozen historical evaluation.
+9. After the optimiser blockers, build the **append-only prediction ledger and BI semantic export**
+   before a dashboard UI. Retain both player-fixture and player-gameweek predictions for every
+   pre-deadline run, never overwrite a vintage, and join actual outcomes only after finalisation.
+   The decision layer should support: upcoming 1/3/5-GW player EV and risk; fixture difficulty split
+   into overall, attack, and defence; actual-versus-predicted player and team performance; player
+   form (minutes, starts, xG, xA, goals, assists, bonus/BPS, DC, points); calibration by position and
+   horizon; and optimiser-plan audits. Preserve the primitive measures and publish any composite
+   difficulty score only with a versioned formula and direction. Export a pivot-friendly star schema
+   atomically; BI consumers never query the mutable production DuckDB.
 
 ## Sub-agent coordination and handoff
 
@@ -519,6 +553,8 @@ Installed general-purpose skills that complement them are:
   that should become an auditable notebook.
 - `data-analytics:design-kpis` for phase gates, model success criteria, operational freshness,
   and dashboard KPIs.
+- `data-analytics:create-data-context` for the prediction-ledger/BI semantic layer, canonical
+  grains, metric ownership, and source-of-truth documentation.
 - `data-analytics:metric-diagnostics` for explaining changes in model or data-quality metrics.
 - `data-analytics:visualize-data` for calibration, reliability, distribution, and backtest
   figures.

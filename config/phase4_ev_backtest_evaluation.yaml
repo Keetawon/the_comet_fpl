@@ -1,0 +1,79 @@
+# Phase 4 Stage D / Prospective EV Walk-forward Backtest evaluation contract.
+#
+# Defined before any EV backtest execution. Evaluates prospective EV ranking and
+# points-distribution performance over GW29-38 of the 2025-26 season.
+#
+# A candidate/backtest cannot choose easier gameweeks, populations, metrics, or
+# lift gates after seeing its results.
+
+contract_version: "1.0"
+phase: 4
+
+horizon:
+  season: "2025-26"
+  start_gw: 29
+  end_gw: 38
+  expected_selected_gws: 10
+  expected_fixtures: 99
+  expected_player_fixture_rows: 8224
+  split_unit: observed_gameweek
+  cutoff_proxy: first_kickoff_of_gameweek
+
+support:
+  max_fixture_points: 34
+
+components:
+  stage_a: trailing_goals_attack_defence
+  minutes: concentration_adaptive_shrinkage_player_minutes_v3
+  saves: league_constant_save_rate_v1
+  defensive_contribution: team_rescaled_dc_v1
+  bps_residual: trailing_ict_ridge_residual_v1
+
+primary_architecture:
+  name: prospective_v3_coupled_seasonal_bonus
+  attacking: minutes_gated_coupled_team_share_attacking_goals_v3
+  assists: coupled_team_share_assists
+  appearance: seasonal_equal_weighted_trailing_5
+  seasonal_appearance_min_rows: 3
+  prior_season_blend_weight: 0.0
+  historical_availability_multiplier: 1.0
+  scoring_rules: "2026_27"
+  bonus_simulation: joint_fixture_bps_monte_carlo
+
+diagnostic_comparator:
+  name: prospective_v1_independent_seasonal_bonus
+  attacking: xg_informed_trailing_player_goals_v1
+  assists: xa_informed_trailing_player_assists_v1
+  role: development_diagnostic_only_not_a_promotion_gate
+
+monte_carlo:
+  draws: 2000
+  seed: 202627
+
+target_population:
+  eligible: minutes_not_null
+  include_zero_minutes: true
+  scoring_ruleset: "2026_27"
+
+metrics:
+  ranking:
+    - ndcg_at_20
+    - top_20_actual_points_capture_ratio
+    - top_20_overlap
+    - spearman_ev_vs_actual_within_gw_position
+    - spearman_ev_vs_actual_cumulative
+  calibration:
+    - ev_total_vs_actual_total
+    - signed_bias
+    - ev_actual_ratio
+    - mae
+    - rmse
+  proper_distribution:
+    - mean_log_score
+    - mean_ranked_probability_score
+    - randomized_pit_80
+
+scoring_calibration:
+  log_probability_floor: 1.0e-12
+  randomized_pit_band: [0.1, 0.9]
+  randomized_pit_seed: 202627

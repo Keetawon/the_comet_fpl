@@ -515,10 +515,12 @@ def appeared_attack_signals(
     """
     frame = con.execute(
         """
-        SELECT season, gw, fixture, kickoff_time, code, expected_goals, threat
+        SELECT season, gw, fixture,
+               strftime(CAST(kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ') AS kickoff_time,
+               code, expected_goals, threat
         FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND minutes > 0 AND kickoff_time < ?
-        ORDER BY kickoff_time, season, fixture, code
+        WHERE minutes IS NOT NULL AND minutes > 0 AND CAST(kickoff_time AS TIMESTAMPTZ) < ?
+        ORDER BY CAST(kickoff_time AS TIMESTAMPTZ), season, fixture, code
         """,
         [as_of],
     ).pl()
@@ -528,7 +530,8 @@ def appeared_attack_signals(
     sig_sum = 0.0
     sig_n = 0
     for r in frame.iter_rows(named=True):
-        epoch = float(r["kickoff_time"].timestamp())
+        k_ts = datetime.fromisoformat(str(r["kickoff_time"]).replace("Z", "+00:00"))
+        epoch = float(k_ts.timestamp())
         xg = None if r["expected_goals"] is None else float(r["expected_goals"])
         threat = None if r["threat"] is None else float(r["threat"])
         appeared.setdefault(int(r["code"]), []).append((epoch, xg, threat))
@@ -590,10 +593,12 @@ def appeared_assist_signals(
     """
     frame = con.execute(
         """
-        SELECT season, gw, fixture, kickoff_time, code, expected_assists, creativity
+        SELECT season, gw, fixture,
+               strftime(CAST(kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ') AS kickoff_time,
+               code, expected_assists, creativity
         FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND minutes > 0 AND kickoff_time < ?
-        ORDER BY kickoff_time, season, fixture, code
+        WHERE minutes IS NOT NULL AND minutes > 0 AND CAST(kickoff_time AS TIMESTAMPTZ) < ?
+        ORDER BY CAST(kickoff_time AS TIMESTAMPTZ), season, fixture, code
         """,
         [as_of],
     ).pl()
@@ -603,7 +608,8 @@ def appeared_assist_signals(
     sig_sum = 0.0
     sig_n = 0
     for r in frame.iter_rows(named=True):
-        epoch = float(r["kickoff_time"].timestamp())
+        k_ts = datetime.fromisoformat(str(r["kickoff_time"]).replace("Z", "+00:00"))
+        epoch = float(k_ts.timestamp())
         xa = None if r["expected_assists"] is None else float(r["expected_assists"])
         creativity = None if r["creativity"] is None else float(r["creativity"])
         appeared.setdefault(int(r["code"]), []).append((epoch, xa, creativity))
@@ -626,7 +632,7 @@ def league_assist_rate(con: duckdb.DuckDBPyConnection, as_of: datetime) -> float
         """
         SELECT sum(assists) AS a, sum(goals_scored) AS g
         FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND kickoff_time < ?
+        WHERE minutes IS NOT NULL AND CAST(kickoff_time AS TIMESTAMPTZ) < ?
         """,
         [as_of],
     ).fetchone()
@@ -664,7 +670,14 @@ def prospective_team_scored(
         JOIN mart_dim_team AS opponent
           ON opponent.season = m.season AND opponent.team_id = m.opponent_team_id
     """
-    window_frame = con.execute(f"SELECT {select} {join} WHERE m.kickoff_time < ?", [as_of]).pl()
+    order_by = (
+        "ORDER BY CAST(m.kickoff_time AS TIMESTAMPTZ), m.season, m.fixture, "
+        "club.team_code, opponent.team_code"
+    )
+    window_frame = con.execute(
+        f"SELECT {select} {join} WHERE CAST(m.kickoff_time AS TIMESTAMPTZ) < ? {order_by}",
+        [as_of],
+    ).pl()
     league_conceded = 1.4
     if not window_frame.is_empty():
         conceded = window_frame["goals_against"].drop_nulls()

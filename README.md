@@ -12,18 +12,23 @@ different answers:
 
 A single `xP` answers only the first.
 
-**Current status: the data foundation is complete; Stages A, B, and C are in model validation.**
-Phase 1 Candidates V1 and V2
-were fitted under the fixed walk-forward contract and correctly not promoted. V2 scored 1.4939
-against the 1.5003 best baseline, a 0.4284% lift against the required 1%. Candidate V3's
-development result was invalidated (a leakage defect); its leakage-safe successor Candidate V4
-was evaluated once as development-only — 1.4945, a +0.39% lift short of the 1% gate and not a
-promotion verdict — so the trailing-goals baseline remains the Stage A model.
-Phase 2's minutes baselines and Candidates V1/V2/V3 have been development-evaluated; none is
-promoted, and V2/V3 fail the fixed starter-ranking gate. Phase 3's attacking-goals baselines,
-harness, and Candidate V1 are implemented, but V1 is only a historical xG-signal probe: it does
-not compose Stage A team goals with Stage B minutes or conserve a team goal total. The production
-team-coupled Stage C architecture and Stage D simulation remain unimplemented.
+**Current status: the data foundation and the development-only forward pipeline through Stage E
+are implemented; no forecast component or squad recommendation is promoted as production-valid.**
+Phase 1 Candidates V1 and V2 were fitted under the fixed walk-forward contract and correctly not
+promoted. Candidate V3's development result was invalidated for leakage; its leakage-safe successor
+V4 was evaluated once and also missed the fixed gate, so `trailing_goals_attack_defence` remains the
+Stage A model. Phase 2's minutes Candidates V1/V2/V3 are development-only; V2/V3 fail the frozen
+starter-ranking gate. Phase 3's team-coupled, minutes-gated attacking Candidate V3 is the best
+development candidate but remains unpromoted. Stage D v3 composes the components by seeded
+Monte-Carlo and awards bonus through a joint per-fixture BPS simulation across both clubs.
+
+The prospective job now emits a reproducible, provenance-bearing JSONL artifact containing one
+full-points distribution per `(season, gw, code)`. Stage E consumes only that artifact and produces
+a deterministic legal squad, lineup, captain, bench, and bounded multi-GW transfer plan. Both are
+explicitly development-only. Before operational use, the optimiser needs the no-transfer pruning
+defect fixed, horizon availability semantics measured, stronger optimiser-run provenance, and an
+explicit static-price policy. The append-only prediction ledger, BI semantic exports, static
+`publish` boundary, and real-deadline prospective validation are the next production-track work.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
@@ -83,13 +88,15 @@ against vendored fixtures. See [Snapshots (R5)](#snapshots-r5).
 ```
 config/       sources, scoring, data quality, and versioned evaluation contracts
 src/fpl/
+  artifacts/  stable prospective-points JSONL transport contract
   ingest/     archive.py, fpl_api.py, live_snapshot.py, snapshot_files.py
   storage/    db.py, schema.sql
   transform/  crosswalk.py, facts.py, quality.py
   features/   pit.py   -- point-in-time access layer (R4)
   models/     scoring plus Stage A team, Stage B minutes, and Stage C attacking models
+  optimize/   Stage E squad, lineup, captain, and bounded transfer planning
   validate/   walk-forward folds, metrics, baselines, harnesses, and guarded dev runners
-  jobs/       build_db.py, daily_snapshot.py, load_snapshots.py, verify_rules.py
+  jobs/       build/load/snapshot plus prospective forecast and optimiser entry points
 tests/
 .github/workflows/               -- CI plus daily and finalized-history R5 capture
 ```
@@ -283,20 +290,28 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
-| 3 | Stages C/D player events + simulation | attacking-goals baselines/harness and historical V1 xG-signal probe complete; Stage D composer (v1 core → v2 saves/DC → v3 full-points incl. bonus) and a prospective GW-horizon xP job are implemented and development-evaluated (development-only, none promoted); production team-coupled Stage C not implemented |
-| 3b | Stage E squad optimiser + `publish` static export | not started |
+| 3 | Stages C/D player events + simulation | attacking V1 historical probe, team-coupled V2/V3 development candidates, Stage D v3 full-points/BPS composer, and prospective GW-horizon forecast are implemented; all remain development-only |
+| 3b | Stage E optimiser + prediction ledger + `publish` | optimiser and stable input artifact implemented development-only; optimiser hardening, append-only prediction ledger, BI exports, and static `publish` remain |
 | 4 | Dashboard v1 | not started |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
 
 Phase 3b is an addition to the original phasing, which ended Phase 3 at simulation and had no
-phase delivering Stage E. A GW1 squad is a Stage E output — 15 players, £100.0m, 2/5/5/3, max
-3 per club — so it needs a slot ahead of the dashboard.
+phase delivering Stage E. The implemented optimiser respects the verified 2026/27 squad, budget,
+club, formation, captain, bench, free-transfer, and hit rules. Its fixed-squad ILP is exact; its
+multi-GW transfer path is explicitly bounded. See
+[`docs/stage-e-squad-optimizer.md`](docs/stage-e-squad-optimizer.md) and
+[`docs/prospective-points-artifact.md`](docs/prospective-points-artifact.md).
 
-`publish` writes static JSON rather than being queried live: the dashboard updates once per
-gameweek, which is a static-site shaped workload. `docs/publish-contract.md` fixes that
-boundary so Streamlit v1 is a thin renderer over the same artefact a React frontend would
-consume, and swapping frontends later costs nothing. Nothing downstream of `publish` queries
-DuckDB.
+The next data product is an immutable forecast ledger: every pre-deadline run is retained with its
+`as_of`, input hashes, model/component identities, and player-fixture/player-gameweek distributions;
+actuals are attached only after fixtures finish. That ledger becomes the source for model monitoring,
+fixture-difficulty matrices, player-form pivots, EV-versus-actual analysis, and optimiser audits.
+Historical prediction vintages must never be overwritten by a newer forecast.
+
+`publish` remains unimplemented. It will atomically export versioned JSON for the application and
+pivot-friendly columnar tables for BI from the internal ledger/marts. Dashboards and BI tools consume
+those read-only exports, never the mutable production DuckDB. `docs/publish-contract.md` fixes the
+existing application boundary; the BI star-schema extension must be versioned before implementation.
 
 `docs/phase0-design.md` records the audit behind the schema decisions, including where
 measured values diverged from the original specification and why.

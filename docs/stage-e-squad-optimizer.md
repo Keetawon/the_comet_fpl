@@ -3,6 +3,24 @@
 Status: implemented, development-only. Its output is a deterministic decision aid over a
 development-only forecast artifact, not a validated FPL recommendation.
 
+## Post-implementation review status
+
+The saved GW1-5 result reconciles: every squad and formation is legal, transfer/free-transfer/hit
+accounting is exact, and the reported 330.4045 expected points equals the five weekly lineup and
+captain totals with zero hits. It is still **not operationally ready**:
+
+1. successor pruning can remove the legal no-transfer action after ranking and before beam search;
+2. the current `chance_of_playing_next_round` overlay is repeated across the whole forecast horizon,
+   which needs a measured per-GW policy;
+3. optimiser output needs its own Git/worktree, squad-config, search-policy, and solver provenance,
+   separately from forecast provenance; and
+4. all future affordability checks use the deadline's static `now_cost`; price changes and FPL
+   selling values are not modelled.
+
+Fix the no-transfer defect and add a dense regression test before another decision run. The other
+three items must be measured, implemented, or made explicit in the output contract before describing
+the plan as operational.
+
 ## Input boundary
 
 The optimizer reads only the versioned prospective-points JSONL artifact documented in
@@ -39,6 +57,10 @@ bench points and autosub probability are excluded from the objective. The solver
 bench goalkeeper, a deterministic outfield bench order, captain, and vice-captain. Vice fallback is
 not assigned an expected value. Ownership is reported but does not affect selection.
 
+The same deadline-known `now_cost` is used for every gameweek in the horizon. This is a frozen-price
+planning assumption, not a forecast of future affordability. The plan must be regenerated at each
+deadline; it does not model future market prices or selling-value profit rules.
+
 PuLP/CBC is the one added production dependency. It gives an auditable exact binary linear solve for
 the fixed-squad selection problem, remains small relative to the existing scientific stack, and
 avoids maintaining a custom combinatorial solver. CBC uses its deterministic single-process default
@@ -54,11 +76,13 @@ unused transfers remain banked and each excess transfer subtracts four points. E
 is legal and every visited lineup/captain choice is exact.
 
 The transfer path is deliberately bounded for predictable local runtime. Candidate players are the
-initial squad plus the top configured horizon utilities per position. Each state explores zero, one,
-or two same-position replacements, retains at most 200 legal transitions, and keeps a 30-state beam.
-Therefore the reported transfer plan is exact only within visited states; it is not a global
-optimality claim outside the configured candidate-pool, depth, transition, and beam limits. These
-limits live in configuration rather than Python.
+initial squad plus the top configured horizon utilities per position. Each state generates zero,
+one, or two same-position replacements, ranks them by current-GW player-utility improvement, retains
+at most 200 legal transitions, and keeps a 30-state beam. The current truncation does not reserve the
+zero-transfer proposal, which is the confirmed defect above. Even after that is fixed, the reported
+transfer plan is exact only within visited states; it is not a global optimality claim outside the
+configured candidate-pool, depth, transition, and beam limits. These limits live in configuration
+rather than Python.
 
 This bound was selected by timing the same point-in-time GW1-5 artifact before wiring it. A 100×20
 search finished in 22.6 seconds but lost 5.14 expected points relative to the broad reference; the

@@ -33,7 +33,7 @@ def test_assists_contract_loads_with_point_in_time_cutoffs() -> None:
     load_phase3_stage_c_assists_evaluation.cache_clear()
     contract = load_phase3_stage_c_assists_evaluation()
     assert contract.phase == 3
-    assert contract.contract_version == "1.1"
+    assert contract.contract_version == "1.2"
     assert contract.target.entity == "player"
     assert contract.target.grain == "season_player_code_fixture"
     assert contract.target.outcome == "assists_distribution"
@@ -161,9 +161,11 @@ def test_assists_v1_0_document_is_baseline_only() -> None:
     document["contract_version"] = "1.0"
     document["amendments"] = []
     document.pop("stage_c_assists_candidate_v1", None)
+    document.pop("stage_c_assists_candidate_v2", None)
     contract = Phase3StageCAssistsEvaluationConfig.model_validate(document)
     assert contract.contract_version == "1.0"
     assert contract.stage_c_assists_candidate_v1 is None
+    assert contract.stage_c_assists_candidate_v2 is None
 
 
 def test_assists_v1_0_document_rejects_a_candidate_block() -> None:
@@ -177,7 +179,7 @@ def test_assists_v1_0_document_rejects_a_candidate_block() -> None:
 
 def test_assists_version_bump_without_amendment_is_rejected() -> None:
     document = copy.deepcopy(_document())
-    document["contract_version"] = "1.2"
+    document["contract_version"] = "1.3"
     with pytest.raises(ValidationError, match="no amendment record"):
         Phase3StageCAssistsEvaluationConfig.model_validate(document)
 
@@ -198,13 +200,72 @@ def test_assists_brier_regression_gate_field_is_pinned() -> None:
 
 
 def test_assists_does_not_perturb_goals_contract() -> None:
-    """The assists contract is a separate file; the goals contract still loads at 1.3."""
+    """The assists contract is a separate file; the goals contract still loads at 1.4."""
     from fpl.config import load_phase3_evaluation
 
     load_phase3_evaluation.cache_clear()
     goals = load_phase3_evaluation()
-    assert goals.contract_version == "1.3"
+    assert goals.contract_version == "1.4"
     assert {defn.name for defn in goals.baselines.definitions} == {
         "positional_goal_rate_poisson",
         "trailing_player_goal_rate_poisson",
     }
+
+
+def test_assists_candidate_v2_policy_is_frozen_and_additive() -> None:
+    contract = load_phase3_stage_c_assists_evaluation()
+    cand = contract.stage_c_assists_candidate_v2
+    assert cand is not None
+    assert cand.name == "exposure_weighted_xa_team_share_assists_v2"
+    assert cand.development_only is True
+    assert cand.alpha == 5.0
+    assert cand.prior_minutes == 90.0
+    assert cand.history_window == 5
+    assert cand.signal == "expected_assists_only_no_fallback_never_reads_creativity"
+    assert cand.minutes_baseline == "trailing_5_player_minutes"
+    assert cand.window == "option_a_last_five_appeared_rows_then_measured_signal_rows_among_them"
+    expected_selected = (
+        "none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward_"
+        "prior_minutes_is_fixed_not_selected"
+    )
+    assert cand.selected_parameter == expected_selected
+
+
+def test_assists_candidate_v2_constants_are_pinned() -> None:
+    """alpha and prior_minutes cannot be changed without failing to load."""
+    document = copy.deepcopy(_document())
+    document["stage_c_assists_candidate_v2"]["alpha"] = 7.0
+    with pytest.raises(ValidationError, match=r"alpha is pinned to 5\.0"):
+        Phase3StageCAssistsEvaluationConfig.model_validate(document)
+    document2 = copy.deepcopy(_document())
+    document2["stage_c_assists_candidate_v2"]["prior_minutes"] = 270.0
+    with pytest.raises(ValidationError, match=r"prior_minutes is pinned to 90\.0"):
+        Phase3StageCAssistsEvaluationConfig.model_validate(document2)
+
+
+def test_assists_amendment_1_2_record_is_frozen() -> None:
+    """The 1.2 amendment record (candidates_evaluated_before_amendment: 1) is pinned."""
+    document = copy.deepcopy(_document())
+    document["amendments"][1]["candidates_evaluated_before_amendment"] = 0
+    with pytest.raises(ValidationError, match="not the frozen record"):
+        Phase3StageCAssistsEvaluationConfig.model_validate(document)
+
+
+def test_assists_v2_is_additive_to_v1_0_comparison_rules() -> None:
+    """Amendment 1.2 changes no v1.0/1.1 baseline/metric/gate field."""
+    contract = load_phase3_stage_c_assists_evaluation()
+    assert {defn.name for defn in contract.baselines.definitions} == {
+        "positional_assist_rate_poisson",
+        "trailing_player_assist_rate_poisson",
+    }
+    assert contract.promotion.minimum_primary_relative_lift == 0.01
+    assert contract.promotion.minimum_fold_count == 181
+    assert contract.promotion.require_no_season_mean_log_score_regression is True
+
+
+def test_assists_v2_block_is_required_at_1_2() -> None:
+    """A 1.2 config that silently drops the V2 block fails to load."""
+    document = copy.deepcopy(_document())
+    document.pop("stage_c_assists_candidate_v2", None)
+    with pytest.raises(ValidationError, match="stage_c_assists_candidate_v2"):
+        Phase3StageCAssistsEvaluationConfig.model_validate(document)

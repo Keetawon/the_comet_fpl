@@ -8,6 +8,11 @@
 > Stage-D component-independence limitation. Its point-in-time safety is real; its accuracy is
 > unproven and is established only as 2026/27 accrues.
 
+**As-built follow-up:** the job now defaults to team-coupled goals **and** assists, emits the stable
+JSONL contract in `docs/prospective-points-artifact.md`, and feeds the development-only Stage E
+optimiser in `docs/stage-e-squad-optimizer.md`. The dated first-run counts and leaderboard below
+remain a historical development record rather than a live status page.
+
 ## What it does
 
 `fpl.jobs.prospective_points_v1` is the **prospective sibling** of the Stage D v3 walk-forward
@@ -52,12 +57,12 @@ not re-optimised every week. GW1-5 is that planning window.
 - **Current-form / frozen horizon.** All trailing windows are frozen at `as_of`; GW2..N reuse the
   GW1 information set (no in-season update). This is the correct forecast at one deadline, but it
   does not chase form within the window.
-- **Goals are team-coupled and opponent-aware (default); assists are not.** By default goals use
+- **Goals and assists are team-coupled and opponent-aware by default.** Goals use
   Stage C Candidate V3: the Stage A team-goal expectation `lambda_team` (opponent/venue-modulated)
   is allocated among a club's players by a minutes-gated trailing attacking share, conserving the
-  team total, so a striker's goal distribution responds to the opponent across the horizon.
-  **Assists remain the independent Candidate V1** (fixture-blind), and `--attacking v1` reverts
-  goals to the independent V1 too.
+  team total, so a striker's goal distribution responds to the opponent across the horizon. Assists
+  allocate `lambda_team * assist_rate` by a minutes-gated xA-share. `--attacking v1` and
+  `--assists v1` independently restore the historical per-player candidates.
 - **Season-boundary appearance correction (default `--appearance seasonal`).** The trailing-minutes
   window at a GW1 deadline is the *end of the prior season* — its least representative phase: a
   nailed starter rested in dead-rubber final fixtures reads as a rotation risk, suppressing both his
@@ -99,6 +104,8 @@ not re-optimised every week. GW1-5 is that planning window.
   availability; a transparent post-model overlay (`status` / `chance_of_playing_next_round` from the
   deadline bootstrap) scales the expected points alongside the raw figure. `i`/`s`/`u`/`n` → 0,
   `a` → 1, an explicit chance → chance/100, doubtful without a percentage → 0.5.
+  The present implementation repeats that next-round multiplier across GW1-5; this is an unresolved
+  horizon assumption, not a claim that an injury probability stays constant for five gameweeks.
 
 ## First run
 
@@ -153,8 +160,7 @@ rotation without inventing certainty for the genuinely uncertain:
   Mac Allister +17, Watkins 17.9 → 20.7 — because their goal share now scales with an
   opponent-modulated `lambda_team`. The leaderboard still leans defensive, which is partly the
   genuine 2026/27 rules (defensive-contribution + clean-sheet points are large and opponent-coupled)
-  and partly that assists remain uncoupled and the share signal for a not-yet-covered future season
-  is `threat`, not xG.
+  and partly the uncertainty in early-season appearance and attacking-share inputs.
 - **Assists are team-coupled by default, lifting genuine creators honestly.** An assist requires a
   team goal, so the club's assisted-goal expectation is `lambda_team * assist_rate` (measured
   `sum(assists)/sum(goals)` ~0.90, stable 0.89-0.94 across seasons) allocated by an xA-share
@@ -170,8 +176,8 @@ rotation without inventing certainty for the genuinely uncertain:
   `expected_goals` includes penalty xG — and the archive cannot separate penalty goals from
   open-play, so xG-share is the *grounded* way to capture the penalty premium rather than an
   unmeasurable explicit term. Effect on GW1-5: Haaland rank 21 → 5, Watkins → 2, Mbeumo 62 → 3,
-  Gyökeres 95 → 39, rebalancing the top toward finishers; Saka / Semenyo fall (lower xG — their
-  value is in assists, still uncoupled). Isak is unmoved (appearance-limited, not share-limited).
+  Gyökeres 95 → 39, rebalancing the top toward finishers; Saka / Semenyo fall because their value is
+  more assist-led than goal-led. Isak is unmoved (appearance-limited, not share-limited).
 - **The elite-striker suppression is an appearance defect, not an attacking one.** Haaland (8.8 xP
   over five gameweeks, ~1.8/gw — below the 2-pt appearance floor) and Isak (3.1) sit far too low.
   The cause is the trailing-minutes window at the deadline: Haaland's last six 2025-26 appearances
@@ -195,5 +201,5 @@ uv run python -m fpl.jobs.load_snapshots snapshots/daily/*/*
 
 # 3. Prospective full-points xP over the GW1-5 horizon (read-only).
 uv run python -m fpl.jobs.prospective_points_v1 --gw-from 1 --gw-to 5 \
-  --output docs/results/phase4-prospective-points-gw1-5-development.json
+  --output D:/tmp/prospective-points-2026-27-gw1-5.jsonl
 ```
