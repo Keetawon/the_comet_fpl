@@ -57,7 +57,6 @@ from fpl.models.points_composition import (
 )
 from fpl.types import Position
 from fpl.validate.metrics import Distribution
-from fpl.validate.metrics import poisson_pmf as team_poisson_pmf
 from fpl.validate.minutes_baselines import MinuteBins, TargetRow
 from fpl.validate.minutes_harness import player_fixture_history, team_code_map
 from fpl.validate.points_harness import (
@@ -246,6 +245,7 @@ def generate_forecasts_for_fold(
     draws: int = 2000,
     base_seed: int = 202627,
     max_support: int = DEFAULT_MAX_POINTS_FULL,
+    seasonal_appearance_min_rows: int = 3,
 ) -> list[FixtureForecast]:
     """Generate prospective fixture full-points forecasts for a single fold gameweek.
 
@@ -253,6 +253,17 @@ def generate_forecasts_for_fold(
     When use_v3_primary=True, allocates Primary V3 goals and coupled assists by team.
     When use_v3_primary=False, uses V1 goals and V1 assists.
     Calls compose_fixture_full_points ONCE per complete fixture roster per architecture.
+
+    ``seasonal_appearance_min_rows`` is the frozen ``seasonal_equal_weighted_trailing_5``
+    threshold, passed in from the contract rather than hardcoded so that changing the
+    pre-registered value actually changes what runs.
+
+    No prior-season appearance blend and no availability multiplier are applied here. The
+    horizon is GW29-38, mid-season on both counts: the production blend weight
+    (:func:`_season_boundary_long_weight`) is 0.0 outside August-November, and a historical
+    backtest has no live availability feed to overlay. The contract pins
+    ``prior_season_blend_weight: 0.0`` and ``historical_availability_multiplier: 1.0`` to state
+    that absence as policy; the runner asserts both before calling this.
     """
     targets = extract_target_roster_for_gw(con, season, gw)
     if not targets:
@@ -343,10 +354,12 @@ def generate_forecasts_for_fold(
             )
 
     schedule_df = pl.DataFrame(schedule_rows)
-    team_scored, league_conceded = prospective_team_scored(
+    # The league-mean fallback the production job uses is deliberately not taken here: the
+    # schedule frame is built from these very target rows and reciprocity is validated above, so
+    # every (fixture, team_code) must resolve. A missing entry is a defect and fails closed.
+    team_scored, _league_conceded = prospective_team_scored(
         con, season=season, as_of=as_of, team_map=team_map, schedule=schedule_df
     )
-    league_conceded_dist = team_poisson_pmf(max(league_conceded, 1e-6))
 
     # Signal resolution for primary V3 goals & coupled assists
     share_window = 5
@@ -492,28 +505,32 @@ def generate_forecasts_for_fold(
             was_home=t.was_home,
         )
 
-        t5_entry, t5_n = trailing5_bins.get(t.code, (0.0, 0))
+        # `trailing5_minute_bins` always returns a four-bin distribution; below the frozen
+        # minimum row count the window is too short to stand on and the Stage B V3 minutes
+        # model predicts instead.
+        default_bins: tuple[float, float, float, float] = (1.0, 0.0, 0.0, 0.0)
+        t5_entry, t5_n = trailing5_bins.get(t.code, (default_bins, 0))
         minutes_dist: tuple[float, float, float, float]
-        if t5_n >= 3:
-            if isinstance(t5_entry, tuple):
-                minutes_dist = (
-                    float(t5_entry[0]),
-                    float(t5_entry[1]),
-                    float(t5_entry[2]),
-                    float(t5_entry[3]),
-                )
-            else:
-                rate = float(t5_entry)
-                minutes_dist = (1.0 - rate, 0.0, 0.0, rate)
+        if t5_n >= seasonal_appearance_min_rows:
+            minutes_dist = (
+                float(t5_entry[0]),
+                float(t5_entry[1]),
+                float(t5_entry[2]),
+                float(t5_entry[3]),
+            )
         else:
             minutes_dist = minutes_model.predict(minutes_target)
 
         v1_goals = goals_model.predict(stage_c_target)
         v1_assists = assists_model.predict(stage_c_target)
 
+        # A player's team-conceded distribution is the OPPONENT's scored-goals distribution.
         conceded_dist = team_scored.get((t.fixture, t.opponent_team_code))
         if conceded_dist is None:
-            conceded_dist = league_conceded_dist
+            raise ValueError(
+                f"No Stage A distribution for fixture {t.fixture}, opponent team_code "
+                f"{t.opponent_team_code} (needed for conceded, clean sheets, and GK saves)"
+            )
 
         lambda_conceded = sum(idx * mass for idx, mass in enumerate(conceded_dist))
         saves_dist = saves_model.predict(t.position, lambda_conceded)
@@ -566,9 +583,14 @@ def generate_forecasts_for_fold(
         for t_code, roster_pending in by_team.items():
             own_scored = team_scored.get((fix, t_code))
             if own_scored is None:
-                for p in roster_pending:
-                    res[p.target.code] = p.v1_goals
-                continue
+                # Fail closed. The Stage A schedule frame is built from these same target rows
+                # and reciprocity is already validated, so a missing entry is a defect, not a
+                # cold start. Falling back to V1 here would silently score the comparator's
+                # architecture inside the primary and never say so.
+                raise ValueError(
+                    f"Primary V3 goals: no Stage A distribution for fixture {fix}, "
+                    f"team_code {t_code}"
+                )
             lambda_team = sum(idx * mass for idx, mass in enumerate(own_scored))
             roster = [
                 _RosterEntry(p.target.code, p.signal, p.signal_cold_start) for p in roster_pending
@@ -592,9 +614,11 @@ def generate_forecasts_for_fold(
         for t_code, roster_pending in by_team.items():
             own_scored = team_scored.get((fix, t_code))
             if own_scored is None:
-                for p in roster_pending:
-                    res[p.target.code] = p.v1_assists
-                continue
+                # Fail closed, for the same reason as the goals path above.
+                raise ValueError(
+                    f"Primary coupled assists: no Stage A distribution for fixture {fix}, "
+                    f"team_code {t_code}"
+                )
             lambda_team = sum(idx * mass for idx, mass in enumerate(own_scored))
             lambda_assist = lambda_team * assist_rate
             roster = [

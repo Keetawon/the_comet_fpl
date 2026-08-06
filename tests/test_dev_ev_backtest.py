@@ -7,6 +7,9 @@ and strict provenance / failure handling.
 
 from __future__ import annotations
 
+import contextlib
+import re
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,7 +23,10 @@ from fpl.jobs.prospective_points_v1 import (
 )
 from fpl.models.points_composition import DEFAULT_MAX_POINTS_FULL
 from fpl.storage.db import connect
+from fpl.validate import dev_ev_backtest as dev_ev_backtest_module
 from fpl.validate.dev_ev_backtest import (
+    _assert_contract_drives_runtime,
+    _target_completeness,
     main,
     run_ev_backtest,
 )
@@ -379,6 +385,7 @@ def test_postflight_worktree_became_dirty_raises(tmp_path: Path) -> None:
         patch("fpl.validate.dev_ev_backtest._check_clean_worktree", side_effect=[True, False]),
         patch("fpl.validate.dev_ev_backtest._git_commit_sha", return_value="sha1"),
         patch("fpl.validate.dev_ev_backtest._file_sha256", return_value="hash1"),
+        patch("fpl.validate.dev_ev_backtest._target_completeness", return_value={}),
         patch("fpl.validate.dev_ev_backtest.run_ev_backtest") as mock_run,
         patch("fpl.validate.dev_ev_backtest.connect"),
     ):
@@ -398,6 +405,7 @@ def test_postflight_git_commit_sha_changed_raises(tmp_path: Path) -> None:
         patch("fpl.validate.dev_ev_backtest._check_clean_worktree", return_value=True),
         patch("fpl.validate.dev_ev_backtest._git_commit_sha", side_effect=["sha1", "sha2"]),
         patch("fpl.validate.dev_ev_backtest._file_sha256", return_value="hash1"),
+        patch("fpl.validate.dev_ev_backtest._target_completeness", return_value={}),
         patch("fpl.validate.dev_ev_backtest.run_ev_backtest") as mock_run,
         patch("fpl.validate.dev_ev_backtest.connect"),
     ):
@@ -407,25 +415,106 @@ def test_postflight_git_commit_sha_changed_raises(tmp_path: Path) -> None:
             main()
 
 
-def test_postflight_file_sha_changed_raises(tmp_path: Path) -> None:
+@contextlib.contextmanager
+def _patched_main(tmp_path: Path, *, file_sha_side_effect: list[str]) -> Iterator[None]:
+    """Run `main` against stubbed provenance inputs and a stubbed backtest.
+
+    `_target_completeness` is stubbed here because these tests are about the provenance guards;
+    the completeness guard itself is driven against a real database further down.
+    """
     out_file = tmp_path / "out.json"
     dummy_db = tmp_path / "dummy.db"
     dummy_db.write_text("db", encoding="utf-8")
+    rep = _dummy_report()
     with (
         patch("sys.argv", ["dev_ev_backtest", "--output", str(out_file)]),
         patch("fpl.validate.dev_ev_backtest.default_db_path", return_value=dummy_db),
         patch("fpl.validate.dev_ev_backtest._check_clean_worktree", return_value=True),
         patch("fpl.validate.dev_ev_backtest._git_commit_sha", return_value="sha1"),
-        patch(
-            "fpl.validate.dev_ev_backtest._file_sha256",
-            side_effect=["db1", "cfg1", "score1", "src1", "src2", "src3", "src4", "src5", "db2"],
-        ),
+        patch("fpl.validate.dev_ev_backtest._file_sha256", side_effect=file_sha_side_effect),
+        patch("fpl.validate.dev_ev_backtest._target_completeness", return_value={}),
         patch("fpl.validate.dev_ev_backtest.run_ev_backtest") as mock_run,
         patch("fpl.validate.dev_ev_backtest.connect"),
     ):
-        rep = _dummy_report()
         mock_run.return_value = (rep, rep, 99, 8224)
-        with pytest.raises(RuntimeError, match="DuckDB database SHA256 changed"):
+        yield
+
+
+def _hashed_source_files() -> list[str]:
+    """The source files `main` hashes, read out of the runner rather than duplicated here."""
+    source = Path(str(dev_ev_backtest_module.__file__)).read_text(encoding="utf-8")
+    body = source.split("source_files = [", 1)[1].split("]", 1)[0]
+    return re.findall(r'"([A-Za-z0-9_]+\.py)"', body)
+
+
+_SOURCE_FILES = _hashed_source_files()
+# `main` hashes in a fixed order: database, contract YAML, scoring YAML, then each source file.
+_PREFLIGHT_HASH_COUNT = 3 + len(_SOURCE_FILES)
+
+
+def test_provenance_covers_every_module_that_determines_the_architecture() -> None:
+    """The hash list must not silently shrink back to the four new files.
+
+    Clean Git HEAD is the authoritative code identity; these hashes only catch a mid-run edit,
+    which leaves HEAD untouched. That is worth having only if it spans the modules that decide
+    what the numbers are -- a mid-run edit to the minutes model or the BPS simulator invalidates
+    a run exactly as much as one to the adapter.
+    """
+    must_cover = {
+        "ev_backtest_adapter.py",
+        "ev_backtest_harness.py",
+        "dev_ev_backtest.py",
+        "points_composition.py",
+        "prospective_points_v1.py",
+        "bps_bonus.py",
+        "gk_saves_v1.py",
+        "defensive_contribution_v1.py",
+        "minutes_v3.py",
+        "metrics.py",
+    }
+    assert must_cover <= set(_SOURCE_FILES)
+
+
+@pytest.mark.parametrize(
+    ("drift_index", "expected_message"),
+    [
+        (0, "DuckDB database SHA256 changed"),
+        (1, "Contract YAML SHA256 changed"),
+        (2, "Scoring YAML SHA256 changed"),
+    ],
+)
+def test_postflight_each_non_source_drift_path_raises(
+    tmp_path: Path, drift_index: int, expected_message: str
+) -> None:
+    """Database, contract, and scoring drift are three separate guards, tested separately.
+
+    A single test that only ever trips the first check cannot show the second and third exist.
+    """
+    values = [f"h{i}" for i in range(_PREFLIGHT_HASH_COUNT)]
+    postflight = list(values)
+    postflight[drift_index] = "DRIFTED"
+
+    with _patched_main(tmp_path, file_sha_side_effect=values + postflight):
+        with pytest.raises(RuntimeError, match=expected_message):
+            main()
+
+
+@pytest.mark.parametrize("source_index", range(len(_SOURCE_FILES)))
+def test_postflight_every_source_file_drift_path_raises(tmp_path: Path, source_index: int) -> None:
+    """Every hashed source file is independently guarded, not just the first.
+
+    The source hashes are a mid-run tamper diagnostic layered on top of the authoritative
+    clean-HEAD check; each entry only earns its place if a change to that file alone stops the
+    run, so each is driven to fail on its own.
+    """
+    values = [f"h{i}" for i in range(_PREFLIGHT_HASH_COUNT)]
+    postflight = list(values)
+    postflight[3 + source_index] = "DRIFTED"
+    expected_file = _SOURCE_FILES[source_index]
+
+    with _patched_main(tmp_path, file_sha_side_effect=values + postflight):
+        # Naming the file proves this drifted the intended entry, not merely some entry.
+        with pytest.raises(RuntimeError, match=rf"Source file {re.escape(expected_file)} SHA256"):
             main()
 
 
@@ -453,6 +542,7 @@ def test_destination_no_clobber_and_uuid_tmp_cleanup(tmp_path: Path) -> None:
         patch("fpl.validate.dev_ev_backtest._check_clean_worktree", return_value=True),
         patch("fpl.validate.dev_ev_backtest._git_commit_sha", return_value="sha1"),
         patch("fpl.validate.dev_ev_backtest._file_sha256", return_value="hash1"),
+        patch("fpl.validate.dev_ev_backtest._target_completeness", return_value={}),
         patch("fpl.validate.dev_ev_backtest.run_ev_backtest") as mock_run,
         patch("fpl.validate.dev_ev_backtest.connect"),
         patch("os.rename", side_effect=PermissionError("Simulated rename error")),
@@ -465,3 +555,152 @@ def test_destination_no_clobber_and_uuid_tmp_cleanup(tmp_path: Path) -> None:
 
         tmp_files = list(tmp_path.glob("*.tmp"))
         assert len(tmp_files) == 0, f"Temporary files were not cleaned up: {tmp_files}"
+
+
+# --------------------------------------------------------------------------------------
+# Read-only access and connection lifetime
+# --------------------------------------------------------------------------------------
+
+
+def test_database_is_opened_read_only(tmp_path: Path) -> None:
+    """The backtest must not be able to mutate the archive it is scoring against."""
+    values = [f"h{i}" for i in range(_PREFLIGHT_HASH_COUNT)]
+    out_file = tmp_path / "out.json"
+    dummy_db = tmp_path / "dummy.db"
+    dummy_db.write_text("db", encoding="utf-8")
+    rep = _dummy_report()
+
+    with (
+        patch("sys.argv", ["dev_ev_backtest", "--output", str(out_file)]),
+        patch("fpl.validate.dev_ev_backtest.default_db_path", return_value=dummy_db),
+        patch("fpl.validate.dev_ev_backtest._check_clean_worktree", return_value=True),
+        patch("fpl.validate.dev_ev_backtest._git_commit_sha", return_value="sha1"),
+        patch("fpl.validate.dev_ev_backtest._file_sha256", side_effect=values * 2),
+        patch("fpl.validate.dev_ev_backtest._target_completeness", return_value={}),
+        patch("fpl.validate.dev_ev_backtest.run_ev_backtest") as mock_run,
+        patch("fpl.validate.dev_ev_backtest.connect") as mock_connect,
+    ):
+        mock_run.return_value = (rep, rep, 99, 8224)
+        main()
+
+    mock_connect.assert_called_once()
+    assert mock_connect.call_args.kwargs["read_only"] is True
+
+
+def test_database_connection_is_closed_when_the_backtest_raises(tmp_path: Path) -> None:
+    """A failed run must not leave the archive connection open."""
+    out_file = tmp_path / "out.json"
+    dummy_db = tmp_path / "dummy.db"
+    dummy_db.write_text("db", encoding="utf-8")
+
+    with (
+        patch("sys.argv", ["dev_ev_backtest", "--output", str(out_file)]),
+        patch("fpl.validate.dev_ev_backtest.default_db_path", return_value=dummy_db),
+        patch("fpl.validate.dev_ev_backtest._check_clean_worktree", return_value=True),
+        patch("fpl.validate.dev_ev_backtest._git_commit_sha", return_value="sha1"),
+        patch("fpl.validate.dev_ev_backtest._file_sha256", return_value="hash1"),
+        patch("fpl.validate.dev_ev_backtest._target_completeness", return_value={}),
+        patch(
+            "fpl.validate.dev_ev_backtest.run_ev_backtest",
+            side_effect=RuntimeError("backtest exploded"),
+        ),
+        patch("fpl.validate.dev_ev_backtest.connect") as mock_connect,
+    ):
+        with pytest.raises(RuntimeError, match="backtest exploded"):
+            main()
+
+    mock_connect.return_value.close.assert_called_once()
+    assert not out_file.exists()
+
+
+# --------------------------------------------------------------------------------------
+# Target completeness for the scored season and ruleset
+# --------------------------------------------------------------------------------------
+
+
+def _completeness_db(missing: str, is_complete: bool) -> duckdb.DuckDBPyConnection:
+    con = connect(":memory:", read_only=False)
+    con.execute("""
+        CREATE TABLE mart_target_completeness (
+            season VARCHAR,
+            ruleset_id VARCHAR,
+            missing_components VARCHAR,
+            is_complete BOOLEAN,
+            row_count BIGINT
+        )
+    """)
+    con.execute(
+        "INSERT INTO mart_target_completeness VALUES ('2025-26', '2026_27', ?, ?, 8224)",
+        [missing, is_complete],
+    )
+    return con
+
+
+def test_target_completeness_recorded_when_the_season_is_complete() -> None:
+    con = _completeness_db("", True)
+    record = _target_completeness(con, "2025-26", "2026_27")
+    assert record == {
+        "season": "2025-26",
+        "ruleset_id": "2026_27",
+        "missing_components": "",
+        "is_complete": True,
+        "row_count": 8224,
+    }
+
+
+def test_incomplete_season_refuses_to_run() -> None:
+    """Replayed points silently understate a player whose component the season never measured."""
+    con = _completeness_db("defensive_contribution", False)
+    with pytest.raises(RuntimeError, match="missing components 'defensive_contribution'"):
+        _target_completeness(con, "2025-26", "2026_27")
+
+
+def test_absent_completeness_row_refuses_to_run() -> None:
+    """Unproven is not the same as complete."""
+    con = _completeness_db("", True)
+    with pytest.raises(RuntimeError, match="No mart_target_completeness row"):
+        _target_completeness(con, "2024-25", "2026_27")
+
+
+# --------------------------------------------------------------------------------------
+# The contract must govern the run, not merely describe it
+# --------------------------------------------------------------------------------------
+
+
+def test_contract_component_drift_stops_the_run() -> None:
+    """A frozen identity that no longer matches the installed model must fail closed.
+
+    This is the guard that contract 1.0 lacked: it froze two saves/DC names that existed
+    nowhere in the repository, and nothing at runtime compared them to what actually ran.
+    """
+    from fpl.config import load_phase4_ev_backtest_evaluation
+
+    contract = load_phase4_ev_backtest_evaluation()
+    drifted = contract.model_copy(
+        update={
+            "components": contract.components.model_copy(update={"saves": "some_other_saves_model"})
+        }
+    )
+    with pytest.raises(RuntimeError, match="Contract component saves"):
+        _assert_contract_drives_runtime(drifted)
+
+
+def test_contract_log_probability_floor_drift_stops_the_run() -> None:
+    from fpl.config import load_phase4_ev_backtest_evaluation
+
+    contract = load_phase4_ev_backtest_evaluation()
+    drifted = contract.model_copy(
+        update={
+            "scoring_calibration": contract.scoring_calibration.model_copy(
+                update={"log_probability_floor": 1e-6}
+            )
+        }
+    )
+    with pytest.raises(RuntimeError, match="log_probability_floor"):
+        _assert_contract_drives_runtime(drifted)
+
+
+def test_unmodified_contract_passes_the_runtime_assertions() -> None:
+    from fpl.config import load_phase4_ev_backtest_evaluation
+
+    _assert_contract_drives_runtime(load_phase4_ev_backtest_evaluation())

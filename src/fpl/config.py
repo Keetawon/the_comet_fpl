@@ -3419,12 +3419,51 @@ class Phase4SupportPolicy(_Frozen):
     max_fixture_points: Literal[34]
 
 
+ORIGINAL_PHASE4_CONTRACT_VERSION = "1.0"
+
+# The ordered amendment history pinned per contract version, exactly as for Phase 1. A missing,
+# reordered, or count-altered entry fails to load, so a pre-registered contract cannot be
+# rewritten between two commits and read back as though it had always said so.
+FROZEN_PHASE4_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
+    "1.1": (("1.1", 0),),
+}
+
+
+class Phase4Amendment(_Frozen):
+    """One recorded change to the pre-registered Phase 4 EV backtest contract.
+
+    Same shape and same purpose as :class:`Phase1Amendment`: an amendment must say when it
+    happened and how many evaluations had been executed by then, so that a dishonest amendment
+    is a false statement rather than a silent omission.
+    """
+
+    version: str = Field(min_length=1)
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    candidates_evaluated_before_amendment: int = Field(ge=0)
+    changed: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    evidence: str = Field(min_length=1)
+
+
 class Phase4ComponentsPolicy(_Frozen):
+    """Frozen component identities.
+
+    Every name here is an implementation constant, not a label: ``saves`` and
+    ``defensive_contribution`` must equal ``fpl.models.gk_saves_v1.NAME`` and
+    ``fpl.models.defensive_contribution_v1.NAME``, which is what
+    ``fpl.validate.points_harness.default_component_suite`` installs. Contract 1.0 named two
+    models that existed nowhere in the repository and misdescribed the ones that ran; amendment
+    1.1 corrected them before any evaluation. ``assists_architecture`` and ``bps_simulation``
+    name inline architectures that carry no model NAME constant.
+    """
+
     stage_a: Literal["trailing_goals_attack_defence"]
     minutes: Literal["concentration_adaptive_shrinkage_player_minutes_v3"]
-    saves: Literal["league_constant_save_rate_v1"]
-    defensive_contribution: Literal["team_rescaled_dc_v1"]
+    saves: Literal["gk_saves_poisson_from_team_conceded_v1"]
+    defensive_contribution: Literal["trailing_dc_threshold_hit_bernoulli_v1"]
     bps_residual: Literal["trailing_ict_ridge_residual_v1"]
+    assists_architecture: Literal["ev_backtest_adapter_coupled_team_share_assists"]
+    bps_simulation: Literal["points_composition_joint_fixture_bps_monte_carlo"]
 
 
 class Phase4PrimaryArchitecturePolicy(_Frozen):
@@ -3514,10 +3553,17 @@ class Phase4ScoringCalibrationPolicy(_Frozen):
 
 
 class Phase4EVBacktestConfig(_Frozen):
-    """Executable evaluation contract for the Phase 4 EV Walk-forward Backtest."""
+    """Executable evaluation contract for the Phase 4 EV Walk-forward Backtest.
 
-    contract_version: Literal["1.0"]
+    "Executable" is the load-bearing word: every field here is consumed by
+    ``fpl.validate.dev_ev_backtest`` and threaded to the code that acts on it, or asserted
+    against the implementation constant it freezes. A value that is merely duplicated as a
+    hardcoded default cannot detect drift, which is the whole point of pre-registering it.
+    """
+
+    contract_version: Literal["1.1"]
     phase: Literal[4]
+    amendments: tuple[Phase4Amendment, ...] = ()
     horizon: Phase4HorizonPolicy
     support: Phase4SupportPolicy
     components: Phase4ComponentsPolicy
@@ -3527,6 +3573,37 @@ class Phase4EVBacktestConfig(_Frozen):
     target_population: Phase4TargetPopulationPolicy
     metrics: Phase4MetricsPolicy
     scoring_calibration: Phase4ScoringCalibrationPolicy
+
+    @model_validator(mode="after")
+    def _version_bump_requires_an_amendment(self) -> Self:
+        """A changed contract may not become invisible. Bumping the version without a record
+        would let the pre-registration be rewritten between commits and read as original."""
+        if self.contract_version != ORIGINAL_PHASE4_CONTRACT_VERSION and not any(
+            amendment.version == self.contract_version for amendment in self.amendments
+        ):
+            raise ValueError(
+                f"Phase 4 contract version {self.contract_version} has no amendment record; "
+                "a pre-registered contract may not change without one"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _amendment_history_is_frozen(self) -> Self:
+        """The whole ordered amendment history is pinned, not just the current version."""
+        expected = FROZEN_PHASE4_AMENDMENT_HISTORY.get(self.contract_version)
+        if expected is None:
+            return self
+        actual = tuple(
+            (amendment.version, amendment.candidates_evaluated_before_amendment)
+            for amendment in self.amendments
+        )
+        if actual != expected:
+            raise ValueError(
+                f"Phase 4 amendment history for contract {self.contract_version} is not the "
+                f"frozen record: expected {expected}, got {actual}. The ordered amendment "
+                "sequence and evaluation counts are pinned and may not be altered."
+            )
+        return self
 
 
 @functools.cache

@@ -25,7 +25,12 @@ MAX_GOALS = 10
 # Log score is unbounded when a model assigns zero probability to what happened. Rather than
 # returning infinity -- which would make one row dominate every aggregate -- the probability
 # is floored, and the floor is small enough to remain a severe penalty.
-_PROBABILITY_FLOOR = 1e-12
+#
+# Public because evaluation contracts pre-register this value (for example Phase 4's
+# `scoring_calibration.log_probability_floor`); a runner asserts the contract against this
+# constant so the two cannot drift apart unnoticed.
+PROBABILITY_FLOOR = 1e-12
+_PROBABILITY_FLOOR = PROBABILITY_FLOOR
 
 type Distribution = tuple[float, ...]
 

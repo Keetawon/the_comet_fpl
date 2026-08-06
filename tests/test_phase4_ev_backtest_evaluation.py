@@ -6,13 +6,16 @@ import pytest
 from pydantic import ValidationError
 
 from fpl.config import Phase4EVBacktestConfig, load_phase4_ev_backtest_evaluation
+from fpl.models import defensive_contribution_v1, gk_saves_v1
+from fpl.validate.metrics import PROBABILITY_FLOOR
+from fpl.validate.points_harness import default_component_suite
 
 
 def test_phase4_ev_backtest_contract_loads() -> None:
     load_phase4_ev_backtest_evaluation.cache_clear()
     contract = load_phase4_ev_backtest_evaluation()
     assert contract.phase == 4
-    assert contract.contract_version == "1.0"
+    assert contract.contract_version == "1.1"
     assert contract.horizon.season == "2025-26"
     assert contract.horizon.start_gw == 29
     assert contract.horizon.end_gw == 38
@@ -23,8 +26,8 @@ def test_phase4_ev_backtest_contract_loads() -> None:
     assert contract.support.max_fixture_points == 34
     assert contract.components.stage_a == "trailing_goals_attack_defence"
     assert contract.components.minutes == "concentration_adaptive_shrinkage_player_minutes_v3"
-    assert contract.components.saves == "league_constant_save_rate_v1"
-    assert contract.components.defensive_contribution == "team_rescaled_dc_v1"
+    assert contract.components.saves == "gk_saves_poisson_from_team_conceded_v1"
+    assert contract.components.defensive_contribution == "trailing_dc_threshold_hit_bernoulli_v1"
     assert contract.components.bps_residual == "trailing_ict_ridge_residual_v1"
     assert contract.primary_architecture.name == "prospective_v3_coupled_seasonal_bonus"
     assert contract.primary_architecture.seasonal_appearance_min_rows == 3
@@ -78,6 +81,8 @@ def test_phase4_ev_backtest_contract_loads() -> None:
         (("scoring_calibration", "log_probability_floor"), 1e-6),
         (("scoring_calibration", "randomized_pit_band"), [0.2, 0.8]),
         (("scoring_calibration", "randomized_pit_seed"), 12345),
+        (("components", "assists_architecture"), "wrong_assists_architecture"),
+        (("components", "bps_simulation"), "wrong_bps_simulation"),
     ],
 )
 def test_phase4_ev_backtest_contract_valid_but_wrong_mutations_rejected(
@@ -91,3 +96,63 @@ def test_phase4_ev_backtest_contract_valid_but_wrong_mutations_rejected(
 
     with pytest.raises(ValidationError):
         Phase4EVBacktestConfig.model_validate(doc)
+
+
+# --------------------------------------------------------------------------------------
+# The contract must name what actually runs
+# --------------------------------------------------------------------------------------
+#
+# Contract 1.0 froze `league_constant_save_rate_v1` and `team_rescaled_dc_v1`. Neither string
+# existed anywhere in the repository, and both misdescribed the model they claimed to pin: the
+# saves component is fitted fold-locally, and the DC component applies no destination-team
+# rescaling at all. Every test passed, because they only checked the YAML against itself. These
+# tests close that gap by comparing the frozen identity to the implementation constant.
+
+
+def test_frozen_component_identities_equal_the_implementation_constants() -> None:
+    contract = load_phase4_ev_backtest_evaluation()
+    assert contract.components.saves == gk_saves_v1.NAME
+    assert contract.components.defensive_contribution == defensive_contribution_v1.NAME
+
+
+def test_frozen_identities_equal_what_the_executed_suite_installs() -> None:
+    """The suite is what actually runs, so it is the authority the contract must match."""
+    contract = load_phase4_ev_backtest_evaluation()
+    suite = default_component_suite()
+
+    assert contract.components.minutes == suite.minutes_name
+    assert contract.components.saves == suite.saves_name
+    assert contract.components.defensive_contribution == suite.dc_name
+    # The comparator architecture is the suite's own goals/assists models, unmodified.
+    assert contract.diagnostic_comparator.attacking == suite.goals_name
+    assert contract.diagnostic_comparator.assists == suite.assists_name
+
+
+def test_frozen_log_probability_floor_equals_the_scoring_constant() -> None:
+    contract = load_phase4_ev_backtest_evaluation()
+    assert contract.scoring_calibration.log_probability_floor == PROBABILITY_FLOOR
+
+
+def test_version_bump_without_an_amendment_record_is_rejected() -> None:
+    """A pre-registered contract may not change invisibly."""
+    doc = load_phase4_ev_backtest_evaluation().model_dump()
+    doc["amendments"] = []
+    with pytest.raises(ValidationError, match="no amendment record"):
+        Phase4EVBacktestConfig.model_validate(doc)
+
+
+def test_amendment_history_is_pinned() -> None:
+    """Rewriting a recorded amendment's evaluation count fails to load."""
+    doc = load_phase4_ev_backtest_evaluation().model_dump()
+    doc["amendments"][0]["candidates_evaluated_before_amendment"] = 3
+    with pytest.raises(ValidationError, match="not the frozen record"):
+        Phase4EVBacktestConfig.model_validate(doc)
+
+
+def test_amendment_1_1_records_zero_prior_evaluations() -> None:
+    """The correction was made before first execution; the record must say so."""
+    contract = load_phase4_ev_backtest_evaluation()
+    assert len(contract.amendments) == 1
+    amendment = contract.amendments[0]
+    assert amendment.version == "1.1"
+    assert amendment.candidates_evaluated_before_amendment == 0

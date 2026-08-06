@@ -9,6 +9,23 @@ Bin 34 represents 34+. For proper scores (Log Score, CRPS, PIT-80), actual targe
 Multi-fixture (DGW) PMFs are convolved without truncation over support 0..(34 * fixture_count).
 Weekly EV is the exact sum of fixture EVs.
 Cumulative ranking aggregates player-GW rows by player code across all 10 gameweeks.
+
+Two grains, deliberately, and they do NOT reconcile by averaging:
+
+* The overall report's proper scores and MAE/RMSE are computed at **fixture** grain
+  ``(season, code, fixture)`` -- the contract's scored population.
+* ``gw_calibration`` is computed at **player-GW** grain, on the convolved rows, because that is
+  the grain a weekly decision is made at. A DGW player is one row there and two here, and each
+  gameweek draws its own PIT randomisation, so the per-GW means are a separate weekly view and
+  never average to the overall figure. ``ev_total``/``actual_total`` do sum across both, since
+  weekly EV is the exact sum of fixture EVs.
+
+One tie policy governs every ranking output. The oracle ordering is ``(-actual_points, code)``
+everywhere -- NDCG, capture ratio, overlap, displayed ``actual_rank``, and ``in_both_top_20`` --
+so ``top_20_overlap`` always equals the fraction of detail rows flagged ``in_both_top_20``.
+Predicted EV must never enter the actual ordering: among actual-points ties (very common at both
+grains) an EV tiebreak would hand the higher-EV player the better actual rank and the oracle
+slot, flattering the model in exactly the table a reader checks it against.
 """
 
 from __future__ import annotations
@@ -229,21 +246,33 @@ def compute_spearman_rank_correlation(x: Sequence[float], y: Sequence[float]) ->
     return num / math.sqrt(den_x * den_y)
 
 
+def _predicted_order(rows: Sequence[PlayerGwRow]) -> list[PlayerGwRow]:
+    """The single predicted ordering: EV DESC, then code ASC. Used by every ranking output."""
+    return sorted(rows, key=lambda r: (-r.ev, r.code))
+
+
+def _oracle_order(rows: Sequence[PlayerGwRow]) -> list[PlayerGwRow]:
+    """The single oracle ordering: actual points DESC, then code ASC.
+
+    EV is deliberately absent from this key. See the module docstring: an EV tiebreak inside an
+    actual-points tie biases the oracle toward the model being scored.
+    """
+    return sorted(rows, key=lambda r: (-r.actual_points, r.code))
+
+
 def compute_ndcg_at_k(rows: Sequence[PlayerGwRow], k: int = 20) -> tuple[float, float, float]:
     """Compute NDCG@k, Top-k capture ratio, and Top-k overlap for player-GW rows.
 
-    Deterministic tie breaking on EV: (ev DESC, code ASC).
-    Oracle sorting: (actual_points DESC, code ASC).
-    Relevance for NDCG is max(0, actual_points).
+    Predicted order is (ev DESC, code ASC); oracle order is (actual_points DESC, code ASC).
+    Relevance for NDCG is max(0, actual_points). :func:`_top_20_details` uses the same two
+    orderings, so the overlap returned here equals the fraction of detail rows flagged
+    ``in_both_top_20``.
     """
     if not rows or k <= 0:
         return 1.0, 1.0, 1.0
 
-    sorted_pred = sorted(rows, key=lambda r: (-r.ev, r.code))
-    pred_k = sorted_pred[:k]
-
-    sorted_oracle = sorted(rows, key=lambda r: (-r.actual_points, r.code))
-    oracle_k = sorted_oracle[:k]
+    pred_k = _predicted_order(rows)[:k]
+    oracle_k = _oracle_order(rows)[:k]
 
     dcg = 0.0
     for r_idx, row in enumerate(pred_k, start=1):
@@ -269,16 +298,19 @@ def compute_ndcg_at_k(rows: Sequence[PlayerGwRow], k: int = 20) -> tuple[float, 
 
 
 def _top_20_details(rows: Sequence[PlayerGwRow], k: int = 20) -> tuple[Top20PlayerRow, ...]:
-    """Build detailed top-k player ranking rows with deterministic tie handling.
+    """Build detailed top-k player ranking rows under the harness's single tie policy.
 
-    Ties in EV are broken by player code ASC.
-    Ties in actual points are broken by higher EV DESC, then player code ASC.
+    Both orderings come from :func:`_predicted_order` and :func:`_oracle_order`, the same two
+    functions :func:`compute_ndcg_at_k` uses. Ties in EV break by player code ASC; ties in actual
+    points also break by player code ASC and never by EV. That equality is the contract: the
+    displayed ``actual_rank``, the ``in_both_top_20`` flag, and the aggregate ``top_20_overlap``
+    are all reading one oracle, so the detail table cannot disagree with the headline number.
     """
     if not rows:
         return ()
 
-    pred_sorted = sorted(rows, key=lambda r: (-r.ev, r.code))
-    actual_sorted = sorted(rows, key=lambda r: (-r.actual_points, -r.ev, r.code))
+    pred_sorted = _predicted_order(rows)
+    actual_sorted = _oracle_order(rows)
 
     actual_rank_map = {r.code: rank for rank, r in enumerate(actual_sorted, start=1)}
     oracle_top_k_codes = {r.code for r in actual_sorted[:k]}
@@ -304,6 +336,8 @@ def score_backtest_rows(
     fixture_rows: Sequence[FixturePredictionRow],
     *,
     seed: int = 202627,
+    max_support: int = 34,
+    pit_band: tuple[float, float] = (0.1, 0.9),
 ) -> BacktestScoreReport:
     """Score a backtest population of FixturePredictionRow entries.
 
@@ -311,9 +345,17 @@ def score_backtest_rows(
     Bin 34 represents 34+; scored_target = min(max(actual_points, 0), max_support).
     Weekly rankings evaluated on convolved player-GW rows.
     Cumulative rankings aggregated across all 10 GWs per player code.
+
+    ``seed``, ``max_support``, and ``pit_band`` are supplied by the caller from the frozen
+    contract (``monte_carlo.seed`` / ``scoring_calibration.randomized_pit_seed``,
+    ``support.max_fixture_points``, ``scoring_calibration.randomized_pit_band``) rather than
+    fixed here, so a contract change moves the numbers instead of being silently ignored.
     """
     if not fixture_rows:
         raise ValueError("Cannot score empty fixture prediction rows")
+
+    pit_low, pit_high = pit_band
+    expected_pmf_length = max_support + 1
 
     # Validate unique grain (season, code, fixture) and PMF properties
     seen_keys: set[tuple[str, int, int]] = set()
@@ -323,8 +365,10 @@ def score_backtest_rows(
             raise ValueError(f"Duplicate prediction grain {key}")
         seen_keys.add(key)
 
-        if len(r.pmf) != 35:
-            raise ValueError(f"Fixture PMF length {len(r.pmf)} != 35 for code {r.code}")
+        if len(r.pmf) != expected_pmf_length:
+            raise ValueError(
+                f"Fixture PMF length {len(r.pmf)} != {expected_pmf_length} for code {r.code}"
+            )
         if not math.isfinite(r.ev):
             raise ValueError(f"Non-finite EV {r.ev} for player code {r.code}")
         for p_k in r.pmf:
@@ -413,7 +457,7 @@ def score_backtest_rows(
 
         mean_log = sum(logs) / n_gw_players
         mean_crps_val = sum(crpss) / n_gw_players
-        in_pit = sum(1 for p in pits if 0.1 <= p <= 0.9)
+        in_pit = sum(1 for p in pits if pit_low <= p <= pit_high)
         pit_cov = in_pit / float(n_gw_players)
 
         gw_calib_list.append(
@@ -504,7 +548,7 @@ def score_backtest_rows(
     all_pits = [
         randomised_pit(p, t, rng_tot) for p, t in zip(fix_pmfs, fix_dist_targets, strict=True)
     ]
-    tot_pit_cov = sum(1 for p in all_pits if 0.1 <= p <= 0.9) / float(tot_fixtures)
+    tot_pit_cov = sum(1 for p in all_pits if pit_low <= p <= pit_high) / float(tot_fixtures)
 
     distinct_fixtures = len({(r.season, r.gw, r.fixture) for r in fixture_rows})
 

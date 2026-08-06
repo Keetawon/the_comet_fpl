@@ -6,8 +6,37 @@
 # A candidate/backtest cannot choose easier gameweeks, populations, metrics, or
 # lift gates after seeing its results.
 
-contract_version: "1.0"
+contract_version: "1.1"
 phase: 4
+
+amendments:
+  - version: "1.1"
+    date: "2026-08-06"
+    candidates_evaluated_before_amendment: 0
+    changed: >-
+      Corrected two frozen component identities to the constants the executed suite actually
+      carries: components.saves 'league_constant_save_rate_v1' ->
+      'gk_saves_poisson_from_team_conceded_v1' (fpl.models.gk_saves_v1.NAME) and
+      components.defensive_contribution 'team_rescaled_dc_v1' ->
+      'trailing_dc_threshold_hit_bernoulli_v1' (fpl.models.defensive_contribution_v1.NAME).
+      Added components.assists_architecture and components.bps_simulation to name the two
+      inline architectures that have no model NAME constant. No horizon, population, metric,
+      support, Monte-Carlo, or scoring/calibration value changed.
+    reason: >-
+      Neither original string existed anywhere in the repository, and both misdescribed the
+      model they claimed to freeze. The saves component is fitted fold-locally
+      (gk_saves_v1.py:104-124); the league constant is only its cold-start fallback. The
+      defensive-contribution component applies NO destination-team rescaling - it shrinks
+      toward a fold-local POSITION hit rate (defensive_contribution_v1.py:128-136) - so
+      'team_rescaled_dc_v1' asserted exactly the property AGENTS.md requires and the code does
+      not implement. A pre-registration that names a non-existent model cannot pin anything.
+    evidence: >-
+      Zero evaluations had been executed under contract 1.0: no results artifact exists, no
+      run of fpl.validate.dev_ev_backtest had been performed, and no primary or comparator
+      number had been observed. The correction is therefore a pre-registration repair before
+      first execution, not a post-hoc amendment of a judged gate. Enforced going forward by
+      tests/test_phase4_ev_backtest_evaluation.py, which asserts each frozen identity equals
+      the implementation constant that default_component_suite() actually installs.
 
 horizon:
   season: "2025-26"
@@ -22,12 +51,18 @@ horizon:
 support:
   max_fixture_points: 34
 
+# Every name below is the implementation constant the executed suite installs, asserted
+# against the code by tests/test_phase4_ev_backtest_evaluation.py. `assists_architecture` and
+# `bps_simulation` name inline architectures that carry no model NAME constant; they are pinned
+# here so the contract states what was run rather than leaving it implicit.
 components:
   stage_a: trailing_goals_attack_defence
   minutes: concentration_adaptive_shrinkage_player_minutes_v3
-  saves: league_constant_save_rate_v1
-  defensive_contribution: team_rescaled_dc_v1
+  saves: gk_saves_poisson_from_team_conceded_v1
+  defensive_contribution: trailing_dc_threshold_hit_bernoulli_v1
   bps_residual: trailing_ict_ridge_residual_v1
+  assists_architecture: ev_backtest_adapter_coupled_team_share_assists
+  bps_simulation: points_composition_joint_fixture_bps_monte_carlo
 
 primary_architecture:
   name: prospective_v3_coupled_seasonal_bonus
