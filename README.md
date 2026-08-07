@@ -46,10 +46,15 @@ roster and first-kickoff cutoff proxies. **That calibration win has since been m
 errors cancelling**: the composer applied P(play) twice and destroyed 11.11% of all goal and assist
 mass, which offset an over-prediction elsewhere; with the defect fixed the same rows give EV/actual
 1.0430. The frozen artifact keeps its defective numbers and is not re-run. A component
-decomposition then shows the composer accurate to -0.5% across what it actually models, with the
-residual bias being the unmodelled cards / own goals / missed penalties, and identifies the
-goals-conceded penalty (charged in full to short appearances) as the next real defect --
-see `docs/phase4-composer-p-play-double-gating-fix.md`. Before
+decomposition then showed the composer accurate to -0.5% across what it actually models, with the
+residual bias being the unmodelled cards / own goals / missed penalties, and identified a second
+real defect: the goals-conceded penalty was charged in full to short appearances. **That is now
+also fixed** -- conceded goals are binomially thinned to a measured per-bin on-pitch exposure
+(0.344 / 0.813 / 1.0, which is *not* minutes/90), cutting the clean-sheet and penalty errors by 66%
+and 58%. Both repairs move the aggregate total the wrong way, because it was previously near zero
+only through offsetting errors; the residual is now concentrated in the unmodelled negative
+components (417 points) and a low-scoring-window regime effect. See
+`docs/phase4-composer-p-play-double-gating-fix.md`. Before
 operational use, the optimiser needs the no-transfer pruning
 defect fixed, horizon availability semantics measured, stronger optimiser-run provenance, and an
 explicit static-price policy. The append-only prediction ledger, BI semantic exports, static

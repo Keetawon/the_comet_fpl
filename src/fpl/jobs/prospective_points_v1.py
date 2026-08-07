@@ -111,6 +111,7 @@ from fpl.models.defensive_contribution_v1 import DcHistoryRow
 from fpl.models.gk_saves_v1 import GkSavesHistoryRow
 from fpl.models.points_composition import (
     DEFAULT_MAX_POINTS_FULL,
+    MEASURED_CONCEDED_EXPOSURE,
     BpsExactLookup,
     ComponentDistributions,
     ComposedPlayer,
@@ -1355,6 +1356,7 @@ def predict_prospective_points(
             fixture_seed=_fixture_seed(base_seed, season, fixture),
             draws=draws,
             max_points=max_points,
+            conceded_exposure=MEASURED_CONCEDED_EXPOSURE,
         )
         by_code: dict[int, ComposedPlayer] = {c.code: c for c in composed}
         for t in targets:

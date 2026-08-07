@@ -18,6 +18,7 @@ from fpl.models.attacking_v2 import _RosterEntry
 from fpl.models.attacking_v3 import allocate_minutes_gated_rates
 from fpl.models.bps_bonus import PlayerRow, award_bonus, exact_bps
 from fpl.models.points_composition import (
+    MEASURED_CONCEDED_EXPOSURE,
     BpsExactLookup,
     ComponentDistributions,
     ExtraScoring,
@@ -27,6 +28,7 @@ from fpl.models.points_composition import (
     compose_points_distribution,
     conditional_rate,
     representative_minutes,
+    thin_count_distribution,
 )
 from fpl.models.scoring import calculate_points
 from fpl.types import PlayerMatchStats, Position
@@ -474,3 +476,159 @@ def test_the_composer_realises_the_unconditional_rate_end_to_end() -> None:
     # The uncorrected wiring delivers only p_play of the mass it was asked to allocate.
     uncorrected = realised_goal_mass(unconditional)
     assert uncorrected == pytest.approx(unconditional * p_play, rel=0.02)
+
+
+# --------------------------------------------------------------------------------------
+# Goals conceded are charged only for the part of the match the player was on the pitch
+# --------------------------------------------------------------------------------------
+#
+# FPL charges the goals-conceded penalty, and awards the clean sheet, on goals conceded WHILE THE
+# PLAYER WAS ON THE PITCH. The composer handed every appearing player the full-match team conceded
+# distribution, which over-charged substitutes 4.2x (measured mean penalty 0.559 against an actual
+# 0.133 for the 1-59 bin).
+
+
+def test_thinning_is_the_identity_at_full_exposure() -> None:
+    """Bin 3 must not move: a player who lasted the match saw all of it."""
+    team = count_poisson_pmf(1.43)
+    assert thin_count_distribution(team, 1.0) == team
+
+
+def test_thinning_moves_mass_toward_zero_and_stays_a_proper_distribution() -> None:
+    team = count_poisson_pmf(1.6)
+    thinned = thin_count_distribution(team, 0.344)
+    assert sum(thinned) == pytest.approx(sum(team))
+    assert thinned[0] > team[0]  # more chance of seeing none of them
+    mean_team = sum(i * m for i, m in enumerate(team))
+    mean_thinned = sum(i * m for i, m in enumerate(thinned))
+    assert mean_thinned == pytest.approx(0.344 * mean_team, rel=1e-6)
+
+
+def test_thinning_a_known_count_is_the_binomial() -> None:
+    """A point mass at 3 conceded, thinned at 0.5, is Binomial(3, 0.5) exactly."""
+    thinned = thin_count_distribution(_count_one_hot(3), 0.5)
+    assert thinned[:4] == pytest.approx((0.125, 0.375, 0.375, 0.125))
+    assert sum(thinned[4:]) == pytest.approx(0.0)
+
+
+def test_measured_exposure_matches_the_archive_penalty_rates() -> None:
+    """The constant is only worth having if it reproduces the observed penalty per bin.
+
+    Archive means (GK/DEF): bin 1 0.133, bin 2 0.412, bin 3 0.485, against a team conceded rate of
+    about 1.5. The un-thinned composer charges every one of them the bin-3 figure.
+    """
+    team = count_poisson_pmf(1.5)
+
+    def mean_penalty(exposure: float) -> float:
+        thinned = thin_count_distribution(team, exposure)
+        return sum((n // 2) * mass for n, mass in enumerate(thinned))
+
+    assert mean_penalty(MEASURED_CONCEDED_EXPOSURE[1]) == pytest.approx(0.11, abs=0.03)
+    assert mean_penalty(MEASURED_CONCEDED_EXPOSURE[2]) == pytest.approx(0.41, abs=0.03)
+    assert mean_penalty(MEASURED_CONCEDED_EXPOSURE[3]) == pytest.approx(0.49, abs=0.03)
+    # The defect: without thinning a substitute is charged the full-match rate, 4x the truth.
+    assert mean_penalty(1.0) / mean_penalty(MEASURED_CONCEDED_EXPOSURE[1]) > 3.5
+
+
+def test_omitting_exposure_reproduces_the_unthinned_composer_bit_for_bit() -> None:
+    """The new parameter must be inert when absent, on both composer entry points."""
+    players = [
+        FixturePlayer(
+            code=code,
+            components=ComponentDistributions(
+                position=position,
+                minutes=(0.1, 0.2, 0.3, 0.4),
+                goals=count_poisson_pmf(0.3),
+                assists=count_poisson_pmf(0.2),
+                team_goals_conceded=count_poisson_pmf(1.4),
+            ),
+            residual_mean=0.0,
+            residual_sigma=3.0,
+        )
+        for code, position in ((11, Position.DEF), (12, Position.MID))
+    ]
+    absent = compose_fixture_full_points(
+        players, LOOKUP, BPS_LOOKUP, EXTRA, fixture_seed=5, draws=800
+    )
+    explicit_identity = compose_fixture_full_points(
+        players,
+        LOOKUP,
+        BPS_LOOKUP,
+        EXTRA,
+        fixture_seed=5,
+        draws=800,
+        conceded_exposure=(0.0, 1.0, 1.0, 1.0),
+    )
+    assert [p.distribution for p in absent] == [p.distribution for p in explicit_identity]
+
+    thinned = compose_fixture_full_points(
+        players,
+        LOOKUP,
+        BPS_LOOKUP,
+        EXTRA,
+        fixture_seed=5,
+        draws=800,
+        conceded_exposure=MEASURED_CONCEDED_EXPOSURE,
+    )
+    assert [p.distribution for p in thinned] != [p.distribution for p in absent]
+
+
+def _defender_expected_points(minutes_bin: int, exposure: tuple[float, ...] | None) -> float:
+    """A defender facing a leaky opponent, scored end to end through the real composer."""
+    components = ComponentDistributions(
+        position=Position.DEF,
+        minutes=_minutes_one_hot(minutes_bin),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=count_poisson_pmf(2.4),
+    )
+    pmf = compose_points_distribution(
+        components, LOOKUP, seed=202627, draws=200_000, conceded_exposure=exposure
+    )
+    return sum(index * mass for index, mass in enumerate(pmf))
+
+
+def test_thinning_raises_a_defenders_points_at_every_appearing_bin() -> None:
+    """Isolates exposure: identical bin, identical everything, only the charge changes."""
+    for minutes_bin in (BIN_1_59, 2, BIN_90):
+        thinned = _defender_expected_points(minutes_bin, MEASURED_CONCEDED_EXPOSURE)
+        unthinned = _defender_expected_points(minutes_bin, None)
+        if minutes_bin == BIN_90:
+            assert thinned == unthinned  # exposure 1.0 -> nothing to thin
+        else:
+            assert thinned > unthinned
+
+
+def test_a_sixty_minute_defender_outscores_an_ever_present_one_against_a_leaky_team() -> None:
+    """Both bank 2 appearance points and both are clean-sheet eligible, so exposure is the only
+    difference between them -- and coming off on 75 minutes really is worth points when the team
+    is shipping goals."""
+    sixty = _defender_expected_points(2, MEASURED_CONCEDED_EXPOSURE)
+    ever_present = _defender_expected_points(BIN_90, MEASURED_CONCEDED_EXPOSURE)
+    assert sixty > ever_present
+
+
+def test_a_substituted_defender_can_keep_a_clean_sheet_his_team_did_not() -> None:
+    """FPL awards the clean sheet on goals conceded while ON THE PITCH.
+
+    A 60-89 player whose team conceded once, after he was withdrawn, keeps his clean sheet. The
+    un-thinned composer could never represent that: it required the whole team to keep one.
+    """
+    components = ComponentDistributions(
+        position=Position.DEF,
+        minutes=_minutes_one_hot(2),
+        goals=_count_one_hot(0),
+        assists=_count_one_hot(0),
+        team_goals_conceded=_count_one_hot(1),  # the team concedes exactly one, every world
+    )
+    clean_sheet_points = RULES.clean_sheets.points[Position.DEF]
+    scored = RULES.appearance.long_play_points + clean_sheet_points
+
+    unthinned = compose_points_distribution(components, LOOKUP, seed=11, draws=50_000)
+    assert unthinned[scored] == 0.0  # team conceded, so nobody ever keeps one
+
+    thinned = compose_points_distribution(
+        components, LOOKUP, seed=11, draws=50_000, conceded_exposure=MEASURED_CONCEDED_EXPOSURE
+    )
+    # He is on the pitch for 0.813 of the conceded goals, so he keeps it about 18.7% of the time.
+    assert thinned[scored] == pytest.approx(1.0 - MEASURED_CONCEDED_EXPOSURE[2], abs=0.01)

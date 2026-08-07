@@ -135,23 +135,99 @@ holds at zero and reality subtracts. That gap is already documented in `points_c
 this quantifies it for the first time.
 
 Three findings inside that near-zero total are worth separating, because they are not the same kind
-of thing:
+of thing. The first two are the same defect seen from two sides, and are now fixed (below); the
+third must **not** be "fixed".
 
-1. **The goals-conceded penalty is a genuine specification defect (−175.7 points, the largest single
-   gap).** FPL charges a GK/DEF for goals conceded *while they were on the pitch*. The composer
-   charges every appearing player the full-match team-conceded distribution regardless of the drawn
-   minutes bin. Measured over GW29-38: GK/DEF rows playing 1-59 minutes conceded 105 goals across
-   229 rows (0.459/row), against 1.280/row for 90-minute players — roughly a third the exposure,
-   charged in full. This is fixable and is the next repair.
+1. **The goals-conceded penalty was a genuine specification defect (−175.7 points, the largest
+   single gap).** FPL charges a GK/DEF for goals conceded *while they were on the pitch*. The
+   composer charged every appearing player the full-match team-conceded distribution regardless of
+   the drawn minutes bin.
 
-2. **Clean sheets under-predict by 7.0%, which is the same defect seen from the other side.** Too
-   much conceded mass away from zero.
+2. **Clean sheets under-predicted by 7.0% — the same defect from the other side.** Too much
+   conceded mass away from zero, so a player withdrawn before his team shipped one could never keep
+   a clean sheet the way FPL awards it.
 
-3. **Goals over-predicting by 12.8% is most likely regime, not miscalibration, and should not be
-   "fixed".** GW29-38 ran at 2.576 goals per fixture, the lowest window in the archive (season
-   averages 2.729 / 2.732 / 3.147 / 2.845 / 2.645). Stage A predicts near the pooled historical
-   mean of about 2.9. On 99 fixtures the standard error of the mean is about 0.171, so the window
-   sits roughly 1.9 standard errors low — within ordinary variation. Tuning Stage A down to match a
+3. **Goals over-predicting by 12.8% is regime, not miscalibration, and must not be tuned away.**
+   GW29-38 ran at 2.576 goals per fixture, the lowest window in the archive (season averages
+   2.729 / 2.732 / 3.147 / 2.845 / 2.645). Stage A predicts near the pooled historical mean of
+   about 2.9. On 99 fixtures the standard error of the mean is about 0.171, so the window sits
+   roughly 1.9 standard errors low — within ordinary variation. Tuning Stage A down to match a
    99-fixture sample would be fitting noise, and would repeat the mistake `AGENTS.md` already
    records for home advantage. The position mix of allocated goals (a DEF goal scores 6, a FWD goal
    4) is a separate and untested contributor to this figure.
+
+# Second repair: goals conceded are charged only for time on the pitch
+
+## The measured exposure, and why it is not minutes/90
+
+The archive's player-level `goals_conceded` is already an on-pitch figure, so the share of a team's
+conceded goals a player is exposed to can be measured directly as
+`mean(player goals_conceded) / mean(team goals_conceded)`, per Stage B minutes bin, over GK/DEF
+rows (the positions the penalty applies to):
+
+| bin | rows | minutes/90 | **measured exposure** | actual penalty | composer charged |
+|---|---:|---:|---:|---:|---:|
+| 1 (1-59) | 3,986 | 0.254 | **0.344** | 0.133 | 0.559 — **4.2× too high** |
+| 2 (60-89) | 2,324 | 0.837 | **0.813** | 0.412 | 0.556 — 1.35× too high |
+| 3 (90) | 16,464 | 1.000 | **0.999** | 0.485 | 0.485 — exact |
+
+**Exposure is not minutes/90.** Substitutes see 35% *more* of their team's conceded goals than
+their time on the pitch implies (0.344 against 0.254) — they come on into game states that are
+already going badly, and late goals are more frequent. Deriving the fraction from the bin's minutes
+would have under-charged them; it is measured instead.
+
+Pooled across positions rather than split by them. Per-position exposure varies modestly where it
+is measurable (bin 1: DEF 0.341, MID 0.316, FWD 0.295; bin 2: DEF 0.814, MID 0.776, FWD 0.736), but
+the goalkeeper cells carry 73 and 16 rows — far too few to estimate, and exactly where this
+repository's measured-constants discipline prefers a pooled value. Bin 3 is pinned to an exact 1.0;
+the measured 0.999 is archive noise.
+
+## The repair
+
+`thin_count_distribution` binomially thins the team conceded distribution to a bin's exposure:
+given the team concedes `n`, the player sees `Binomial(n, exposure)`. `MEASURED_CONCEDED_EXPOSURE`
+is `(0.0, 0.344, 0.813, 1.0)`. Both composers take an optional `conceded_exposure`; omitting it
+gives every bin the identical un-thinned cumulative and reproduces the previous composer
+**bit-for-bit**, which is what keeps every existing Stage D v1/v2/v3 test valid. The two production
+call sites pass the measured constant.
+
+Thinning is an approximation in one known direction: it treats a team's conceded goals as
+independently timed, so it cannot represent a substitute walking into a collapse and shipping three
+in twenty minutes. Against the archive it is very good where the mass is — predicted mean penalty
+0.417 against an actual 0.412 for bin 2, 0.479 against 0.485 for bin 3 — and understates only
+bin 1 (0.106 against 0.133), where the alternative on offer was 0.559.
+
+The clean sheet follows automatically and correctly: a 60-89 player whose team conceded once after
+he was withdrawn now keeps his clean sheet, which is what FPL awards and what the un-thinned
+composer could not represent at all.
+
+## Result
+
+| component | before | after | actual | error cut |
+|---|---:|---:|---:|---:|
+| clean sheet | 1246.8 (−7.0%) | **1309.2 (−2.4%)** | 1341.0 | 66% |
+| goals-conceded penalty | −581.7 (+43.3%) | **−479.1 (+18.0%)** | −406.0 | 58% |
+| **combined absolute error** | **269.9** | **104.9** | | **61%** |
+
+**And the aggregate total got worse: −0.5% to +1.2% (9322.4 to 9487.4 against 9372.0).** This is
+the same lesson as the first repair, and it is worth stating plainly rather than burying: the
+previous total was close to correct because a −94.2 clean-sheet error and a −175.7 penalty error
+were offsetting a +154.6 goals error and a +57.0 assists error. Removing two of the four leaves the
+other two exposed.
+
+That is a better state, not a worse one. The model is now closer to correct component by component,
+and the residual is **concentrated in one identified place** — Stage A's goal expectation against
+an unusually low-scoring window — rather than smeared across four components that happened to sum
+to nearly zero. A total that is right for the wrong reasons cannot be improved, because any real
+repair moves it the wrong way; this one can.
+
+## What is left, in size order
+
+1. **Unmodelled negative components: 417 points (4.7% of actual full points).** Cards, own goals,
+   and missed penalties are held at zero by design and reality subtracts them. This is now the
+   largest single gap in the composer and the clearest next accuracy work.
+2. **Goals +12.8% / assists +8.1%: regime, ~1.9 standard errors on a 99-fixture window.** Do not
+   tune. If it needs an answer, the answer is a longer evaluation window, not a smaller `lambda`.
+3. **Bin-1 conceded exposure understates by 20%** because binomial thinning cannot express a
+   substitute arriving into a collapse. Small (bin 1 is a minority of GK/DEF rows) and second-order
+   against the 4.2× error it replaced.

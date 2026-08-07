@@ -236,15 +236,25 @@ not a modelling error.** Across the components the composer models it is accurat
 (9322.3 against 9372.0). The apparent +4.3% is the **unmodelled negative components** -- cards, own
 goals, missed penalties -- worth 417 points over the window and held at zero by design. Inside that
 near-zero total, three things differ in kind and must not be lumped together:
-(a) the **goals-conceded penalty is a real specification defect**, -175.7 points and the largest
+(a) the **goals-conceded penalty was a real specification defect**, -175.7 points and the largest
 single gap -- FPL charges a GK/DEF only for goals conceded while on the pitch, but the composer
-charges every appearing player the full-match conceded distribution, and GK/DEF rows playing 1-59
-minutes conceded 0.459 per row against 1.280 for 90-minute players; (b) clean sheets under-predict
+charged every appearing player the full-match conceded distribution; (b) clean sheets under-predicted
 by 7.0%, the same defect from the other side; (c) **goals over-predicting by 12.8% is regime, not
 miscalibration** -- GW29-38 ran at 2.576 goals per fixture, the lowest window in the archive
 (season means 2.729/2.732/3.147/2.845/2.645) against a Stage A expectation near the pooled 2.9,
 about 1.9 standard errors low on 99 fixtures. Do not tune Stage A to a 99-fixture sample; that is
 the home-advantage mistake recorded above.
+
+(a) and (b) are now **fixed**. Goals conceded are charged only for the share of the match a player
+was on the pitch, binomially thinned to a measured per-bin exposure (see the measured constant
+below). Clean sheet error fell -7.0% -> -2.4% and the penalty error +43.3% -> +18.0%, cutting their
+combined absolute error 269.9 -> 104.9 points (61%). **The aggregate total moved the wrong way,
+-0.5% -> +1.2%, and that is expected**: it was previously near zero only because the clean-sheet and
+penalty errors offset the goals and assists regime error. Concentrating the residual in one
+identified place beats a total that is right for the wrong reasons -- the latter cannot be improved,
+because every real repair moves it. The largest remaining composer gap is now the **unmodelled
+negative components** (cards, own goals, missed penalties): 417 points, 4.7% of actual full points,
+held at zero by design.
 
 Two figures need reading with care. **Cumulative Spearman near 0.95 is inflated** by ranking all 841
 players including non-starters -- it largely measures who plays; the honest within-gameweek figure
@@ -475,6 +485,18 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   The same audit measured that recency does **not** help the xG signal either (equal-5 MAE 0.0944
   vs recency-5 0.0957 predicting next-season xG/appearance for attackers) — but the xG/xA/DC signals
   already equal-weight appeared rows, so only appearance needed the fix.
+- **A player's exposure to his team's conceded goals is not his share of the minutes.** FPL charges
+  the goals-conceded penalty, and awards the clean sheet, only on goals conceded *while the player
+  was on the pitch*. Measured directly (the archive's player `goals_conceded` is already an on-pitch
+  figure) as `mean(player conceded) / mean(team conceded)` over GK/DEF rows by Stage B minutes bin:
+  **0.344** (1-59, 3,986 rows), **0.813** (60-89, 2,324 rows), **0.999** (90, 16,464 rows). The same
+  bins average **0.254 / 0.837 / 1.000** of the match *by minutes*, so a substitute sees **35% more**
+  of his team's conceded goals than his time on the pitch implies -- he comes on into a game already
+  going badly, and late goals are more frequent. Never derive this fraction from minutes. Pooled
+  across positions: per-position spread is modest where measurable (bin 1: DEF 0.341, MID 0.316,
+  FWD 0.295; bin 2: DEF 0.814, MID 0.776, FWD 0.736) but the goalkeeper cells carry 73 and 16 rows.
+  Charging every appearing player the full-match distribution over-charged substitutes **4.2x**
+  (0.559 against an actual 0.133).
 - **`rest_days` cannot see cup or European congestion.** The archive is Premier League only (380
   fixtures per season, no competition field), and `rest_days` is the gap between a team's
   consecutive PL fixtures — so a midweek FA Cup / League Cup / Champions/Europa fixture is invisible

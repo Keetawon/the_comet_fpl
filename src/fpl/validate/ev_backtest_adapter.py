@@ -48,6 +48,7 @@ from fpl.models.defensive_contribution_v1 import DcHistoryRow
 from fpl.models.gk_saves_v1 import GkSavesHistoryRow
 from fpl.models.points_composition import (
     DEFAULT_MAX_POINTS_FULL,
+    MEASURED_CONCEDED_EXPOSURE,
     BpsExactLookup,
     ComponentDistributions,
     ExtraScoring,
@@ -728,6 +729,7 @@ def generate_forecasts_for_fold(
             fixture_seed=row_seed,
             draws=draws,
             max_points=max_support,
+            conceded_exposure=MEASURED_CONCEDED_EXPOSURE,
         )
 
         for comp in composed_list:

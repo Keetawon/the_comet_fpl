@@ -62,6 +62,67 @@ DEFAULT_MAX_POINTS = 30
 # distributions over 0..MAX_COUNT). Matches ``fpl.validate.metrics.MAX_GOALS``.
 MAX_COUNT = 10
 
+# The share of a fixture's TEAM goals conceded that a player is on the pitch for, by Stage B minutes
+# bin ``(0, 1-59, 60-89, 90)``. FPL charges the goals-conceded penalty, and awards the clean sheet,
+# only for goals conceded WHILE THE PLAYER WAS ON THE PITCH; a composer that hands every appearing
+# player the full-match team distribution over-charges every substitute.
+#
+# Measured on this archive over GK/DEF rows (the positions the penalty applies to), as
+# ``mean(player goals_conceded) / mean(team goals_conceded)`` -- the archive's player-level
+# ``goals_conceded`` is already an on-pitch figure, so this is a direct measurement rather than an
+# assumption:
+#
+#     bin 1 (1-59)  3,986 rows   exposure 0.344
+#     bin 2 (60-89) 2,324 rows   exposure 0.813
+#     bin 3 (90)   16,464 rows   exposure 0.999
+#
+# **Exposure is not minutes/90.** Those same bins average 0.254 / 0.837 / 1.000 of the match by
+# minutes, so substitutes see 35% MORE of their team's conceded goals than their time on the pitch
+# implies -- they come on into game states that are already going badly, and late goals are more
+# frequent. Deriving the fraction from the bin's minutes would under-charge them; this is measured
+# instead.
+#
+# Pooled across positions rather than split by them. Per-position exposure varies modestly where it
+# is measurable (bin 1: DEF 0.341, MID 0.316, FWD 0.295; bin 2: DEF 0.814, MID 0.776, FWD 0.736),
+# but the goalkeeper cells that would matter most carry 73 and 16 rows -- far too few to estimate,
+# and exactly the situation where this repository's measured-constants discipline prefers a pooled
+# value. Bin 3 is set to an exact 1.0: a player who lasted the full match saw the whole of it, and
+# the measured 0.999 is archive noise.
+MEASURED_CONCEDED_EXPOSURE: tuple[float, ...] = (0.0, 0.344, 0.813, 1.0)
+
+
+def thin_count_distribution(distribution: Sequence[float], exposure: float) -> tuple[float, ...]:
+    """Binomially thin a count distribution: each event is retained independently w.p. ``exposure``.
+
+    Used to turn a fixture's TEAM goals-conceded distribution into the distribution of goals
+    conceded while one player was on the pitch. Given the team concedes ``n``, the player sees
+    ``Binomial(n, exposure)``.
+
+    ``exposure >= 1.0`` returns the input unchanged (and is the identity the callers rely on to
+    reproduce the un-thinned composer bit-for-bit). The result has the same length as the input, so
+    it stays a valid index space for :class:`PointsLookup`.
+
+    Thinning is an approximation in one known direction: it treats a team's conceded goals as
+    independently timed, so it cannot represent a substitute arriving into a collapse and shipping
+    three in twenty minutes. Measured against the archive the approximation is very good for the
+    bins that carry the mass -- predicted mean penalty 0.417 against an actual 0.412 for bin 2, and
+    0.479 against 0.485 for bin 3 -- and materially under-states only bin 1 (0.106 against 0.133),
+    where the alternative on offer is the un-thinned 0.559.
+    """
+    if exposure >= 1.0:
+        return tuple(distribution)
+    retained = [0.0] * len(distribution)
+    for count, mass in enumerate(distribution):
+        if mass == 0.0:
+            continue
+        # Binomial(count, exposure) pmf, built by the recurrence to avoid repeated factorials.
+        term = (1.0 - exposure) ** count
+        for seen in range(count + 1):
+            retained[seen] += mass * term
+            if seen < count:
+                term *= (exposure / (1.0 - exposure)) * (count - seen) / (seen + 1)
+    return tuple(retained)
+
 
 @dataclass(frozen=True, slots=True)
 class ExtraScoring:
@@ -232,6 +293,23 @@ class PointsLookup:
         return self._table[(position, bin_index, goals, assists, conceded)]
 
 
+def _conceded_cumulative_by_bin(
+    team_conceded: Sequence[float], exposure: Sequence[float] | None, bins: int
+) -> list[list[float]]:
+    """One conceded cumulative per minutes bin, thinned to that bin's on-pitch exposure.
+
+    ``exposure is None`` gives every bin the identical un-thinned cumulative, which is what makes
+    the un-thinned composer reproduce bit-for-bit: the same uniform indexes the same table.
+    """
+    if exposure is None:
+        shared = _cumulative(team_conceded)
+        return [shared] * bins
+    return [
+        _cumulative(thin_count_distribution(team_conceded, exposure[index]))
+        for index in range(bins)
+    ]
+
+
 def _cumulative(distribution: Sequence[float]) -> list[float]:
     running = 0.0
     out: list[float] = []
@@ -262,6 +340,7 @@ def compose_points_distribution(
     draws: int,
     max_points: int = DEFAULT_MAX_POINTS,
     extra: ExtraScoring | None = None,
+    conceded_exposure: Sequence[float] | None = None,
 ) -> Distribution:
     """Monte-Carlo compose one player-fixture's components into a non-bonus points distribution.
 
@@ -296,7 +375,9 @@ def compose_points_distribution(
     minutes_cumulative = _cumulative(components.minutes)
     goals_cumulative = _cumulative(components.goals)
     assists_cumulative = _cumulative(components.assists)
-    conceded_cumulative = _cumulative(components.team_goals_conceded)
+    conceded_cumulative = _conceded_cumulative_by_bin(
+        components.team_goals_conceded, conceded_exposure, len(components.minutes)
+    )
     saves_cumulative = _cumulative(components.saves) if components.saves is not None else None
 
     position = components.position
@@ -321,7 +402,7 @@ def compose_points_distribution(
         else:
             goals = _sample_index(goals_cumulative, u_goals)
             assists = _sample_index(assists_cumulative, u_assists)
-            conceded = _sample_index(conceded_cumulative, u_conceded)
+            conceded = _sample_index(conceded_cumulative[bin_index], u_conceded)
             total = lookup.points(position, bin_index, goals, assists, conceded)
             if extended:
                 assert extra is not None  # guaranteed above when `extended`
@@ -478,6 +559,7 @@ def compose_fixture_full_points(
     fixture_seed: int,
     draws: int,
     max_points: int = DEFAULT_MAX_POINTS_FULL,
+    conceded_exposure: Sequence[float] | None = None,
 ) -> list[ComposedPlayer]:
     """Jointly compose every player in one fixture into full-points (incl. bonus) distributions.
 
@@ -514,7 +596,12 @@ def compose_fixture_full_points(
     minutes_cumulative = [_cumulative(p.components.minutes) for p in ordered]
     goals_cumulative = [_cumulative(p.components.goals) for p in ordered]
     assists_cumulative = [_cumulative(p.components.assists) for p in ordered]
-    conceded_cumulative = [_cumulative(p.components.team_goals_conceded) for p in ordered]
+    conceded_cumulative = [
+        _conceded_cumulative_by_bin(
+            p.components.team_goals_conceded, conceded_exposure, len(p.components.minutes)
+        )
+        for p in ordered
+    ]
     saves_cumulative = [
         _cumulative(p.components.saves) if p.components.saves is not None else None for p in ordered
     ]
@@ -547,7 +634,7 @@ def compose_fixture_full_points(
                 continue  # non-appearance: scores exactly 0 and is not ranked for bonus.
             goals = _sample_index(goals_cumulative[i], u_goals)
             assists = _sample_index(assists_cumulative[i], u_assists)
-            conceded = _sample_index(conceded_cumulative[i], u_conceded)
+            conceded = _sample_index(conceded_cumulative[i][bin_index], u_conceded)
             base = points_lookup.points(position, bin_index, goals, assists, conceded)
             if extended[i]:
                 cumulative_saves = saves_cumulative[i]
