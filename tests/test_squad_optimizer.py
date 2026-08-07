@@ -27,7 +27,7 @@ from fpl.optimize.squad import (
     exact_lineup,
     optimize_initial_squad,
 )
-from fpl.optimize.transfers import plan_transfers
+from fpl.optimize.transfers import _successor_squads, plan_transfers
 
 HASH = "a" * 64
 
@@ -246,6 +246,166 @@ def test_transfer_planner_takes_hit_only_when_incremental_gain_repays_it(
     assert gw2.hit_points == expected_hit
     assert 15 in gw2.transfers_in
     assert (25 in gw2.transfers_in) is (expected_transfers == 2)
+
+
+# ---------------------------------------------------------------------------
+# No-transfer reservation in successor generation (forced-churn defect regression).
+#
+# _successor_squads seeds the current squad at improvement 0.0, then truncates to
+# transition_limit_per_state after sorting by (-improvement, item). Any positive-improvement
+# swap ranks above hold; a full candidate pool produces far more than the limit, so the hold
+# action is truncated away and the planner is forced to transfer every gameweek. Holding must
+# always be representable -- it is the only way to bank a free transfer or avoid a points hit.
+# ---------------------------------------------------------------------------
+
+_NO_TRANSFER_SQUAD_BY_POSITION: dict[str, tuple[int, ...]] = {
+    "GK": (1001, 1002),
+    "DEF": (2001, 2002, 2003, 2004, 2005),
+    "MID": (3001, 3002, 3003, 3004, 3005),
+    "FWD": (4001, 4002, 4003),
+}
+_NO_TRANSFER_CANDIDATES_BY_POSITION: dict[str, tuple[int, ...]] = {
+    "GK": tuple(1100 + offset for offset in range(1, 11)),
+    "DEF": tuple(2100 + offset for offset in range(1, 11)),
+    "MID": tuple(3100 + offset for offset in range(1, 11)),
+    "FWD": tuple(4100 + offset for offset in range(1, 11)),
+}
+
+
+def _no_transfer_squad() -> tuple[int, ...]:
+    return tuple(
+        sorted(code for codes in _NO_TRANSFER_SQUAD_BY_POSITION.values() for code in codes)
+    )
+
+
+def _no_transfer_fixture(
+    squad_points: float,
+    candidate_points: float,
+    horizon: int = 1,
+) -> tuple[ArtifactIndex, tuple[int, ...], tuple[int, ...]]:
+    """A 15-player squad plus ten same-position candidates per position.
+
+    Every player costs the same and is on a distinct team, so every same-position swap is
+    budget- and club-legal and the count of positive-improvement proposals is controlled only by
+    the candidate utilities.
+    """
+    players: list[_Player] = []
+    for position, codes in _NO_TRANSFER_SQUAD_BY_POSITION.items():
+        for code in codes:
+            players.append(_Player(code=code, position=position, points=(squad_points,) * horizon))
+    for position, codes in _NO_TRANSFER_CANDIDATES_BY_POSITION.items():
+        for code in codes:
+            players.append(
+                _Player(code=code, position=position, points=(candidate_points,) * horizon)
+            )
+    rules = load_squad_rules()
+    index = ArtifactIndex.build(_artifact(tuple(players)), rules)
+    squad = _no_transfer_squad()
+    candidate_codes = [
+        code for codes in _NO_TRANSFER_CANDIDATES_BY_POSITION.values() for code in codes
+    ]
+    pool = tuple(sorted({*squad, *candidate_codes}))
+    return index, squad, pool
+
+
+def test_successor_set_reserves_the_no_transfer_action_under_positive_pressure() -> None:
+    """A full candidate pool yields far more than transition_limit_per_state positive-improvement
+    swaps, so ranking-and-truncation drops the hold action (the defect). The current squad must
+    survive as a successor regardless of ranking."""
+    rules = load_squad_rules()
+    index, squad, pool = _no_transfer_fixture(squad_points=1.0, candidate_points=10.0)
+    successors = _successor_squads(index, rules, squad, pool, gw=1, risk_lambda=0.0)
+    assert squad in successors
+    # Truncation genuinely occurred and was overridden: the reserved slot pushes the returned set
+    # past the configured limit. Pre-fix this length equalled the limit and excluded the squad.
+    assert len(successors) > rules.search.transition_limit_per_state
+
+
+@pytest.mark.parametrize(
+    ("max_depth", "transition_limit", "candidate_points", "already_best"),
+    [
+        (1, 5, 10.0, False),
+        (2, 5, 10.0, False),
+        (2, 200, 10.0, False),
+        (2, 5, 0.0, True),
+    ],
+)
+def test_no_transfer_action_reserved_across_depths_pool_sizes_and_when_already_best(
+    max_depth: int,
+    transition_limit: int,
+    candidate_points: float,
+    already_best: bool,
+) -> None:
+    """The reserved hold slot holds across transfer depths 1 and 2, across pool/limit sizes, and
+    when the current squad is already the strongest proposal (no append needed)."""
+    base = load_squad_rules()
+    rules = base.model_copy(
+        update={
+            "search": base.search.model_copy(
+                update={
+                    "maximum_planned_transfers_per_gameweek": max_depth,
+                    "transition_limit_per_state": transition_limit,
+                }
+            )
+        }
+    )
+    index, squad, pool = _no_transfer_fixture(squad_points=5.0, candidate_points=candidate_points)
+    successors = _successor_squads(index, rules, squad, pool, gw=1, risk_lambda=0.0)
+    assert squad in successors
+    if already_best:
+        # Candidates are weaker, so no swap improves on the squad: hold is the rank-1 action.
+        assert successors[0] == squad
+    else:
+        assert successors[0] != squad
+
+
+def test_planner_holds_when_every_transfer_costs_an_unrepaid_hit() -> None:
+    """End-to-end: when each transfer costs a hit it cannot repay, the planner must hold. This is
+    only reachable once the hold action survives successor truncation (the fix): a full pool of
+    marginally-better candidates generates >transition_limit positive-improvement proposals, which
+    pre-fix drops hold and forces a churn. Every transfer costs a four-point hit here because the
+    rule grants no free transfer after GW1, and the +0.5 GW2 gain never repays it."""
+    squad_codes = (1, 2, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24, 30, 31, 32)
+    squad_position = {
+        1: "GK",
+        2: "GK",
+        10: "DEF",
+        11: "DEF",
+        12: "DEF",
+        13: "DEF",
+        14: "DEF",
+        20: "MID",
+        21: "MID",
+        22: "MID",
+        23: "MID",
+        24: "MID",
+        30: "FWD",
+        31: "FWD",
+        32: "FWD",
+    }
+    players: list[_Player] = [
+        _Player(code=code, position=squad_position[code], points=(5.0, 5.0)) for code in squad_codes
+    ]
+    for position, base in (("GK", 1000), ("DEF", 2000), ("MID", 3000), ("FWD", 4000)):
+        for offset in range(1, 11):
+            # GW1 equals the squad so candidates rank into the candidate pool; GW2 is only +0.5
+            # better, which never repays the four-point hit each transfer costs under zero free.
+            players.append(_Player(code=base + offset, position=position, points=(5.0, 5.5)))
+    artifact = _artifact(tuple(players))
+    base_rules = load_squad_rules()
+    rules = base_rules.model_copy(
+        update={
+            "transfers": base_rules.transfers.model_copy(
+                update={"free_per_gameweek_after_first_deadline": 0}
+            )
+        }
+    )
+    index, initial = _manual_solution(artifact, rules, squad_codes)
+    plan = plan_transfers(index, rules, initial)
+    gameweek_two = plan.weeks[1]
+    assert gameweek_two.transfers_in == ()
+    assert gameweek_two.transfers_out == ()
+    assert gameweek_two.hit_points == 0
 
 
 def test_distributional_risk_penalty_can_change_a_pick_without_claiming_lift() -> None:

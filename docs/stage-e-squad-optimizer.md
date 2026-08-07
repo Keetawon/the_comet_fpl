@@ -9,7 +9,18 @@ The saved GW1-5 result reconciles: every squad and formation is legal, transfer/
 accounting is exact, and the reported 330.4045 expected points equals the five weekly lineup and
 captain totals with zero hits. It is still **not operationally ready**:
 
-1. successor pruning can remove the legal no-transfer action after ranking and before beam search;
+1. ~~successor pruning can drop the legal no-transfer action~~ — **FIXED**, and the original wording
+   understated it. With a 15-player squad, depth-2 transfers, and a full candidate pool there are
+   far more than `transition_limit_per_state` (200) positive-improvement swaps, so ranking-and-
+   truncation dropped the hold action on essentially every state and the planner was forced to churn
+   every gameweek regardless of the points hit a transfer costs. `_successor_squads` now reserves
+   the current squad in every successor set so it survives truncation regardless of ranking (holding
+   is the only way to bank a free transfer or avoid a hit). Dense regression tests pin the
+   reservation across transfer depths 1 and 2, across pool and limit sizes, and when the current
+   squad is already the strongest proposal; an end-to-end test confirms the planner now holds when a
+   transfer's four-point hit outweighs its gain. The reservation is appended in sort-order, which is
+   correct because hold only misses the ranking cut when every retained proposal has strictly
+   positive improvement;
 2. the current `chance_of_playing_next_round` overlay is repeated across the whole forecast horizon,
    which needs a measured per-GW policy;
 3. optimiser output needs its own Git/worktree, squad-config, search-policy, and solver provenance,
@@ -17,9 +28,8 @@ captain totals with zero hits. It is still **not operationally ready**:
 4. all future affordability checks use the deadline's static `now_cost`; price changes and FPL
    selling values are not modelled.
 
-Fix the no-transfer defect and add a dense regression test before another decision run. The other
-three items must be measured, implemented, or made explicit in the output contract before describing
-the plan as operational.
+The no-transfer defect is fixed. The remaining three items (2-4) must be measured, implemented, or
+made explicit in the output contract before describing the plan as operational.
 
 ## Input boundary
 
@@ -78,11 +88,11 @@ is legal and every visited lineup/captain choice is exact.
 The transfer path is deliberately bounded for predictable local runtime. Candidate players are the
 initial squad plus the top configured horizon utilities per position. Each state generates zero,
 one, or two same-position replacements, ranks them by current-GW player-utility improvement, retains
-at most 200 legal transitions, and keeps a 30-state beam. The current truncation does not reserve the
-zero-transfer proposal, which is the confirmed defect above. Even after that is fixed, the reported
-transfer plan is exact only within visited states; it is not a global optimality claim outside the
-configured candidate-pool, depth, transition, and beam limits. These limits live in configuration
-rather than Python.
+at most 200 legal transitions, and keeps a 30-state beam. The truncation reserves the zero-transfer
+proposal (the current squad) in every successor set, so the planner can always hold, bank a free
+transfer, or avoid a points hit. The reported transfer plan is exact only within visited states; it
+is not a global optimality claim outside the configured candidate-pool, depth, transition, and beam
+limits. These limits live in configuration rather than Python.
 
 This bound was selected by timing the same point-in-time GW1-5 artifact before wiring it. A 100×20
 search finished in 22.6 seconds but lost 5.14 expected points relative to the broad reference; the

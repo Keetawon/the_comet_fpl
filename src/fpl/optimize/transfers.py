@@ -129,7 +129,18 @@ def _successor_squads(
                 ) - sum(row_utility(index.rows[(code, gw)], risk_lambda) for code in outgoing)
                 scored[proposal] = improvement
     ordered = sorted(scored, key=lambda item: (-scored[item], item))
-    return tuple(ordered[: rules.search.transition_limit_per_state])
+    limit = rules.search.transition_limit_per_state
+    kept = ordered[:limit]
+    # Reserve the no-transfer action. The current squad is seeded at improvement 0.0, so every
+    # positive-improvement swap ranks above it; with a full candidate pool there are far more than
+    # `limit` such swaps and truncation drops the hold action, forcing a transfer every gameweek.
+    # Holding must always be representable -- it is the only way to bank a free transfer or avoid a
+    # points hit. Appending is consistent with the (-improvement, item) ordering because hold only
+    # misses the cut when every retained proposal has strictly positive improvement, so 0.0 sorts
+    # after all of them.
+    if squad not in kept:
+        kept.append(squad)
+    return tuple(kept)
 
 
 def _transfer_delta(
