@@ -8,10 +8,13 @@ availability overlay, reproducibility, multi-gameweek totals, and provenance -- 
 
 from __future__ import annotations
 
+import math
 import subprocess
+from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from fpl.config import load_phase2_evaluation, repo_root
@@ -29,6 +32,7 @@ from fpl.jobs.prospective_points_v1 import (
     resolve_share_signal_kind,
     season_boundary_minutes,
     trailing5_minute_bins,
+    trailing_ict,
 )
 from fpl.storage.db import initialise
 from fpl.validate.minutes_baselines import MinuteBins
@@ -454,6 +458,148 @@ def test_trailing5_minute_bins_equal_weights_the_last_five() -> None:
         # weighting fixes it at exactly 0.6 -- the mechanism that stops a dead-rubber final
         # gameweek from dominating the appearance estimate.
         assert dist == (0.0, 0.0, 0.4, 0.6)
+    finally:
+        con.close()
+
+
+# 50 codes x 4,000 rows = 200,000 measured ICT rows, the same order as the real archive's ICT
+# population. Verified to actually reproduce the defect: under the previous `GROUP BY avg()` this
+# shape returns a different exact mean for 38 of the 50 codes at 2, 4, and 8 threads versus 1. A
+# smaller or differently-shaped table does NOT split the aggregate and would pass against the
+# defect, so these dimensions are load-bearing rather than arbitrary.
+_ICT_CODES = 50
+_ICT_ROWS_PER_CODE = 4_000
+
+
+def _ict_determinism_db(
+    *, codes: int = _ICT_CODES, rows_per_code: int = _ICT_ROWS_PER_CODE
+) -> duckdb.DuckDBPyConnection:
+    """An archive-shaped ICT history big enough for DuckDB to parallelise the aggregate.
+
+    The values are deliberately not representable in binary and vary per row: a column of
+    identical or exactly-representable values sums identically in any order, so it would pass
+    against the very defect this exists to catch.
+    """
+    con = initialise(":memory:")
+    con.execute("""
+        CREATE OR REPLACE TABLE mart_fact_player_fixture (
+            season VARCHAR,
+            gw INT,
+            fixture INT,
+            kickoff_time TIMESTAMPTZ,
+            code INT,
+            minutes INT,
+            influence DOUBLE,
+            creativity DOUBLE
+        )
+    """)
+    con.execute(
+        """
+        INSERT INTO mart_fact_player_fixture
+        SELECT
+            '2025-26' AS season,
+            (r % 38) + 1 AS gw,
+            r AS fixture,
+            TIMESTAMPTZ '2025-08-01 12:00:00+00' + INTERVAL (r) HOUR AS kickoff_time,
+            c AS code,
+            90 AS minutes,
+            0.1 + (c * 0.0007) + (r * 0.0013) AS influence,
+            0.3 + (c * 0.0011) + (r * 0.0017) AS creativity
+        FROM range(1, ?) AS t1(c), range(1, ?) AS t2(r)
+        """,
+        [codes + 1, rows_per_code + 1],
+    )
+    return con
+
+
+def _trailing_ict_at_threads(threads: int) -> dict[int, tuple[float, float]]:
+    con = _ict_determinism_db()
+    try:
+        con.execute(f"SET threads TO {threads}")
+        return trailing_ict(con, datetime(2030, 1, 1, tzinfo=UTC))
+    finally:
+        con.close()
+
+
+def test_trailing_ict_is_bit_identical_across_duckdb_thread_counts() -> None:
+    """The ICT map must not depend on how many threads DuckDB happened to use.
+
+    A `GROUP BY avg()` splits the scan across threads and combines the partial sums in completion
+    order, so float non-associativity makes the exact value a function of the thread count -- 628
+    of 1,777 codes moved between 1 and 8 threads on this archive. This map feeds the BPS residual
+    of a pre-registered evaluation, so equality here is exact, not approximate: `pytest.approx`
+    would accept precisely the drift being guarded against.
+    """
+    single = _trailing_ict_at_threads(1)
+    assert len(single) == _ICT_CODES
+
+    for threads in (2, 4, 8):
+        assert _trailing_ict_at_threads(threads) == single, (
+            f"trailing_ict differs at {threads} threads"
+        )
+
+
+def test_trailing_ict_matches_an_exact_reference_reduction() -> None:
+    """Pin the reduction itself, not just its stability: ordered rows summed with `math.fsum`."""
+    con = _ict_determinism_db(codes=5, rows_per_code=40)
+    try:
+        rows = con.execute(
+            """
+            SELECT code, influence, creativity
+            FROM mart_fact_player_fixture
+            ORDER BY code, kickoff_time, season, fixture
+            """
+        ).fetchall()
+        expected: dict[int, tuple[float, float]] = {}
+        by_code: dict[int, list[tuple[float, float]]] = defaultdict(list)
+        for code, influence, creativity in rows:
+            by_code[int(code)].append((float(influence), float(creativity)))
+        for code, values in by_code.items():
+            n = len(values)
+            expected[code] = (
+                math.fsum(v[0] for v in values) / n,
+                math.fsum(v[1] for v in values) / n,
+            )
+
+        assert trailing_ict(con, datetime(2030, 1, 1, tzinfo=UTC)) == expected
+    finally:
+        con.close()
+
+
+def test_trailing_ict_population_and_null_semantics_are_unchanged() -> None:
+    """The deterministic reduction must not quietly move the population it averages over.
+
+    Three exclusions and one inclusion, all load-bearing: a NULL `minutes` row is unmeasured; a
+    row at or after `as_of` is future knowledge; a row missing either ICT component carries no
+    signal and is skipped rather than zero-filled; and a measured zero-minute row still counts.
+    """
+    con = initialise(":memory:")
+    try:
+        con.execute("""
+            CREATE OR REPLACE TABLE mart_fact_player_fixture (
+                season VARCHAR, gw INT, fixture INT, kickoff_time TIMESTAMPTZ,
+                code INT, minutes INT, influence DOUBLE, creativity DOUBLE
+            )
+        """)
+        as_of = datetime(2025, 9, 1, tzinfo=UTC)
+        con.execute(
+            """
+            INSERT INTO mart_fact_player_fixture VALUES
+                ('2025-26', 1, 1, TIMESTAMPTZ '2025-08-01 12:00:00+00', 7, 90, 10.0, 20.0),
+                -- measured zero-minute row: ICT exists, so it counts
+                ('2025-26', 2, 2, TIMESTAMPTZ '2025-08-08 12:00:00+00', 7, 0, 20.0, 40.0),
+                -- NULL minutes: unmeasured, excluded
+                ('2025-26', 3, 3, TIMESTAMPTZ '2025-08-15 12:00:00+00', 7, NULL, 99.0, 99.0),
+                -- NULL creativity: no signal, skipped rather than read as zero
+                ('2025-26', 4, 4, TIMESTAMPTZ '2025-08-22 12:00:00+00', 7, 90, 99.0, NULL),
+                -- at/after as_of: future knowledge, excluded
+                ('2025-26', 5, 5, TIMESTAMPTZ '2025-09-01 12:00:00+00', 7, 90, 99.0, 99.0),
+                -- a second code, entirely unmeasured, must be absent from the map
+                ('2025-26', 1, 6, TIMESTAMPTZ '2025-08-01 12:00:00+00', 8, NULL, 5.0, 5.0)
+            """
+        )
+        result = trailing_ict(con, as_of)
+        assert result == {7: (15.0, 30.0)}
     finally:
         con.close()
 

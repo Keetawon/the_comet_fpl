@@ -2,7 +2,43 @@
 
 **Status: pre-registration, development-only. Never executed.** The Prospective Expected Value (EV)
 Walk-forward Backtest is pre-registered under `config/phase4_ev_backtest_evaluation.yaml`
-(contract v1.1). No run has been performed and no result artifact exists.
+(contract v1.2). No run has been performed, no archive run has occurred, no result artifact exists,
+and no EV number — primary or comparator — has been observed. Both amendments below were therefore
+made *before* first execution, and both record
+`candidates_evaluated_before_amendment: 0`.
+
+## Amendment 1.2 — the BPS residual parameters are pre-registered
+
+Bonus is simulated jointly per fixture from the predicted BPS residual mean and sigma, so the six
+inputs to `fit_residual_model` move every full-points distribution the backtest scores. Under
+contract 1.1 the adapter constructed `BpsSimConfig()` and inherited its dataclass defaults, which
+were written into the run record only *after* the run finished — making them an output of the
+evaluation rather than an input to it. A reader could not distinguish a value chosen before
+execution from one changed after seeing a result, which is the distinction pre-registration exists
+to make.
+
+| Parameter | Frozen value | Role in the fit |
+| --- | --- | --- |
+| `trailing_window` | 10 | Length of the per-player residual history the prediction shrinks toward |
+| `prior_strength` | 10.0 | Shrinkage of a player's trailing residual mean toward the positional line |
+| `ridge_lambda` | 1.0 | Ridge penalty on the per-position influence/creativity regression |
+| `sigma_floor` | 2.0 | Lower bound on the residual noise scale used in the BPS draw |
+| `sd_floor` | 1.0e-6 | Guard against a degenerate predictor standard deviation |
+| `minimum_position_rows` | 30 | Rows a position needs before it gets its own line instead of the pooled fallback |
+
+The six numbers are exactly the `BpsSimConfig` defaults that were already in force, so this
+pre-registers what the code did rather than retuning it. Nothing else changed.
+
+They are now *threaded*, not duplicated: `dev_ev_backtest` builds a `BpsResidualParameters` from
+the contract and passes it into `generate_forecasts_for_fold`, which passes it straight to
+`fit_residual_model`. `BpsSimConfig` is no longer imported by the adapter at all, so there is no
+path back to inheriting a default, and `BpsResidualParameters` deliberately declares no defaults of
+its own. The applied values are written to the run record under
+`bps_residual_parameters_applied`. Guarded by valid-but-wrong mutation tests on all six fields,
+plus a wiring test that swaps the contract to values nothing else in the codebase holds and asserts
+`fit_residual_model` receives them — the pre-registered values coincide with the old defaults, so a
+test that merely asserted "the fit saw 10/10.0/1.0/2.0/1e-6/30" would pass against the defaults it
+replaced.
 
 ## Amendment 1.1 — component identities corrected before first execution
 
@@ -40,10 +76,43 @@ horizon is mid-season on both counts (the production blend weight is 0.0 outside
 and a historical backtest has no live availability feed). The runner asserts both identity values so
 the record cannot claim a policy that no code applies.
 
-The BPS residual/simulation parameters (`prior_strength`, `trailing_window`, `ridge_lambda`,
-`sigma_floor`, `sd_floor`, `minimum_position_rows`) are development constants from
-`BpsSimConfig`, **not** pre-registered values. They are written verbatim into the run record so the
-artifact states what it used.
+The six BPS residual parameters were the last values that were not pre-registered; amendment 1.2
+closes that gap (see above), so every value that materially shapes a scored distribution is now
+frozen in the contract and threaded into the code that acts on it.
+
+## Deterministic ICT reduction
+
+`prospective_points_v1.trailing_ict` supplies the influence/creativity proxies the BPS residual is
+predicted from, so it feeds a pre-registered evaluation and must be bit-reproducible.
+
+It previously computed `avg(influence)` under a DuckDB `GROUP BY`. That partitions the scan across
+threads and combines the partial sums in completion order, and float addition is not associative,
+so the exact value depended on the thread count: measured on this archive, **628 of 1,777 codes**
+returned a different exact mean at 1 thread versus 8. This is the same class of defect the
+repository already measured for Polars `group_by` without `maintain_order`, recorded in
+`AGENTS.md`'s measured constants.
+
+Adding `ORDER BY` after the `GROUP BY` does **not** fix it — that sorts the aggregation's output
+and cannot control the order the addends were combined in. The reduction itself had to change:
+
+1. Rows are read under a total order on `(code, kickoff_time, season, fixture)` — `(season,
+   fixture)` is unique within a code at player-fixture grain, so the ordering is total, not merely
+   stable-looking.
+2. Each code's influence and creativity are summed in Python with `math.fsum`, which is correctly
+   rounded and therefore returns the same value for *any* permutation of its input, and divided by
+   an integer count.
+
+Both halves are deliberate: either alone fixes today's defect, and together the result stays
+reproducible if one is later changed. The population and NULL semantics are byte-for-byte the
+previous ones — `minutes IS NOT NULL`, `kickoff_time < as_of`, `influence IS NOT NULL`,
+`creativity IS NOT NULL` — so a NULL is skipped rather than read as zero, and a measured
+zero-minute row still counts. No target-row ICT is read and no model semantics changed.
+
+The regression test asserts **exact dictionary equality** across DuckDB thread counts 1, 2, 4 and 8
+— not `pytest.approx`, which would accept precisely the drift being guarded against. Its fixture
+(50 codes × 4,000 rows) is sized to reproduce the defect: verified to return a different exact mean
+for 38 of 50 codes under the old implementation, and a smaller table does not split the aggregate
+at all, so it would pass against the defect.
 
 This backtest evaluates how accurately the **current prospective point-in-time forecasting
 architecture** ranks players and models points distributions over the final ten observed gameweeks

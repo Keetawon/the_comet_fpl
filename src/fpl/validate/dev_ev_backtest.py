@@ -34,11 +34,12 @@ from fpl.config import (
     load_phase4_ev_backtest_evaluation,
     repo_root,
 )
-from fpl.models.bps_bonus import BpsSimConfig
 from fpl.storage.db import connect, default_db_path
 from fpl.validate.ev_backtest_adapter import (
+    BpsResidualParameters,
     FixtureForecast,
     ForecastTarget,
+    bps_residual_parameters_from_contract,
     derive_final_ten_gws,
     extract_target_labels_for_gw,
     extract_target_roster_for_gw,
@@ -185,6 +186,7 @@ def run_ev_backtest(
     seasonal_appearance_min_rows: int = 3,
     pit_seed: int = 202627,
     pit_band: tuple[float, float] = (0.1, 0.9),
+    bps_residual: BpsResidualParameters | None = None,
 ) -> tuple[BacktestScoreReport, BacktestScoreReport, int, int]:
     """Execute the EV walk-forward backtest over start_gw..end_gw.
 
@@ -195,6 +197,8 @@ def run_ev_backtest(
     Returns (primary_report, comparator_report, total_derived_fixtures, total_derived_target_rows).
     """
     logger.info("Starting EV Walk-forward Backtest over %s GW%d-%d", season, start_gw, end_gw)
+
+    bps_params = bps_residual or bps_residual_parameters_from_contract()
 
     derived_gws = derive_final_ten_gws(con, season=season)
     expected_gws = tuple(range(start_gw, end_gw + 1))
@@ -233,6 +237,7 @@ def run_ev_backtest(
             base_seed=seed,
             max_support=max_support,
             seasonal_appearance_min_rows=seasonal_appearance_min_rows,
+            bps_residual=bps_params,
         )
 
         # Comparator architecture forecasts (V1 goals + V1 assists)
@@ -245,6 +250,7 @@ def run_ev_backtest(
             base_seed=seed,  # Identical fixture seed!
             max_support=max_support,
             seasonal_appearance_min_rows=seasonal_appearance_min_rows,
+            bps_residual=bps_params,
         )
         primary_fc_by_gw[gw] = primary_fc
         comp_fc_by_gw[gw] = comp_fc
@@ -399,10 +405,9 @@ def main() -> None:
         sys.exit(1)
     preflight_source_hashes = {p.name: _file_sha256(p) for p in source_files}
 
-    # The BPS residual/simulation parameters are development constants, not pre-registered
-    # values. They are recorded verbatim so the run states what it used rather than leaving it
-    # to a reader to infer from a dataclass default.
-    bps_sim_config = dataclasses.asdict(BpsSimConfig())
+    # Pre-registered at amendment 1.2 and threaded into the adapter, so this records what
+    # governed the run rather than what a dataclass happened to default to afterwards.
+    bps_params = bps_residual_parameters_from_contract()
 
     created_at = _utc_now()
 
@@ -426,6 +431,7 @@ def main() -> None:
             ),
             pit_seed=contract.scoring_calibration.randomized_pit_seed,
             pit_band=contract.scoring_calibration.randomized_pit_band,
+            bps_residual=bps_params,
         )
 
         # Validate derived anchors using explicit exceptions
@@ -490,7 +496,7 @@ def main() -> None:
             "contract_sha256": preflight_contract_sha256,
             "scoring_sha256": preflight_scoring_sha256,
             "source_hashes": preflight_source_hashes,
-            "bps_sim_config": bps_sim_config,
+            "bps_residual_parameters_applied": dataclasses.asdict(bps_params),
             "target_completeness": completeness,
             # What the contract actually governed at runtime, as opposed to what it declares.
             "contract_policy_applied": {

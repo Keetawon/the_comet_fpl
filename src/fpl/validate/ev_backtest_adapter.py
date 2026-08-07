@@ -20,6 +20,7 @@ import polars as pl
 from fpl.config import (
     load_phase2_evaluation,
     load_phase3_evaluation,
+    load_phase4_ev_backtest_evaluation,
     load_scoring_rules,
 )
 from fpl.jobs.prospective_points_v1 import (
@@ -42,7 +43,7 @@ from fpl.models.attacking_baselines import (
 )
 from fpl.models.attacking_v2 import _RosterEntry, mean_trailing_signal
 from fpl.models.attacking_v3 import allocate_minutes_gated_rates
-from fpl.models.bps_bonus import BpsSimConfig, fit_residual_model
+from fpl.models.bps_bonus import fit_residual_model
 from fpl.models.defensive_contribution_v1 import DcHistoryRow
 from fpl.models.gk_saves_v1 import GkSavesHistoryRow
 from fpl.models.points_composition import (
@@ -69,6 +70,36 @@ from fpl.validate.points_harness_v3 import (
 )
 
 logger = logging.getLogger("fpl.validate.ev_backtest_adapter")
+
+
+@dataclass(frozen=True, slots=True)
+class BpsResidualParameters:
+    """The six frozen inputs to :func:`fit_residual_model`, read from the Phase 4 contract.
+
+    No defaults, deliberately. These values move every full-points distribution the backtest
+    scores -- bonus is simulated jointly per fixture from the predicted residual mean and sigma --
+    so a caller must say where they came from rather than silently inheriting a dataclass default.
+    """
+
+    trailing_window: int
+    prior_strength: float
+    ridge_lambda: float
+    sigma_floor: float
+    sd_floor: float
+    minimum_position_rows: int
+
+
+def bps_residual_parameters_from_contract() -> BpsResidualParameters:
+    """The pre-registered BPS residual parameters (Phase 4 contract, amendment 1.2)."""
+    policy = load_phase4_ev_backtest_evaluation().bps_residual_parameters
+    return BpsResidualParameters(
+        trailing_window=policy.trailing_window,
+        prior_strength=policy.prior_strength,
+        ridge_lambda=policy.ridge_lambda,
+        sigma_floor=policy.sigma_floor,
+        sd_floor=policy.sd_floor,
+        minimum_position_rows=policy.minimum_position_rows,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,6 +277,7 @@ def generate_forecasts_for_fold(
     base_seed: int = 202627,
     max_support: int = DEFAULT_MAX_POINTS_FULL,
     seasonal_appearance_min_rows: int = 3,
+    bps_residual: BpsResidualParameters | None = None,
 ) -> list[FixtureForecast]:
     """Generate prospective fixture full-points forecasts for a single fold gameweek.
 
@@ -257,6 +289,12 @@ def generate_forecasts_for_fold(
     ``seasonal_appearance_min_rows`` is the frozen ``seasonal_equal_weighted_trailing_5``
     threshold, passed in from the contract rather than hardcoded so that changing the
     pre-registered value actually changes what runs.
+
+    ``bps_residual`` carries the six frozen BPS residual parameters. The runner passes them
+    explicitly; omitting them reads the same contract via
+    :func:`bps_residual_parameters_from_contract`. There is deliberately no path back to
+    ``BpsSimConfig()`` defaults -- inheriting them is what made those six numbers an output of a
+    run rather than a pre-registered input to it.
 
     No prior-season appearance blend and no availability multiplier are applied here. The
     horizon is GW29-38, mid-season on both counts: the production blend weight
@@ -285,7 +323,7 @@ def generate_forecasts_for_fold(
     if rules.bps is None:
         raise ValueError("scoring_2026_27.yaml has no bps block")
     bps = rules.bps
-    bps_config = BpsSimConfig()
+    bps_params = bps_residual or bps_residual_parameters_from_contract()
     phase2_config = load_phase2_evaluation()
     phase3_config = load_phase3_evaluation()
     bins = MinuteBins.from_config(phase2_config)
@@ -469,12 +507,12 @@ def generate_forecasts_for_fold(
     residual_model = fit_residual_model(
         residual_rows,
         bps,
-        prior_strength=bps_config.prior_strength,
-        trailing_window=bps_config.trailing_window,
-        ridge_lambda=bps_config.ridge_lambda,
-        sigma_floor=bps_config.sigma_floor,
-        sd_floor=bps_config.sd_floor,
-        minimum_position_rows=bps_config.minimum_position_rows,
+        prior_strength=bps_params.prior_strength,
+        trailing_window=bps_params.trailing_window,
+        ridge_lambda=bps_params.ridge_lambda,
+        sigma_floor=bps_params.sigma_floor,
+        sd_floor=bps_params.sd_floor,
+        minimum_position_rows=bps_params.minimum_position_rows,
     )
     ict_map = trailing_ict(con, as_of)
     trailing5_bins = trailing5_minute_bins(con, as_of, bins)

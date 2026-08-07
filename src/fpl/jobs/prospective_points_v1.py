@@ -67,6 +67,7 @@ import argparse
 import hashlib
 import json
 import logging
+import math
 import subprocess
 import sys
 from collections import defaultdict
@@ -334,22 +335,51 @@ def trailing_ict(con: duckdb.DuckDBPyConnection, as_of: datetime) -> dict[int, t
 
     The BPS residual's ICT proxies for a *future* fixture: a player's own trailing mean, never a
     realised target value. Absent codes fall back to ``(0.0, 0.0)`` at the call site.
+
+    **Bit-reproducible by construction.** This previously read ``avg(influence)`` under a DuckDB
+    ``GROUP BY``, which partitions across threads and sums the partials in completion order, so
+    float addition's non-associativity makes the result depend on the thread count: measured on
+    this archive, 628 of 1,777 codes returned a different exact value at 1 thread versus 8. That
+    is the same failure the repository already measured for Polars ``group_by`` without
+    ``maintain_order``, and every aggregation feeding a pre-registered evaluation must be immune
+    to it -- the Phase 4 EV backtest consumes this map.
+
+    The fix is a deterministic reduction rather than an ``ORDER BY``, which sorts the *output* of
+    an aggregation and so cannot control the order the addends were combined in. Rows are pulled
+    under a total order on ``(code, kickoff_time, season, fixture)`` -- ``(season, fixture)`` is
+    unique within a code at this grain -- and summed with :func:`math.fsum`, which is correctly
+    rounded and therefore returns the same value for any permutation of its input. The ordering
+    and the exact summation are belt and braces on purpose: either alone would fix today's
+    defect, and together the result stays reproducible even if one of them is later changed.
+
+    Population and NULL semantics are unchanged: appeared-or-measured rows (``minutes`` not NULL)
+    strictly before ``as_of``, with both ICT components measured. A NULL is skipped, never read as
+    zero, and zero-minute rows with measured ICT still count -- identical to the previous filter.
     """
-    frame = con.execute(
+    rows = con.execute(
         """
-        SELECT code,
-               avg(influence) AS influence,
-               avg(creativity) AS creativity
+        SELECT code, influence, creativity
         FROM mart_fact_player_fixture
         WHERE minutes IS NOT NULL AND kickoff_time < ?
           AND influence IS NOT NULL AND creativity IS NOT NULL
-        GROUP BY code
+        ORDER BY code, kickoff_time, season, fixture
         """,
         [as_of],
-    ).pl()
+    ).fetchall()
+
+    influence_by_code: dict[int, list[float]] = defaultdict(list)
+    creativity_by_code: dict[int, list[float]] = defaultdict(list)
+    for code, influence, creativity in rows:
+        player = int(code)
+        influence_by_code[player].append(float(influence))
+        creativity_by_code[player].append(float(creativity))
+
     return {
-        int(r["code"]): (float(r["influence"]), float(r["creativity"]))
-        for r in frame.iter_rows(named=True)
+        code: (
+            math.fsum(values) / len(values),
+            math.fsum(creativity_by_code[code]) / len(values),
+        )
+        for code, values in influence_by_code.items()
     }
 
 

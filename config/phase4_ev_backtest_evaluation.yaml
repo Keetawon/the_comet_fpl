@@ -6,10 +6,37 @@
 # A candidate/backtest cannot choose easier gameweeks, populations, metrics, or
 # lift gates after seeing its results.
 
-contract_version: "1.1"
+contract_version: "1.2"
 phase: 4
 
 amendments:
+  - version: "1.2"
+    date: "2026-08-07"
+    candidates_evaluated_before_amendment: 0
+    changed: >-
+      Added the frozen `bps_residual_parameters` block: trailing_window 10, prior_strength 10.0,
+      ridge_lambda 1.0, sigma_floor 2.0, sd_floor 1.0e-6, minimum_position_rows 30. These are the
+      six values `fit_residual_model` is fitted with. They are now read from this contract and
+      threaded into the adapter; the adapter no longer constructs a BpsSimConfig() whose defaults
+      it silently inherits. No horizon, population, component identity, metric, support,
+      Monte-Carlo, or scoring/calibration value changed, and the six numbers are exactly the
+      BpsSimConfig defaults previously in force - this pre-registers what the code already did
+      rather than retuning it.
+    reason: >-
+      The BPS residual ridge and its shrinkage materially move every full-points distribution the
+      backtest scores, because bonus is simulated jointly per fixture from the predicted residual
+      mean and sigma. Under contract 1.1 those six values were dataclass defaults recorded only
+      AFTER a run completed, so they were an output of the run rather than a pre-registered input:
+      a reader could not tell a value chosen before execution from one changed after seeing a
+      result, which is precisely the distinction pre-registration exists to make.
+    evidence: >-
+      Zero EV backtest evaluations have been executed under any contract version. No run of
+      fpl.validate.dev_ev_backtest has been performed, results/ev_backtest_2025_26_gw29_38.json
+      does not exist, no result artifact of any kind has been produced, no archive run occurred,
+      and no primary or comparator EV number has been observed by anyone. This is therefore a
+      pre-registration made before first execution, not an amendment following an observed
+      result. Enforced by valid-but-wrong mutation tests on every field plus a runtime-wiring
+      test asserting the contract values reach fit_residual_model.
   - version: "1.1"
     date: "2026-08-06"
     candidates_evaluated_before_amendment: 0
@@ -84,6 +111,18 @@ diagnostic_comparator:
 monte_carlo:
   draws: 2000
   seed: 202627
+
+# The BPS residual fit (`fit_residual_model`). Bonus is simulated jointly per fixture from the
+# predicted residual mean and sigma, so these six values move every full-points distribution the
+# backtest scores. Pre-registered at amendment 1.2, before any execution, and threaded into the
+# adapter -- the runtime reads them from here rather than inheriting BpsSimConfig defaults.
+bps_residual_parameters:
+  trailing_window: 10
+  prior_strength: 10.0
+  ridge_lambda: 1.0
+  sigma_floor: 2.0
+  sd_floor: 1.0e-6
+  minimum_position_rows: 30
 
 target_population:
   eligible: minutes_not_null

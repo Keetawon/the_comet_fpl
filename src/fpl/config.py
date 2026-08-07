@@ -3426,6 +3426,7 @@ ORIGINAL_PHASE4_CONTRACT_VERSION = "1.0"
 # rewritten between two commits and read back as though it had always said so.
 FROZEN_PHASE4_AMENDMENT_HISTORY: dict[str, tuple[tuple[str, int], ...]] = {
     "1.1": (("1.1", 0),),
+    "1.2": (("1.2", 0), ("1.1", 0)),
 }
 
 
@@ -3464,6 +3465,55 @@ class Phase4ComponentsPolicy(_Frozen):
     bps_residual: Literal["trailing_ict_ridge_residual_v1"]
     assists_architecture: Literal["ev_backtest_adapter_coupled_team_share_assists"]
     bps_simulation: Literal["points_composition_joint_fixture_bps_monte_carlo"]
+
+
+class Phase4BpsResidualParametersPolicy(_Frozen):
+    """The frozen BPS residual fit, pre-registered at amendment 1.2 before any execution.
+
+    Bonus is simulated jointly per fixture from the predicted residual mean and sigma, so these
+    six values move every full-points distribution the backtest scores. They were previously
+    ``BpsSimConfig`` dataclass defaults recorded only after a run finished, which made them an
+    output of the evaluation rather than an input to it. The runtime now reads them from here.
+
+    Floats are validated rather than typed ``Literal``: PEP 586 does not admit float literals, so
+    an equality validator is how a float is pinned in this file (the same pattern the Phase 4
+    calibration policy already uses).
+    """
+
+    trailing_window: Literal[10]
+    prior_strength: float
+    ridge_lambda: float
+    sigma_floor: float
+    sd_floor: float
+    minimum_position_rows: Literal[30]
+
+    @field_validator("prior_strength")
+    @classmethod
+    def _check_prior_strength(cls, v: float) -> float:
+        if v != 10.0:
+            raise ValueError(f"prior_strength {v} != 10.0")
+        return v
+
+    @field_validator("ridge_lambda")
+    @classmethod
+    def _check_ridge_lambda(cls, v: float) -> float:
+        if v != 1.0:
+            raise ValueError(f"ridge_lambda {v} != 1.0")
+        return v
+
+    @field_validator("sigma_floor")
+    @classmethod
+    def _check_sigma_floor(cls, v: float) -> float:
+        if v != 2.0:
+            raise ValueError(f"sigma_floor {v} != 2.0")
+        return v
+
+    @field_validator("sd_floor")
+    @classmethod
+    def _check_sd_floor(cls, v: float) -> float:
+        if v != 1.0e-6:
+            raise ValueError(f"sd_floor {v} != 1.0e-6")
+        return v
 
 
 class Phase4PrimaryArchitecturePolicy(_Frozen):
@@ -3561,7 +3611,7 @@ class Phase4EVBacktestConfig(_Frozen):
     hardcoded default cannot detect drift, which is the whole point of pre-registering it.
     """
 
-    contract_version: Literal["1.1"]
+    contract_version: Literal["1.2"]
     phase: Literal[4]
     amendments: tuple[Phase4Amendment, ...] = ()
     horizon: Phase4HorizonPolicy
@@ -3570,6 +3620,7 @@ class Phase4EVBacktestConfig(_Frozen):
     primary_architecture: Phase4PrimaryArchitecturePolicy
     diagnostic_comparator: Phase4DiagnosticComparatorPolicy
     monte_carlo: Phase4MonteCarloPolicy
+    bps_residual_parameters: Phase4BpsResidualParametersPolicy
     target_population: Phase4TargetPopulationPolicy
     metrics: Phase4MetricsPolicy
     scoring_calibration: Phase4ScoringCalibrationPolicy

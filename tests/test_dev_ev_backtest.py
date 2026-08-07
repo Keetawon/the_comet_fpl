@@ -8,6 +8,8 @@ and strict provenance / failure handling.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
+import json
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -16,6 +18,7 @@ from unittest.mock import patch
 import duckdb
 import pytest
 
+from fpl.config import load_phase4_ev_backtest_evaluation
 from fpl.jobs.prospective_points_v1 import (
     prospective_team_scored,
     trailing5_minute_bins,
@@ -24,6 +27,7 @@ from fpl.jobs.prospective_points_v1 import (
 from fpl.models.points_composition import DEFAULT_MAX_POINTS_FULL
 from fpl.storage.db import connect
 from fpl.validate import dev_ev_backtest as dev_ev_backtest_module
+from fpl.validate import ev_backtest_adapter
 from fpl.validate.dev_ev_backtest import (
     _assert_contract_drives_runtime,
     _target_completeness,
@@ -31,7 +35,9 @@ from fpl.validate.dev_ev_backtest import (
     run_ev_backtest,
 )
 from fpl.validate.ev_backtest_adapter import (
+    BpsResidualParameters,
     allocate_minutes_gated_rates,
+    bps_residual_parameters_from_contract,
     derive_final_ten_gws,
     extract_target_labels_for_gw,
     extract_target_roster_for_gw,
@@ -704,3 +710,134 @@ def test_unmodified_contract_passes_the_runtime_assertions() -> None:
     from fpl.config import load_phase4_ev_backtest_evaluation
 
     _assert_contract_drives_runtime(load_phase4_ev_backtest_evaluation())
+
+
+# --------------------------------------------------------------------------------------
+# The pre-registered BPS residual parameters must reach fit_residual_model
+# --------------------------------------------------------------------------------------
+
+
+def test_contract_bps_residual_parameters_reach_fit_residual_model() -> None:
+    """Amendment 1.2's six values must govern the fit, not just be recorded next to it.
+
+    The adapter previously built `BpsSimConfig()` and passed its dataclass defaults, so the
+    numbers that shaped every bonus simulation were an output of the run. Spying on the call
+    proves the contract is wired through rather than merely asserted alongside.
+    """
+    contract = load_phase4_ev_backtest_evaluation()
+    policy = contract.bps_residual_parameters
+    db = _build_test_db()
+
+    with patch(
+        "fpl.validate.ev_backtest_adapter.fit_residual_model",
+        wraps=ev_backtest_adapter.fit_residual_model,
+    ) as spy_fit:
+        generate_forecasts_for_fold(db, "2025-26", 29, draws=50)
+
+    spy_fit.assert_called_once()
+    assert spy_fit.call_args.kwargs == {
+        "trailing_window": policy.trailing_window,
+        "prior_strength": policy.prior_strength,
+        "ridge_lambda": policy.ridge_lambda,
+        "sigma_floor": policy.sigma_floor,
+        "sd_floor": policy.sd_floor,
+        "minimum_position_rows": policy.minimum_position_rows,
+    }
+
+
+def test_changing_the_contract_changes_what_the_residual_model_is_fitted_with() -> None:
+    """The discriminating version of the test above.
+
+    The pre-registered values happen to equal the old `BpsSimConfig` defaults, so a test that
+    only asserts "the fit saw 10/10.0/1.0/2.0/1e-6/30" would pass just as happily against the
+    dataclass defaults it replaced. Swapping the contract to values nothing else in the codebase
+    holds is what proves the contract is the source.
+    """
+    contract = load_phase4_ev_backtest_evaluation()
+    swapped = contract.model_copy(
+        update={
+            "bps_residual_parameters": contract.bps_residual_parameters.model_copy(
+                update={
+                    "trailing_window": 3,
+                    "prior_strength": 42.0,
+                    "ridge_lambda": 0.125,
+                    "sigma_floor": 9.0,
+                    "sd_floor": 1e-11,
+                    "minimum_position_rows": 13,
+                }
+            )
+        }
+    )
+    db = _build_test_db()
+
+    with (
+        patch(
+            "fpl.validate.ev_backtest_adapter.load_phase4_ev_backtest_evaluation",
+            return_value=swapped,
+        ),
+        patch(
+            "fpl.validate.ev_backtest_adapter.fit_residual_model",
+            wraps=ev_backtest_adapter.fit_residual_model,
+        ) as spy_fit,
+    ):
+        generate_forecasts_for_fold(db, "2025-26", 29, draws=50)
+
+    assert spy_fit.call_args.kwargs == {
+        "trailing_window": 3,
+        "prior_strength": 42.0,
+        "ridge_lambda": 0.125,
+        "sigma_floor": 9.0,
+        "sd_floor": 1e-11,
+        "minimum_position_rows": 13,
+    }
+
+
+def test_explicit_bps_residual_parameters_override_the_contract_lookup() -> None:
+    """The runner passes the parameters explicitly; that path must be the one that binds."""
+    db = _build_test_db()
+    supplied = BpsResidualParameters(
+        trailing_window=4,
+        prior_strength=2.5,
+        ridge_lambda=0.25,
+        sigma_floor=3.0,
+        sd_floor=1e-8,
+        minimum_position_rows=7,
+    )
+
+    with patch(
+        "fpl.validate.ev_backtest_adapter.fit_residual_model",
+        wraps=ev_backtest_adapter.fit_residual_model,
+    ) as spy_fit:
+        generate_forecasts_for_fold(db, "2025-26", 29, draws=50, bps_residual=supplied)
+
+    assert spy_fit.call_args.kwargs == dataclasses.asdict(supplied)
+
+
+def test_the_runner_records_the_applied_bps_residual_parameters(tmp_path: Path) -> None:
+    """The reconciliation must state which values governed the fit."""
+    values = [f"h{i}" for i in range(_PREFLIGHT_HASH_COUNT)]
+    out_file = tmp_path / "out.json"
+    dummy_db = tmp_path / "dummy.db"
+    dummy_db.write_text("db", encoding="utf-8")
+    rep = _dummy_report()
+
+    with (
+        patch("sys.argv", ["dev_ev_backtest", "--output", str(out_file)]),
+        patch("fpl.validate.dev_ev_backtest.default_db_path", return_value=dummy_db),
+        patch("fpl.validate.dev_ev_backtest._check_clean_worktree", return_value=True),
+        patch("fpl.validate.dev_ev_backtest._git_commit_sha", return_value="sha1"),
+        patch("fpl.validate.dev_ev_backtest._file_sha256", side_effect=values * 2),
+        patch("fpl.validate.dev_ev_backtest._target_completeness", return_value={}),
+        patch("fpl.validate.dev_ev_backtest.run_ev_backtest") as mock_run,
+        patch("fpl.validate.dev_ev_backtest.connect"),
+    ):
+        mock_run.return_value = (rep, rep, 99, 8224)
+        main()
+
+    record = json.loads(out_file.read_text(encoding="utf-8"))
+    assert record["contract_version"] == "1.2"
+    assert record["bps_residual_parameters_applied"] == dataclasses.asdict(
+        bps_residual_parameters_from_contract()
+    )
+    # And the runner handed the very same object to the backtest it recorded.
+    assert mock_run.call_args.kwargs["bps_residual"] == bps_residual_parameters_from_contract()
