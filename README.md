@@ -54,7 +54,21 @@ also fixed** -- conceded goals are binomially thinned to a measured per-bin on-p
 and 58%. Both repairs move the aggregate total the wrong way, because it was previously near zero
 only through offsetting errors; the residual is now concentrated in the unmodelled negative
 components (417 points) and a low-scoring-window regime effect. See
-`docs/phase4-composer-p-play-double-gating-fix.md`. Before
+`docs/phase4-composer-p-play-double-gating-fix.md`.
+
+**A third defect explained the composer's under-dispersion, and is also fixed.** The frozen run's
+PIT-80 coverage of 0.7404 against a nominal 0.80 traced to the trailing-five minutes estimate being
+a raw `counts / n` over at most five rows: every marginal took one of six values, and
+`P(play) = 1.000` was routine. Measured over 101,306 point-in-time rows, a raw `5/5` actually
+predicts appearance **0.897** and a raw `0/5` predicts **0.039**, so nailed starters had no lower
+tail and fringe players no upper tail. `models/minutes_shrinkage.py` replaces it with a
+point-in-time Dirichlet posterior whose concentration was fitted on 2021-22..2024-25 with 2025-26
+held out, plus a separate regime for zero-appearance windows. On the same 8,224 rows:
+**PIT-80 0.74538 -> 0.79985**, CRPS +2.46%, mean log score +51.59%, clean-sheet error -0.4%. MAE
+regresses 3.73%, which is the expected point-versus-distribution trade and is reported rather than
+omitted. Unlike Stage B's shrinkage candidates it *gains* rank resolution (within-position AUC on
+`P(60+)` +1.02%), because the raw estimator tied pure-absence and substitute-only windows together.
+See `docs/phase4-composer-minutes-shrinkage-fix.md`. Before
 operational use, the optimiser needs the no-transfer pruning
 defect fixed, horizon availability semantics measured, stronger optimiser-run provenance, and an
 explicit static-price policy. The append-only prediction ledger, BI semantic exports, static

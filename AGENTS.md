@@ -256,10 +256,40 @@ because every real repair moves it. The largest remaining composer gap is now th
 negative components** (cards, own goals, missed penalties): 417 points, 4.7% of actual full points,
 held at zero by design.
 
+That 417 is now measured and is **deliberately left unmodelled** (owner decision, 2026-08-07):
+yellow cards 374 points, red 30, own goals 14, missed penalties 4, penalties saved +5. Do not
+describe it as rare -- **cards are 90% of it and are not rare**: 374 bookings in 8,224 rows, a
+booking-prone player picks one up every 2.3 appearances, and the rate persists (split-half
+correlation 0.44 within 2025-26, mean 0.123 per appearance, sd 0.101). The reason to skip it is
+size, not frequency: the mean effect is **-0.051 points per row**, and over a five-gameweek horizon
+the spread between the most and least booked nailed starter is about **1.6 points**, small against
+the residual elsewhere. Revisit only if a decision turns on that margin.
+
 Two figures need reading with care. **Cumulative Spearman near 0.95 is inflated** by ranking all 841
 players including non-starters -- it largely measures who plays; the honest within-gameweek figure
-is 0.70-0.78 and cumulative top-20 overlap is 5 of 20. **PIT-80 coverage is 0.7404 against a nominal
-0.80**, so the fixture distributions are too narrow. Contract 1.2 pins the BPS residual fit, and
+is 0.70-0.78 and cumulative top-20 overlap is 5 of 20. **PIT-80 coverage was 0.7404 against a
+nominal 0.80** in the frozen run, so the fixture distributions were too narrow.
+
+**That under-dispersion has since been located and fixed forward, and it was one defect.** The
+composer's trailing-five minutes estimate was a raw maximum-likelihood `counts / n` over at most
+five rows, so every marginal took one of six values and `P(play) = 1.000` was routine. Measured
+over 101,306 point-in-time rows from 2021-22 to 2024-25, a raw `5/5` actually predicts appearance
+**0.897** and 60+ minutes **0.869**, and a raw `0/5` predicts **0.039** -- so a nailed starter got
+no lower tail and a fringe player no upper tail. `models/minutes_shrinkage.py` replaces it with a
+point-in-time Dirichlet posterior (`alpha = 3.5`, selected on 2021-22..2024-25 with 2025-26 held
+out; `alpha = 0.0` reproduces the raw estimate exactly). On the same 8,224 GW29-38 rows,
+**PIT-80 0.74538 -> 0.79985** (nominal 0.80), CRPS +2.46%, mean log score +51.59%, clean-sheet
+error -2.4% -> **-0.4%**. **MAE regresses 3.73% and that is the expected trade**: MAE is a point
+metric that rewards the `P(play) = 0` rows the repair removes, while CRPS -- its proper
+distributional generalisation -- improves. Two further things must not be misread: a zero-appearance
+window is a **separate regime** with its own measured profile (extrapolating the shrinkage to
+`k = 0` gives 0.16 against a measured 0.039), and the shrinkage target is the **in-squad**
+population (bin-0 frequency 0.304), never the pooled one (0.594). **This is not the Stage B
+shrinkage failure**: the estimator is strictly increasing in the observed count so it cannot
+reorder within a position, and per-gameweek within-position AUC on `P(60+)` *improves* +1.02%
+(better in 123 of 152 groups) because the raw estimator tied pure-absence and substitute-only
+windows together at zero when they realise 60+ minutes 0.9% and 13.4% of the time. See
+`docs/phase4-composer-minutes-shrinkage-fix.md`. Contract 1.2 pins the BPS residual fit, and
 `trailing_ict` is bit-reproducible across DuckDB thread counts. Keep `results/` tracked; commit each
 immutable result before any later run -- every candidate runner's postflight fails closed on a dirty
 worktree, so an uncommitted artifact silently invalidates the next run after it has done all its
@@ -503,6 +533,27 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   and a truly-congested player reads as fully rested. No minutes model uses `rest_days` today, and
   true congestion is not computable from this data without an external all-competitions fixture
   feed. Month / phase-of-season is the only available congestion proxy.
+- **A raw trailing-five appearance count is badly over-confident, and `k = 0` is a separate
+  regime.** Measured over 101,306 point-in-time rows (2021-22..2024-25), what raw `k/5` actually
+  predicts is: `0/5` -> play **0.039** / 60+ **0.036**; `1/5` -> 0.310 / 0.279; `2/5` -> 0.459 /
+  0.419; `3/5` -> 0.588 / 0.543; `4/5` -> 0.736 / 0.695; `5/5` -> **0.897** / **0.869**. Five
+  Bernoulli trials do not support a probability of 0 or 1, and a composer that draws a minutes bin
+  from one gets no lower tail for a nailed starter and no upper tail for a fringe player. For
+  `k >= 1` the realised rate is near-linear in `k` (a Dirichlet posterior, concentration **3.5**
+  fitted out of sample), but extrapolating that line to `k = 0` predicts 0.16 against a measured
+  **0.039** on 43,139 rows -- a zero-appearance window means injured / suspended / out of the side,
+  a persistent state, and needs its own measured profile. Shrink toward the **in-squad** bin
+  frequency (bin-0 **0.304**), never the pooled one (**0.594**), which double-counts absences the
+  regime split already removed. Positional priors are required for goalkeepers, whose profile
+  (0.741, 0.005, 0.001, 0.253) is nothing like an outfielder's.
+- **Shrinking a five-row count buys rank resolution rather than costing it** -- the opposite of the
+  Stage B V1/V2/V3 result, so do not assume the Stage B failure generalises. The posterior mean is
+  strictly increasing in the observed count, so within a position it cannot reorder; and the raw
+  estimator *ties* pure-absence and substitute-only windows together at `P(60+) = 0` when they go
+  on to play 60+ minutes **0.9%** and **13.4%** of the time (17,069 rows in 2025-26). Measured
+  per-gameweek within-position AUC on `P(60+)` rises 0.90886 -> 0.91815. Measure ranking with AUC,
+  not an average-rank Spearman: on a binary outcome with a large tie block the Spearman reads
+  -10.9% where AUC reads +2.2%, and the AUC figure is the correct one.
 
 ## Priorities for upcoming work
 
@@ -626,8 +677,13 @@ Unless the user sets another priority, address prerequisites before model sophis
    gate**, all measured before wiring; and a heavier **historical track** (new pre-registered Stage
    A/B/C candidates) needed only to claim measured lift. Shipped on the prospective track so far:
    penalty/set-piece premium, xG-share (embedding the penalty premium) and coupled xA-share for
-   assists, the season-boundary appearance correction, and (latest) the **equal-weighted trailing-5
-   appearance window** replacing the recency-weighted estimate at the boundary. A whole-composer
+   assists, the season-boundary appearance correction, the **equal-weighted trailing-5
+   appearance window** replacing the recency-weighted estimate at the boundary, and (latest) the
+   **shrunk trailing-5 minute-bin estimate** (`models/minutes_shrinkage.py`) replacing the raw
+   `counts / n`, which took PIT-80 from 0.74538 to 0.79985 against a nominal 0.80. Its `alpha` was
+   selected on 2021-22..2024-25 with 2025-26 held out and **must not be re-tuned against GW29-38**;
+   the residual +2.0% appearance over-prediction on the target-roster population needs a fresh
+   out-of-sample window, not a re-fit. A whole-composer
    recency audit is complete: appearance was the only recency-weighted signal (now fixed); xG-share,
    xA-share, the DC hit rate, and the pooled GK save rate are equal-weighted or league-pooled and
    were confirmed correct as-is. Still open on this track and measured-but-not-yet-built: a

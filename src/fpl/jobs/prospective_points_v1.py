@@ -109,6 +109,11 @@ from fpl.models.attacking_v3 import allocate_minutes_gated_rates
 from fpl.models.bps_bonus import BpsSimConfig, fit_residual_model
 from fpl.models.defensive_contribution_v1 import DcHistoryRow
 from fpl.models.gk_saves_v1 import GkSavesHistoryRow
+from fpl.models.minutes_shrinkage import (
+    MINUTES_SHRINKAGE_ALPHA,
+    MINUTES_SHRINKAGE_MIN_PRIOR_ROWS,
+    shrink_minute_bins,
+)
 from fpl.models.points_composition import (
     DEFAULT_MAX_POINTS_FULL,
     MEASURED_CONCEDED_EXPOSURE,
@@ -448,8 +453,9 @@ def trailing5_minute_bins(
     bins: MinuteBins,
     *,
     window: int = 5,
+    alpha: float = MINUTES_SHRINKAGE_ALPHA,
 ) -> dict[int, tuple[tuple[float, float, float, float], int]]:
-    """``code -> (equal-weighted minute-bin distribution, n)`` over the most recent ``window`` rows.
+    """``code -> (shrunk minute-bin distribution, n)`` over the most recent ``window`` rows.
 
     The recent appearance estimate as a *plain average of the last five matches* -- no recency
     weight. Measured against three historical season boundaries, equal-weighting the trailing five
@@ -460,31 +466,80 @@ def trailing5_minute_bins(
     boundary blend with the prior-season rate (:func:`season_boundary_minutes`) then lifts a nailed
     starter the contaminated window still under-rates. Point in time: only ``kickoff_time < as_of``,
     most-recent ``window`` rows per ``code``, equal weight.
+
+    The equal-weighted counts are then shrunk by
+    :func:`fpl.models.minutes_shrinkage.shrink_minute_bins`, because ``counts / n`` over five rows
+    takes only six values and is over-confident at both ends -- it is the composer's dominant
+    source of under-dispersion. Both priors the estimator needs are built here from the *same*
+    ``kickoff_time < as_of`` history, per position, so nothing about the shrinkage reaches forward
+    in time. ``alpha = 0.0`` returns the unshrunk counts.
+
+    A player's position is taken from his own most recent historical row rather than from a
+    dimension table: position is season-scoped in the same way team membership is, and the
+    dimension records only where a player finished.
     """
     frame = con.execute(
         """
-        WITH ranked AS (
-            SELECT code, minutes,
-                   row_number() OVER (PARTITION BY code ORDER BY kickoff_time DESC) AS rn
-            FROM mart_fact_player_fixture
-            WHERE minutes IS NOT NULL AND kickoff_time < ?
-        )
-        SELECT code, minutes FROM ranked WHERE rn <= ?
+        SELECT code, position, minutes
+        FROM mart_fact_player_fixture
+        WHERE minutes IS NOT NULL AND kickoff_time < ?
+        ORDER BY code, kickoff_time, fixture
         """,
-        [as_of, window],
+        [as_of],
     ).pl()
     n_bins = bins.n_bins()
     by_code: dict[int, list[int]] = defaultdict(list)
+    position_of: dict[int, str] = {}
     for r in frame.iter_rows(named=True):
-        by_code[int(r["code"])].append(int(r["minutes"]))
+        code = int(r["code"])
+        by_code[code].append(bins.index_of(int(r["minutes"])))
+        position_of[code] = str(r["position"])
+
+    # Both priors, point in time, over every historical row that has a usable window of its own.
+    # A row lands in the "out of the side" population when its window holds no appearance at all,
+    # and in the in-squad population otherwise; the two are disjoint by construction, which is
+    # what makes the in-squad prior the right shrinkage target for the in-squad regime.
+    in_squad: defaultdict[str, list[float]] = defaultdict(lambda: [0.0] * n_bins)
+    out_of_side: defaultdict[str, list[float]] = defaultdict(lambda: [0.0] * n_bins)
+    pooled_in = [0.0] * n_bins
+    pooled_out = [0.0] * n_bins
+    for code, sequence in by_code.items():
+        position = position_of[code]
+        for index, target_bin in enumerate(sequence):
+            past = sequence[max(0, index - window) : index]
+            if len(past) < _MIN_TRAILING5_ROWS:
+                continue
+            absent = all(b == 0 for b in past)
+            bucket = out_of_side if absent else in_squad
+            pooled = pooled_out if absent else pooled_in
+            bucket[position][target_bin] += 1.0
+            pooled[target_bin] += 1.0
+
+    def normalise(counts: list[float], fallback: tuple[float, ...]) -> tuple[float, ...]:
+        total = sum(counts)
+        if total < MINUTES_SHRINKAGE_MIN_PRIOR_ROWS:
+            return fallback
+        return tuple(c / total for c in counts)
+
+    uniform = tuple(1.0 / n_bins for _ in range(n_bins))
+    pooled_in_prior = normalise(pooled_in, uniform)
+    pooled_out_prior = normalise(pooled_out, uniform)
+
     out: dict[int, tuple[tuple[float, float, float, float], int]] = {}
-    for code, mins in by_code.items():
+    for code, sequence in by_code.items():
+        recent = sequence[-window:]
         counts = [0.0] * n_bins
-        for m in mins:
-            counts[bins.index_of(m)] += 1.0
-        total = float(len(mins))
-        dist = cast(tuple[float, float, float, float], tuple(c / total for c in counts))
-        out[code] = (dist, len(mins))
+        for b in recent:
+            counts[b] += 1.0
+        position = position_of[code]
+        dist = shrink_minute_bins(
+            counts,
+            len(recent),
+            in_squad_prior=normalise(in_squad[position], pooled_in_prior),
+            out_of_side_profile=normalise(out_of_side[position], pooled_out_prior),
+            alpha=alpha,
+        )
+        out[code] = (cast(tuple[float, float, float, float], dist), len(recent))
     return out
 
 

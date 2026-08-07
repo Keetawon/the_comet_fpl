@@ -449,7 +449,8 @@ def test_trailing5_minute_bins_equal_weights_the_last_five() -> None:
     )
     try:
         bins = MinuteBins.from_config(load_phase2_evaluation())
-        result = trailing5_minute_bins(con, AS_OF, bins)
+        # alpha=0.0 isolates the windowing from the shrinkage, which is what this test is about.
+        result = trailing5_minute_bins(con, AS_OF, bins, alpha=0.0)
         dist, n = result[1001]
         assert n == 5
         assert abs(sum(dist) - 1.0) < 1e-12
@@ -458,6 +459,31 @@ def test_trailing5_minute_bins_equal_weights_the_last_five() -> None:
         # weighting fixes it at exactly 0.6 -- the mechanism that stops a dead-rubber final
         # gameweek from dominating the appearance estimate.
         assert dist == (0.0, 0.0, 0.4, 0.6)
+    finally:
+        con.close()
+
+
+def test_trailing5_minute_bins_shrinks_an_ever_present_off_certainty() -> None:
+    """The default path must never hand the composer a probability of exactly 1.
+
+    A raw count of 5/5 says a nailed starter cannot fail to play. Measured over four archive
+    seasons he plays 0.897 of the time, so the raw estimate leaves his distribution with no
+    lower tail at all -- the composer's dominant source of under-dispersion.
+    """
+    con = _basic_db(
+        players=[_player(11, 1001, 3, 1)],
+        fixtures=[_fixture(501, 1, 2)],
+        history=[(1001, "MID", 1, 2, True)],
+    )
+    try:
+        bins = MinuteBins.from_config(load_phase2_evaluation())
+        raw, _ = trailing5_minute_bins(con, AS_OF, bins, alpha=0.0)[1001]
+        shrunk, _ = trailing5_minute_bins(con, AS_OF, bins)[1001]
+        assert raw[0] == 0.0
+        assert shrunk[0] > 0.0
+        assert abs(sum(shrunk) - 1.0) < 1e-12
+        # Shrinkage moves mass toward the prior; it must not invert the observed ordering.
+        assert shrunk[3] > shrunk[2] > shrunk[1]
     finally:
         con.close()
 
