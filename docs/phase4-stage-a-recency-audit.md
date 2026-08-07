@@ -134,7 +134,22 @@ GK and DEF are precisely the positions whose points come from clean sheets, and 
 the component over-predicting by +5.7%. The positional bias and the clean-sheet over-prediction
 are one finding, not two.
 
+> **Retracted.** The paragraph above was measured on this window alone. On GW29-38 the clean sheet
+> runs −0.4% while GK and DEF are still over by +3.5% and +3.7%, so the clean sheet is not the
+> cause. The positional bias itself is stable across both windows; its confirmed cause is
+> positional mis-allocation of attacking output. See `docs/phase4-composer-positional-bias.md`.
+
 ### A measured directional defect in the clean-sheet path
+
+**Superseded. See `docs/phase4-composer-positional-bias.md`.** The attribution in this section was
+measured on this window alone and does not survive the other one: on GW29-38 the clean sheet runs
+**-0.4%** while GK and DEF are still over by +3.5% and +3.7%, so the clean sheet cannot be the
+cause of the positional bias. The bin-2 thinning effect is real when tested *conditionally* on the
+team's conceded count -- a 60-89 player keeps the clean sheet 0.1408 of the time against thinning's
+0.1870, given the team conceded once -- but is worth about 15 points, and the raw cross-bin
+comparison used below compares different populations whose teams concede at different rates. The
+confirmed cause is positional mis-allocation of attacking output: forwards are allocated 38-40%
+too few assists in both windows. The section is kept as the audit record.
 
 Archive semantics were verified exact first: over 2025-26 GK/DEF rows, `clean_sheets = 1` holds
 for 1,015 rows and coincides with `minutes >= 60 AND goals_conceded = 0` with **zero** mismatches

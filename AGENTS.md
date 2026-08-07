@@ -596,14 +596,34 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   Stage A evaluation never surfaced a 4-8% level miss for this reason. Aggregate bias has to be
   measured as bias, against realised totals, and by position -- never inferred from a score that
   looks healthy.
-- **The composer's remaining bias is positional, not global**: with the unmodelled negative
-  components added back, GK **+6.0%**, DEF **+5.3%**, MID +2.3%, FWD **-3.0%** over 2025-26
-  GW10-28. GK and DEF are the clean-sheet positions and the clean sheet over-predicts by +5.7%, so
-  it is one finding. Realised `P(clean sheet)` is **0.2495** at 60-89 minutes against **0.2713** at
-  90 -- reality gives the substituted player the *lower* clean-sheet chance, while binomial
-  thinning at exposure 0.813 necessarily gives him the higher one. Thinning is still right on the
-  conceded *mean* (0.417 against 0.412); it is `P(0)` and a selected 60-89 population that it gets
-  wrong.
+- **The composer's remaining bias is positional, not global, and it is mis-allocated attacking
+  output.** With the unmodelled negatives added back: GK +5.9%/+3.5%, DEF +5.3%/+3.7%,
+  MID +2.4%/+4.0%, FWD **-3.1%/-4.1%** over 2025-26 GW10-28 / GW29-38 -- forwards low and
+  everything else high, in both windows. Measured as expected *counts* against realised counts,
+  **forwards are allocated 38-40% too few assists in both windows** (model share 7-8% against an
+  actual 11-15%), **defenders +29%/+61% too many goals** and +12%/+28% too many assists, and
+  **goalkeepers 1.0-1.6 goals against an actual zero**. A defender's goal scores 6 against a
+  forward's 4, so this inflates the total and mis-ranks positions at once. It is consistent with
+  the already-measured constant that the defender attacking signal is **xA, not xG** (persistence
+  0.784 against 0.319): a trailing xG share is near-noise for defenders, and one converted
+  set-piece keeps a defender's share inflated afterwards.
+- **Do not attribute the positional bias to the clean sheet, and do not "fix" the Poisson zero.**
+  Both were tested and rejected. The clean sheet runs -0.4% on GW29-38 while GK/DEF are still
+  +3.5%/+3.7% there. The Stage A Poisson zero looks +7.4% too high pooled (0.2659 predicted against
+  0.2475) but splits by season as 1.021 / 0.993 / **1.292** / 1.084 / 1.020 -- the whole effect is
+  2023-24, the outlier scoring season where the level miss shows up as an apparent shape defect.
+  Train z = +2.72, 2025-26 holdout z = **+0.32**. Third pooled-figure-is-one-season trap in this
+  repository, after xG coverage and home advantage: **always split a pooled anomaly by season
+  before acting on it.**
+- **Binomial thinning over-states the bin-2 clean sheet by about a third, and it is worth ~15
+  points.** Conditional on the team conceding exactly one goal (746 rows), a 60-89 minute GK/DEF
+  keeps the clean sheet **0.1408** of the time against thinning's **0.1870** -- a player withdrawn
+  in that window is disproportionately one whose side had already conceded, so the goal falls
+  inside his window more often than independent timing implies. Do not compare raw `P(clean sheet)`
+  across minutes bins to measure this (0.2495 at 60-89 against 0.2713 at 90); those are different
+  populations, whose teams concede 1.49 against 1.336 per match, and the composer already handles
+  that through each fixture's own rate. Thinning remains right on the conceded *mean* (0.417
+  against 0.412).
 
 ## Priorities for upcoming work
 
@@ -748,18 +768,23 @@ Unless the user sets another priority, address prerequisites before model sophis
    grain and +0.00% CRPS at the composer grain, because lowering the level trades goals accuracy
    against clean-sheet accuracy one for one; do not re-open it (`docs/phase4-stage-a-recency-audit.md`).
    What the audit surfaced instead is the **next accuracy item on evidence**: the composer's bias is
-   **positional, not global**. With the unmodelled negatives added back so the comparison is like
-   for like, GK runs **+6.0%**, DEF **+5.3%**, MID +2.3% and FWD **-3.0%**, which tilts every squad
-   the optimiser builds toward defenders. GK and DEF are the clean-sheet positions and the clean
-   sheet is the component over-predicting by +5.7%, so this is one finding. Inside it sits a
-   measured directional defect: realised `P(clean sheet)` is **0.2495** for a 60-89 minute GK/DEF
-   row against **0.2713** for a 90-minute one, while the composer awards it from `thinned[0]` and
-   binomial thinning at exposure 0.813 necessarily gives the **opposite** ordering. Archive
-   semantics were verified exact first (1,015 clean sheets, zero mismatches against
-   `minutes >= 60 AND goals_conceded = 0`). This does not retract the conceded-exposure repair,
-   which is still right on the conceded *mean* (0.417 against 0.412 for bin 2); thinning gets the
-   mean right and `P(0)` wrong, and the 60-89 population is selected -- a player withdrawn there is
-   disproportionately one whose match was going badly. Also still open and
+   **positional, not global**, and stable across both windows: GK +5.9%/+3.5%, DEF +5.3%/+3.7%,
+   MID +2.4%/+4.0%, FWD **-3.1%/-4.1%** (GW10-28 / GW29-38, unmodelled negatives added back so the
+   comparison is like for like). **The clean-sheet attribution first recorded for it is retracted**
+   -- the clean sheet runs -0.4% on GW29-38 while GK/DEF are still +3.5%/+3.7% there, so it cannot
+   be the cause. Three explanations were tested and rejected: bin-2 clean-sheet thinning is real
+   but worth ~15 points (conditional on the team conceding once, a 60-89 player keeps the clean
+   sheet 0.1408 of the time against thinning's 0.1870, because a defender withdrawn then is
+   disproportionately one whose side had already conceded); the Stage A Poisson zero looked +7.4%
+   too high pooled but **the whole effect is 2023-24** (train z = +2.72, 2025-26 holdout
+   z = **+0.32**), so no zero correction ships; and `P(60+)` is calibrated to +1.9%. **The
+   confirmed defect is positional mis-allocation of attacking output**: forwards get **38-40% too
+   few assists in both windows** (model share 7-8% against an actual 11-15%), defenders get
+   **+29%/+61% too many goals** and +12%/+28% too many assists, and goalkeepers are allocated
+   1.0-1.6 goals against an actual zero. A defender's goal scores 6 against a forward's 4, so this
+   mis-ranks positions and inflates the total at once, and it connects to the measured constant
+   that the defender attacking signal is xA, not xG. See `docs/phase4-composer-positional-bias.md`.
+   Also still open and
    measured-but-not-yet-built: a price-informed starter prior in the appearance layer. The Stage E squad
    optimiser and its stable prospective-points input artifact are now implemented
    **development-only**. The fixed-squad ILP is exact; the multi-GW transfer search is bounded and
