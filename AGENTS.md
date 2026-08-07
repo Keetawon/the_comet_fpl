@@ -254,10 +254,22 @@ pooled mean and **does not track the current season's scoring level**. 2025-26 d
 its full 380 fixtures, about 2.5 standard errors below that anchor, and the season-to-season spread
 (2.645 to 3.147) is far wider than the 0.087 standard error of a season mean. So the residual is a
 season-level miss, not a 99-fixture fluke. Tuning `lambda` to the season in progress is still
-forbidden for the same reason as before; what this licenses is the open **Stage A recency /
-time-decay audit**, whose question is how much weight the league scoring level should place on N
-observed fixtures of the current season against the pooled prior. See
-`docs/phase4-composer-out-of-window-validation.md`.
+forbidden for the same reason as before. See `docs/phase4-composer-out-of-window-validation.md`.
+
+**The Stage A recency / time-decay audit that finding licensed has now been run, and its answer is
+NO -- do not build it.** Blending the league level toward the season to date
+(`w = N/(N+k)`, `k = 120` team-matches selected on 2021-22..2024-25 with 2025-26 held out) fixes
+the level almost exactly (2.868 -> **2.733** against an actual 2.750) and is worth **-0.01%** of
+team-grain log score, flat across the whole `k` grid from -0.11% to +0.03%. At the composer grain
+it is worth CRPS +0.00%, PIT-80 -0.0001, log -0.31%, and decisions barely move (per-gameweek
+top-20 overlap 19.21/20, same captain in 18 of 19 gameweeks). The reason it cannot help is that
+**the league scoring level is not a free parameter**: lowering it improves goals (+7.2% ->
++2.5%), the conceded penalty and saves, and breaks the clean sheet by the same amount (+5.7% ->
+**+11.5%**), leaving the modelled total unchanged at +2.9% -> +3.0%. A level bias is also nearly
+invisible to a proper score at this grain by construction -- a Poisson charges about
+`(dlambda)^2/2lambda`, so 4% costs ~0.1% at `lambda ~ 1.4`, which is why five seasons of Stage A
+work never surfaced it. Do not re-open this on the level argument. See
+`docs/phase4-stage-a-recency-audit.md`.
 
 (a) and (b) are now **fixed**. Goals conceded are charged only for the share of the match a player
 was on the pitch, binomially thinned to a measured per-bin exposure (see the measured constant
@@ -575,8 +587,23 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   standard error near 0.087, so **the league scoring level is genuinely non-stationary and Stage A
   does not track it**. The consequence is a persistent composer bias in one direction for a whole
   season: +5.8% over GW10-28, +10.6% over GW29-38. Do not fix this by fitting `lambda` to the
-  season in progress; fix it, if at all, by measuring how much weight N observed fixtures of the
-  current season should carry against the pooled prior.
+  season in progress. **That "fix it by weighting the current season" route has now been measured
+  and does not work** -- it is worth -0.01% at the Stage A grain and +0.00% CRPS at the composer
+  grain, because the level trades goals accuracy against clean-sheet accuracy one for one.
+- **A level bias is nearly invisible to a proper score, so do not expect one to find it.** A
+  Poisson log score charges about `(dlambda)^2 / 2*lambda` for a level error, so at the Stage A
+  team-match rate of `lambda ~ 1.4` a **4% level error costs ~0.1%** of log score. Five seasons of
+  Stage A evaluation never surfaced a 4-8% level miss for this reason. Aggregate bias has to be
+  measured as bias, against realised totals, and by position -- never inferred from a score that
+  looks healthy.
+- **The composer's remaining bias is positional, not global**: with the unmodelled negative
+  components added back, GK **+6.0%**, DEF **+5.3%**, MID +2.3%, FWD **-3.0%** over 2025-26
+  GW10-28. GK and DEF are the clean-sheet positions and the clean sheet over-predicts by +5.7%, so
+  it is one finding. Realised `P(clean sheet)` is **0.2495** at 60-89 minutes against **0.2713** at
+  90 -- reality gives the substituted player the *lower* clean-sheet chance, while binomial
+  thinning at exposure 0.813 necessarily gives him the higher one. Thinning is still right on the
+  conceded *mean* (0.417 against 0.412); it is `P(0)` and a selected 60-89 population that it gets
+  wrong.
 
 ## Priorities for upcoming work
 
@@ -716,9 +743,24 @@ Unless the user sets another priority, address prerequisites before model sophis
    audit the next accuracy item on evidence**: Stage A expects ~2.86 goals per fixture in both
    windows while reality delivers 2.712 and 2.576, so the goals residual is a season-level miss
    rather than the 99-fixture fluke previously recorded (see
-   `docs/phase4-composer-out-of-window-validation.md`). Still open on this track and
-   measured-but-not-yet-built: that audit (its `lambda_conceded` drives both goal allocation and GK
-   saves), and a price-informed starter prior in the appearance layer. The Stage E squad
+   `docs/phase4-composer-out-of-window-validation.md`). **That audit has since been run and closed
+   negative** -- blending the league level toward the season to date is worth -0.01% at the Stage A
+   grain and +0.00% CRPS at the composer grain, because lowering the level trades goals accuracy
+   against clean-sheet accuracy one for one; do not re-open it (`docs/phase4-stage-a-recency-audit.md`).
+   What the audit surfaced instead is the **next accuracy item on evidence**: the composer's bias is
+   **positional, not global**. With the unmodelled negatives added back so the comparison is like
+   for like, GK runs **+6.0%**, DEF **+5.3%**, MID +2.3% and FWD **-3.0%**, which tilts every squad
+   the optimiser builds toward defenders. GK and DEF are the clean-sheet positions and the clean
+   sheet is the component over-predicting by +5.7%, so this is one finding. Inside it sits a
+   measured directional defect: realised `P(clean sheet)` is **0.2495** for a 60-89 minute GK/DEF
+   row against **0.2713** for a 90-minute one, while the composer awards it from `thinned[0]` and
+   binomial thinning at exposure 0.813 necessarily gives the **opposite** ordering. Archive
+   semantics were verified exact first (1,015 clean sheets, zero mismatches against
+   `minutes >= 60 AND goals_conceded = 0`). This does not retract the conceded-exposure repair,
+   which is still right on the conceded *mean* (0.417 against 0.412 for bin 2); thinning gets the
+   mean right and `P(0)` wrong, and the 60-89 population is selected -- a player withdrawn there is
+   disproportionately one whose match was going badly. Also still open and
+   measured-but-not-yet-built: a price-informed starter prior in the appearance layer. The Stage E squad
    optimiser and its stable prospective-points input artifact are now implemented
    **development-only**. The fixed-squad ILP is exact; the multi-GW transfer search is bounded and
    makes no global-optimality claim. Before another decision run, fix the confirmed no-transfer
