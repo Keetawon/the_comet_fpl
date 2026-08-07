@@ -118,6 +118,7 @@ from fpl.models.points_composition import (
     FixturePlayer,
     PointsLookup,
     compose_fixture_full_points,
+    conditional_rate,
     representative_minutes,
 )
 from fpl.storage.db import connect, default_db_path
@@ -1285,7 +1286,9 @@ def predict_prospective_points(
             )
             for p in roster_pending:
                 rate, _path = allocated[p.code]
-                goals[p.code] = goal_poisson_pmf(rate)
+                # The allocated rate is unconditional (it already carries p_play); the composer
+                # gates on the minutes draw, so hand it the conditional-on-appearance rate.
+                goals[p.code] = goal_poisson_pmf(conditional_rate(rate, p.p_play, cap=lambda_team))
         return goals
 
     def _fixture_assists(pending: list[_Pending], fixture: int) -> dict[int, Distribution]:
@@ -1317,7 +1320,8 @@ def predict_prospective_points(
             )
             for p in roster_pending:
                 rate, _path = allocated[p.code]
-                out[p.code] = goal_poisson_pmf(rate)
+                # Conditional on appearance, exactly as in the goals path above.
+                out[p.code] = goal_poisson_pmf(conditional_rate(rate, p.p_play, cap=lambda_assist))
         return out
 
     # 5. Joint per-fixture composition -> full-points distribution per player.

@@ -14,6 +14,8 @@ import pytest
 
 from fpl.config import load_phase2_evaluation, load_scoring_rules
 from fpl.models.attacking_baselines import poisson_pmf as count_poisson_pmf
+from fpl.models.attacking_v2 import _RosterEntry
+from fpl.models.attacking_v3 import allocate_minutes_gated_rates
 from fpl.models.bps_bonus import PlayerRow, award_bonus, exact_bps
 from fpl.models.points_composition import (
     BpsExactLookup,
@@ -23,6 +25,7 @@ from fpl.models.points_composition import (
     PointsLookup,
     compose_fixture_full_points,
     compose_points_distribution,
+    conditional_rate,
     representative_minutes,
 )
 from fpl.models.scoring import calculate_points
@@ -342,3 +345,132 @@ def test_v2_per_player_path_unchanged() -> None:
         team_goals_conceded=_count_one_hot(0),
     )
     assert compose_points_distribution(short, LOOKUP, seed=3, draws=400)[1] == 1.0
+
+
+# --------------------------------------------------------------------------------------
+# P(play) is applied exactly once: the composer conserves the Stage A team goal total
+# --------------------------------------------------------------------------------------
+#
+# `allocate_minutes_gated_rates` returns rates that already carry p_play and sum to lambda_team.
+# The composer gates AGAIN on the minutes draw, so feeding those rates in unchanged realises only
+# `p_play * rate` per player and the roster silently loses attacking mass -- measured at 11.11% of
+# all goal and assist mass over the GW29-38 horizon. `conditional_rate` divides p_play back out.
+
+
+def test_conditional_rate_inverts_the_composer_appearance_gate() -> None:
+    # The composer realises p_play * conditional_rate; that must equal the unconditional rate.
+    for unconditional, p_play in ((0.42, 0.8), (0.11, 0.35), (1.7, 0.99)):
+        restored = p_play * conditional_rate(unconditional, p_play, cap=10.0)
+        assert restored == pytest.approx(unconditional)
+
+
+def test_conditional_rate_leaves_a_never_playing_roster_alone() -> None:
+    # p_play == 0 is only reachable on the all-absent fallback, where the composer scores every
+    # draw as zero anyway. Returning the input beats dividing by zero.
+    assert conditional_rate(0.5, 0.0, cap=2.0) == 0.5
+    assert conditional_rate(0.0, 0.0, cap=2.0) == 0.0
+
+
+def test_one_rotation_risk_among_nailed_team_mates_does_not_inflate_the_rate() -> None:
+    """An individual p_play cancels: it is in the numerator and in the roster denominator."""
+    roster = [_RosterEntry(code=i, signal=1.0, cold_start=False) for i in range(1, 5)]
+    lambda_team = 1.6
+    p_play = {1: 0.02, 2: 1.0, 3: 1.0, 4: 1.0}  # player 1 is a near-certain absentee
+    allocated = allocate_minutes_gated_rates(roster, p_play, lambda_team, minutes_gating=True)
+    rate, _path = allocated[1]
+    # Equal shares, so the conditional rate is lambda_team * 0.25 / 0.755 -- bounded and well
+    # under lambda_team. The 0.02 does NOT reappear as a 50x multiplier.
+    assert conditional_rate(rate, p_play[1], cap=lambda_team) == pytest.approx(
+        lambda_team * 0.25 / 0.755
+    )
+
+
+def test_a_whole_roster_of_absentees_is_capped_at_the_team_rate() -> None:
+    """The denominator collapses when NOBODY is likely to play, so the cap has to be real.
+
+    Without it a uniform p_play of 1e-6 over three equal shares turns a lambda_team of 1.6 into
+    533,333 -- a single player expected to outscore their own team 300,000 times over.
+    """
+    roster = [_RosterEntry(code=i, signal=1.0, cold_start=False) for i in range(1, 4)]
+    lambda_team = 1.6
+    tiny = dict.fromkeys((1, 2, 3), 1e-6)
+    allocated = allocate_minutes_gated_rates(roster, tiny, lambda_team, minutes_gating=True)
+    for code in (1, 2, 3):
+        rate, _path = allocated[code]
+        assert rate / tiny[code] > 500_000  # the uncapped division really does diverge
+        assert conditional_rate(rate, tiny[code], cap=lambda_team) == lambda_team
+
+
+def test_the_cap_is_inert_on_a_realistic_roster() -> None:
+    """It must not quietly truncate ordinary predictions -- only the degenerate ones."""
+    roster = [
+        _RosterEntry(code=1, signal=0.55, cold_start=False),
+        _RosterEntry(code=2, signal=0.30, cold_start=False),
+        _RosterEntry(code=3, signal=0.10, cold_start=False),
+        _RosterEntry(code=4, signal=0.05, cold_start=True),
+    ]
+    p_play = {1: 0.95, 2: 0.60, 3: 0.25, 4: 0.40}
+    lambda_team = 1.72
+    allocated = allocate_minutes_gated_rates(roster, p_play, lambda_team, minutes_gating=True)
+    for code, p in p_play.items():
+        rate, _path = allocated[code]
+        assert conditional_rate(rate, p, cap=lambda_team) < lambda_team
+
+
+def test_corrected_roster_conserves_the_stage_a_team_goal_total() -> None:
+    """sum_i P(play_i) * conditional_rate_i == lambda_team, which is the conservation property.
+
+    Fails against the uncorrected wiring: passing the allocated rate straight through realises
+    sum_i p_play_i * rate_i, which is strictly below lambda_team whenever anyone may be absent.
+    """
+    roster = [
+        _RosterEntry(code=1, signal=0.55, cold_start=False),  # nailed striker
+        _RosterEntry(code=2, signal=0.30, cold_start=False),  # rotated winger
+        _RosterEntry(code=3, signal=0.10, cold_start=False),  # squad player
+        _RosterEntry(code=4, signal=0.05, cold_start=True),  # cold start
+    ]
+    p_play = {1: 0.95, 2: 0.60, 3: 0.25, 4: 0.40}
+    lambda_team = 1.72
+    allocated = allocate_minutes_gated_rates(roster, p_play, lambda_team, minutes_gating=True)
+
+    realised_corrected = sum(
+        p_play[code] * conditional_rate(allocated[code][0], p_play[code], cap=lambda_team)
+        for code in p_play
+    )
+    assert realised_corrected == pytest.approx(lambda_team)
+
+    realised_uncorrected = sum(p_play[code] * allocated[code][0] for code in p_play)
+    assert realised_uncorrected < lambda_team * 0.85  # the defect loses a sixth of the mass here
+
+
+def test_the_composer_realises_the_unconditional_rate_end_to_end() -> None:
+    """Drive the real composer and read the realised goal rate back out of the points pmf.
+
+    A 90-minute midfielder who concedes exactly one goal scores ``appearance + 5 * goals`` and
+    nothing else, so ``E[points] = p_play * appearance + goal_points * E[realised goals]`` inverts
+    to the goal mass the composer actually delivered.
+    """
+    p_play = 0.7
+    unconditional = 0.40
+    appearance_points = RULES.appearance.long_play_points
+    goal_points = RULES.goals_scored[Position.MID]
+    draws = 400_000
+
+    def realised_goal_mass(rate: float) -> float:
+        components = ComponentDistributions(
+            position=Position.MID,
+            minutes=(1.0 - p_play, 0.0, 0.0, p_play),
+            goals=count_poisson_pmf(rate),
+            assists=_count_one_hot(0),
+            team_goals_conceded=_count_one_hot(1),  # one conceded: no clean sheet, no MID penalty
+        )
+        pmf = compose_points_distribution(components, LOOKUP, seed=202627, draws=draws)
+        expected_points = sum(index * mass for index, mass in enumerate(pmf))
+        return (expected_points - p_play * appearance_points) / goal_points
+
+    corrected = realised_goal_mass(conditional_rate(unconditional, p_play, cap=3.0))
+    assert corrected == pytest.approx(unconditional, rel=0.02)
+
+    # The uncorrected wiring delivers only p_play of the mass it was asked to allocate.
+    uncorrected = realised_goal_mass(unconditional)
+    assert uncorrected == pytest.approx(unconditional * p_play, rel=0.02)

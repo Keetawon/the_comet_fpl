@@ -213,15 +213,38 @@ source files unchanged, clean worktree and unchanged HEAD at both pre- and postf
 **The V1 independent comparator outscores the V3 coupled primary.** On identical rows: mean log
 score 2.0899 vs **2.0510**, CRPS 0.6351 vs **0.6328**, NDCG@20 0.7762 vs **0.7926**, top-20 capture
 0.7763 vs **0.7968**, top-20 overlap 0.25 vs **0.35**, MAE 0.9423 vs **0.9156**, cumulative Spearman
-0.9515 vs 0.9520. The primary loses or ties on every scored metric. Its one clear win is aggregate
-calibration: **EV/actual 1.0163 against 0.9473**, a signed bias of +146.4 against -472.3 on an
-8,955-point actual total -- exactly where conserving the team goal total should show, and the
-independent architecture does not conserve it.
+0.9515 vs 0.9520. The primary loses or ties on every scored metric. Its one apparent win is
+aggregate calibration: **EV/actual 1.0163 against 0.9473**, a signed bias of +146.4 against -472.3
+on an 8,955-point actual total.
+
+**That calibration win has since been measured to be two errors cancelling, and is not evidence
+for the coupled architecture.** It was originally read as conservation of the team goal total
+showing through. It was not: the composer was applying P(play) twice and destroying **11.11%** of
+all goal and assist mass (537.05 allocated, 477.40 realised), so the roster never conserved
+`lambda_team` at all. That loss was offsetting an over-prediction elsewhere. With P(play) applied
+once the same 8,224 rows give EV 9339.92 and EV/actual **1.0430** (bias +384.9). The defect is now
+fixed forward (`docs/phase4-composer-p-play-double-gating-fix.md`); the frozen artifact keeps the
+defective numbers, is not re-run or re-judged, and reproduces only at its pinned commit `8af5760`.
 
 **This decides nothing.** The comparator is pre-registered as
-`development_diagnostic_only_not_a_promotion_gate`; the run carries the known composer P(play)
+`development_diagnostic_only_not_a_promotion_gate`; the run carried the composer P(play)
 double-gating defect; and the target roster and first-kickoff cutoff are unversioned
 outcome-derived proxies. It cannot authorize production use, promotion, or a change of default.
+
+**A component decomposition with P(play) applied once locates the remaining bias, and it is mostly
+not a modelling error.** Across the components the composer models it is accurate to **-0.5%**
+(9322.3 against 9372.0). The apparent +4.3% is the **unmodelled negative components** -- cards, own
+goals, missed penalties -- worth 417 points over the window and held at zero by design. Inside that
+near-zero total, three things differ in kind and must not be lumped together:
+(a) the **goals-conceded penalty is a real specification defect**, -175.7 points and the largest
+single gap -- FPL charges a GK/DEF only for goals conceded while on the pitch, but the composer
+charges every appearing player the full-match conceded distribution, and GK/DEF rows playing 1-59
+minutes conceded 0.459 per row against 1.280 for 90-minute players; (b) clean sheets under-predict
+by 7.0%, the same defect from the other side; (c) **goals over-predicting by 12.8% is regime, not
+miscalibration** -- GW29-38 ran at 2.576 goals per fixture, the lowest window in the archive
+(season means 2.729/2.732/3.147/2.845/2.645) against a Stage A expectation near the pooled 2.9,
+about 1.9 standard errors low on 99 fixtures. Do not tune Stage A to a 99-fixture sample; that is
+the home-advantage mistake recorded above.
 
 Two figures need reading with care. **Cumulative Spearman near 0.95 is inflated** by ranking all 841
 players including non-starters -- it largely measures who plays; the honest within-gameweek figure

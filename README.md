@@ -39,10 +39,17 @@ explicitly development-only. The provenance-guarded Stage D EV walk-forward back
 **run once** under contract 1.2 over the final ten observed gameweeks of 2025/26
 (`results/ev_backtest_2025_26_gw29_38.json`). Its headline is negative for the current default: the
 **V1 diagnostic comparator outscores the V3/coupled primary on every scored metric** (log 2.0510 vs
-2.0899, NDCG@20 0.7926 vs 0.7762), the primary's one clear win being aggregate calibration
+2.0899, NDCG@20 0.7926 vs 0.7762), the primary's one apparent win being aggregate calibration
 (EV/actual 1.0163 vs 0.9473). It decides nothing -- the comparator is pre-registered as a diagnostic
-and not a gate, and the run carries the known composer P(play) double-gating defect plus historical
-roster and first-kickoff cutoff proxies. Before
+and not a gate, and the run carried the composer P(play) double-gating defect plus historical
+roster and first-kickoff cutoff proxies. **That calibration win has since been measured to be two
+errors cancelling**: the composer applied P(play) twice and destroyed 11.11% of all goal and assist
+mass, which offset an over-prediction elsewhere; with the defect fixed the same rows give EV/actual
+1.0430. The frozen artifact keeps its defective numbers and is not re-run. A component
+decomposition then shows the composer accurate to -0.5% across what it actually models, with the
+residual bias being the unmodelled cards / own goals / missed penalties, and identifies the
+goals-conceded penalty (charged in full to short appearances) as the next real defect --
+see `docs/phase4-composer-p-play-double-gating-fix.md`. Before
 operational use, the optimiser needs the no-transfer pruning
 defect fixed, horizon availability semantics measured, stronger optimiser-run provenance, and an
 explicit static-price policy. The append-only prediction ledger, BI semantic exports, static

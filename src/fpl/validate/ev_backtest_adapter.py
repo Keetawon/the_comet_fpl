@@ -54,6 +54,7 @@ from fpl.models.points_composition import (
     FixturePlayer,
     PointsLookup,
     compose_fixture_full_points,
+    conditional_rate,
     representative_minutes,
 )
 from fpl.types import Position
@@ -639,7 +640,11 @@ def generate_forecasts_for_fold(
             )
             for p in roster_pending:
                 rate, _path = allocated[p.target.code]
-                res[p.target.code] = goal_poisson_pmf(rate)
+                # The allocated rate is unconditional (it already carries p_play); the composer
+                # gates on the minutes draw, so hand it the conditional-on-appearance rate.
+                res[p.target.code] = goal_poisson_pmf(
+                    conditional_rate(rate, p.p_play, cap=lambda_team)
+                )
         return res
 
     def _fixture_assists(pending_list: list[_PendingTarget], fix: int) -> dict[int, Distribution]:
@@ -669,7 +674,10 @@ def generate_forecasts_for_fold(
             )
             for p in roster_pending:
                 rate, _path = allocated[p.target.code]
-                res[p.target.code] = goal_poisson_pmf(rate)
+                # Conditional on appearance, exactly as in the goals path above.
+                res[p.target.code] = goal_poisson_pmf(
+                    conditional_rate(rate, p.p_play, cap=lambda_assist)
+                )
         return res
 
     forecasts: list[FixtureForecast] = []

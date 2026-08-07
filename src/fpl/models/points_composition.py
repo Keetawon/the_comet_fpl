@@ -95,6 +95,13 @@ class ComponentDistributions:
     disable the whole saves draw); ``dc_hit_probability`` is ``P(defensive_contribution >=
     threshold)`` for the player-fixture (``0.0`` disables the DC draw). Both default so that a
     v1-style construction (neither supplied) reproduces v1 bit-for-bit.
+
+    **``goals`` and ``assists`` are CONDITIONAL ON APPEARANCE.** The composer draws the minutes bin
+    first and scores a bin-0 draw as exactly zero, so it only ever looks these distributions up in a
+    world where the player played. A caller holding an *unconditional* rate -- one that already
+    carries ``P(play)``, as every minutes-gated Stage C allocation does -- must divide it out with
+    :func:`conditional_rate` before constructing this. Passing an unconditional rate here applies
+    the appearance gate twice and silently destroys attacking mass.
     """
 
     position: Position
@@ -104,6 +111,49 @@ class ComponentDistributions:
     team_goals_conceded: Distribution
     saves: Distribution | None = None
     dc_hit_probability: float = 0.0
+
+
+def conditional_rate(unconditional: float, p_play: float, *, cap: float) -> float:
+    """Convert an unconditional per-fixture event rate into a conditional-on-appearance one.
+
+    A minutes-gated Stage C allocation
+    (:func:`fpl.models.attacking_v3.allocate_minutes_gated_rates`) returns
+
+        ``rate_i = lambda_team * share_i * p_play_i / sum_j(share_j * p_play_j)``
+
+    whose defining property is conservation: ``sum_i rate_i == lambda_team``. That is the
+    *unconditional* expectation -- it already prices in the chance the player does not feature.
+    :func:`compose_fixture_full_points` then gates a second time by drawing the minutes bin, so
+    feeding ``rate_i`` straight in realises only ``p_play_i * rate_i`` and the roster's expected
+    goals fall short of ``lambda_team``. Measured over the GW29-38 backtest horizon this destroyed
+    **11.11%** of all goal and assist mass (537.05 expected events allocated, 477.40 realised).
+
+    Dividing by ``p_play`` restores it: the composer realises
+    ``p_play_i * (rate_i / p_play_i) == rate_i`` and the roster conserves ``lambda_team`` again.
+
+    **``cap`` is required, because the division genuinely can explode.** Substituting the
+    allocation gives
+
+        ``rate_i / p_play_i == lambda_team * share_i / sum_j(share_j * p_play_j)``
+
+    so an individual player's own ``p_play`` does cancel -- one rotation risk among ten nailed
+    team-mates is harmless. What does not cancel is the denominator: if the *whole* roster is
+    unlikely to feature, ``sum_j(share_j * p_play_j)`` collapses and the conditional rate diverges
+    (a uniform ``p_play`` of ``1e-6`` over three players turns a ``lambda_team`` of 1.6 into
+    533,333). The limit is not meaningless -- conditional on an unlikely player being the one who
+    turns out, they really would be carrying the whole attack -- but no single player can be
+    expected to outscore their own team, so the result is capped at ``cap``. Callers pass the
+    fixture's ``lambda_team``. On a real roster the cap is inert: it binds only when one player's
+    share exceeds the availability-weighted share of the entire squad.
+
+    ``p_play <= 0`` returns the input unchanged. The only allocation path that reaches it is the
+    fallback taken when a roster's weighted shares sum to zero, i.e. when *nobody* is expected to
+    play; the composer scores every such draw as zero regardless, so there is no mass to recover
+    and inventing an infinite rate would be worse than leaving it alone.
+    """
+    if p_play <= 0.0:
+        return unconditional
+    return min(unconditional / p_play, cap)
 
 
 def representative_minutes(
