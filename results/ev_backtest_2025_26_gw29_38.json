@@ -1,0 +1,5139 @@
+{
+  "contract_version": "1.2",
+  "created_at": "2026-08-07T06:20:13Z",
+  "completed_at": "2026-08-07T06:24:23Z",
+  "git_commit_sha": "8af5760647196d79b76ca9e15ebf080fbf1b95c7",
+  "database_sha256": "99f8b87bee55ede8a90d7d4b35148f0c2a6143c25b6911fc7ba2f8c1872b8d19",
+  "contract_sha256": "25742529484452f715e321fe9f6e19a3b3d3c7c7b28693ecb8d81da33de7538d",
+  "scoring_sha256": "7aca188231a85339e1f57fe7e3b4dd93bb982e2fb6c1101e808bef8281e2241b",
+  "source_hashes": {
+    "ev_backtest_adapter.py": "81d599a97ab3cbbf102569d900d5092759b2143c8dfa430d13d0ae87b6dfa6a1",
+    "ev_backtest_harness.py": "0ac631d30edd93a9245a4f08409121c798bdd7b810875fcb28b4e0ce82312619",
+    "dev_ev_backtest.py": "ac314db4a0fca174f692765244e44ee0bd1edc94f6746010cf777115f06f5c70",
+    "points_harness.py": "e1f44ea8f34c2af03dc36ab8364b519fa656f1732b7d3b2fd8c3bbdee0f02eec",
+    "points_harness_v3.py": "1caadca8b7e0e5fcdf8e4ba216a16f50f09206dc48cc8e49568735ae5bbe47f8",
+    "metrics.py": "1d8211f79a1727ef033bf394b4213d1162fa562c8e946fad5cded27fa7363b2a",
+    "baselines.py": "4cdeed82f76bf6b72401197716e79d49927a9fbbc4f19a3126be534d6b2e6869",
+    "points_composition.py": "8f6fb706764062915b4be66b552680b3e6457d8ee6295d42762d0b650e6debf2",
+    "bps_bonus.py": "209b3d2b120187407e17b120beaebfd238fd707d56796c4b15790399f57afcdb",
+    "gk_saves_v1.py": "38e0d612a116a360f67fe797dd39e3219400d4002c01875543fde77edb892894",
+    "defensive_contribution_v1.py": "58d348ba01aba32f48575fb38dc01eef72765671bfdb7db030016b48ad5724b0",
+    "minutes_v3.py": "2777082c7931a9299657c1173ff96ebf4df91ed35a6e5b4c4b83b9b68c2a8170",
+    "attacking_v1.py": "11a0791cbfb61ef3b64214aa4db60ece330757e88a68bc0478486cb3ca4f3364",
+    "attacking_v3.py": "8e67b8c882a31d6fd76797bf2387ee739faebeff6f0520375e28efa2efb94717",
+    "attacking_assists_v1.py": "f06865a03f7f1427d9c9e3aa73dca3bba09b6e2e7de24592870561e94d9d7bb3",
+    "prospective_points_v1.py": "0ec567c46aa174bc22e3d4da8cf2189cff824fedf2adf8ddc1747377957f20b6"
+  },
+  "bps_residual_parameters_applied": {
+    "trailing_window": 10,
+    "prior_strength": 10.0,
+    "ridge_lambda": 1.0,
+    "sigma_floor": 2.0,
+    "sd_floor": 1e-06,
+    "minimum_position_rows": 30
+  },
+  "target_completeness": {
+    "season": "2025-26",
+    "ruleset_id": "2026_27",
+    "missing_components": "",
+    "is_complete": true,
+    "row_count": 29747
+  },
+  "contract_policy_applied": {
+    "max_fixture_points": 34,
+    "seasonal_appearance_min_rows": 3,
+    "prior_season_blend_weight": 0.0,
+    "historical_availability_multiplier": 1.0,
+    "monte_carlo_draws": 2000,
+    "monte_carlo_seed": 202627,
+    "log_probability_floor": 1e-12,
+    "randomized_pit_band": [
+      0.1,
+      0.9
+    ],
+    "randomized_pit_seed": 202627
+  },
+  "weekly_metric_grain": "player_gameweek",
+  "overall_metric_grain": "player_fixture",
+  "derived_anchors": {
+    "season": "2025-26",
+    "start_gw": 29,
+    "end_gw": 38,
+    "distinct_fixture_count": 99,
+    "total_player_fixture_rows": 8224
+  },
+  "primary_architecture": {
+    "season": "2025-26",
+    "start_gw": 29,
+    "end_gw": 38,
+    "distinct_fixture_count": 99,
+    "total_player_fixture_rows": 8224,
+    "total_player_gw_rows": 7894,
+    "total_unique_players": 841,
+    "total_negative_actuals": 18,
+    "total_upper_tail_actuals": 0,
+    "cumulative_ndcg_at_20": 0.7762220915974256,
+    "cumulative_top_20_capture_ratio": 0.7762923351158645,
+    "cumulative_top_20_overlap": 0.25,
+    "cumulative_spearman": 0.9514931791849175,
+    "cumulative_spearman_by_position": {
+      "MID": 0.9569559093283996,
+      "DEF": 0.9464679446503901,
+      "GK": 0.9034211609111458,
+      "FWD": 0.9515009183008163
+    },
+    "ev_total": 9101.413,
+    "actual_total": 8955.0,
+    "signed_bias": 146.41300000000047,
+    "ev_actual_ratio": 1.016349860413177,
+    "mae": 0.9422631322957198,
+    "rmse": 1.9062094629707822,
+    "mean_log_score": 2.089913537260884,
+    "mean_crps": 0.635100450753891,
+    "mean_ranked_probability_score": 0.635100450753891,
+    "pit_80_coverage": 0.7403939688715954,
+    "gw_metrics": [
+      {
+        "gw": 29,
+        "predictions_count": 820,
+        "negative_actual_count": 3,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.4078502058538013,
+        "top_20_capture_ratio": 0.49321266968325794,
+        "top_20_overlap": 0.3,
+        "spearman_within_gw": 0.7562280348935079,
+        "spearman_by_position": {
+          "MID": 0.7921211881436534,
+          "DEF": 0.6937771420982246,
+          "FWD": 0.8235362870908702,
+          "GK": 0.6962312751254405
+        },
+        "top_20_details": [
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 7.679,
+            "actual_points": 7,
+            "predicted_rank": 1,
+            "actual_rank": 36,
+            "in_both_top_20": false
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 7.012,
+            "actual_points": 0,
+            "predicted_rank": 2,
+            "actual_rank": 545,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 6.679,
+            "actual_points": 1,
+            "predicted_rank": 3,
+            "actual_rank": 217,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 6.6335,
+            "actual_points": 1,
+            "predicted_rank": 4,
+            "actual_rank": 180,
+            "in_both_top_20": false
+          },
+          {
+            "code": 118748,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 6.2545,
+            "actual_points": 9,
+            "predicted_rank": 5,
+            "actual_rank": 13,
+            "in_both_top_20": true
+          },
+          {
+            "code": 510663,
+            "position": "FWD",
+            "team_code": 14,
+            "ev": 6.186,
+            "actual_points": 2,
+            "predicted_rank": 6,
+            "actual_rank": 160,
+            "in_both_top_20": false
+          },
+          {
+            "code": 448514,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 6.1685,
+            "actual_points": 4,
+            "predicted_rank": 7,
+            "actual_rank": 80,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 6.1615,
+            "actual_points": 4,
+            "predicted_rank": 8,
+            "actual_rank": 82,
+            "in_both_top_20": false
+          },
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 6.0465,
+            "actual_points": 9,
+            "predicted_rank": 9,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 5.8455,
+            "actual_points": 8,
+            "predicted_rank": 10,
+            "actual_rank": 23,
+            "in_both_top_20": false
+          },
+          {
+            "code": 102057,
+            "position": "FWD",
+            "team_code": 54,
+            "ev": 5.5495,
+            "actual_points": 1,
+            "predicted_rank": 11,
+            "actual_rank": 183,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 5.543,
+            "actual_points": 2,
+            "predicted_rank": 12,
+            "actual_rank": 158,
+            "in_both_top_20": false
+          },
+          {
+            "code": 503139,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 5.4695,
+            "actual_points": 3,
+            "predicted_rank": 13,
+            "actual_rank": 106,
+            "in_both_top_20": false
+          },
+          {
+            "code": 17761,
+            "position": "DEF",
+            "team_code": 11,
+            "ev": 5.3765,
+            "actual_points": 15,
+            "predicted_rank": 14,
+            "actual_rank": 2,
+            "in_both_top_20": true
+          },
+          {
+            "code": 484420,
+            "position": "MID",
+            "team_code": 56,
+            "ev": 5.3475,
+            "actual_points": 5,
+            "predicted_rank": 15,
+            "actual_rank": 65,
+            "in_both_top_20": false
+          },
+          {
+            "code": 165809,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 4.971,
+            "actual_points": 2,
+            "predicted_rank": 16,
+            "actual_rank": 118,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232185,
+            "position": "MID",
+            "team_code": 31,
+            "ev": 4.913,
+            "actual_points": 15,
+            "predicted_rank": 17,
+            "actual_rank": 3,
+            "in_both_top_20": true
+          },
+          {
+            "code": 232928,
+            "position": "MID",
+            "team_code": 11,
+            "ev": 4.878,
+            "actual_points": 10,
+            "predicted_rank": 18,
+            "actual_rank": 10,
+            "in_both_top_20": true
+          },
+          {
+            "code": 215413,
+            "position": "MID",
+            "team_code": 11,
+            "ev": 4.8725000000000005,
+            "actual_points": 9,
+            "predicted_rank": 19,
+            "actual_rank": 14,
+            "in_both_top_20": true
+          },
+          {
+            "code": 204716,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.7375,
+            "actual_points": 2,
+            "predicted_rank": 20,
+            "actual_rank": 125,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 30,
+        "predictions_count": 822,
+        "negative_actual_count": 1,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.39290177262569864,
+        "top_20_capture_ratio": 0.3497536945812808,
+        "top_20_overlap": 0.2,
+        "spearman_within_gw": 0.750118930089569,
+        "spearman_by_position": {
+          "MID": 0.7636915531313108,
+          "DEF": 0.7154810822371415,
+          "FWD": 0.7875121952900725,
+          "GK": 0.7727700529032114
+        },
+        "top_20_details": [
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 7.6385,
+            "actual_points": 10,
+            "predicted_rank": 1,
+            "actual_rank": 9,
+            "in_both_top_20": true
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 6.774,
+            "actual_points": 2,
+            "predicted_rank": 2,
+            "actual_rank": 135,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232185,
+            "position": "MID",
+            "team_code": 31,
+            "ev": 6.4725,
+            "actual_points": 3,
+            "predicted_rank": 3,
+            "actual_rank": 111,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 6.458,
+            "actual_points": 2,
+            "predicted_rank": 4,
+            "actual_rank": 165,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 6.3575,
+            "actual_points": 9,
+            "predicted_rank": 5,
+            "actual_rank": 16,
+            "in_both_top_20": true
+          },
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 6.328,
+            "actual_points": 2,
+            "predicted_rank": 6,
+            "actual_rank": 160,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 6.2535,
+            "actual_points": 6,
+            "predicted_rank": 7,
+            "actual_rank": 59,
+            "in_both_top_20": false
+          },
+          {
+            "code": 118748,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 6.2505,
+            "actual_points": 1,
+            "predicted_rank": 8,
+            "actual_rank": 204,
+            "in_both_top_20": false
+          },
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 6.1085,
+            "actual_points": 2,
+            "predicted_rank": 9,
+            "actual_rank": 180,
+            "in_both_top_20": false
+          },
+          {
+            "code": 448104,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 6.0825000000000005,
+            "actual_points": 4,
+            "predicted_rank": 10,
+            "actual_rank": 88,
+            "in_both_top_20": false
+          },
+          {
+            "code": 223340,
+            "position": "MID",
+            "team_code": 3,
+            "ev": 5.8745,
+            "actual_points": 3,
+            "predicted_rank": 11,
+            "actual_rank": 110,
+            "in_both_top_20": false
+          },
+          {
+            "code": 444765,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 5.699,
+            "actual_points": 1,
+            "predicted_rank": 12,
+            "actual_rank": 243,
+            "in_both_top_20": false
+          },
+          {
+            "code": 510663,
+            "position": "FWD",
+            "team_code": 14,
+            "ev": 5.6825,
+            "actual_points": 1,
+            "predicted_rank": 13,
+            "actual_rank": 269,
+            "in_both_top_20": false
+          },
+          {
+            "code": 448514,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 5.421,
+            "actual_points": 1,
+            "predicted_rank": 14,
+            "actual_rank": 245,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 5.4005,
+            "actual_points": 2,
+            "predicted_rank": 15,
+            "actual_rank": 149,
+            "in_both_top_20": false
+          },
+          {
+            "code": 243298,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 5.385,
+            "actual_points": 3,
+            "predicted_rank": 16,
+            "actual_rank": 114,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 5.2515,
+            "actual_points": 9,
+            "predicted_rank": 17,
+            "actual_rank": 19,
+            "in_both_top_20": true
+          },
+          {
+            "code": 445122,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.202,
+            "actual_points": 1,
+            "predicted_rank": 18,
+            "actual_rank": 244,
+            "in_both_top_20": false
+          },
+          {
+            "code": 247348,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 5.1465,
+            "actual_points": 0,
+            "predicted_rank": 19,
+            "actual_rank": 466,
+            "in_both_top_20": false
+          },
+          {
+            "code": 165809,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 5.0815,
+            "actual_points": 9,
+            "predicted_rank": 20,
+            "actual_rank": 14,
+            "in_both_top_20": true
+          }
+        ]
+      },
+      {
+        "gw": 31,
+        "predictions_count": 664,
+        "negative_actual_count": 3,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.3390233441256837,
+        "top_20_capture_ratio": 0.35609756097560974,
+        "top_20_overlap": 0.15,
+        "spearman_within_gw": 0.7409524834043979,
+        "spearman_by_position": {
+          "DEF": 0.6215270297467732,
+          "MID": 0.7888189153510706,
+          "FWD": 0.8275001351163676,
+          "GK": 0.7893045747860719
+        },
+        "top_20_details": [
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 7.1659999999999995,
+            "actual_points": 0,
+            "predicted_rank": 1,
+            "actual_rank": 427,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232826,
+            "position": "MID",
+            "team_code": 4,
+            "ev": 6.926,
+            "actual_points": 10,
+            "predicted_rank": 2,
+            "actual_rank": 9,
+            "in_both_top_20": true
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 6.7875000000000005,
+            "actual_points": 13,
+            "predicted_rank": 3,
+            "actual_rank": 3,
+            "in_both_top_20": true
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 6.728,
+            "actual_points": 4,
+            "predicted_rank": 4,
+            "actual_rank": 71,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 6.0845,
+            "actual_points": 3,
+            "predicted_rank": 5,
+            "actual_rank": 75,
+            "in_both_top_20": false
+          },
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 6.0625,
+            "actual_points": 2,
+            "predicted_rank": 6,
+            "actual_rank": 127,
+            "in_both_top_20": false
+          },
+          {
+            "code": 167074,
+            "position": "DEF",
+            "team_code": 54,
+            "ev": 5.596,
+            "actual_points": 0,
+            "predicted_rank": 7,
+            "actual_rank": 283,
+            "in_both_top_20": false
+          },
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 5.3095,
+            "actual_points": 2,
+            "predicted_rank": 8,
+            "actual_rank": 116,
+            "in_both_top_20": false
+          },
+          {
+            "code": 444765,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 5.263,
+            "actual_points": 6,
+            "predicted_rank": 9,
+            "actual_rank": 46,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232892,
+            "position": "DEF",
+            "team_code": 54,
+            "ev": 5.1435,
+            "actual_points": 2,
+            "predicted_rank": 10,
+            "actual_rank": 113,
+            "in_both_top_20": false
+          },
+          {
+            "code": 547701,
+            "position": "MID",
+            "team_code": 6,
+            "ev": 5.046,
+            "actual_points": 2,
+            "predicted_rank": 11,
+            "actual_rank": 140,
+            "in_both_top_20": false
+          },
+          {
+            "code": 102057,
+            "position": "FWD",
+            "team_code": 54,
+            "ev": 4.787,
+            "actual_points": 5,
+            "predicted_rank": 12,
+            "actual_rank": 51,
+            "in_both_top_20": false
+          },
+          {
+            "code": 118748,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.699,
+            "actual_points": 0,
+            "predicted_rank": 13,
+            "actual_rank": 269,
+            "in_both_top_20": false
+          },
+          {
+            "code": 243298,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.5889999999999995,
+            "actual_points": 2,
+            "predicted_rank": 14,
+            "actual_rank": 114,
+            "in_both_top_20": false
+          },
+          {
+            "code": 533463,
+            "position": "MID",
+            "team_code": 94,
+            "ev": 4.5785,
+            "actual_points": 1,
+            "predicted_rank": 15,
+            "actual_rank": 214,
+            "in_both_top_20": false
+          },
+          {
+            "code": 215379,
+            "position": "MID",
+            "team_code": 17,
+            "ev": 4.486,
+            "actual_points": 5,
+            "predicted_rank": 16,
+            "actual_rank": 55,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 4.482,
+            "actual_points": 5,
+            "predicted_rank": 17,
+            "actual_rank": 62,
+            "in_both_top_20": false
+          },
+          {
+            "code": 510663,
+            "position": "FWD",
+            "team_code": 14,
+            "ev": 4.471,
+            "actual_points": 1,
+            "predicted_rank": 18,
+            "actual_rank": 210,
+            "in_both_top_20": false
+          },
+          {
+            "code": 222531,
+            "position": "MID",
+            "team_code": 17,
+            "ev": 4.4395,
+            "actual_points": 8,
+            "predicted_rank": 19,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          },
+          {
+            "code": 446008,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 4.4245,
+            "actual_points": 2,
+            "predicted_rank": 20,
+            "actual_rank": 120,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 32,
+        "predictions_count": 826,
+        "negative_actual_count": 2,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.30510070263000627,
+        "top_20_capture_ratio": 0.3548387096774194,
+        "top_20_overlap": 0.15,
+        "spearman_within_gw": 0.7172110210864093,
+        "spearman_by_position": {
+          "MID": 0.7958550758680465,
+          "DEF": 0.5900480671369618,
+          "FWD": 0.7828572987726837,
+          "GK": 0.6848352391704785
+        },
+        "top_20_details": [
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 10.051,
+            "actual_points": 4,
+            "predicted_rank": 1,
+            "actual_rank": 64,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232826,
+            "position": "MID",
+            "team_code": 4,
+            "ev": 6.55,
+            "actual_points": 3,
+            "predicted_rank": 2,
+            "actual_rank": 92,
+            "in_both_top_20": false
+          },
+          {
+            "code": 223340,
+            "position": "MID",
+            "team_code": 3,
+            "ev": 6.3705,
+            "actual_points": 0,
+            "predicted_rank": 3,
+            "actual_rank": 430,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.9965,
+            "actual_points": 4,
+            "predicted_rank": 4,
+            "actual_rank": 70,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 5.9455,
+            "actual_points": 9,
+            "predicted_rank": 5,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 5.7555,
+            "actual_points": 13,
+            "predicted_rank": 6,
+            "actual_rank": 8,
+            "in_both_top_20": true
+          },
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 5.622,
+            "actual_points": 2,
+            "predicted_rank": 7,
+            "actual_rank": 157,
+            "in_both_top_20": false
+          },
+          {
+            "code": 424876,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 5.574,
+            "actual_points": 5,
+            "predicted_rank": 8,
+            "actual_rank": 55,
+            "in_both_top_20": false
+          },
+          {
+            "code": 444765,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 5.499,
+            "actual_points": 3,
+            "predicted_rank": 9,
+            "actual_rank": 97,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 5.281,
+            "actual_points": 3,
+            "predicted_rank": 10,
+            "actual_rank": 103,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232413,
+            "position": "MID",
+            "team_code": 3,
+            "ev": 5.267,
+            "actual_points": 1,
+            "predicted_rank": 11,
+            "actual_rank": 229,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 5.266,
+            "actual_points": 2,
+            "predicted_rank": 12,
+            "actual_rank": 149,
+            "in_both_top_20": false
+          },
+          {
+            "code": 448104,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.0225,
+            "actual_points": 0,
+            "predicted_rank": 13,
+            "actual_rank": 505,
+            "in_both_top_20": false
+          },
+          {
+            "code": 243298,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 5.021,
+            "actual_points": 6,
+            "predicted_rank": 14,
+            "actual_rank": 41,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 5.0025,
+            "actual_points": 2,
+            "predicted_rank": 15,
+            "actual_rank": 156,
+            "in_both_top_20": false
+          },
+          {
+            "code": 222531,
+            "position": "MID",
+            "team_code": 17,
+            "ev": 4.981,
+            "actual_points": 2,
+            "predicted_rank": 16,
+            "actual_rank": 132,
+            "in_both_top_20": false
+          },
+          {
+            "code": 50175,
+            "position": "FWD",
+            "team_code": 36,
+            "ev": 4.9805,
+            "actual_points": 2,
+            "predicted_rank": 17,
+            "actual_rank": 107,
+            "in_both_top_20": false
+          },
+          {
+            "code": 243016,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.961,
+            "actual_points": 1,
+            "predicted_rank": 18,
+            "actual_rank": 231,
+            "in_both_top_20": false
+          },
+          {
+            "code": 233963,
+            "position": "DEF",
+            "team_code": 21,
+            "ev": 4.9595,
+            "actual_points": 21,
+            "predicted_rank": 19,
+            "actual_rank": 1,
+            "in_both_top_20": true
+          },
+          {
+            "code": 469142,
+            "position": "DEF",
+            "team_code": 36,
+            "ev": 4.939,
+            "actual_points": 5,
+            "predicted_rank": 20,
+            "actual_rank": 58,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 33,
+        "predictions_count": 829,
+        "negative_actual_count": 1,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.4415194501803745,
+        "top_20_capture_ratio": 0.5110294117647058,
+        "top_20_overlap": 0.25,
+        "spearman_within_gw": 0.7750163035062204,
+        "spearman_by_position": {
+          "FWD": 0.7531978215475579,
+          "DEF": 0.7653571088704834,
+          "MID": 0.7833754892548421,
+          "GK": 0.760809503731343
+        },
+        "top_20_details": [
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 12.6835,
+            "actual_points": 0,
+            "predicted_rank": 1,
+            "actual_rank": 553,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 12.1335,
+            "actual_points": 8,
+            "predicted_rank": 2,
+            "actual_rank": 44,
+            "in_both_top_20": false
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 11.120000000000001,
+            "actual_points": 13,
+            "predicted_rank": 3,
+            "actual_rank": 10,
+            "in_both_top_20": true
+          },
+          {
+            "code": 201658,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 10.79,
+            "actual_points": 9,
+            "predicted_rank": 4,
+            "actual_rank": 30,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 10.3905,
+            "actual_points": 5,
+            "predicted_rank": 5,
+            "actual_rank": 91,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 10.1935,
+            "actual_points": 10,
+            "predicted_rank": 6,
+            "actual_rank": 27,
+            "in_both_top_20": false
+          },
+          {
+            "code": 177815,
+            "position": "FWD",
+            "team_code": 2,
+            "ev": 10.057500000000001,
+            "actual_points": 8,
+            "predicted_rank": 7,
+            "actual_rank": 41,
+            "in_both_top_20": false
+          },
+          {
+            "code": 50175,
+            "position": "FWD",
+            "team_code": 36,
+            "ev": 9.3985,
+            "actual_points": 8,
+            "predicted_rank": 8,
+            "actual_rank": 38,
+            "in_both_top_20": false
+          },
+          {
+            "code": 503139,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 9.386,
+            "actual_points": 5,
+            "predicted_rank": 9,
+            "actual_rank": 97,
+            "in_both_top_20": false
+          },
+          {
+            "code": 220566,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 9.318,
+            "actual_points": 2,
+            "predicted_rank": 10,
+            "actual_rank": 179,
+            "in_both_top_20": false
+          },
+          {
+            "code": 466052,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 9.0525,
+            "actual_points": 13,
+            "predicted_rank": 11,
+            "actual_rank": 9,
+            "in_both_top_20": true
+          },
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 8.843,
+            "actual_points": 2,
+            "predicted_rank": 12,
+            "actual_rank": 186,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465351,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 8.835,
+            "actual_points": 11,
+            "predicted_rank": 13,
+            "actual_rank": 17,
+            "in_both_top_20": true
+          },
+          {
+            "code": 444180,
+            "position": "MID",
+            "team_code": 90,
+            "ev": 8.6245,
+            "actual_points": 4,
+            "predicted_rank": 14,
+            "actual_rank": 114,
+            "in_both_top_20": false
+          },
+          {
+            "code": 165809,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 8.4545,
+            "actual_points": 7,
+            "predicted_rank": 15,
+            "actual_rank": 49,
+            "in_both_top_20": false
+          },
+          {
+            "code": 199598,
+            "position": "MID",
+            "team_code": 2,
+            "ev": 8.2365,
+            "actual_points": 12,
+            "predicted_rank": 16,
+            "actual_rank": 12,
+            "in_both_top_20": true
+          },
+          {
+            "code": 204936,
+            "position": "GK",
+            "team_code": 43,
+            "ev": 8.202,
+            "actual_points": 8,
+            "predicted_rank": 17,
+            "actual_rank": 43,
+            "in_both_top_20": false
+          },
+          {
+            "code": 514254,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 8.0225,
+            "actual_points": 1,
+            "predicted_rank": 18,
+            "actual_rank": 286,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232826,
+            "position": "MID",
+            "team_code": 4,
+            "ev": 8.002,
+            "actual_points": 0,
+            "predicted_rank": 19,
+            "actual_rank": 460,
+            "in_both_top_20": false
+          },
+          {
+            "code": 494521,
+            "position": "DEF",
+            "team_code": 91,
+            "ev": 7.973,
+            "actual_points": 13,
+            "predicted_rank": 20,
+            "actual_rank": 11,
+            "in_both_top_20": true
+          }
+        ]
+      },
+      {
+        "gw": 34,
+        "predictions_count": 582,
+        "negative_actual_count": 1,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.37126697803500075,
+        "top_20_capture_ratio": 0.36363636363636365,
+        "top_20_overlap": 0.15,
+        "spearman_within_gw": 0.7351786140222347,
+        "spearman_by_position": {
+          "MID": 0.7538575299860988,
+          "DEF": 0.69521941159106,
+          "FWD": 0.795452925344226,
+          "GK": 0.6716793932700944
+        },
+        "top_20_details": [
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 8.022,
+            "actual_points": 5,
+            "predicted_rank": 1,
+            "actual_rank": 40,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 6.231,
+            "actual_points": 4,
+            "predicted_rank": 2,
+            "actual_rank": 46,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.538,
+            "actual_points": 8,
+            "predicted_rank": 3,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          },
+          {
+            "code": 424876,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 5.4255,
+            "actual_points": 1,
+            "predicted_rank": 4,
+            "actual_rank": 157,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 5.2425,
+            "actual_points": 1,
+            "predicted_rank": 5,
+            "actual_rank": 176,
+            "in_both_top_20": false
+          },
+          {
+            "code": 222531,
+            "position": "MID",
+            "team_code": 17,
+            "ev": 5.1915000000000004,
+            "actual_points": 13,
+            "predicted_rank": 6,
+            "actual_rank": 2,
+            "in_both_top_20": true
+          },
+          {
+            "code": 243298,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 5.156,
+            "actual_points": 2,
+            "predicted_rank": 7,
+            "actual_rank": 103,
+            "in_both_top_20": false
+          },
+          {
+            "code": 233963,
+            "position": "DEF",
+            "team_code": 21,
+            "ev": 5.126,
+            "actual_points": 4,
+            "predicted_rank": 8,
+            "actual_rank": 57,
+            "in_both_top_20": false
+          },
+          {
+            "code": 441164,
+            "position": "DEF",
+            "team_code": 6,
+            "ev": 5.1205,
+            "actual_points": 8,
+            "predicted_rank": 9,
+            "actual_rank": 21,
+            "in_both_top_20": false
+          },
+          {
+            "code": 154566,
+            "position": "FWD",
+            "team_code": 6,
+            "ev": 4.9705,
+            "actual_points": 1,
+            "predicted_rank": 10,
+            "actual_rank": 134,
+            "in_both_top_20": false
+          },
+          {
+            "code": 215413,
+            "position": "MID",
+            "team_code": 11,
+            "ev": 4.774,
+            "actual_points": 8,
+            "predicted_rank": 11,
+            "actual_rank": 16,
+            "in_both_top_20": true
+          },
+          {
+            "code": 547027,
+            "position": "MID",
+            "team_code": 56,
+            "ev": 4.7,
+            "actual_points": 1,
+            "predicted_rank": 12,
+            "actual_rank": 183,
+            "in_both_top_20": false
+          },
+          {
+            "code": 219847,
+            "position": "FWD",
+            "team_code": 3,
+            "ev": 4.652,
+            "actual_points": 4,
+            "predicted_rank": 13,
+            "actual_rank": 54,
+            "in_both_top_20": false
+          },
+          {
+            "code": 244850,
+            "position": "MID",
+            "team_code": 7,
+            "ev": 4.5055,
+            "actual_points": 2,
+            "predicted_rank": 14,
+            "actual_rank": 104,
+            "in_both_top_20": false
+          },
+          {
+            "code": 178301,
+            "position": "FWD",
+            "team_code": 7,
+            "ev": 4.4825,
+            "actual_points": 2,
+            "predicted_rank": 15,
+            "actual_rank": 92,
+            "in_both_top_20": false
+          },
+          {
+            "code": 204480,
+            "position": "MID",
+            "team_code": 3,
+            "ev": 4.423,
+            "actual_points": 2,
+            "predicted_rank": 16,
+            "actual_rank": 98,
+            "in_both_top_20": false
+          },
+          {
+            "code": 201895,
+            "position": "DEF",
+            "team_code": 56,
+            "ev": 4.3665,
+            "actual_points": 0,
+            "predicted_rank": 17,
+            "actual_rank": 260,
+            "in_both_top_20": false
+          },
+          {
+            "code": 430871,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 4.2465,
+            "actual_points": 0,
+            "predicted_rank": 18,
+            "actual_rank": 321,
+            "in_both_top_20": false
+          },
+          {
+            "code": 118748,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.2175,
+            "actual_points": 1,
+            "predicted_rank": 19,
+            "actual_rank": 133,
+            "in_both_top_20": false
+          },
+          {
+            "code": 215136,
+            "position": "DEF",
+            "team_code": 17,
+            "ev": 4.1975,
+            "actual_points": 5,
+            "predicted_rank": 20,
+            "actual_rank": 42,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 35,
+        "predictions_count": 832,
+        "negative_actual_count": 2,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.38509836799889824,
+        "top_20_capture_ratio": 0.40540540540540543,
+        "top_20_overlap": 0.1,
+        "spearman_within_gw": 0.7282698185004026,
+        "spearman_by_position": {
+          "FWD": 0.7519871725088962,
+          "MID": 0.7412969521941729,
+          "DEF": 0.6736535137876761,
+          "GK": 0.7925447371008787
+        },
+        "top_20_details": [
+          {
+            "code": 177815,
+            "position": "FWD",
+            "team_code": 2,
+            "ev": 6.2505,
+            "actual_points": 6,
+            "predicted_rank": 1,
+            "actual_rank": 33,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 6.0584999999999996,
+            "actual_points": 6,
+            "predicted_rank": 2,
+            "actual_rank": 48,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 6.058,
+            "actual_points": 5,
+            "predicted_rank": 3,
+            "actual_rank": 54,
+            "in_both_top_20": false
+          },
+          {
+            "code": 466052,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 5.8585,
+            "actual_points": 5,
+            "predicted_rank": 4,
+            "actual_rank": 62,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 5.6325,
+            "actual_points": 4,
+            "predicted_rank": 5,
+            "actual_rank": 76,
+            "in_both_top_20": false
+          },
+          {
+            "code": 431639,
+            "position": "FWD",
+            "team_code": 90,
+            "ev": 5.4864999999999995,
+            "actual_points": 2,
+            "predicted_rank": 6,
+            "actual_rank": 131,
+            "in_both_top_20": false
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 5.3925,
+            "actual_points": 1,
+            "predicted_rank": 7,
+            "actual_rank": 246,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 5.2705,
+            "actual_points": 7,
+            "predicted_rank": 8,
+            "actual_rank": 31,
+            "in_both_top_20": false
+          },
+          {
+            "code": 178301,
+            "position": "FWD",
+            "team_code": 7,
+            "ev": 5.2540000000000004,
+            "actual_points": 1,
+            "predicted_rank": 9,
+            "actual_rank": 183,
+            "in_both_top_20": false
+          },
+          {
+            "code": 179268,
+            "position": "DEF",
+            "team_code": 8,
+            "ev": 5.232,
+            "actual_points": 4,
+            "predicted_rank": 10,
+            "actual_rank": 72,
+            "in_both_top_20": false
+          },
+          {
+            "code": 244850,
+            "position": "MID",
+            "team_code": 7,
+            "ev": 5.2245,
+            "actual_points": 1,
+            "predicted_rank": 11,
+            "actual_rank": 224,
+            "in_both_top_20": false
+          },
+          {
+            "code": 249231,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 5.1885,
+            "actual_points": 11,
+            "predicted_rank": 12,
+            "actual_rank": 8,
+            "in_both_top_20": true
+          },
+          {
+            "code": 220627,
+            "position": "DEF",
+            "team_code": 2,
+            "ev": 5.1545,
+            "actual_points": 2,
+            "predicted_rank": 13,
+            "actual_rank": 127,
+            "in_both_top_20": false
+          },
+          {
+            "code": 219847,
+            "position": "FWD",
+            "team_code": 3,
+            "ev": 5.1195,
+            "actual_points": 0,
+            "predicted_rank": 14,
+            "actual_rank": 418,
+            "in_both_top_20": false
+          },
+          {
+            "code": 424876,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.941,
+            "actual_points": 13,
+            "predicted_rank": 15,
+            "actual_rank": 5,
+            "in_both_top_20": true
+          },
+          {
+            "code": 201658,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 4.9350000000000005,
+            "actual_points": 3,
+            "predicted_rank": 16,
+            "actual_rank": 90,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 4.899,
+            "actual_points": 6,
+            "predicted_rank": 17,
+            "actual_rank": 38,
+            "in_both_top_20": false
+          },
+          {
+            "code": 494521,
+            "position": "DEF",
+            "team_code": 91,
+            "ev": 4.889,
+            "actual_points": 7,
+            "predicted_rank": 18,
+            "actual_rank": 30,
+            "in_both_top_20": false
+          },
+          {
+            "code": 607464,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 4.867,
+            "actual_points": 5,
+            "predicted_rank": 19,
+            "actual_rank": 68,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.7955,
+            "actual_points": 1,
+            "predicted_rank": 20,
+            "actual_rank": 170,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 36,
+        "predictions_count": 838,
+        "negative_actual_count": 2,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.5652325639605592,
+        "top_20_capture_ratio": 0.5882352941176471,
+        "top_20_overlap": 0.25,
+        "spearman_within_gw": 0.7252209646597045,
+        "spearman_by_position": {
+          "DEF": 0.680531702134301,
+          "FWD": 0.8159834545091933,
+          "MID": 0.7170144771262139,
+          "GK": 0.7927321399344188
+        },
+        "top_20_details": [
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 15.643,
+            "actual_points": 5,
+            "predicted_rank": 1,
+            "actual_rank": 72,
+            "in_both_top_20": false
+          },
+          {
+            "code": 223094,
+            "position": "FWD",
+            "team_code": 43,
+            "ev": 11.971,
+            "actual_points": 11,
+            "predicted_rank": 2,
+            "actual_rank": 12,
+            "in_both_top_20": true
+          },
+          {
+            "code": 466052,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 11.8635,
+            "actual_points": 5,
+            "predicted_rank": 3,
+            "actual_rank": 71,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 10.905000000000001,
+            "actual_points": 15,
+            "predicted_rank": 4,
+            "actual_rank": 2,
+            "in_both_top_20": true
+          },
+          {
+            "code": 578153,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 10.693,
+            "actual_points": 6,
+            "predicted_rank": 5,
+            "actual_rank": 59,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465351,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 9.0295,
+            "actual_points": 6,
+            "predicted_rank": 6,
+            "actual_rank": 53,
+            "in_both_top_20": false
+          },
+          {
+            "code": 165809,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 9.004,
+            "actual_points": 7,
+            "predicted_rank": 7,
+            "actual_rank": 36,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437499,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 8.570500000000001,
+            "actual_points": 4,
+            "predicted_rank": 8,
+            "actual_rank": 90,
+            "in_both_top_20": false
+          },
+          {
+            "code": 204936,
+            "position": "GK",
+            "team_code": 43,
+            "ev": 8.554,
+            "actual_points": 14,
+            "predicted_rank": 9,
+            "actual_rank": 5,
+            "in_both_top_20": true
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 7.9575,
+            "actual_points": 12,
+            "predicted_rank": 10,
+            "actual_rank": 10,
+            "in_both_top_20": true
+          },
+          {
+            "code": 651426,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 7.9014999999999995,
+            "actual_points": 4,
+            "predicted_rank": 11,
+            "actual_rank": 96,
+            "in_both_top_20": false
+          },
+          {
+            "code": 248875,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 7.7620000000000005,
+            "actual_points": 12,
+            "predicted_rank": 12,
+            "actual_rank": 9,
+            "in_both_top_20": true
+          },
+          {
+            "code": 427623,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 6.878,
+            "actual_points": 4,
+            "predicted_rank": 13,
+            "actual_rank": 88,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 6.6315,
+            "actual_points": 8,
+            "predicted_rank": 14,
+            "actual_rank": 34,
+            "in_both_top_20": false
+          },
+          {
+            "code": 441164,
+            "position": "DEF",
+            "team_code": 6,
+            "ev": 6.6005,
+            "actual_points": 1,
+            "predicted_rank": 15,
+            "actual_rank": 247,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 6.5600000000000005,
+            "actual_points": 3,
+            "predicted_rank": 16,
+            "actual_rank": 103,
+            "in_both_top_20": false
+          },
+          {
+            "code": 224117,
+            "position": "FWD",
+            "team_code": 3,
+            "ev": 5.751,
+            "actual_points": 2,
+            "predicted_rank": 17,
+            "actual_rank": 148,
+            "in_both_top_20": false
+          },
+          {
+            "code": 242898,
+            "position": "MID",
+            "team_code": 31,
+            "ev": 5.6765,
+            "actual_points": 4,
+            "predicted_rank": 18,
+            "actual_rank": 87,
+            "in_both_top_20": false
+          },
+          {
+            "code": 178301,
+            "position": "FWD",
+            "team_code": 7,
+            "ev": 5.656,
+            "actual_points": 9,
+            "predicted_rank": 19,
+            "actual_rank": 21,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232185,
+            "position": "MID",
+            "team_code": 31,
+            "ev": 5.51,
+            "actual_points": 8,
+            "predicted_rank": 20,
+            "actual_rank": 30,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 37,
+        "predictions_count": 840,
+        "negative_actual_count": 0,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.4013810779947511,
+        "top_20_capture_ratio": 0.4026548672566372,
+        "top_20_overlap": 0.2,
+        "spearman_within_gw": 0.766240125729538,
+        "spearman_by_position": {
+          "DEF": 0.649426252249398,
+          "FWD": 0.8333286638724152,
+          "MID": 0.814519756033705,
+          "GK": 0.8373985857477696
+        },
+        "top_20_details": [
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 7.1155,
+            "actual_points": 6,
+            "predicted_rank": 1,
+            "actual_rank": 43,
+            "in_both_top_20": false
+          },
+          {
+            "code": 224117,
+            "position": "FWD",
+            "team_code": 3,
+            "ev": 6.4175,
+            "actual_points": 1,
+            "predicted_rank": 2,
+            "actual_rank": 223,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 5.991,
+            "actual_points": 9,
+            "predicted_rank": 3,
+            "actual_rank": 15,
+            "in_both_top_20": true
+          },
+          {
+            "code": 538207,
+            "position": "FWD",
+            "team_code": 4,
+            "ev": 5.8340000000000005,
+            "actual_points": 13,
+            "predicted_rank": 4,
+            "actual_rank": 6,
+            "in_both_top_20": true
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 5.792,
+            "actual_points": 3,
+            "predicted_rank": 5,
+            "actual_rank": 96,
+            "in_both_top_20": false
+          },
+          {
+            "code": 462424,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.665,
+            "actual_points": 8,
+            "predicted_rank": 6,
+            "actual_rank": 24,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 5.5585,
+            "actual_points": 2,
+            "predicted_rank": 7,
+            "actual_rank": 152,
+            "in_both_top_20": false
+          },
+          {
+            "code": 220237,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 5.4435,
+            "actual_points": 4,
+            "predicted_rank": 8,
+            "actual_rank": 65,
+            "in_both_top_20": false
+          },
+          {
+            "code": 466052,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 5.235,
+            "actual_points": 1,
+            "predicted_rank": 9,
+            "actual_rank": 255,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 5.1855,
+            "actual_points": 2,
+            "predicted_rank": 10,
+            "actual_rank": 167,
+            "in_both_top_20": false
+          },
+          {
+            "code": 17761,
+            "position": "DEF",
+            "team_code": 11,
+            "ev": 5.177,
+            "actual_points": 3,
+            "predicted_rank": 11,
+            "actual_rank": 77,
+            "in_both_top_20": false
+          },
+          {
+            "code": 424876,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 5.092,
+            "actual_points": 9,
+            "predicted_rank": 12,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          },
+          {
+            "code": 249231,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 5.0185,
+            "actual_points": 1,
+            "predicted_rank": 13,
+            "actual_rank": 235,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 5.0095,
+            "actual_points": 14,
+            "predicted_rank": 14,
+            "actual_rank": 3,
+            "in_both_top_20": true
+          },
+          {
+            "code": 243298,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.9795,
+            "actual_points": 2,
+            "predicted_rank": 15,
+            "actual_rank": 132,
+            "in_both_top_20": false
+          },
+          {
+            "code": 177815,
+            "position": "FWD",
+            "team_code": 2,
+            "ev": 4.9125,
+            "actual_points": 7,
+            "predicted_rank": 16,
+            "actual_rank": 29,
+            "in_both_top_20": false
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.907,
+            "actual_points": 2,
+            "predicted_rank": 17,
+            "actual_rank": 156,
+            "in_both_top_20": false
+          },
+          {
+            "code": 441164,
+            "position": "DEF",
+            "team_code": 6,
+            "ev": 4.866,
+            "actual_points": 0,
+            "predicted_rank": 18,
+            "actual_rank": 491,
+            "in_both_top_20": false
+          },
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 4.7745,
+            "actual_points": 2,
+            "predicted_rank": 19,
+            "actual_rank": 134,
+            "in_both_top_20": false
+          },
+          {
+            "code": 207283,
+            "position": "MID",
+            "team_code": 94,
+            "ev": 4.7545,
+            "actual_points": 2,
+            "predicted_rank": 20,
+            "actual_rank": 122,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 38,
+        "predictions_count": 841,
+        "negative_actual_count": 2,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.39720399487562075,
+        "top_20_capture_ratio": 0.41148325358851673,
+        "top_20_overlap": 0.3,
+        "spearman_within_gw": 0.7005367158663778,
+        "spearman_by_position": {
+          "DEF": 0.6498673245737225,
+          "MID": 0.7037484246114366,
+          "FWD": 0.8134940767904172,
+          "GK": 0.6738640101380508
+        },
+        "top_20_details": [
+          {
+            "code": 441164,
+            "position": "DEF",
+            "team_code": 6,
+            "ev": 6.9195,
+            "actual_points": 10,
+            "predicted_rank": 1,
+            "actual_rank": 10,
+            "in_both_top_20": true
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 6.7865,
+            "actual_points": 2,
+            "predicted_rank": 2,
+            "actual_rank": 113,
+            "in_both_top_20": false
+          },
+          {
+            "code": 243298,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 6.4575,
+            "actual_points": 2,
+            "predicted_rank": 3,
+            "actual_rank": 139,
+            "in_both_top_20": false
+          },
+          {
+            "code": 424876,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 6.361,
+            "actual_points": 2,
+            "predicted_rank": 4,
+            "actual_rank": 142,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.723,
+            "actual_points": 1,
+            "predicted_rank": 5,
+            "actual_rank": 225,
+            "in_both_top_20": false
+          },
+          {
+            "code": 247670,
+            "position": "FWD",
+            "team_code": 21,
+            "ev": 5.5785,
+            "actual_points": 8,
+            "predicted_rank": 6,
+            "actual_rank": 19,
+            "in_both_top_20": true
+          },
+          {
+            "code": 448047,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 5.459,
+            "actual_points": 1,
+            "predicted_rank": 7,
+            "actual_rank": 244,
+            "in_both_top_20": false
+          },
+          {
+            "code": 446008,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 5.338,
+            "actual_points": 9,
+            "predicted_rank": 8,
+            "actual_rank": 13,
+            "in_both_top_20": true
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 5.2795000000000005,
+            "actual_points": 2,
+            "predicted_rank": 9,
+            "actual_rank": 169,
+            "in_both_top_20": false
+          },
+          {
+            "code": 551226,
+            "position": "MID",
+            "team_code": 21,
+            "ev": 5.233,
+            "actual_points": 9,
+            "predicted_rank": 10,
+            "actual_rank": 14,
+            "in_both_top_20": true
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 5.157,
+            "actual_points": 14,
+            "predicted_rank": 11,
+            "actual_rank": 3,
+            "in_both_top_20": true
+          },
+          {
+            "code": 223094,
+            "position": "FWD",
+            "team_code": 43,
+            "ev": 5.14,
+            "actual_points": 0,
+            "predicted_rank": 12,
+            "actual_rank": 434,
+            "in_both_top_20": false
+          },
+          {
+            "code": 484420,
+            "position": "MID",
+            "team_code": 56,
+            "ev": 5.109,
+            "actual_points": 5,
+            "predicted_rank": 13,
+            "actual_rank": 63,
+            "in_both_top_20": false
+          },
+          {
+            "code": 538207,
+            "position": "FWD",
+            "team_code": 4,
+            "ev": 5.1025,
+            "actual_points": 2,
+            "predicted_rank": 14,
+            "actual_rank": 171,
+            "in_both_top_20": false
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 5.0600000000000005,
+            "actual_points": 0,
+            "predicted_rank": 15,
+            "actual_rank": 556,
+            "in_both_top_20": false
+          },
+          {
+            "code": 469142,
+            "position": "DEF",
+            "team_code": 36,
+            "ev": 5.0045,
+            "actual_points": 1,
+            "predicted_rank": 16,
+            "actual_rank": 255,
+            "in_both_top_20": false
+          },
+          {
+            "code": 466052,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 4.9535,
+            "actual_points": 1,
+            "predicted_rank": 17,
+            "actual_rank": 253,
+            "in_both_top_20": false
+          },
+          {
+            "code": 208706,
+            "position": "MID",
+            "team_code": 4,
+            "ev": 4.9135,
+            "actual_points": 1,
+            "predicted_rank": 18,
+            "actual_rank": 215,
+            "in_both_top_20": false
+          },
+          {
+            "code": 201658,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 4.822,
+            "actual_points": 10,
+            "predicted_rank": 19,
+            "actual_rank": 8,
+            "in_both_top_20": true
+          },
+          {
+            "code": 450070,
+            "position": "MID",
+            "team_code": 21,
+            "ev": 4.806,
+            "actual_points": 6,
+            "predicted_rank": 20,
+            "actual_rank": 47,
+            "in_both_top_20": false
+          }
+        ]
+      }
+    ],
+    "gw_calibration": [
+      {
+        "gw": 29,
+        "ev_total": 916.288,
+        "actual_total": 903.0,
+        "signed_bias": 13.288000000000011,
+        "ev_actual_ratio": 1.0147153931339978,
+        "mae": 0.9265170731707317,
+        "rmse": 1.8926021791535024,
+        "mean_log_score": 1.8232400140720486,
+        "mean_crps": 0.6218073756097561,
+        "pit_80_coverage": 0.7439024390243902
+      },
+      {
+        "gw": 30,
+        "ev_total": 918.7845,
+        "actual_total": 956.0,
+        "signed_bias": -37.21550000000002,
+        "ev_actual_ratio": 0.9610716527196652,
+        "mae": 0.9641052311435523,
+        "rmse": 1.8707177138474624,
+        "mean_log_score": 2.283852336359423,
+        "mean_crps": 0.6570245909367397,
+        "pit_80_coverage": 0.732360097323601
+      },
+      {
+        "gw": 31,
+        "ev_total": 733.687,
+        "actual_total": 739.0,
+        "signed_bias": -5.312999999999988,
+        "ev_actual_ratio": 0.9928105548037889,
+        "mae": 0.9574006024096384,
+        "rmse": 1.9408278687882292,
+        "mean_log_score": 1.9664299238004206,
+        "mean_crps": 0.6458177326807228,
+        "pit_80_coverage": 0.75
+      },
+      {
+        "gw": 32,
+        "ev_total": 921.256,
+        "actual_total": 904.0,
+        "signed_bias": 17.255999999999972,
+        "ev_actual_ratio": 1.0190884955752213,
+        "mae": 0.9724697336561743,
+        "rmse": 2.1014268649287007,
+        "mean_log_score": 2.342653371464435,
+        "mean_crps": 0.670076059322034,
+        "pit_80_coverage": 0.7457627118644068
+      },
+      {
+        "gw": 33,
+        "ev_total": 1205.1605,
+        "actual_total": 1220.0,
+        "signed_bias": -14.839500000000044,
+        "ev_actual_ratio": 0.987836475409836,
+        "mae": 1.1138124246079615,
+        "rmse": 2.2357388383928454,
+        "mean_log_score": 2.016952460498072,
+        "mean_crps": 0.7677418392072862,
+        "pit_80_coverage": 0.738238841978287
+      },
+      {
+        "gw": 34,
+        "ev_total": 639.7205,
+        "actual_total": 625.0,
+        "signed_bias": 14.720500000000015,
+        "ev_actual_ratio": 1.0235528,
+        "mae": 0.9611847079037801,
+        "rmse": 1.8834228367641381,
+        "mean_log_score": 2.025006923422869,
+        "mean_crps": 0.6441541645189004,
+        "pit_80_coverage": 0.7233676975945017
+      },
+      {
+        "gw": 35,
+        "ev_total": 923.014,
+        "actual_total": 871.0,
+        "signed_bias": 52.01400000000001,
+        "ev_actual_ratio": 1.0597175660160736,
+        "mae": 0.9255793269230769,
+        "rmse": 1.894384803638059,
+        "mean_log_score": 2.216976538388562,
+        "mean_crps": 0.6258666171875,
+        "pit_80_coverage": 0.7439903846153846
+      },
+      {
+        "gw": 36,
+        "ev_total": 1016.3770000000001,
+        "actual_total": 985.0,
+        "signed_bias": 31.377000000000066,
+        "ev_actual_ratio": 1.0318548223350255,
+        "mae": 1.0000966587112172,
+        "rmse": 2.0146789114765777,
+        "mean_log_score": 2.273081708590595,
+        "mean_crps": 0.668098055272163,
+        "pit_80_coverage": 0.7494033412887828
+      },
+      {
+        "gw": 37,
+        "ev_total": 913.079,
+        "actual_total": 873.0,
+        "signed_bias": 40.07899999999995,
+        "ev_actual_ratio": 1.04590950744559,
+        "mae": 0.9004190476190476,
+        "rmse": 1.8327555248015148,
+        "mean_log_score": 1.6893560363451707,
+        "mean_crps": 0.594020500595238,
+        "pit_80_coverage": 0.7726190476190476
+      },
+      {
+        "gw": 38,
+        "ev_total": 914.0465,
+        "actual_total": 879.0,
+        "signed_bias": 35.04650000000004,
+        "ev_actual_ratio": 1.0398708759954494,
+        "mae": 0.9479019024970274,
+        "rmse": 1.848090261444794,
+        "mean_log_score": 2.367088003067763,
+        "mean_crps": 0.6351088088585018,
+        "pit_80_coverage": 0.7431629013079667
+      }
+    ],
+    "cumulative_top_20_details": [
+      {
+        "code": 141746,
+        "position": "MID",
+        "team_code": 1,
+        "ev": 68.822,
+        "actual_points": 77,
+        "predicted_rank": 1,
+        "actual_rank": 1,
+        "in_both_top_20": true
+      },
+      {
+        "code": 97032,
+        "position": "DEF",
+        "team_code": 14,
+        "ev": 59.468,
+        "actual_points": 46,
+        "predicted_rank": 2,
+        "actual_rank": 24,
+        "in_both_top_20": false
+      },
+      {
+        "code": 472769,
+        "position": "DEF",
+        "team_code": 43,
+        "ev": 57.7055,
+        "actual_points": 37,
+        "predicted_rank": 3,
+        "actual_rank": 63,
+        "in_both_top_20": false
+      },
+      {
+        "code": 209036,
+        "position": "DEF",
+        "team_code": 43,
+        "ev": 54.739000000000004,
+        "actual_points": 47,
+        "predicted_rank": 4,
+        "actual_rank": 20,
+        "in_both_top_20": true
+      },
+      {
+        "code": 502500,
+        "position": "FWD",
+        "team_code": 94,
+        "ev": 54.071,
+        "actual_points": 40,
+        "predicted_rank": 5,
+        "actual_rank": 50,
+        "in_both_top_20": false
+      },
+      {
+        "code": 465642,
+        "position": "DEF",
+        "team_code": 4,
+        "ev": 50.468,
+        "actual_points": 25,
+        "predicted_rank": 6,
+        "actual_rank": 151,
+        "in_both_top_20": false
+      },
+      {
+        "code": 243298,
+        "position": "MID",
+        "team_code": 14,
+        "ev": 49.82300000000001,
+        "actual_points": 33,
+        "predicted_rank": 7,
+        "actual_rank": 89,
+        "in_both_top_20": false
+      },
+      {
+        "code": 437730,
+        "position": "MID",
+        "team_code": 43,
+        "ev": 49.6345,
+        "actual_points": 37,
+        "predicted_rank": 8,
+        "actual_rank": 62,
+        "in_both_top_20": false
+      },
+      {
+        "code": 226597,
+        "position": "DEF",
+        "team_code": 3,
+        "ev": 49.427499999999995,
+        "actual_points": 56,
+        "predicted_rank": 9,
+        "actual_rank": 9,
+        "in_both_top_20": true
+      },
+      {
+        "code": 424876,
+        "position": "MID",
+        "team_code": 14,
+        "ev": 48.67699999999999,
+        "actual_points": 56,
+        "predicted_rank": 10,
+        "actual_rank": 10,
+        "in_both_top_20": true
+      },
+      {
+        "code": 532529,
+        "position": "MID",
+        "team_code": 36,
+        "ev": 48.439,
+        "actual_points": 43,
+        "predicted_rank": 11,
+        "actual_rank": 37,
+        "in_both_top_20": false
+      },
+      {
+        "code": 244851,
+        "position": "MID",
+        "team_code": 8,
+        "ev": 47.001999999999995,
+        "actual_points": 31,
+        "predicted_rank": 12,
+        "actual_rank": 103,
+        "in_both_top_20": false
+      },
+      {
+        "code": 466052,
+        "position": "MID",
+        "team_code": 43,
+        "ev": 46.6175,
+        "actual_points": 41,
+        "predicted_rank": 13,
+        "actual_rank": 45,
+        "in_both_top_20": false
+      },
+      {
+        "code": 222531,
+        "position": "MID",
+        "team_code": 17,
+        "ev": 45.3155,
+        "actual_points": 74,
+        "predicted_rank": 14,
+        "actual_rank": 2,
+        "in_both_top_20": true
+      },
+      {
+        "code": 165809,
+        "position": "MID",
+        "team_code": 43,
+        "ev": 44.11299999999999,
+        "actual_points": 32,
+        "predicted_rank": 15,
+        "actual_rank": 96,
+        "in_both_top_20": false
+      },
+      {
+        "code": 244850,
+        "position": "MID",
+        "team_code": 7,
+        "ev": 43.522999999999996,
+        "actual_points": 40,
+        "predicted_rank": 16,
+        "actual_rank": 49,
+        "in_both_top_20": false
+      },
+      {
+        "code": 475168,
+        "position": "FWD",
+        "team_code": 8,
+        "ev": 43.434000000000005,
+        "actual_points": 36,
+        "predicted_rank": 17,
+        "actual_rank": 75,
+        "in_both_top_20": false
+      },
+      {
+        "code": 503139,
+        "position": "MID",
+        "team_code": 91,
+        "ev": 43.364000000000004,
+        "actual_points": 38,
+        "predicted_rank": 18,
+        "actual_rank": 56,
+        "in_both_top_20": false
+      },
+      {
+        "code": 223094,
+        "position": "FWD",
+        "team_code": 43,
+        "ev": 43.286500000000004,
+        "actual_points": 46,
+        "predicted_rank": 19,
+        "actual_rank": 25,
+        "in_both_top_20": false
+      },
+      {
+        "code": 177815,
+        "position": "FWD",
+        "team_code": 2,
+        "ev": 42.8265,
+        "actual_points": 36,
+        "predicted_rank": 20,
+        "actual_rank": 67,
+        "in_both_top_20": false
+      }
+    ]
+  },
+  "diagnostic_comparator": {
+    "season": "2025-26",
+    "start_gw": 29,
+    "end_gw": 38,
+    "distinct_fixture_count": 99,
+    "total_player_fixture_rows": 8224,
+    "total_player_gw_rows": 7894,
+    "total_unique_players": 841,
+    "total_negative_actuals": 18,
+    "total_upper_tail_actuals": 0,
+    "cumulative_ndcg_at_20": 0.7926078488645879,
+    "cumulative_top_20_capture_ratio": 0.7967914438502673,
+    "cumulative_top_20_overlap": 0.35,
+    "cumulative_spearman": 0.9519976678034299,
+    "cumulative_spearman_by_position": {
+      "MID": 0.9579217528072478,
+      "DEF": 0.9462638394226673,
+      "GK": 0.9028811225576576,
+      "FWD": 0.9560252107940015
+    },
+    "ev_total": 8482.7075,
+    "actual_total": 8955.0,
+    "signed_bias": -472.29249999999956,
+    "ev_actual_ratio": 0.9472593523171413,
+    "mae": 0.9156327213035019,
+    "rmse": 1.8882578831619372,
+    "mean_log_score": 2.0510197963277994,
+    "mean_crps": 0.6327526176738814,
+    "mean_ranked_probability_score": 0.6327526176738814,
+    "pit_80_coverage": 0.7380836575875487,
+    "gw_metrics": [
+      {
+        "gw": 29,
+        "predictions_count": 820,
+        "negative_actual_count": 3,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.44638728372913195,
+        "top_20_capture_ratio": 0.5113122171945701,
+        "top_20_overlap": 0.3,
+        "spearman_within_gw": 0.7588010258703028,
+        "spearman_by_position": {
+          "MID": 0.7933490906375609,
+          "DEF": 0.7007211638459541,
+          "GK": 0.7012662573223816,
+          "FWD": 0.8288831042473024
+        },
+        "top_20_details": [
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 5.821000000000001,
+            "actual_points": 9,
+            "predicted_rank": 1,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 5.6565,
+            "actual_points": 1,
+            "predicted_rank": 2,
+            "actual_rank": 180,
+            "in_both_top_20": false
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 5.509,
+            "actual_points": 0,
+            "predicted_rank": 3,
+            "actual_rank": 545,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 5.4395,
+            "actual_points": 1,
+            "predicted_rank": 4,
+            "actual_rank": 217,
+            "in_both_top_20": false
+          },
+          {
+            "code": 17761,
+            "position": "DEF",
+            "team_code": 11,
+            "ev": 5.0305,
+            "actual_points": 15,
+            "predicted_rank": 5,
+            "actual_rank": 2,
+            "in_both_top_20": true
+          },
+          {
+            "code": 204936,
+            "position": "GK",
+            "team_code": 43,
+            "ev": 5.005,
+            "actual_points": 1,
+            "predicted_rank": 6,
+            "actual_rank": 214,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 4.9865,
+            "actual_points": 8,
+            "predicted_rank": 7,
+            "actual_rank": 23,
+            "in_both_top_20": false
+          },
+          {
+            "code": 448514,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.974,
+            "actual_points": 4,
+            "predicted_rank": 8,
+            "actual_rank": 80,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 4.7805,
+            "actual_points": 7,
+            "predicted_rank": 9,
+            "actual_rank": 36,
+            "in_both_top_20": false
+          },
+          {
+            "code": 204716,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.7325,
+            "actual_points": 2,
+            "predicted_rank": 10,
+            "actual_rank": 125,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 4.6075,
+            "actual_points": 4,
+            "predicted_rank": 11,
+            "actual_rank": 82,
+            "in_both_top_20": false
+          },
+          {
+            "code": 503139,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 4.6055,
+            "actual_points": 3,
+            "predicted_rank": 12,
+            "actual_rank": 106,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 4.399,
+            "actual_points": 11,
+            "predicted_rank": 13,
+            "actual_rank": 8,
+            "in_both_top_20": true
+          },
+          {
+            "code": 510663,
+            "position": "FWD",
+            "team_code": 14,
+            "ev": 4.391,
+            "actual_points": 2,
+            "predicted_rank": 14,
+            "actual_rank": 160,
+            "in_both_top_20": false
+          },
+          {
+            "code": 223827,
+            "position": "DEF",
+            "team_code": 56,
+            "ev": 4.382,
+            "actual_points": 9,
+            "predicted_rank": 15,
+            "actual_rank": 17,
+            "in_both_top_20": true
+          },
+          {
+            "code": 111234,
+            "position": "GK",
+            "team_code": 11,
+            "ev": 4.36,
+            "actual_points": 6,
+            "predicted_rank": 16,
+            "actual_rank": 41,
+            "in_both_top_20": false
+          },
+          {
+            "code": 102057,
+            "position": "FWD",
+            "team_code": 54,
+            "ev": 4.3035,
+            "actual_points": 1,
+            "predicted_rank": 17,
+            "actual_rank": 183,
+            "in_both_top_20": false
+          },
+          {
+            "code": 116535,
+            "position": "GK",
+            "team_code": 14,
+            "ev": 4.279,
+            "actual_points": 1,
+            "predicted_rank": 18,
+            "actual_rank": 192,
+            "in_both_top_20": false
+          },
+          {
+            "code": 118748,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.255,
+            "actual_points": 9,
+            "predicted_rank": 19,
+            "actual_rank": 13,
+            "in_both_top_20": true
+          },
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 4.2364999999999995,
+            "actual_points": 19,
+            "predicted_rank": 20,
+            "actual_rank": 1,
+            "in_both_top_20": true
+          }
+        ]
+      },
+      {
+        "gw": 30,
+        "predictions_count": 822,
+        "negative_actual_count": 1,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.3667218223926911,
+        "top_20_capture_ratio": 0.3645320197044335,
+        "top_20_overlap": 0.2,
+        "spearman_within_gw": 0.7472453894620297,
+        "spearman_by_position": {
+          "FWD": 0.7793943864471944,
+          "DEF": 0.711754489066975,
+          "MID": 0.7624085731177459,
+          "GK": 0.7716304890466694
+        },
+        "top_20_details": [
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 5.778,
+            "actual_points": 2,
+            "predicted_rank": 1,
+            "actual_rank": 180,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.7385,
+            "actual_points": 9,
+            "predicted_rank": 2,
+            "actual_rank": 16,
+            "in_both_top_20": true
+          },
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 5.654,
+            "actual_points": 2,
+            "predicted_rank": 3,
+            "actual_rank": 160,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 5.536,
+            "actual_points": 10,
+            "predicted_rank": 4,
+            "actual_rank": 9,
+            "in_both_top_20": true
+          },
+          {
+            "code": 448104,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.321,
+            "actual_points": 4,
+            "predicted_rank": 5,
+            "actual_rank": 88,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.944,
+            "actual_points": 2,
+            "predicted_rank": 6,
+            "actual_rank": 135,
+            "in_both_top_20": false
+          },
+          {
+            "code": 444765,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 4.9285,
+            "actual_points": 1,
+            "predicted_rank": 7,
+            "actual_rank": 243,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.7090000000000005,
+            "actual_points": 2,
+            "predicted_rank": 8,
+            "actual_rank": 149,
+            "in_both_top_20": false
+          },
+          {
+            "code": 154561,
+            "position": "GK",
+            "team_code": 3,
+            "ev": 4.566,
+            "actual_points": 7,
+            "predicted_rank": 9,
+            "actual_rank": 34,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 4.5355,
+            "actual_points": 2,
+            "predicted_rank": 10,
+            "actual_rank": 165,
+            "in_both_top_20": false
+          },
+          {
+            "code": 445122,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 4.5165,
+            "actual_points": 1,
+            "predicted_rank": 11,
+            "actual_rank": 244,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 4.444,
+            "actual_points": 9,
+            "predicted_rank": 12,
+            "actual_rank": 19,
+            "in_both_top_20": true
+          },
+          {
+            "code": 448514,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.4365,
+            "actual_points": 1,
+            "predicted_rank": 13,
+            "actual_rank": 245,
+            "in_both_top_20": false
+          },
+          {
+            "code": 223827,
+            "position": "DEF",
+            "team_code": 56,
+            "ev": 4.399,
+            "actual_points": 4,
+            "predicted_rank": 14,
+            "actual_rank": 82,
+            "in_both_top_20": false
+          },
+          {
+            "code": 215379,
+            "position": "MID",
+            "team_code": 17,
+            "ev": 4.2385,
+            "actual_points": 2,
+            "predicted_rank": 15,
+            "actual_rank": 151,
+            "in_both_top_20": false
+          },
+          {
+            "code": 494521,
+            "position": "DEF",
+            "team_code": 91,
+            "ev": 4.201,
+            "actual_points": 11,
+            "predicted_rank": 16,
+            "actual_rank": 7,
+            "in_both_top_20": true
+          },
+          {
+            "code": 191866,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 4.189,
+            "actual_points": 0,
+            "predicted_rank": 17,
+            "actual_rank": 380,
+            "in_both_top_20": false
+          },
+          {
+            "code": 204936,
+            "position": "GK",
+            "team_code": 43,
+            "ev": 4.189,
+            "actual_points": 2,
+            "predicted_rank": 18,
+            "actual_rank": 146,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232185,
+            "position": "MID",
+            "team_code": 31,
+            "ev": 4.1845,
+            "actual_points": 3,
+            "predicted_rank": 19,
+            "actual_rank": 111,
+            "in_both_top_20": false
+          },
+          {
+            "code": 247348,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 4.162,
+            "actual_points": 0,
+            "predicted_rank": 20,
+            "actual_rank": 466,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 31,
+        "predictions_count": 664,
+        "negative_actual_count": 3,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.3470199415305205,
+        "top_20_capture_ratio": 0.4195121951219512,
+        "top_20_overlap": 0.2,
+        "spearman_within_gw": 0.7405504657016537,
+        "spearman_by_position": {
+          "DEF": 0.6192108243260194,
+          "FWD": 0.8234543560558124,
+          "MID": 0.7899272898690476,
+          "GK": 0.7893045747860719
+        },
+        "top_20_details": [
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 6.0285,
+            "actual_points": 0,
+            "predicted_rank": 1,
+            "actual_rank": 427,
+            "in_both_top_20": false
+          },
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 5.583,
+            "actual_points": 2,
+            "predicted_rank": 2,
+            "actual_rank": 127,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232826,
+            "position": "MID",
+            "team_code": 4,
+            "ev": 5.212,
+            "actual_points": 10,
+            "predicted_rank": 3,
+            "actual_rank": 9,
+            "in_both_top_20": true
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.981,
+            "actual_points": 3,
+            "predicted_rank": 4,
+            "actual_rank": 75,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 4.8955,
+            "actual_points": 13,
+            "predicted_rank": 5,
+            "actual_rank": 3,
+            "in_both_top_20": true
+          },
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 4.773,
+            "actual_points": 2,
+            "predicted_rank": 6,
+            "actual_rank": 116,
+            "in_both_top_20": false
+          },
+          {
+            "code": 167074,
+            "position": "DEF",
+            "team_code": 54,
+            "ev": 4.6955,
+            "actual_points": 0,
+            "predicted_rank": 7,
+            "actual_rank": 283,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 4.623,
+            "actual_points": 4,
+            "predicted_rank": 8,
+            "actual_rank": 71,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232892,
+            "position": "DEF",
+            "team_code": 54,
+            "ev": 4.588,
+            "actual_points": 2,
+            "predicted_rank": 9,
+            "actual_rank": 113,
+            "in_both_top_20": false
+          },
+          {
+            "code": 80201,
+            "position": "GK",
+            "team_code": 54,
+            "ev": 4.489,
+            "actual_points": 3,
+            "predicted_rank": 10,
+            "actual_rank": 73,
+            "in_both_top_20": false
+          },
+          {
+            "code": 444765,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 4.3635,
+            "actual_points": 6,
+            "predicted_rank": 11,
+            "actual_rank": 46,
+            "in_both_top_20": false
+          },
+          {
+            "code": 503139,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 4.126,
+            "actual_points": 2,
+            "predicted_rank": 12,
+            "actual_rank": 135,
+            "in_both_top_20": false
+          },
+          {
+            "code": 215379,
+            "position": "MID",
+            "team_code": 17,
+            "ev": 4.122,
+            "actual_points": 5,
+            "predicted_rank": 13,
+            "actual_rank": 55,
+            "in_both_top_20": false
+          },
+          {
+            "code": 180736,
+            "position": "DEF",
+            "team_code": 8,
+            "ev": 4.1175,
+            "actual_points": 0,
+            "predicted_rank": 14,
+            "actual_rank": 294,
+            "in_both_top_20": false
+          },
+          {
+            "code": 98980,
+            "position": "GK",
+            "team_code": 7,
+            "ev": 4.0615,
+            "actual_points": 6,
+            "predicted_rank": 15,
+            "actual_rank": 31,
+            "in_both_top_20": false
+          },
+          {
+            "code": 440993,
+            "position": "MID",
+            "team_code": 11,
+            "ev": 4.0285,
+            "actual_points": 10,
+            "predicted_rank": 16,
+            "actual_rank": 10,
+            "in_both_top_20": true
+          },
+          {
+            "code": 494521,
+            "position": "DEF",
+            "team_code": 91,
+            "ev": 4.009,
+            "actual_points": 4,
+            "predicted_rank": 17,
+            "actual_rank": 70,
+            "in_both_top_20": false
+          },
+          {
+            "code": 199798,
+            "position": "DEF",
+            "team_code": 7,
+            "ev": 3.956,
+            "actual_points": 6,
+            "predicted_rank": 18,
+            "actual_rank": 34,
+            "in_both_top_20": false
+          },
+          {
+            "code": 223827,
+            "position": "DEF",
+            "team_code": 56,
+            "ev": 3.95,
+            "actual_points": 0,
+            "predicted_rank": 19,
+            "actual_rank": 346,
+            "in_both_top_20": false
+          },
+          {
+            "code": 222531,
+            "position": "MID",
+            "team_code": 17,
+            "ev": 3.9085,
+            "actual_points": 8,
+            "predicted_rank": 20,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          }
+        ]
+      },
+      {
+        "gw": 32,
+        "predictions_count": 826,
+        "negative_actual_count": 2,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.34949287403168655,
+        "top_20_capture_ratio": 0.4314516129032258,
+        "top_20_overlap": 0.2,
+        "spearman_within_gw": 0.714285986579662,
+        "spearman_by_position": {
+          "MID": 0.7930782748352639,
+          "DEF": 0.588592108204771,
+          "FWD": 0.7922484741757446,
+          "GK": 0.6850094246863185
+        },
+        "top_20_details": [
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 5.9665,
+            "actual_points": 4,
+            "predicted_rank": 1,
+            "actual_rank": 64,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.3885,
+            "actual_points": 4,
+            "predicted_rank": 2,
+            "actual_rank": 70,
+            "in_both_top_20": false
+          },
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 5.2295,
+            "actual_points": 2,
+            "predicted_rank": 3,
+            "actual_rank": 157,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232826,
+            "position": "MID",
+            "team_code": 4,
+            "ev": 4.8845,
+            "actual_points": 3,
+            "predicted_rank": 4,
+            "actual_rank": 92,
+            "in_both_top_20": false
+          },
+          {
+            "code": 444765,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 4.8625,
+            "actual_points": 3,
+            "predicted_rank": 5,
+            "actual_rank": 97,
+            "in_both_top_20": false
+          },
+          {
+            "code": 469142,
+            "position": "DEF",
+            "team_code": 36,
+            "ev": 4.811,
+            "actual_points": 5,
+            "predicted_rank": 6,
+            "actual_rank": 58,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.77,
+            "actual_points": 9,
+            "predicted_rank": 7,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          },
+          {
+            "code": 448104,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 4.369,
+            "actual_points": 0,
+            "predicted_rank": 8,
+            "actual_rank": 505,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 4.3525,
+            "actual_points": 2,
+            "predicted_rank": 9,
+            "actual_rank": 149,
+            "in_both_top_20": false
+          },
+          {
+            "code": 223340,
+            "position": "MID",
+            "team_code": 3,
+            "ev": 4.2865,
+            "actual_points": 0,
+            "predicted_rank": 10,
+            "actual_rank": 430,
+            "in_both_top_20": false
+          },
+          {
+            "code": 424876,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.284,
+            "actual_points": 5,
+            "predicted_rank": 11,
+            "actual_rank": 55,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 4.264,
+            "actual_points": 13,
+            "predicted_rank": 12,
+            "actual_rank": 8,
+            "in_both_top_20": true
+          },
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 4.26,
+            "actual_points": 2,
+            "predicted_rank": 13,
+            "actual_rank": 156,
+            "in_both_top_20": false
+          },
+          {
+            "code": 233963,
+            "position": "DEF",
+            "team_code": 21,
+            "ev": 4.244,
+            "actual_points": 21,
+            "predicted_rank": 14,
+            "actual_rank": 1,
+            "in_both_top_20": true
+          },
+          {
+            "code": 154561,
+            "position": "GK",
+            "team_code": 3,
+            "ev": 4.221,
+            "actual_points": 1,
+            "predicted_rank": 15,
+            "actual_rank": 190,
+            "in_both_top_20": false
+          },
+          {
+            "code": 613804,
+            "position": "DEF",
+            "team_code": 21,
+            "ev": 4.1615,
+            "actual_points": 6,
+            "predicted_rank": 16,
+            "actual_rank": 48,
+            "in_both_top_20": false
+          },
+          {
+            "code": 95658,
+            "position": "DEF",
+            "team_code": 1,
+            "ev": 4.1295,
+            "actual_points": 0,
+            "predicted_rank": 17,
+            "actual_rank": 319,
+            "in_both_top_20": false
+          },
+          {
+            "code": 220362,
+            "position": "DEF",
+            "team_code": 21,
+            "ev": 4.1205,
+            "actual_points": 6,
+            "predicted_rank": 18,
+            "actual_rank": 38,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.088,
+            "actual_points": 15,
+            "predicted_rank": 19,
+            "actual_rank": 3,
+            "in_both_top_20": true
+          },
+          {
+            "code": 231416,
+            "position": "DEF",
+            "team_code": 36,
+            "ev": 4.074,
+            "actual_points": 6,
+            "predicted_rank": 20,
+            "actual_rank": 40,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 33,
+        "predictions_count": 829,
+        "negative_actual_count": 1,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.4569747262467423,
+        "top_20_capture_ratio": 0.4852941176470588,
+        "top_20_overlap": 0.2,
+        "spearman_within_gw": 0.7773252541305036,
+        "spearman_by_position": {
+          "DEF": 0.7616192268080912,
+          "FWD": 0.7744628077859924,
+          "GK": 0.7607086316236876,
+          "MID": 0.7864793764099816
+        },
+        "top_20_details": [
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 10.1715,
+            "actual_points": 8,
+            "predicted_rank": 1,
+            "actual_rank": 44,
+            "in_both_top_20": false
+          },
+          {
+            "code": 475168,
+            "position": "FWD",
+            "team_code": 8,
+            "ev": 9.335,
+            "actual_points": 0,
+            "predicted_rank": 2,
+            "actual_rank": 553,
+            "in_both_top_20": false
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 8.8485,
+            "actual_points": 13,
+            "predicted_rank": 3,
+            "actual_rank": 10,
+            "in_both_top_20": true
+          },
+          {
+            "code": 204936,
+            "position": "GK",
+            "team_code": 43,
+            "ev": 8.554,
+            "actual_points": 8,
+            "predicted_rank": 4,
+            "actual_rank": 43,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465351,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 8.345,
+            "actual_points": 11,
+            "predicted_rank": 5,
+            "actual_rank": 17,
+            "in_both_top_20": true
+          },
+          {
+            "code": 201658,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 8.3205,
+            "actual_points": 9,
+            "predicted_rank": 6,
+            "actual_rank": 30,
+            "in_both_top_20": false
+          },
+          {
+            "code": 503139,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 8.273,
+            "actual_points": 5,
+            "predicted_rank": 7,
+            "actual_rank": 97,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 8.213000000000001,
+            "actual_points": 5,
+            "predicted_rank": 8,
+            "actual_rank": 91,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 8.049,
+            "actual_points": 10,
+            "predicted_rank": 9,
+            "actual_rank": 27,
+            "in_both_top_20": false
+          },
+          {
+            "code": 177815,
+            "position": "FWD",
+            "team_code": 2,
+            "ev": 8.008,
+            "actual_points": 8,
+            "predicted_rank": 10,
+            "actual_rank": 41,
+            "in_both_top_20": false
+          },
+          {
+            "code": 50175,
+            "position": "FWD",
+            "team_code": 36,
+            "ev": 7.943,
+            "actual_points": 8,
+            "predicted_rank": 11,
+            "actual_rank": 38,
+            "in_both_top_20": false
+          },
+          {
+            "code": 220566,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 7.928,
+            "actual_points": 2,
+            "predicted_rank": 12,
+            "actual_rank": 179,
+            "in_both_top_20": false
+          },
+          {
+            "code": 514254,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 7.641,
+            "actual_points": 1,
+            "predicted_rank": 13,
+            "actual_rank": 286,
+            "in_both_top_20": false
+          },
+          {
+            "code": 221466,
+            "position": "DEF",
+            "team_code": 91,
+            "ev": 7.637,
+            "actual_points": 6,
+            "predicted_rank": 14,
+            "actual_rank": 71,
+            "in_both_top_20": false
+          },
+          {
+            "code": 199598,
+            "position": "MID",
+            "team_code": 2,
+            "ev": 7.599,
+            "actual_points": 12,
+            "predicted_rank": 15,
+            "actual_rank": 12,
+            "in_both_top_20": true
+          },
+          {
+            "code": 467779,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 7.5895,
+            "actual_points": 2,
+            "predicted_rank": 16,
+            "actual_rank": 201,
+            "in_both_top_20": false
+          },
+          {
+            "code": 494521,
+            "position": "DEF",
+            "team_code": 91,
+            "ev": 7.415500000000001,
+            "actual_points": 13,
+            "predicted_rank": 17,
+            "actual_rank": 11,
+            "in_both_top_20": true
+          },
+          {
+            "code": 244851,
+            "position": "MID",
+            "team_code": 8,
+            "ev": 7.351,
+            "actual_points": 2,
+            "predicted_rank": 18,
+            "actual_rank": 186,
+            "in_both_top_20": false
+          },
+          {
+            "code": 444180,
+            "position": "MID",
+            "team_code": 90,
+            "ev": 7.34,
+            "actual_points": 4,
+            "predicted_rank": 19,
+            "actual_rank": 114,
+            "in_both_top_20": false
+          },
+          {
+            "code": 463981,
+            "position": "DEF",
+            "team_code": 91,
+            "ev": 7.292,
+            "actual_points": 5,
+            "predicted_rank": 20,
+            "actual_rank": 94,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 34,
+        "predictions_count": 582,
+        "negative_actual_count": 1,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.4184583885266599,
+        "top_20_capture_ratio": 0.41919191919191917,
+        "top_20_overlap": 0.2,
+        "spearman_within_gw": 0.7375389413688801,
+        "spearman_by_position": {
+          "MID": 0.7567725779633577,
+          "DEF": 0.6982759219306199,
+          "FWD": 0.7947874043089936,
+          "GK": 0.6716793932700944
+        },
+        "top_20_details": [
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 5.3815,
+            "actual_points": 5,
+            "predicted_rank": 1,
+            "actual_rank": 40,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 5.303,
+            "actual_points": 4,
+            "predicted_rank": 2,
+            "actual_rank": 46,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 4.8295,
+            "actual_points": 8,
+            "predicted_rank": 3,
+            "actual_rank": 18,
+            "in_both_top_20": true
+          },
+          {
+            "code": 222531,
+            "position": "MID",
+            "team_code": 17,
+            "ev": 4.638,
+            "actual_points": 13,
+            "predicted_rank": 4,
+            "actual_rank": 2,
+            "in_both_top_20": true
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 4.6245,
+            "actual_points": 1,
+            "predicted_rank": 5,
+            "actual_rank": 176,
+            "in_both_top_20": false
+          },
+          {
+            "code": 424876,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 4.5,
+            "actual_points": 1,
+            "predicted_rank": 6,
+            "actual_rank": 157,
+            "in_both_top_20": false
+          },
+          {
+            "code": 201895,
+            "position": "DEF",
+            "team_code": 56,
+            "ev": 4.3675,
+            "actual_points": 0,
+            "predicted_rank": 7,
+            "actual_rank": 260,
+            "in_both_top_20": false
+          },
+          {
+            "code": 441164,
+            "position": "DEF",
+            "team_code": 6,
+            "ev": 4.354,
+            "actual_points": 8,
+            "predicted_rank": 8,
+            "actual_rank": 21,
+            "in_both_top_20": false
+          },
+          {
+            "code": 233963,
+            "position": "DEF",
+            "team_code": 21,
+            "ev": 4.3005,
+            "actual_points": 4,
+            "predicted_rank": 9,
+            "actual_rank": 57,
+            "in_both_top_20": false
+          },
+          {
+            "code": 215413,
+            "position": "MID",
+            "team_code": 11,
+            "ev": 3.983,
+            "actual_points": 8,
+            "predicted_rank": 10,
+            "actual_rank": 16,
+            "in_both_top_20": true
+          },
+          {
+            "code": 220362,
+            "position": "DEF",
+            "team_code": 21,
+            "ev": 3.9,
+            "actual_points": 3,
+            "predicted_rank": 11,
+            "actual_rank": 68,
+            "in_both_top_20": false
+          },
+          {
+            "code": 547027,
+            "position": "MID",
+            "team_code": 56,
+            "ev": 3.8665,
+            "actual_points": 1,
+            "predicted_rank": 12,
+            "actual_rank": 183,
+            "in_both_top_20": false
+          },
+          {
+            "code": 244850,
+            "position": "MID",
+            "team_code": 7,
+            "ev": 3.8634999999999997,
+            "actual_points": 2,
+            "predicted_rank": 13,
+            "actual_rank": 104,
+            "in_both_top_20": false
+          },
+          {
+            "code": 467189,
+            "position": "GK",
+            "team_code": 21,
+            "ev": 3.8529999999999998,
+            "actual_points": 2,
+            "predicted_rank": 14,
+            "actual_rank": 113,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232928,
+            "position": "MID",
+            "team_code": 11,
+            "ev": 3.8355,
+            "actual_points": 3,
+            "predicted_rank": 15,
+            "actual_rank": 70,
+            "in_both_top_20": false
+          },
+          {
+            "code": 106760,
+            "position": "DEF",
+            "team_code": 1,
+            "ev": 3.8085,
+            "actual_points": 5,
+            "predicted_rank": 16,
+            "actual_rank": 38,
+            "in_both_top_20": false
+          },
+          {
+            "code": 154561,
+            "position": "GK",
+            "team_code": 3,
+            "ev": 3.797,
+            "actual_points": 10,
+            "predicted_rank": 17,
+            "actual_rank": 7,
+            "in_both_top_20": true
+          },
+          {
+            "code": 243298,
+            "position": "MID",
+            "team_code": 14,
+            "ev": 3.7855,
+            "actual_points": 2,
+            "predicted_rank": 18,
+            "actual_rank": 103,
+            "in_both_top_20": false
+          },
+          {
+            "code": 178301,
+            "position": "FWD",
+            "team_code": 7,
+            "ev": 3.753,
+            "actual_points": 2,
+            "predicted_rank": 19,
+            "actual_rank": 92,
+            "in_both_top_20": false
+          },
+          {
+            "code": 509291,
+            "position": "MID",
+            "team_code": 39,
+            "ev": 3.747,
+            "actual_points": 1,
+            "predicted_rank": 20,
+            "actual_rank": 177,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 35,
+        "predictions_count": 832,
+        "negative_actual_count": 2,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.32062906961325044,
+        "top_20_capture_ratio": 0.3333333333333333,
+        "top_20_overlap": 0.0,
+        "spearman_within_gw": 0.7313968272670093,
+        "spearman_by_position": {
+          "DEF": 0.6760743190328032,
+          "MID": 0.7438078818311988,
+          "FWD": 0.754669313449839,
+          "GK": 0.7962937344635217
+        },
+        "top_20_details": [
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 5.1935,
+            "actual_points": 4,
+            "predicted_rank": 1,
+            "actual_rank": 76,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 4.888,
+            "actual_points": 5,
+            "predicted_rank": 2,
+            "actual_rank": 54,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 4.7905,
+            "actual_points": 6,
+            "predicted_rank": 3,
+            "actual_rank": 38,
+            "in_both_top_20": false
+          },
+          {
+            "code": 494521,
+            "position": "DEF",
+            "team_code": 91,
+            "ev": 4.6795,
+            "actual_points": 7,
+            "predicted_rank": 4,
+            "actual_rank": 30,
+            "in_both_top_20": false
+          },
+          {
+            "code": 220627,
+            "position": "DEF",
+            "team_code": 2,
+            "ev": 4.64,
+            "actual_points": 2,
+            "predicted_rank": 5,
+            "actual_rank": 127,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465351,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.6205,
+            "actual_points": 1,
+            "predicted_rank": 6,
+            "actual_rank": 242,
+            "in_both_top_20": false
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.5745000000000005,
+            "actual_points": 1,
+            "predicted_rank": 7,
+            "actual_rank": 246,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 4.56,
+            "actual_points": 6,
+            "predicted_rank": 8,
+            "actual_rank": 48,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.522,
+            "actual_points": 1,
+            "predicted_rank": 9,
+            "actual_rank": 170,
+            "in_both_top_20": false
+          },
+          {
+            "code": 177815,
+            "position": "FWD",
+            "team_code": 2,
+            "ev": 4.447,
+            "actual_points": 6,
+            "predicted_rank": 10,
+            "actual_rank": 33,
+            "in_both_top_20": false
+          },
+          {
+            "code": 179268,
+            "position": "DEF",
+            "team_code": 8,
+            "ev": 4.4095,
+            "actual_points": 4,
+            "predicted_rank": 11,
+            "actual_rank": 72,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 4.3585,
+            "actual_points": 7,
+            "predicted_rank": 12,
+            "actual_rank": 31,
+            "in_both_top_20": false
+          },
+          {
+            "code": 466052,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 4.3500000000000005,
+            "actual_points": 5,
+            "predicted_rank": 13,
+            "actual_rank": 62,
+            "in_both_top_20": false
+          },
+          {
+            "code": 222694,
+            "position": "DEF",
+            "team_code": 2,
+            "ev": 4.316,
+            "actual_points": 1,
+            "predicted_rank": 14,
+            "actual_rank": 210,
+            "in_both_top_20": false
+          },
+          {
+            "code": 651426,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 4.284,
+            "actual_points": 0,
+            "predicted_rank": 15,
+            "actual_rank": 817,
+            "in_both_top_20": false
+          },
+          {
+            "code": 154561,
+            "position": "GK",
+            "team_code": 3,
+            "ev": 4.283,
+            "actual_points": 6,
+            "predicted_rank": 16,
+            "actual_rank": 32,
+            "in_both_top_20": false
+          },
+          {
+            "code": 607464,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 4.2605,
+            "actual_points": 5,
+            "predicted_rank": 17,
+            "actual_rank": 68,
+            "in_both_top_20": false
+          },
+          {
+            "code": 204936,
+            "position": "GK",
+            "team_code": 43,
+            "ev": 4.2555,
+            "actual_points": 1,
+            "predicted_rank": 18,
+            "actual_rank": 193,
+            "in_both_top_20": false
+          },
+          {
+            "code": 201658,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 4.219,
+            "actual_points": 3,
+            "predicted_rank": 19,
+            "actual_rank": 90,
+            "in_both_top_20": false
+          },
+          {
+            "code": 578153,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.1905,
+            "actual_points": 3,
+            "predicted_rank": 20,
+            "actual_rank": 101,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 36,
+        "predictions_count": 838,
+        "negative_actual_count": 2,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.5581072376029058,
+        "top_20_capture_ratio": 0.5798319327731093,
+        "top_20_overlap": 0.25,
+        "spearman_within_gw": 0.7261086686569797,
+        "spearman_by_position": {
+          "DEF": 0.6819962777086788,
+          "FWD": 0.8150533303087677,
+          "GK": 0.790908541400395,
+          "MID": 0.7148684681694804
+        },
+        "top_20_details": [
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 11.696,
+            "actual_points": 5,
+            "predicted_rank": 1,
+            "actual_rank": 72,
+            "in_both_top_20": false
+          },
+          {
+            "code": 578153,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 10.006499999999999,
+            "actual_points": 6,
+            "predicted_rank": 2,
+            "actual_rank": 59,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 9.902000000000001,
+            "actual_points": 15,
+            "predicted_rank": 3,
+            "actual_rank": 2,
+            "in_both_top_20": true
+          },
+          {
+            "code": 465351,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 8.854,
+            "actual_points": 6,
+            "predicted_rank": 4,
+            "actual_rank": 53,
+            "in_both_top_20": false
+          },
+          {
+            "code": 223094,
+            "position": "FWD",
+            "team_code": 43,
+            "ev": 8.735,
+            "actual_points": 11,
+            "predicted_rank": 5,
+            "actual_rank": 12,
+            "in_both_top_20": true
+          },
+          {
+            "code": 204936,
+            "position": "GK",
+            "team_code": 43,
+            "ev": 8.676,
+            "actual_points": 14,
+            "predicted_rank": 6,
+            "actual_rank": 5,
+            "in_both_top_20": true
+          },
+          {
+            "code": 466052,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 8.45,
+            "actual_points": 5,
+            "predicted_rank": 7,
+            "actual_rank": 71,
+            "in_both_top_20": false
+          },
+          {
+            "code": 437499,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 8.352,
+            "actual_points": 4,
+            "predicted_rank": 8,
+            "actual_rank": 90,
+            "in_both_top_20": false
+          },
+          {
+            "code": 651426,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 7.742999999999999,
+            "actual_points": 4,
+            "predicted_rank": 9,
+            "actual_rank": 96,
+            "in_both_top_20": false
+          },
+          {
+            "code": 165809,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 7.6635,
+            "actual_points": 7,
+            "predicted_rank": 10,
+            "actual_rank": 36,
+            "in_both_top_20": false
+          },
+          {
+            "code": 248875,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 6.754,
+            "actual_points": 12,
+            "predicted_rank": 11,
+            "actual_rank": 9,
+            "in_both_top_20": true
+          },
+          {
+            "code": 437730,
+            "position": "MID",
+            "team_code": 43,
+            "ev": 6.73,
+            "actual_points": 12,
+            "predicted_rank": 12,
+            "actual_rank": 10,
+            "in_both_top_20": true
+          },
+          {
+            "code": 427623,
+            "position": "DEF",
+            "team_code": 31,
+            "ev": 6.395,
+            "actual_points": 4,
+            "predicted_rank": 13,
+            "actual_rank": 88,
+            "in_both_top_20": false
+          },
+          {
+            "code": 172649,
+            "position": "GK",
+            "team_code": 31,
+            "ev": 5.477,
+            "actual_points": 3,
+            "predicted_rank": 14,
+            "actual_rank": 106,
+            "in_both_top_20": false
+          },
+          {
+            "code": 242898,
+            "position": "MID",
+            "team_code": 31,
+            "ev": 5.434,
+            "actual_points": 4,
+            "predicted_rank": 15,
+            "actual_rank": 87,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 5.359,
+            "actual_points": 3,
+            "predicted_rank": 16,
+            "actual_rank": 103,
+            "in_both_top_20": false
+          },
+          {
+            "code": 152551,
+            "position": "MID",
+            "team_code": 31,
+            "ev": 5.084,
+            "actual_points": 3,
+            "predicted_rank": 17,
+            "actual_rank": 104,
+            "in_both_top_20": false
+          },
+          {
+            "code": 232185,
+            "position": "MID",
+            "team_code": 31,
+            "ev": 5.023,
+            "actual_points": 8,
+            "predicted_rank": 18,
+            "actual_rank": 30,
+            "in_both_top_20": false
+          },
+          {
+            "code": 231747,
+            "position": "FWD",
+            "team_code": 31,
+            "ev": 4.995,
+            "actual_points": 6,
+            "predicted_rank": 19,
+            "actual_rank": 47,
+            "in_both_top_20": false
+          },
+          {
+            "code": 469142,
+            "position": "DEF",
+            "team_code": 36,
+            "ev": 4.9635,
+            "actual_points": 6,
+            "predicted_rank": 20,
+            "actual_rank": 54,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 37,
+        "predictions_count": 840,
+        "negative_actual_count": 0,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.40210185308277396,
+        "top_20_capture_ratio": 0.4026548672566372,
+        "top_20_overlap": 0.15,
+        "spearman_within_gw": 0.7645166744500824,
+        "spearman_by_position": {
+          "DEF": 0.6532439333620856,
+          "GK": 0.838516174698957,
+          "MID": 0.8123313206742312,
+          "FWD": 0.8346741486143715
+        },
+        "top_20_details": [
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.9305,
+            "actual_points": 6,
+            "predicted_rank": 1,
+            "actual_rank": 43,
+            "in_both_top_20": false
+          },
+          {
+            "code": 462424,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 5.2225,
+            "actual_points": 8,
+            "predicted_rank": 2,
+            "actual_rank": 24,
+            "in_both_top_20": false
+          },
+          {
+            "code": 17761,
+            "position": "DEF",
+            "team_code": 11,
+            "ev": 4.9705,
+            "actual_points": 3,
+            "predicted_rank": 3,
+            "actual_rank": 77,
+            "in_both_top_20": false
+          },
+          {
+            "code": 220237,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 4.8025,
+            "actual_points": 4,
+            "predicted_rank": 4,
+            "actual_rank": 65,
+            "in_both_top_20": false
+          },
+          {
+            "code": 154561,
+            "position": "GK",
+            "team_code": 3,
+            "ev": 4.702,
+            "actual_points": 6,
+            "predicted_rank": 5,
+            "actual_rank": 40,
+            "in_both_top_20": false
+          },
+          {
+            "code": 465642,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 4.5525,
+            "actual_points": 2,
+            "predicted_rank": 6,
+            "actual_rank": 152,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 4.4655000000000005,
+            "actual_points": 9,
+            "predicted_rank": 7,
+            "actual_rank": 15,
+            "in_both_top_20": true
+          },
+          {
+            "code": 177815,
+            "position": "FWD",
+            "team_code": 2,
+            "ev": 4.3905,
+            "actual_points": 7,
+            "predicted_rank": 8,
+            "actual_rank": 29,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.3295,
+            "actual_points": 2,
+            "predicted_rank": 9,
+            "actual_rank": 123,
+            "in_both_top_20": false
+          },
+          {
+            "code": 200834,
+            "position": "DEF",
+            "team_code": 56,
+            "ev": 4.286,
+            "actual_points": 2,
+            "predicted_rank": 10,
+            "actual_rank": 117,
+            "in_both_top_20": false
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.2855,
+            "actual_points": 14,
+            "predicted_rank": 11,
+            "actual_rank": 3,
+            "in_both_top_20": true
+          },
+          {
+            "code": 432830,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 4.268,
+            "actual_points": 3,
+            "predicted_rank": 12,
+            "actual_rank": 90,
+            "in_both_top_20": false
+          },
+          {
+            "code": 201895,
+            "position": "DEF",
+            "team_code": 56,
+            "ev": 4.267,
+            "actual_points": 1,
+            "predicted_rank": 13,
+            "actual_rank": 208,
+            "in_both_top_20": false
+          },
+          {
+            "code": 224967,
+            "position": "DEF",
+            "team_code": 11,
+            "ev": 4.265,
+            "actual_points": 1,
+            "predicted_rank": 14,
+            "actual_rank": 224,
+            "in_both_top_20": false
+          },
+          {
+            "code": 502500,
+            "position": "FWD",
+            "team_code": 94,
+            "ev": 4.251,
+            "actual_points": 2,
+            "predicted_rank": 15,
+            "actual_rank": 167,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 4.2225,
+            "actual_points": 3,
+            "predicted_rank": 16,
+            "actual_rank": 96,
+            "in_both_top_20": false
+          },
+          {
+            "code": 249231,
+            "position": "DEF",
+            "team_code": 94,
+            "ev": 4.14,
+            "actual_points": 1,
+            "predicted_rank": 17,
+            "actual_rank": 235,
+            "in_both_top_20": false
+          },
+          {
+            "code": 80201,
+            "position": "GK",
+            "team_code": 54,
+            "ev": 4.1295,
+            "actual_points": 2,
+            "predicted_rank": 18,
+            "actual_rank": 105,
+            "in_both_top_20": false
+          },
+          {
+            "code": 484420,
+            "position": "MID",
+            "team_code": 56,
+            "ev": 4.116,
+            "actual_points": 13,
+            "predicted_rank": 19,
+            "actual_rank": 5,
+            "in_both_top_20": true
+          },
+          {
+            "code": 469142,
+            "position": "DEF",
+            "team_code": 36,
+            "ev": 4.107,
+            "actual_points": 2,
+            "predicted_rank": 20,
+            "actual_rank": 154,
+            "in_both_top_20": false
+          }
+        ]
+      },
+      {
+        "gw": 38,
+        "predictions_count": 841,
+        "negative_actual_count": 2,
+        "upper_tail_actual_count": 0,
+        "ndcg_at_20": 0.3910901065756642,
+        "top_20_capture_ratio": 0.3875598086124402,
+        "top_20_overlap": 0.3,
+        "spearman_within_gw": 0.6950986001454098,
+        "spearman_by_position": {
+          "DEF": 0.6483322349399838,
+          "MID": 0.6970859036643501,
+          "GK": 0.6740457360765655,
+          "FWD": 0.8115689225127759
+        },
+        "top_20_details": [
+          {
+            "code": 441164,
+            "position": "DEF",
+            "team_code": 6,
+            "ev": 5.2625,
+            "actual_points": 10,
+            "predicted_rank": 1,
+            "actual_rank": 10,
+            "in_both_top_20": true
+          },
+          {
+            "code": 97032,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 5.2535,
+            "actual_points": 2,
+            "predicted_rank": 2,
+            "actual_rank": 113,
+            "in_both_top_20": false
+          },
+          {
+            "code": 226597,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 4.9255,
+            "actual_points": 1,
+            "predicted_rank": 3,
+            "actual_rank": 225,
+            "in_both_top_20": false
+          },
+          {
+            "code": 209036,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.6075,
+            "actual_points": 0,
+            "predicted_rank": 4,
+            "actual_rank": 404,
+            "in_both_top_20": false
+          },
+          {
+            "code": 141746,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 4.51,
+            "actual_points": 14,
+            "predicted_rank": 5,
+            "actual_rank": 3,
+            "in_both_top_20": true
+          },
+          {
+            "code": 446008,
+            "position": "MID",
+            "team_code": 1,
+            "ev": 4.474,
+            "actual_points": 9,
+            "predicted_rank": 6,
+            "actual_rank": 13,
+            "in_both_top_20": true
+          },
+          {
+            "code": 469142,
+            "position": "DEF",
+            "team_code": 36,
+            "ev": 4.4285,
+            "actual_points": 1,
+            "predicted_rank": 7,
+            "actual_rank": 255,
+            "in_both_top_20": false
+          },
+          {
+            "code": 484420,
+            "position": "MID",
+            "team_code": 56,
+            "ev": 4.42,
+            "actual_points": 5,
+            "predicted_rank": 8,
+            "actual_rank": 63,
+            "in_both_top_20": false
+          },
+          {
+            "code": 135720,
+            "position": "DEF",
+            "team_code": 6,
+            "ev": 4.402,
+            "actual_points": 8,
+            "predicted_rank": 9,
+            "actual_rank": 15,
+            "in_both_top_20": true
+          },
+          {
+            "code": 220237,
+            "position": "DEF",
+            "team_code": 4,
+            "ev": 4.3585,
+            "actual_points": 3,
+            "predicted_rank": 10,
+            "actual_rank": 95,
+            "in_both_top_20": false
+          },
+          {
+            "code": 532529,
+            "position": "MID",
+            "team_code": 36,
+            "ev": 4.3215,
+            "actual_points": 2,
+            "predicted_rank": 11,
+            "actual_rank": 169,
+            "in_both_top_20": false
+          },
+          {
+            "code": 204716,
+            "position": "DEF",
+            "team_code": 14,
+            "ev": 4.3125,
+            "actual_points": 1,
+            "predicted_rank": 12,
+            "actual_rank": 213,
+            "in_both_top_20": false
+          },
+          {
+            "code": 477717,
+            "position": "DEF",
+            "team_code": 90,
+            "ev": 4.302,
+            "actual_points": 0,
+            "predicted_rank": 13,
+            "actual_rank": 565,
+            "in_both_top_20": false
+          },
+          {
+            "code": 462424,
+            "position": "DEF",
+            "team_code": 3,
+            "ev": 4.281,
+            "actual_points": 0,
+            "predicted_rank": 14,
+            "actual_rank": 538,
+            "in_both_top_20": false
+          },
+          {
+            "code": 154561,
+            "position": "GK",
+            "team_code": 3,
+            "ev": 4.2425,
+            "actual_points": 0,
+            "predicted_rank": 15,
+            "actual_rank": 357,
+            "in_both_top_20": false
+          },
+          {
+            "code": 201658,
+            "position": "MID",
+            "team_code": 91,
+            "ev": 4.194,
+            "actual_points": 10,
+            "predicted_rank": 16,
+            "actual_rank": 8,
+            "in_both_top_20": true
+          },
+          {
+            "code": 472769,
+            "position": "DEF",
+            "team_code": 43,
+            "ev": 4.1805,
+            "actual_points": 0,
+            "predicted_rank": 17,
+            "actual_rank": 556,
+            "in_both_top_20": false
+          },
+          {
+            "code": 178301,
+            "position": "FWD",
+            "team_code": 7,
+            "ev": 4.1505,
+            "actual_points": 13,
+            "predicted_rank": 18,
+            "actual_rank": 4,
+            "in_both_top_20": true
+          },
+          {
+            "code": 204936,
+            "position": "GK",
+            "team_code": 43,
+            "ev": 4.117,
+            "actual_points": 0,
+            "predicted_rank": 19,
+            "actual_rank": 400,
+            "in_both_top_20": false
+          },
+          {
+            "code": 538207,
+            "position": "FWD",
+            "team_code": 4,
+            "ev": 4.108,
+            "actual_points": 2,
+            "predicted_rank": 20,
+            "actual_rank": 171,
+            "in_both_top_20": false
+          }
+        ]
+      }
+    ],
+    "gw_calibration": [
+      {
+        "gw": 29,
+        "ev_total": 852.432,
+        "actual_total": 903.0,
+        "signed_bias": -50.567999999999984,
+        "ev_actual_ratio": 0.9440000000000001,
+        "mae": 0.897869512195122,
+        "rmse": 1.863135445536538,
+        "mean_log_score": 1.7474668946262257,
+        "mean_crps": 0.6175721420731707,
+        "pit_80_coverage": 0.75
+      },
+      {
+        "gw": 30,
+        "ev_total": 854.7345,
+        "actual_total": 956.0,
+        "signed_bias": -101.26549999999997,
+        "ev_actual_ratio": 0.8940737447698746,
+        "mae": 0.9347049878345499,
+        "rmse": 1.8400751711113958,
+        "mean_log_score": 2.282846041914204,
+        "mean_crps": 0.6506896651459854,
+        "pit_80_coverage": 0.7262773722627737
+      },
+      {
+        "gw": 31,
+        "ev_total": 682.9245,
+        "actual_total": 739.0,
+        "signed_bias": -56.075500000000034,
+        "ev_actual_ratio": 0.9241197564276048,
+        "mae": 0.9307010542168674,
+        "rmse": 1.9217418440011498,
+        "mean_log_score": 2.0064378566637,
+        "mean_crps": 0.6435972195030121,
+        "pit_80_coverage": 0.7469879518072289
+      },
+      {
+        "gw": 32,
+        "ev_total": 854.829,
+        "actual_total": 904.0,
+        "signed_bias": -49.17100000000005,
+        "ev_actual_ratio": 0.9456073008849557,
+        "mae": 0.9385544794188861,
+        "rmse": 2.084243193455915,
+        "mean_log_score": 2.2379256121943536,
+        "mean_crps": 0.6637833958837772,
+        "pit_80_coverage": 0.7469733656174334
+      },
+      {
+        "gw": 33,
+        "ev_total": 1124.903,
+        "actual_total": 1220.0,
+        "signed_bias": -95.09699999999998,
+        "ev_actual_ratio": 0.9220516393442623,
+        "mae": 1.0817720144752714,
+        "rmse": 2.20558523972628,
+        "mean_log_score": 2.043292100944769,
+        "mean_crps": 0.7641801817441263,
+        "pit_80_coverage": 0.7406513872135102
+      },
+      {
+        "gw": 34,
+        "ev_total": 595.7175,
+        "actual_total": 625.0,
+        "signed_bias": -29.282500000000027,
+        "ev_actual_ratio": 0.953148,
+        "mae": 0.9233874570446736,
+        "rmse": 1.852289239208414,
+        "mean_log_score": 1.9438809110280368,
+        "mean_crps": 0.6375425210481099,
+        "pit_80_coverage": 0.7268041237113402
+      },
+      {
+        "gw": 35,
+        "ev_total": 861.7185,
+        "actual_total": 871.0,
+        "signed_bias": -9.281500000000051,
+        "ev_actual_ratio": 0.9893438576349024,
+        "mae": 0.9050366586538462,
+        "rmse": 1.8855217078775317,
+        "mean_log_score": 2.14668291982565,
+        "mean_crps": 0.6273436319110577,
+        "pit_80_coverage": 0.7391826923076923
+      },
+      {
+        "gw": 36,
+        "ev_total": 951.2495,
+        "actual_total": 985.0,
+        "signed_bias": -33.75049999999999,
+        "ev_actual_ratio": 0.9657355329949239,
+        "mae": 0.9699170644391407,
+        "rmse": 1.9659386135278751,
+        "mean_log_score": 2.1752954814115695,
+        "mean_crps": 0.6605133658540326,
+        "pit_80_coverage": 0.7422434367541766
+      },
+      {
+        "gw": 37,
+        "ev_total": 849.847,
+        "actual_total": 873.0,
+        "signed_bias": -23.15300000000002,
+        "ev_actual_ratio": 0.9734788087056128,
+        "mae": 0.879025,
+        "rmse": 1.841974815472061,
+        "mean_log_score": 1.6845254676207881,
+        "mean_crps": 0.5979385803571429,
+        "pit_80_coverage": 0.7666666666666667
+      },
+      {
+        "gw": 38,
+        "ev_total": 854.352,
+        "actual_total": 879.0,
+        "signed_bias": -24.648000000000025,
+        "ev_actual_ratio": 0.9719590443686007,
+        "mae": 0.9312021403091557,
+        "rmse": 1.841790859988769,
+        "mean_log_score": 2.354841991857891,
+        "mean_crps": 0.6377209256837099,
+        "pit_80_coverage": 0.7407847800237812
+      }
+    ],
+    "cumulative_top_20_details": [
+      {
+        "code": 141746,
+        "position": "MID",
+        "team_code": 1,
+        "ev": 51.786500000000004,
+        "actual_points": 77,
+        "predicted_rank": 1,
+        "actual_rank": 1,
+        "in_both_top_20": true
+      },
+      {
+        "code": 97032,
+        "position": "DEF",
+        "team_code": 14,
+        "ev": 49.65500000000001,
+        "actual_points": 46,
+        "predicted_rank": 2,
+        "actual_rank": 24,
+        "in_both_top_20": false
+      },
+      {
+        "code": 209036,
+        "position": "DEF",
+        "team_code": 43,
+        "ev": 48.44050000000001,
+        "actual_points": 47,
+        "predicted_rank": 3,
+        "actual_rank": 20,
+        "in_both_top_20": true
+      },
+      {
+        "code": 472769,
+        "position": "DEF",
+        "team_code": 43,
+        "ev": 46.106,
+        "actual_points": 37,
+        "predicted_rank": 4,
+        "actual_rank": 63,
+        "in_both_top_20": false
+      },
+      {
+        "code": 226597,
+        "position": "DEF",
+        "team_code": 3,
+        "ev": 44.471,
+        "actual_points": 56,
+        "predicted_rank": 5,
+        "actual_rank": 9,
+        "in_both_top_20": true
+      },
+      {
+        "code": 502500,
+        "position": "FWD",
+        "team_code": 94,
+        "ev": 42.7575,
+        "actual_points": 40,
+        "predicted_rank": 6,
+        "actual_rank": 50,
+        "in_both_top_20": false
+      },
+      {
+        "code": 204936,
+        "position": "GK",
+        "team_code": 43,
+        "ev": 42.719,
+        "actual_points": 34,
+        "predicted_rank": 7,
+        "actual_rank": 85,
+        "in_both_top_20": false
+      },
+      {
+        "code": 465642,
+        "position": "DEF",
+        "team_code": 4,
+        "ev": 42.1895,
+        "actual_points": 25,
+        "predicted_rank": 8,
+        "actual_rank": 151,
+        "in_both_top_20": false
+      },
+      {
+        "code": 244851,
+        "position": "MID",
+        "team_code": 8,
+        "ev": 39.930499999999995,
+        "actual_points": 31,
+        "predicted_rank": 9,
+        "actual_rank": 103,
+        "in_both_top_20": false
+      },
+      {
+        "code": 465351,
+        "position": "DEF",
+        "team_code": 43,
+        "ev": 39.82600000000001,
+        "actual_points": 29,
+        "predicted_rank": 10,
+        "actual_rank": 121,
+        "in_both_top_20": false
+      },
+      {
+        "code": 503139,
+        "position": "MID",
+        "team_code": 91,
+        "ev": 39.789,
+        "actual_points": 38,
+        "predicted_rank": 11,
+        "actual_rank": 56,
+        "in_both_top_20": false
+      },
+      {
+        "code": 424876,
+        "position": "MID",
+        "team_code": 14,
+        "ev": 39.009,
+        "actual_points": 56,
+        "predicted_rank": 12,
+        "actual_rank": 10,
+        "in_both_top_20": true
+      },
+      {
+        "code": 437730,
+        "position": "MID",
+        "team_code": 43,
+        "ev": 38.705499999999994,
+        "actual_points": 37,
+        "predicted_rank": 13,
+        "actual_rank": 62,
+        "in_both_top_20": false
+      },
+      {
+        "code": 222531,
+        "position": "MID",
+        "team_code": 17,
+        "ev": 38.222,
+        "actual_points": 74,
+        "predicted_rank": 14,
+        "actual_rank": 2,
+        "in_both_top_20": true
+      },
+      {
+        "code": 201895,
+        "position": "DEF",
+        "team_code": 56,
+        "ev": 38.167,
+        "actual_points": 32,
+        "predicted_rank": 15,
+        "actual_rank": 99,
+        "in_both_top_20": false
+      },
+      {
+        "code": 215413,
+        "position": "MID",
+        "team_code": 11,
+        "ev": 37.818,
+        "actual_points": 48,
+        "predicted_rank": 16,
+        "actual_rank": 14,
+        "in_both_top_20": true
+      },
+      {
+        "code": 532529,
+        "position": "MID",
+        "team_code": 36,
+        "ev": 37.78,
+        "actual_points": 43,
+        "predicted_rank": 17,
+        "actual_rank": 37,
+        "in_both_top_20": false
+      },
+      {
+        "code": 469142,
+        "position": "DEF",
+        "team_code": 36,
+        "ev": 37.7385,
+        "actual_points": 43,
+        "predicted_rank": 18,
+        "actual_rank": 35,
+        "in_both_top_20": false
+      },
+      {
+        "code": 215379,
+        "position": "MID",
+        "team_code": 17,
+        "ev": 37.5335,
+        "actual_points": 61,
+        "predicted_rank": 19,
+        "actual_rank": 5,
+        "in_both_top_20": true
+      },
+      {
+        "code": 232928,
+        "position": "MID",
+        "team_code": 11,
+        "ev": 37.513,
+        "actual_points": 40,
+        "predicted_rank": 20,
+        "actual_rank": 48,
+        "in_both_top_20": false
+      }
+    ]
+  }
+}

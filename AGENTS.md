@@ -117,16 +117,56 @@ log 0.140500, +2.12% over the best baseline, passes all eight frozen gate diagno
 every season) but stays **development-only, not promoted** (unversioned proxies plus a development
 minutes proxy). See `docs/phase3-stage-c-attacking-candidate-v{2,3}-development.md`.
 
-The next Stage C exposure-weighted candidates are implemented, pre-registered, and offline-tested,
-but **neither historical development runner has been executed**. Goals Candidate V4
-(`exposure_weighted_xg_team_share_attacking_goals_v4`, goals contract 1.4) and assists Candidate V2
-(`exposure_weighted_xa_team_share_assists_v2`, assists contract 1.2) replace the per-appearance
-share with a shrunk xG/xA-per-minute rate multiplied by unconditional expected minutes from the
-frozen `trailing_5_player_minutes` distribution, then normalise to the same Stage A team scale.
-They use xG/xA only, a fixed 90-minute position-specific prior, and conserve the team rate in
-expectation. They do not change the frozen composer or the prospective default. Any historical
-execution requires separate explicit authorization: one clean goals run and one clean assists run,
-independent reconciliation, and no promotion verdict. See
+The Stage C exposure-weighted successors replace the per-appearance share with a shrunk
+xG/xA-per-minute rate multiplied by unconditional expected minutes from the frozen
+`trailing_5_player_minutes` distribution, then normalise to the same Stage A team scale. They use
+xG/xA only, a fixed 90-minute position-specific prior, and conserve the team rate in expectation.
+They do not change the frozen composer or the prospective default. Each has now been run **once**
+as a clean historical development evaluation (2026-08-07, against a freshly rebuilt archive whose
+full suite passes 1,276 tests with zero skips). Both are **development-only, not promoted**, are
+left as committed, and are **not retuned or re-judged**. Both share the identical estimator path
+split -- 19.44% cold start, 22.29% equal share, 58.27% exposure weighted -- because both key off
+the same Stage A exposure and xG/xA coverage.
+
+Goals Candidate V4 (`exposure_weighted_xg_team_share_attacking_goals_v4`, goals contract 1.4)
+**misses its aggregate bar**: mean log score 0.14418 against the best baseline
+`trailing_player_goal_rate_poisson` at 0.14355, a lift of **-0.4426%** where 1% was required, and
+**-0.0149% against V3** (0.14416) -- indistinguishable, marginally behind. Two of eight development
+diagnostics fail (aggregate log lift; per-season regression). It nonetheless wins **both**
+guardrails against the baseline (RPS 0.03476 vs 0.03513, +1.06%; Brier>=1 0.03101 vs 0.03138,
++1.20%) and posts the best PIT-80 absolute error of the four models at 0.0009.
+
+**The pooled goals figure measures xG's absence, not the candidate.** Per-season lift splits
+exactly on coverage: 2021-22 **-11.02%**, 2022-23 -7.05%, 2023-24 +1.24%, 2024-25 +5.03%, 2025-26
+**+7.14%**. 2021-22 runs 100% on the equal-share fallback because there is no xG to weight exposure
+with, so the candidate degenerates and the two pre-xG seasons drag the pooled number below the bar.
+This is the same regime effect already recorded for Stage A; never quote the pooled figure as the
+answer. Whether the covered-season gain is real or regime-specific is not decidable from one run.
+
+Assists Candidate V2 (`exposure_weighted_xa_team_share_assists_v2`, assists contract 1.2) **clears
+the baseline bar but loses the head-to-head**: mean log score 0.14010 against
+`trailing_player_assist_rate_poisson` at 0.14273, **+1.8458%**, with both guardrails improving
+(RPS 0.03240 vs 0.03314, +2.26%; Brier>=1 0.02978 vs 0.03052, +2.43%) and seven of eight
+diagnostics passing -- the failure is per-season regression confined to 2021-22 (-4.68%), again the
+no-xA season on the equal-share fallback. But against the incumbent
+`xa_informed_trailing_player_assists_v1` already in the composer, V2 is **behind on mean log score:
+0.14010 vs 0.13994, -0.1104%**, while winning both guardrails against it (RPS 0.03240 vs 0.03279;
+Brier 0.02978 vs 0.03018).
+
+**The V2-vs-V1 gap is resolution bought with reliability, not a narrower distribution.** The
+`P(>=1 assist)` reliability curves show V2 separating players far more aggressively than V1: it
+moves 2,815 rows out of the lowest bucket and multiplies the confident buckets -- [0.2,0.3) 884 ->
+2,076, [0.3,0.4) 47 -> 480, [0.4,0.5) 16 -> 80. That is **higher resolution**, and per bucket V2 is
+actually the better-calibrated of the two at the top ([0.3,0.4) over-predicts by +0.073 against
+V1's +0.112; [0.4,0.5) +0.120 against +0.228). But **every confident bucket over-predicts in both
+models**, and V2 exposes five to ten times as many rows to that bias. A bounded quadratic score
+barely notices a 0.02-0.07 over-prediction; the log score charges `-log(1 - p)` on every non-event
+at the inflated `p`, so the same rows that win RPS and Brier lose mean log score. Do **not** read
+this as the Stage B Candidate V3 pattern: V3 improved *all four* proper scores including log and
+failed only on rank resolution, which is close to the opposite trade.
+
+Results: `results/stage_c_goals_candidate_v4_development.json`,
+`results/stage_c_assists_candidate_v2_development.json`. Designs:
 `docs/phase3-stage-c-attacking-candidate-v4-design.md` and
 `docs/phase3-stage-c-assists-candidate-v2-design.md`.
 
@@ -161,19 +201,36 @@ and future transfers use the deadline's static prices with no price-change or se
 See `docs/phase4-*`, `docs/prospective-points-artifact.md`, and
 `docs/stage-e-squad-optimizer.md`.
 
-The Stage D prospective-EV walk-forward backtest is implemented and pre-registered under
-`config/phase4_ev_backtest_evaluation.yaml` contract 1.2, but **has not been executed and has no
-result artifact**. It covers the final ten observed gameweeks of 2025/26 (expected GW29-38, 99
-fixtures, 8,224 player-fixture rows), comparing the current V3 goals / coupled-assists architecture
-with a V1 goals / V1 assists diagnostic comparator on identical rows. It composes complete fixture
-rosters with common seeds, scores fixture distributions plus weekly/cumulative ranking, requires a
-complete replay target, and publishes an immutable provenance-bearing JSON result only after clean
-pre/postflight checks. Contract 1.2 pins the BPS residual fit and the trailing ICT reduction is
-bit-reproducible across DuckDB thread counts. The run remains DEVELOPMENT-ONLY: it carries the known
-composer P(play) double-gating defect and uses outcome-derived historical roster plus first-kickoff
-cutoff proxies, so it cannot authorize production use or promotion. Do not execute it without
-explicit owner authorization. Keep `results/` tracked; after an authorized run, review and commit
-the immutable result before any later run.
+The Stage D prospective-EV walk-forward backtest has now been **executed once** (2026-08-07) under
+`config/phase4_ev_backtest_evaluation.yaml` contract 1.2, at commit `8af5760`, and its immutable
+result is `results/ev_backtest_2025_26_gw29_38.json`. It is **never re-run, amended, or re-judged**.
+It covers the final ten observed gameweeks of 2025/26, comparing the current V3 goals /
+coupled-assists architecture with a V1 goals / V1 assists diagnostic comparator on identical rows.
+Anchors matched the contract exactly: GW29-38, 99 fixtures, 8,224 player-fixture rows, 7,894
+player-GW rows, 841 players, `mart_target_completeness` complete for 2025-26 / `2026_27`, 16 hashed
+source files unchanged, clean worktree and unchanged HEAD at both pre- and postflight.
+
+**The V1 independent comparator outscores the V3 coupled primary.** On identical rows: mean log
+score 2.0899 vs **2.0510**, CRPS 0.6351 vs **0.6328**, NDCG@20 0.7762 vs **0.7926**, top-20 capture
+0.7763 vs **0.7968**, top-20 overlap 0.25 vs **0.35**, MAE 0.9423 vs **0.9156**, cumulative Spearman
+0.9515 vs 0.9520. The primary loses or ties on every scored metric. Its one clear win is aggregate
+calibration: **EV/actual 1.0163 against 0.9473**, a signed bias of +146.4 against -472.3 on an
+8,955-point actual total -- exactly where conserving the team goal total should show, and the
+independent architecture does not conserve it.
+
+**This decides nothing.** The comparator is pre-registered as
+`development_diagnostic_only_not_a_promotion_gate`; the run carries the known composer P(play)
+double-gating defect; and the target roster and first-kickoff cutoff are unversioned
+outcome-derived proxies. It cannot authorize production use, promotion, or a change of default.
+
+Two figures need reading with care. **Cumulative Spearman near 0.95 is inflated** by ranking all 841
+players including non-starters -- it largely measures who plays; the honest within-gameweek figure
+is 0.70-0.78 and cumulative top-20 overlap is 5 of 20. **PIT-80 coverage is 0.7404 against a nominal
+0.80**, so the fixture distributions are too narrow. Contract 1.2 pins the BPS residual fit, and
+`trailing_ict` is bit-reproducible across DuckDB thread counts. Keep `results/` tracked; commit each
+immutable result before any later run -- every candidate runner's postflight fails closed on a dirty
+worktree, so an uncommitted artifact silently invalidates the next run after it has done all its
+work.
 
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
@@ -512,8 +569,11 @@ Unless the user sets another priority, address prerequisites before model sophis
    end-to-end Stage C is unvalidated. The team-coupled successors (Candidate V2 refuted, V3 the
    best attacking candidate but development-only) are now pre-registered and evaluated under
    amendments 1.2/1.3; both are left as committed and are not retuned. The exposure-weighted goals
-   V4 and assists V2 successors are pre-registered and implemented but unrun; do not execute either
-   runner without separate authorization, and do not extend V1 into that role.
+   V4 and assists V2 successors have each had their single authorized development run (V4 -0.44% vs
+   baseline and level with V3; V2 +1.85% vs baseline but -0.11% against the incumbent V1). Both are
+   left as committed, are **not retuned**, and may not be re-run or re-judged. A ranking- or
+   accuracy-targeted successor needs its own named policy and amendment, not a post-hoc tweak of
+   either, and do not extend V1 into that role.
 8. The prospective forecasting path (`jobs/prospective_points_v1.py`) and Stage D composer are
    development-only forward tooling, not gated candidates. Two tracks improve them: a
    **prospective-forecast track** using live-snapshot fields (prices `now_cost`, penalty/set-piece
@@ -535,9 +595,13 @@ Unless the user sets another priority, address prerequisites before model sophis
    regression test). Before operational use, measure and contract the horizon semantics of the
    next-round availability overlay, add independent optimiser code/config/solver provenance, and
    state that future prices and selling values are static/unknown. The contract-1.2 Stage D EV
-   walk-forward runner is ready but unexecuted; its one archive run is a separate owner decision,
-   development-only, and not a promotion gate. Prospective changes must stay point-in-time safe and
-   must not silently re-run or re-judge any frozen historical evaluation.
+   walk-forward backtest has had its one archive run (`results/ev_backtest_2025_26_gw29_38.json`);
+   it is immutable and is not re-run. Its result -- the V1 comparator outscoring the V3/coupled
+   primary on every scored metric, the primary winning only aggregate calibration -- is a
+   development diagnostic and explicitly **not** grounds to change the prospective default.
+   Diagnosing it is legitimate follow-up work; reinterpreting it as a promotion verdict is not.
+   Prospective changes must stay point-in-time safe and must not silently re-run or re-judge any
+   frozen historical evaluation.
 9. After the optimiser blockers, build the **append-only prediction ledger and BI semantic export**
    before a dashboard UI. Retain both player-fixture and player-gameweek predictions for every
    pre-deadline run, never overwrite a vintage, and join actual outcomes only after finalisation.

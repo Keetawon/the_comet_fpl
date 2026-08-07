@@ -19,20 +19,30 @@ promoted. Candidate V3's development result was invalidated for leakage; its lea
 V4 was evaluated once and also missed the fixed gate, so `trailing_goals_attack_defence` remains the
 Stage A model. Phase 2's minutes Candidates V1/V2/V3 are development-only; V2/V3 fail the frozen
 starter-ranking gate. Phase 3's team-coupled, minutes-gated attacking Candidate V3 is the best
-development-evaluated candidate but remains unpromoted. The exposure-weighted successors -- goals
-V4 (`exposure_weighted_xg_team_share_attacking_goals_v4`) and assists V2
-(`exposure_weighted_xa_team_share_assists_v2`) -- are pre-registered and offline-tested but have
-**not** had their single historical development runs. Stage D v3 composes the components by seeded
-Monte-Carlo and awards bonus through a joint per-fixture BPS simulation across both clubs.
+development-evaluated candidate but remains unpromoted. The exposure-weighted successors have each
+now had their single historical development run and neither is promoted: goals V4
+(`exposure_weighted_xg_team_share_attacking_goals_v4`) misses its aggregate bar at -0.44% and ties
+V3 (-0.01%), though it wins both guardrails and gains monotonically in the xG-covered seasons
+(+1.24% / +5.03% / +7.14%) while the two pre-xG seasons drag the pooled figure down; assists V2
+(`exposure_weighted_xa_team_share_assists_v2`) clears the baseline bar at +1.85% but is **behind the
+V1 already in the composer** (-0.11% log). V2 wins the bounded guardrails by separating players far
+more aggressively than V1, but every confident reliability bucket over-predicts in both models and
+V2 puts five to ten times as many rows there, which the log score charges for and a bounded
+quadratic score does not -- resolution bought with reliability, not a narrower distribution.
+Stage D v3 composes the components by seeded Monte-Carlo and awards bonus through a joint
+per-fixture BPS simulation across both clubs.
 
 The prospective job now emits a reproducible, provenance-bearing JSONL artifact containing one
 full-points distribution per `(season, gw, code)`. Stage E consumes only that artifact and produces
 a deterministic legal squad, lineup, captain, bench, and bounded multi-GW transfer plan. Both are
-explicitly development-only. A provenance-guarded Stage D EV walk-forward backtest is also
-implemented and pre-registered under contract 1.2 for the final ten observed gameweeks of 2025/26;
-it co-scores the current V3/coupled architecture and a V1 diagnostic comparator, but has **not**
-been executed and has no result. It remains diagnostic only because it carries the known composer
-P(play) double-gating defect plus historical roster and first-kickoff cutoff proxies. Before
+explicitly development-only. The provenance-guarded Stage D EV walk-forward backtest has now been
+**run once** under contract 1.2 over the final ten observed gameweeks of 2025/26
+(`results/ev_backtest_2025_26_gw29_38.json`). Its headline is negative for the current default: the
+**V1 diagnostic comparator outscores the V3/coupled primary on every scored metric** (log 2.0510 vs
+2.0899, NDCG@20 0.7926 vs 0.7762), the primary's one clear win being aggregate calibration
+(EV/actual 1.0163 vs 0.9473). It decides nothing -- the comparator is pre-registered as a diagnostic
+and not a gate, and the run carries the known composer P(play) double-gating defect plus historical
+roster and first-kickoff cutoff proxies. Before
 operational use, the optimiser needs the no-transfer pruning
 defect fixed, horizon availability semantics measured, stronger optimiser-run provenance, and an
 explicit static-price policy. The append-only prediction ledger, BI semantic exports, static
@@ -298,7 +308,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | **0b** | Historical/live ingestion, PIT facts, scoring calculator, snapshots | **complete** |
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
-| 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 are development-evaluated; exposure-weighted goals V4 / assists V2 are pre-registered but unrun; the Stage D v3 composer, prospective forecast, and 2025/26 GW29-38 EV backtest runner are implemented development-only, with the EV backtest not yet executed |
+| 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 development-evaluated; exposure-weighted goals V4 (-0.44% vs baseline, ties V3) and assists V2 (+1.85% vs baseline, -0.11% vs the incumbent V1) each run once, development-only, neither promoted; Stage D v3 composer, prospective forecast, and the GW29-38 EV backtest all run and development-only, with the V1 comparator outscoring the V3 primary |
 | 3b | Stage E optimiser + prediction ledger + `publish` | optimiser and stable input artifact implemented development-only; optimiser hardening, append-only prediction ledger, BI exports, and static `publish` remain |
 | 4 | Dashboard v1 | not started |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
