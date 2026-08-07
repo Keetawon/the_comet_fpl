@@ -117,6 +117,19 @@ log 0.140500, +2.12% over the best baseline, passes all eight frozen gate diagno
 every season) but stays **development-only, not promoted** (unversioned proxies plus a development
 minutes proxy). See `docs/phase3-stage-c-attacking-candidate-v{2,3}-development.md`.
 
+The next Stage C exposure-weighted candidates are implemented, pre-registered, and offline-tested,
+but **neither historical development runner has been executed**. Goals Candidate V4
+(`exposure_weighted_xg_team_share_attacking_goals_v4`, goals contract 1.4) and assists Candidate V2
+(`exposure_weighted_xa_team_share_assists_v2`, assists contract 1.2) replace the per-appearance
+share with a shrunk xG/xA-per-minute rate multiplied by unconditional expected minutes from the
+frozen `trailing_5_player_minutes` distribution, then normalise to the same Stage A team scale.
+They use xG/xA only, a fixed 90-minute position-specific prior, and conserve the team rate in
+expectation. They do not change the frozen composer or the prospective default. Any historical
+execution requires separate explicit authorization: one clean goals run and one clean assists run,
+independent reconciliation, and no promotion verdict. See
+`docs/phase3-stage-c-attacking-candidate-v4-design.md` and
+`docs/phase3-stage-c-assists-candidate-v2-design.md`.
+
 Stage D (composition) and a prospective forecasting path are implemented and **development-only**.
 The composer (`models/points_composition.py`) draws the fitted component distributions and applies
 the 2026/27 rules by seeded Monte-Carlo: v1 (core five components), v2 (+ saves + DC), v3 (full
@@ -147,6 +160,20 @@ whole horizon; optimiser output does not yet carry its own complete code/config/
 and future transfers use the deadline's static prices with no price-change or selling-value model.
 See `docs/phase4-*`, `docs/prospective-points-artifact.md`, and
 `docs/stage-e-squad-optimizer.md`.
+
+The Stage D prospective-EV walk-forward backtest is implemented and pre-registered under
+`config/phase4_ev_backtest_evaluation.yaml` contract 1.2, but **has not been executed and has no
+result artifact**. It covers the final ten observed gameweeks of 2025/26 (expected GW29-38, 99
+fixtures, 8,224 player-fixture rows), comparing the current V3 goals / coupled-assists architecture
+with a V1 goals / V1 assists diagnostic comparator on identical rows. It composes complete fixture
+rosters with common seeds, scores fixture distributions plus weekly/cumulative ranking, requires a
+complete replay target, and publishes an immutable provenance-bearing JSON result only after clean
+pre/postflight checks. Contract 1.2 pins the BPS residual fit and the trailing ICT reduction is
+bit-reproducible across DuckDB thread counts. The run remains DEVELOPMENT-ONLY: it carries the known
+composer P(play) double-gating defect and uses outcome-derived historical roster plus first-kickoff
+cutoff proxies, so it cannot authorize production use or promotion. Do not execute it without
+explicit owner authorization. Keep `results/` tracked; after an authorized run, review and commit
+the immutable result before any later run.
 
 The official 2026/27 payload confirms 17 scoring fields; captured official rule sources confirm
 the seven thresholds/units absent from it. Two replay edge cases remain explicitly unexercised.
@@ -484,8 +511,9 @@ Unless the user sets another priority, address prerequisites before model sophis
    conclusion is narrow — xG beats recent goals where xG is measured on this archive — and
    end-to-end Stage C is unvalidated. The team-coupled successors (Candidate V2 refuted, V3 the
    best attacking candidate but development-only) are now pre-registered and evaluated under
-   amendments 1.2/1.3; both are left as committed and are not retuned. Do not extend V1 into that
-   role.
+   amendments 1.2/1.3; both are left as committed and are not retuned. The exposure-weighted goals
+   V4 and assists V2 successors are pre-registered and implemented but unrun; do not execute either
+   runner without separate authorization, and do not extend V1 into that role.
 8. The prospective forecasting path (`jobs/prospective_points_v1.py`) and Stage D composer are
    development-only forward tooling, not gated candidates. Two tracks improve them: a
    **prospective-forecast track** using live-snapshot fields (prices `now_cost`, penalty/set-piece
@@ -506,8 +534,10 @@ Unless the user sets another priority, address prerequisites before model sophis
    pruning defect (always reserve the current squad in every successor set and add a dense
    regression test). Before operational use, measure and contract the horizon semantics of the
    next-round availability overlay, add independent optimiser code/config/solver provenance, and
-   state that future prices and selling values are static/unknown. Prospective changes must stay
-   point-in-time safe and must not silently re-run or re-judge any frozen historical evaluation.
+   state that future prices and selling values are static/unknown. The contract-1.2 Stage D EV
+   walk-forward runner is ready but unexecuted; its one archive run is a separate owner decision,
+   development-only, and not a promotion gate. Prospective changes must stay point-in-time safe and
+   must not silently re-run or re-judge any frozen historical evaluation.
 9. After the optimiser blockers, build the **append-only prediction ledger and BI semantic export**
    before a dashboard UI. Retain both player-fixture and player-gameweek predictions for every
    pre-deadline run, never overwrite a vintage, and join actual outcomes only after finalisation.
