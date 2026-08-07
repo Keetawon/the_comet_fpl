@@ -245,6 +245,20 @@ miscalibration** -- GW29-38 ran at 2.576 goals per fixture, the lowest window in
 about 1.9 standard errors low on 99 fixtures. Do not tune Stage A to a 99-fixture sample; that is
 the home-advantage mistake recorded above.
 
+**(c) has since been re-measured on a second window and the "nothing to do" half of that reading
+is wrong.** On 2025-26 GW10-28 (191 fixtures, 14,959 rows, disjoint from the diagnosis window)
+goals over-predict by **+7.2%**, and the directly measured Stage A expectation is **2.869 against
+an actual 2.712** (ratio 1.058), versus **2.849 against 2.576** (ratio 1.106) on GW29-38. Stage A's
+expectation moves 0.7% between the windows while reality moves 5.0%: it is anchored near the
+pooled mean and **does not track the current season's scoring level**. 2025-26 delivers 2.645 over
+its full 380 fixtures, about 2.5 standard errors below that anchor, and the season-to-season spread
+(2.645 to 3.147) is far wider than the 0.087 standard error of a season mean. So the residual is a
+season-level miss, not a 99-fixture fluke. Tuning `lambda` to the season in progress is still
+forbidden for the same reason as before; what this licenses is the open **Stage A recency /
+time-decay audit**, whose question is how much weight the league scoring level should place on N
+observed fixtures of the current season against the pooled prior. See
+`docs/phase4-composer-out-of-window-validation.md`.
+
 (a) and (b) are now **fixed**. Goals conceded are charged only for the share of the match a player
 was on the pitch, binomially thinned to a measured per-bin exposure (see the measured constant
 below). Clean sheet error fell -7.0% -> -2.4% and the penalty error +43.3% -> +18.0%, cutting their
@@ -554,6 +568,15 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   per-gameweek within-position AUC on `P(60+)` rises 0.90886 -> 0.91815. Measure ranking with AUC,
   not an average-rank Spearman: on a binary outcome with a large tie block the Spearman reads
   -10.9% where AUC reads +2.2%, and the AUC figure is the correct one.
+- **Stage A predicts about 2.86 goals per fixture regardless of the season it is in.** Measured
+  directly on 2025-26: `E[goals]` 2.869 over GW10-28 and 2.849 over GW29-38 -- a 0.7% move --
+  while the actual rate moved 2.712 to 2.576, a 5.0% move. Season rates over the archive are
+  2.729 / 2.732 / **3.147** / 2.845 / **2.645** (pooled 2.820), a 0.50 spread against a season-mean
+  standard error near 0.087, so **the league scoring level is genuinely non-stationary and Stage A
+  does not track it**. The consequence is a persistent composer bias in one direction for a whole
+  season: +5.8% over GW10-28, +10.6% over GW29-38. Do not fix this by fitting `lambda` to the
+  season in progress; fix it, if at all, by measuring how much weight N observed fixtures of the
+  current season should carry against the pooled prior.
 
 ## Priorities for upcoming work
 
@@ -686,9 +709,16 @@ Unless the user sets another priority, address prerequisites before model sophis
    out-of-sample window, not a re-fit. A whole-composer
    recency audit is complete: appearance was the only recency-weighted signal (now fixed); xG-share,
    xA-share, the DC hit rate, and the pooled GK save rate are equal-weighted or league-pooled and
-   were confirmed correct as-is. Still open on this track and measured-but-not-yet-built: a
-   price-informed starter prior in the appearance layer, and a Stage A team-goals recency/time-decay
-   audit (its `lambda_conceded` drives both goal allocation and GK saves). The Stage E squad
+   were confirmed correct as-is. All three composer repairs have now been confirmed on a second,
+   disjoint window (2025-26 GW10-28, 191 fixtures, 14,959 rows): PIT-80 lands at **0.79878** against
+   the nominal 0.80 there, so the calibration repair generalises, and the appearance residual is
+   confirmed persistent at +2.6%. That same run makes the **Stage A team-goals recency/time-decay
+   audit the next accuracy item on evidence**: Stage A expects ~2.86 goals per fixture in both
+   windows while reality delivers 2.712 and 2.576, so the goals residual is a season-level miss
+   rather than the 99-fixture fluke previously recorded (see
+   `docs/phase4-composer-out-of-window-validation.md`). Still open on this track and
+   measured-but-not-yet-built: that audit (its `lambda_conceded` drives both goal allocation and GK
+   saves), and a price-informed starter prior in the appearance layer. The Stage E squad
    optimiser and its stable prospective-points input artifact are now implemented
    **development-only**. The fixed-squad ILP is exact; the multi-GW transfer search is bounded and
    makes no global-optimality claim. Before another decision run, fix the confirmed no-transfer
