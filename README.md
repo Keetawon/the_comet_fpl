@@ -68,7 +68,14 @@ held out, plus a separate regime for zero-appearance windows. On the same 8,224 
 regresses 3.73%, which is the expected point-versus-distribution trade and is reported rather than
 omitted. Unlike Stage B's shrinkage candidates it *gains* rank resolution (within-position AUC on
 `P(60+)` +1.02%), because the raw estimator tied pure-absence and substitute-only windows together.
-See `docs/phase4-composer-minutes-shrinkage-fix.md`. Before
+See `docs/phase4-composer-minutes-shrinkage-fix.md`. On the first live 2026/27 GW1-5 run -- the
+cross-summer boundary the estimator was never fitted against -- the degenerate `P(play) = 0.0` is
+gone (0 of 570 players, was one on the raw estimator), but the boundary surfaces a bounded, narrow
+under-prediction: a nailed starter rested through the May dead rubbers has an all-zero window mapped
+to the out-of-side floor, and the `0.7 * prior + 0.3 * recent` blend caps him at ~0.71 (Vicario
+0.576 against a 0.816 prior). It is left unfixed before GW1 -- conservative, ~1-7 players, and a
+change to a measured-optimal blend -- and recorded in
+`docs/phase4-season-boundary-appearance-underprediction.md`. Before
 operational use, the optimiser needs the no-transfer pruning
 defect fixed, horizon availability semantics measured, stronger optimiser-run provenance, and an
 explicit static-price policy. The append-only prediction ledger, BI semantic exports, static
