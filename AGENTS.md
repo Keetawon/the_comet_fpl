@@ -580,6 +580,25 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   per-gameweek within-position AUC on `P(60+)` rises 0.90886 -> 0.91815. Measure ranking with AUC,
   not an average-rank Spearman: on a binary outcome with a large tie block the Spearman reads
   -10.9% where AUC reads +2.2%, and the AUC figure is the correct one.
+- **At a season boundary the shrinkage floor and the appearance blend under-predict rested-nailed
+  starters, but the degenerate zero is gone.** Measured on the first live 2026/27 GW1-5 prospective
+  run (`as_of` = the real GW1 deadline), the regime the estimator was never fitted against. **Zero**
+  of 570 roster players are predicted a final `P(play)` of exactly 0.0 (was one on the raw
+  `counts / n` estimator): the shrinkage floor plus the `seasonal` blend removes the degenerate zero
+  on live cross-summer data. Zero-history players route to the position prior (constant per position:
+  GK 0.2496, DEF 0.4089, MID 0.4387, FWD 0.4216), never to "will not play" -- but a genuine
+  first-choice **goalkeeper** with no PL history reads 0.25 because the GK prior is reserve-dominated
+  (two keepers per club, one starts), and no live field corrects it. The real defect is bounded and
+  narrow: an all-zero trailing window (a player rested through the May dead rubbers) is mapped by the
+  shrinkage to the out-of-side floor (~0.037), and the blend `p_play = 0.7 * prior + 0.3 * recent`
+  then trusts that *actively wrong* recent at 0.3, capping a nailed player at a ceiling of
+  **~0.71** (goalkeepers ~0.635). Vicario (prior 0.816, live status available) reads **0.576** --
+  ~0.24 below his prior and ~0.14 below the measured cross-season nailed average of **~0.78**. It is
+  narrow (one player above a `prior >= 0.8` bar, ~six high-appearance returners) and conservative
+  (under- not over-prediction), so it is **not fixed before GW1**: the 0.7/0.3 blend is
+  measured-optimal on average and re-weighting the boundary-rest case is a modelling change needing
+  its own validation window, and return-from-rest belongs in the availability overlay. See
+  `docs/phase4-season-boundary-appearance-underprediction.md`.
 - **Stage A predicts about 2.86 goals per fixture regardless of the season it is in.** Measured
   directly on 2025-26: `E[goals]` 2.869 over GW10-28 and 2.849 over GW29-38 -- a 0.7% move --
   while the actual rate moved 2.712 to 2.576, a 5.0% move. Season rates over the archive are
