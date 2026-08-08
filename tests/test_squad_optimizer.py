@@ -27,7 +27,7 @@ from fpl.optimize.squad import (
     exact_lineup,
     optimize_initial_squad,
 )
-from fpl.optimize.transfers import plan_transfers
+from fpl.optimize.transfers import _successor_squads, plan_transfers
 
 HASH = "a" * 64
 
@@ -246,6 +246,117 @@ def test_transfer_planner_takes_hit_only_when_incremental_gain_repays_it(
     assert gw2.hit_points == expected_hit
     assert 15 in gw2.transfers_in
     assert (25 in gw2.transfers_in) is (expected_transfers == 2)
+
+
+_INITIAL_SQUAD = (1, 2, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24, 30, 31, 32)
+
+
+def _with_search(rules: SquadRules, **overrides: int) -> SquadRules:
+    """Override the bounded-search limits on a frozen rules object for a focused test."""
+    return rules.model_copy(update={"search": rules.search.model_copy(update=overrides)})
+
+
+def _successor_fixture(
+    n_def_upgrades: int, upgrade_points: float = 20.0
+) -> tuple[ArtifactIndex, SquadRules, tuple[int, ...]]:
+    """15-man squad plus `n_def_upgrades` DEF alternatives on distinct clubs.
+
+    At the default `upgrade_points` every alternative beats every squad defender, so any single
+    swap of a squad DEF for an alternative has positive immediate improvement -- far more positive
+    proposals than a small transition limit can keep, which is exactly what truncated the
+    no-transfer action away.
+    """
+    squad_players = tuple(p for p in _base_players() if p.code in set(_INITIAL_SQUAD))
+    upgrades = tuple(
+        _Player(code=4000 + i, position="DEF", points=(upgrade_points,), team_id=4000 + i)
+        for i in range(n_def_upgrades)
+    )
+    artifact = _artifact(squad_players + upgrades)
+    rules = load_squad_rules()
+    index = ArtifactIndex.build(artifact, rules)
+    pool = tuple(sorted(u.code for u in upgrades))
+    return index, rules, pool
+
+
+def test_successor_set_reserves_the_no_transfer_action_under_positive_pressure() -> None:
+    """The current squad must survive truncation even when every retained proposal improves.
+
+    Failing-test-first: before the fix the current squad is seeded at improvement 0.0, sorts below
+    every positive-improvement swap, and is truncated at transition_limit_per_state, so it is
+    absent from the successor set. Asserting it is PRESENT fails pre-fix and passes post-fix.
+    """
+    index, rules, pool = _successor_fixture(n_def_upgrades=5)
+    rules = _with_search(
+        rules, transition_limit_per_state=1, maximum_planned_transfers_per_gameweek=1
+    )
+    successors = _successor_squads(index, rules, _INITIAL_SQUAD, pool, 1, 0.0)
+    assert len(successors) >= 2  # the single best swap plus the reserved hold
+    assert _INITIAL_SQUAD in successors
+
+
+@pytest.mark.parametrize("max_depth", [1, 2])
+@pytest.mark.parametrize("transition_limit", [1, 3])
+@pytest.mark.parametrize("n_upgrades", [2, 5])
+def test_no_transfer_action_is_reserved_across_depths_and_limits(
+    max_depth: int, transition_limit: int, n_upgrades: int
+) -> None:
+    index, rules, pool = _successor_fixture(n_def_upgrades=n_upgrades)
+    rules = _with_search(
+        rules,
+        transition_limit_per_state=transition_limit,
+        maximum_planned_transfers_per_gameweek=max_depth,
+    )
+    successors = _successor_squads(index, rules, _INITIAL_SQUAD, pool, 1, 0.0)
+    assert _INITIAL_SQUAD in successors
+
+
+def test_no_transfer_action_is_reserved_when_it_is_already_the_best_proposal() -> None:
+    """When no swap improves, hold sorts at the top and must still be present.
+
+    This case passes before and after the fix -- the control showing the reservation does not
+    depend on truncation happening, only that hold is never dropped.
+    """
+    index, rules, pool = _successor_fixture(n_def_upgrades=3, upgrade_points=0.0)
+    rules = _with_search(
+        rules, transition_limit_per_state=1, maximum_planned_transfers_per_gameweek=1
+    )
+    successors = _successor_squads(index, rules, _INITIAL_SQUAD, pool, 1, 0.0)
+    assert _INITIAL_SQUAD in successors
+
+
+def _hold_artifact() -> ProspectivePointsArtifact:
+    """Initial squad flat at 5.0 in GW2, plus three DEF upgrades each worth only +0.5."""
+    players: list[_Player] = []
+    for player in _base_players(horizon=2):
+        if player.code not in set(_INITIAL_SQUAD):
+            continue
+        players.append(replace(player, points=(player.points[0], 5.0)))
+    for i in range(3):
+        players.append(_Player(code=4000 + i, position="DEF", points=(0.0, 5.5), team_id=4000 + i))
+    return _artifact(tuple(players))
+
+
+def test_planner_holds_when_every_transfer_costs_an_unrepaid_hit() -> None:
+    """With no free transfer available, a small upgrade cannot repay its hit, so the plan holds.
+
+    free_per_gameweek is set to 0 so every GW2 transfer costs a 4-point hit; the DEF upgrades gain
+    only +0.5 each, far short of the hit. transition_limit_per_state=1 means the pre-fix successor
+    set truncated the no-transfer action away and FORCED a losing -4 churn. Post-fix the plan holds:
+    zero transfers, zero hit.
+    """
+    artifact = _hold_artifact()
+    rules = _with_search(load_squad_rules(), transition_limit_per_state=1)
+    rules = rules.model_copy(
+        update={
+            "transfers": rules.transfers.model_copy(
+                update={"free_per_gameweek_after_first_deadline": 0}
+            )
+        }
+    )
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    plan = plan_transfers(index, rules, initial)
+    assert plan.weeks[1].transfers_in == ()
+    assert plan.weeks[1].hit_points == 0
 
 
 def test_distributional_risk_penalty_can_change_a_pick_without_claiming_lift() -> None:

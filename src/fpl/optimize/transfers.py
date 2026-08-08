@@ -129,7 +129,16 @@ def _successor_squads(
                 ) - sum(row_utility(index.rows[(code, gw)], risk_lambda) for code in outgoing)
                 scored[proposal] = improvement
     ordered = sorted(scored, key=lambda item: (-scored[item], item))
-    return tuple(ordered[: rules.search.transition_limit_per_state])
+    kept = list(ordered[: rules.search.transition_limit_per_state])
+    # Always reserve the no-transfer (hold) action. It is seeded at improvement 0.0, so it sorts
+    # below every positive-improvement swap and is truncated away whenever more than
+    # transition_limit_per_state proposals improve -- which is routine for a 15-man squad against a
+    # large pool. Holding is frequently optimal (bank a free transfer, avoid a -4 hit), so the
+    # search must always be able to represent it. The successor set may now be limit + 1; the single
+    # caller iterates it and a returned current squad maps to a zero-transfer, zero-hit week.
+    if squad not in kept:
+        kept.append(squad)
+    return tuple(kept)
 
 
 def _transfer_delta(

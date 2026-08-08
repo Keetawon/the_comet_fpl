@@ -7,19 +7,36 @@ development-only forecast artifact, not a validated FPL recommendation.
 
 The saved GW1-5 result reconciles: every squad and formation is legal, transfer/free-transfer/hit
 accounting is exact, and the reported 330.4045 expected points equals the five weekly lineup and
-captain totals with zero hits. It is still **not operationally ready**:
+captain totals with zero hits.
 
-1. successor pruning can remove the legal no-transfer action after ranking and before beam search;
-2. the current `chance_of_playing_next_round` overlay is repeated across the whole forecast horizon,
+The no-transfer pruning defect is now **fixed**. `_successor_squads` seeded the current squad at an
+immediate improvement of 0.0, sorted every proposal by descending improvement, and truncated to
+`transition_limit_per_state`. Because any swap with a positive immediate improvement sorts above the
+hold action, and for a 15-man squad against a large candidate pool the number of positive-improvement
+swaps far exceeds the limit (200 in the shipped config), the hold action was truncated away
+essentially always -- so the planner was **forced to churn every gameweek regardless of the hit
+cost**, unable to represent banking a transfer or avoiding a -4. This is stronger than "can remove the
+legal no-transfer action": in practice it removed it whenever any transfer improved. The fix reserves
+the current squad in every successor set so it survives truncation regardless of ranking; the returned
+set may now be `limit + 1`, and the single caller iterates it, mapping a returned current squad to a
+zero-transfer, zero-hit week. Regression tests cover the reservation directly (failing-test-first;
+across transfer depths 1-2, transition limits, and candidate-pool sizes; and the control where hold is
+already the best proposal) and end to end (with no free transfer available, a +0.5 upgrade cannot
+repay its -4 hit, and the plan now holds instead of being forced to churn).
+
+The truncation can still drop other legal-but-not-immediately-improving actions -- a transfer that is
+weak now but sets up a future gameweek -- but that is the documented bounded-search approximation, not
+a defect: the no-transfer case is categorically different because holding is the canonical "do
+nothing" baseline that must always be representable, not an optimality-within-bounds question.
+
+Three operational gaps remain open before the plan can be described as operational:
+
+1. the current `chance_of_playing_next_round` overlay is repeated across the whole forecast horizon,
    which needs a measured per-GW policy;
-3. optimiser output needs its own Git/worktree, squad-config, search-policy, and solver provenance,
+2. optimiser output needs its own Git/worktree, squad-config, search-policy, and solver provenance,
    separately from forecast provenance; and
-4. all future affordability checks use the deadline's static `now_cost`; price changes and FPL
+3. all future affordability checks use the deadline's static `now_cost`; price changes and FPL
    selling values are not modelled.
-
-Fix the no-transfer defect and add a dense regression test before another decision run. The other
-three items must be measured, implemented, or made explicit in the output contract before describing
-the plan as operational.
 
 ## Input boundary
 
