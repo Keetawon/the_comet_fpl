@@ -29,7 +29,7 @@ from fpl.validate.baselines import (
     build_baselines,
 )
 from fpl.validate.folds import promoted_team_codes
-from fpl.validate.metrics import MAX_GOALS, expected_goals
+from fpl.validate.metrics import MAX_GOALS, expected_goals, poisson_pmf
 
 TEAM_MATCH_SQL = """
     m.season, m.gw, m.fixture, m.team_id, m.opponent_team_id,
@@ -313,6 +313,28 @@ def test_an_unseen_team_falls_back_to_a_neutral_rating() -> None:
     baseline.fit(_window(_balanced_league(goals_home=2, goals_away=1)))
     (rate,) = baseline.predict_rates(_frame([_row(team_id=99, opponent_team_id=98, was_home=True)]))
     assert rate == pytest.approx(2.0)
+
+
+def test_known_team_codes_reports_fitted_teams_and_leaves_ratings_unchanged() -> None:
+    """The read-only accessor exposes the fitted team_code set; everyone else hits the 1.0x
+    fallback in `rate_for`. Adding it changes no fitted value: `predict()` is byte-identical -- a
+    fitted team keeps its rating and an unseen team still gets the neutral Poisson -- so the
+    Stage A prediction is unchanged and the accessor is purely the missing-set a downstream
+    league-average flag must subtract.
+    """
+    baseline = TrailingGoalsAttackDefence()
+    baseline.fit(_window(_balanced_league(teams=4)))
+    # Fitted team_codes are exactly the four that appeared in the training window (code defaults
+    # to id in `_row`).
+    assert baseline.known_team_codes() == frozenset({1, 2, 3, 4})
+    # An unseen club is missing from the fitted set, so it runs on the 1.0x neutral fallback; the
+    # accessor reports it missing and `predict()` is unchanged by the accessor's addition.
+    unseen = _row(team_id=99, opponent_team_id=98, was_home=True)
+    assert baseline.known_team_codes().isdisjoint({99, 98})
+    (rate,) = baseline.predict_rates(_frame([unseen]))
+    assert rate == pytest.approx(2.0)
+    (dist,) = baseline.predict(_frame([unseen]))
+    assert dist == poisson_pmf(2.0)
 
 
 def test_rates_are_floored_above_zero() -> None:

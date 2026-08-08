@@ -24,6 +24,7 @@ from fpl.jobs.prospective_points_v1 import (
     GW1_2026_27_DEADLINE,
     _expected_points,
     _git_worktree_clean,
+    _stage_a_uses_league_average,
     availability_multiplier,
     live_bootstrap_snapshot,
     player_metadata_live,
@@ -828,3 +829,101 @@ def test_cli_refuses_artifact_output_from_dirty_worktree(
     output = tmp_path / "must-not-exist.jsonl"
     assert prospective_job.main(["--output", str(output)]) == 1
     assert not output.exists()
+
+
+def test_stage_a_league_average_flag_logic_is_pure_over_the_fitted_set() -> None:
+    """The flag is pure over (own team, opponent, fitted set) -- no DuckDB. A player on OR facing a
+    team_code the fitted Stage A model could not resolve ran on the 1.0x league-average fallback:
+    the own team drives his goals via lambda_team and the opponent drives conceded/clean-sheet."""
+    known = frozenset({101, 102})
+    # Both clubs established -> Stage A resolved, not league-average.
+    assert (
+        _stage_a_uses_league_average(
+            team_code=101,
+            opponent_code=102,
+            known_team_codes=known,
+            opponent_conceded_unresolved=False,
+        )
+        is False
+    )
+    # Player's own team is a promoted side (not fitted) -> league-average.
+    assert (
+        _stage_a_uses_league_average(
+            team_code=909,
+            opponent_code=102,
+            known_team_codes=known,
+            opponent_conceded_unresolved=False,
+        )
+        is True
+    )
+    # The opponent is a promoted side -> league-average.
+    assert (
+        _stage_a_uses_league_average(
+            team_code=101,
+            opponent_code=909,
+            known_team_codes=known,
+            opponent_conceded_unresolved=False,
+        )
+        is True
+    )
+    # A None code (a bootstrap team_id with no team_code) and a conceded distribution that could
+    # not be resolved at all both count as league-average too.
+    assert (
+        _stage_a_uses_league_average(
+            team_code=None,
+            opponent_code=102,
+            known_team_codes=known,
+            opponent_conceded_unresolved=False,
+        )
+        is True
+    )
+    assert (
+        _stage_a_uses_league_average(
+            team_code=101,
+            opponent_code=102,
+            known_team_codes=known,
+            opponent_conceded_unresolved=True,
+        )
+        is True
+    )
+
+
+def test_stage_a_league_average_flagged_for_a_club_without_archive_history() -> None:
+    """End-to-end wiring of the fix. Team 3 (code 103) is in the live roster and the GW1 fixture
+    but has no team-match history, so the fitted Stage A ratings resolve only codes 101 and 102.
+    A player facing team 3 (opponent fallback) and a player on team 3 (own-team fallback) must
+    both be flagged league-average. Before the fix the flag was `conceded_dist is None`, which is
+    False here (the fallback still produces a distribution), so the flag never fired."""
+    con = _basic_db(
+        players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 3)],
+        fixtures=[_fixture(501, 1, 3)],
+        history=[(1001, "MID", 1, 2, True), (1002, "FWD", 2, 1, False)],
+    )
+    try:
+        result = predict_prospective_points(
+            con, as_of=AS_OF, season="2026-27", gw_from=1, gw_to=1, db_path=None, repo=None
+        )
+        by_code = {r.code: r for r in result.records}
+        # Player 1001 (team 1) faces promoted team 3 -> opponent used the league-average rating.
+        assert by_code[1001].stage_a_league_average_team is True
+        # Player 1002 is ON promoted team 3 -> own team used the league-average rating.
+        assert by_code[1002].stage_a_league_average_team is True
+    finally:
+        con.close()
+
+
+def test_stage_a_league_average_flag_is_false_when_both_clubs_have_history() -> None:
+    """The negative case: two established clubs (both in the fitted ratings) are not flagged."""
+    con = _basic_db(
+        players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 2)],
+        fixtures=[_fixture(501, 1, 2)],
+        history=[(1001, "MID", 1, 2, True), (1002, "FWD", 2, 1, False)],
+    )
+    try:
+        result = predict_prospective_points(
+            con, as_of=AS_OF, season="2026-27", gw_from=1, gw_to=1, db_path=None, repo=None
+        )
+        for record in result.records:
+            assert record.stage_a_league_average_team is False
+    finally:
+        con.close()

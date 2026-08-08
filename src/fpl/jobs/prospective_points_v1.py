@@ -148,6 +148,8 @@ from fpl.validate.points_harness_v3 import (
 if TYPE_CHECKING:
     import duckdb
 
+    from fpl.validate.baselines import TrailingGoalsAttackDefence
+
 logger = logging.getLogger("fpl.jobs.prospective_points_v1")
 
 # GW1 2026/27 deadline -- the default knowledge-time cutoff for a prospective GW1-onward forecast.
@@ -735,12 +737,17 @@ def prospective_team_scored(
     as_of: datetime,
     team_map: dict[int, int],
     schedule: pl.DataFrame,
+    model: TrailingGoalsAttackDefence | None = None,
 ) -> tuple[dict[tuple[int, int], Distribution], float]:
     """Fit ``trailing_goals_attack_defence`` on history < ``as_of`` and predict each team's scored
     goals for every scheduled fixture in ``schedule``.
 
     Returns ``{(fixture, team_code): scored-goals distribution}`` and the league mean goals conceded
     (the explicit fallback). A player's team-conceded distribution is the OPPONENT's entry.
+
+    Pass a caller-owned ``model`` to keep a handle on the fitted Stage A model after the call (the
+    prospective job does this to read its ``known_team_codes()`` and flag league-average inputs);
+    the default fits an internal instance, leaving every other caller's behaviour unchanged.
     """
     from fpl.validate.baselines import TrailingGoalsAttackDefence, TrainingWindow
 
@@ -773,7 +780,7 @@ def prospective_team_scored(
             if isinstance(value, (int, float)):
                 league_conceded = float(value)
 
-    model = TrailingGoalsAttackDefence()
+    model = model if model is not None else TrailingGoalsAttackDefence()
     model.fit(TrainingWindow(window_frame))
 
     # Build the prediction frame from the live schedule (one row per team-side). Every column the
@@ -904,6 +911,34 @@ class ProspectivePointsResult:
     bootstrap_known_at: datetime
     bootstrap_payload_sha256: str
     schedule_capture_ids: tuple[str, ...]
+
+
+def _stage_a_uses_league_average(
+    *,
+    team_code: int | None,
+    opponent_code: int | None,
+    known_team_codes: frozenset[int],
+    opponent_conceded_unresolved: bool,
+) -> bool:
+    """Whether a player-fixture used a league-average (1.0x) Stage A rating.
+
+    The fitted Stage A model resolves a club's attack and the opponent's defence multiplicatively
+    and falls back to the ``1.0`` league-average multiplier for any ``team_code`` absent from its
+    fitted ratings, so a club with no archive history (a promoted side) is treated as
+    league-average rather than with the promoted-team prior. A player's own team drives his goals
+    via ``lambda_team`` and the opponent drives conceded goals / clean sheets, so either side
+    hitting the fallback makes the prediction league-average-informed.
+
+    ``known_team_codes`` is the fitted model's resolved set; a ``None`` code (an unresolvable
+    bootstrap team_id) and an out-of-window code both count as league-average.
+    ``opponent_conceded_unresolved`` folds in the prior flag condition (no conceded distribution
+    was produced at all), now subsumed by the opponent check but kept explicit.
+    """
+    return (
+        opponent_conceded_unresolved
+        or team_code not in known_team_codes
+        or opponent_code not in known_team_codes
+    )
 
 
 def predict_prospective_points(
@@ -1079,9 +1114,20 @@ def predict_prospective_points(
     )
 
     # 3. Stage A conceded distributions predicted over the scheduled fixtures.
+    from fpl.validate.baselines import TrailingGoalsAttackDefence
+
+    stage_a_model = TrailingGoalsAttackDefence()
     team_scored, league_conceded = prospective_team_scored(
-        con, season=season, as_of=as_of, team_map=team_map, schedule=schedule
+        con,
+        season=season,
+        as_of=as_of,
+        team_map=team_map,
+        schedule=schedule,
+        model=stage_a_model,
     )
+    # team_codes the fitted Stage A ratings resolve; everyone else (a promoted side with no archive
+    # history) ran on the 1.0x league-average fallback and is flagged below.
+    known_team_codes = stage_a_model.known_team_codes()
     league_conceded_dist = poisson_pmf(max(league_conceded, 1e-6))
 
     # 3b. Team-coupled (V3) goals allocation inputs. The share signal (xG vs threat) is resolved per
@@ -1273,7 +1319,12 @@ def predict_prospective_points(
             conceded_dist = (
                 team_scored.get((fixture, opponent_code)) if opponent_code is not None else None
             )
-            stage_a_league_average = conceded_dist is None
+            stage_a_league_average = _stage_a_uses_league_average(
+                team_code=team_code,
+                opponent_code=opponent_code,
+                known_team_codes=known_team_codes,
+                opponent_conceded_unresolved=conceded_dist is None,
+            )
             if conceded_dist is None:
                 conceded_dist = league_conceded_dist
             lambda_conceded = sum(i * mass for i, mass in enumerate(conceded_dist))

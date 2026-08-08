@@ -57,6 +57,17 @@ Each forecast row contains:
 - cold-start, league-average-team, attacking-signal, assist-signal, and transfer flags already
   tracked by the forecaster.
 
+`stage_a_league_average_team` is `true` when this prediction used a league-average (1.0x) Stage A
+rating for the player's own team OR the fixture opponent. The fitted Stage A model resolves every
+club's attack and the opponent's defence multiplicatively and falls back to the 1.0x multiplier for
+any `team_code` absent from its fitted ratings, so a club with no archive history -- a promoted
+side -- runs on the league-average rating: the player's own team drives his goals via `lambda_team`
+and the opponent drives conceded goals / clean sheets. The promoted-team prior
+(attack 0.719x / defence 1.309x) is deliberately **not** applied on this path; using it is separate,
+separately-variance-carrying open modelling work. (An earlier wording, "team unresolvable",
+described only the never-occurring case where a bootstrap `team_id` maps to no `team_code` at all,
+which never fires for the 20 league clubs.)
+
 JSON `null` is preserved. It is never converted to zero. The distribution must be non-negative,
 finite, sum to one within `1e-9`, and reconcile to `expected_points`. Availability is a separate
 reported overlay: it changes the adjusted expectation but never the stored distribution.

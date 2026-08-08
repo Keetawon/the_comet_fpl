@@ -238,6 +238,17 @@ class TrailingAttackDefence(StageABaseline):
     def predict(self, fixtures: pl.DataFrame) -> list[Distribution]:
         return [poisson_pmf(rate) for rate in self.predict_rates(fixtures)]
 
+    def known_team_codes(self) -> frozenset[int]:
+        """The ``team_code`` set the fitted ratings resolve.
+
+        `rate_for` falls back to the ``1.0`` league-average multiplier for any team absent from
+        these ratings (attack and defence share the same keys because they are built from one
+        grouped window), so this is the set that did NOT use the fallback -- everyone else
+        (a club with no archive history, e.g. a promoted side) ran on the league-average rating.
+        Read-only; it changes no fitted value.
+        """
+        return frozenset(self._ratings.attack)
+
 
 class TrailingGoalsAttackDefence(TrailingAttackDefence):
     def __init__(self) -> None:
