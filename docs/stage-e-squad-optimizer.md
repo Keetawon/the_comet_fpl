@@ -29,13 +29,14 @@ weak now but sets up a future gameweek -- but that is the documented bounded-sea
 a defect: the no-transfer case is categorically different because holding is the canonical "do
 nothing" baseline that must always be representable, not an optimality-within-bounds question.
 
-Three operational gaps remain open before the plan can be described as operational:
+The optimiser-provenance gap is now **closed**: `--output` writes a durable, immutable,
+provenance-bearing artifact with its own Git/worktree, squad-config, search-policy, and solver
+provenance, separate from the forecast's (see [Durable optimizer artifact](#durable-optimizer-artifact)
+below). Two operational gaps remain open before the plan can be described as operational:
 
 1. the current `chance_of_playing_next_round` overlay is repeated across the whole forecast horizon,
-   which needs a measured per-GW policy;
-2. optimiser output needs its own Git/worktree, squad-config, search-policy, and solver provenance,
-   separately from forecast provenance; and
-3. all future affordability checks use the deadline's static `now_cost`; price changes and FPL
+   which needs a measured per-GW policy; and
+2. all future affordability checks use the deadline's static `now_cost`; price changes and FPL
    selling values are not modelled.
 
 ## Input boundary
@@ -120,19 +121,58 @@ the expected-value objective. A positive value is only a sensitivity analysis un
 evidence shows it improves an owner-defined utility; a changed squad is not evidence that the
 risk-aware version is better.
 
+## Durable optimizer artifact
+
+`--output PATH` writes an immutable, provenance-bearing record of the decision, defined and validated
+in `src/fpl/artifacts/optimizer_plan.py` and kept out of the thin job. It is the optimiser analogue of
+the prospective-points artifact: the artifact module owns the schema, serialisation, run-id
+derivation, and atomic write; the job discovers provenance and maps the optimiser's domain objects
+into the typed records.
+
+- **Schema.** `schema = "fpl.optimizer-plan"`, `schema_version = 1`, and an explicit development-only
+  `status`. Serialised as canonical JSON (sorted keys, `allow_nan=False`); every float field rejects
+  non-finite values at construction.
+- **`run_id`.** A SHA-256 over only the behaviour-defining provenance: the forecast content hash, the
+  squad-rules content hash and contract version, the optimiser commit, `risk_lambda`, every search
+  bound, and the solver name/options/seed. It excludes wall-clock creation time, file paths, and
+  environment-discovered solver *versions*, so two runs from identical inputs produce the same id and
+  identical decision content, while any behaviour-defining change produces a different id. The id is
+  re-derived and checked on read, so a tampered artifact is rejected.
+- **Provenance.** The input forecast (path, SHA-256, schema/version, `as_of`, horizon, forecast
+  commit); the optimiser's own Git HEAD and clean-worktree state; the squad-rules path, contract
+  version, and file SHA-256; the solver name, discoverable PuLP/CBC versions (recorded, not part of
+  the id), deterministic options and seed, and solve status; and the complete search policy
+  (candidate pool, transfer depth, transition limit, beam width, free-transfer state, `risk_lambda`,
+  search method, and declared optimality scope).
+- **Decision.** The chosen 15-player squad and cost, and for every gameweek the XI, captain,
+  vice-captain, bench goalkeeper, ordered bench, transfers in/out, free-transfer state, and hit
+  points, plus the explicit bench/autosub, availability, ownership, static-price, selling-value, and
+  bounded-search assumptions.
+- **Atomicity and immutability.** The write goes through a unique sibling temporary file plus an
+  atomic rename, refuses to overwrite an existing destination (no-clobber), and fails closed: a dirty
+  worktree, an unresolvable commit, or an already-present destination all refuse to write. Put output
+  outside the repository so it does not dirty the checkout.
+
 ## Run
 
-First create the artifact using the sequential recipe in the artifact document, then run:
+First create the forecast artifact using the sequential recipe in the artifact document, then run:
 
 ```powershell
+# stdout plan only (unchanged behaviour):
 .\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad D:/tmp/prospective-points-2026-27-gw1-5.jsonl
-.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad D:/tmp/prospective-points-2026-27-gw1-5.jsonl --risk-lambda 0.5
+# also write the immutable, provenance-bearing optimizer artifact:
+.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad D:/tmp/prospective-points-2026-27-gw1-5.jsonl --output D:/tmp/optimizer-plan-default.json
+# risk sensitivity analysis (clearly labelled; never replaces the EV result):
+.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad D:/tmp/prospective-points-2026-27-gw1-5.jsonl --risk-lambda 0.5 --output D:/tmp/optimizer-plan-risk.json
 ```
 
-The command prints canonical JSON containing artifact and rule provenance, the initial 15-player
-squad, each gameweek's XI/captain/vice/bench, transfers, free-transfer state, hit cost, expected
-points, risk-adjusted objective, and every simplifying assumption.
+The command always prints canonical JSON to stdout containing artifact and rule provenance, the
+initial 15-player squad, each gameweek's XI/captain/vice/bench, transfers, free-transfer state, hit
+cost, expected points, risk-adjusted objective, and every simplifying assumption. When `--output` is
+supplied it additionally writes the durable artifact described above.
 
 Offline tests use synthetic, hand-computable artifacts. They pin squad, captain, budget and club-cap
 constraints, distribution-driven risk sensitivity, and cases where a four-point hit is and is not
-worth taking.
+worth taking. `tests/test_optimizer_artifact.py` pins the artifact schema and provenance
+completeness, the deterministic run-id derivation, immutable no-clobber and atomic-failure behaviour,
+strict-JSON / non-finite rejection, and the job's fail-closed provenance discovery.

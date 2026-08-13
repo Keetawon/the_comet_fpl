@@ -14,6 +14,12 @@ from fpl.artifacts.prospective_points import (
 )
 from fpl.optimize.rules import POSITIONS, PositionName, SquadRules
 
+# The CBC invocation is pinned here so downstream provenance (the optimizer artifact) records the
+# exact options and seed the solver actually ran under, and cannot silently drift from them. The
+# ``randomSeed 0`` option fixes CBC's random seed; ``msg=False`` keeps it quiet.
+CBC_SOLVER_OPTIONS: tuple[str, ...] = ("randomSeed 0",)
+CBC_RANDOM_SEED = 0
+
 
 class OptimizationError(RuntimeError):
     """The artifact or constraints cannot produce a valid optimal squad."""
@@ -313,7 +319,7 @@ def optimize_initial_squad(
     problem += primary_objective
     # CBC's default is a deterministic single-process search. Passing ``threads=1`` activates
     # its threaded branch mode and deadlocks this bundled Windows build on the five-GW model.
-    solver = pulp.PULP_CBC_CMD(msg=False, options=["randomSeed 0"])
+    solver = pulp.PULP_CBC_CMD(msg=False, options=list(CBC_SOLVER_OPTIONS))
     status_code = problem.solve(solver)
     status = str(pulp.LpStatus[status_code])
     if status != "Optimal":
