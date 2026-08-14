@@ -310,7 +310,10 @@ DIM_PLAYER = Table(
         "One row per player, ever. This is the only player dimension safe to join across "
         "seasons without fanning out."
     ),
-    source_owner="fpl.transform.crosswalk:mart_dim_player (distinct on code)",
+    source_owner=(
+        "fpl.transform.crosswalk:mart_dim_player + "
+        "fpl.ingest.live_snapshot:stg_live_player_version (distinct on code, live season unioned)"
+    ),
     columns=(
         _key("code", "int", "Permanent player identity, 1:1 with the person across all seasons."),
         _nullable(
@@ -339,7 +342,9 @@ DIM_PLAYER_SEASON = Table(
     subject="A player's season-scoped attributes.",
     grain=("season", "code"),
     grain_note="One row per player per season they appear in.",
-    source_owner="fpl.transform.crosswalk:mart_dim_player",
+    source_owner=(
+        "fpl.transform.crosswalk:mart_dim_player + fpl.ingest.live_snapshot:stg_live_player_version"
+    ),
     columns=(
         _key("season", "string", "Season, e.g. 2026-27."),
         _key("code", "int", "Permanent player identity."),
@@ -419,7 +424,10 @@ DIM_TEAM = Table(
         "One row per club, ever. 27 codes over five seasons. The only club key safe to join "
         "across seasons."
     ),
-    source_owner="fpl.transform.crosswalk:mart_dim_team (distinct on team_code)",
+    source_owner=(
+        "fpl.transform.crosswalk:mart_dim_team + fpl.ingest.live_snapshot:stg_live_team_version "
+        "(distinct on team_code, live season unioned)"
+    ),
     columns=(
         _key("team_code", "int", "Permanent club identity, 1:1 with the club."),
         _key("team_name", "string", "Club name."),
@@ -433,7 +441,9 @@ DIM_TEAM_SEASON = Table(
     subject="The season-scoped club id and its resolution to a permanent club.",
     grain=("season", "team_id"),
     grain_note="One row per club per season it played in.",
-    source_owner="fpl.transform.crosswalk:mart_dim_team",
+    source_owner=(
+        "fpl.transform.crosswalk:mart_dim_team + fpl.ingest.live_snapshot:stg_live_team_version"
+    ),
     columns=(
         _key("season", "string", "Season."),
         _key("team_id", "int", "Season-scoped club id. NEVER join this across seasons."),
@@ -458,7 +468,9 @@ DIM_FIXTURE = Table(
     subject="One scheduled or played match.",
     grain=("season", "fixture"),
     grain_note="One row per fixture per season. Fixture ids are season-scoped.",
-    source_owner="fpl.transform.facts:stg_fixture",
+    source_owner=(
+        "fpl.transform.facts:stg_fixture + fpl.ingest.live_snapshot:stg_live_fixture_version"
+    ),
     columns=(
         _key("season", "string", "Season."),
         _key("fixture", "int", "Season-scoped fixture id."),
@@ -499,7 +511,10 @@ DIM_GAMEWEEK = Table(
         "One row per observed gameweek. Never assume 1..38: 2022-23 has no GW7, so iterate "
         "observed gameweeks rather than a range."
     ),
-    source_owner="fpl.transform.facts:stg_fixture (observed gameweeks)",
+    source_owner=(
+        "fpl.transform.facts:stg_fixture + "
+        "fpl.ingest.live_snapshot:stg_live_fixture_version (observed gameweeks)"
+    ),
     columns=(
         _key("season", "string", "Season."),
         _key("gw", "int", "Gameweek number as published."),

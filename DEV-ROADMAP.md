@@ -357,6 +357,26 @@ clobbering. `docs/bi-export-contract.md` defines the read-only consumer boundary
 all-vintage run selection, and explicit optimizer-plan input. `tests/test_bi_export.py` covers the
 offline boundary plus an archive-build smoke test.
 
+**Two follow-up fixes (2026-08-14), found by an independent clean-environment verification and both
+now landed:**
+
+1. *Undeclared `pytz` runtime dependency.* The provenance reads fetched `TIMESTAMPTZ` via DuckDB
+   `fetchall()`, which converts to a Python `datetime` through `pytz` — not a declared dependency
+   (the project pins `tzdata` for `zoneinfo`). On a clean install the export failed with
+   `ModuleNotFoundError` as soon as any forecast vintage or optimizer plan was present. Fixed by
+   reading those instants with `epoch_us()` (exact microseconds, no timezone name, no `pytz`).
+
+2. *Live-season dimension sourcing.* The six identity dimensions were sourced from the archive marts
+   only, which cover completed seasons — so a real (upcoming-season) forecast vintage failed
+   referential integrity because its new players/clubs/fixtures/gameweeks had no dimension row. The
+   dimensions now union the archive marts with the versioned live staging for seasons the marts do
+   not carry. A new `stg_live_team_version` (flattened from the bootstrap `teams` payload at
+   snapshot-load time) supplies the live season's `team_id → team_code` map, which was previously
+   only raw JSON. Point-in-time policy: latest committed snapshot per entity (current registry);
+   forecast facts keep their own `as_of`, so no leakage. A fresh build with no snapshots stays
+   historical-only. See `docs/bi-export-contract.md` and `tests/test_bi_export.py`
+   (`test_live_season_dimensions_are_sourced_from_the_snapshot_registry`).
+
 Create domain code under a new `src/fpl/publish/` package and keep the job entry point thin.
 
 - Export versioned Parquet facts/dimensions plus a strict manifest with schema version, creation

@@ -212,6 +212,23 @@ CREATE TABLE IF NOT EXISTS stg_live_player_version (
     PRIMARY KEY (season, element, capture_id)
 );
 
+-- Versioned live club registry, flattened from the bootstrap-static `teams` payload. It is the
+-- only point-in-time source of the live season's season-scoped `team_id -> team_code` mapping and
+-- club names; the archive marts (mart_dim_team/stg_team) cover completed seasons only, so without
+-- this the BI export cannot resolve a live-season forecast's clubs to their cross-season identity.
+-- Identity/registration metadata only, no outcome column.
+CREATE TABLE IF NOT EXISTS stg_live_team_version (
+    season      VARCHAR NOT NULL,
+    team_id     INTEGER NOT NULL,
+    team_code   INTEGER,
+    known_at    TIMESTAMPTZ NOT NULL,
+    capture_id  VARCHAR NOT NULL,
+    team_name   VARCHAR NOT NULL,
+    short_name  VARCHAR NOT NULL,
+    pulse_id    INTEGER,
+    PRIMARY KEY (season, team_id, capture_id)
+);
+
 CREATE TABLE IF NOT EXISTS stg_live_fixture_version (
     season            VARCHAR NOT NULL,
     fixture           INTEGER NOT NULL,

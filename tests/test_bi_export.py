@@ -308,6 +308,68 @@ def _seed_database(path: Path, *, record: bool) -> tuple[ProspectivePointsArtifa
         con.close()
 
 
+_ELEMENT_TYPE = {"GK": 1, "DEF": 2, "MID": 3, "FWD": 4}
+
+
+def _seed_live_database(path: Path) -> tuple[ProspectivePointsArtifact, str]:
+    """Seed ONLY the live snapshot registry for the forecast season -- no marts for it.
+
+    This is the real deadline shape: the archive marts cover completed seasons only, so the
+    2026-27 forecast's players, clubs, fixtures and gameweeks must resolve through the live-season
+    dimension rows the exporter unions in from the versioned live staging.
+    """
+    artifact = _forecast_artifact()
+    con = initialise(path)
+    try:
+        con.executemany(
+            """
+            INSERT INTO stg_live_team_version (
+                season, team_id, team_code, known_at, capture_id, team_name, short_name, pulse_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (SEASON, 1, 101, KNOWN_AT, "cap-live", "Alpha", "ALP", 1001),
+                (SEASON, 2, 102, KNOWN_AT, "cap-live", "Beta", "BET", 1002),
+            ],
+        )
+        con.executemany(
+            """
+            INSERT INTO stg_live_player_version (
+                season, element, code, known_at, capture_id, web_name, element_type, position,
+                team_id, now_cost, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    SEASON,
+                    code,
+                    code,
+                    KNOWN_AT,
+                    "cap-live",
+                    f"P{code}",
+                    _ELEMENT_TYPE[pos],
+                    pos,
+                    1,
+                    50,
+                    "a",
+                )
+                for code, pos in enumerate(_positions(), start=1)
+            ],
+        )
+        con.execute(
+            """
+            INSERT INTO stg_live_fixture_version (
+                season, fixture, known_at, capture_id, gw, kickoff_time, team_h, team_a,
+                team_h_difficulty, team_a_difficulty, finished
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [SEASON, 100, KNOWN_AT, "cap-live", 1, KICKOFF, 1, 2, 3, 3, False],
+        )
+        return artifact, record_forecast(con, artifact)
+    finally:
+        con.close()
+
+
 def _optimizer_artifact(artifact: ProspectivePointsArtifact, *, forecast_sha256: str | None = None):
     positions = _positions()
     members = tuple(
@@ -665,6 +727,51 @@ def test_non_finite_source_float_is_rejected_before_publish(tmp_path: Path) -> N
 
     with pytest.raises(BiExportValidationError, match="non-finite"):
         export_bi(database, tmp_path / "published")
+
+
+def test_live_season_dimensions_are_sourced_from_the_snapshot_registry(tmp_path: Path) -> None:
+    """A real deadline forecast is for the upcoming season, which the archive marts never cover.
+
+    With no marts for the forecast season, referential integrity can only hold if the exporter
+    unions the live-season players, clubs, fixtures and gameweeks in from the versioned live
+    staging. Export success is exactly that proof.
+    """
+    database = tmp_path / "live-season.duckdb"
+    _, run_id = _seed_live_database(database)
+
+    output = tmp_path / "published"
+    export_bi(database, output, created_at=datetime(2026, 8, 25, tzinfo=UTC))
+    manifest = validate_bi_export(output)
+
+    assert manifest["exported_run_ids"] == [run_id]
+    assert manifest["tables"]["fact_forecast_player_gameweek"]["row_count"] == 15
+
+    player_season = pq.read_table(output / "dim_player_season.parquet")
+    assert player_season.num_rows == 15
+    assert set(player_season.column("season").to_pylist()) == {SEASON}
+
+    player = pq.read_table(output / "dim_player.parquet")
+    assert set(player.column("code").to_pylist()) == set(range(1, 16))
+
+    team_season = pq.read_table(output / "dim_team_season.parquet")
+    assert set(
+        zip(
+            team_season.column("season").to_pylist(),
+            team_season.column("team_id").to_pylist(),
+            strict=True,
+        )
+    ) == {(SEASON, 1), (SEASON, 2)}
+    assert set(team_season.column("team_code").to_pylist()) == {101, 102}
+
+    fixture = pq.read_table(output / "dim_fixture.parquet")
+    assert fixture.column("home_team_code").to_pylist() == [101]
+    assert fixture.column("away_team_code").to_pylist() == [102]
+
+    gameweek = pq.read_table(output / "dim_gameweek.parquet")
+    assert (gameweek.column("season").to_pylist(), gameweek.column("gw").to_pylist()) == (
+        [SEASON],
+        [1],
+    )
 
 
 @pytest.mark.archive

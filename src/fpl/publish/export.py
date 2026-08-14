@@ -139,6 +139,37 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "total_points_as_recorded",
         "points_under_rules_2026_27",
     ),
+    "stg_live_player_version": (
+        "season",
+        "code",
+        "element",
+        "known_at",
+        "capture_id",
+        "web_name",
+        "position",
+        "team_id",
+    ),
+    "stg_live_team_version": (
+        "season",
+        "team_id",
+        "team_code",
+        "known_at",
+        "capture_id",
+        "team_name",
+        "short_name",
+        "pulse_id",
+    ),
+    "stg_live_fixture_version": (
+        "season",
+        "fixture",
+        "known_at",
+        "capture_id",
+        "gw",
+        "kickoff_time",
+        "team_h",
+        "team_a",
+        "finished",
+    ),
     "mart_fact_player_form": (
         "season",
         "gw",
@@ -469,25 +500,68 @@ def _validate_source_schema(con: duckdb.DuckDBPyConnection) -> bool:
     return ledger_present
 
 
+# Live-season registry, latest committed snapshot per entity. The archive marts cover completed
+# seasons only, so a live-season forecast's players, clubs, fixtures and gameweeks are sourced from
+# the versioned live staging and unioned into the dimensions for seasons the marts do not carry.
+# Point-in-time policy: the dimension shows the current registry (the latest capture per entity);
+# forecast facts keep their own as_of/bootstrap_known_at, so no forecast input is affected and no
+# leakage is introduced. See docs/bi-export-contract.md.
+_LIVE_PLAYER_LATEST: Final[str] = """
+    SELECT season, code, element, web_name, position, team_id
+    FROM stg_live_player_version
+    QUALIFY row_number() OVER (
+        PARTITION BY season, code ORDER BY known_at DESC, capture_id DESC
+    ) = 1
+"""
+_LIVE_TEAM_LATEST: Final[str] = """
+    SELECT season, team_id, team_code, team_name, short_name, pulse_id
+    FROM stg_live_team_version
+    WHERE team_code IS NOT NULL
+    QUALIFY row_number() OVER (
+        PARTITION BY season, team_id ORDER BY known_at DESC, capture_id DESC
+    ) = 1
+"""
+_LIVE_FIXTURE_LATEST: Final[str] = """
+    SELECT season, fixture, gw, kickoff_time, team_h, team_a, finished
+    FROM stg_live_fixture_version
+    QUALIFY row_number() OVER (
+        PARTITION BY season, fixture ORDER BY known_at DESC, capture_id DESC
+    ) = 1
+"""
+
+
 def _source_queries(ledger_present: bool) -> dict[str, str]:
     queries: dict[str, str] = {
-        "dim_player": """
-            WITH ranked AS (
-                SELECT code, opta_code, web_name AS latest_web_name,
-                       row_number() OVER (
-                           PARTITION BY code
-                           ORDER BY season DESC, element_id DESC
-                       ) AS rank_within_code
+        "dim_player": f"""
+            WITH unified AS (
+                SELECT season, element_id AS sort_id, code, web_name, opta_code
                 FROM mart_dim_player
+                UNION ALL
+                SELECT season, element AS sort_id, code, web_name,
+                       CAST(NULL AS VARCHAR) AS opta_code
+                FROM ({_LIVE_PLAYER_LATEST})
+            ),
+            opta AS (SELECT code, max(opta_code) AS opta_code FROM unified GROUP BY code),
+            ranked AS (
+                SELECT code, web_name AS latest_web_name,
+                       row_number() OVER (
+                           PARTITION BY code ORDER BY season DESC, sort_id DESC
+                       ) AS rank_within_code
+                FROM unified
             )
-            SELECT code, opta_code, latest_web_name
-            FROM ranked
-            WHERE rank_within_code = 1
+            SELECT ranked.code, opta.opta_code, ranked.latest_web_name
+            FROM ranked JOIN opta ON opta.code = ranked.code
+            WHERE ranked.rank_within_code = 1
         """,
-        "dim_player_season": """
+        "dim_player_season": f"""
             SELECT season, code, element_id, web_name, position,
                    team_id AS season_end_team_id
             FROM mart_dim_player
+            UNION ALL
+            SELECT season, code, element AS element_id, web_name, position,
+                   team_id AS season_end_team_id
+            FROM ({_LIVE_PLAYER_LATEST})
+            WHERE season NOT IN (SELECT DISTINCT season FROM mart_dim_player)
         """,
         "dim_player_stint": """
             SELECT stint.season, stint.code, stint.stint_index, stint.team_id,
@@ -498,24 +572,35 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
               ON team.season = stint.season
              AND team.team_id = stint.team_id
         """,
-        "dim_team": """
-            WITH ranked AS (
+        "dim_team": f"""
+            WITH unified AS (
+                SELECT season, team_id AS sort_id, team_code, team_name, short_name
+                FROM mart_dim_team
+                UNION ALL
+                SELECT season, team_id AS sort_id, team_code, team_name, short_name
+                FROM ({_LIVE_TEAM_LATEST})
+            ),
+            ranked AS (
                 SELECT team_code, team_name, short_name,
                        row_number() OVER (
-                           PARTITION BY team_code
-                           ORDER BY season DESC, team_id DESC
+                           PARTITION BY team_code ORDER BY season DESC, sort_id DESC
                        ) AS rank_within_team
-                FROM mart_dim_team
+                FROM unified
+                WHERE team_code IS NOT NULL
             )
             SELECT team_code, team_name, short_name
             FROM ranked
             WHERE rank_within_team = 1
         """,
-        "dim_team_season": """
+        "dim_team_season": f"""
             SELECT season, team_id, team_code, team_name, short_name, pulse_id
             FROM mart_dim_team
+            UNION ALL
+            SELECT season, team_id, team_code, team_name, short_name, pulse_id
+            FROM ({_LIVE_TEAM_LATEST})
+            WHERE season NOT IN (SELECT DISTINCT season FROM mart_dim_team)
         """,
-        "dim_fixture": """
+        "dim_fixture": f"""
             SELECT fixture.season, fixture.fixture, fixture.gw, fixture.kickoff_time,
                    fixture.team_h AS home_team_id, fixture.team_a AS away_team_id,
                    home.team_code AS home_team_code, away.team_code AS away_team_code,
@@ -527,8 +612,19 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
             LEFT JOIN mart_dim_team AS away
               ON away.season = fixture.season
              AND away.team_id = fixture.team_a
+            UNION ALL
+            SELECT lf.season, lf.fixture, lf.gw, lf.kickoff_time,
+                   lf.team_h AS home_team_id, lf.team_a AS away_team_id,
+                   home.team_code AS home_team_code, away.team_code AS away_team_code,
+                   CAST(NULL AS INTEGER) AS pulse_id, lf.finished
+            FROM ({_LIVE_FIXTURE_LATEST}) AS lf
+            LEFT JOIN ({_LIVE_TEAM_LATEST}) AS home
+              ON home.season = lf.season AND home.team_id = lf.team_h
+            LEFT JOIN ({_LIVE_TEAM_LATEST}) AS away
+              ON away.season = lf.season AND away.team_id = lf.team_a
+            WHERE lf.season NOT IN (SELECT DISTINCT season FROM stg_fixture)
         """,
-        "dim_gameweek": """
+        "dim_gameweek": f"""
             SELECT season, gw,
                    CAST(NULL AS TIMESTAMPTZ) AS deadline_time,
                    min(kickoff_time) AS first_kickoff,
@@ -539,6 +635,18 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
                    END AS finished
             FROM stg_fixture
             WHERE gw IS NOT NULL
+            GROUP BY season, gw
+            UNION ALL
+            SELECT season, gw,
+                   CAST(NULL AS TIMESTAMPTZ) AS deadline_time,
+                   min(kickoff_time) AS first_kickoff,
+                   max(kickoff_time) AS last_kickoff,
+                   CAST(count(*) AS INTEGER) AS fixture_count,
+                   CASE
+                       WHEN count(finished) = count(*) THEN bool_and(finished)
+                   END AS finished
+            FROM ({_LIVE_FIXTURE_LATEST})
+            WHERE gw IS NOT NULL AND season NOT IN (SELECT DISTINCT season FROM stg_fixture)
             GROUP BY season, gw
         """,
         "fact_player_fixture_actual": """

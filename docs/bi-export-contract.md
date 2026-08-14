@@ -66,6 +66,29 @@ A recorded schema-version-1 forecast vintage can likewise have zero fixture-grai
 its player-gameweek rows remain exported and its two fixture facts are empty for that vintage. The
 exporter does not manufacture fixture forecasts from a convolved gameweek distribution.
 
+### Live-season dimensions
+
+A real deadline forecast is for the **upcoming** season, which the archive marts
+(`mart_dim_player`, `mart_dim_team`, `stg_fixture`) never cover — they are built from completed
+seasons only. Without a source for that season's players, clubs, fixtures and gameweeks, a recorded
+live-season forecast would fail referential integrity (its `code`, `team_id`/`team_code`, `fixture`
+and `gw` resolve to no dimension row) and could not be published.
+
+The six affected dimensions (`dim_player`, `dim_player_season`, `dim_team`, `dim_team_season`,
+`dim_fixture`, `dim_gameweek`) therefore **union the archive marts with the versioned live staging**
+(`stg_live_player_version`, `stg_live_team_version`, `stg_live_fixture_version`) for any season the
+marts do not carry. `stg_live_team_version` is flattened from the bootstrap-static `teams` payload
+at snapshot-load time; it is the only source of the live season's season-scoped `team_id → team_code`
+map and club names. A fresh build with no snapshots loaded leaves the live staging empty, so the
+export is historical-only — unchanged from before.
+
+**Point-in-time policy.** A live-season dimension row is the **latest committed snapshot per entity**
+(the most recent capture by `known_at`) — the current registry. This introduces no leakage: the
+dimension is descriptive current attributes, while every forecast fact keeps its own `as_of` and
+`bootstrap_known_at`; no forecast input is derived from it. Per-vintage (slowly-changing) dimension
+history is out of scope for v1. Season-scoped ids (`element_id`, `team_id`) are never joined across
+seasons; live rows are unioned only for seasons the marts omit, so no `(season, id)` grain collides.
+
 ### Optimizer plans
 
 Optimizer decision artifacts are never discovered implicitly. Pass zero or more

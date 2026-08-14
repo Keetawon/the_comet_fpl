@@ -61,6 +61,7 @@ class CapturedPayload:
 @dataclass(frozen=True, slots=True)
 class LoadResult:
     player_versions: int = 0
+    team_versions: int = 0
     fixture_versions: int = 0
     player_fixture_versions: int = 0
     skipped_rows: int = 0
@@ -196,6 +197,7 @@ def _insert_many(
         return
     allowed = {
         "stg_live_player_version",
+        "stg_live_team_version",
         "stg_live_fixture_version",
         "stg_live_player_fixture_version",
         "mart_fact_player_fixture_live",
@@ -291,13 +293,44 @@ def load_capture(con: duckdb.DuckDBPyConnection, capture_id: str) -> LoadResult:
         player_rows,
     )
 
+    team_rows: list[tuple[object, ...]] = [
+        (
+            season,
+            team.id,
+            team.code,
+            captured_at,
+            capture_id,
+            team.name,
+            team.short_name,
+            team.pulse_id,
+        )
+        for team in bootstrap.teams
+    ]
+    _insert_many(
+        con,
+        "stg_live_team_version",
+        (
+            "season",
+            "team_id",
+            "team_code",
+            "known_at",
+            "capture_id",
+            "team_name",
+            "short_name",
+            "pulse_id",
+        ),
+        team_rows,
+    )
+
     raw_fixtures = payloads.get(("fixtures", ""), [])
     fixtures = [ApiFixture.model_validate(item) for item in raw_fixtures]
     skew = detect_season_skew(bootstrap, fixtures)
     if fixtures and not skew.is_consistent:
         _record_skew(con, season=season, detail=skew.detail, captured_at=captured_at)
         return LoadResult(
-            player_versions=len(player_rows), skipped_rows=len(fixtures) + unsupported
+            player_versions=len(player_rows),
+            team_versions=len(team_rows),
+            skipped_rows=len(fixtures) + unsupported,
         )
 
     fixture_by_id = {fixture.id: fixture for fixture in fixtures}
@@ -516,6 +549,7 @@ def load_capture(con: duckdb.DuckDBPyConnection, capture_id: str) -> LoadResult:
     _insert_many(con, "mart_fact_player_fixture_live", mart_columns, mart_rows)
     return LoadResult(
         player_versions=len(player_rows),
+        team_versions=len(team_rows),
         fixture_versions=len(fixture_rows),
         player_fixture_versions=len(history_rows),
         skipped_rows=skipped,

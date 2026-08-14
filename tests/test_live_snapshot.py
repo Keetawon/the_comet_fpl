@@ -120,8 +120,17 @@ def test_capture_manifest_and_live_loader_are_atomic() -> None:
         )
         assert result.payload_count == 4
         assert result.loaded.player_versions == 1
+        assert result.loaded.team_versions == 2
         assert result.loaded.fixture_versions == 1
         assert result.loaded.player_fixture_versions == 1
+        assert con.execute("SELECT count(*) FROM stg_live_team_version").fetchone() == (2,)
+        team_row = con.execute(
+            """
+            SELECT team_id, team_name, short_name
+            FROM stg_live_team_version WHERE team_id = 1
+            """
+        ).fetchone()
+        assert team_row == (1, "Home", "HOM")
         header = con.execute(
             "SELECT payload_count, length(manifest_sha256) FROM snapshot_capture"
         ).fetchone()
