@@ -327,6 +327,17 @@ This is an output/contract change only. It must not alter the component models o
 
 ### P1.3 — Outcome attachment
 
+**Implementation status (2026-08-14): implemented and offline-tested.**
+`src/fpl/storage/outcomes.py` owns source selection and validation; the thin
+`fpl.jobs.attach_outcomes` CLI wires it to the existing ledger transaction. It reads
+`mart_target_player_fixture` only at `(season, code, fixture)` grain and treats the season-qualified
+`stg_fixture.finished = TRUE` value as the authoritative official-fixtures finalization signal.
+Eligible fixtures must also have `kickoff_time < as_of`, both separately named point measures must
+be non-NULL, and a source duplicate is rejected. Exact re-runs are idempotent no-ops; new fixture
+keys append; any changed value for an attached key fails closed rather than weakening append-only
+history. Offline temp-DuckDB tests cover the happy path, NULL/unfinalized/duplicate failures,
+idempotency, append-only addition, transaction rollback, and a double-gameweek player.
+
 Build the thin job that attaches outcomes only for finalized fixtures. It must:
 
 - read at player-fixture grain;

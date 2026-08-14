@@ -17,8 +17,15 @@ pinned. Daily snapshots protect the inputs; this ledger protects the commitment.
 The ledger consumes the frozen prospective-points JSONL artifact documented in
 `docs/prospective-points-artifact.md` and nothing else. It never reaches around that boundary into
 the models or the database to re-derive a prediction: the artifact boundary is what makes a recorded
-run auditable. `src/fpl/storage/ledger.py` holds the domain logic;
+run auditable. `src/fpl/storage/ledger.py` holds the forecast domain logic;
 `python -m fpl.jobs.record_forecast <artifact.jsonl> [--db PATH]` is a thin CLI over it.
+
+Finalized actuals have a separate, deliberately narrow mart boundary:
+`python -m fpl.jobs.attach_outcomes --as-of <ISO-8601-with-offset> [--season SEASON] [--db PATH]`.
+`fpl.storage.outcomes` reads only `mart_target_player_fixture` joined on the season-qualified
+fixture key to `stg_fixture`. The latter's `finished = TRUE` is the authoritative official-fixtures
+finalization signal retained by the repository; both point columns must be non-NULL and
+`kickoff_time < as_of`. The job never reads or changes a prediction.
 
 ## Schema
 
@@ -81,7 +88,12 @@ and is deliberately **not** part of the identity.
   and new rows; the earlier vintage is untouched.
 - **Fail closed.** The run row and every prediction row are written in one transaction; a mid-ingest
   error rolls the whole thing back and leaves the ledger unchanged. Outcome attachment is likewise
-  transactional and refuses a duplicate `(season, code, fixture)`.
+  transactional. The P1.3 domain boundary rejects a missing/false finalization flag, NULL points,
+  or duplicate source player-fixture key before calling the ledger writer.
+- **Outcome idempotency without mutation.** A re-run that presents the same finalized values for an
+  existing `(season, code, fixture)` skips that row and reports an idempotent no-op. A newly
+  finalized fixture appends normally. A re-presented key with either point measure changed raises an
+  error instead of overwriting an actual, preserving the append-only guarantee.
 
 ## Knowledge time
 
@@ -98,9 +110,12 @@ transformation. The artifact carries an explicit `as_of`, so nothing here is inf
   around the artifact into the model: the rows are the same composed distributions the gameweek
   rows are convolved from, and that relation is re-checked on every serialise and read. Vintages
   recorded before P1.2 remain schema version 1 and legitimately have no fixture rows.
-- **Outcome ingestion path.** `attach_outcomes` stores outcomes given to it; the job that reads final
-  fixtures from the marts and calls it (only after finalisation, at `(season, code, fixture)` grain)
-  is not yet built.
+- **Outcome ingestion path — closed by P1.3.** `fpl.storage.outcomes` validates and selects
+  finalized player-fixture outcomes from the marts; `fpl.jobs.attach_outcomes` is the thin CLI that
+  attaches them. It preserves recorded and 2026/27-replayed points as distinct measures, rejects
+  NULL/unfinalized/duplicate source rows, treats exact re-runs as no-ops, appends new fixture keys,
+  and rejects changed values for an attached key. Two fixtures for one player in a double gameweek
+  remain two rows because the grain includes `fixture`.
 - **Read/BI layer.** The decision-layer reads (upcoming EV and risk, actual-versus-predicted,
   calibration by position and horizon) and the atomic star-schema export described in `AGENTS.md`
   priority 9 consume this ledger but are separate, later work.
