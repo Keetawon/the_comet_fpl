@@ -108,8 +108,16 @@ class SquadRules(_Frozen):
         return self
 
 
+def parse_squad_rules(payload: bytes) -> SquadRules:
+    """Parse the verified squad rules from exact UTF-8 bytes."""
+    try:
+        loaded = yaml.safe_load(payload.decode("utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ValueError("squad rules are not valid UTF-8") from exc
+    return SquadRules.model_validate(loaded)
+
+
 def load_squad_rules(path: Path | None = None) -> SquadRules:
     """Load the verified live squad rules and bounded planning policy."""
     resolved = path or config_dir() / "squad_2026_27.yaml"
-    with resolved.open("r", encoding="utf-8") as handle:
-        return SquadRules.model_validate(yaml.safe_load(handle))
+    return parse_squad_rules(resolved.read_bytes())

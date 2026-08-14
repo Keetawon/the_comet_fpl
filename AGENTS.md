@@ -210,10 +210,12 @@ distribution per `(season, gw, code)`. Stage E consumes only that artifact and i
 fixed-squad ILP plus a deterministic bounded transfer planner under the verified 2026/27 squad
 rules. It is development-only, not a validated recommendation. The confirmed no-transfer pruning
 defect is fixed: the current squad is reserved in every successor set, so holding and banking a
-transfer cannot be truncated away. Three operational gaps remain: `chance_of_playing_next_round`
-is repeated across the whole horizon; optimizer output lacks its own complete
-Git/config/solver/search provenance and immutable atomic artifact contract; and future transfers use
-the deadline's static prices with no price-change or selling-value model. The append-only prediction
+transfer cannot be truncated away. The optimizer now has a versioned, immutable, fail-closed
+artifact contract that binds the complete decision to the forecast, rules, Git HEAD, search policy,
+and fully discovered solver identity; its reader independently revalidates squad, lineup, captain,
+bench, transfer, horizon, and aggregate legality. Two operational gaps remain:
+`chance_of_playing_next_round` is repeated across the whole horizon, and future transfers use the
+deadline's static prices with no price-change or selling-value model. The append-only prediction
 ledger is implemented in `src/fpl/storage/ledger.py` and records immutable player-gameweek forecast
 vintages from the JSONL artifact, with outcomes held separately. It still lacks player-fixture
 forecast distributions, the finalized-outcome ingestion job, and the BI read/export layer. See
@@ -430,7 +432,7 @@ Also preserve these data contracts:
   It reads outcomes, which the feature layer may not -- scoring a prediction needs the label.
 - `src/fpl/models/`: scoring, the Stage A team-goals models, Stage B minutes candidates, and
   Stage C attacking-goals baselines/probes.
-- `src/fpl/artifacts/`: stable, typed transport contracts such as the prospective-points JSONL.
+- `src/fpl/artifacts/`: stable, typed prospective-points and optimizer-decision transport contracts.
 - `src/fpl/optimize/`: Stage E squad, lineup, captain, and bounded transfer planning.
 - `src/fpl/jobs/`: thin orchestration/CLI entry points.
 - `tests/`: executable data contracts; vendored API fixtures keep tests offline.
@@ -835,8 +837,10 @@ research guardrails; they are not permission to displace the active delivery ord
    **development-only**. The fixed-squad ILP is exact; the multi-GW transfer search is bounded and
    makes no global-optimality claim. The confirmed no-transfer pruning defect is fixed: the current
    squad is always reserved in every successor set, with dense and end-to-end regression coverage.
-   Before the GW1 decision run, add an immutable atomic optimizer output with independent
-   Git/worktree, squad-config, search-policy, and solver provenance. Apply the next-round
+   The immutable optimizer artifact is implemented with independent Git/worktree, squad-config,
+   search-policy, solver, and decision provenance plus concurrent no-clobber publication. Use it for
+   both deadline paths and complete the sequential runbook rehearsal before the owner decision.
+   Apply the next-round
    availability overlay to GW1 only in the decision view; any later-GW reuse is an explicit scenario
    assumption until measured. State that future prices and selling values are static/unknown. The
    contract-1.2 Stage D EV

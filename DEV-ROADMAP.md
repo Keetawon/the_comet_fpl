@@ -39,8 +39,6 @@ Verified on `main` at `c158df1` on 2026-08-13; re-check HEAD and the latest snap
 
 Open operational gaps:
 
-- optimizer output is stdout JSON and lacks its own complete Git/config/solver/search provenance,
-  immutable run identity, and atomic file contract;
 - `chance_of_playing_next_round` is repeated across GW1-5;
 - future prices use deadline `now_cost`; price changes and selling value are not modelled;
 - the ledger lacks player-fixture forecast distributions and an outcome-ingestion job;
@@ -71,11 +69,14 @@ P0 blocks BI implementation. Work top to bottom.
 
 Harden `fpl.jobs.optimize_squad` without changing its objective or search behavior.
 
+**Implementation status (2026-08-14): complete and offline-tested.** The deadline rehearsal and
+final deadline run remain outstanding operational work.
+
 Required output contract:
 
 - a versioned schema and explicit development-only status;
-- atomic write through a unique sibling temporary file, followed by an atomic rename;
-- no-clobber behavior for an existing immutable destination;
+- atomic write through a flushed unique sibling temporary file and an atomic create-if-absent
+  promotion, including concurrent-writer no-clobber behavior;
 - input forecast artifact path, SHA-256, schema/version, run `as_of`, horizon, and forecast commit;
 - optimizer Git HEAD and clean-worktree status;
 - squad-rule path, contract version, and file SHA-256;
@@ -97,6 +98,9 @@ or dirty input state fails closed; the existing hand-computable squad and transf
 Add a concise `docs/gw1-deadline-runbook.md`. Prefer a thin orchestration entry point only if it
 removes operator error without moving business logic into `src/fpl/jobs/`.
 
+**Implementation status (2026-08-14): authored and PowerShell syntax-checked.** The first retained
+rehearsal remains due by 2026-08-18.
+
 The runbook must execute, in order:
 
 1. verify branch/HEAD and a clean worktree;
@@ -104,14 +108,16 @@ The runbook must execute, in order:
 3. rebuild DuckDB and load all daily snapshots sequentially;
 4. run the full local gate;
 5. generate the default GW1-5 artifact (`v3/coupled/seasonal/auto`);
-6. record that artifact in the append-only ledger before the deadline;
-7. generate and record the V1/V1 diagnostic artifact on the identical cutoff, horizon, draws, seed,
-   database, and live captures;
-8. optimize both artifacts at `risk_lambda=0`; optional risk runs are clearly labelled sensitivity
+6. before any ledger write mutates DuckDB, generate the V1/V1 diagnostic artifact on the identical
+   cutoff, horizon, draws, seed, database, and live captures;
+7. compare the two forecast manifests and require identical input/database/schedule identities
+   except for the declared component architecture;
+8. record the default and diagnostic artifacts sequentially in the append-only ledger;
+9. optimize both artifacts at `risk_lambda=0`; optional risk runs are clearly labelled sensitivity
    analyses and never replace the EV result;
-9. verify hashes, manifests, `known_at <= as_of`, row accounting, probability sums, squad legality,
-   cost, club cap, formation, captain/vice, and no-clobber behavior;
-10. produce a short comparison report and retain every artifact/run identity.
+10. verify hashes, manifests, `known_at <= as_of`, row accounting, probability sums, squad legality,
+    cost, club cap, formation, captain/vice, aggregate reconciliation, and no-clobber behavior;
+11. produce a short comparison report and retain every artifact/run identity.
 
 The GW1 view is read from the GW1-5 artifact; do not create a redundant forecast merely to filter one
 gameweek. The five-gameweek horizon informs initial squad value, while the GW1 row informs lineup and

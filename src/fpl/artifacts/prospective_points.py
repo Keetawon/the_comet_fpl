@@ -344,9 +344,18 @@ def write_artifact_atomic(path: Path, artifact: ProspectivePointsArtifact) -> st
     return hashlib.sha256(payload).hexdigest()
 
 
-def read_artifact(path: Path) -> ProspectivePointsArtifact:
-    """Parse and fully validate a JSONL artifact without any database access."""
-    lines = path.read_text(encoding="utf-8").splitlines()
+def read_artifact_bytes(payload: bytes) -> ProspectivePointsArtifact:
+    """Parse and fully validate exact JSONL bytes without any database access.
+
+    Keeping this byte-oriented entry point public lets provenance-sensitive consumers hash and
+    parse one immutable in-memory snapshot instead of reading a path once for content and again for
+    its identity.
+    """
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ArtifactError("artifact is not valid UTF-8") from exc
+    lines = text.splitlines()
     if not lines:
         raise ArtifactError("artifact is empty")
     try:
@@ -357,6 +366,11 @@ def read_artifact(path: Path) -> ProspectivePointsArtifact:
     artifact = ProspectivePointsArtifact(manifest=manifest, rows=rows)
     _validate_artifact(artifact)
     return artifact
+
+
+def read_artifact(path: Path) -> ProspectivePointsArtifact:
+    """Parse and fully validate a JSONL artifact without any database access."""
+    return read_artifact_bytes(path.read_bytes())
 
 
 def _validate_artifact(artifact: ProspectivePointsArtifact) -> None:

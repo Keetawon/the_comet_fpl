@@ -75,11 +75,12 @@ under-prediction: a nailed starter rested through the May dead rubbers has an al
 to the out-of-side floor, and the `0.7 * prior + 0.3 * recent` blend caps him at ~0.71 (Vicario
 0.576 against a 0.816 prior). It is left unfixed before GW1 -- conservative, ~1-7 players, and a
 change to a measured-optimal blend -- and recorded in
-`docs/phase4-season-boundary-appearance-underprediction.md`. Before
-operational use, the optimiser needs the no-transfer pruning
-defect fixed, horizon availability semantics measured, stronger optimiser-run provenance, and an
-explicit static-price policy. The append-only prediction ledger, BI semantic exports, static
-`publish` boundary, and real-deadline prospective validation are the next production-track work.
+`docs/phase4-season-boundary-appearance-underprediction.md`. The no-transfer pruning defect is
+fixed, and the optimiser now emits an immutable, provenance-bearing decision artifact whose reader
+revalidates legality offline. Before operational use, horizon availability semantics and future
+price/selling-value handling remain explicit unmeasured scenario gaps. The append-only
+player-gameweek prediction ledger is implemented; outcome ingestion, player-fixture forecasts, BI
+semantic exports, the static `publish` boundary, and real-deadline prospective validation remain.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
@@ -139,7 +140,7 @@ against vendored fixtures. See [Snapshots (R5)](#snapshots-r5).
 ```
 config/       sources, scoring, data quality, and versioned evaluation contracts
 src/fpl/
-  artifacts/  stable prospective-points JSONL transport contract
+  artifacts/  stable prospective-points and optimizer-decision transport contracts
   ingest/     archive.py, fpl_api.py, live_snapshot.py, snapshot_files.py
   storage/    db.py, schema.sql
   transform/  crosswalk.py, facts.py, quality.py
@@ -342,7 +343,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
 | 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 development-evaluated; exposure-weighted goals V4 (-0.44% vs baseline, ties V3) and assists V2 (+1.85% vs baseline, -0.11% vs the incumbent V1) each run once, development-only, neither promoted; Stage D v3 composer, prospective forecast, and the GW29-38 EV backtest all run and development-only, with the V1 comparator outscoring the V3 primary |
-| 3b | Stage E optimiser + prediction ledger + `publish` | optimiser and stable input artifact implemented development-only; optimiser hardening, append-only prediction ledger, BI exports, and static `publish` remain |
+| 3b | Stage E optimiser + prediction ledger + `publish` | optimiser, stable input/decision artifacts, no-transfer repair, and append-only player-gameweek ledger implemented development-only; horizon availability/prices, outcome ingestion, BI exports, and static `publish` remain |
 | 4 | Dashboard v1 | not started |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
 
@@ -353,11 +354,11 @@ multi-GW transfer path is explicitly bounded. See
 [`docs/stage-e-squad-optimizer.md`](docs/stage-e-squad-optimizer.md) and
 [`docs/prospective-points-artifact.md`](docs/prospective-points-artifact.md).
 
-The next data product is an immutable forecast ledger: every pre-deadline run is retained with its
-`as_of`, input hashes, model/component identities, and player-fixture/player-gameweek distributions;
-actuals are attached only after fixtures finish. That ledger becomes the source for model monitoring,
-fixture-difficulty matrices, player-form pivots, EV-versus-actual analysis, and optimiser audits.
-Historical prediction vintages must never be overwritten by a newer forecast.
+The immutable forecast ledger now retains every recorded pre-deadline player-gameweek vintage with
+its `as_of`, input hashes, and model/component identities; historical vintages are never overwritten.
+It still needs finalized-outcome ingestion and player-fixture forecast grain. Those additions plus
+the BI semantic export become the source for model monitoring, fixture-difficulty matrices,
+player-form pivots, EV-versus-actual analysis, and optimiser audits.
 
 `publish` remains unimplemented. It will atomically export versioned JSON for the application and
 pivot-friendly columnar tables for BI from the internal ledger/marts. Dashboards and BI tools consume

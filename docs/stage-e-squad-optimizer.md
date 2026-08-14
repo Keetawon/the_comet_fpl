@@ -29,13 +29,14 @@ weak now but sets up a future gameweek -- but that is the documented bounded-sea
 a defect: the no-transfer case is categorically different because holding is the canonical "do
 nothing" baseline that must always be representable, not an optimality-within-bounds question.
 
-Three operational gaps remain open before the plan can be described as operational:
+The optimiser-provenance gap is now **closed**: `--output` writes a durable, immutable,
+provenance-bearing artifact with its own Git/worktree, squad-config, search-policy, and solver
+provenance, separate from the forecast's (see [Durable optimizer artifact](#durable-optimizer-artifact)
+below). Two operational gaps remain open before the plan can be described as operational:
 
 1. the current `chance_of_playing_next_round` overlay is repeated across the whole forecast horizon,
-   which needs a measured per-GW policy;
-2. optimiser output needs its own Git/worktree, squad-config, search-policy, and solver provenance,
-   separately from forecast provenance; and
-3. all future affordability checks use the deadline's static `now_cost`; price changes and FPL
+   which needs a measured per-GW policy; and
+2. all future affordability checks use the deadline's static `now_cost`; price changes and FPL
    selling values are not modelled.
 
 ## Input boundary
@@ -95,11 +96,11 @@ is legal and every visited lineup/captain choice is exact.
 The transfer path is deliberately bounded for predictable local runtime. Candidate players are the
 initial squad plus the top configured horizon utilities per position. Each state generates zero,
 one, or two same-position replacements, ranks them by current-GW player-utility improvement, retains
-at most 200 legal transitions, and keeps a 30-state beam. The current truncation does not reserve the
-zero-transfer proposal, which is the confirmed defect above. Even after that is fixed, the reported
-transfer plan is exact only within visited states; it is not a global optimality claim outside the
-configured candidate-pool, depth, transition, and beam limits. These limits live in configuration
-rather than Python.
+at most 200 ranked legal transitions plus the reserved zero-transfer action, and keeps a 30-state
+beam. Reserving the hold action prevents pruning from forcing a transfer or hit when neither is
+repaid. The reported transfer plan remains exact only within visited states; it is not a global
+optimality claim outside the configured candidate-pool, depth, transition, and beam limits. These
+limits live in configuration rather than Python.
 
 This bound was selected by timing the same point-in-time GW1-5 artifact before wiring it. A 100×20
 search finished in 22.6 seconds but lost 5.14 expected points relative to the broad reference; the
@@ -120,19 +121,62 @@ the expected-value objective. A positive value is only a sensitivity analysis un
 evidence shows it improves an owner-defined utility; a changed squad is not evidence that the
 risk-aware version is better.
 
+## Durable optimizer artifact
+
+`--output PATH` writes an immutable, provenance-bearing record of the decision, defined and validated
+in `src/fpl/artifacts/optimizer_plan.py` and kept out of the thin job. It is the optimiser analogue of
+the prospective-points artifact: the artifact module owns the schema, serialisation, run-id
+derivation, and atomic write; the job discovers provenance and maps the optimiser's domain objects
+into the typed records.
+
+- **Schema.** `schema = "fpl.optimizer-plan"`, `schema_version = 1`, and an explicit development-only
+  `status`. Serialised as canonical JSON (sorted keys, `allow_nan=False`); every float field rejects
+  non-finite values at construction.
+- **Run identity and decision integrity.** `decision_sha256` covers the embedded legality rules,
+  initial squad, every weekly squad/XI/captain/vice/bench/transfer, aggregate points, and assumptions.
+  `run_id` then covers that digest plus the forecast/rules hashes, optimiser commit, complete search
+  policy, and complete PuLP/CBC identity including discovered versions, options, seed, and status.
+  Only relocatable paths and wall-clock time are excluded. Both hashes are re-derived on read.
+- **Provenance.** The input forecast (path, SHA-256, schema/version, `as_of`, horizon, forecast
+  commit); the optimiser's own Git HEAD and clean-worktree state; the squad-rules path, contract
+  version, and file SHA-256; the solver name, required PuLP/CBC versions, deterministic options and
+  seed, and solve status; and the complete search policy
+  (candidate pool, transfer depth, transition limit, beam width, free-transfer state, `risk_lambda`,
+  search method, and declared optimality scope).
+- **Decision and offline legality.** The chosen 15-player squad and cost, plus every gameweek's
+  post-transfer 15, XI, captain, vice-captain, bench goalkeeper, ordered bench, transfers,
+  free-transfer state, hits, and explicit assumptions. Reading validates budget, club cap, position
+  quotas, formation, lineup/bench partition, captaincy, transfer deltas/state, horizon, and aggregate
+  point reconciliation without loading DuckDB or mutable config.
+- **Provenance race safety.** The job hashes and parses the same in-memory forecast/rules bytes under
+  a clean HEAD, rechecks those bytes, HEAD, and worktree before publication, and checks again after
+  publication. Drift removes the just-written output and fails closed.
+- **Atomicity and immutability.** The write flushes a unique sibling temporary file and atomically
+  creates the destination as a hard link. That filesystem create-if-absent operation gives exactly
+  one winner under concurrent writes; it never relies on exists followed by replace. An existing
+  destination, incomplete solver identity, dirty worktree, unresolved commit, or provenance drift
+  refuses output. Put output outside the repository so it does not dirty the checkout.
+
 ## Run
 
-First create the artifact using the sequential recipe in the artifact document, then run:
+First create the forecast artifact using the sequential recipe in the artifact document, then run:
 
 ```powershell
+# stdout plan only (unchanged behaviour):
 .\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad D:/tmp/prospective-points-2026-27-gw1-5.jsonl
-.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad D:/tmp/prospective-points-2026-27-gw1-5.jsonl --risk-lambda 0.5
+# also write the immutable, provenance-bearing optimizer artifact:
+.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad D:/tmp/prospective-points-2026-27-gw1-5.jsonl --output D:/tmp/optimizer-plan-default.json
+# risk sensitivity analysis (clearly labelled; never replaces the EV result):
+.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad D:/tmp/prospective-points-2026-27-gw1-5.jsonl --risk-lambda 0.5 --output D:/tmp/optimizer-plan-risk.json
 ```
 
-The command prints canonical JSON containing artifact and rule provenance, the initial 15-player
-squad, each gameweek's XI/captain/vice/bench, transfers, free-transfer state, hit cost, expected
-points, risk-adjusted objective, and every simplifying assumption.
+A successful command prints canonical JSON to stdout containing artifact and rule provenance, the
+initial 15-player squad, each gameweek's XI/captain/vice/bench, transfers, free-transfer state, hit
+cost, expected points, risk-adjusted objective, and every simplifying assumption. When `--output` is
+supplied it additionally writes the durable artifact described above.
 
 Offline tests use synthetic, hand-computable artifacts. They pin squad, captain, budget and club-cap
 constraints, distribution-driven risk sensitivity, and cases where a four-point hit is and is not
-worth taking.
+worth taking. `tests/test_optimizer_artifact.py` also pins decision tamper rejection, offline
+legality, complete behavior identity, concurrent no-clobber, failure cleanup, and pre/postflight
+drift suppression.
