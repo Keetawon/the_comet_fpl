@@ -133,17 +133,17 @@ Degradation flags travel with the row: `cold_start_player`, `stage_a_league_aver
 
 ### `fact_forecast_player_fixture` — grain `(run_id, season, fixture, code)`
 
-**Not yet sourced — P1.2 must deliver the transport.** This is the natural forecast grain: double
-gameweeks are real, and the gameweek row is *derived* from these by convolution. Do **not**
+**Sourced by P1.2** from `ledger_prediction_player_fixture`. This is the natural forecast grain:
+double gameweeks are real, and the gameweek row is *derived* from these by convolution. Do **not**
 reverse-engineer fixture values out of a convolved gameweek distribution; the convolution is not
 invertible. Each row maps to exactly one gameweek row via `(run_id, season, gw, code)`, and that
 mapping is part of the transport contract.
 
 ### `fact_forecast_team_fixture` — grain `(run_id, season, fixture, team_id)`
 
-**Not yet sourced — P1.2.** Two rows per fixture, one per club. These are the fixture-difficulty
-**primitives**: `lambda_for`, `lambda_against`, `probability_clean_sheet`, plus the official FDR as a
-separate measure.
+**Sourced by P1.2** from `ledger_prediction_team_fixture`. Two rows per fixture, one per club.
+These are the fixture-difficulty **primitives**: `lambda_for`, `lambda_against`,
+`probability_clean_sheet`, plus the official FDR as a separate measure.
 
 P1.5's ease indices are derived from the lambdas and must be published *beside* them, versioned and
 explicitly directed (100 = league average, higher = easier for the named team). Never display an
@@ -172,12 +172,27 @@ minutes.
 
 ### `fact_player_form` — grain `(season, gw, code, window)`
 
-**Not yet sourced — P1.6.** Long format, one row per window (`last_3`, `last_5`, `last_10`,
-`season_to_date`), so a pivot can put window on an axis.
+**Sourced by P1.6** as `mart_fact_player_form`, built from `mart_fact_player_fixture` and the
+separately owned `points_under_rules_2026_27` target in `mart_target_player_fixture`. Long format,
+one row per window (`last_3`, `last_5`, `last_10`, `season_to_date`), so a pivot can put window on
+an axis.
 
 **Availability and productivity have different denominators and must not be mixed.** Availability
 counts *rostered* fixtures (appearances, starts, minutes, DNPs); productivity counts *appeared*
-fixtures (goals, assists, bonus, BPS, DC, xG, xA).
+fixtures (goals, assists, bonus, BPS, DC, xG, xA). Here **rostered means that a
+`mart_fact_player_fixture` row exists** -- the registered player-fixture population, not an inferred
+matchday squad. A zero-minute row is therefore rostered and is counted as a DNP, but contributes no
+productivity measure.
+
+Each anchor is an observed `(season, gw, code)` with a player-fixture row. The rolling windows take
+that player's most recent rostered fixtures ordered by kickoff, with the anchor gameweek's latest
+kickoff as the point-in-time cutoff; double-gameweek legs are retained as two fixture rows, while a
+missing published gameweek creates no synthetic form row. `season_to_date` remains within the same
+season.
+
+`starts` is NULL when any rostered source row in the window has unmeasured starts. In particular,
+the 2021-22 archive did not measure starts at all, so reporting zero there would create a false
+availability fact.
 
 Per-90 rates use only the matching measured rows:
 
@@ -211,9 +226,8 @@ the work. Three were added, each forced by a documented invariant rather than by
 
 `dim_player` and `dim_team` remain as the roadmap named them, narrowed to permanent identity only.
 
-## Not yet sourced
+## Source completeness
 
-`fact_forecast_player_fixture`, `fact_forecast_team_fixture` and `fact_player_form` have no transport
-yet. They are declared here so P1.2 and P1.6 have a fixed target, and are listed in
-`contract.NOT_YET_SOURCED` so the P1.4 exporter can refuse to publish a partial contract silently
-rather than emitting an export that looks complete.
+Every v1 table now has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
+and P1.6 supplies `fact_player_form`. Consequently `contract.NOT_YET_SOURCED` is empty; P1.4 can
+require the complete v1 contract rather than silently emitting an apparently complete partial export.

@@ -790,7 +790,7 @@ FACT_PLAYER_FORM = Table(
         "One row per player per gameweek per window. Long format rather than wide, so a pivot "
         "can put window on an axis."
     ),
-    source_owner="P1.6 player-form contract (NOT YET IMPLEMENTED)",
+    source_owner="fpl.transform.facts:mart_fact_player_form",
     columns=(
         _key("season", "string", "Season."),
         _key("gw", "int", "Gameweek the window ends at, inclusive."),
@@ -798,7 +798,13 @@ FACT_PLAYER_FORM = Table(
         _key("window", "string", "One of last_3, last_5, last_10, season_to_date."),
         _key("rostered_fixtures", "int", "Fixtures in the window where the player was rostered."),
         _key("appearances", "int", "Fixtures with minutes >= 1."),
-        _key("starts", "int", "Fixtures started."),
+        _nullable(
+            "starts",
+            "int",
+            "unmeasured",
+            "Fixtures started. NULL when any rostered fixture in the window has an unmeasured "
+            "starts value (all 2021-22 source rows are unmeasured).",
+        ),
         _key("did_not_play", "int", "Rostered fixtures with zero minutes."),
         _key("minutes", "int", "Total minutes."),
         _nullable("goals_scored", "int", "not_applicable", "Goals over APPEARED fixtures."),
@@ -847,6 +853,8 @@ FACT_PLAYER_FORM = Table(
     notes=(
         "Availability and productivity have DIFFERENT denominators and must not be mixed. "
         "Availability counts rostered fixtures; productivity counts appeared fixtures.",
+        "starts is a measured availability field, not an inference from minutes. Preserve its "
+        "NULL coverage rather than turning pre-2022-23 unknown starts into zero.",
         "A per-90 rate is a display measure. Never multiply it by expected minutes in the "
         "reporting layer to synthesise a forecast; that is the model's job.",
         "Never zero-fill an unmeasured xG or xA to make a window look complete.",
@@ -923,10 +931,9 @@ SEMANTIC_CONTRACT_V1 = SemanticContract(
     ),
 )
 
-#: Tables whose source transport does not exist yet. P1.6 must deliver the remaining one before the
-#: P1.4 exporter can publish a complete contract; the exporter must refuse to emit a partial one
-#: silently. The two fixture-grain forecast facts were sourced by P1.2.
-NOT_YET_SOURCED: frozenset[str] = frozenset({"fact_player_form"})
+#: Every table in semantic contract v1 now has a concrete source owner.  P1.4 can therefore reject
+#: only a genuinely future partial contract rather than silently treating a v1 table as optional.
+NOT_YET_SOURCED: frozenset[str] = frozenset()
 
 
 __all__ = [

@@ -65,6 +65,11 @@ class FactCounts:
     player_fixture_rows: int
     team_match_rows: int
     target_rows: int
+    player_form_rows: int = 0
+
+
+class PlayerFormSourceError(ValueError):
+    """A player-form source mart cannot support its declared player-fixture grain."""
 
 
 def build_dimensions(con: duckdb.DuckDBPyConnection) -> None:
@@ -250,6 +255,189 @@ def build_targets(
     return _scalar(con, "SELECT count(*) FROM mart_target_player_fixture")
 
 
+def build_player_form(con: duckdb.DuckDBPyConnection) -> int:
+    """Materialize descriptive player form at ``(season, gw, code, window)`` grain.
+
+    A ``mart_fact_player_fixture`` row is the rostered population.  Availability therefore counts
+    every such row, including zero-minute rows; productivity measures deliberately use only rows
+    with ``minutes >= 1``.  The four windows are anchored on observed gameweeks rather than an
+    assumed ``1..38`` sequence.  Their cutoff is the last observed kickoff in the anchor gameweek,
+    so a double gameweek is complete at its one player-gameweek row while a later gameweek cannot
+    leak backwards.
+
+    ``expected_goals`` and ``expected_assists`` retain their measurement coverage: their sums and
+    per-90 denominators include only appeared rows where the respective signal is non-NULL.  A
+    starts total is NULL if any rostered source row in the window has unmeasured starts; treating
+    the entirely unmeasured 2021-22 column as zero would manufacture availability data.
+    """
+    _assert_player_form_source_grain(con)
+    con.execute("DELETE FROM mart_fact_player_form")
+    con.execute(
+        """
+        INSERT INTO mart_fact_player_form (
+            season, gw, code, "window", rostered_fixtures, appearances, starts, did_not_play,
+            minutes, goals_scored, assists, bonus, bps, defensive_contribution, expected_goals,
+            expected_assists, expected_goals_per_90, expected_assists_per_90,
+            points_under_rules_2026_27
+        )
+        WITH rostered AS (
+            SELECT
+                f.season,
+                f.gw,
+                f.fixture,
+                f.kickoff_time,
+                f.code,
+                f.minutes,
+                f.starts,
+                f.goals_scored,
+                f.assists,
+                f.bonus,
+                f.bps,
+                f.defensive_contribution,
+                f.expected_goals,
+                f.expected_assists,
+                t.points_under_rules_2026_27
+            FROM mart_fact_player_fixture AS f
+            LEFT JOIN mart_target_player_fixture AS t
+              ON t.season = f.season
+             AND t.code = f.code
+             AND t.fixture = f.fixture
+        ),
+        gameweek_cutoffs AS (
+            SELECT season, gw, max(kickoff_time) AS last_kickoff
+            FROM rostered
+            GROUP BY season, gw
+        ),
+        anchors AS (
+            SELECT DISTINCT r.season, r.gw, r.code, c.last_kickoff
+            FROM rostered AS r
+            JOIN gameweek_cutoffs AS c
+              ON c.season = r.season
+             AND c.gw = r.gw
+        ),
+        windows AS (
+            SELECT 'last_3' AS window_label, 3 AS fixture_limit
+            UNION ALL SELECT 'last_5', 5
+            UNION ALL SELECT 'last_10', 10
+            UNION ALL SELECT 'season_to_date', NULL
+        ),
+        ranked AS (
+            SELECT
+                a.season,
+                a.gw,
+                a.code,
+                w.window_label,
+                w.fixture_limit,
+                r.minutes,
+                r.starts,
+                r.goals_scored,
+                r.assists,
+                r.bonus,
+                r.bps,
+                r.defensive_contribution,
+                r.expected_goals,
+                r.expected_assists,
+                r.points_under_rules_2026_27,
+                row_number() OVER (
+                    PARTITION BY a.season, a.gw, a.code, w.window_label
+                    ORDER BY r.kickoff_time DESC, r.fixture DESC
+                ) AS recency_rank
+            FROM anchors AS a
+            CROSS JOIN windows AS w
+            JOIN rostered AS r
+              ON r.season = a.season
+             AND r.code = a.code
+             AND r.gw <= a.gw
+             AND r.kickoff_time <= a.last_kickoff
+        ),
+        selected AS (
+            SELECT *
+            FROM ranked
+            WHERE fixture_limit IS NULL OR recency_rank <= fixture_limit
+        )
+        SELECT
+            season,
+            gw,
+            code,
+            window_label,
+            CAST(count(*) AS INTEGER) AS rostered_fixtures,
+            CAST(count(*) FILTER (WHERE minutes >= 1) AS INTEGER) AS appearances,
+            CASE
+                WHEN count(starts) = count(*) THEN CAST(sum(starts) AS INTEGER)
+            END AS starts,
+            CAST(count(*) FILTER (WHERE minutes = 0) AS INTEGER) AS did_not_play,
+            CAST(sum(minutes) AS INTEGER) AS minutes,
+            CAST(sum(goals_scored) FILTER (WHERE minutes >= 1) AS INTEGER) AS goals_scored,
+            CAST(sum(assists) FILTER (WHERE minutes >= 1) AS INTEGER) AS assists,
+            CAST(sum(bonus) FILTER (WHERE minutes >= 1) AS INTEGER) AS bonus,
+            CAST(sum(bps) FILTER (WHERE minutes >= 1) AS INTEGER) AS bps,
+            CAST(
+                sum(defensive_contribution) FILTER (WHERE minutes >= 1) AS INTEGER
+            ) AS defensive_contribution,
+            sum(expected_goals) FILTER (WHERE minutes >= 1) AS expected_goals,
+            sum(expected_assists) FILTER (WHERE minutes >= 1) AS expected_assists,
+            CASE
+                WHEN sum(
+                    CASE WHEN minutes >= 1 AND expected_goals IS NOT NULL THEN minutes END
+                ) > 0
+                THEN 90.0 * sum(expected_goals) FILTER (WHERE minutes >= 1)
+                    / sum(
+                        CASE WHEN minutes >= 1 AND expected_goals IS NOT NULL THEN minutes END
+                    )
+            END AS expected_goals_per_90,
+            CASE
+                WHEN sum(
+                    CASE WHEN minutes >= 1 AND expected_assists IS NOT NULL THEN minutes END
+                ) > 0
+                THEN 90.0 * sum(expected_assists) FILTER (WHERE minutes >= 1)
+                    / sum(
+                        CASE WHEN minutes >= 1 AND expected_assists IS NOT NULL THEN minutes END
+                    )
+            END AS expected_assists_per_90,
+            CASE
+                WHEN count(*) FILTER (WHERE minutes >= 1) = 0 THEN NULL
+                WHEN count(points_under_rules_2026_27) FILTER (WHERE minutes >= 1)
+                    <> count(*) FILTER (WHERE minutes >= 1) THEN NULL
+                ELSE CAST(
+                    sum(points_under_rules_2026_27) FILTER (WHERE minutes >= 1) AS INTEGER
+                )
+            END AS points_under_rules_2026_27
+        FROM selected
+        GROUP BY season, gw, code, window_label
+        """
+    )
+    return _scalar(con, "SELECT count(*) FROM mart_fact_player_form")
+
+
+def _assert_player_form_source_grain(con: duckdb.DuckDBPyConnection) -> None:
+    """Fail closed if a hand-built or migrated source would fan out the form aggregation."""
+    for table in ("mart_fact_player_fixture", "mart_target_player_fixture"):
+        duplicate_keys = _scalar(
+            con,
+            f"""
+            SELECT count(*) FROM (
+                SELECT season, code, fixture
+                FROM {table}
+                GROUP BY season, code, fixture
+                HAVING count(*) > 1
+            )
+            """,
+        )
+        if duplicate_keys:
+            raise PlayerFormSourceError(
+                f"{table} has {duplicate_keys} duplicate player-fixture key(s); "
+                "a form window cannot deduplicate real double gameweeks"
+            )
+    null_minutes = _scalar(
+        con, "SELECT count(*) FROM mart_fact_player_fixture WHERE minutes IS NULL"
+    )
+    if null_minutes:
+        raise PlayerFormSourceError(
+            f"mart_fact_player_fixture has {null_minutes} NULL minutes value(s); "
+            "rostered availability cannot be reported without a measured minutes outcome"
+        )
+
+
 def _recompute_points(con: duckdb.DuckDBPyConnection, rules: ScoringRules) -> None:
     """Fill `points_under_rules_<ruleset>` from components, via the calculator.
 
@@ -344,10 +532,14 @@ def build_all(con: duckdb.DuckDBPyConnection) -> FactCounts:
     # After the facts: stints are derived from them, because the fact row's team_id is the
     # only per-fixture-correct record of which club a player turned out for.
     build_player_stints(con)
+    team_match_rows = build_team_match(con)
+    target_rows = build_targets(con)
+    player_form_rows = build_player_form(con)
     return FactCounts(
         player_fixture_rows=player_fixture_rows,
-        team_match_rows=build_team_match(con),
-        target_rows=build_targets(con),
+        team_match_rows=team_match_rows,
+        target_rows=target_rows,
+        player_form_rows=player_form_rows,
     )
 
 

@@ -180,6 +180,14 @@ def test_per_90_rates_document_their_matching_minutes_denominator() -> None:
         assert "NULL when that" in column.description
 
 
+def test_form_starts_preserves_historical_measurement_coverage() -> None:
+    """2021-22 never measured starts, so a form aggregate must not invent zero starts."""
+    form = CONTRACT.table("fact_player_form")
+    starts = next(column for column in form.columns if column.name == "starts")
+    assert starts.nullable and starts.null_means == "unmeasured"
+    assert "2021-22" in starts.description
+
+
 def test_grain_columns_are_never_nullable() -> None:
     for table in CONTRACT.tables:
         by_name = {column.name: column for column in table.columns}
@@ -422,14 +430,14 @@ def test_column_requires_null_semantics_exactly_when_nullable() -> None:
 # --------------------------------------------------------------------------------------
 
 
-def test_unsourced_tables_are_declared_so_the_exporter_cannot_publish_a_partial_contract() -> None:
-    # P1.2 sourced both fixture-grain forecast facts; only the player-form fact (P1.6) is left.
-    assert {"fact_player_form"} == NOT_YET_SOURCED
-    for name in NOT_YET_SOURCED:
-        assert "NOT YET IMPLEMENTED" in CONTRACT.table(name).source_owner
+def test_every_contract_table_is_now_sourced_for_the_exporter() -> None:
+    """P1.6 sources the last P1.1 declaration, so P1.4 can require the complete contract."""
+    assert frozenset() == NOT_YET_SOURCED
     for table in CONTRACT.tables:
-        if table.name not in NOT_YET_SOURCED:
-            assert "NOT YET IMPLEMENTED" not in table.source_owner
+        assert "NOT YET IMPLEMENTED" not in table.source_owner
+    assert CONTRACT.table("fact_player_form").source_owner == (
+        "fpl.transform.facts:mart_fact_player_form"
+    )
 
 
 def _referenced_source_tables(source_owner: str) -> set[str]:

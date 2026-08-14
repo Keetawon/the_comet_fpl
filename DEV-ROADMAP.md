@@ -377,6 +377,17 @@ not blend official FDR into the model index.
 
 ### P1.6 — Player-form contract
 
+**Implementation status (2026-08-14): implemented and offline-tested.**
+`fpl.transform.facts:build_player_form` materializes `mart_fact_player_form` at the long
+`(season, gw, code, window)` grain and `build_db` rebuilds it after the component and target marts.
+It treats the existence of a `mart_fact_player_fixture` row as rostered, uses observed gameweek
+anchors and their latest kickoff as the point-in-time boundary, preserves both legs of a double
+gameweek, and never creates a row for a missing gameweek. Availability aggregates rostered rows;
+productivity aggregates `minutes >= 1` rows only. xG/xA sums and per-90 denominators use only the
+matching measured rows, points come only from `mart_target_player_fixture.points_under_rules_2026_27`,
+and unmeasured starts, xG/xA, and DC stay NULL rather than becoming zero. P1.6 sources the last
+semantic-contract table, so `contract.NOT_YET_SOURCED` is now empty.
+
 Keep availability and productivity separate:
 
 - availability windows use recent rostered player-fixture rows and report appearances, starts,

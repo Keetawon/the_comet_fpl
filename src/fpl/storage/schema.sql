@@ -499,6 +499,39 @@ CREATE TABLE IF NOT EXISTS mart_target_player_fixture (
     PRIMARY KEY (season, code, fixture)
 );
 
+-- DESCRIPTIVE OBSERVED player form for the BI semantic contract.  This stays outside the
+-- feature layer: it reads realised component and target marts and must never become a model input.
+--
+-- Grain is one player / observed gameweek / reporting window.  A player-fixture row is the
+-- "rostered" population; it is broader than appeared players, so the availability denominators
+-- below deliberately include zero-minute rows.  Productivity fields are built separately from
+-- appeared rows only in transform.facts.build_player_form().
+CREATE TABLE IF NOT EXISTS mart_fact_player_form (
+    season                       VARCHAR NOT NULL,
+    gw                           INTEGER NOT NULL,
+    code                         INTEGER NOT NULL,
+    "window"                     VARCHAR NOT NULL,
+    rostered_fixtures            INTEGER NOT NULL,
+    appearances                  INTEGER NOT NULL,
+    -- `starts` is unmeasured for every 2021-22 player-fixture row.  It must remain NULL for a
+    -- window with incomplete starts coverage rather than being silently reported as zero.
+    starts                       INTEGER,
+    did_not_play                 INTEGER NOT NULL,
+    minutes                      INTEGER NOT NULL,
+    goals_scored                 INTEGER,
+    assists                      INTEGER,
+    bonus                        INTEGER,
+    bps                          INTEGER,
+    defensive_contribution       INTEGER,
+    expected_goals               DOUBLE,
+    expected_assists             DOUBLE,
+    expected_goals_per_90        DOUBLE,
+    expected_assists_per_90      DOUBLE,
+    points_under_rules_2026_27   INTEGER,
+    PRIMARY KEY (season, gw, code, "window"),
+    CHECK ("window" IN ('last_3', 'last_5', 'last_10', 'season_to_date'))
+);
+
 -- Which components each ruleset needs but the season did not measure. Without this,
 -- points_under_rules_2026_27 silently understates defenders before 2025-26, when
 -- defensive_contribution was not recorded at all.
