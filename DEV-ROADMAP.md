@@ -231,6 +231,37 @@ dashboard must never query the mutable production DuckDB directly.
 
 ### P1.1 — Freeze semantic contract v1
 
+**Implementation status (2026-08-14): frozen, typed, and executable.**
+`src/fpl/publish/contract.py` declares the schema as validated data,
+`docs/bi-semantic-contract.md` is its authoritative prose counterpart, and
+`tests/test_bi_semantic_contract.py` pins it with 45 tests. The two files change together.
+
+The contract is executable rather than prose because every expensive defect here has been
+join-shaped. `SemanticContract.validate_contract()` rejects, by construction: a join touching a
+season-scoped id (`element_id`, `team_id`, `opponent_team_id`) without binding `season`; a forecast
+fact missing `run_id`/`as_of` or not keying on `run_id`; an outcome fact carrying `run_id`; a
+`many_to_one` join that does not bind its target's full grain and would fan out; a nullable column
+that does not declare what its NULL means; and a nullable or absent grain column. Each rejection has
+a test that constructs the violation and asserts it is caught.
+
+**Three dimensions were added to the roadmap's original five**, each forced by a documented
+invariant, not by taste:
+
+- `dim_player_season` — `web_name`, `position` and `element_id` are season-scoped, so a single
+  `code`-grain player dimension carrying them would misreport them or fan cross-season queries out;
+- `dim_player_stint` — club membership is time-scoped within a season, and `AGENTS.md` forbids
+  resolving club from a player dimension, so without this there is nowhere correct to resolve it;
+- `dim_team_season` — the season-scoped `team_id` on every fact needs somewhere to resolve to a
+  cross-season `team_code`.
+
+`dim_player` and `dim_team` remain as named, narrowed to permanent identity only: `dim_player`
+carries no club and no position.
+
+`NullMeaning` deliberately has no `zero` option, so an unmeasured xG can never be published as a
+measured `0.0`. `fact_forecast_player_fixture`, `fact_forecast_team_fixture` and `fact_player_form`
+are declared but listed in `contract.NOT_YET_SOURCED`, giving P1.2 and P1.6 a fixed target and
+letting the P1.4 exporter refuse to publish a partial contract silently.
+
 Define each table's grain, keys, null semantics, source owner, and allowed joins before writing the
 exporter.
 
