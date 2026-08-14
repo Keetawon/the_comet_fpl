@@ -117,6 +117,43 @@ CREATE TABLE IF NOT EXISTS ledger_prediction_player_gameweek (
     PRIMARY KEY (run_id, season, gw, code)
 );
 
+CREATE TABLE IF NOT EXISTS ledger_prediction_player_fixture (
+    run_id                      VARCHAR NOT NULL,
+    season                      VARCHAR NOT NULL,
+    gw                          INTEGER NOT NULL,
+    fixture                     INTEGER NOT NULL,
+    code                        INTEGER NOT NULL,
+    kickoff_time                TIMESTAMPTZ NOT NULL,
+    position                    VARCHAR NOT NULL,
+    team_id                     INTEGER NOT NULL,
+    team_code                   INTEGER,
+    opponent_team_id            INTEGER NOT NULL,
+    was_home                    BOOLEAN NOT NULL,
+    expected_points             DOUBLE NOT NULL,
+    expected_bonus              DOUBLE NOT NULL,
+    distribution                DOUBLE[] NOT NULL,
+    stage_a_league_average_team BOOLEAN NOT NULL,
+    PRIMARY KEY (run_id, season, fixture, code)
+);
+
+CREATE TABLE IF NOT EXISTS ledger_prediction_team_fixture (
+    run_id                      VARCHAR NOT NULL,
+    season                      VARCHAR NOT NULL,
+    gw                          INTEGER NOT NULL,
+    fixture                     INTEGER NOT NULL,
+    kickoff_time                TIMESTAMPTZ NOT NULL,
+    team_id                     INTEGER NOT NULL,
+    team_code                   INTEGER,
+    opponent_team_id            INTEGER NOT NULL,
+    was_home                    BOOLEAN NOT NULL,
+    lambda_for                  DOUBLE NOT NULL,
+    lambda_against              DOUBLE NOT NULL,
+    probability_clean_sheet     DOUBLE NOT NULL,
+    goals_for_distribution      DOUBLE[] NOT NULL,
+    stage_a_league_average_team BOOLEAN NOT NULL,
+    PRIMARY KEY (run_id, season, fixture, team_id)
+);
+
 CREATE TABLE IF NOT EXISTS ledger_outcome_player_fixture (
     season                     VARCHAR NOT NULL,
     code                       INTEGER NOT NULL,
@@ -277,6 +314,77 @@ def _insert_predictions(
         """,
         params,
     )
+    _insert_fixture_predictions(con, run_id, artifact)
+
+
+def _insert_fixture_predictions(
+    con: duckdb.DuckDBPyConnection, run_id: str, artifact: ProspectivePointsArtifact
+) -> None:
+    """Record the schema-version-2 fixture-grain rows, if the artifact carries them.
+
+    A version-1 artifact has none, so this is a no-op and the vintage is still complete for its
+    own schema version. Both tables share the run's transaction, so a vintage can never be half
+    recorded at one grain and whole at another.
+    """
+    if artifact.player_fixture_rows:
+        con.executemany(
+            """
+            INSERT INTO ledger_prediction_player_fixture (
+                run_id, season, gw, fixture, code, kickoff_time, position, team_id, team_code,
+                opponent_team_id, was_home, expected_points, expected_bonus, distribution,
+                stage_a_league_average_team
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                [
+                    run_id,
+                    row.season,
+                    row.gw,
+                    row.fixture,
+                    row.code,
+                    row.kickoff_time,
+                    row.position,
+                    row.team_id,
+                    row.team_code,
+                    row.opponent_team_id,
+                    row.was_home,
+                    row.expected_points,
+                    row.expected_bonus,
+                    list(row.distribution),
+                    row.stage_a_league_average_team,
+                ]
+                for row in artifact.player_fixture_rows
+            ],
+        )
+    if artifact.team_fixture_rows:
+        con.executemany(
+            """
+            INSERT INTO ledger_prediction_team_fixture (
+                run_id, season, gw, fixture, kickoff_time, team_id, team_code, opponent_team_id,
+                was_home, lambda_for, lambda_against, probability_clean_sheet,
+                goals_for_distribution, stage_a_league_average_team
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                [
+                    run_id,
+                    row.season,
+                    row.gw,
+                    row.fixture,
+                    row.kickoff_time,
+                    row.team_id,
+                    row.team_code,
+                    row.opponent_team_id,
+                    row.was_home,
+                    row.lambda_for,
+                    row.lambda_against,
+                    row.probability_clean_sheet,
+                    list(row.goals_for_distribution),
+                    row.stage_a_league_average_team,
+                ]
+                for row in artifact.team_fixture_rows
+            ],
+        )
 
 
 def record_forecast(

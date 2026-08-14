@@ -83,6 +83,8 @@ from fpl.artifacts.prospective_points import (
     ArtifactPlayerInput,
     ContractIdentity,
     ForecastArtifactManifest,
+    ForecastPlayerFixtureRow,
+    ForecastTeamFixtureRow,
     LiveInputProvenance,
     ProspectivePointsArtifact,
     build_artifact_rows,
@@ -846,6 +848,30 @@ class ProspectivePointsRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class ProspectiveTeamFixtureRecord:
+    """One club's modelled scoring and conceding for one scheduled fixture.
+
+    Derived entirely from the Stage A team-goal distributions the composer already consumes:
+    ``lambda_against`` is the opponent's own scored expectation and the clean sheet is the
+    opponent's zero mass. Nothing is re-modelled here.
+    """
+
+    season: str
+    gw: int
+    fixture: int
+    kickoff_time: datetime
+    team_id: int
+    team_code: int | None
+    opponent_team_id: int
+    was_home: bool
+    lambda_for: float
+    lambda_against: float
+    probability_clean_sheet: float
+    goals_for_distribution: Distribution
+    stage_a_league_average_team: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ProspectivePlayerTotal:
     code: int
     position: str
@@ -896,6 +922,7 @@ class ProspectivePointsResult:
     assists_mode: str
     freshness_cold_start: bool
     records: tuple[ProspectivePointsRecord, ...]
+    team_records: tuple[ProspectiveTeamFixtureRecord, ...]
     players: tuple[ProspectivePlayerMetadata, ...]
     player_totals: tuple[ProspectivePlayerTotal, ...]
     component_names: dict[str, str]
@@ -1496,6 +1523,47 @@ def predict_prospective_points(
                 )
             )
 
+    # 5b. Team-fixture primitives, read off the SAME Stage A distributions the composer consumed.
+    #     Nothing is re-modelled: lambda_against is the opponent's own scored expectation and the
+    #     clean sheet is the opponent's zero mass, so these rows cannot disagree with the player
+    #     rows they sit beside.
+    team_records: list[ProspectiveTeamFixtureRecord] = []
+    for r in schedule.iter_rows(named=True):
+        team_id = int(r["team_id"])
+        opponent_team_id = int(r["opponent_team_id"])
+        fixture = int(r["fixture"])
+        team_code = team_map.get(team_id)
+        opponent_code = team_map.get(opponent_team_id)
+        own_scored = team_scored.get((fixture, team_code)) if team_code is not None else None
+        opponent_scored = (
+            team_scored.get((fixture, opponent_code)) if opponent_code is not None else None
+        )
+        stage_a_league_average = _stage_a_uses_league_average(
+            team_code=team_code,
+            opponent_code=opponent_code,
+            known_team_codes=known_team_codes,
+            opponent_conceded_unresolved=opponent_scored is None,
+        )
+        scored = own_scored if own_scored is not None else league_conceded_dist
+        conceded = opponent_scored if opponent_scored is not None else league_conceded_dist
+        team_records.append(
+            ProspectiveTeamFixtureRecord(
+                season=season,
+                gw=int(r["gw"]),
+                fixture=fixture,
+                kickoff_time=r["kickoff_time"],
+                team_id=team_id,
+                team_code=team_code,
+                opponent_team_id=opponent_team_id,
+                was_home=bool(r["was_home"]),
+                lambda_for=sum(i * mass for i, mass in enumerate(scored)),
+                lambda_against=sum(i * mass for i, mass in enumerate(conceded)),
+                probability_clean_sheet=conceded[0],
+                goals_for_distribution=scored,
+                stage_a_league_average_team=stage_a_league_average,
+            )
+        )
+
     # 6. Per-player horizon totals (sum over the player's fixtures; double gameweeks add).
     totals_acc: dict[int, dict[str, Any]] = {}
     for rec in records:
@@ -1551,6 +1619,7 @@ def predict_prospective_points(
         assists_mode=assists,
         freshness_cold_start=freshness.cold_start,
         records=tuple(sorted(records, key=lambda row: (row.fixture, row.code))),
+        team_records=tuple(sorted(team_records, key=lambda row: (row.fixture, row.team_id))),
         players=tuple(sorted(player_metadata, key=lambda player: player.code)),
         player_totals=player_totals,
         component_names={
@@ -1709,6 +1778,57 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
         players=players,
         fixtures=fixture_inputs,
     )
+    # The fixture-grain transport (schema version 2). These are the SAME composed distributions the
+    # gameweek rows are convolved from, not a second forecast, and the artifact validator proves
+    # that by re-convolving them on every read.
+    positions = {player.code: player.position for player in players}
+    player_fixture_rows = tuple(
+        sorted(
+            (
+                ForecastPlayerFixtureRow(
+                    season=record.season,
+                    gw=record.gw,
+                    fixture=record.fixture,
+                    code=record.code,
+                    kickoff_time=record.kickoff_time,
+                    position=positions[record.code],
+                    team_id=record.team_id,
+                    team_code=record.team_code,
+                    opponent_team_id=record.opponent_team_id,
+                    was_home=record.was_home,
+                    expected_points=record.expected_points,
+                    expected_bonus=record.expected_bonus,
+                    distribution=record.distribution,
+                    stage_a_league_average_team=record.stage_a_league_average_team,
+                )
+                for record in result.records
+            ),
+            key=lambda row: (row.season, row.fixture, row.code),
+        )
+    )
+    team_fixture_rows = tuple(
+        sorted(
+            (
+                ForecastTeamFixtureRow(
+                    season=record.season,
+                    gw=record.gw,
+                    fixture=record.fixture,
+                    kickoff_time=record.kickoff_time,
+                    team_id=record.team_id,
+                    team_code=record.team_code,
+                    opponent_team_id=record.opponent_team_id,
+                    was_home=record.was_home,
+                    lambda_for=record.lambda_for,
+                    lambda_against=record.lambda_against,
+                    probability_clean_sheet=record.probability_clean_sheet,
+                    goals_for_distribution=record.goals_for_distribution,
+                    stage_a_league_average_team=record.stage_a_league_average_team,
+                )
+                for record in result.team_records
+            ),
+            key=lambda row: (row.season, row.fixture, row.team_id),
+        )
+    )
     contracts = {
         "phase2_minutes": ContractIdentity(
             name="phase2_evaluation",
@@ -1734,11 +1854,14 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
         **{f"component.{name}": value for name, value in result.component_names.items()},
     }
     manifest = ForecastArtifactManifest(
+        schema_version=2,
         as_of=result.as_of,
         season=result.season,
         gw_from=result.gw_from,
         gw_to=result.gw_to,
         row_count=len(rows),
+        player_fixture_row_count=len(player_fixture_rows),
+        team_fixture_row_count=len(team_fixture_rows),
         roster_size=result.roster_size,
         fixture_count=result.fixture_count,
         monte_carlo_draws=result.draws,
@@ -1757,7 +1880,12 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
             schedule_capture_ids=result.schedule_capture_ids,
         ),
     )
-    return ProspectivePointsArtifact(manifest=manifest, rows=rows)
+    return ProspectivePointsArtifact(
+        manifest=manifest,
+        rows=rows,
+        player_fixture_rows=player_fixture_rows,
+        team_fixture_rows=team_fixture_rows,
+    )
 
 
 def format_top_table(result: ProspectivePointsResult, *, top: int = 20) -> str:

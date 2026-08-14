@@ -288,6 +288,30 @@ Every forecast fact includes `run_id` and `as_of`. Every actual stays separate u
 
 ### P1.2 — Add fixture-grain forecast transport
 
+**Implementation status (2026-08-14): implemented, offline-tested, and verified end to end.**
+Artifact schema version 2 adds `player_fixture` and `team_fixture` record types alongside the
+unchanged player-gameweek rows; the ledger gains `ledger_prediction_player_fixture` and
+`ledger_prediction_team_fixture`, written inside the run's own transaction. Contract in
+`docs/prospective-points-artifact.md` and `docs/prediction-ledger.md`; tests in
+`tests/test_fixture_grain_transport.py`.
+
+It is an output/contract change only. The composer already produced per-fixture distributions and
+the job already held the Stage A team-goal distributions; both were simply discarded at write time.
+`lambda_against` and the clean sheet are read off the opponent's own scored distribution, so a team
+row cannot disagree with the player rows beside it. **No component model, composer, objective or
+default changed**, and a real GW1-2 run reproduces the same player-gameweek rows as before.
+
+**The mapping is enforced rather than asserted.** On every serialise and every read each gameweek
+row is re-derived from its own player-fixture rows: fixture ids and kickoff times must match, the
+distributions must convolve to exactly the stored gameweek distribution, expected bonus must sum,
+and the Stage A fallback flag must be the OR across the player's fixtures. So the two grains cannot
+drift apart silently — which matters because the convolution is not invertible.
+
+Schema version 1 stays readable and the frozen pre-P1.2 vintages are unaffected: a version-1
+manifest declares neither fixture count, and supplying fixture rows under version 1 fails closed.
+`fact_forecast_player_fixture` and `fact_forecast_team_fixture` are consequently removed from
+`contract.NOT_YET_SOURCED`, leaving only `fact_player_form` (P1.6).
+
 The current public artifact and ledger preserve only player-gameweek distributions. Add a versioned
 fixture-grain transport rather than reverse-engineering component values from a convolved GW PMF.
 

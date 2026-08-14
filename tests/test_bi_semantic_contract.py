@@ -423,11 +423,8 @@ def test_column_requires_null_semantics_exactly_when_nullable() -> None:
 
 
 def test_unsourced_tables_are_declared_so_the_exporter_cannot_publish_a_partial_contract() -> None:
-    assert {
-        "fact_forecast_player_fixture",
-        "fact_forecast_team_fixture",
-        "fact_player_form",
-    } == NOT_YET_SOURCED
+    # P1.2 sourced both fixture-grain forecast facts; only the player-form fact (P1.6) is left.
+    assert {"fact_player_form"} == NOT_YET_SOURCED
     for name in NOT_YET_SOURCED:
         assert "NOT YET IMPLEMENTED" in CONTRACT.table(name).source_owner
     for table in CONTRACT.tables:

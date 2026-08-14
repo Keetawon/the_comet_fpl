@@ -604,7 +604,7 @@ FACT_FORECAST_PLAYER_FIXTURE = Table(
         "One row per player per fixture per vintage. This is the natural forecast grain: double "
         "gameweeks are real, and the gameweek row is derived from these by convolution."
     ),
-    source_owner="P1.2 fixture-grain forecast transport (NOT YET IMPLEMENTED)",
+    source_owner="fpl.storage.ledger:ledger_prediction_player_fixture",
     forecast_scoped=True,
     columns=(
         *_FORECAST_KEYS,
@@ -652,7 +652,7 @@ FACT_FORECAST_TEAM_FIXTURE = Table(
     subject="A club's forecast scoring and conceding rates for one fixture.",
     grain=("run_id", "season", "fixture", "team_id"),
     grain_note="Two rows per fixture per vintage, one for each club.",
-    source_owner="P1.2 fixture-grain forecast transport (NOT YET IMPLEMENTED)",
+    source_owner="fpl.storage.ledger:ledger_prediction_team_fixture",
     forecast_scoped=True,
     columns=(
         *_FORECAST_KEYS,
@@ -923,16 +923,10 @@ SEMANTIC_CONTRACT_V1 = SemanticContract(
     ),
 )
 
-#: Tables whose source transport does not exist yet. P1.2 and P1.6 must deliver these before the
+#: Tables whose source transport does not exist yet. P1.6 must deliver the remaining one before the
 #: P1.4 exporter can publish a complete contract; the exporter must refuse to emit a partial one
-#: silently.
-NOT_YET_SOURCED: frozenset[str] = frozenset(
-    {
-        "fact_forecast_player_fixture",
-        "fact_forecast_team_fixture",
-        "fact_player_form",
-    }
-)
+#: silently. The two fixture-grain forecast facts were sourced by P1.2.
+NOT_YET_SOURCED: frozenset[str] = frozenset({"fact_player_form"})
 
 
 __all__ = [

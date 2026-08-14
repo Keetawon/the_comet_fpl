@@ -22,7 +22,7 @@ run auditable. `src/fpl/storage/ledger.py` holds the domain logic;
 
 ## Schema
 
-Three tables in the main DuckDB, all prefixed `ledger_`.
+Five tables in the main DuckDB, all prefixed `ledger_`.
 
 `ledger_forecast_run` -- one immutable row per recorded run, carrying the manifest's full provenance:
 `run_id` (PK), `created_at`, `as_of`, `season`, `gw_from`, `gw_to`, `commit_sha`, `database_sha256`,
@@ -37,6 +37,23 @@ field including the full `distribution` (`DOUBLE[]`) and all five degradation fl
 `assist_signal_cold_start`, `transferred_no_rescale`). `fixture_ids` and `kickoff_times` are stored
 as JSON arrays, preserving the fixture linkage. Nullable live fields (`web_name`, `team_code`,
 `now_cost`, `selected_by_percent`, `chance_of_playing`) stay `NULL`; nothing is coerced to zero.
+
+`ledger_prediction_player_fixture` -- PK `(run_id, season, fixture, code)`, the fixture-grain
+transport added by P1.2. Carries `gw`, `kickoff_time`, `position`, `team_id`, nullable `team_code`,
+`opponent_team_id`, `was_home`, the full per-fixture `distribution` (`DOUBLE[]`),
+`expected_points`, `expected_bonus`, and `stage_a_league_average_team`. This is the grain the
+composer works at; the gameweek table is its convolution, and the artifact proves that relation on
+every read.
+
+`ledger_prediction_team_fixture` -- PK `(run_id, season, fixture, team_id)`, two rows per fixture.
+Carries `gw`, `kickoff_time`, `team_code`, `opponent_team_id`, `was_home`, `lambda_for`,
+`lambda_against`, `probability_clean_sheet`, `goals_for_distribution` (`DOUBLE[]`), and
+`stage_a_league_average_team`. These are the fixture-difficulty primitives the BI layer publishes.
+
+Both fixture tables are written inside the same transaction as the run and its gameweek rows, so a
+vintage can never be half recorded at one grain and whole at another. A schema-version-1 artifact
+carries no fixture rows, so recording one leaves both tables empty for that run; that is a complete
+vintage for its own schema version, not a partial one.
 
 `ledger_outcome_player_fixture` -- a **separate** table at `(season, code, fixture)` grain,
 carrying `attached_at`, `total_points_as_recorded`, and `points_under_rules_2026_27`. It is joined to
@@ -74,12 +91,13 @@ transformation. The artifact carries an explicit `as_of`, so nothing here is inf
 
 ## Open gaps
 
-- **Player-fixture grain.** `AGENTS.md` priority 9 wants **both** player-fixture and player-gameweek
-  predictions retained. The artifact is player-gameweek only (double gameweeks are convolved in the
-  artifact), though it carries `fixture_ids`. The ledger records the gameweek grain faithfully and
-  preserves the fixture linkage, but per-fixture distributions are not available without an upstream
-  fixture-grain transport contract. Recorded here as an open item rather than manufactured by
-  reaching around the artifact into the model.
+- **Player-fixture grain — closed by P1.2.** `AGENTS.md` priority 9 wants **both** player-fixture
+  and player-gameweek predictions retained, and both are now recorded. Artifact schema version 2
+  transports the per-fixture distributions and the team-fixture primitives, and the ledger stores
+  them in `ledger_prediction_player_fixture` and `ledger_prediction_team_fixture`. Nothing reaches
+  around the artifact into the model: the rows are the same composed distributions the gameweek
+  rows are convolved from, and that relation is re-checked on every serialise and read. Vintages
+  recorded before P1.2 remain schema version 1 and legitimately have no fixture rows.
 - **Outcome ingestion path.** `attach_outcomes` stores outcomes given to it; the job that reads final
   fixtures from the marts and calls it (only after finalisation, at `(season, code, fixture)` grain)
   is not yet built.

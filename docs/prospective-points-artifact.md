@@ -28,13 +28,19 @@ the requested horizon, including players with no fixture. A blank gameweek is th
 `[1.0]` at zero points. Double-gameweek fixture distributions are convolved in ascending fixture
 order.
 
-## Manifest contract (`schema_version = 1`)
+## Manifest contract (`schema_version = 2`)
+
+Version 2 adds the fixture-grain transport described below. Version 1 remains readable: it carried
+player-gameweek rows only, and a version-1 manifest declares neither fixture-row count. A producer
+emitting fixture rows opts into version 2 and must declare both counts, so a truncated file cannot
+read as complete; supplying fixture rows under version 1 fails closed.
 
 The manifest contains:
 
 - `schema = "fpl.prospective-points"`, `schema_version`, and the explicit development-only status;
 - `as_of`, `season`, `gw_from`, `gw_to`, row/roster/fixture counts, seed, draw count, and fixture
   support limit;
+- from version 2, `player_fixture_row_count` and `team_fixture_row_count`;
 - Git commit, an enforced clean-worktree flag, and database SHA-256 identities;
 - scoring, Stage B, and Stage C contract names, versions, and SHA-256 identities;
 - component modes and names, including appearance, attacking, assist, and share-signal modes;
@@ -67,6 +73,32 @@ and the opponent drives conceded goals / clean sheets. The promoted-team prior
 separately-variance-carrying open modelling work. (An earlier wording, "team unresolvable",
 described only the never-occurring case where a bootstrap `team_id` maps to no `team_code` at all,
 which never fires for the 20 league clubs.)
+
+## Fixture-grain transport (`record_type` `player_fixture` and `team_fixture`)
+
+The forecaster works at fixture grain and the gameweek row is *derived* from it by convolution.
+That convolution is **not invertible**, so the fixture rows are transported rather than
+reconstructed: nothing downstream can recover a player's two legs of a double gameweek, or the
+opponent and venue behind a single leg, from a convolved gameweek PMF.
+
+A `player_fixture` row carries `(season, gw, fixture, code)`, `kickoff_time`, `position`, the
+season-scoped `team_id` and cross-season `team_code`, `opponent_team_id`, `was_home`, the raw
+`distribution` with its `expected_points` and `expected_bonus`, and `stage_a_league_average_team`.
+
+A `team_fixture` row carries `(season, gw, fixture, team_id)` with `team_code`,
+`opponent_team_id`, `was_home`, `lambda_for`, `lambda_against`, `probability_clean_sheet`, the
+`goals_for_distribution`, and `stage_a_league_average_team`. Both sides of every fixture are
+published. These are the fixture-difficulty **primitives**; any ease index is derived from the two
+lambdas and must be shown beside them with an explicit direction. `lambda_against` and the clean
+sheet are read off the opponent's own scored distribution, so a team row cannot disagree with the
+player rows beside it.
+
+**The mapping is enforced, not asserted.** On every serialise and every read, each gameweek row is
+re-derived from its own player-fixture rows: the fixture ids and kickoff times must match, the
+distributions must convolve to exactly the stored gameweek distribution, expected bonus must sum,
+and `stage_a_league_average_team` must be the OR across the player's fixtures. A gameweek row with
+no fixture rows must name no fixtures, and a fixture row with no gameweek row is rejected. So the
+two grains cannot drift apart silently, and a consumer never has to guess which one is right.
 
 JSON `null` is preserved. It is never converted to zero. The distribution must be non-negative,
 finite, sum to one within `1e-9`, and reconcile to `expected_points`. Availability is a separate
