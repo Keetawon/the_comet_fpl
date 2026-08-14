@@ -361,6 +361,17 @@ def _isoformat(value: datetime | None) -> str | None:
     return value.astimezone(UTC).isoformat()
 
 
+def _utc_from_epoch_us(microseconds: int) -> datetime:
+    """Rebuild a UTC instant from a DuckDB ``epoch_us`` value.
+
+    The provenance reads below select ``epoch_us(...)`` instead of the raw ``TIMESTAMPTZ`` so that
+    DuckDB never converts a stored timestamp into a Python ``datetime``.  That conversion imports
+    ``pytz``, which this project deliberately does not depend on (it pins ``tzdata`` for
+    ``zoneinfo``); microseconds since the epoch are exact and carry no timezone name to resolve.
+    """
+    return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(microseconds=microseconds)
+
+
 def _contract_columns(table: Table) -> tuple[str, ...]:
     return tuple(column.name for column in table.columns)
 
@@ -786,26 +797,27 @@ def _assess_freshness(
 
     raw_rows = con.execute(
         """
-        SELECT run_id, as_of, bootstrap_known_at, freshness_cold_start
+        SELECT run_id, epoch_us(as_of) AS as_of_us,
+               epoch_us(bootstrap_known_at) AS known_at_us, freshness_cold_start
         FROM ledger_forecast_run
         ORDER BY run_id
         """
     ).fetchall()
     records: list[_ForecastFreshness] = []
     for raw in raw_rows:
-        run_id, as_of, known_at, cold_start = raw
+        run_id, as_of_us, known_at_us, cold_start = raw
         if (
             not isinstance(run_id, str)
-            or not isinstance(as_of, datetime)
-            or not isinstance(known_at, datetime)
+            or not isinstance(as_of_us, int)
+            or isinstance(as_of_us, bool)
+            or not isinstance(known_at_us, int)
+            or isinstance(known_at_us, bool)
         ):
             raise BiExportSourceError(
                 "ledger forecast provenance has an invalid timestamp or run id"
             )
-        if as_of.tzinfo is None or known_at.tzinfo is None:
-            raise BiExportSourceError(
-                "ledger forecast provenance timestamps must be timezone-aware"
-            )
+        as_of = _utc_from_epoch_us(as_of_us)
+        known_at = _utc_from_epoch_us(known_at_us)
         if known_at > as_of:
             raise BiExportFreshnessError(
                 f"run {run_id} has bootstrap_known_at after as_of; future knowledge cannot be "
@@ -841,11 +853,11 @@ def _assess_freshness(
             None if maximum_source_age is None else maximum_source_age.total_seconds()
         ),
     }
-    known_at = {
+    known_at_bounds = {
         "minimum": _isoformat(min(known_values, default=None)),
         "maximum": _isoformat(max(known_values, default=None)),
     }
-    return run_ids, freshness, known_at
+    return run_ids, freshness, known_at_bounds
 
 
 def _forecast_run_for_plan(
@@ -854,7 +866,8 @@ def _forecast_run_for_plan(
     forecast = artifact.provenance.forecast
     rows = con.execute(
         """
-        SELECT run_id, as_of, season, gw_from, gw_to, commit_sha, artifact_schema, schema_version
+        SELECT run_id, epoch_us(as_of) AS as_of_us, season, gw_from, gw_to, commit_sha,
+               artifact_schema, schema_version
         FROM ledger_forecast_run
         WHERE artifact_sha256 = ?
         """,
@@ -865,11 +878,12 @@ def _forecast_run_for_plan(
             f"optimizer plan {path} refers to forecast SHA {forecast.sha256}, which resolves to "
             f"{len(rows)} exported ledger run(s), expected exactly one"
         )
-    run_id, as_of, season, gw_from, gw_to, commit_sha, schema, schema_version = rows[0]
-    if not isinstance(run_id, str) or not isinstance(as_of, datetime):
+    run_id, as_of_us, season, gw_from, gw_to, commit_sha, schema, schema_version = rows[0]
+    if not isinstance(run_id, str) or not isinstance(as_of_us, int) or isinstance(as_of_us, bool):
         raise OptimizerPlanResolutionError(
             f"optimizer plan {path} resolved malformed ledger provenance"
         )
+    as_of = _utc_from_epoch_us(as_of_us)
     expected = (
         forecast.as_of,
         forecast.season,
