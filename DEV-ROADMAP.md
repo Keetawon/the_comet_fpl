@@ -149,6 +149,29 @@ captaincy.
 
 ### P0.3 — Decision comparison
 
+**Implementation status (2026-08-14): implemented, offline-tested, and produced once from the
+retained rehearsal vintages.** `src/fpl/artifacts/decision_comparison.py` owns the schema,
+derivation, deterministic `comparison_id`, and atomic no-clobber write;
+`fpl.jobs.compare_decisions` is the thin entry point; `docs/decision-comparison-artifact.md` is the
+contract and `docs/gw1-deadline-runbook.md` step 12 the operational context.
+
+It reads only the four frozen artifacts, touches no database, and re-derives each ledger `run_id`
+from that forecast's own manifest and canonical bytes, so nothing is re-forecast or re-solved. It
+fails closed instead of reporting when the two forecasts disagree on cutoff, horizon, database,
+seed, draws, live captures or contracts; when they declare the same `component_modes`; when a plan
+names a different forecast hash than the one it is paired with; or when a plan's first-gameweek
+expected points do not reconcile to that forecast's own rows.
+
+Rehearsal output: `comparison_id`
+`181e1aaa98b602c2b21c9be32927f1168c4a05c70222754e2237c76a1bf75e54`, reproduced bit for bit on a
+second run to a fresh path. Squad overlap 8/15, GW1 XI overlap 7/11, captain and vice-captain both
+disagree. Cross-evaluated captain gaps: +2.07 xP under the default model and +1.42 xP under the
+diagnostic, each computed inside a single model.
+
+**Absolute EV is not comparable between the paths** (322.79 against 249.46 over GW1-5 measures the
+two models' calibration against each other, not squad quality), so the captain question is answered
+by cross-evaluation and never by comparing one model's EV with the other's.
+
 The final report must show, for default and diagnostic paths:
 
 - selected 15, cost, ownership, GW1 expected points, and GW1-5 expected points;

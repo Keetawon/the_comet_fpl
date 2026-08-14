@@ -285,12 +285,35 @@ hashes are printed. Any illegal/tampered decision fails before the summary print
 
 ## Step 12 — Retain both vintages and produce the comparison
 
-Keep both forecast JSONLs, both ledger `run_id`s, and both optimizer artifacts. Produce the decision
-comparison DEV-ROADMAP P0.3 specifies (default vs diagnostic): selected 15, cost, ownership, GW1 EV
-and GW1-5 EV, GW1 XI / captain / vice / ordered bench, players common to both paths and players unique
-to either, captain agreement and the EV gap between alternatives, availability/status and every
-cold-start / Stage A league-average / attacking / assist / transfer flag, the bounded transfer
-scenario and any hits with the frozen-price caveat, and all provenance and ledger/optimizer run IDs.
+Keep both forecast JSONLs, both ledger `run_id`s, and both optimizer artifacts, then produce the
+DEV-ROADMAP P0.3 decision comparison with the dedicated job. It reads only the four frozen artifacts,
+touches no database, and re-derives each ledger `run_id` from that forecast's own manifest and
+canonical bytes, so nothing is re-forecast or re-solved:
+
+```powershell
+$comparison = "$out\decision-comparison.json"
+$comparisonReport = "$out\decision-comparison.md"
+.\.venv\Scripts\python.exe -m fpl.jobs.compare_decisions `
+  --default-forecast $default --default-plan $defaultPlan `
+  --diagnostic-forecast $diag --diagnostic-plan $diagPlan `
+  --output $comparison --report $comparisonReport
+if ($LASTEXITCODE -ne 0) { throw "decision comparison failed" }
+```
+
+Verify: the job prints the Markdown decision aid, writes both outputs immutably (no-clobber), and
+records a `comparison_id` covering both paths' content hashes and run identities. It **fails closed**
+rather than producing a misleading report: the two forecasts must share `as_of`, season, horizon,
+database, seed, draws, live captures and contracts and must differ in `component_modes`; each plan
+must name the forecast it is paired with; and each plan's first-gameweek expected points must
+reconcile to that forecast's own rows. Re-running with identical inputs reproduces the artifact bit
+for bit.
+
+The report covers what P0.3 requires: selected 15, cost, ownership, GW1 EV and GW1-5 EV, GW1
+XI / captain / vice / ordered bench, players common to both paths and players unique to either,
+captain agreement with a **cross-evaluated** EV gap (each model scores both captains, so the gap is
+never taken across two different scales), availability/status and every cold-start / Stage A
+league-average / attacking / assist / transfer flag, the bounded transfer scenario and any hits with
+the frozen-price caveat, and all provenance and ledger/optimizer run IDs.
 
 The comparison is a decision aid, not a promotion test. Do not choose a model because one named player
 looks more plausible. The GW1 lineup and captaincy are read from the GW1 (first) week of the default
