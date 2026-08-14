@@ -188,11 +188,35 @@ player looks more plausible.
 
 ### P0.4 — Rehearsal and deadline schedule
 
-- By 2026-08-15: finish optimizer artifact hardening and its tests.
+- By 2026-08-15: finish optimizer artifact hardening and its tests. **Done (2026-08-14).**
 - By 2026-08-18: complete one clean end-to-end rehearsal on the latest committed snapshot; record it
-  as a real pre-deadline vintage, not as the final team.
+  as a real pre-deadline vintage, not as the final team. **Done (2026-08-14); see P0.2.**
 - On 2026-08-20: produce a preliminary decision pack so there is a safe fallback if the final API
   capture or local machine fails.
+
+  **A first preliminary pack was produced early, on 2026-08-14**, at HEAD
+  `a149f31b88da9b29f921d1cb8e5690d527b15cc6`, on the same latest committed snapshot
+  (`2026-08-13T072348Z`) the rehearsal used — the preliminary step takes the latest committed
+  snapshot and captures nothing, so no newer input existed. Steps 1-12 ran in order, the full gate
+  was green (1,418 passed), and all four artifacts plus the comparison validated through their
+  readers.
+
+  **It reproduces the rehearsal's decision exactly and therefore adds no new information.** All
+  2,905 prediction rows are bit-identical to the rehearsal for both paths, and both optimizer
+  artifacts carry the *same* `decision_sha256` (default `14eff5b3…c8e767`, diagnostic
+  `1f63e2c0…182df5`) with a *different* `run_id` (default `3d5de107…f200ca1`, diagnostic
+  `960b4994…ce5aedde`). That split is the contract working as designed: `decision_sha256` binds what
+  was decided, `run_id` binds what produced it, and only the producing commit and database hash
+  moved. Ledger vintages `6ccb5445…e69396` (default) and `b2ea050b…6a8a646` (diagnostic); comparison
+  `9c66ad3b…9ba6a7`.
+
+  Two operational facts were confirmed rather than assumed: a full `build_db` rebuild **preserves**
+  recorded ledger vintages (2 before, 2 after, then 4 once the preliminary pair was recorded), and
+  recording a forecast changes `database_sha256` for any later run, which is why the runbook
+  generates both forecasts before any ledger write.
+
+  **The 2026-08-20 slot still stands.** Its value is fresher data, and re-running it then on a newer
+  committed snapshot is what makes it a real fallback rather than a relabelled rehearsal.
 - On 2026-08-21: capture and commit the latest official data, rerun the sequential pipeline roughly
   2-3 hours before the deadline, and lock the owner decision no later than 30 minutes before the
   deadline. Do not trade reproducibility for a last-minute unrecorded refresh.
