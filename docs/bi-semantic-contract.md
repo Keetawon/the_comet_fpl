@@ -4,11 +4,12 @@ Status: **frozen** (DEV-ROADMAP P1.1). Development-only data, like everything up
 
 This is the authoritative description of what the BI export publishes. Its executable counterpart is
 `src/fpl/publish/contract.py`, which declares the same schema as typed data and validates it; the two
-must be changed together. P1.2-P1.4 build against this contract rather than discovering a schema by
-writing an exporter.
+must be changed together. P1.2-P1.4 were built against this contract rather than discovering a
+schema by writing an exporter. The atomic publication and manifest rules are in
+`docs/bi-export-contract.md`.
 
 Nothing downstream of the publish boundary queries the mutable production DuckDB. BI, dashboards and
-notebooks read only the atomic read-only export that P1.4 will produce.
+notebooks read only the atomic read-only export that P1.4 produces.
 
 ## Why the contract is executable
 

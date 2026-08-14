@@ -348,6 +348,15 @@ Build the thin job that attaches outcomes only for finalized fixtures. It must:
 
 ### P1.4 — Atomic pivot-friendly export
 
+**Implementation status (2026-08-14): implemented and contract-tested.**
+`src/fpl/publish/export.py` now owns the atomic, versioned Parquet boundary and
+`fpl.jobs.export_bi` is the thin CLI. It publishes all fourteen frozen v1 tables, validates the
+complete staged export before an atomic generation-pointer swap, and refuses source drift, broken
+season-qualified joins, non-finite/altered NULL values, stale opt-in freshness, and concurrent
+clobbering. `docs/bi-export-contract.md` defines the read-only consumer boundary, layout, manifest,
+all-vintage run selection, and explicit optimizer-plan input. `tests/test_bi_export.py` covers the
+offline boundary plus an archive-build smoke test.
+
 Create domain code under a new `src/fpl/publish/` package and keep the job entry point thin.
 
 - Export versioned Parquet facts/dimensions plus a strict manifest with schema version, creation

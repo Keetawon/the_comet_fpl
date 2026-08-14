@@ -26,6 +26,14 @@ from fpl.publish.contract import (
 )
 
 CONTRACT = SEMANTIC_CONTRACT_V1
+LEDGER_SOURCE_TABLES = frozenset(
+    {
+        "ledger_forecast_run",
+        "ledger_prediction_player_gameweek",
+        "ledger_prediction_player_fixture",
+        "ledger_prediction_team_fixture",
+    }
+)
 
 
 # --------------------------------------------------------------------------------------
@@ -463,7 +471,12 @@ def test_every_sourced_table_names_a_database_table_or_an_artifact_module() -> N
 
 @pytest.mark.archive
 def test_declared_source_tables_exist_in_the_database(db: duckdb.DuckDBPyConnection) -> None:
-    """Every named production table really exists, so the exporter has something to read."""
+    """Every source exists, except the documented all-absent fresh ledger state.
+
+    ``build_db`` intentionally does not create a ledger until the first forecast is recorded. P1.4
+    treats that complete zero-vintage state as publishable; a partially present ledger remains
+    source drift and must fail this check (and the exporter) closed.
+    """
     existing = {
         row[0]
         for row in db.execute(
@@ -477,6 +490,10 @@ def test_declared_source_tables_exist_in_the_database(db: duckdb.DuckDBPyConnect
             continue
         referenced = _referenced_source_tables(table.source_owner)
         missing = referenced - existing
-        assert not missing, f"{table.name} references missing source table(s) {sorted(missing)}"
+        if missing:
+            assert referenced <= LEDGER_SOURCE_TABLES and not (existing & LEDGER_SOURCE_TABLES), (
+                f"{table.name} references missing source table(s) {sorted(missing)}"
+            )
+            continue
         checked += len(referenced)
     assert checked > 0, "no production source tables were checked"
