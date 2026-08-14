@@ -98,8 +98,32 @@ or dirty input state fails closed; the existing hand-computable squad and transf
 Add a concise `docs/gw1-deadline-runbook.md`. Prefer a thin orchestration entry point only if it
 removes operator error without moving business logic into `src/fpl/jobs/`.
 
-**Implementation status (2026-08-14): authored and PowerShell syntax-checked.** The first retained
-rehearsal remains due by 2026-08-18.
+**Implementation status (2026-08-14): authored, and executed end to end once as a retained
+rehearsal** on `main` at `724f8287368f1961a5a7bf7be4c9fe1aaba9f701`, ahead of the 2026-08-18 due
+date. All eleven steps ran in order with no deviation and no step failing closed:
+
+- snapshot `2026-08-13T072348Z` verified (season `2026-27`, 20 teams, 380 fixtures,
+  first kickoff `2026-08-21T19:00:00Z`, first deadline `2026-08-21T17:30:00Z`); all 18 committed
+  daily packages re-verified, 54 `SHA256SUMS` entries, zero mismatches;
+- DuckDB rebuilt and all 18 snapshots loaded sequentially; full gate green with the archive present
+  (1,377 passed, zero skipped; Ruff, format, and strict mypy clean);
+- both forecasts generated before any ledger write, so both record the same
+  `database_sha256 = f062360d…c1446`; each is 2,905 rows = 581 roster x 5 gameweeks, `as_of`
+  `2026-08-21T17:30:00Z`, `bootstrap_known_at 2026-08-13T07:23:48Z <= as_of`;
+- manifests agree on `as_of`, season, horizon, seed, draws, database, live inputs, and contracts,
+  and differ only in `component_modes` (`v3`/`coupled` against `v1`/`v1`, both `seasonal`);
+- both recorded sequentially in the ledger as distinct vintages, then both optimized at
+  `risk_lambda=0` into immutable artifacts that re-read and re-validate through
+  `read_optimizer_artifact`.
+
+Rehearsal identities are retained outside the repository. Default forecast
+`fc0fad1b…31b0c` -> ledger run `f9bbd862…70de25` -> optimizer run `786d79cc…fe02e3`
+(decision `14eff5b3…c8e767`). Diagnostic forecast `a9397a3e…44ca3a` -> ledger run
+`7a8c8495…b6381a` -> optimizer run `93234e61…bda8cf` (decision `1f63e2c0…182df5`).
+
+Re-optimizing the default forecast to a fresh path reproduced the artifact bit for bit (same
+`run_id`, `decision_sha256`, and file SHA-256), and re-running to an existing path was refused. This
+rehearsal is a pre-deadline vintage, not the final team; the official deadline run is still due.
 
 The runbook must execute, in order:
 
