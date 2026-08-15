@@ -194,6 +194,12 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "availability_status": "a",
                 "chance_of_playing": None,
                 "availability_multiplier": 1.0,
+                "expected_points": 5.5 if gw == 1 else 4.5,
+                "cold_start_player": False,
+                "stage_a_league_average_team": False,
+                "attacking_signal_cold_start": False,
+                "assist_signal_cold_start": False,
+                "transferred_no_rescale": False,
             }
         )
         player_gameweek.append(
@@ -211,6 +217,12 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "availability_status": "d",
                 "chance_of_playing": 75,
                 "availability_multiplier": 0.75,
+                "expected_points": 2.0 if gw == 1 else 3.0,
+                "cold_start_player": False,
+                "stage_a_league_average_team": True,
+                "attacking_signal_cold_start": False,
+                "assist_signal_cold_start": False,
+                "transferred_no_rescale": False,
             }
         )
     player_fixture = [
@@ -248,6 +260,10 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "gw_from": 1,
                 "gw_to": 2,
                 "status": "recorded",
+                "component_modes": (
+                    '{"appearance": "seasonal", "assists": "coupled", '
+                    '"attacking": "v3", "share_signal": "auto"}'
+                ),
             }
         ],
         "dim_player_season": [
@@ -301,6 +317,77 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
         "fact_forecast_team_fixture": team_fixture,
         "fact_forecast_player_gameweek": player_gameweek,
         "fact_forecast_player_fixture": player_fixture,
+        "dim_gameweek": [
+            {
+                "season": SEASON,
+                "gw": gw,
+                "deadline_time": None,  # deadlines are not sourced; never fabricated
+                "first_kickoff": min(KICKOFFS[f] for f in fixtures_of_gw),
+                "last_kickoff": max(KICKOFFS[f] for f in fixtures_of_gw),
+                "fixture_count": len(fixtures_of_gw),
+                "finished": False,
+            }
+            for gw, fixtures_of_gw in ((1, (100,)), (2, (101, 102)))
+        ],
+        # A miniature optimizer decision: two weeks, captain/vice in the XI, the MID
+        # transferred in during GW2.  Grained (optimizer_run_id, gw, code).
+        "fact_optimizer_plan": [
+            {
+                "optimizer_run_id": "opt-1",
+                "decision_sha256": "dec-1",
+                "forecast_run_id": RUN_ID,
+                "as_of": AS_OF,
+                "season": SEASON,
+                "gw": gw,
+                "code": code,
+                "role": role,
+                "bench_order_index": bench,
+                "is_captain": code == 1,
+                "is_vice_captain": code == 2,
+                "now_cost": 55 if code == 1 else 65,
+                "transferred_in": gw == 2 and code == 2,
+                "transferred_out": False,
+                "hit_points_this_gw": 0,
+            }
+            for gw in (1, 2)
+            for code, role, bench in ((1, "starting_xi", None), (2, "starting_xi", None))
+        ]
+        + [
+            {
+                "optimizer_run_id": "opt-2",
+                "decision_sha256": "dec-2",
+                "forecast_run_id": RUN_ID,
+                "as_of": AS_OF,
+                "season": SEASON,
+                "gw": 1,
+                "code": 1,
+                "role": "starting_xi",
+                "bench_order_index": None,
+                "is_captain": True,
+                "is_vice_captain": False,
+                "now_cost": 55,
+                "transferred_in": False,
+                "transferred_out": False,
+                "hit_points_this_gw": 4,
+            },
+            {
+                "optimizer_run_id": "opt-2",
+                "decision_sha256": "dec-2",
+                "forecast_run_id": RUN_ID,
+                "as_of": AS_OF,
+                "season": SEASON,
+                "gw": 1,
+                "code": 2,
+                "role": "starting_xi",
+                "bench_order_index": None,
+                "is_captain": False,
+                "is_vice_captain": True,
+                "now_cost": 65,
+                "transferred_in": False,
+                "transferred_out": False,
+                "hit_points_this_gw": 4,
+            },
+        ],
         "fact_team_form": [
             # An older-season row exists: the anchor must be the LATEST (season, gw) pair.
             _team_form_row(OLDER, 38, 101, "last_3", matches_played=3),
@@ -582,7 +669,85 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
     first = render_read_model_files(build_dashboard_read_models(export_dir))
     second = render_read_model_files(build_dashboard_read_models(export_dir))
     assert first == second
-    assert set(first) == {FIXTURE_MATRIX_FILENAME, PLAYERS_FILENAME}
+    assert set(first) == {
+        FIXTURE_MATRIX_FILENAME,
+        PLAYERS_FILENAME,
+        "next_gw.json",
+        "summary.json",
+    }
+
+
+def test_next_gw_plans_join_ev_context_and_modes(tmp_path: Path) -> None:
+    models = build_dashboard_read_models(_build_source_export(tmp_path))
+    plans = models.next_gw["plans"]
+    assert [plan["optimizer_run_id"] for plan in plans] == ["opt-1", "opt-2"]
+
+    plan = plans[0]
+    assert (plan["forecast_run_id"], plan["decision_sha256"]) == (RUN_ID, "dec-1")
+    assert plan["gw_from"] == 1 and plan["gw_to"] == 2
+    # component modes travel with the plan so the UI can label the architecture
+    assert plan["component_modes"] == {
+        "appearance": "seasonal",
+        "assists": "coupled",
+        "attacking": "v3",
+        "share_signal": "auto",
+    }
+    week1, week2 = plan["weeks"]
+    assert (week1["captain_code"], week1["vice_captain_code"]) == (1, 2)
+    assert week1["players"][0]["web_name"] == "Vicario"
+    assert week1["players"][0]["team_short_name"] == "ALP"  # season-safe fallback resolved
+    assert week1["players"][0]["expected_points"] == 5.5  # joined from the forecast gw row
+    assert week1["squad_cost"] == 120
+    assert not any(player["transferred_in"] for player in week1["players"])
+    assert any(player["transferred_in"] for player in week2["players"])
+    # per-gameweek EV for the horizon, keyed by code, later GW included
+    assert plan["player_xp"]["1"] == {"1": 5.5, "2": 4.5}
+    # ownership/availability overlay and flags from the first forecast gameweek
+    assert plan["squad_context"]["2"]["availability_multiplier"] == 0.75
+    assert plan["squad_context"]["2"]["stage_a_league_average_team"] is True
+
+    # opt-2 carries the GW1 hit points; its vice differs from opt-1's captain/vice pairing
+    assert plans[1]["weeks"][0]["hit_points"] == 4
+    assert plans[1]["weeks"][0]["vice_captain_code"] == 2
+
+
+def test_next_gw_fails_closed_on_unknown_forecast_run(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_optimizer_plan"]
+    rows.append({**rows[0], "optimizer_run_id": "opt-3", "forecast_run_id": "run-missing"})
+    _rewrite_table(export_dir, "fact_optimizer_plan", rows)
+    with pytest.raises(DashboardJsonError, match="absent from"):
+        build_dashboard_read_models(export_dir)
+
+
+def test_summary_snapshots_the_latest_run(tmp_path: Path) -> None:
+    models = build_dashboard_read_models(_build_source_export(tmp_path))
+    summary = models.summary
+    assert summary["latest_run"]["run_id"] == RUN_ID
+    assert summary["latest_run"]["component_modes"]["attacking"] == "v3"
+    assert summary["roster"] == {"players": 2, "teams": 3}
+    # next gameweek carries kickoffs; the deadline stays null, never fabricated
+    assert summary["next_gameweek"]["gw"] == 1
+    assert summary["next_gameweek"]["fixture_count"] == 1
+    assert summary["next_gameweek"]["first_kickoff"] == KICKOFFS[100].isoformat()
+
+    assert [row["code"] for row in summary["top_xp"]] == [1, 2]  # 5.5 then 2.0 at GW1
+    assert summary["top_xp"][0]["team_short_name"] == "ALP"
+    # horizon sums GW1+GW2: player 2 (2.0 + 3.0 = 5.0) overtakes player 1 (5.5 + 4.5 = 10.0)
+    assert [row["code"] for row in summary["horizon_top_xp"]] == [1, 2]
+    assert summary["horizon_top_xp"][1]["expected_points"] == pytest.approx(5.0)
+    # only the flagged player (status d) appears in the risk list
+    assert [row["code"] for row in summary["flagged_top_xp"]] == [2]
+
+    easiest, hardest = summary["easiest_fixtures"][0], summary["hardest_fixtures"][0]
+    assert (easiest["team_short_name"], easiest["overall_ease_index"]) == ("ALP", 120.0)
+    assert (hardest["team_short_name"], hardest["overall_ease_index"]) == ("BET", 80.0)
+
+    assert [plan["optimizer_run_id"] for plan in summary["optimizer_plans"]] == [
+        "opt-1",
+        "opt-2",
+    ]
+    assert summary["optimizer_plans"][0]["decision_sha256"] == "dec-1"
 
 
 def test_reads_only_parquet_and_opens_no_duckdb_handle(

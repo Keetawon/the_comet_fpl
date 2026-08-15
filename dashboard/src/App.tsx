@@ -4,19 +4,13 @@
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ThemeToggle, initTheme } from "@/components/ThemeToggle";
+import { NextGwPage } from "@/pages/NextGwPage";
 import { FixtureMatrixPage } from "@/pages/FixtureMatrixPage";
 import { PlayersPage } from "@/pages/PlayersPage";
 import { StubPage } from "@/pages/StubPage";
+import { SummaryPage } from "@/pages/SummaryPage";
 
 const STUBS: Record<string, { phase: string; description: string }> = {
-  summary: {
-    phase: "later in P1.7",
-    description: "Season snapshot: next deadline, latest run, headline EV and risk.",
-  },
-  "next-gw": {
-    phase: "after GW1",
-    description: "Next-gameweek squad suggestion: XI, captain, vice, bench, and EV deltas.",
-  },
   "forecast-vs-actual": {
     phase: "after outcomes exist",
     description: "EV versus actual points, bias, calibration, and rank/capture by position.",
@@ -27,10 +21,12 @@ const STUBS: Record<string, { phase: string; description: string }> = {
   },
 };
 
+const DEFAULT_ROUTE = "summary";
+
 function useHashRoute(): [string, (id: string) => void] {
-  const [route, setRoute] = useState(() => window.location.hash.slice(1) || "fixtures");
+  const [route, setRoute] = useState(() => window.location.hash.slice(1) || DEFAULT_ROUTE);
   useEffect(() => {
-    const onHashChange = () => setRoute(window.location.hash.slice(1) || "fixtures");
+    const onHashChange = () => setRoute(window.location.hash.slice(1) || DEFAULT_ROUTE);
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -53,16 +49,16 @@ export default function App() {
           <ThemeToggle />
         </header>
         <main className="min-h-0 flex-1 overflow-auto">
-          {route === "fixtures" ? (
+          {route === "summary" ? (
+            <SummaryPage />
+          ) : route === "fixtures" ? (
             <FixtureMatrixPage />
           ) : route === "players" ? (
             <PlayersPage />
+          ) : route === "next-gw" ? (
+            <NextGwPage />
           ) : stub ? (
-            <StubPage
-              label={route === "summary" ? "Summary" : route.replace(/-/g, " ")}
-              phase={stub.phase}
-              description={stub.description}
-            />
+            <StubPage label={route.replace(/-/g, " ")} phase={stub.phase} description={stub.description} />
           ) : (
             <StubPage
               label="Fixture matrix"

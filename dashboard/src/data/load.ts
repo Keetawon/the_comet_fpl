@@ -3,7 +3,13 @@
 // read-model directory (default: the files copied into public/data by the dev setup in
 // README.md).
 
-import type { DashboardManifest, PlayerRecord, TeamRecord } from "./types";
+import type {
+  DashboardManifest,
+  NextGwPlan,
+  PlayerRecord,
+  SummaryData,
+  TeamRecord,
+} from "./types";
 
 const BASE: string = import.meta.env.VITE_DATA_BASE ?? "/data";
 
@@ -58,4 +64,13 @@ export async function loadPlayers(): Promise<PlayersData> {
     loadManifest(),
   ]);
   return { players: payload.players, manifest };
+}
+
+export async function loadNextGw(): Promise<{ plans: NextGwPlan[] }> {
+  const payload = await fetchJson<{ plans: NextGwPlan[] }>("next_gw.json");
+  return { plans: payload.plans };
+}
+
+export async function loadSummary(): Promise<SummaryData> {
+  return fetchJson<SummaryData>("summary.json");
 }

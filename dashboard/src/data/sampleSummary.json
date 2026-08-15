@@ -1,0 +1,59 @@
+{
+  "json_schema_version": 2,
+  "latest_run": {
+    "run_id": "86a072ade6dd4d56",
+    "as_of": "2026-08-21T17:30:00+00:00",
+    "created_at": "2026-08-16T01:00:00+00:00",
+    "season": "2026-27",
+    "gw_from": 1,
+    "gw_to": 5,
+    "status": "recorded",
+    "component_modes": {
+      "appearance": "seasonal",
+      "assists": "coupled",
+      "attacking": "v3",
+      "share_signal": "auto"
+    }
+  },
+  "roster": {"players": 587, "teams": 20},
+  "next_gameweek": {
+    "gw": 1,
+    "first_kickoff": "2026-08-22T11:30:00+00:00",
+    "last_kickoff": "2026-08-23T19:00:00+00:00",
+    "fixture_count": 10
+  },
+  "top_xp": [
+    {"code": 1, "web_name": "Alpha", "position": "MID", "team_short_name": "ALP", "expected_points": 7.4},
+    {"code": 2, "web_name": "Beta", "position": "GK", "team_short_name": "BET", "expected_points": 3.9}
+  ],
+  "horizon_top_xp": [
+    {"code": 1, "web_name": "Alpha", "position": "MID", "team_short_name": "ALP", "expected_points": 30.2},
+    {"code": 3, "web_name": "Gamma", "position": "FWD", "team_short_name": "GAM", "expected_points": 22.4}
+  ],
+  "flagged_top_xp": [
+    {"code": 2, "web_name": "Beta", "position": "GK", "team_short_name": "BET", "expected_points": 3.9}
+  ],
+  "easiest_fixtures": [
+    {"team_short_name": "ALP", "opponent_short_name": "HUL", "was_home": true,
+     "overall_ease_index": 137.5, "official_fdr": 2}
+  ],
+  "hardest_fixtures": [
+    {"team_short_name": "MUN", "opponent_short_name": "ARS", "was_home": false,
+     "overall_ease_index": 72.1, "official_fdr": 5}
+  ],
+  "optimizer_plans": [
+    {
+      "optimizer_run_id": "opt-default",
+      "decision_sha256": "dec-default-0000",
+      "forecast_run_id": "run-a",
+      "component_modes": {"attacking": "v3", "assists": "coupled", "appearance": "seasonal", "share_signal": "auto"}
+    },
+    {
+      "optimizer_run_id": "opt-diagnostic",
+      "decision_sha256": "dec-diag-1111",
+      "forecast_run_id": "run-b",
+      "component_modes": {"attacking": "v1", "assists": "v1", "appearance": "seasonal", "share_signal": "auto"}
+    }
+  ],
+  "ease_index_formula_version": "fixture-ease-v1"
+}

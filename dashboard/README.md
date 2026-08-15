@@ -61,7 +61,22 @@ published read-model directory.
   the expanded row exposes every primitive behind the colour (club lambdas, clean sheets,
   ease indices) beside the player's own probabilities, with attack- vs defence-detail column
   ordering driven by the view.
-- Summary, Next GW suggestion, Forecast vs actual, Optimizer audit: stubs, in roadmap order.
+- **Summary** (implemented, P1.7d): the landing snapshot from `summary.json` — latest run
+  with its component modes, roster coverage, the next gameweek's first kickoff (deadlines
+  are not sourced, so none is shown), headline xP lists, availability-flag risk (labelled as
+  a reported overlay), fixture-ease extremes with FDR beside, and the optimizer plans
+  present.
+- **Next GW suggestion** (implemented, P1.7d): the development-only optimizer plan from
+  `next_gw.json` — XI by position with captain/vice badges, ordered bench, transfer path
+  with hits (frozen prices), a squad table with a 1/3/5-GW EV selector bounded by the
+  vintage horizon, ownership/availability overlay and flags, and — when two architectures
+  are present — the default-vs-diagnostic diff as set overlaps only. Cross-plan EV is never
+  compared: it measures the models' calibration against each other, not squad quality.
+- Forecast vs actual, Optimizer audit: stubs, in roadmap order.
+
+`next_gw.json` needs optimizer plans in the Parquet export: pass each immutable optimizer
+artifact when publishing, e.g. `export_bi --optimizer-plan <plan.json>` (repeatable; each
+plan must resolve to a recorded ledger forecast run).
 
 ## Rules the UI must keep
 

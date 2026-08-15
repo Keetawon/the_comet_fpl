@@ -495,8 +495,27 @@ component tests (12) cover bucket direction, NULL→neutral, and DGW two-chip be
 `npm run build`, `tsc`, and `oxlint` are clean. Dev data: a real schema-v2 vintage
 (GW1-5 default architecture, run `86a072ade6dd4d56…`) is recorded in the dev ledger and
 its read models render the page; the generated JSON under `dashboard/public/data/` is
-gitignored and regenerable via `dashboard/README.md`. The Players page (P1.7c) reuses the
-tinted scale, ticker, view toggle, and filter bar.
+gitignored and regenerable via `dashboard/README.md`.
+
+**P1.7d Summary + Next GW pages (2026-08-16): implemented.** The read-model manifest grows
+to schema version 2 with two additive files (v1 record shapes unchanged):
+`summary.json` (latest run + parsed component modes, roster coverage, next-gameweek
+first/last kickoff from `dim_gameweek` — deadlines are a typed NULL in the export and are
+never fabricated — top-5 next-GW/horizon/flagged xP, ease extremes with FDR beside, plans
+present) and `next_gw.json` (every `fact_optimizer_plan` plan joined season-safely to its
+own forecast run's per-gameweek EV, ownership/availability overlay, and flags; weeks with
+roles/captain/vice/bench order/hits/squad cost; a full-horizon per-gameweek `player_xp` map
+so the UI's 1/3/5-GW selector sums inside one model — any unmeasured gameweek makes the
+summed horizon EV null, never partial; `component_modes` from `dim_forecast_run` labels
+which architecture produced each plan). The emitter reads two more source tables
+(`dim_gameweek`, `fact_optimizer_plan`) and fails closed on plans referencing unknown
+forecast runs, weeks outside the horizon, mixed decisions, players the forecast never
+rated, or missing captain/vice. **The default-vs-diagnostic diff is derived in the UI from
+the complete plans, not precomputed, and cross-plan EV is never compared anywhere** (the
+P0.3 calibration lesson is baked into the page copy). The Summary page is the app landing
+route. Optimizer plans reach the export only as explicit `--optimizer-plan` inputs, each
+resolving to exactly one recorded ledger forecast run; no plans in the export means a "no
+plans" state, never a fabricated squad.
 
 **P1.7c Players page (2026-08-16): implemented.** One additive read-model change ships
 with it: each `players.json` fixture row now also carries the player's CLUB primitives for

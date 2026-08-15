@@ -15,6 +15,7 @@ machinery surfaces its own :class:`fpl.publish.export.BiExportError` subclasses.
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 from collections.abc import Callable, Mapping
@@ -46,12 +47,18 @@ from fpl.publish.export import (
 )
 
 DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
-DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 1
+# v2: the manifest gains the summary and next-gameweek read models alongside v1's
+# fixture-matrix and players files; the v1 record shapes are unchanged.
+DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 2
 FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
+SUMMARY_SCHEMA: Final[str] = "fpl.dashboard-summary"
+NEXT_GW_SCHEMA: Final[str] = "fpl.dashboard-next-gw"
 MANIFEST_FILENAME: Final[str] = "manifest.json"
 FIXTURE_MATRIX_FILENAME: Final[str] = "fixture_matrix.json"
 PLAYERS_FILENAME: Final[str] = "players.json"
+SUMMARY_FILENAME: Final[str] = "summary.json"
+NEXT_GW_FILENAME: Final[str] = "next_gw.json"
 
 # Exactly the tables the read models read.  The source export is contract-complete, so a
 # missing entry means the manifest was not produced by fpl.publish.export.
@@ -60,20 +67,28 @@ _READ_TABLES: Final[tuple[str, ...]] = (
     "dim_player_season",
     "dim_team_season",
     "dim_fixture",
+    "dim_gameweek",
     "fact_forecast_team_fixture",
     "fact_team_form",
     "fact_forecast_player_gameweek",
     "fact_player_form",
     "fact_forecast_player_fixture",
+    "fact_optimizer_plan",
 )
 _WINDOW_LABELS: Final[tuple[str, ...]] = ("last_3", "last_5", "last_10", "season_to_date")
-_FILE_LIST_KEY: Final[dict[str, str]] = {
+# Which top-level array of each file the manifest row_count counts.  summary.json is a
+# single object, so its row count is 1.
+_FILE_LIST_KEY: Final[dict[str, str | None]] = {
     FIXTURE_MATRIX_FILENAME: "teams",
     PLAYERS_FILENAME: "players",
+    NEXT_GW_FILENAME: "plans",
+    SUMMARY_FILENAME: None,
 }
 _FILE_SCHEMA: Final[dict[str, str]] = {
     FIXTURE_MATRIX_FILENAME: FIXTURE_MATRIX_SCHEMA,
     PLAYERS_FILENAME: PLAYERS_SCHEMA,
+    NEXT_GW_FILENAME: NEXT_GW_SCHEMA,
+    SUMMARY_FILENAME: SUMMARY_SCHEMA,
 }
 _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
     {
@@ -96,11 +111,13 @@ class DashboardJsonError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class DashboardReadModels:
-    """The derived, publishable content of both exploration read models."""
+    """The derived, publishable content of all four page read models."""
 
     runs: tuple[dict[str, Any], ...]
     teams: tuple[dict[str, Any], ...]
     players: tuple[dict[str, Any], ...]
+    summary: dict[str, Any]
+    next_gw: dict[str, Any]
     ease_index_formula_version: str | None
 
 
@@ -114,6 +131,7 @@ class DashboardJsonResult:
     run_ids: tuple[str, ...]
     fixture_matrix_rows: int
     players_rows: int
+    next_gw_plans: int
 
 
 def _iso_or_none(value: object) -> str | None:
@@ -498,6 +516,423 @@ def _build_players(
     return tuple(players)
 
 
+def _component_modes(runs: pl.DataFrame) -> dict[str, dict[str, Any]]:
+    """run_id -> parsed component modes; the ledger stores them as sorted-key JSON."""
+    result: dict[str, dict[str, Any]] = {}
+    for row in runs.iter_rows(named=True):
+        raw = row.get("component_modes")
+        if not isinstance(raw, str):
+            raise DashboardJsonError(
+                f"dim_forecast_run {row['run_id']} has malformed component_modes"
+            )
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise DashboardJsonError(
+                f"dim_forecast_run {row['run_id']} component_modes is not JSON: {exc}"
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise DashboardJsonError(
+                f"dim_forecast_run {row['run_id']} component_modes is not an object"
+            )
+        result[row["run_id"]] = parsed
+    return result
+
+
+def _short_name_maps(
+    team_season: pl.DataFrame,
+) -> tuple[dict[tuple[str, int], str], dict[tuple[str, int], tuple[int, str]]]:
+    by_code: dict[tuple[str, int], str] = {}
+    by_id: dict[tuple[str, int], tuple[int, str]] = {}
+    for row in team_season.iter_rows(named=True):
+        key = (row["season"], int(row["team_code"]))
+        by_code[key] = row["short_name"]
+        by_id[(row["season"], int(row["team_id"]))] = (int(row["team_code"]), row["short_name"])
+    return by_code, by_id
+
+
+def _player_identity_maps(
+    player_season: pl.DataFrame,
+) -> tuple[dict[tuple[str, int], tuple[str, str]], tuple[str, ...]]:
+    names: dict[tuple[str, int], tuple[str, str]] = {}
+    for row in player_season.iter_rows(named=True):
+        names[(row["season"], int(row["code"]))] = (row["web_name"], row["position"])
+    positions = ("GK", "DEF", "MID", "FWD")
+    return names, positions
+
+
+def _build_next_gw(
+    plans_frame: pl.DataFrame,
+    runs: pl.DataFrame,
+    player_gameweek: pl.DataFrame,
+    player_season: pl.DataFrame,
+    team_season: pl.DataFrame,
+) -> dict[str, Any]:
+    """next_gw.json: every optimizer plan in the source export, joined season-safely to the
+    forecast's per-gameweek EV, ownership/availability overlay, and flags.
+
+    The default-vs-diagnostic diff is *not* precomputed here: both plans ship complete, and
+    the set operations (squad/XI overlap, captain agreement, unique players) are derived in
+    the UI from the same records.  ``component_modes`` travels with each plan so the UI can
+    label which architecture produced it without guessing.
+    """
+    if plans_frame.height == 0:
+        return {"plans": ()}
+
+    modes = _component_modes(runs)
+    horizon = {row["run_id"]: row for row in _horizon_projection(runs).iter_rows(named=True)}
+    names, _ = _player_identity_maps(player_season)
+    by_code, by_id = _short_name_maps(team_season)
+
+    # EV keyed (forecast run, gw, code); team_code resolved season-safely (the raw forecast
+    # row's team_code may be NULL and fall back to (season, team_id)).
+    ev: dict[tuple[str, int, int], float | None] = {}
+    run_team_code: dict[tuple[str, int, int], int] = {}
+    for row in player_gameweek.iter_rows(named=True):
+        key = (row["run_id"], int(row["gw"]), int(row["code"]))
+        ev[key] = row["expected_points"]
+        team_code = row["team_code"]
+        if team_code is None:
+            resolved = by_id.get((row["season"], int(row["team_id"])))
+            team_code = resolved[0] if resolved is not None else None
+        if team_code is None:
+            raise DashboardJsonError(
+                f"forecast row {row['run_id']} GW{row['gw']} code {row['code']} has a club "
+                "that fails to resolve season-safely"
+            )
+        run_team_code[key] = int(team_code)
+    first_gw = (
+        player_gameweek.group_by(["run_id", "code"])
+        .agg(pl.col("gw").min().alias("_first_gw"))
+        .join(player_gameweek, on=["run_id", "code"])
+        .filter(pl.col("gw") == pl.col("_first_gw"))
+    )
+    context: dict[tuple[str, int], dict[str, Any]] = {}
+    for row in first_gw.iter_rows(named=True):
+        context[(row["run_id"], int(row["code"]))] = {
+            "selected_by_percent": row["selected_by_percent"],
+            "availability_status": row["availability_status"],
+            "chance_of_playing": row["chance_of_playing"],
+            "availability_multiplier": row["availability_multiplier"],
+            "cold_start_player": row["cold_start_player"],
+            "stage_a_league_average_team": row["stage_a_league_average_team"],
+            "attacking_signal_cold_start": row["attacking_signal_cold_start"],
+            "assist_signal_cold_start": row["assist_signal_cold_start"],
+            "transferred_no_rescale": row["transferred_no_rescale"],
+        }
+
+    role_rank = {"starting_xi": 0, "bench_goalkeeper": 1, "bench_outfield": 2}
+    plans: list[dict[str, Any]] = []
+    for optimizer_run_id in sorted(plans_frame.get_column("optimizer_run_id").unique().to_list()):
+        sub = plans_frame.filter(pl.col("optimizer_run_id") == optimizer_run_id)
+        forecast_run_ids = sub.get_column("forecast_run_id").unique().to_list()
+        if len(forecast_run_ids) != 1:
+            raise DashboardJsonError(
+                f"optimizer run {optimizer_run_id} spans {len(forecast_run_ids)} forecast runs"
+            )
+        forecast_run_id = forecast_run_ids[0]
+        run = horizon.get(forecast_run_id)
+        if run is None:
+            raise DashboardJsonError(
+                f"optimizer run {optimizer_run_id} references forecast run absent from "
+                "dim_forecast_run"
+            )
+        seasons = sub.get_column("season").unique().to_list()
+        if seasons != [run["run_season"]]:
+            raise DashboardJsonError(
+                f"optimizer run {optimizer_run_id} season {seasons} disagrees with its "
+                f"forecast run's {run['run_season']}"
+            )
+        decision_shas = sub.get_column("decision_sha256").unique().to_list()
+        if len(decision_shas) != 1:
+            raise DashboardJsonError(f"optimizer run {optimizer_run_id} mixes decisions")
+        outside = sub.filter((pl.col("gw") < run["gw_from"]) | (pl.col("gw") > run["gw_to"]))
+        if outside.height:
+            raise DashboardJsonError(
+                f"optimizer run {optimizer_run_id} has weeks outside its forecast horizon"
+            )
+
+        weeks: list[dict[str, Any]] = []
+        for gw in sorted(sub.get_column("gw").unique().to_list()):
+            week_rows = sorted(
+                sub.filter(pl.col("gw") == gw).iter_rows(named=True),
+                key=lambda row: (
+                    role_rank.get(str(row["role"]), 3),
+                    row["bench_order_index"] if row["bench_order_index"] is not None else 0,
+                    int(row["code"]),
+                ),
+            )
+            hits = {row["hit_points_this_gw"] for row in week_rows}
+            if len(hits) != 1:
+                raise DashboardJsonError(
+                    f"optimizer run {optimizer_run_id} GW{gw} has inconsistent hit points"
+                )
+            captains = [
+                row for row in week_rows if row["is_captain"] and row["role"] == "starting_xi"
+            ]
+            vices = [
+                row for row in week_rows if row["is_vice_captain"] and row["role"] == "starting_xi"
+            ]
+            if len(captains) != 1 or len(vices) != 1:
+                raise DashboardJsonError(
+                    f"optimizer run {optimizer_run_id} GW{gw} needs exactly one captain and "
+                    "one vice-captain in the XI"
+                )
+            players: list[dict[str, Any]] = []
+            for row in week_rows:
+                code = int(row["code"])
+                identity = names.get((run["run_season"], code))
+                if identity is None:
+                    raise DashboardJsonError(
+                        f"optimizer run {optimizer_run_id} names code {code} with no "
+                        "dim_player_season row; refusing an unlabelled plan"
+                    )
+                team_code = run_team_code.get((forecast_run_id, gw, code))
+                if team_code is None:
+                    raise DashboardJsonError(
+                        f"optimizer run {optimizer_run_id} GW{gw} names code {code} absent "
+                        "from its forecast; refusing a plan the forecast never rated"
+                    )
+                short = by_code.get((run["run_season"], team_code))
+                if short is None:
+                    raise DashboardJsonError(
+                        f"plan player code {code} has a team_code that fails to resolve"
+                    )
+                players.append(
+                    {
+                        "code": code,
+                        "web_name": identity[0],
+                        "position": identity[1],
+                        "team_code": team_code,
+                        "team_short_name": short,
+                        "now_cost": row["now_cost"],
+                        "role": row["role"],
+                        "bench_order_index": row["bench_order_index"],
+                        "is_captain": bool(row["is_captain"]),
+                        "is_vice_captain": bool(row["is_vice_captain"]),
+                        "transferred_in": bool(row["transferred_in"]),
+                        "transferred_out": bool(row["transferred_out"]),
+                        "expected_points": ev[(forecast_run_id, gw, code)],
+                    }
+                )
+            weeks.append(
+                {
+                    "gw": gw,
+                    "hit_points": next(iter(hits)),
+                    "squad_cost": sum(
+                        player["now_cost"] for player in players if player["now_cost"] is not None
+                    ),
+                    "captain_code": int(captains[0]["code"]),
+                    "vice_captain_code": int(vices[0]["code"]),
+                    "players": players,
+                }
+            )
+
+        squad_codes = sorted(
+            {int(code) for week in weeks for code in (player["code"] for player in week["players"])}
+        )
+        player_xp: dict[str, dict[str, float | None]] = {}
+        for code in squad_codes:
+            by_gw: dict[str, float | None] = {}
+            for gw in range(run["gw_from"], run["gw_to"] + 1):
+                by_gw[str(gw)] = ev.get((forecast_run_id, gw, code))
+            player_xp[str(code)] = by_gw
+        plans.append(
+            {
+                "optimizer_run_id": optimizer_run_id,
+                "decision_sha256": decision_shas[0],
+                "forecast_run_id": forecast_run_id,
+                "as_of": _iso_or_none(next(iter(sub.get_column("as_of")))),
+                "season": run["run_season"],
+                "gw_from": run["gw_from"],
+                "gw_to": run["gw_to"],
+                "component_modes": modes.get(forecast_run_id),
+                "weeks": weeks,
+                "player_xp": player_xp,
+                "squad_context": {
+                    str(code): context.get((forecast_run_id, code)) for code in squad_codes
+                },
+            }
+        )
+    return {"plans": tuple(plans)}
+
+
+def _summary_player_rows(
+    rows: list[dict[str, Any]],
+    season: str,
+    names: Mapping[tuple[str, int], tuple[str, str]],
+    by_code: Mapping[tuple[str, int], str],
+    by_id: Mapping[tuple[str, int], tuple[int, str]],
+) -> list[dict[str, Any]]:
+    summary_rows: list[dict[str, Any]] = []
+    for row in rows:
+        code = int(row["code"])
+        identity = names.get((season, code), (None, None))
+        team_code = row.get("team_code")
+        if team_code is None and row.get("team_id") is not None:
+            resolved = by_id.get((season, int(row["team_id"])))
+            team_code = resolved[0] if resolved is not None else None
+        summary_rows.append(
+            {
+                "code": code,
+                "web_name": identity[0],
+                "position": identity[1],
+                "team_short_name": by_code.get((season, team_code)) if team_code else None,
+                "expected_points": row["expected_points"],
+            }
+        )
+    return summary_rows
+
+
+def _build_summary(
+    runs: pl.DataFrame,
+    player_gameweek: pl.DataFrame,
+    team_fixture: pl.DataFrame,
+    dim_gameweek: pl.DataFrame,
+    player_season: pl.DataFrame,
+    team_season: pl.DataFrame,
+    plans_frame: pl.DataFrame,
+    ease_version: str | None,
+) -> dict[str, Any]:
+    """summary.json: the landing snapshot -- latest run, roster coverage, headline EV and
+    risk, the next gameweek's first kickoff (deadlines are not sourced, never fabricated),
+    and the optimizer plans present in the export."""
+    by_code, by_id = _short_name_maps(team_season)
+    names, _ = _player_identity_maps(player_season)
+
+    if runs.height == 0:
+        return {
+            "latest_run": None,
+            "roster": {"players": 0, "teams": 0},
+            "next_gameweek": None,
+            "top_xp": [],
+            "horizon_top_xp": [],
+            "flagged_top_xp": [],
+            "easiest_fixtures": [],
+            "hardest_fixtures": [],
+            "optimizer_plans": [],
+            "ease_index_formula_version": ease_version,
+        }
+
+    ordered = runs.sort(["created_at", "run_id"], nulls_last=True)
+    latest = ordered.rows(named=True)[-1]
+    run_id = latest["run_id"]
+    season = latest["season"]
+    gw_from, gw_to = latest["gw_from"], latest["gw_to"]
+    modes = _component_modes(runs)[run_id]
+
+    run_gw = player_gameweek.filter(pl.col("run_id") == run_id)
+    first_rows = (
+        run_gw.filter(pl.col("gw") == gw_from)
+        .sort("expected_points", descending=True, nulls_last=True)
+        .head(5)
+        .to_dicts()
+    )
+    flagged_rows = (
+        run_gw.filter(
+            (pl.col("gw") == gw_from)
+            & pl.col("availability_status").is_not_null()
+            & (pl.col("availability_status") != "a")
+        )
+        .sort("expected_points", descending=True, nulls_last=True)
+        .head(5)
+        .to_dicts()
+    )
+    horizon_rows = (
+        run_gw.filter((pl.col("gw") >= gw_from) & (pl.col("gw") <= gw_to))
+        .group_by("code")
+        .agg(
+            pl.col("team_code").first(),
+            pl.col("team_id").first(),
+            pl.col("expected_points").sum().alias("expected_points"),
+        )
+        .sort("expected_points", descending=True, nulls_last=True)
+        .head(5)
+        .to_dicts()
+    )
+
+    run_fixtures = team_fixture.filter(
+        (pl.col("run_id") == run_id)
+        & (pl.col("gw") == gw_from)
+        & pl.col("overall_ease_index").is_not_null()
+    )
+    fixture_rows = []
+    for row in run_fixtures.iter_rows(named=True):
+        opponent = by_id.get((season, int(row["opponent_team_id"])))
+        fixture_rows.append(
+            {
+                "team_short_name": by_code.get((season, int(row["team_code"]))),
+                "opponent_short_name": opponent[1] if opponent else None,
+                "was_home": row["was_home"],
+                "overall_ease_index": row["overall_ease_index"],
+                "official_fdr": row["official_fdr"],
+            }
+        )
+    fixture_rows.sort(
+        key=lambda row: (
+            -(row["overall_ease_index"] if row["overall_ease_index"] is not None else 0.0)
+        )
+    )
+
+    gw_row = (
+        dim_gameweek.filter((pl.col("season") == season) & (pl.col("gw") == gw_from))
+        .sort("gw")
+        .rows(named=True)
+    )
+    next_gameweek = (
+        {
+            "gw": gw_from,
+            "first_kickoff": _iso_or_none(gw_row[0]["first_kickoff"]),
+            "last_kickoff": _iso_or_none(gw_row[0]["last_kickoff"]),
+            "fixture_count": gw_row[0]["fixture_count"],
+        }
+        if gw_row
+        else None
+    )
+
+    optimizer_plans = []
+    if plans_frame.height:
+        plan_modes = _component_modes(runs)
+        seen: dict[str, dict[str, Any]] = {}
+        for row in plans_frame.iter_rows(named=True):
+            seen[row["optimizer_run_id"]] = {
+                "optimizer_run_id": row["optimizer_run_id"],
+                "decision_sha256": row["decision_sha256"],
+                "forecast_run_id": row["forecast_run_id"],
+                "component_modes": plan_modes.get(row["forecast_run_id"]),
+            }
+        optimizer_plans = [seen[key] for key in sorted(seen)]
+
+    return {
+        "latest_run": {
+            "run_id": run_id,
+            "as_of": _iso_or_none(latest["as_of"]),
+            "created_at": _iso_or_none(latest["created_at"]),
+            "season": season,
+            "gw_from": gw_from,
+            "gw_to": gw_to,
+            "status": latest["status"],
+            "component_modes": modes,
+        },
+        "roster": {
+            "players": player_gameweek.filter(pl.col("run_id") == run_id)
+            .get_column("code")
+            .n_unique(),
+            "teams": team_fixture.filter(pl.col("run_id") == run_id)
+            .get_column("team_code")
+            .n_unique(),
+        },
+        "next_gameweek": next_gameweek,
+        "top_xp": _summary_player_rows(first_rows, season, names, by_code, by_id),
+        "horizon_top_xp": _summary_player_rows(horizon_rows, season, names, by_code, by_id),
+        "flagged_top_xp": _summary_player_rows(flagged_rows, season, names, by_code, by_id),
+        "easiest_fixtures": fixture_rows[:3],
+        "hardest_fixtures": list(reversed(fixture_rows[-3:])),
+        "optimizer_plans": optimizer_plans,
+        "ease_index_formula_version": ease_version,
+    }
+
+
 def _run_records(runs: pl.DataFrame, manifest: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
     records: list[dict[str, Any]] = []
     for row in runs.sort("run_id").iter_rows(named=True):
@@ -544,10 +979,29 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_forecast_run"],
         frames["fact_player_form"],
     )
+    next_gw = _build_next_gw(
+        frames["fact_optimizer_plan"],
+        frames["dim_forecast_run"],
+        frames["fact_forecast_player_gameweek"],
+        frames["dim_player_season"],
+        frames["dim_team_season"],
+    )
+    summary = _build_summary(
+        frames["dim_forecast_run"],
+        frames["fact_forecast_player_gameweek"],
+        frames["fact_forecast_team_fixture"],
+        frames["dim_gameweek"],
+        frames["dim_player_season"],
+        frames["dim_team_season"],
+        frames["fact_optimizer_plan"],
+        ease_version,
+    )
     return DashboardReadModels(
         runs=runs,
         teams=teams,
         players=players,
+        summary=summary,
+        next_gw=next_gw,
         ease_index_formula_version=ease_version,
     )
 
@@ -559,7 +1013,7 @@ def build_dashboard_read_models(export_dir: Path) -> DashboardReadModels:
 
 
 def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
-    """Deterministic strict-JSON bytes for both read models; identical models, identical bytes."""
+    """Deterministic strict-JSON bytes for all read models; identical models, identical bytes."""
     return {
         FIXTURE_MATRIX_FILENAME: _canonical_json_bytes(
             {
@@ -577,7 +1031,31 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
             },
             indent=2,
         ),
+        NEXT_GW_FILENAME: _canonical_json_bytes(
+            {
+                "schema": NEXT_GW_SCHEMA,
+                "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+                "plans": list(models.next_gw["plans"]),
+            },
+            indent=2,
+        ),
+        SUMMARY_FILENAME: _canonical_json_bytes(
+            {
+                "schema": SUMMARY_SCHEMA,
+                "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+                **models.summary,
+            },
+            indent=2,
+        ),
     }
+
+
+def _file_row_count(document: Mapping[str, Any], filename: str) -> int:
+    """Rows the manifest counts for one file: its top-level array, or 1 for an object."""
+    list_key = _FILE_LIST_KEY[filename]
+    if list_key is None:
+        return 1
+    return len(document[list_key])
 
 
 def _manifest_content_sha256(manifest: Mapping[str, Any]) -> str:
@@ -607,7 +1085,7 @@ def _validate_directory(
             or document.get("json_schema_version") != DASHBOARD_JSON_SCHEMA_VERSION
         ):
             raise DashboardJsonError(f"{filename} lost its schema envelope")
-        if len(document[_FILE_LIST_KEY[filename]]) != entry["row_count"]:
+        if _file_row_count(document, filename) != entry["row_count"]:
             raise DashboardJsonError(f"{filename} row count does not match the manifest")
     manifest = _strict_json_loads((directory / MANIFEST_FILENAME).read_text(encoding="utf-8"))
     if set(manifest) != _MANIFEST_KEYS:
@@ -674,14 +1152,18 @@ def export_dashboard_json(
             payloads = render_read_model_files(models)
 
             files: dict[str, dict[str, Any]] = {}
+            row_counts = {
+                FIXTURE_MATRIX_FILENAME: len(models.teams),
+                PLAYERS_FILENAME: len(models.players),
+                NEXT_GW_FILENAME: len(models.next_gw["plans"]),
+                SUMMARY_FILENAME: 1,
+            }
             for filename, payload in payloads.items():
                 path = staging / filename
                 path.write_bytes(payload)
                 _fsync_file(path)
                 files[filename] = {
-                    "row_count": len(models.teams)
-                    if filename == FIXTURE_MATRIX_FILENAME
-                    else len(models.players),
+                    "row_count": row_counts[filename],
                     "sha256": _sha256_bytes(payload),
                 }
             manifest: dict[str, Any] = {
@@ -720,6 +1202,7 @@ def export_dashboard_json(
         run_ids=tuple(str(record["run_id"]) for record in models.runs),
         fixture_matrix_rows=len(models.teams),
         players_rows=len(models.players),
+        next_gw_plans=len(models.next_gw["plans"]),
     )
 
 
@@ -729,8 +1212,12 @@ __all__ = [
     "FIXTURE_MATRIX_FILENAME",
     "FIXTURE_MATRIX_SCHEMA",
     "MANIFEST_FILENAME",
+    "NEXT_GW_FILENAME",
+    "NEXT_GW_SCHEMA",
     "PLAYERS_FILENAME",
     "PLAYERS_SCHEMA",
+    "SUMMARY_FILENAME",
+    "SUMMARY_SCHEMA",
     "DashboardJsonError",
     "DashboardJsonResult",
     "DashboardReadModels",

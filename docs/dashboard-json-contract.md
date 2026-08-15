@@ -1,8 +1,10 @@
-# Dashboard read-model JSON contract, version 1
+# Dashboard read-model JSON contract, version 2
 
-Status: implemented by DEV-ROADMAP P1.7a (backend publish layer only; no UI). This document
-is the authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The P1.7b
-static app renders these files and nothing else.
+Status: implemented by DEV-ROADMAP P1.7a (backend publish layer) and extended by P1.7d with
+the summary and next-gameweek read models. This document is the authoritative prose
+counterpart of `src/fpl/publish/dashboard_json.py`. The static app renders these files and
+nothing else. Version 2 adds `summary.json` and `next_gw.json` to the version-1 file set;
+the version-1 record shapes are unchanged.
 
 ## Boundary and provenance chain
 
@@ -40,7 +42,9 @@ data/
 └── .dashboard-json.generation.9b4…/
     ├── manifest.json
     ├── fixture_matrix.json
-    └── players.json
+    ├── players.json
+    ├── next_gw.json
+    └── summary.json
 ```
 
 ## Null semantics (hard)
@@ -170,12 +174,56 @@ The player-fixture probability/expected-minute fields are `null` until the ledge
 them (P1.2 exports them as typed NULLs); they are never reconstructed from a convolved
 gameweek distribution.
 
+## next_gw.json — one object per optimizer plan (P1.7d)
+
+The population is every plan in the source export's `fact_optimizer_plan` (the export is
+built with explicit `--optimizer-plan` artifact inputs; no plans in, no plans out — the UI
+shows a "no plans" state, never a fabricated squad). Each plan object carries:
+
+- identity and provenance: `optimizer_run_id`, `decision_sha256`, `forecast_run_id`, `as_of`,
+  `season`, `gw_from`, `gw_to`;
+- `component_modes` parsed from that plan's forecast run in `dim_forecast_run`, so the UI can
+  label which architecture produced the plan (`attacking=v3` + `assists=coupled` is the
+  frozen default; anything else is labelled diagnostic) without guessing;
+- `weeks[]`, one per optimizer gameweek: `hit_points`, `squad_cost` (sum of `now_cost`, the
+  deadline's static prices), `captain_code` / `vice_captain_code`, and `players[]` with role
+  (`starting_xi` / `bench_goalkeeper` / `bench_outfield`), `bench_order_index`,
+  transfer flags, price, and that gameweek's `expected_points` joined from the plan's own
+  forecast run;
+- `player_xp`: per `code`, the full-horizon per-gameweek EV map (`{"1": 7.4, …}`), so the
+  UI's 1/3/5-GW selector sums inside one model. A missing/unmeasured gameweek is `null` and
+  **makes the summed horizon EV null, never a partial sum**;
+- `squad_context`: ownership/availability overlay and all five fallback/cold-start flags per
+  code, taken from that forecast run's first gameweek (the same deadline-known rule as
+  players.json identity). Availability is a reported overlay valid for the first forecast
+  gameweek only.
+
+The emitter fails closed when a plan references a forecast run absent from
+`dim_forecast_run`, spans weeks outside its forecast horizon, mixes decisions, names a player
+the forecast never rated, or lacks exactly one captain and one vice-captain in the XI.
+
+**The default-vs-diagnostic diff is not precomputed.** Both plans ship complete, and the UI
+derives squad/XI overlap and captaincy agreement as set operations. Cross-plan EV is never
+compared anywhere: absolute EV differences between architectures measure the two models'
+calibration against each other, not squad quality (the P0.3 lesson).
+
+## summary.json — the landing snapshot (P1.7d)
+
+A single object: the latest recorded run (`max created_at`) with its parsed component modes,
+roster coverage (players/clubs with forecast rows), the next gameweek's `first_kickoff` /
+`last_kickoff` / `fixture_count` from `dim_gameweek` (**deadlines are not sourced — the
+export's `deadline_time` is a typed NULL and none is ever fabricated**), top-5 lists for
+next-GW xP, horizon xP, and flagged-availability xP (the availability overlay is labelled as
+such), the three easiest and hardest next-GW fixtures by directed ease with official FDR
+beside (never blended), the optimizer plans present, and the ease formula version. With no
+recorded runs the summary is an explicit null-run object, not an error.
+
 ## Read-model manifest
 
 ```json
 {
   "schema": "fpl.dashboard-read-models",
-  "json_schema_version": 1,
+  "json_schema_version": 2,
   "generated_at": "2026-08-15T00:00:00+00:00",
   "source": {
     "export_schema": "fpl.bi-semantic-export",
@@ -193,13 +241,16 @@ gameweek distribution.
   "ease_index_formula_version": "fixture-ease-v1",
   "files": {
     "fixture_matrix.json": {"row_count": 20, "sha256": "…"},
-    "players.json": {"row_count": 581, "sha256": "…"}
+    "players.json": {"row_count": 581, "sha256": "…"},
+    "next_gw.json": {"row_count": 2, "sha256": "…"},
+    "summary.json": {"row_count": 1, "sha256": "…"}
   },
   "content_sha256": "…"
 }
 ```
 
-`row_count` is the number of objects in the file's top-level array. `runs` is sorted by
+`row_count` is the number of objects in the file's top-level array (`plans` for
+next_gw.json); summary.json is a single object, so its row count is 1. `runs` is sorted by
 `run_id` and validated against both the source manifest's `exported_run_ids` and the
 `dim_forecast_run` rows read from the export. Every fixture row must fall inside its run's
 `gw_from..gw_to` horizon and season; anything outside fails closed. A source export that
@@ -207,7 +258,7 @@ mixes ease formula versions also fails closed.
 
 ## Consumers
 
-The P1.7b static app, any notebook, and any external tool read only these files (or the
-Parquet export). Nothing downstream of the BI boundary queries DuckDB. Read models for the
-summary / next-GW / forecast-vs-actual / optimizer pages are later additive files under this
-same manifest and schema version bump policy.
+The P1.7b/P1.7c/P1.7d static app, any notebook, and any external tool read only these files
+(or the Parquet export). Nothing downstream of the BI boundary queries DuckDB. Read models
+for the forecast-vs-actual / optimizer pages are later additive files under this same
+manifest and schema version bump policy.

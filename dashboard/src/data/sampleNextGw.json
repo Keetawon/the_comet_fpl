@@ -1,0 +1,143 @@
+{
+  "json_schema_version": 2,
+  "plans": [
+    {
+      "optimizer_run_id": "opt-default",
+      "decision_sha256": "dec-default-0000",
+      "forecast_run_id": "run-a",
+      "as_of": "2026-08-21T17:30:00+00:00",
+      "season": "2026-27",
+      "gw_from": 1,
+      "gw_to": 5,
+      "component_modes": {
+        "appearance": "seasonal",
+        "assists": "coupled",
+        "attacking": "v3",
+        "share_signal": "auto"
+      },
+      "weeks": [
+        {
+          "gw": 1,
+          "hit_points": 0,
+          "squad_cost": 750,
+          "captain_code": 1,
+          "vice_captain_code": 2,
+          "players": [
+            {
+              "code": 1, "web_name": "Alpha", "position": "MID", "team_code": 101,
+              "team_short_name": "ALP", "now_cost": 128, "role": "starting_xi",
+              "bench_order_index": null, "is_captain": true, "is_vice_captain": false,
+              "transferred_in": false, "transferred_out": false, "expected_points": 7.4
+            },
+            {
+              "code": 2, "web_name": "Beta", "position": "GK", "team_code": 102,
+              "team_short_name": "BET", "now_cost": 45, "role": "starting_xi",
+              "bench_order_index": null, "is_captain": false, "is_vice_captain": true,
+              "transferred_in": false, "transferred_out": false, "expected_points": 3.9
+            },
+            {
+              "code": 3, "web_name": "Gamma", "position": "FWD", "team_code": 103,
+              "team_short_name": "GAM", "now_cost": 90, "role": "bench_outfield",
+              "bench_order_index": 1, "is_captain": false, "is_vice_captain": false,
+              "transferred_in": false, "transferred_out": false, "expected_points": 2.1
+            }
+          ]
+        }
+      ],
+      "player_xp": {
+        "1": {"1": 7.4, "2": 6.1, "3": 5.5, "4": 4.9, "5": 6.3},
+        "2": {"1": 3.9, "2": 3.4, "3": 3.8, "4": 3.1, "5": 4.0},
+        "3": {"1": 2.1, "2": null, "3": 2.4, "4": 2.8, "5": 2.2}
+      },
+      "squad_context": {
+        "1": {
+          "selected_by_percent": 42.1, "availability_status": "a", "chance_of_playing": null,
+          "availability_multiplier": 1.0, "cold_start_player": false,
+          "stage_a_league_average_team": false, "attacking_signal_cold_start": false,
+          "assist_signal_cold_start": false, "transferred_no_rescale": false
+        },
+        "2": {
+          "selected_by_percent": 8.0, "availability_status": "d", "chance_of_playing": 75,
+          "availability_multiplier": 0.75, "cold_start_player": false,
+          "stage_a_league_average_team": true, "attacking_signal_cold_start": false,
+          "assist_signal_cold_start": false, "transferred_no_rescale": false
+        },
+        "3": {
+          "selected_by_percent": null, "availability_status": null, "chance_of_playing": null,
+          "availability_multiplier": null, "cold_start_player": true,
+          "stage_a_league_average_team": false, "attacking_signal_cold_start": true,
+          "assist_signal_cold_start": false, "transferred_no_rescale": true
+        }
+      }
+    },
+    {
+      "optimizer_run_id": "opt-diagnostic",
+      "decision_sha256": "dec-diag-1111",
+      "forecast_run_id": "run-b",
+      "as_of": "2026-08-21T17:30:00+00:00",
+      "season": "2026-27",
+      "gw_from": 1,
+      "gw_to": 5,
+      "component_modes": {
+        "appearance": "seasonal",
+        "assists": "v1",
+        "attacking": "v1",
+        "share_signal": "auto"
+      },
+      "weeks": [
+        {
+          "gw": 1,
+          "hit_points": 4,
+          "squad_cost": 742,
+          "captain_code": 4,
+          "vice_captain_code": 1,
+          "players": [
+            {
+              "code": 1, "web_name": "Alpha", "position": "MID", "team_code": 101,
+              "team_short_name": "ALP", "now_cost": 128, "role": "starting_xi",
+              "bench_order_index": null, "is_captain": false, "is_vice_captain": true,
+              "transferred_in": false, "transferred_out": false, "expected_points": 6.9
+            },
+            {
+              "code": 2, "web_name": "Beta", "position": "GK", "team_code": 102,
+              "team_short_name": "BET", "now_cost": 45, "role": "bench_goalkeeper",
+              "bench_order_index": null, "is_captain": false, "is_vice_captain": false,
+              "transferred_in": false, "transferred_out": false, "expected_points": 3.6
+            },
+            {
+              "code": 4, "web_name": "Delta", "position": "FWD", "team_code": 104,
+              "team_short_name": "DEL", "now_cost": 102, "role": "starting_xi",
+              "bench_order_index": null, "is_captain": true, "is_vice_captain": false,
+              "transferred_in": true, "transferred_out": false, "expected_points": 5.2
+            }
+          ]
+        }
+      ],
+      "player_xp": {
+        "1": {"1": 6.9, "2": 5.8, "3": 5.1, "4": 4.7, "5": 6.0},
+        "2": {"1": 3.6, "2": 3.2, "3": 3.5, "4": 2.9, "5": 3.7},
+        "4": {"1": 5.2, "2": 4.4, "3": 4.9, "4": 5.5, "5": 4.1}
+      },
+      "squad_context": {
+        "1": {
+          "selected_by_percent": 42.1, "availability_status": "a", "chance_of_playing": null,
+          "availability_multiplier": 1.0, "cold_start_player": false,
+          "stage_a_league_average_team": false, "attacking_signal_cold_start": false,
+          "assist_signal_cold_start": false, "transferred_no_rescale": false
+        },
+        "2": {
+          "selected_by_percent": 8.0, "availability_status": "d", "chance_of_playing": 75,
+          "availability_multiplier": 0.75, "cold_start_player": false,
+          "stage_a_league_average_team": false, "attacking_signal_cold_start": false,
+          "assist_signal_cold_start": false, "transferred_no_rescale": false
+        },
+        "4": {
+          "selected_by_percent": 1.2, "availability_status": "a", "chance_of_playing": null,
+          "availability_multiplier": 1.0, "cold_start_player": false,
+          "stage_a_league_average_team": false, "attacking_signal_cold_start": false,
+          "assist_signal_cold_start": false, "transferred_no_rescale": false
+        }
+      }
+    }
+  ]
+}
