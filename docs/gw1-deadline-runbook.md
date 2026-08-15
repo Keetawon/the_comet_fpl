@@ -319,6 +319,27 @@ The comparison is a decision aid, not a promotion test. Do not choose a model be
 looks more plausible. The GW1 lineup and captaincy are read from the GW1 (first) week of the default
 optimizer artifact; the GW1-5 horizon informs initial squad value.
 
+## After Step 12 — BI export and dashboard read models (optional, never a deadline blocker)
+
+Once the decision procedure is complete and recorded, the read-only BI boundary can be
+published from the same committed database. This is P1 output, not part of the deadline
+decision, and must never delay or mutate it:
+
+```powershell
+.\.venv\Scripts\python.exe -m fpl.jobs.export_bi --output "$out\bi-export" `
+  [--optimizer-plan $defaultPlan --optimizer-plan $diagPlan]
+if ($LASTEXITCODE -ne 0) { throw "BI export failed" }
+
+.\.venv\Scripts\python.exe -m fpl.jobs.export_dashboard_json `
+  --input "$out\bi-export" --output "$out\dashboard-json"
+if ($LASTEXITCODE -ne 0) { throw "dashboard read models failed" }
+```
+
+`export_dashboard_json` reads only the published Parquet export (never the production
+DuckDB), verifies its manifest and file hashes, and atomically publishes
+`fixture_matrix.json` + `players.json` with a provenance-bearing manifest
+(`docs/dashboard-json-contract.md`). It changes no model, ledger row, or artifact.
+
 ## Deadline-day timing
 
 - **By 2026-08-15:** finish and gate the durable optimizer artifact implementation.

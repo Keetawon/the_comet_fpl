@@ -458,6 +458,24 @@ It exists to feed the P1.7 fixture-matrix **Team** page's recent-form block.
 
 ### P1.7 — Dashboard MVP
 
+**P1.7a backend read-model export (2026-08-15): implemented, offline-tested.**
+`src/fpl/publish/dashboard_json.py` + thin `fpl.jobs.export_dashboard_json` publish
+versioned per-page application JSON (`fixture_matrix.json`, `players.json`) derived **only**
+from a published P1.4 Parquet export via Polars — no DuckDB handle is opened at all. It
+reuses the Parquet exporter's atomic generation-swap machinery (sibling staging dir, validate,
+symlink swap, concurrent no-clobber, failure cleanup), verifies the source export's manifest
+self-hash and every file SHA it reads, and emits a manifest whose `content_sha256` excludes
+only `generated_at` so identical inputs are byte-identical. NULL stays JSON `null` (ease
+indices, official FDR, xG/xA, rates, not-yet-persisted fixture probabilities); objects key on
+`run_id` + `season` + `team_code`/`code` only; club labels resolve season-safely through
+`dim_team_season`; player fixture chips carry the club's ease/FDR joined on the
+season-qualified fixture-team key; availability is a passed-through reported overlay. The
+read models cover the two exploration pages only; the summary / next-GW / forecast-vs-actual /
+optimizer pages are later additive files. Contract: `docs/dashboard-json-contract.md`; the
+runbook notes the emitter as optional post-decision output. Tests:
+`tests/test_dashboard_json.py` (publication tests need the directory-symlink privilege, as
+for `tests/test_bi_export.py`).
+
 Build only after the export contract and its tests pass. Minimum pages:
 
 1. **GW1 decision:** squad, XI, captain/vice, bench, EV, ownership, availability, flags, and
