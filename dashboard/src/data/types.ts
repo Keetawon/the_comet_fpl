@@ -144,10 +144,9 @@ export interface ForecastRun {
 export type PlanRole = "starting_xi" | "bench_goalkeeper" | "bench_outfield";
 
 export interface ComponentModes {
-  attacking?: string | null;
-  assists?: string | null;
-  appearance?: string | null;
-  share_signal?: string | null;
+  attacking_mode?: string | null;
+  assists_mode?: string | null;
+  appearance_mode?: string | null;
   [key: string]: string | null | undefined;
 }
 

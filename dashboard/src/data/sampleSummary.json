@@ -1,4 +1,4 @@
-{
+﻿{
   "json_schema_version": 2,
   "latest_run": {
     "run_id": "86a072ade6dd4d56",
@@ -9,10 +9,10 @@
     "gw_to": 5,
     "status": "recorded",
     "component_modes": {
-      "appearance": "seasonal",
-      "assists": "coupled",
-      "attacking": "v3",
-      "share_signal": "auto"
+      "appearance_mode": "seasonal",
+      "assists_mode": "coupled",
+      "attacking_mode": "v3",
+      "share_signal_kind": "expected_goals"
     }
   },
   "roster": {"players": 587, "teams": 20},
@@ -46,13 +46,13 @@
       "optimizer_run_id": "opt-default",
       "decision_sha256": "dec-default-0000",
       "forecast_run_id": "run-a",
-      "component_modes": {"attacking": "v3", "assists": "coupled", "appearance": "seasonal", "share_signal": "auto"}
+      "component_modes": {"attacking_mode": "v3", "assists_mode": "coupled", "appearance_mode": "seasonal", "share_signal_kind": "expected_goals"}
     },
     {
       "optimizer_run_id": "opt-diagnostic",
       "decision_sha256": "dec-diag-1111",
       "forecast_run_id": "run-b",
-      "component_modes": {"attacking": "v1", "assists": "v1", "appearance": "seasonal", "share_signal": "auto"}
+      "component_modes": {"attacking_mode": "v1", "assists_mode": "v1", "appearance_mode": "seasonal", "share_signal_kind": "expected_goals"}
     }
   ],
   "ease_index_formula_version": "fixture-ease-v1"

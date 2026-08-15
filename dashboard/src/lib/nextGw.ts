@@ -6,21 +6,21 @@
 import type { NextGwPlan, PlanWeek } from "@/data/types";
 
 export interface ComponentModes {
-  attacking?: string | null;
-  assists?: string | null;
-  appearance?: string | null;
-  share_signal?: string | null;
+  attacking_mode?: string | null;
+  assists_mode?: string | null;
+  appearance_mode?: string | null;
+  [key: string]: string | null | undefined;
 }
 
 /** True when the plan's forecast ran the frozen default architecture. */
 export function isDefaultArchitecture(modes: ComponentModes | null): boolean {
-  return modes?.attacking === "v3" && modes?.assists === "coupled";
+  return modes?.attacking_mode === "v3" && modes?.assists_mode === "coupled";
 }
 
 export function planLabel(modes: ComponentModes | null): string {
   if (!modes) return "unknown architecture";
-  const goals = modes.attacking ?? "?";
-  const assists = modes.assists ?? "?";
+  const goals = modes.attacking_mode ?? "?";
+  const assists = modes.assists_mode ?? "?";
   const tag = isDefaultArchitecture(modes) ? "default" : "diagnostic";
   return `${goals} goals / ${assists} assists (${tag})`;
 }

@@ -1,4 +1,4 @@
-{
+﻿{
   "json_schema_version": 2,
   "plans": [
     {
@@ -10,10 +10,10 @@
       "gw_from": 1,
       "gw_to": 5,
       "component_modes": {
-        "appearance": "seasonal",
-        "assists": "coupled",
-        "attacking": "v3",
-        "share_signal": "auto"
+        "appearance_mode": "seasonal",
+        "assists_mode": "coupled",
+        "attacking_mode": "v3",
+        "share_signal_kind": "expected_goals"
       },
       "weeks": [
         {
@@ -79,10 +79,10 @@
       "gw_from": 1,
       "gw_to": 5,
       "component_modes": {
-        "appearance": "seasonal",
-        "assists": "v1",
-        "attacking": "v1",
-        "share_signal": "auto"
+        "appearance_mode": "seasonal",
+        "assists_mode": "v1",
+        "attacking_mode": "v1",
+        "share_signal_kind": "expected_goals"
       },
       "weeks": [
         {

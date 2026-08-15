@@ -261,8 +261,8 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "gw_to": 2,
                 "status": "recorded",
                 "component_modes": (
-                    '{"appearance": "seasonal", "assists": "coupled", '
-                    '"attacking": "v3", "share_signal": "auto"}'
+                    '{"appearance_mode": "seasonal", "assists_mode": "coupled", '
+                    '"attacking_mode": "v3", "share_signal_kind": "expected_goals"}'
                 ),
             }
         ],
@@ -687,10 +687,10 @@ def test_next_gw_plans_join_ev_context_and_modes(tmp_path: Path) -> None:
     assert plan["gw_from"] == 1 and plan["gw_to"] == 2
     # component modes travel with the plan so the UI can label the architecture
     assert plan["component_modes"] == {
-        "appearance": "seasonal",
-        "assists": "coupled",
-        "attacking": "v3",
-        "share_signal": "auto",
+        "appearance_mode": "seasonal",
+        "assists_mode": "coupled",
+        "attacking_mode": "v3",
+        "share_signal_kind": "expected_goals",
     }
     week1, week2 = plan["weeks"]
     assert (week1["captain_code"], week1["vice_captain_code"]) == (1, 2)
@@ -724,7 +724,7 @@ def test_summary_snapshots_the_latest_run(tmp_path: Path) -> None:
     models = build_dashboard_read_models(_build_source_export(tmp_path))
     summary = models.summary
     assert summary["latest_run"]["run_id"] == RUN_ID
-    assert summary["latest_run"]["component_modes"]["attacking"] == "v3"
+    assert summary["latest_run"]["component_modes"]["attacking_mode"] == "v3"
     assert summary["roster"] == {"players": 2, "teams": 3}
     # next gameweek carries kickoffs; the deadline stays null, never fabricated
     assert summary["next_gameweek"]["gw"] == 1
