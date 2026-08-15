@@ -66,10 +66,15 @@ class FactCounts:
     team_match_rows: int
     target_rows: int
     player_form_rows: int = 0
+    team_form_rows: int = 0
 
 
 class PlayerFormSourceError(ValueError):
     """A player-form source mart cannot support its declared player-fixture grain."""
+
+
+class TeamFormSourceError(ValueError):
+    """A team-form source mart cannot support its declared team/window grain."""
 
 
 def build_dimensions(con: duckdb.DuckDBPyConnection) -> None:
@@ -409,6 +414,174 @@ def build_player_form(con: duckdb.DuckDBPyConnection) -> int:
     return _scalar(con, "SELECT count(*) FROM mart_fact_player_form")
 
 
+def build_team_form(con: duckdb.DuckDBPyConnection) -> int:
+    """Materialize descriptive team form at ``(season, gw, team_code, window)`` grain.
+
+    The club-level counterpart of :func:`build_player_form`, with the same anchoring: observed
+    gameweeks only, the window ends at the anchor gameweek inclusive, and the point-in-time
+    boundary is the anchor gameweek's latest kickoff, so a double gameweek's two legs both count
+    while a later gameweek cannot leak backwards and a blank gameweek never fabricates a match.
+
+    ``team_code`` is resolved from ``mart_dim_team`` inside the match's own season, because a bare
+    ``team_id`` is reassigned every season.  Goal aggregates stay NULL when any match in the window
+    has an unmeasured score, and ``team_xg`` / ``team_xgc`` keep their null-safe SUM semantics --
+    2021-22 measured no xG, and a 0.0 there would be a measurement claim we cannot make.  Per-match
+    rates are NULL on a zero denominator and, for the xG/xGC rates, when the underlying sum is NULL.
+    """
+    _assert_team_form_source_grain(con)
+    con.execute("DELETE FROM mart_fact_team_form")
+    con.execute(
+        """
+        INSERT INTO mart_fact_team_form (
+            season, gw, team_code, "window", matches_played, goals_for, goals_against,
+            clean_sheets, wins, draws, losses, team_xg, team_xgc,
+            goals_for_per_match, goals_against_per_match, team_xg_per_match, team_xgc_per_match
+        )
+        WITH matches AS (
+            SELECT m.season, m.gw, m.fixture, m.kickoff_time, t.team_code,
+                   m.goals_for, m.goals_against, m.team_xg, m.team_xgc
+            FROM mart_fact_team_match AS m
+            JOIN mart_dim_team AS t
+              ON t.season = m.season
+             AND t.team_id = m.team_id
+        ),
+        gameweek_cutoffs AS (
+            SELECT season, gw, max(kickoff_time) AS last_kickoff
+            FROM matches
+            GROUP BY season, gw
+        ),
+        anchors AS (
+            SELECT DISTINCT r.season, r.gw, r.team_code, c.last_kickoff
+            FROM matches AS r
+            JOIN gameweek_cutoffs AS c
+              ON c.season = r.season
+             AND c.gw = r.gw
+        ),
+        windows AS (
+            SELECT 'last_3' AS window_label, 3 AS match_limit
+            UNION ALL SELECT 'last_5', 5
+            UNION ALL SELECT 'last_10', 10
+            UNION ALL SELECT 'season_to_date', NULL
+        ),
+        ranked AS (
+            SELECT
+                a.season,
+                a.gw,
+                a.team_code,
+                w.window_label,
+                w.match_limit,
+                r.goals_for,
+                r.goals_against,
+                r.team_xg,
+                r.team_xgc,
+                row_number() OVER (
+                    PARTITION BY a.season, a.gw, a.team_code, w.window_label
+                    ORDER BY r.kickoff_time DESC, r.fixture DESC
+                ) AS recency_rank
+            FROM anchors AS a
+            CROSS JOIN windows AS w
+            JOIN matches AS r
+              ON r.season = a.season
+             AND r.team_code = a.team_code
+             AND r.gw <= a.gw
+             AND r.kickoff_time <= a.last_kickoff
+        ),
+        selected AS (
+            SELECT *
+            FROM ranked
+            WHERE match_limit IS NULL OR recency_rank <= match_limit
+        )
+        SELECT
+            season,
+            gw,
+            team_code,
+            window_label,
+            CAST(count(*) AS INTEGER) AS matches_played,
+            CASE
+                WHEN count(goals_for) = count(*)
+                    THEN CAST(sum(goals_for) AS INTEGER)
+            END AS goals_for,
+            CASE
+                WHEN count(goals_against) = count(*)
+                    THEN CAST(sum(goals_against) AS INTEGER)
+            END AS goals_against,
+            CASE
+                WHEN count(goals_against) = count(*)
+                    THEN CAST(count(*) FILTER (WHERE goals_against = 0) AS INTEGER)
+            END AS clean_sheets,
+            CASE
+                WHEN count(goals_for) = count(*) AND count(goals_against) = count(*)
+                    THEN CAST(count(*) FILTER (WHERE goals_for > goals_against) AS INTEGER)
+            END AS wins,
+            CASE
+                WHEN count(goals_for) = count(*) AND count(goals_against) = count(*)
+                    THEN CAST(count(*) FILTER (WHERE goals_for = goals_against) AS INTEGER)
+            END AS draws,
+            CASE
+                WHEN count(goals_for) = count(*) AND count(goals_against) = count(*)
+                    THEN CAST(count(*) FILTER (WHERE goals_for < goals_against) AS INTEGER)
+            END AS losses,
+            sum(team_xg) AS team_xg,
+            sum(team_xgc) AS team_xgc,
+            CASE
+                WHEN count(*) > 0 AND count(goals_for) = count(*)
+                    THEN 1.0 * sum(goals_for) / count(*)
+            END AS goals_for_per_match,
+            CASE
+                WHEN count(*) > 0 AND count(goals_against) = count(*)
+                    THEN 1.0 * sum(goals_against) / count(*)
+            END AS goals_against_per_match,
+            CASE
+                WHEN count(*) > 0 AND sum(team_xg) IS NOT NULL
+                    THEN sum(team_xg) / count(*)
+            END AS team_xg_per_match,
+            CASE
+                WHEN count(*) > 0 AND sum(team_xgc) IS NOT NULL
+                    THEN sum(team_xgc) / count(*)
+            END AS team_xgc_per_match
+        FROM selected
+        GROUP BY season, gw, team_code, window_label
+        """
+    )
+    return _scalar(con, "SELECT count(*) FROM mart_fact_team_form")
+
+
+def _assert_team_form_source_grain(con: duckdb.DuckDBPyConnection) -> None:
+    """Fail closed if a hand-built or migrated source would fan out the form aggregation."""
+    duplicate_keys = _scalar(
+        con,
+        """
+        SELECT count(*) FROM (
+            SELECT season, team_id, fixture
+            FROM mart_fact_team_match
+            GROUP BY season, team_id, fixture
+            HAVING count(*) > 1
+        )
+        """,
+    )
+    if duplicate_keys:
+        raise TeamFormSourceError(
+            f"mart_fact_team_match has {duplicate_keys} duplicate team-fixture key(s); "
+            "a form window cannot deduplicate real double gameweeks"
+        )
+    unresolved = _scalar(
+        con,
+        """
+        SELECT count(*)
+        FROM mart_fact_team_match AS m
+        WHERE NOT EXISTS (
+            SELECT 1 FROM mart_dim_team AS t
+            WHERE t.season = m.season AND t.team_id = m.team_id
+        )
+        """,
+    )
+    if unresolved:
+        raise TeamFormSourceError(
+            f"mart_fact_team_match has {unresolved} row(s) whose (season, team_id) resolves to no "
+            "mart_dim_team row; a team_code cannot be invented"
+        )
+
+
 def _assert_player_form_source_grain(con: duckdb.DuckDBPyConnection) -> None:
     """Fail closed if a hand-built or migrated source would fan out the form aggregation."""
     for table in ("mart_fact_player_fixture", "mart_target_player_fixture"):
@@ -535,11 +708,13 @@ def build_all(con: duckdb.DuckDBPyConnection) -> FactCounts:
     team_match_rows = build_team_match(con)
     target_rows = build_targets(con)
     player_form_rows = build_player_form(con)
+    team_form_rows = build_team_form(con)
     return FactCounts(
         player_fixture_rows=player_fixture_rows,
         team_match_rows=team_match_rows,
         target_rows=target_rows,
         player_form_rows=player_form_rows,
+        team_form_rows=team_form_rows,
     )
 
 

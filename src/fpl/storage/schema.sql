@@ -549,6 +549,36 @@ CREATE TABLE IF NOT EXISTS mart_fact_player_form (
     CHECK ("window" IN ('last_3', 'last_5', 'last_10', 'season_to_date'))
 );
 
+-- DESCRIPTIVE OBSERVED team form for the BI semantic contract, the club-level counterpart of
+-- mart_fact_player_form.  Same anchoring: observed gameweeks, window ends at the anchor gameweek
+-- inclusive, the anchor gameweek's latest kickoff is the point-in-time cutoff, both legs of a
+-- double gameweek count, and a blank gameweek never fabricates a match.
+--
+-- team_code, never team_id, is the key: club ids are reassigned every season.
+CREATE TABLE IF NOT EXISTS mart_fact_team_form (
+    season                  VARCHAR NOT NULL,
+    gw                      INTEGER NOT NULL,
+    team_code               INTEGER NOT NULL,
+    "window"                VARCHAR NOT NULL,
+    matches_played          INTEGER NOT NULL,
+    -- Goal aggregates are NULL when any match in the window has an unmeasured score, rather
+    -- than silently undercounting. xG/xGC are NULL when unmeasured (all of 2021-22), never 0.0.
+    goals_for               INTEGER,
+    goals_against           INTEGER,
+    clean_sheets            INTEGER,
+    wins                    INTEGER,
+    draws                   INTEGER,
+    losses                  INTEGER,
+    team_xg                 DOUBLE,
+    team_xgc                DOUBLE,
+    goals_for_per_match     DOUBLE,
+    goals_against_per_match DOUBLE,
+    team_xg_per_match       DOUBLE,
+    team_xgc_per_match      DOUBLE,
+    PRIMARY KEY (season, gw, team_code, "window"),
+    CHECK ("window" IN ('last_3', 'last_5', 'last_10', 'season_to_date'))
+);
+
 -- Which components each ruleset needs but the season did not measure. Without this,
 -- points_under_rules_2026_27 silently understates defenders before 2025-26, when
 -- defensive_contribution was not recorded at all.

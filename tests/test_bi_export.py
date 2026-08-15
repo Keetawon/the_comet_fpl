@@ -315,6 +315,17 @@ def _seed_database(path: Path, *, record: bool) -> tuple[ProspectivePointsArtifa
                 7,
             ],
         )
+        con.execute(
+            """
+            INSERT INTO mart_fact_team_form (
+                season, gw, team_code, "window", matches_played, goals_for, goals_against,
+                clean_sheets, wins, draws, losses, team_xg, team_xgc,
+                goals_for_per_match, goals_against_per_match, team_xg_per_match,
+                team_xgc_per_match
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [SEASON, 1, 101, "last_3", 1, 2, 1, 0, 1, 0, 0, 1.8, 0.9, 2.0, 1.0, 1.8, 0.9],
+        )
         return artifact, record_forecast(con, artifact) if record else None
     finally:
         con.close()
@@ -552,6 +563,11 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     assert optimizer.num_rows == 15
     assert set(optimizer.column("forecast_run_id").to_pylist()) == {run_id}
     assert optimizer.column("transferred_out").to_pylist() == [False] * 15
+    team_form = pq.read_table(output / "fact_team_form.parquet")
+    assert team_form.column("team_code").to_pylist() == [101]
+    assert team_form.column("matches_played").to_pylist() == [1]
+    assert team_form.column("goals_for").to_pylist() == [2]
+    assert team_form.column("goals_for_per_match").to_pylist() == pytest.approx([2.0])
 
 
 def test_team_fixture_ease_indices_are_directed_and_keep_raw_lambdas(tmp_path: Path) -> None:
@@ -906,12 +922,20 @@ def test_live_season_dimensions_are_sourced_from_the_snapshot_registry(tmp_path:
 
 @pytest.mark.archive
 def test_archive_database_exports_the_complete_contract(tmp_path: Path) -> None:
-    """Real-build smoke test: all source owners can satisfy the frozen 14-table boundary."""
+    """Real-build smoke test: all source owners can satisfy the frozen 15-table boundary."""
     result = export_bi(default_db_path(), tmp_path / "archive-export")
     manifest = validate_bi_export(result.output_dir)
 
     assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V1.tables}
-    assert len(_table_paths(result.output_dir)) == 14
+    assert len(_table_paths(result.output_dir)) == 15
+    team_form = pq.read_table(result.output_dir / "fact_team_form.parquet")
+    assert team_form.num_rows > 0
+    # 2021-22 measured no xG: its windows must stay NULL, never 0.0.
+    seasons = team_form.column("season").to_pylist()
+    xg_values = team_form.column("team_xg").to_pylist()
+    xg_2021_22 = [xg for season, xg in zip(seasons, xg_values, strict=True) if season == "2021-22"]
+    assert xg_2021_22
+    assert all(value is None for value in xg_2021_22)
     team_fixture = pq.read_table(result.output_dir / "fact_forecast_team_fixture.parquet")
     assert {
         "lambda_for",

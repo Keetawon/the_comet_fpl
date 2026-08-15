@@ -445,6 +445,17 @@ xA_per_90 = 90 * sum(expected_assists) / sum(minutes on those same measured-xA r
 Return NULL when the matching minutes denominator is zero. Never zero-fill unmeasured xG/xA, and
 never multiply a per-90 display rate by expected minutes inside the reporting layer.
 
+**P1.6b addition (owner-approved, 2026-08-15): `fact_team_form`.** The backward team-form companion
+at `(season, gw, team_code, window)` grain, added to the semantic contract and the Parquet export in
+the same change (declared and sourced together, so never in `NOT_YET_SOURCED`; semantic contract
+stays at v1, an additive table exactly as P1.5's columns were). It mirrors `build_player_form`'s
+anchoring exactly — observed gameweeks, window ending at the anchor gameweek inclusive, the anchor
+gameweek's latest kickoff as the point-in-time boundary, both double-gameweek legs counted, no
+fabricated blank-gameweek match — and is keyed on `team_code` only. Unmeasured `team_xg`/`team_xgc`
+(all of 2021-22) stay NULL with their per-match rates, never zero. `fpl.transform.facts:
+build_team_form` materializes `mart_fact_team_form`, rebuilt by `build_db` after the other marts.
+It exists to feed the P1.7 fixture-matrix **Team** page's recent-form block.
+
 ### P1.7 — Dashboard MVP
 
 Build only after the export contract and its tests pass. Minimum pages:
@@ -452,7 +463,8 @@ Build only after the export contract and its tests pass. Minimum pages:
 1. **GW1 decision:** squad, XI, captain/vice, bench, EV, ownership, availability, flags, and
    default-vs-diagnostic differences.
 2. **Fixture matrix:** overall/attack/defence ease for GW1 and rolling 3/5-GW horizons, with raw
-   lambdas and home/away filters.
+   lambdas and home/away filters. The **Team** view also shows recent form from `fact_team_form`
+   (last 3/5/10 and season-to-date).
 3. **Player-form pivot:** position/team/price filters; rolling 3/5/10 minutes, starts, xG, xA,
    xG/90, xA/90, goals, assists, bonus/BPS, DC, points, and upcoming EV.
 4. **Forecast versus actual:** EV/actual, bias, CRPS/calibration, and rank/capture by position and

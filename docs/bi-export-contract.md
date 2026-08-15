@@ -42,6 +42,7 @@ data/
     ├── fact_forecast_team_fixture.parquet
     ├── fact_player_fixture_actual.parquet
     ├── fact_player_form.parquet
+    ├── fact_team_form.parquet
     └── fact_optimizer_plan.parquet
 ```
 
@@ -110,6 +111,15 @@ exporter does not invent an artificial role or row to make that field appear pop
 No source NULL is zero-filled. Nullable floats remain Parquet NULLs—not `NaN` and not `0.0`—and
 non-finite floats are refused. The P1.2 ledger does not persist fixture-level player minutes/rates,
 so those player-fixture fields are explicit typed NULLs rather than reconstructed values.
+
+### Team form
+
+`fact_team_form` is a direct projection of `mart_fact_team_form` — backward-looking observed form at
+`(season, gw, team_code, window)` grain, keyed on the cross-season `team_code`. It carries no
+timestamps and no `run_id`. A live season with no finished matches contributes zero rows, exactly as
+for `fact_player_form`. Its NULL discipline is re-asserted after the Parquet round trip like every
+other table: unmeasured `team_xg`/`team_xgc` (all of 2021-22) stay NULL, never `0.0`, and their
+per-match rates are NULL whenever their numerator is.
 
 ### Fixture ease and official FDR
 
@@ -181,6 +191,6 @@ characters):
 }
 ```
 
-The real `tables` object always contains all fourteen contract tables. `created_at`, exported
+The real `tables` object always contains all fifteen contract tables. `created_at`, exported
 `run_id`s, source min/max `known_at`, freshness, database hash, per-table row counts, and per-file
 hashes are all required and validated on read.

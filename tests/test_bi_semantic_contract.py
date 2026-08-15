@@ -59,6 +59,7 @@ def test_contract_publishes_the_expected_tables() -> None:
         "fact_forecast_team_fixture",
         "fact_player_fixture_actual",
         "fact_player_form",
+        "fact_team_form",
         "fact_optimizer_plan",
     }
 
@@ -79,6 +80,7 @@ def test_contract_publishes_the_expected_tables() -> None:
         ("fact_forecast_team_fixture", ("run_id", "season", "fixture", "team_id")),
         ("fact_player_fixture_actual", ("season", "fixture", "code")),
         ("fact_player_form", ("season", "gw", "code", "window")),
+        ("fact_team_form", ("season", "gw", "team_code", "window")),
         ("fact_optimizer_plan", ("optimizer_run_id", "gw", "code")),
     ],
 )
@@ -141,7 +143,7 @@ def test_every_forecast_fact_carries_run_id_and_as_of_and_keys_on_the_vintage() 
 
 def test_actual_and_form_facts_carry_no_run_id() -> None:
     """Outcomes stay separate from predictions until finalisation."""
-    for name in ("fact_player_fixture_actual", "fact_player_form"):
+    for name in ("fact_player_fixture_actual", "fact_player_form", "fact_team_form"):
         assert "run_id" not in CONTRACT.table(name).column_names
 
 
@@ -462,6 +464,9 @@ def test_every_contract_table_is_now_sourced_for_the_exporter() -> None:
         assert "NOT YET IMPLEMENTED" not in table.source_owner
     assert CONTRACT.table("fact_player_form").source_owner == (
         "fpl.transform.facts:mart_fact_player_form"
+    )
+    assert CONTRACT.table("fact_team_form").source_owner == (
+        "fpl.transform.facts:mart_fact_team_form"
     )
 
 

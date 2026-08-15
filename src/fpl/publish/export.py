@@ -181,6 +181,25 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "capture_id",
     ),
     "mart_fact_team_match": ("season", "fixture", "team_id", "fdr"),
+    "mart_fact_team_form": (
+        "season",
+        "gw",
+        "team_code",
+        "window",
+        "matches_played",
+        "goals_for",
+        "goals_against",
+        "clean_sheets",
+        "wins",
+        "draws",
+        "losses",
+        "team_xg",
+        "team_xgc",
+        "goals_for_per_match",
+        "goals_against_per_match",
+        "team_xg_per_match",
+        "team_xgc_per_match",
+    ),
     "mart_fact_player_form": (
         "season",
         "gw",
@@ -702,6 +721,13 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
                    points_under_rules_2026_27
             FROM mart_fact_player_form
         """,
+        "fact_team_form": """
+            SELECT season, gw, team_code, "window", matches_played, goals_for, goals_against,
+                   clean_sheets, wins, draws, losses, team_xg, team_xgc,
+                   goals_for_per_match, goals_against_per_match, team_xg_per_match,
+                   team_xgc_per_match
+            FROM mart_fact_team_form
+        """,
     }
     if not ledger_present:
         for table_name in _FORECAST_TABLE_NAMES:
@@ -927,7 +953,9 @@ def _write_parquet(path: Path, frame: pa.Table) -> None:
 
 
 def _fsync_file(path: Path) -> None:
-    with path.open("rb") as handle:
+    # Append mode opens a writable descriptor without truncating: os.fsync needs one on
+    # Windows (a read-only handle raises EBADF) and nothing is appended.
+    with path.open("ab") as handle:
         os.fsync(handle.fileno())
 
 

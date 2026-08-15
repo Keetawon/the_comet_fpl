@@ -227,6 +227,28 @@ xA_per_90 = 90 * sum(expected_assists) / sum(minutes on those same measured-xA r
 NULL when that denominator is zero. A per-90 is a **display** measure: never multiply it by expected
 minutes in the reporting layer to synthesise a forecast.
 
+### `fact_team_form` — grain `(season, gw, team_code, window)`
+
+**Sourced by P1.6b** (owner-approved addition) as `mart_fact_team_form`, built from
+`mart_fact_team_match` with `team_code` resolved through `mart_dim_team` inside each match's own
+season. Long format, one row per window (`last_3`, `last_5`, `last_10`, `season_to_date`). It is
+the data behind the P1.7 fixture-matrix **Team** page's recent-form block, and the club-level
+counterpart of `fact_player_form` with the same anchoring: observed gameweeks only, the window ends
+at the anchor gameweek inclusive, the anchor gameweek's latest kickoff is the point-in-time
+boundary, both legs of a double gameweek count as two matches, and a blank gameweek creates no row
+and never a synthetic match.
+
+Keyed on `team_code`, **never `team_id`** — club ids are reassigned every season. It is
+backward-looking observed form from the historical marts and carries no `run_id`; a live season with
+no finished matches contributes zero rows.
+
+`team_xg` / `team_xgc` are NULL where unmeasured — the whole of 2021-22 measured no xG — and their
+per-match rates are additionally NULL then, never `0.0`. Goal aggregates (`goals_for`,
+`goals_against`, `clean_sheets`, `wins`, `draws`, `losses`) are NULL when any match in the window
+has an unmeasured score rather than silently undercounting. Per-match rates are
+`measure / matches_played` and NULL on a zero denominator; they are display measures and must never
+be multiplied by a fixture count to synthesise a forecast.
+
 ### `fact_optimizer_plan` — grain `(optimizer_run_id, gw, code)`
 
 One player's role in one planned gameweek, from `fpl.artifacts.optimizer_plan`. It carries
@@ -252,5 +274,7 @@ the work. Three were added, each forced by a documented invariant rather than by
 ## Source completeness
 
 Every v1 table now has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
-and P1.6 supplies `fact_player_form`. Consequently `contract.NOT_YET_SOURCED` is empty; P1.4 can
-require the complete v1 contract rather than silently emitting an apparently complete partial export.
+P1.6 supplies `fact_player_form`, and P1.6b adds `fact_team_form` (declared and sourced in the same
+change, so it is never in `NOT_YET_SOURCED`). Consequently `contract.NOT_YET_SOURCED` is empty; P1.4
+can require the complete v1 contract rather than silently emitting an apparently complete partial
+export.

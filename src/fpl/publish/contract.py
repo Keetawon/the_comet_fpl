@@ -922,6 +922,102 @@ FACT_PLAYER_FORM = Table(
     ),
 )
 
+FACT_TEAM_FORM = Table(
+    name="fact_team_form",
+    role="fact",
+    subject="Rolling recent-form windows for a club, as at a gameweek.",
+    grain=("season", "gw", "team_code", "window"),
+    grain_note=(
+        "One row per club per observed gameweek per window. Long format, like fact_player_form, "
+        "so a pivot can put window on an axis."
+    ),
+    source_owner="fpl.transform.facts:mart_fact_team_form",
+    columns=(
+        _key("season", "string", "Season."),
+        _key("gw", "int", "Gameweek the window ends at, inclusive."),
+        _key("team_code", "int", "Permanent club identity, 1:1 with the club."),
+        _key("window", "string", "One of last_3, last_5, last_10, season_to_date."),
+        _key("matches_played", "int", "Matches in the window, including double-gameweek legs."),
+        _nullable(
+            "goals_for",
+            "int",
+            "not_applicable",
+            "Goals scored over the window. NULL when any match in the window has an unmeasured "
+            "score.",
+        ),
+        _nullable(
+            "goals_against",
+            "int",
+            "not_applicable",
+            "Goals conceded over the window. NULL when any match in the window has an unmeasured "
+            "score.",
+        ),
+        _nullable(
+            "clean_sheets",
+            "int",
+            "not_applicable",
+            "Matches with goals_against = 0. NULL when coverage is incomplete.",
+        ),
+        _nullable("wins", "int", "not_applicable", "Wins. NULL when coverage is incomplete."),
+        _nullable("draws", "int", "not_applicable", "Draws. NULL when coverage is incomplete."),
+        _nullable("losses", "int", "not_applicable", "Losses. NULL when coverage is incomplete."),
+        _nullable(
+            "team_xg",
+            "float",
+            "unmeasured",
+            "xG summed over MEASURED-xG matches only. NULL for the whole of 2021-22, never 0.0.",
+        ),
+        _nullable(
+            "team_xgc",
+            "float",
+            "unmeasured",
+            "xGC summed over MEASURED-xGC matches only. NULL where unmeasured, never 0.0.",
+        ),
+        _nullable(
+            "goals_for_per_match",
+            "float",
+            "not_applicable",
+            "goals_for / matches_played. NULL on a zero denominator or incomplete coverage.",
+        ),
+        _nullable(
+            "goals_against_per_match",
+            "float",
+            "not_applicable",
+            "goals_against / matches_played. NULL on a zero denominator or incomplete coverage.",
+        ),
+        _nullable(
+            "team_xg_per_match",
+            "float",
+            "unmeasured",
+            "team_xg / matches_played. NULL when the xG sum is NULL or the denominator is zero.",
+        ),
+        _nullable(
+            "team_xgc_per_match",
+            "float",
+            "unmeasured",
+            "team_xgc / matches_played. NULL when the xGC sum is NULL or the denominator is zero.",
+        ),
+    ),
+    joins=(
+        Join(to_table="dim_team", on=(("team_code", "team_code"),), cardinality="many_to_one"),
+        Join(
+            to_table="dim_gameweek",
+            on=(("season", "season"), ("gw", "gw")),
+            cardinality="many_to_one",
+        ),
+    ),
+    notes=(
+        "Backward-looking observed form only, from the historical team-match mart; a live season "
+        "with no finished matches contributes zero rows. It never carries run_id.",
+        "Keyed on team_code, never team_id: club ids are reassigned every season.",
+        "Anchor gameweeks are observed, never an assumed 1..38. A blank gameweek creates no row "
+        "and no synthetic match.",
+        "A per-match rate is a display measure. Never multiply it by a fixture count to synthesise "
+        "a forecast; that is the model's job.",
+    ),
+)
+
+
 FACT_OPTIMIZER_PLAN = Table(
     name="fact_optimizer_plan",
     role="fact",
@@ -988,6 +1084,7 @@ SEMANTIC_CONTRACT_V1 = SemanticContract(
         FACT_FORECAST_TEAM_FIXTURE,
         FACT_PLAYER_FIXTURE_ACTUAL,
         FACT_PLAYER_FORM,
+        FACT_TEAM_FORM,
         FACT_OPTIMIZER_PLAN,
     ),
 )

@@ -83,11 +83,12 @@ def build(
             counts = facts.build_all(con)
             logger.info(
                 "mart_fact_player_fixture=%d mart_fact_team_match=%d mart_target_player_fixture=%d "
-                "mart_fact_player_form=%d",
+                "mart_fact_player_form=%d mart_fact_team_form=%d",
                 counts.player_fixture_rows,
                 counts.team_match_rows,
                 counts.target_rows,
                 counts.player_form_rows,
+                counts.team_form_rows,
             )
 
             record_build_metadata(con, "seasons", ",".join(sources.archive.seasons))
@@ -95,6 +96,7 @@ def build(
             record_build_metadata(con, "player_fixture_rows", str(counts.player_fixture_rows))
             record_build_metadata(con, "team_match_rows", str(counts.team_match_rows))
             record_build_metadata(con, "player_form_rows", str(counts.player_form_rows))
+            record_build_metadata(con, "team_form_rows", str(counts.team_form_rows))
             record_build_metadata(con, "anomaly_checks_triggered", str(len(anomalies)))
         finally:
             con.close()
