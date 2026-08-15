@@ -23,7 +23,7 @@ const PAGES: readonly PageDef[] = [
   { id: "fixtures", label: "Fixture matrix", icon: CalendarDays, ready: true },
   { id: "players", label: "Players", icon: Users, ready: true },
   { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList, ready: true },
-  { id: "forecast-vs-actual", label: "Forecast vs actual", icon: LineChart, ready: false },
+  { id: "forecast-vs-actual", label: "Forecast vs actual", icon: LineChart, ready: true },
   { id: "optimizer", label: "Optimizer audit", icon: Scale, ready: false },
 ];
 

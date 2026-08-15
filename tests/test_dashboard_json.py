@@ -195,6 +195,7 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "chance_of_playing": None,
                 "availability_multiplier": 1.0,
                 "expected_points": 5.5 if gw == 1 else 4.5,
+                "distribution": "[0.1, 0.2, 0.3, 0.25, 0.15]",
                 "cold_start_player": False,
                 "stage_a_league_average_team": False,
                 "attacking_signal_cold_start": False,
@@ -218,6 +219,7 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "chance_of_playing": 75,
                 "availability_multiplier": 0.75,
                 "expected_points": 2.0 if gw == 1 else 3.0,
+                "distribution": "[0.4, 0.35, 0.25]",
                 "cold_start_player": False,
                 "stage_a_league_average_team": True,
                 "attacking_signal_cold_start": False,
@@ -317,6 +319,25 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
         "fact_forecast_team_fixture": team_fixture,
         "fact_forecast_player_gameweek": player_gameweek,
         "fact_forecast_player_fixture": player_fixture,
+        # Finalised outcomes at player-fixture grain. Code 2's fixture 101 is unfinalised
+        # (NULL points) and must stay out of every gameweek sum, never read as 0.
+        "fact_player_fixture_actual": [
+            {
+                "season": SEASON,
+                "fixture": fixture,
+                "code": code,
+                "gw": gw,
+                "points_under_rules_2026_27": points,
+            }
+            for fixture, gw, code, points in (
+                (100, 1, 1, 6),
+                (101, 2, 1, 4),
+                (102, 2, 1, 2),
+                (100, 1, 2, 1),
+                (101, 2, 2, None),  # unknown until finalised
+                (102, 2, 2, 2),
+            )
+        ],
         "dim_gameweek": [
             {
                 "season": SEASON,
@@ -664,6 +685,59 @@ def test_source_integrity_chain_fails_closed(tmp_path: Path) -> None:
         build_dashboard_read_models(export_dir)
 
 
+def test_forecast_vs_actual_scores_finalised_gameweeks_only(tmp_path: Path) -> None:
+    models = build_dashboard_read_models(_build_source_export(tmp_path))
+    result = models.forecast_vs_actual
+    assert result["has_outcomes"] is True
+    (run,) = result["runs"]
+    assert run["run_id"] == RUN_ID
+    # four scored player-gameweeks; the unfinalised fixture row never enters a sum
+    assert run["rows"] == 4
+    assert run["mean_ev"] == pytest.approx(3.75)
+    assert run["mean_actual"] == pytest.approx(3.75)
+    assert run["bias"] == pytest.approx(0.0)
+    assert run["mae"] == pytest.approx(1.0)
+    assert run["crps"] is not None and run["crps"] > 0.0
+
+    positions = {block["position"]: block for block in run["by_position"]}
+    assert positions["GK"]["rows"] == 2
+    assert positions["GK"]["bias"] == pytest.approx(1.0)  # 5.0 EV against 6.0 actual
+    assert positions["MID"]["bias"] == pytest.approx(-1.0)
+    gws = {block["gw"]: block for block in run["by_gw"]}
+    assert gws[1]["bias"] == pytest.approx(-0.25)
+    assert gws[2]["bias"] == pytest.approx(0.25)
+
+    buckets = {block["bucket"]: block for block in run["calibration"]}
+    # code 1 predicts P(>=2) = 0.70 in both gameweeks and delivered both times
+    assert buckets["0.7-1.0"]["predicted_mean"] == pytest.approx(0.7)
+    assert buckets["0.7-1.0"]["observed_rate"] == pytest.approx(1.0)
+    # code 2 predicts P(>=2) = 0.25 and delivered once of twice
+    assert buckets["0.1-0.3"]["predicted_mean"] == pytest.approx(0.25)
+    assert buckets["0.1-0.3"]["observed_rate"] == pytest.approx(0.5)
+
+
+def test_forecast_vs_actual_without_outcomes_is_an_explicit_empty_state(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = [
+        {**row, "points_under_rules_2026_27": None}
+        for row in _source_tables()["fact_player_fixture_actual"]
+    ]
+    _rewrite_table(export_dir, "fact_player_fixture_actual", rows)
+    result = build_dashboard_read_models(export_dir).forecast_vs_actual
+    assert result == {"has_outcomes": False, "runs": []}
+
+
+def test_discrete_crps_matches_hand_computed_cases() -> None:
+    from fpl.publish.dashboard_json import _discrete_crps
+
+    # A point mass at 0 against an observation of 2 charges exactly 2.
+    assert _discrete_crps([1.0], 2.0) == pytest.approx(2.0)
+    # Uniform on {0, 1} against 1: E|X-y| = 0.5, spread term 0.5*E|X-X'| = 0.25.
+    assert _discrete_crps([0.5, 0.5], 1.0) == pytest.approx(0.25)
+    # Negative mass is unmeasured, never a score.
+    assert _discrete_crps([-0.1, 1.1], 1.0) is None
+
+
 def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
     export_dir = _build_source_export(tmp_path)
     first = render_read_model_files(build_dashboard_read_models(export_dir))
@@ -674,6 +748,7 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
         PLAYERS_FILENAME,
         "next_gw.json",
         "summary.json",
+        "forecast_vs_actual.json",
     }
 
 

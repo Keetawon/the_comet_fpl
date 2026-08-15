@@ -72,7 +72,12 @@ published read-model directory.
   vintage horizon, ownership/availability overlay and flags, and — when two architectures
   are present — the default-vs-diagnostic diff as set overlaps only. Cross-plan EV is never
   compared: it measures the models' calibration against each other, not squad quality.
-- Forecast vs actual, Optimizer audit: stubs, in roadmap order.
+- **Forecast vs actual** (implemented, P1.7e): each recorded vintage scored against its own
+  season's finalised outcomes (points under 2026/27 rules, read-time join at
+  `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a
+  P(≥2 points) calibration table. With no finalised outcomes (the 2026-27 GW1 state) the
+  page shows the framework and says why; unfinalised rows are excluded, never read as zero.
+- Optimizer audit: stub, in roadmap order.
 
 `next_gw.json` needs optimizer plans in the Parquet export: pass each immutable optimizer
 artifact when publishing, e.g. `export_bi --optimizer-plan <plan.json>` (repeatable; each

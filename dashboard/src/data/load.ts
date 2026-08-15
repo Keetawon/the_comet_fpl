@@ -5,6 +5,7 @@
 
 import type {
   DashboardManifest,
+  ForecastVsActualData,
   NextGwPlan,
   PlayerRecord,
   SummaryData,
@@ -73,4 +74,8 @@ export async function loadNextGw(): Promise<{ plans: NextGwPlan[] }> {
 
 export async function loadSummary(): Promise<SummaryData> {
   return fetchJson<SummaryData>("summary.json");
+}
+
+export async function loadForecastVsActual(): Promise<ForecastVsActualData> {
+  return fetchJson<ForecastVsActualData>("forecast_vs_actual.json");
 }

@@ -54,11 +54,13 @@ FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
 SUMMARY_SCHEMA: Final[str] = "fpl.dashboard-summary"
 NEXT_GW_SCHEMA: Final[str] = "fpl.dashboard-next-gw"
+FORECAST_VS_ACTUAL_SCHEMA: Final[str] = "fpl.dashboard-forecast-vs-actual"
 MANIFEST_FILENAME: Final[str] = "manifest.json"
 FIXTURE_MATRIX_FILENAME: Final[str] = "fixture_matrix.json"
 PLAYERS_FILENAME: Final[str] = "players.json"
 SUMMARY_FILENAME: Final[str] = "summary.json"
 NEXT_GW_FILENAME: Final[str] = "next_gw.json"
+FORECAST_VS_ACTUAL_FILENAME: Final[str] = "forecast_vs_actual.json"
 
 # Exactly the tables the read models read.  The source export is contract-complete, so a
 # missing entry means the manifest was not produced by fpl.publish.export.
@@ -74,6 +76,7 @@ _READ_TABLES: Final[tuple[str, ...]] = (
     "fact_player_form",
     "fact_forecast_player_fixture",
     "fact_optimizer_plan",
+    "fact_player_fixture_actual",
 )
 _WINDOW_LABELS: Final[tuple[str, ...]] = ("last_3", "last_5", "last_10", "season_to_date")
 # Which top-level array of each file the manifest row_count counts.  summary.json is a
@@ -83,12 +86,14 @@ _FILE_LIST_KEY: Final[dict[str, str | None]] = {
     PLAYERS_FILENAME: "players",
     NEXT_GW_FILENAME: "plans",
     SUMMARY_FILENAME: None,
+    FORECAST_VS_ACTUAL_FILENAME: "runs",
 }
 _FILE_SCHEMA: Final[dict[str, str]] = {
     FIXTURE_MATRIX_FILENAME: FIXTURE_MATRIX_SCHEMA,
     PLAYERS_FILENAME: PLAYERS_SCHEMA,
     NEXT_GW_FILENAME: NEXT_GW_SCHEMA,
     SUMMARY_FILENAME: SUMMARY_SCHEMA,
+    FORECAST_VS_ACTUAL_FILENAME: FORECAST_VS_ACTUAL_SCHEMA,
 }
 _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
     {
@@ -111,13 +116,14 @@ class DashboardJsonError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class DashboardReadModels:
-    """The derived, publishable content of all four page read models."""
+    """The derived, publishable content of all five page read models."""
 
     runs: tuple[dict[str, Any], ...]
     teams: tuple[dict[str, Any], ...]
     players: tuple[dict[str, Any], ...]
     summary: dict[str, Any]
     next_gw: dict[str, Any]
+    forecast_vs_actual: dict[str, Any]
     ease_index_formula_version: str | None
 
 
@@ -933,6 +939,179 @@ def _build_summary(
     }
 
 
+def _discrete_crps(probabilities: list[float], actual: float) -> float | None:
+    """CRPS of an integer-indexed pmf against an observation, by the double-sum identity.
+
+    Returns None when the pmf is malformed (negative mass, or weights that are not finite);
+    the caller reports such a row as unmeasured rather than inventing a score.
+    """
+    support = list(range(len(probabilities)))
+    if any((not (p >= 0.0)) or p > 1.0 for p in probabilities):
+        return None
+    first = sum(p * abs(x - actual) for x, p in zip(support, probabilities, strict=True))
+    second = 0.0
+    for i, p_i in enumerate(probabilities):
+        for j, p_j in enumerate(probabilities):
+            second += p_i * p_j * abs(i - j)
+    return first - 0.5 * second
+
+
+_CALIBRATION_BUCKETS: Final[tuple[tuple[str, float, float], ...]] = (
+    ("0.0-0.1", 0.0, 0.1),
+    ("0.1-0.3", 0.1, 0.3),
+    ("0.3-0.5", 0.3, 0.5),
+    ("0.5-0.7", 0.5, 0.7),
+    ("0.7-1.0", 0.7, 1.01),
+)
+_CALIBRATION_THRESHOLD: Final[int] = 2
+
+
+def _parse_distribution(raw: object) -> list[float] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise DashboardJsonError(
+            f"forecast distribution must be a JSON string, found {type(raw).__name__}"
+        )
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise DashboardJsonError(f"forecast distribution is not JSON: {exc}") from exc
+    if not isinstance(parsed, list) or not all(
+        isinstance(value, (int, float)) and not isinstance(value, bool) for value in parsed
+    ):
+        raise DashboardJsonError("forecast distribution must be a JSON array of numbers")
+    return [float(value) for value in parsed]
+
+
+def _score_block(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Mean EV / actual / bias / MAE / CRPS over scored rows; None when nothing scored."""
+    if not rows:
+        return {
+            "rows": 0,
+            "mean_ev": None,
+            "mean_actual": None,
+            "bias": None,
+            "mae": None,
+            "crps": None,
+        }
+    count = len(rows)
+    mean_ev = sum(row["ev"] for row in rows) / count
+    mean_actual = sum(row["actual"] for row in rows) / count
+    mae = sum(abs(row["actual"] - row["ev"]) for row in rows) / count
+    crps_values = [row["crps"] for row in rows if row["crps"] is not None]
+    return {
+        "rows": count,
+        "mean_ev": mean_ev,
+        "mean_actual": mean_actual,
+        "bias": mean_actual - mean_ev,
+        "mae": mae,
+        "crps": sum(crps_values) / len(crps_values) if crps_values else None,
+    }
+
+
+def _build_forecast_vs_actual(
+    player_gameweek: pl.DataFrame,
+    player_fixture_actual: pl.DataFrame,
+    runs: pl.DataFrame,
+) -> dict[str, Any]:
+    """forecast_vs_actual.json: each vintage scored against its own season's finalised
+    outcomes, at player-gameweek grain, under the ``points_under_rules_2026_27`` measure.
+
+    The join is read-time only: forecast rows keep their ``run_id``, outcome rows keep
+    none, and they meet on ``(season, gw, code)``. With no finalised outcomes inside any
+    vintage's horizon (the 2026-27 GW1 state), ``has_outcomes`` is false and every block
+    is empty -- the UI shows the framework and says why, never zero-filled numbers.
+    """
+    horizon = {row["run_id"]: row for row in _horizon_projection(runs).iter_rows(named=True)}
+    # Finalised points per (season, gw, code): unmeasured (NULL) points stay out, never 0.
+    actual_points: dict[tuple[str, int, int], float] = {}
+    if player_fixture_actual.height:
+        measured = player_fixture_actual.filter(pl.col("points_under_rules_2026_27").is_not_null())
+        grouped = measured.group_by(["season", "gw", "code"]).agg(
+            pl.col("points_under_rules_2026_27").sum().alias("actual")
+        )
+        for row in grouped.iter_rows(named=True):
+            actual_points[(row["season"], int(row["gw"]), int(row["code"]))] = float(row["actual"])
+
+    scored_by_run: dict[str, list[dict[str, Any]]] = {}
+    for row in player_gameweek.iter_rows(named=True):
+        run = horizon.get(row["run_id"])
+        if run is None:
+            raise DashboardJsonError(
+                f"forecast row references run {row['run_id']} absent from dim_forecast_run"
+            )
+        actual = actual_points.get((row["season"], int(row["gw"]), int(row["code"])))
+        if actual is None or row["expected_points"] is None:
+            continue  # no finalised outcome (yet) for this player-gameweek: unscored, not zero
+        distribution = _parse_distribution(row.get("distribution"))
+        probabilities_ge_threshold = None
+        crps = None
+        if distribution is not None:
+            total = sum(distribution)
+            if total > 0.0:
+                probabilities_ge_threshold = sum(distribution[_CALIBRATION_THRESHOLD:]) / total
+            crps = _discrete_crps(distribution, actual)
+        scored_by_run.setdefault(row["run_id"], []).append(
+            {
+                "gw": int(row["gw"]),
+                "code": int(row["code"]),
+                "position": row["position"],
+                "ev": float(row["expected_points"]),
+                "actual": actual,
+                "p_ge_threshold": probabilities_ge_threshold,
+                "crps": crps,
+            }
+        )
+
+    run_records: list[dict[str, Any]] = []
+    for run_id in sorted(scored_by_run):
+        rows = scored_by_run[run_id]
+        run = horizon[run_id]
+        by_position = []
+        for position in sorted({row["position"] for row in rows}):
+            block = _score_block([row for row in rows if row["position"] == position])
+            by_position.append({"position": position, **block})
+        by_gw = []
+        for gw in sorted({row["gw"] for row in rows}):
+            block = _score_block([row for row in rows if row["gw"] == gw])
+            by_gw.append({"gw": gw, **block})
+        calibration = []
+        for label, low, high in _CALIBRATION_BUCKETS:
+            bucket = [
+                row
+                for row in rows
+                if row["p_ge_threshold"] is not None and low <= row["p_ge_threshold"] < high
+            ]
+            if not bucket:
+                continue
+            calibration.append(
+                {
+                    "bucket": label,
+                    "threshold_points": _CALIBRATION_THRESHOLD,
+                    "rows": len(bucket),
+                    "predicted_mean": sum(row["p_ge_threshold"] for row in bucket) / len(bucket),
+                    "observed_rate": sum(
+                        1.0 for row in bucket if row["actual"] >= _CALIBRATION_THRESHOLD
+                    )
+                    / len(bucket),
+                }
+            )
+        run_records.append(
+            {
+                "run_id": run_id,
+                "season": run["run_season"],
+                "gw_from": run["gw_from"],
+                "gw_to": run["gw_to"],
+                **_score_block(rows),
+                "by_position": by_position,
+                "by_gw": by_gw,
+                "calibration": calibration,
+            }
+        )
+    return {"has_outcomes": bool(run_records), "runs": run_records}
+
+
 def _run_records(runs: pl.DataFrame, manifest: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
     records: list[dict[str, Any]] = []
     for row in runs.sort("run_id").iter_rows(named=True):
@@ -996,12 +1175,18 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["fact_optimizer_plan"],
         ease_version,
     )
+    forecast_vs_actual = _build_forecast_vs_actual(
+        frames["fact_forecast_player_gameweek"],
+        frames["fact_player_fixture_actual"],
+        frames["dim_forecast_run"],
+    )
     return DashboardReadModels(
         runs=runs,
         teams=teams,
         players=players,
         summary=summary,
         next_gw=next_gw,
+        forecast_vs_actual=forecast_vs_actual,
         ease_index_formula_version=ease_version,
     )
 
@@ -1044,6 +1229,14 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
                 "schema": SUMMARY_SCHEMA,
                 "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
                 **models.summary,
+            },
+            indent=2,
+        ),
+        FORECAST_VS_ACTUAL_FILENAME: _canonical_json_bytes(
+            {
+                "schema": FORECAST_VS_ACTUAL_SCHEMA,
+                "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+                **models.forecast_vs_actual,
             },
             indent=2,
         ),
@@ -1157,6 +1350,7 @@ def export_dashboard_json(
                 PLAYERS_FILENAME: len(models.players),
                 NEXT_GW_FILENAME: len(models.next_gw["plans"]),
                 SUMMARY_FILENAME: 1,
+                FORECAST_VS_ACTUAL_FILENAME: len(models.forecast_vs_actual["runs"]),
             }
             for filename, payload in payloads.items():
                 path = staging / filename
@@ -1211,6 +1405,8 @@ __all__ = [
     "DASHBOARD_JSON_SCHEMA_VERSION",
     "FIXTURE_MATRIX_FILENAME",
     "FIXTURE_MATRIX_SCHEMA",
+    "FORECAST_VS_ACTUAL_FILENAME",
+    "FORECAST_VS_ACTUAL_SCHEMA",
     "MANIFEST_FILENAME",
     "NEXT_GW_FILENAME",
     "NEXT_GW_SCHEMA",

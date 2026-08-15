@@ -253,6 +253,48 @@ export interface SummaryData {
   ease_index_formula_version: string | null;
 }
 
+// ---- forecast_vs_actual.json (P1.7e): vintages scored against finalised outcomes ----
+
+export interface ScoreBlock {
+  rows: number;
+  mean_ev: number | null;
+  mean_actual: number | null;
+  bias: number | null;
+  mae: number | null;
+  crps: number | null;
+}
+
+export interface FvaPosition extends ScoreBlock {
+  position: string;
+}
+
+export interface FvaGw extends ScoreBlock {
+  gw: number;
+}
+
+export interface FvaCalibration {
+  bucket: string;
+  threshold_points: number;
+  rows: number;
+  predicted_mean: number;
+  observed_rate: number;
+}
+
+export interface FvaRun extends ScoreBlock {
+  run_id: string;
+  season: string;
+  gw_from: number;
+  gw_to: number;
+  by_position: FvaPosition[];
+  by_gw: FvaGw[];
+  calibration: FvaCalibration[];
+}
+
+export interface ForecastVsActualData {
+  has_outcomes: boolean;
+  runs: FvaRun[];
+}
+
 export interface DashboardManifest {
   schema: string;
   json_schema_version: number;

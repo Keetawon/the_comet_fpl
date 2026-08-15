@@ -1,0 +1,30 @@
+{
+  "json_schema_version": 2,
+  "has_outcomes": true,
+  "runs": [
+    {
+      "run_id": "86a072ade6dd4d56",
+      "season": "2026-27",
+      "gw_from": 1,
+      "gw_to": 2,
+      "rows": 4,
+      "mean_ev": 3.75,
+      "mean_actual": 3.75,
+      "bias": 0.0,
+      "mae": 1.0,
+      "crps": 1.8125,
+      "by_position": [
+        {"position": "GK", "rows": 2, "mean_ev": 5.0, "mean_actual": 6.0, "bias": 1.0, "mae": 1.0, "crps": 2.0},
+        {"position": "MID", "rows": 2, "mean_ev": 2.5, "mean_actual": 1.5, "bias": -1.0, "mae": 1.0, "crps": 1.625}
+      ],
+      "by_gw": [
+        {"gw": 1, "rows": 2, "mean_ev": 3.75, "mean_actual": 3.5, "bias": -0.25, "mae": 0.75, "crps": 1.7},
+        {"gw": 2, "rows": 2, "mean_ev": 3.75, "mean_actual": 4.0, "bias": 0.25, "mae": 1.25, "crps": 1.925}
+      ],
+      "calibration": [
+        {"bucket": "0.1-0.3", "threshold_points": 2, "rows": 2, "predicted_mean": 0.25, "observed_rate": 0.5},
+        {"bucket": "0.7-1.0", "threshold_points": 2, "rows": 2, "predicted_mean": 0.7, "observed_rate": 1.0}
+      ]
+    }
+  ]
+}

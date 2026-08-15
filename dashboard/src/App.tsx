@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ThemeToggle, initTheme } from "@/components/ThemeToggle";
+import { ForecastVsActualPage } from "@/pages/ForecastVsActualPage";
 import { NextGwPage } from "@/pages/NextGwPage";
 import { FixtureMatrixPage } from "@/pages/FixtureMatrixPage";
 import { PlayersPage } from "@/pages/PlayersPage";
@@ -11,10 +12,6 @@ import { StubPage } from "@/pages/StubPage";
 import { SummaryPage } from "@/pages/SummaryPage";
 
 const STUBS: Record<string, { phase: string; description: string }> = {
-  "forecast-vs-actual": {
-    phase: "after outcomes exist",
-    description: "EV versus actual points, bias, calibration, and rank/capture by position.",
-  },
   optimizer: {
     phase: "after GW1",
     description: "Optimizer run provenance, constraints, chosen squad, and transfer path.",
@@ -57,6 +54,8 @@ export default function App() {
             <PlayersPage />
           ) : route === "next-gw" ? (
             <NextGwPage />
+          ) : route === "forecast-vs-actual" ? (
+            <ForecastVsActualPage />
           ) : stub ? (
             <StubPage label={route.replace(/-/g, " ")} phase={stub.phase} description={stub.description} />
           ) : (

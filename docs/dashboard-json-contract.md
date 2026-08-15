@@ -1,10 +1,11 @@
 # Dashboard read-model JSON contract, version 2
 
-Status: implemented by DEV-ROADMAP P1.7a (backend publish layer) and extended by P1.7d with
-the summary and next-gameweek read models. This document is the authoritative prose
-counterpart of `src/fpl/publish/dashboard_json.py`. The static app renders these files and
-nothing else. Version 2 adds `summary.json` and `next_gw.json` to the version-1 file set;
-the version-1 record shapes are unchanged.
+Status: implemented by DEV-ROADMAP P1.7a (backend publish layer) and extended by P1.7d/P1.7e
+with the summary, next-gameweek, and forecast-vs-actual read models. This document is the
+authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The static app
+renders these files and nothing else. Version 2 adds `summary.json`, `next_gw.json`, and
+`forecast_vs_actual.json` to the version-1 file set; the version-1 record shapes are
+unchanged.
 
 ## Boundary and provenance chain
 
@@ -44,7 +45,8 @@ data/
     ├── fixture_matrix.json
     ├── players.json
     ├── next_gw.json
-    └── summary.json
+    ├── summary.json
+    └── forecast_vs_actual.json
 ```
 
 ## Null semantics (hard)
@@ -207,6 +209,24 @@ derives squad/XI overlap and captaincy agreement as set operations. Cross-plan E
 compared anywhere: absolute EV differences between architectures measure the two models'
 calibration against each other, not squad quality (the P0.3 lesson).
 
+## forecast_vs_actual.json — vintages scored against finalised outcomes (P1.7e)
+
+One object per recorded vintage that has at least one scored player-gameweek, plus a
+top-level `has_outcomes` flag. The join is **read-time only**: forecast rows keep their
+`run_id`, outcome rows carry none, and they meet on `(season, gw, code)` — gameweek actuals
+are the sum of `points_under_rules_2026_27` over that gameweek's finalised player-fixture
+rows. Unfinalised (NULL-points) rows are excluded from every sum, never read as zero.
+
+Each run block reports `rows`, `mean_ev`, `mean_actual`, `bias` (actual − EV; positive = the
+model under-predicted), `mae`, and `crps` (mean discrete CRPS computed from the stored
+full-points distribution by the double-sum identity; a malformed pmf scores `crps: null` for
+that row rather than inventing a number), split `by_position` and `by_gw`, plus a
+`calibration` table bucketing predicted `P(points >= 2)` (from the stored distribution)
+against the observed rate. **With no finalised outcomes inside any vintage's horizon — the
+2026-27 GW1 state — `has_outcomes` is false, `runs` is empty, and the UI shows the framework
+with an explicit explanation instead of zero-filled numbers.** Cross-vintage EV differences
+measure calibration, not squad quality; a run is compared only against its own outcomes.
+
 ## summary.json — the landing snapshot (P1.7d)
 
 A single object: the latest recorded run (`max created_at`) with its parsed component modes,
@@ -243,22 +263,23 @@ recorded runs the summary is an explicit null-run object, not an error.
     "fixture_matrix.json": {"row_count": 20, "sha256": "…"},
     "players.json": {"row_count": 581, "sha256": "…"},
     "next_gw.json": {"row_count": 2, "sha256": "…"},
-    "summary.json": {"row_count": 1, "sha256": "…"}
+    "summary.json": {"row_count": 1, "sha256": "…"},
+    "forecast_vs_actual.json": {"row_count": 0, "sha256": "…"}
   },
   "content_sha256": "…"
 }
 ```
 
 `row_count` is the number of objects in the file's top-level array (`plans` for
-next_gw.json); summary.json is a single object, so its row count is 1. `runs` is sorted by
-`run_id` and validated against both the source manifest's `exported_run_ids` and the
-`dim_forecast_run` rows read from the export. Every fixture row must fall inside its run's
-`gw_from..gw_to` horizon and season; anything outside fails closed. A source export that
-mixes ease formula versions also fails closed.
+next_gw.json, `runs` for forecast_vs_actual.json); summary.json is a single object, so its
+row count is 1. `runs` is sorted by `run_id` and validated against both the source
+manifest's `exported_run_ids` and the `dim_forecast_run` rows read from the export. Every
+fixture row must fall inside its run's `gw_from..gw_to` horizon and season; anything outside
+fails closed. A source export that mixes ease formula versions also fails closed.
 
 ## Consumers
 
-The P1.7b/P1.7c/P1.7d static app, any notebook, and any external tool read only these files
-(or the Parquet export). Nothing downstream of the BI boundary queries DuckDB. Read models
-for the forecast-vs-actual / optimizer pages are later additive files under this same
-manifest and schema version bump policy.
+The P1.7b-P1.7e static app, any notebook, and any external tool read only these files
+(or the Parquet export). Nothing downstream of the BI boundary queries DuckDB. The
+optimizer-audit read model is the remaining later additive file under this same manifest and
+schema version bump policy.
