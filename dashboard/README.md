@@ -27,7 +27,8 @@ refused after the generation is staged; the staged generation under
 `.<name>.*.tmp` is complete and can be copied manually. On Linux/CI this does not apply.
 
 `manifest.json` is optional for the app (every record repeats its `run_id`/`as_of`); copy
-it when available. `players.json` is only fetched by the Players page.
+it when available. Each page fetches only its own file(s); `players.json` (the largest) is
+fetched only by the Players page.
 
 ## Run
 
@@ -77,11 +78,16 @@ published read-model directory.
   `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a
   P(≥2 points) calibration table. With no finalised outcomes (the 2026-27 GW1 state) the
   page shows the framework and says why; unfinalised rows are excluded, never read as zero.
-- Optimizer audit: stub, in roadmap order.
+- **Optimizer audit** (implemented, P1.7e): the provenance behind each optimizer decision
+  from `optimizer_audit.json` — Git heads and the clean-worktree guarantee, forecast and
+  squad-rule inputs, solver identity/options/seed/status, the bounded-search policy with its
+  declared optimality scope, the verified squad-rule constraints, the explicit assumptions,
+  and the transfer path with hits (full squad/XI on the Next GW page). Always carries the
+  development-only banner.
 
-`next_gw.json` needs optimizer plans in the Parquet export: pass each immutable optimizer
-artifact when publishing, e.g. `export_bi --optimizer-plan <plan.json>` (repeatable; each
-plan must resolve to a recorded ledger forecast run).
+`next_gw.json` and `optimizer_audit.json` need optimizer plans in the Parquet export: pass
+each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-plan
+<plan.json>` (repeatable; each plan must resolve to a recorded ledger forecast run).
 
 ## Rules the UI must keep
 

@@ -55,12 +55,14 @@ PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
 SUMMARY_SCHEMA: Final[str] = "fpl.dashboard-summary"
 NEXT_GW_SCHEMA: Final[str] = "fpl.dashboard-next-gw"
 FORECAST_VS_ACTUAL_SCHEMA: Final[str] = "fpl.dashboard-forecast-vs-actual"
+OPTIMIZER_AUDIT_SCHEMA: Final[str] = "fpl.dashboard-optimizer-audit"
 MANIFEST_FILENAME: Final[str] = "manifest.json"
 FIXTURE_MATRIX_FILENAME: Final[str] = "fixture_matrix.json"
 PLAYERS_FILENAME: Final[str] = "players.json"
 SUMMARY_FILENAME: Final[str] = "summary.json"
 NEXT_GW_FILENAME: Final[str] = "next_gw.json"
 FORECAST_VS_ACTUAL_FILENAME: Final[str] = "forecast_vs_actual.json"
+OPTIMIZER_AUDIT_FILENAME: Final[str] = "optimizer_audit.json"
 
 # Exactly the tables the read models read.  The source export is contract-complete, so a
 # missing entry means the manifest was not produced by fpl.publish.export.
@@ -77,6 +79,7 @@ _READ_TABLES: Final[tuple[str, ...]] = (
     "fact_forecast_player_fixture",
     "fact_optimizer_plan",
     "fact_player_fixture_actual",
+    "dim_optimizer_run",
 )
 _WINDOW_LABELS: Final[tuple[str, ...]] = ("last_3", "last_5", "last_10", "season_to_date")
 # Which top-level array of each file the manifest row_count counts.  summary.json is a
@@ -87,6 +90,7 @@ _FILE_LIST_KEY: Final[dict[str, str | None]] = {
     NEXT_GW_FILENAME: "plans",
     SUMMARY_FILENAME: None,
     FORECAST_VS_ACTUAL_FILENAME: "runs",
+    OPTIMIZER_AUDIT_FILENAME: "plans",
 }
 _FILE_SCHEMA: Final[dict[str, str]] = {
     FIXTURE_MATRIX_FILENAME: FIXTURE_MATRIX_SCHEMA,
@@ -94,6 +98,7 @@ _FILE_SCHEMA: Final[dict[str, str]] = {
     NEXT_GW_FILENAME: NEXT_GW_SCHEMA,
     SUMMARY_FILENAME: SUMMARY_SCHEMA,
     FORECAST_VS_ACTUAL_FILENAME: FORECAST_VS_ACTUAL_SCHEMA,
+    OPTIMIZER_AUDIT_FILENAME: OPTIMIZER_AUDIT_SCHEMA,
 }
 _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
     {
@@ -116,7 +121,7 @@ class DashboardJsonError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class DashboardReadModels:
-    """The derived, publishable content of all five page read models."""
+    """The derived, publishable content of all six page read models."""
 
     runs: tuple[dict[str, Any], ...]
     teams: tuple[dict[str, Any], ...]
@@ -124,6 +129,7 @@ class DashboardReadModels:
     summary: dict[str, Any]
     next_gw: dict[str, Any]
     forecast_vs_actual: dict[str, Any]
+    optimizer_audit: dict[str, Any]
     ease_index_formula_version: str | None
 
 
@@ -1112,6 +1118,71 @@ def _build_forecast_vs_actual(
     return {"has_outcomes": bool(run_records), "runs": run_records}
 
 
+def _parse_json_column(raw: object, subject: str) -> Any:
+    """Parse one of dim_optimizer_run's deterministic JSON columns, failing closed."""
+    if raw is None:
+        raise DashboardJsonError(f"{subject} is NULL; the optimizer-run dimension is incomplete")
+    if not isinstance(raw, str):
+        raise DashboardJsonError(f"{subject} must be a JSON string, found {type(raw).__name__}")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise DashboardJsonError(f"{subject} is not JSON: {exc}") from exc
+
+
+def _build_optimizer_audit(dim_optimizer_run: pl.DataFrame, runs: pl.DataFrame) -> dict[str, Any]:
+    """optimizer_audit.json: the full provenance behind each optimizer decision -- solver
+    identity and status, Git heads, squad-rule snapshot (the constraints), bounded-search
+    policy, and explicit assumptions.  The squad and transfer path themselves are NOT
+    duplicated here: next_gw.json already carries them, and the audit page reads both."""
+    modes = _component_modes(runs) if dim_optimizer_run.height else {}
+    if dim_optimizer_run.height == 0:
+        return {"plans": []}
+    plans: list[dict[str, Any]] = []
+    for row in dim_optimizer_run.sort("optimizer_run_id").iter_rows(named=True):
+        optimizer_run_id = row["optimizer_run_id"]
+        subject = f"optimizer run {optimizer_run_id}"
+        if row["forecast_run_id"] not in modes:
+            raise DashboardJsonError(
+                f"{subject} references forecast run absent from dim_forecast_run"
+            )
+        plans.append(
+            {
+                "optimizer_run_id": optimizer_run_id,
+                "decision_sha256": row["decision_sha256"],
+                "forecast_run_id": row["forecast_run_id"],
+                "component_modes": modes[row["forecast_run_id"]],
+                "as_of": _iso_or_none(row["as_of"]),
+                "season": row["season"],
+                "gw_from": row["gw_from"],
+                "gw_to": row["gw_to"],
+                "provenance": {
+                    "optimizer_commit_sha": row["optimizer_commit_sha"],
+                    "optimizer_worktree_clean": row["optimizer_worktree_clean"],
+                    "forecast_artifact_sha256": row["forecast_artifact_sha256"],
+                    "forecast_commit_sha": row["forecast_commit_sha"],
+                    "squad_rules_path": row["squad_rules_path"],
+                    "squad_rules_contract_version": row["squad_rules_contract_version"],
+                    "squad_rules_sha256": row["squad_rules_sha256"],
+                },
+                "solver": {
+                    "name": row["solver_name"],
+                    "package": row["solver_package"],
+                    "package_version": row["solver_package_version"],
+                    "binary_version": row["solver_binary_version"],
+                    "options": _parse_json_column(row["solver_options"], f"{subject} options"),
+                    "seed": row["solver_seed"],
+                    "status": row["solver_status"],
+                },
+                "search_policy": _parse_json_column(row["search_policy"], f"{subject} policy"),
+                "rules_snapshot": _parse_json_column(row["rules_snapshot"], f"{subject} rules"),
+                "assumptions": _parse_json_column(row["assumptions"], f"{subject} assumptions"),
+                "status": row["status"],
+            }
+        )
+    return {"plans": plans}
+
+
 def _run_records(runs: pl.DataFrame, manifest: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
     records: list[dict[str, Any]] = []
     for row in runs.sort("run_id").iter_rows(named=True):
@@ -1180,6 +1251,9 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["fact_player_fixture_actual"],
         frames["dim_forecast_run"],
     )
+    optimizer_audit = _build_optimizer_audit(
+        frames["dim_optimizer_run"], frames["dim_forecast_run"]
+    )
     return DashboardReadModels(
         runs=runs,
         teams=teams,
@@ -1187,6 +1261,7 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         summary=summary,
         next_gw=next_gw,
         forecast_vs_actual=forecast_vs_actual,
+        optimizer_audit=optimizer_audit,
         ease_index_formula_version=ease_version,
     )
 
@@ -1237,6 +1312,14 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
                 "schema": FORECAST_VS_ACTUAL_SCHEMA,
                 "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
                 **models.forecast_vs_actual,
+            },
+            indent=2,
+        ),
+        OPTIMIZER_AUDIT_FILENAME: _canonical_json_bytes(
+            {
+                "schema": OPTIMIZER_AUDIT_SCHEMA,
+                "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+                **models.optimizer_audit,
             },
             indent=2,
         ),
@@ -1351,6 +1434,7 @@ def export_dashboard_json(
                 NEXT_GW_FILENAME: len(models.next_gw["plans"]),
                 SUMMARY_FILENAME: 1,
                 FORECAST_VS_ACTUAL_FILENAME: len(models.forecast_vs_actual["runs"]),
+                OPTIMIZER_AUDIT_FILENAME: len(models.optimizer_audit["plans"]),
             }
             for filename, payload in payloads.items():
                 path = staging / filename

@@ -166,6 +166,59 @@ def _player_form_row(gw: int, code: int, window: str, **overrides: Any) -> dict[
     return row
 
 
+def _optimizer_run_row(optimizer_run_id: str, decision: str, *, seed: int = 7) -> dict[str, Any]:
+    """A dim_optimizer_run row mirroring the exporter's run-level provenance."""
+    return {
+        "optimizer_run_id": optimizer_run_id,
+        "decision_sha256": decision,
+        "forecast_run_id": RUN_ID,
+        "as_of": AS_OF,
+        "season": SEASON,
+        "gw_from": 1,
+        "gw_to": 2,
+        "optimizer_commit_sha": "commit-opt",
+        "optimizer_worktree_clean": True,
+        "forecast_artifact_sha256": "f" * 64,
+        "forecast_commit_sha": "commit-forecast",
+        "squad_rules_path": "config/squad_2026_27.yaml",
+        "squad_rules_contract_version": "1.0",
+        "squad_rules_sha256": "r" * 64,
+        "solver_name": "CBC",
+        "solver_package": "pulp",
+        "solver_package_version": "3.0.0",
+        "solver_binary_version": "2.10.3",
+        "solver_options": '["randomSeed 7"]',
+        "solver_seed": seed,
+        "solver_status": "Optimal",
+        "search_method": "bounded deterministic dynamic programme with beam pruning",
+        "optimality_scope": "exact lineups within visited states; path not globally exact",
+        "risk_lambda": 0.0,
+        "search_policy": json.dumps(
+            {
+                "beam_width": 8,
+                "candidate_pool_per_position": 30,
+                "free_transfer_per_gameweek": 1,
+                "hit_cost_points": 4,
+                "risk_lambda": 0.0,
+                "search_method": "bounded deterministic dynamic programme with beam pruning",
+                "transfer_depth": 2,
+            },
+            sort_keys=True,
+        ),
+        "rules_snapshot": json.dumps(
+            {
+                "budget_tenths": 1000,
+                "maximum_per_club": 3,
+                "squad_size": 15,
+                "season": SEASON,
+            },
+            sort_keys=True,
+        ),
+        "assumptions": '["bench points are excluded from the objective"]',
+        "status": "development_only_not_a_validated_production_recommendation",
+    }
+
+
 def _source_tables() -> dict[str, list[dict[str, Any]]]:
     team_fixture = [
         _team_fixture_row(100, 1, 2, 1, True, 2.0, 1.0, 120.0, 120.0, 120.0, 2),
@@ -319,6 +372,10 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
         "fact_forecast_team_fixture": team_fixture,
         "fact_forecast_player_gameweek": player_gameweek,
         "fact_forecast_player_fixture": player_fixture,
+        "dim_optimizer_run": [
+            _optimizer_run_row("opt-1", "dec-1"),
+            _optimizer_run_row("opt-2", "dec-2", seed=11),
+        ],
         # Finalised outcomes at player-fixture grain. Code 2's fixture 101 is unfinalised
         # (NULL points) and must stay out of every gameweek sum, never read as 0.
         "fact_player_fixture_actual": [
@@ -738,6 +795,45 @@ def test_discrete_crps_matches_hand_computed_cases() -> None:
     assert _discrete_crps([-0.1, 1.1], 1.0) is None
 
 
+def test_optimizer_audit_carries_full_provenance(tmp_path: Path) -> None:
+    models = build_dashboard_read_models(_build_source_export(tmp_path))
+    plans = models.optimizer_audit["plans"]
+    assert [plan["optimizer_run_id"] for plan in plans] == ["opt-1", "opt-2"]
+
+    plan = plans[0]
+    assert plan["decision_sha256"] == "dec-1"
+    assert plan["component_modes"]["attacking_mode"] == "v3"  # from its forecast run
+    assert plan["provenance"]["optimizer_commit_sha"] == "commit-opt"
+    assert plan["provenance"]["optimizer_worktree_clean"] is True
+    assert plan["provenance"]["squad_rules_contract_version"] == "1.0"
+    assert plan["solver"]["name"] == "CBC"
+    assert plan["solver"]["status"] == "Optimal"
+    assert plan["solver"]["options"] == ["randomSeed 7"]
+    assert plan["solver"]["seed"] == 7
+    assert plan["search_policy"]["candidate_pool_per_position"] == 30
+    assert plan["search_policy"]["risk_lambda"] == 0.0
+    assert plan["rules_snapshot"]["squad_size"] == 15
+    assert plan["assumptions"] == ["bench points are excluded from the objective"]
+    assert plan["status"] == "development_only_not_a_validated_production_recommendation"
+    assert plans[1]["solver"]["seed"] == 11
+
+
+def test_optimizer_audit_without_plans_is_empty_not_an_error(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _rewrite_table(export_dir, "dim_optimizer_run", [])
+    result = build_dashboard_read_models(export_dir).optimizer_audit
+    assert result == {"plans": []}
+
+
+def test_optimizer_audit_fails_closed_on_malformed_json_column(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["dim_optimizer_run"]
+    rows[0] = {**rows[0], "search_policy": "not json"}
+    _rewrite_table(export_dir, "dim_optimizer_run", rows)
+    with pytest.raises(DashboardJsonError, match="not JSON"):
+        build_dashboard_read_models(export_dir)
+
+
 def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
     export_dir = _build_source_export(tmp_path)
     first = render_read_model_files(build_dashboard_read_models(export_dir))
@@ -749,6 +845,7 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
         "next_gw.json",
         "summary.json",
         "forecast_vs_actual.json",
+        "optimizer_audit.json",
     }
 
 

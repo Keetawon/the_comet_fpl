@@ -7,6 +7,7 @@ import type {
   DashboardManifest,
   ForecastVsActualData,
   NextGwPlan,
+  OptimizerAuditData,
   PlayerRecord,
   SummaryData,
   TeamRecord,
@@ -78,4 +79,8 @@ export async function loadSummary(): Promise<SummaryData> {
 
 export async function loadForecastVsActual(): Promise<ForecastVsActualData> {
   return fetchJson<ForecastVsActualData>("forecast_vs_actual.json");
+}
+
+export async function loadOptimizerAudit(): Promise<OptimizerAuditData> {
+  return fetchJson<OptimizerAuditData>("optimizer_audit.json");
 }

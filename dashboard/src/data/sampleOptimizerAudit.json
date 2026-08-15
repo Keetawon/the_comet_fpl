@@ -1,0 +1,76 @@
+{
+  "json_schema_version": 2,
+  "plans": [
+    {
+      "optimizer_run_id": "opt-default",
+      "decision_sha256": "dec-default-0000",
+      "forecast_run_id": "run-a",
+      "component_modes": {
+        "appearance_mode": "seasonal",
+        "assists_mode": "coupled",
+        "attacking_mode": "v3",
+        "share_signal_kind": "expected_goals"
+      },
+      "as_of": "2026-08-21T17:30:00+00:00",
+      "season": "2026-27",
+      "gw_from": 1,
+      "gw_to": 5,
+      "provenance": {
+        "optimizer_commit_sha": "8b12b81e0000000000000000000000000000000",
+        "optimizer_worktree_clean": true,
+        "forecast_artifact_sha256": "efc4df910000000000000000000000000000000000000000000000000000000",
+        "forecast_commit_sha": "53f1ac9000000000000000000000000000000000",
+        "squad_rules_path": "config/squad_2026_27.yaml",
+        "squad_rules_contract_version": "1.0",
+        "squad_rules_sha256": "6065e10000000000000000000000000000000000000000000000000000000000"
+      },
+      "solver": {
+        "name": "CBC",
+        "package": "pulp",
+        "package_version": "3.0.0",
+        "binary_version": "2.10.3",
+        "options": ["randomSeed 0", "ratioGap 0"],
+        "seed": 0,
+        "status": "Optimal"
+      },
+      "search_policy": {
+        "candidate_pool_per_position": 44,
+        "transfer_depth": 2,
+        "transition_limit_per_state": 40,
+        "beam_width": 8,
+        "free_transfer_per_gameweek": 1,
+        "free_transfer_bank_cap": 2,
+        "hit_cost_points": 4,
+        "maximum_transfers_per_gameweek": 2,
+        "risk_lambda": 0.0,
+        "search_method": "bounded deterministic dynamic programme with beam pruning",
+        "optimality_scope": "exact lineups within visited states; transfer path is not globally exact"
+      },
+      "rules_snapshot": {
+        "contract_version": "1.0",
+        "season": "2026-27",
+        "squad_size": 15,
+        "budget_tenths": 1000,
+        "maximum_per_club": 3,
+        "positions": [
+          {"position": "GK", "squad": 2, "minimum_starters": 1, "maximum_starters": 1},
+          {"position": "DEF", "squad": 5, "minimum_starters": 3, "maximum_starters": 5},
+          {"position": "MID", "squad": 5, "minimum_starters": 2, "maximum_starters": 5},
+          {"position": "FWD", "squad": 3, "minimum_starters": 1, "maximum_starters": 3}
+        ],
+        "lineup_starters": 11,
+        "captain_multiplier": 2,
+        "goalkeeper_bench_slots": 1,
+        "outfield_bench_slots": 3
+      },
+      "assumptions": [
+        "bench points and autosub probabilities are excluded from the objective",
+        "availability is a reported overlay valid for GW1 only",
+        "every gameweek uses the deadline-known now_cost; future price changes are not modelled",
+        "FPL selling-value and purchase-price profit rules are not modelled",
+        "the transfer path is optimal only within the configured bounds"
+      ],
+      "status": "development_only_not_a_validated_production_recommendation"
+    }
+  ]
+}

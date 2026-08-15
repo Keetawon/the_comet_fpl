@@ -112,6 +112,21 @@ time, and schedules are themselves versioned by `known_at` upstream.
 
 One gameweek. **Never assume 1..38** — 2022-23 has no GW7. Iterate observed gameweeks.
 
+### `dim_optimizer_run` — grain `(optimizer_run_id)` (P1.7e)
+
+One row per optimizer decision artifact explicitly passed to the export (`--optimizer-plan`;
+a database alone contributes no rows — no plans in, no rows published). Carries the run-level
+provenance `fact_optimizer_plan` deliberately does not repeat at player grain: both Git
+commits (optimizer and forecast) with the clean-worktree guarantee, the forecast artifact
+SHA-256, the squad-rule path/contract version/SHA-256, the full solver identity (name,
+package + binary versions, deterministic options, seed, status), the search method and
+declared optimality scope, risk lambda, and three deterministic JSON columns — the complete
+bounded-search `search_policy`, the verified `rules_snapshot` (the constraints), and the
+`assumptions` list. Joins many-to-one to `dim_forecast_run` on `forecast_run_id`: one vintage
+can back several plans (default and diagnostic architectures), never the reverse. Sourced and
+declared in the same change, so it was never in `NOT_YET_SOURCED`; the contract stays at v1
+(an additive table, exactly as `fact_team_form` was added).
+
 ## Facts
 
 ### `fact_forecast_player_gameweek` — grain `(run_id, season, gw, code)`

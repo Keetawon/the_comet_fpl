@@ -566,6 +566,23 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     assert optimizer.num_rows == 15
     assert set(optimizer.column("forecast_run_id").to_pylist()) == {run_id}
     assert optimizer.column("transferred_out").to_pylist() == [False] * 15
+    # the run dimension carries the full decision provenance, one row per artifact
+    dim = pq.read_table(output / "dim_optimizer_run.parquet")
+    assert dim.num_rows == 1
+    dim_row = {name: dim.column(name)[0].as_py() for name in dim.column_names}
+    assert dim_row["forecast_run_id"] == run_id
+    assert dim_row["optimizer_commit_sha"] == "optimizer-commit"
+    assert dim_row["optimizer_worktree_clean"] is True
+    assert dim_row["squad_rules_contract_version"] == "synthetic-1"
+    assert dim_row["solver_name"] == "synthetic"
+    assert dim_row["solver_status"] == "Optimal"
+    assert dim_row["risk_lambda"] == 0.0
+    assert dim_row["search_method"] == "synthetic"
+    assert json.loads(dim_row["search_policy"])["candidate_pool_per_position"] == 15
+    assert json.loads(dim_row["rules_snapshot"])["squad_size"] == 15
+    assert json.loads(dim_row["assumptions"]) == ["synthetic P1.4 decision"]
+    assert json.loads(dim_row["solver_options"]) == []
+    assert dim_row["status"] == "development_only_not_a_validated_production_recommendation"
     team_form = pq.read_table(output / "fact_team_form.parquet")
     assert team_form.column("team_code").to_pylist() == [101]
     assert team_form.column("matches_played").to_pylist() == [1]
@@ -691,6 +708,7 @@ def test_zero_recorded_runs_is_a_complete_export(tmp_path: Path) -> None:
         "fact_forecast_player_fixture",
         "fact_forecast_team_fixture",
         "fact_optimizer_plan",
+        "dim_optimizer_run",
     ):
         assert checked["tables"][table_name]["row_count"] == 0
 

@@ -1110,9 +1110,9 @@ def _forecast_run_for_plan(
     return run_id, as_of
 
 
-def _optimizer_plan_records(
+def _load_optimizer_artifacts(
     con: duckdb.DuckDBPyConnection, paths: Sequence[Path]
-) -> tuple[dict[str, object], ...]:
+) -> list[tuple[OptimizerPlanArtifact, Path, str, datetime]]:
     artifacts: list[tuple[OptimizerPlanArtifact, Path, str, datetime]] = []
     seen_run_ids: set[str] = set()
     for raw_path in paths:
@@ -1128,9 +1128,64 @@ def _optimizer_plan_records(
         seen_run_ids.add(artifact.run_id)
         forecast_run_id, as_of = _forecast_run_for_plan(con, artifact, path)
         artifacts.append((artifact, path, forecast_run_id, as_of))
+    return sorted(artifacts, key=lambda item: item[0].run_id)
 
+
+def _optimizer_run_records(
+    artifacts: Sequence[tuple[OptimizerPlanArtifact, Path, str, datetime]],
+) -> tuple[dict[str, object], ...]:
+    """Run-level provenance for dim_optimizer_run: one row per decision artifact, carrying
+    the solver identity, search policy, rules snapshot, and assumptions verbatim (the JSON
+    columns deterministic with sorted keys)."""
     records: list[dict[str, object]] = []
-    for artifact, _, forecast_run_id, as_of in sorted(artifacts, key=lambda item: item[0].run_id):
+    for artifact, _, forecast_run_id, as_of in artifacts:
+        provenance = artifact.provenance
+        records.append(
+            {
+                "optimizer_run_id": artifact.run_id,
+                "decision_sha256": artifact.decision_sha256,
+                "forecast_run_id": forecast_run_id,
+                "as_of": as_of,
+                "season": provenance.forecast.season,
+                "gw_from": provenance.forecast.gw_from,
+                "gw_to": provenance.forecast.gw_to,
+                "optimizer_commit_sha": provenance.optimizer_commit_sha,
+                "optimizer_worktree_clean": provenance.optimizer_worktree_clean,
+                "forecast_artifact_sha256": provenance.forecast.sha256,
+                "forecast_commit_sha": provenance.forecast.commit_sha,
+                "squad_rules_path": provenance.squad_rules.path,
+                "squad_rules_contract_version": provenance.squad_rules.contract_version,
+                "squad_rules_sha256": provenance.squad_rules.sha256,
+                "solver_name": artifact.solver.name,
+                "solver_package": artifact.solver.package,
+                "solver_package_version": artifact.solver.package_version,
+                "solver_binary_version": artifact.solver.binary_version,
+                "solver_options": _canonical_json_bytes(list(artifact.solver.options)).decode(
+                    "utf-8"
+                ),
+                "solver_seed": artifact.solver.seed,
+                "solver_status": artifact.solver.status,
+                "search_method": artifact.search_policy.search_method,
+                "optimality_scope": artifact.search_policy.optimality_scope,
+                "risk_lambda": artifact.search_policy.risk_lambda,
+                "search_policy": _canonical_json_bytes(artifact.search_policy.model_dump()).decode(
+                    "utf-8"
+                ),
+                "rules_snapshot": _canonical_json_bytes(artifact.rules.model_dump()).decode(
+                    "utf-8"
+                ),
+                "assumptions": _canonical_json_bytes(list(artifact.assumptions)).decode("utf-8"),
+                "status": artifact.status,
+            }
+        )
+    return tuple(records)
+
+
+def _optimizer_plan_records(
+    artifacts: Sequence[tuple[OptimizerPlanArtifact, Path, str, datetime]],
+) -> tuple[dict[str, object], ...]:
+    records: list[dict[str, object]] = []
+    for artifact, _, forecast_run_id, as_of in artifacts:
         for week in artifact.plan.weeks:
             starter_codes = {player.code for player in week.starting_xi}
             bench_order = {
@@ -1549,16 +1604,23 @@ def export_bi(
                         "optimizer plans require a recorded forecast ledger run, but this "
                         "database has no ledger schema or recorded runs"
                     )
-                optimizer_records = _optimizer_plan_records(con, optimizer_plan_paths)
+                optimizer_artifacts = _load_optimizer_artifacts(con, optimizer_plan_paths)
+                optimizer_records = _optimizer_plan_records(optimizer_artifacts)
+                optimizer_runs = _optimizer_run_records(optimizer_artifacts)
                 queries = _source_queries(ledger_present)
 
+                injected: Mapping[str, tuple[dict[str, object], ...]] = {
+                    "fact_optimizer_plan": optimizer_records,
+                    "dim_optimizer_run": optimizer_runs,
+                }
                 table_exports: dict[str, TableExport] = {}
                 expected_null_counts: dict[str, dict[str, int]] = {}
                 for table in SEMANTIC_CONTRACT_V1.tables:
-                    if table.name == "fact_optimizer_plan":
+                    if table.name in injected:
+                        rows = injected[table.name]
                         frame = (
                             pa.Table.from_pylist(
-                                list(optimizer_records),
+                                list(rows),
                                 schema=pa.schema(
                                     [
                                         pa.field(column.name, _arrow_type(column))
@@ -1566,7 +1628,7 @@ def export_bi(
                                     ]
                                 ),
                             )
-                            if optimizer_records
+                            if rows
                             else _empty_table(table)
                         )
                     else:

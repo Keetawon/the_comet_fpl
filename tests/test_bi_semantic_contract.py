@@ -53,6 +53,7 @@ def test_contract_publishes_the_expected_tables() -> None:
         "dim_team_season",
         "dim_fixture",
         "dim_gameweek",
+        "dim_optimizer_run",
         # facts
         "fact_forecast_player_gameweek",
         "fact_forecast_player_fixture",

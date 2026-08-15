@@ -536,6 +536,31 @@ tests (player chip semantics: xP headline vs colour metric, FDR source, NULL→n
 xP; page smoke incl. expandable primitives and overlay labelling). Dev read models were
 regenerated from the recorded vintage so the new fields carry real data.
 
+**P1.7e Forecast-vs-actual + Optimizer-audit pages (2026-08-16): implemented.** Two read
+models ship. `forecast_vs_actual.json` scores each recorded vintage against its own season's
+finalised outcomes (points under 2026/27 rules) via a read-time join at `(season, gw, code)`:
+rows, mean EV/actual, bias, MAE, and CRPS (double-sum discrete CRPS from the stored
+full-points distribution; a malformed pmf scores null, never an invented number), split by
+position and gameweek, plus a P(≥2 points) calibration table. Unfinalised outcome rows are
+excluded from every sum. **With no finalised outcomes inside any vintage's horizon — the
+2026-27 GW1 state — `has_outcomes` is false and the page shows the framework with an explicit
+explanation, never zero-filled numbers**; no historical vintage is recorded, so there is
+nothing to score against yet. `optimizer_audit.json` exposes the full provenance behind each
+optimizer decision; to carry it across the BI boundary the semantic contract gains an
+additive `dim_optimizer_run` (grain `optimizer_run_id`, sourced only from the explicit
+optimizer-artifact export inputs — no plans passed, no rows published — joining
+many-to-one to `dim_forecast_run`; contract stays at v1 like every additive table so far)
+with both Git commits, forecast artifact SHA, squad-rule path/version/SHA, full solver
+identity/options/seed/status, the bounded-search policy, the rules snapshot, the assumptions,
+and the development-only status as three deterministic JSON columns plus scalars. The audit
+page renders provenance, solver, policy with its declared optimality scope, constraints,
+assumptions, and the transfer path with hits; the squad/XI themselves are not duplicated —
+the page reads `next_gw.json`. The app shell now routes all six pages with no stubs. Dev
+data: the dev ledger carries a diagnostic vintage (run `407668b6…`) beside the default
+(`86a072ad…`), and two dev-only optimizer plans (default `7ce5b0c8…`, diagnostic
+`90683dfc…`, both `risk_lambda=0`, clean worktree) feed the export, so the Next-GW diff and
+the audit page render real plans.
+
 Build only after the export contract and its tests pass. Minimum pages:
 
 1. **GW1 decision:** squad, XI, captain/vice, bench, EV, ownership, availability, flags, and

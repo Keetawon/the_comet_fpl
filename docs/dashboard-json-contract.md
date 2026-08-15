@@ -1,11 +1,11 @@
 # Dashboard read-model JSON contract, version 2
 
 Status: implemented by DEV-ROADMAP P1.7a (backend publish layer) and extended by P1.7d/P1.7e
-with the summary, next-gameweek, and forecast-vs-actual read models. This document is the
-authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The static app
-renders these files and nothing else. Version 2 adds `summary.json`, `next_gw.json`, and
-`forecast_vs_actual.json` to the version-1 file set; the version-1 record shapes are
-unchanged.
+with the summary, next-gameweek, forecast-vs-actual, and optimizer-audit read models. This
+document is the authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The
+static app renders these files and nothing else. Version 2 adds `summary.json`,
+`next_gw.json`, `forecast_vs_actual.json`, and `optimizer_audit.json` to the version-1 file
+set; the version-1 record shapes are unchanged.
 
 ## Boundary and provenance chain
 
@@ -46,7 +46,8 @@ data/
     ├── players.json
     ├── next_gw.json
     ├── summary.json
-    └── forecast_vs_actual.json
+    ├── forecast_vs_actual.json
+    └── optimizer_audit.json
 ```
 
 ## Null semantics (hard)
@@ -238,6 +239,21 @@ such), the three easiest and hardest next-GW fixtures by directed ease with offi
 beside (never blended), the optimizer plans present, and the ease formula version. With no
 recorded runs the summary is an explicit null-run object, not an error.
 
+## optimizer_audit.json — one object per optimizer plan (P1.7e)
+
+The population is every row of the source export's `dim_optimizer_run` (itself sourced only
+from optimizer decision artifacts passed explicitly to the export). Each plan object carries
+the run's full provenance — both Git commits with the clean-worktree guarantee, forecast
+artifact SHA-256, squad-rule path/contract version/SHA-256 — the solver identity (name,
+package + binary versions, deterministic options, seed, status), the parsed bounded-search
+`search_policy`, the parsed `rules_snapshot` (the constraints the plan obeyed), the explicit
+`assumptions` list, and the development-only `status`. `component_modes` from the plan's
+forecast run labels which architecture produced it.
+
+The three JSON columns are parsed at emit time and fail closed on malformed content. **The
+squad, XI, and transfer path are not duplicated here** — `next_gw.json` already carries them,
+and the audit page reads both files.
+
 ## Read-model manifest
 
 ```json
@@ -264,22 +280,24 @@ recorded runs the summary is an explicit null-run object, not an error.
     "players.json": {"row_count": 581, "sha256": "…"},
     "next_gw.json": {"row_count": 2, "sha256": "…"},
     "summary.json": {"row_count": 1, "sha256": "…"},
-    "forecast_vs_actual.json": {"row_count": 0, "sha256": "…"}
+    "forecast_vs_actual.json": {"row_count": 0, "sha256": "…"},
+    "optimizer_audit.json": {"row_count": 2, "sha256": "…"}
   },
   "content_sha256": "…"
 }
 ```
 
 `row_count` is the number of objects in the file's top-level array (`plans` for
-next_gw.json, `runs` for forecast_vs_actual.json); summary.json is a single object, so its
-row count is 1. `runs` is sorted by `run_id` and validated against both the source
-manifest's `exported_run_ids` and the `dim_forecast_run` rows read from the export. Every
-fixture row must fall inside its run's `gw_from..gw_to` horizon and season; anything outside
-fails closed. A source export that mixes ease formula versions also fails closed.
+next_gw.json and optimizer_audit.json, `runs` for forecast_vs_actual.json); summary.json is
+a single object, so its row count is 1. `runs` is sorted by `run_id` and validated against
+both the source manifest's `exported_run_ids` and the `dim_forecast_run` rows read from the
+export. Every fixture row must fall inside its run's `gw_from..gw_to` horizon and season;
+anything outside fails closed. A source export that mixes ease formula versions also fails
+closed.
 
 ## Consumers
 
 The P1.7b-P1.7e static app, any notebook, and any external tool read only these files
-(or the Parquet export). Nothing downstream of the BI boundary queries DuckDB. The
-optimizer-audit read model is the remaining later additive file under this same manifest and
-schema version bump policy.
+(or the Parquet export). Nothing downstream of the BI boundary queries DuckDB. All six
+roadmap pages now have read models; later pages are additive files under this same manifest
+and schema version bump policy.

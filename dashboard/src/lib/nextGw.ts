@@ -12,6 +12,11 @@ export interface ComponentModes {
   [key: string]: string | null | undefined;
 }
 
+/** Anything plan-shaped that carries component modes (next-GW plans and audit plans). */
+export interface ModeCarrier {
+  component_modes: ComponentModes | null;
+}
+
 /** True when the plan's forecast ran the frozen default architecture. */
 export function isDefaultArchitecture(modes: ComponentModes | null): boolean {
   return modes?.attacking_mode === "v3" && modes?.assists_mode === "coupled";
@@ -26,7 +31,7 @@ export function planLabel(modes: ComponentModes | null): string {
 }
 
 /** The plan the page opens on: the default architecture if present, else the first. */
-export function defaultPlan(plans: NextGwPlan[]): NextGwPlan | null {
+export function defaultPlan<T extends ModeCarrier>(plans: T[]): T | null {
   return plans.find((p) => isDefaultArchitecture(p.component_modes)) ?? plans[0] ?? null;
 }
 

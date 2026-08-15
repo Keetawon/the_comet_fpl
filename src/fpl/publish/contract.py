@@ -1070,6 +1070,77 @@ FACT_OPTIMIZER_PLAN = Table(
 )
 
 
+DIM_OPTIMIZER_RUN = Table(
+    name="dim_optimizer_run",
+    role="dimension",
+    subject="One immutable optimizer decision run and the complete provenance that produced it.",
+    grain=("optimizer_run_id",),
+    grain_note=(
+        "One row per optimizer decision artifact explicitly included in the export. The run "
+        "identity binds what produced the decision; decision_sha256 binds what was decided."
+    ),
+    source_owner="fpl.artifacts.optimizer_plan (explicit export inputs)",
+    columns=(
+        _key("optimizer_run_id", "string", "Deterministic optimizer run identity."),
+        _key("decision_sha256", "string", "Hash binding the complete decision content."),
+        _key("forecast_run_id", "string", "Ledger vintage the plan was optimised from."),
+        _key("as_of", "timestamp", "Knowledge time inherited from that vintage."),
+        _key("season", "string", "Season."),
+        _key("gw_from", "int", "First planned gameweek."),
+        _key("gw_to", "int", "Last planned gameweek."),
+        _key("optimizer_commit_sha", "string", "Git HEAD that produced the plan."),
+        _key("optimizer_worktree_clean", "bool", "The plan refused a dirty worktree; always true."),
+        _key("forecast_artifact_sha256", "string", "SHA-256 of the input forecast JSONL artifact."),
+        _key("forecast_commit_sha", "string", "Git HEAD that produced the input forecast."),
+        _key("squad_rules_path", "string", "Squad-rule configuration file this plan obeyed."),
+        _key("squad_rules_contract_version", "string", "Contract version of the squad rules."),
+        _key("squad_rules_sha256", "string", "SHA-256 of the squad-rule configuration file."),
+        _key("solver_name", "string", "Solver name."),
+        _key("solver_package", "string", "Solver package (e.g. the modelling library)."),
+        _key("solver_package_version", "string", "Solver package version."),
+        _key("solver_binary_version", "string", "Solver binary version."),
+        _key("solver_options", "string", "JSON array of the solver's deterministic options."),
+        _key("solver_seed", "int", "Deterministic seed."),
+        _key("solver_status", "string", "Solver termination status."),
+        _key("search_method", "string", "Declared search method."),
+        _key("optimality_scope", "string", "Declared optimality scope of the search."),
+        _key("risk_lambda", "float", "Risk-aversion lambda; 0.0 is pure EV."),
+        _key(
+            "search_policy",
+            "string",
+            "JSON: the complete bounded-search policy (pool, depth, transitions, beam, free "
+            "transfers, hit cost, transfer caps).",
+        ),
+        _key(
+            "rules_snapshot",
+            "string",
+            "JSON: the verified squad-rule snapshot (squad size, budget, club cap, position "
+            "rules, lineup size, captain multiplier, bench slots).",
+        ),
+        _key("assumptions", "string", "JSON array of the plan's explicit modelling assumptions."),
+        _key(
+            "status",
+            "string",
+            "Explicit development-only status; never a validated production recommendation.",
+        ),
+    ),
+    joins=(
+        Join(
+            to_table="dim_forecast_run",
+            on=(("forecast_run_id", "run_id"),),
+            cardinality="many_to_one",
+        ),
+    ),
+    notes=(
+        "Sourced only from optimizer decision artifacts passed explicitly to the export; a "
+        "database alone contributes no optimizer rows. No plans passed, no rows published.",
+        "The three JSON columns are deterministic (sorted keys) so identical decisions emit "
+        "byte-identical values.",
+        "The join to dim_forecast_run is many_to_one on forecast_run_id: a vintage can back "
+        "several plans (default and diagnostic architectures), never the reverse.",
+    ),
+)
+
 SEMANTIC_CONTRACT_V1 = SemanticContract(
     version=SEMANTIC_CONTRACT_VERSION,
     tables=(
@@ -1088,6 +1159,7 @@ SEMANTIC_CONTRACT_V1 = SemanticContract(
         FACT_PLAYER_FORM,
         FACT_TEAM_FORM,
         FACT_OPTIMIZER_PLAN,
+        DIM_OPTIMIZER_RUN,
     ),
 )
 

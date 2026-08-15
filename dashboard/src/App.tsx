@@ -1,24 +1,26 @@
-// App shell: sidebar navigation over a tiny hash route (no router dependency). Only the
-// Fixture matrix page is implemented in P1.7b; the rest are labelled stubs.
+// App shell: sidebar navigation over a tiny hash route (no router dependency). All six
+// roadmap pages are implemented; an unknown hash falls back to the Summary landing page.
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ThemeToggle, initTheme } from "@/components/ThemeToggle";
 import { ForecastVsActualPage } from "@/pages/ForecastVsActualPage";
 import { NextGwPage } from "@/pages/NextGwPage";
+import { OptimizerAuditPage } from "@/pages/OptimizerAuditPage";
 import { FixtureMatrixPage } from "@/pages/FixtureMatrixPage";
 import { PlayersPage } from "@/pages/PlayersPage";
-import { StubPage } from "@/pages/StubPage";
 import { SummaryPage } from "@/pages/SummaryPage";
 
-const STUBS: Record<string, { phase: string; description: string }> = {
-  optimizer: {
-    phase: "after GW1",
-    description: "Optimizer run provenance, constraints, chosen squad, and transfer path.",
-  },
-};
-
 const DEFAULT_ROUTE = "summary";
+
+const PAGES: Record<string, React.ComponentType> = {
+  summary: SummaryPage,
+  fixtures: FixtureMatrixPage,
+  players: PlayersPage,
+  "next-gw": NextGwPage,
+  "forecast-vs-actual": ForecastVsActualPage,
+  optimizer: OptimizerAuditPage,
+};
 
 function useHashRoute(): [string, (id: string) => void] {
   const [route, setRoute] = useState(() => window.location.hash.slice(1) || DEFAULT_ROUTE);
@@ -36,35 +38,17 @@ function useHashRoute(): [string, (id: string) => void] {
 export default function App() {
   useEffect(() => initTheme(), []);
   const [route, navigate] = useHashRoute();
-  const stub = STUBS[route];
+  const Page = PAGES[route] ?? SummaryPage;
 
   return (
     <div className="flex h-screen">
-      <Sidebar active={route} onNavigate={navigate} />
+      <Sidebar active={route in PAGES ? route : DEFAULT_ROUTE} onNavigate={navigate} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-end border-b px-4 py-2">
           <ThemeToggle />
         </header>
         <main className="min-h-0 flex-1 overflow-auto">
-          {route === "summary" ? (
-            <SummaryPage />
-          ) : route === "fixtures" ? (
-            <FixtureMatrixPage />
-          ) : route === "players" ? (
-            <PlayersPage />
-          ) : route === "next-gw" ? (
-            <NextGwPage />
-          ) : route === "forecast-vs-actual" ? (
-            <ForecastVsActualPage />
-          ) : stub ? (
-            <StubPage label={route.replace(/-/g, " ")} phase={stub.phase} description={stub.description} />
-          ) : (
-            <StubPage
-              label="Fixture matrix"
-              phase="redirect"
-              description="Unknown page; use the sidebar."
-            />
-          )}
+          <Page />
         </main>
       </div>
     </div>

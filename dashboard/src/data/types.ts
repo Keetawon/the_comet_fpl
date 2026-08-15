@@ -295,6 +295,85 @@ export interface ForecastVsActualData {
   runs: FvaRun[];
 }
 
+// ---- optimizer_audit.json (P1.7e): provenance behind each optimizer decision ----
+
+export interface AuditProvenance {
+  optimizer_commit_sha: string;
+  optimizer_worktree_clean: boolean;
+  forecast_artifact_sha256: string;
+  forecast_commit_sha: string;
+  squad_rules_path: string;
+  squad_rules_contract_version: string;
+  squad_rules_sha256: string;
+}
+
+export interface AuditSolver {
+  name: string;
+  package: string;
+  package_version: string;
+  binary_version: string;
+  options: string[];
+  seed: number;
+  status: string;
+}
+
+export interface SearchPolicy {
+  candidate_pool_per_position: number;
+  transfer_depth: number;
+  transition_limit_per_state: number;
+  beam_width: number;
+  free_transfer_per_gameweek: number;
+  free_transfer_bank_cap: number;
+  hit_cost_points: number;
+  maximum_transfers_per_gameweek: number;
+  risk_lambda: number;
+  search_method: string;
+  optimality_scope: string;
+  [key: string]: unknown;
+}
+
+export interface RulesPosition {
+  position: string;
+  squad: number;
+  minimum_starters: number;
+  maximum_starters: number;
+}
+
+export interface RulesSnapshot {
+  contract_version: string;
+  season: string;
+  squad_size: number;
+  budget_tenths: number;
+  maximum_per_club: number;
+  positions: RulesPosition[];
+  lineup_starters: number;
+  captain_multiplier: number;
+  goalkeeper_bench_slots: number;
+  outfield_bench_slots: number;
+  [key: string]: unknown;
+}
+
+export interface AuditPlan {
+  optimizer_run_id: string;
+  decision_sha256: string;
+  forecast_run_id: string;
+  component_modes: ComponentModes | null;
+  as_of: string | null;
+  season: string;
+  gw_from: number;
+  gw_to: number;
+  provenance: AuditProvenance;
+  solver: AuditSolver;
+  search_policy: SearchPolicy;
+  rules_snapshot: RulesSnapshot;
+  assumptions: string[];
+  status: string;
+}
+
+export interface OptimizerAuditData {
+  plans: AuditPlan[];
+}
+
 export interface DashboardManifest {
   schema: string;
   json_schema_version: number;
