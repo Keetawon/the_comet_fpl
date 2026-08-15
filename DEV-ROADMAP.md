@@ -389,6 +389,17 @@ Create domain code under a new `src/fpl/publish/` package and keep the job entry
 
 ### P1.5 — Fixture difficulty contract
 
+**Implementation status (2026-08-15): implemented, offline-tested, and archive-smoke-tested.**
+`fpl.publish.export` derives formula-version `fixture-ease-v1` at per-team-fixture grain from the
+immutable stored lambdas, with a per-`(run_id, season)` positive denominator backed by at least two
+rows. Rejected denominators and zero `lambda_against` produce real Parquet NULLs, never zero/NaN/
+infinity. The raw lambdas stay beside the denominator and three directed ease measures. Official FDR
+is joined separately on `(season, fixture, team_id)`: archive `mart_fact_team_match.fdr`, or the
+latest live `mart_team_fixture_live.fdr` capture for a season the archive mart does not carry. It is
+never blended into an ease index. Contract and export details are in
+`docs/bi-semantic-contract.md` and `docs/bi-export-contract.md`; deterministic offline and archive
+coverage is in `tests/test_bi_export.py`.
+
 Publish primitives first: predicted goals for (`lambda_for`), predicted goals against
 (`lambda_against`), clean-sheet probability, opponent, venue, date, and official FDR.
 

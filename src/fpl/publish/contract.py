@@ -680,8 +680,51 @@ FACT_FORECAST_TEAM_FIXTURE = Table(
         _key("was_home", "bool", "Whether this club is at home."),
         _key("lambda_for", "float", "Modelled expected goals scored by this club."),
         _key("lambda_against", "float", "Modelled expected goals conceded by this club."),
+        _nullable(
+            "league_average_team_lambda",
+            "float",
+            "unmeasured",
+            "Mean lambda_for over all team-fixture rows in this (run_id, season), used as the "
+            "common attack/defence ease denominator only when at least two rows support it and "
+            "the mean is positive. NULL means the coverage/positivity gate rejected it.",
+        ),
+        _nullable(
+            "attack_ease_index",
+            "float",
+            "unmeasured",
+            "100 * lambda_for / league_average_team_lambda. 100 is league average and higher "
+            "means an easier/better attacking fixture for the named team; NULL when the shared "
+            "denominator is unavailable.",
+        ),
+        _nullable(
+            "defence_ease_index",
+            "float",
+            "unmeasured",
+            "100 * league_average_team_lambda / lambda_against. 100 is league average and "
+            "higher means an easier/better defensive fixture for the named team; NULL when the "
+            "shared denominator is unavailable or lambda_against is zero.",
+        ),
+        _nullable(
+            "overall_ease_index",
+            "float",
+            "unmeasured",
+            "Geometric mean sqrt(attack_ease_index * defence_ease_index). 100 is league average "
+            "and higher means easier/better overall for the named team; NULL when either "
+            "directed component is unavailable.",
+        ),
+        _key(
+            "ease_index_formula_version",
+            "string",
+            "Non-null formula identity for the three re-derivable publish-layer ease indices.",
+        ),
         _key("probability_clean_sheet", "float", "P(this club concedes zero)."),
-        _nullable("official_fdr", "int", "unmeasured", "Official FPL difficulty rating."),
+        _nullable(
+            "official_fdr",
+            "int",
+            "unmeasured",
+            "Official FPL schedule difficulty rating for this season-qualified fixture/team. "
+            "Kept separate from and never blended into the model-derived ease indices.",
+        ),
         _key(
             "stage_a_league_average_team",
             "bool",
@@ -706,6 +749,9 @@ FACT_FORECAST_TEAM_FIXTURE = Table(
         "These are the fixture-difficulty PRIMITIVES. P1.5's ease indices are derived from "
         "lambda_for and lambda_against and must be published beside them, versioned and "
         "explicitly directed, never as an undirected 'difficulty' number.",
+        "The same per-(run_id, season) mean serves both directions because each club's lambda_for "
+        "for a fixture equals its opponent's lambda_against. Indices are per-team-fixture only; "
+        "rolling 3/5-GW aggregation belongs downstream in P1.7.",
         "Do not blend official_fdr into a model-derived index; keep them separate measures.",
         "Stage A predicts about 2.86 goals per fixture regardless of the season's actual scoring "
         "level, which moved 2.645 to 3.147 across the archive. Treat lambda as a relative "

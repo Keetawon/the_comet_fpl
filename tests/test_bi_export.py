@@ -40,6 +40,7 @@ from fpl.artifacts.prospective_points import (
 )
 from fpl.publish.contract import SEMANTIC_CONTRACT_V1
 from fpl.publish.export import (
+    EASE_INDEX_FORMULA_VERSION,
     BiExportConcurrentWriterError,
     BiExportFreshnessError,
     BiExportSourceError,
@@ -122,10 +123,10 @@ def _forecast_artifact() -> ProspectivePointsArtifact:
             team_code=101,
             opponent_team_id=2,
             was_home=True,
-            lambda_for=1.0,
-            lambda_against=1.0,
-            probability_clean_sheet=0.3,
-            goals_for_distribution=(0.0, 1.0),
+            lambda_for=2.0,
+            lambda_against=0.0,
+            probability_clean_sheet=1.0,
+            goals_for_distribution=(0.0, 0.0, 1.0),
             stage_a_league_average_team=False,
         ),
         ForecastTeamFixtureRow(
@@ -137,10 +138,10 @@ def _forecast_artifact() -> ProspectivePointsArtifact:
             team_code=102,
             opponent_team_id=1,
             was_home=False,
-            lambda_for=1.0,
-            lambda_against=1.0,
-            probability_clean_sheet=0.3,
-            goals_for_distribution=(0.0, 1.0),
+            lambda_for=0.0,
+            lambda_against=2.0,
+            probability_clean_sheet=0.0,
+            goals_for_distribution=(1.0,),
             stage_a_league_average_team=False,
         ),
     )
@@ -216,6 +217,17 @@ def _seed_database(path: Path, *, record: bool) -> tuple[ProspectivePointsArtifa
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [SEASON, 100, 9001, 1, KICKOFF, 1, 2, True],
+        )
+        con.executemany(
+            """
+            INSERT INTO mart_fact_team_match (
+                season, gw, fixture, kickoff_time, team_id, opponent_team_id, was_home, fdr
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (SEASON, 1, 100, KICKOFF, 1, 2, True, 2),
+                (SEASON, 1, 100, KICKOFF, 2, 1, False, 4),
+            ],
         )
         con.execute(
             """
@@ -364,6 +376,20 @@ def _seed_live_database(path: Path) -> tuple[ProspectivePointsArtifact, str]:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [SEASON, 100, KNOWN_AT, "cap-live", 1, KICKOFF, 1, 2, 3, 3, False],
+        )
+        con.executemany(
+            """
+            INSERT INTO mart_team_fixture_live (
+                season, gw, fixture, kickoff_time, team_id, opponent_team_id, was_home,
+                fdr, known_at, capture_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (SEASON, 1, 100, KICKOFF, 1, 2, True, 5, KNOWN_AT - timedelta(hours=1), "old"),
+                (SEASON, 1, 100, KICKOFF, 2, 1, False, 5, KNOWN_AT - timedelta(hours=1), "old"),
+                (SEASON, 1, 100, KICKOFF, 1, 2, True, 2, KNOWN_AT, "cap-live"),
+                (SEASON, 1, 100, KICKOFF, 2, 1, False, 4, KNOWN_AT, "cap-live"),
+            ],
         )
         return artifact, record_forecast(con, artifact)
     finally:
@@ -526,6 +552,108 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     assert optimizer.num_rows == 15
     assert set(optimizer.column("forecast_run_id").to_pylist()) == {run_id}
     assert optimizer.column("transferred_out").to_pylist() == [False] * 15
+
+
+def test_team_fixture_ease_indices_are_directed_and_keep_raw_lambdas(tmp_path: Path) -> None:
+    database = tmp_path / "ease.duckdb"
+    _seed_database(database, record=True)
+
+    output = export_bi(database, tmp_path / "published").output_dir
+    team = pq.read_table(output / "fact_forecast_team_fixture.parquet")
+
+    assert team.column("team_id").to_pylist() == [1, 2]
+    assert team.column("lambda_for").to_pylist() == pytest.approx([2.0, 0.0])
+    assert team.column("lambda_against").to_pylist() == pytest.approx([0.0, 2.0])
+    assert team.column("league_average_team_lambda").to_pylist() == pytest.approx([1.0, 1.0])
+    assert team.column("attack_ease_index").to_pylist() == pytest.approx([200.0, 0.0])
+    assert team.column("defence_ease_index").to_pylist() == [None, 50.0]
+    assert team.column("overall_ease_index").to_pylist() == [None, 0.0]
+    assert team.column("ease_index_formula_version").to_pylist() == [
+        EASE_INDEX_FORMULA_VERSION,
+        EASE_INDEX_FORMULA_VERSION,
+    ]
+    assert team.column("official_fdr").to_pylist() == [2, 4]
+
+
+def test_low_coverage_and_non_positive_denominators_publish_real_nulls(tmp_path: Path) -> None:
+    low_coverage_db = tmp_path / "low-coverage.duckdb"
+    _seed_database(low_coverage_db, record=True)
+    con = connect(low_coverage_db)
+    try:
+        con.execute("DELETE FROM ledger_prediction_team_fixture WHERE team_id = 2")
+    finally:
+        con.close()
+    low_output = export_bi(low_coverage_db, tmp_path / "low-published").output_dir
+    low = pq.read_table(low_output / "fact_forecast_team_fixture.parquet")
+
+    for name in (
+        "league_average_team_lambda",
+        "attack_ease_index",
+        "defence_ease_index",
+        "overall_ease_index",
+    ):
+        assert low.column(name).to_pylist() == [None]
+        assert low.column(name).null_count == 1
+    assert low.column("ease_index_formula_version").to_pylist() == [EASE_INDEX_FORMULA_VERSION]
+
+    non_positive_db = tmp_path / "non-positive.duckdb"
+    _seed_database(non_positive_db, record=True)
+    con = connect(non_positive_db)
+    try:
+        con.execute("UPDATE ledger_prediction_team_fixture SET lambda_for = 0, lambda_against = 0")
+    finally:
+        con.close()
+    zero_output = export_bi(non_positive_db, tmp_path / "zero-published").output_dir
+    zero = pq.read_table(zero_output / "fact_forecast_team_fixture.parquet")
+    for name in (
+        "league_average_team_lambda",
+        "attack_ease_index",
+        "defence_ease_index",
+        "overall_ease_index",
+    ):
+        assert zero.column(name).to_pylist() == [None, None]
+        assert zero.column(name).null_count == 2
+
+
+def test_official_fdr_is_separate_and_cannot_change_ease_indices(tmp_path: Path) -> None:
+    database = tmp_path / "fdr-separate.duckdb"
+    _seed_database(database, record=True)
+    first = export_bi(database, tmp_path / "first-fdr").output_dir
+    first_team = pq.read_table(first / "fact_forecast_team_fixture.parquet")
+    ease_columns = (
+        "league_average_team_lambda",
+        "attack_ease_index",
+        "defence_ease_index",
+        "overall_ease_index",
+    )
+    first_ease = {name: first_team.column(name).to_pylist() for name in ease_columns}
+
+    con = connect(database)
+    try:
+        con.execute("UPDATE mart_fact_team_match SET fdr = 5 - fdr")
+    finally:
+        con.close()
+    second = export_bi(database, tmp_path / "second-fdr").output_dir
+    second_team = pq.read_table(second / "fact_forecast_team_fixture.parquet")
+
+    assert first_team.column("official_fdr").to_pylist() == [2, 4]
+    assert second_team.column("official_fdr").to_pylist() == [3, 1]
+    assert {name: second_team.column(name).to_pylist() for name in ease_columns} == first_ease
+
+
+def test_genuinely_unavailable_official_fdr_stays_null(tmp_path: Path) -> None:
+    database = tmp_path / "missing-fdr.duckdb"
+    _seed_database(database, record=True)
+    con = connect(database)
+    try:
+        con.execute("UPDATE mart_fact_team_match SET fdr = NULL WHERE team_id = 2")
+    finally:
+        con.close()
+
+    output = export_bi(database, tmp_path / "published").output_dir
+    team = pq.read_table(output / "fact_forecast_team_fixture.parquet")
+    assert team.column("official_fdr").to_pylist() == [2, None]
+    assert team.column("official_fdr").null_count == 1
 
 
 def test_zero_recorded_runs_is_a_complete_export(tmp_path: Path) -> None:
@@ -772,6 +900,8 @@ def test_live_season_dimensions_are_sourced_from_the_snapshot_registry(tmp_path:
         [SEASON],
         [1],
     )
+    team_fixture = pq.read_table(output / "fact_forecast_team_fixture.parquet")
+    assert team_fixture.column("official_fdr").to_pylist() == [2, 4]
 
 
 @pytest.mark.archive
@@ -782,3 +912,15 @@ def test_archive_database_exports_the_complete_contract(tmp_path: Path) -> None:
 
     assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V1.tables}
     assert len(_table_paths(result.output_dir)) == 14
+    team_fixture = pq.read_table(result.output_dir / "fact_forecast_team_fixture.parquet")
+    assert {
+        "lambda_for",
+        "lambda_against",
+        "league_average_team_lambda",
+        "attack_ease_index",
+        "defence_ease_index",
+        "overall_ease_index",
+        "ease_index_formula_version",
+        "official_fdr",
+    } <= set(team_fixture.column_names)
+    assert team_fixture.column("ease_index_formula_version").null_count == 0

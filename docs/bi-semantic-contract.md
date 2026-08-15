@@ -144,13 +144,35 @@ mapping is part of the transport contract.
 
 **Sourced by P1.2** from `ledger_prediction_team_fixture`. Two rows per fixture, one per club.
 These are the fixture-difficulty **primitives**: `lambda_for`, `lambda_against`,
-`probability_clean_sheet`, plus the official FDR as a separate measure.
+`probability_clean_sheet`, plus the official FDR as a separate measure. P1.5 publishes the raw
+lambdas beside four nullable derived values and a non-null formula identity:
 
-P1.5's ease indices are derived from the lambdas and must be published *beside* them, versioned and
-explicitly directed (100 = league average, higher = easier for the named team). Never display an
-undirected "difficulty" number, and never blend official FDR into the model index.
+```text
+league_average_team_lambda = mean(lambda_for) over (run_id, season)
+attack_ease_index           = 100 * lambda_for / league_average_team_lambda
+defence_ease_index          = 100 * league_average_team_lambda / lambda_against
+overall_ease_index          = sqrt(attack_ease_index * defence_ease_index)
+ease_index_formula_version  = "fixture-ease-v1"
+```
 
-Read the lambdas as a **relative** signal. Stage A predicts about 2.86 goals per fixture regardless
+These are **ease** indices: `100` is league average and **higher means easier/better for the named
+team**. The denominator uses all team-fixture rows in the same forecast vintage and season. At least
+two rows must support it and its mean must be positive; otherwise the denominator and all three
+indices are NULL, never zero. `lambda_against = 0` makes the defence and overall indices NULL rather
+than infinite. Because each club's `lambda_for` for one fixture equals the other club's
+`lambda_against`, the same per-season mean serves both attack and defence directions.
+
+The formula is a publish-layer derivation: the immutable forecast artifact and ledger keep only the
+primitives, so the composite remains re-derivable and re-versionable. The table stays at
+per-team-fixture grain. Rolling 3/5-GW views are dashboard aggregations in P1.7, not pre-aggregated
+facts here.
+
+`official_fdr` is an official schedule property, not forecast-derived: historical rows come from
+`mart_fact_team_match.fdr`; a live season uses the latest `mart_team_fixture_live.fdr` capture per
+`(season, fixture, team_id)`. It remains NULL where unavailable. Never display an undirected
+"difficulty" number, and **never blend official FDR into any model ease index**.
+
+Read the lambdas and ease indices as a **relative** signal. Stage A predicts about 2.86 goals per fixture regardless
 of the season it is in, while actual season rates range 2.645 to 3.147, so the absolute level is not
 calibrated to the current season.
 

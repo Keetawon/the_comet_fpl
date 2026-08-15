@@ -108,8 +108,24 @@ exporter does not invent an artificial role or row to make that field appear pop
 `total_points_as_recorded` and `points_under_rules_2026_27` as separate measures.
 
 No source NULL is zero-filled. Nullable floats remain Parquet NULLs—not `NaN` and not `0.0`—and
-non-finite floats are refused. The P1.2 ledger does not persist fixture-level minutes/rates or
-official FDR, so those contract fields are explicit typed NULLs rather than reconstructed values.
+non-finite floats are refused. The P1.2 ledger does not persist fixture-level player minutes/rates,
+so those player-fixture fields are explicit typed NULLs rather than reconstructed values.
+
+### Fixture ease and official FDR
+
+The team-fixture ease columns are derived only in this publish layer from the immutable stored
+`lambda_for` / `lambda_against` primitives. Formula version `fixture-ease-v1` uses one denominator
+per `(run_id, season)`: the mean `lambda_for` over every team-fixture row in that group. At least two
+rows and a positive mean are required. When either check fails,
+`league_average_team_lambda`, `attack_ease_index`, `defence_ease_index`, and
+`overall_ease_index` are Parquet NULLs. A zero `lambda_against` also makes defence and overall NULL,
+never infinity. The formula identity remains non-null even on a row whose indices are unavailable.
+
+`official_fdr` is joined separately on the complete season-qualified fixture-team key. Historical
+seasons use `mart_fact_team_match.fdr`. A season absent from that archive mart uses
+`mart_team_fixture_live.fdr`, selecting the latest `(known_at, capture_id)` per
+`(season, fixture, team_id)`, consistent with the live-dimension current-registry policy. Missing FDR
+stays NULL. It is never an input to the denominator or any ease index.
 
 ## Validation
 

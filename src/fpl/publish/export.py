@@ -40,6 +40,8 @@ from fpl.storage.db import connect, table_columns, table_exists
 BI_EXPORT_SCHEMA: Final[str] = "fpl.bi-semantic-export"
 BI_EXPORT_SCHEMA_VERSION: Final[int] = 1
 MANIFEST_FILENAME: Final[str] = "manifest.json"
+EASE_INDEX_FORMULA_VERSION: Final[str] = "fixture-ease-v1"
+_MIN_EASE_INDEX_ROWS: Final[int] = 2
 
 _LEDGER_TABLES: Final[tuple[str, ...]] = (
     "ledger_forecast_run",
@@ -64,9 +66,9 @@ _SQL_TYPES: Final[dict[str, str]] = {
 }
 
 # Every source column named below is physically required for a populated source.  Values which the
-# ledger intentionally does not persist (fixture-level expected minutes/rates and official FDR) are
-# represented by explicit typed NULL expressions in the projection rather than being guessed or
-# reconstructed from another grain.
+# ledger intentionally does not persist (fixture-level expected minutes/rates) are represented by
+# explicit typed NULL expressions in the projection rather than being guessed or reconstructed
+# from another grain. Official FDR is schedule-owned and is sourced separately below.
 _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "mart_dim_player": (
         "code",
@@ -170,6 +172,15 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "team_a",
         "finished",
     ),
+    "mart_team_fixture_live": (
+        "season",
+        "fixture",
+        "team_id",
+        "fdr",
+        "known_at",
+        "capture_id",
+    ),
+    "mart_fact_team_match": ("season", "fixture", "team_id", "fdr"),
     "mart_fact_player_form": (
         "season",
         "gw",
@@ -528,6 +539,21 @@ _LIVE_FIXTURE_LATEST: Final[str] = """
         PARTITION BY season, fixture ORDER BY known_at DESC, capture_id DESC
     ) = 1
 """
+_LIVE_FDR_LATEST: Final[str] = """
+    SELECT season, fixture, team_id, fdr
+    FROM mart_team_fixture_live
+    QUALIFY row_number() OVER (
+        PARTITION BY season, fixture, team_id ORDER BY known_at DESC, capture_id DESC
+    ) = 1
+"""
+_OFFICIAL_FDR: Final[str] = f"""
+    SELECT season, fixture, team_id, fdr
+    FROM mart_fact_team_match
+    UNION ALL
+    SELECT live.season, live.fixture, live.team_id, live.fdr
+    FROM ({_LIVE_FDR_LATEST}) AS live
+    WHERE live.season NOT IN (SELECT DISTINCT season FROM mart_fact_team_match)
+"""
 
 
 def _source_queries(ledger_present: bool) -> dict[str, str]:
@@ -722,15 +748,62 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
                 FROM ledger_prediction_player_fixture AS prediction
                 LEFT JOIN ledger_forecast_run AS run ON run.run_id = prediction.run_id
             """,
-            "fact_forecast_team_fixture": """
-                SELECT prediction.run_id, run.as_of, prediction.season, prediction.fixture,
-                       prediction.team_id, prediction.team_code, prediction.opponent_team_id,
-                       prediction.gw, prediction.was_home, prediction.lambda_for,
-                       prediction.lambda_against, prediction.probability_clean_sheet,
-                       CAST(NULL AS INTEGER) AS official_fdr,
-                       prediction.stage_a_league_average_team
-                FROM ledger_prediction_team_fixture AS prediction
-                LEFT JOIN ledger_forecast_run AS run ON run.run_id = prediction.run_id
+            "fact_forecast_team_fixture": f"""
+                WITH rates AS (
+                    SELECT prediction.run_id, run.as_of, prediction.season,
+                           prediction.fixture, prediction.team_id, prediction.team_code,
+                           prediction.opponent_team_id, prediction.gw, prediction.was_home,
+                           prediction.lambda_for, prediction.lambda_against,
+                           count(*) OVER (
+                               PARTITION BY prediction.run_id, prediction.season
+                           ) AS denominator_row_count,
+                           avg(prediction.lambda_for) OVER (
+                               PARTITION BY prediction.run_id, prediction.season
+                           ) AS raw_league_average_team_lambda,
+                           prediction.probability_clean_sheet,
+                           prediction.stage_a_league_average_team
+                    FROM ledger_prediction_team_fixture AS prediction
+                    LEFT JOIN ledger_forecast_run AS run ON run.run_id = prediction.run_id
+                ),
+                denominators AS (
+                    SELECT *,
+                           CASE
+                               WHEN denominator_row_count >= {_MIN_EASE_INDEX_ROWS}
+                                AND raw_league_average_team_lambda > 0
+                               THEN raw_league_average_team_lambda
+                           END AS league_average_team_lambda
+                    FROM rates
+                ),
+                directed AS (
+                    SELECT *,
+                           CASE WHEN league_average_team_lambda IS NOT NULL
+                               THEN 100.0 * lambda_for / league_average_team_lambda
+                           END AS attack_ease_index,
+                           CASE WHEN league_average_team_lambda IS NOT NULL
+                                      AND lambda_against > 0
+                               THEN 100.0 * league_average_team_lambda / lambda_against
+                           END AS defence_ease_index
+                    FROM denominators
+                )
+                SELECT directed.run_id, directed.as_of, directed.season, directed.fixture,
+                       directed.team_id, directed.team_code, directed.opponent_team_id,
+                       directed.gw, directed.was_home, directed.lambda_for,
+                       directed.lambda_against, directed.league_average_team_lambda,
+                       directed.attack_ease_index, directed.defence_ease_index,
+                       CASE WHEN directed.attack_ease_index IS NOT NULL
+                                  AND directed.defence_ease_index IS NOT NULL
+                            THEN sqrt(
+                                directed.attack_ease_index * directed.defence_ease_index
+                            )
+                       END AS overall_ease_index,
+                       '{EASE_INDEX_FORMULA_VERSION}' AS ease_index_formula_version,
+                       directed.probability_clean_sheet, fdr.fdr AS official_fdr,
+                       directed.stage_a_league_average_team
+                FROM directed
+                LEFT JOIN ({_OFFICIAL_FDR}) AS fdr
+                  ON fdr.season = directed.season
+                 AND fdr.fixture = directed.fixture
+                 AND fdr.team_id = directed.team_id
             """,
         }
     )
@@ -1526,6 +1599,7 @@ def export_bi(
 __all__ = [
     "BI_EXPORT_SCHEMA",
     "BI_EXPORT_SCHEMA_VERSION",
+    "EASE_INDEX_FORMULA_VERSION",
     "BiExportConcurrentWriterError",
     "BiExportError",
     "BiExportFreshnessError",

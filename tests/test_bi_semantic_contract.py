@@ -158,6 +158,23 @@ def test_recorded_and_replayed_points_are_separate_measures() -> None:
     assert {"total_points_as_recorded", "points_under_rules_2026_27"} <= columns
 
 
+def test_team_fixture_ease_columns_are_additive_directed_and_versioned() -> None:
+    table = CONTRACT.table("fact_forecast_team_fixture")
+    by_name = {column.name: column for column in table.columns}
+    for name in (
+        "league_average_team_lambda",
+        "attack_ease_index",
+        "defence_ease_index",
+        "overall_ease_index",
+    ):
+        assert by_name[name].nullable and by_name[name].null_means == "unmeasured"
+    assert not by_name["ease_index_formula_version"].nullable
+    for name in ("attack_ease_index", "defence_ease_index", "overall_ease_index"):
+        assert "100 is league average" in by_name[name].description
+        assert "higher means" in by_name[name].description
+    assert "never blended" in by_name["official_fdr"].description
+
+
 # --------------------------------------------------------------------------------------
 # NULL semantics
 # --------------------------------------------------------------------------------------
