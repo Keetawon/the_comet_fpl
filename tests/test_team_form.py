@@ -271,6 +271,31 @@ def test_unmeasured_xg_stays_null_never_zero() -> None:
         con.close()
 
 
+def test_partial_xg_coverage_rate_divides_by_measured_matches_only() -> None:
+    """A window mixing measured and unmeasured xG (2022-23 measured only 64% of matches) must
+    divide the per-match rate by the measured-match count, not by matches_played."""
+    con = _con()
+    try:
+        _seed_team_codes(con)
+        # Four matches for club 101: two measure xG/xGC, two do not.
+        _insert_match(con, fixture=101, gw=1, offset_days=0, team_xg=None, team_xgc=None)
+        _insert_match(con, fixture=102, gw=2, offset_days=7, team_xg=2.0, team_xgc=0.5)
+        _insert_match(con, fixture=103, gw=3, offset_days=14, team_xg=None, team_xgc=None)
+        _insert_match(con, fixture=104, gw=4, offset_days=21, team_xg=1.0, team_xgc=1.5)
+
+        build_team_form(con)
+
+        row = _form_row(con, gw=4, team_code=101, window="season_to_date")
+        assert row[0] == 4  # matches_played counts every match
+        assert row[7] == pytest.approx(3.0)  # team_xg = sum over the two MEASURED matches
+        assert row[8] == pytest.approx(2.0)  # team_xgc likewise
+        # Rates divide by the two measured matches, NOT by matches_played (4):
+        assert row[11] == pytest.approx(3.0 / 2)  # 1.5, not 3.0 / 4 = 0.75
+        assert row[12] == pytest.approx(2.0 / 2)  # 1.0, not 2.0 / 4 = 0.5
+    finally:
+        con.close()
+
+
 def test_team_code_is_season_scoped_no_cross_season_bleed() -> None:
     """team_id 1 is club 101 in 2025-26 and club 201 in 2021-22; histories must not mix."""
     con = _con()

@@ -245,9 +245,12 @@ no finished matches contributes zero rows.
 `team_xg` / `team_xgc` are NULL where unmeasured — the whole of 2021-22 measured no xG — and their
 per-match rates are additionally NULL then, never `0.0`. Goal aggregates (`goals_for`,
 `goals_against`, `clean_sheets`, `wins`, `draws`, `losses`) are NULL when any match in the window
-has an unmeasured score rather than silently undercounting. Per-match rates are
-`measure / matches_played` and NULL on a zero denominator; they are display measures and must never
-be multiplied by a fixture count to synthesise a forecast.
+has an unmeasured score rather than silently undercounting. The goal per-match rates are
+`measure / matches_played`, but the `team_xg` / `team_xgc` per-match rates divide by the count of
+**measured**-xG/xGC matches, not `matches_played`, so partial coverage (2022-23 measured only 64% of
+matches) does not understate them — mirroring `fact_player_form`, whose per-90 denominator is minutes
+on measured-xG rows only. All per-match rates are NULL on a zero denominator; they are display
+measures and must never be multiplied by a fixture count to synthesise a forecast.
 
 ### `fact_optimizer_plan` — grain `(optimizer_run_id, gw, code)`
 

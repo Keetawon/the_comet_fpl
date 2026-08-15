@@ -531,13 +531,18 @@ def build_team_form(con: duckdb.DuckDBPyConnection) -> int:
                 WHEN count(*) > 0 AND count(goals_against) = count(*)
                     THEN 1.0 * sum(goals_against) / count(*)
             END AS goals_against_per_match,
+            -- xG/xGC rates divide by the count of MEASURED matches, not matches_played:
+            -- dividing a measured-only sum by every match understates the rate where xG
+            -- coverage is partial (2022-23 measured only 64% of matches). This mirrors
+            -- fact_player_form, whose per-90 denominator is minutes on measured-xG rows only.
+            -- count(team_xg) > 0 is exactly the "sum is not NULL" case, so NULL semantics hold.
             CASE
-                WHEN count(*) > 0 AND sum(team_xg) IS NOT NULL
-                    THEN sum(team_xg) / count(*)
+                WHEN count(team_xg) > 0
+                    THEN sum(team_xg) / count(team_xg)
             END AS team_xg_per_match,
             CASE
-                WHEN count(*) > 0 AND sum(team_xgc) IS NOT NULL
-                    THEN sum(team_xgc) / count(*)
+                WHEN count(team_xgc) > 0
+                    THEN sum(team_xgc) / count(team_xgc)
             END AS team_xgc_per_match
         FROM selected
         GROUP BY season, gw, team_code, window_label

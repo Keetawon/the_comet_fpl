@@ -989,13 +989,15 @@ FACT_TEAM_FORM = Table(
             "team_xg_per_match",
             "float",
             "unmeasured",
-            "team_xg / matches_played. NULL when the xG sum is NULL or the denominator is zero.",
+            "team_xg / count of MEASURED-xG matches (not matches_played), so partial coverage "
+            "does not understate the rate. NULL when no match in the window measured xG.",
         ),
         _nullable(
             "team_xgc_per_match",
             "float",
             "unmeasured",
-            "team_xgc / matches_played. NULL when the xGC sum is NULL or the denominator is zero.",
+            "team_xgc / count of MEASURED-xGC matches (not matches_played), so partial coverage "
+            "does not understate the rate. NULL when no match in the window measured xGC.",
         ),
     ),
     joins=(
