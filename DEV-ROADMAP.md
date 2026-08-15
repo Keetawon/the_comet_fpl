@@ -474,7 +474,29 @@ read models cover the two exploration pages only; the summary / next-GW / foreca
 optimizer pages are later additive files. Contract: `docs/dashboard-json-contract.md`; the
 runbook notes the emitter as optional post-decision output. Tests:
 `tests/test_dashboard_json.py` (publication tests need the directory-symlink privilege, as
-for `tests/test_bi_export.py`).
+for `tests/test_bi_export.py`; the archive smoke test is self-contained — it seeds a
+synthetic future-season vintage into a throwaway copy of the built database, so it holds on
+any machine with `build_db` run, with or without recorded real vintages).
+
+**P1.7b UI part 1 (2026-08-16): implemented.** `dashboard/` is a new self-contained Vite +
+React + TypeScript + Tailwind + shadcn/ui + @tanstack/react-table app reading ONLY the
+static JSON read models (never DuckDB, never Parquet in-browser). The sidebar lists all six
+pages in roadmap order with the five unimplemented ones as labelled stubs. Shipped: the
+shared direction-labelled difficulty colour scale with legend and a model-ease vs official
+FDR colour-source toggle (never blended); the FixtureTicker (opponent + venue + headline,
+NULL → neutral dashed chip with no number, blank gameweek → empty slot, double gameweek →
+two chips); the Overall/Attack/Defense view toggle (defence colours on clean-sheet
+probability anchored at the loaded league mean); the venue + gameweek-range filter bar
+bounded by the vintage horizon; and the Fixture matrix (Team) page — one row per club,
+recent form from `fact_team_form` labelled with its anchor season (last season at GW1),
+expandable per-fixture table exposing raw lambdas, clean-sheet probability, all three ease
+indices, official FDR, and the Stage A league-average flag beside the composite. Vitest
+component tests (12) cover bucket direction, NULL→neutral, and DGW two-chip behaviour;
+`npm run build`, `tsc`, and `oxlint` are clean. Dev data: a real schema-v2 vintage
+(GW1-5 default architecture, run `86a072ade6dd4d56…`) is recorded in the dev ledger and
+its read models render the page; the generated JSON under `dashboard/public/data/` is
+gitignored and regenerable via `dashboard/README.md`. The Players page (P1.7c) reuses the
+tinted scale, ticker, view toggle, and filter bar.
 
 Build only after the export contract and its tests pass. Minimum pages:
 
