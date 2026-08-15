@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -40,6 +41,7 @@ from fpl.publish.export import (
     export_bi,
 )
 from fpl.storage.db import default_db_path
+from tests.test_bi_export import _seed_live_database
 
 SEASON = "2026-27"
 PRIOR = "2025-26"
@@ -693,9 +695,23 @@ def test_tampered_source_leaves_the_published_endpoint_intact(tmp_path: Path) ->
 @pytest.mark.archive
 @REQUIRES_SYMLINK
 def test_archive_parquet_export_feeds_valid_read_models(tmp_path: Path) -> None:
-    """Real-build smoke: export_bi then export_dashboard_json yields both valid read models."""
+    """Real-build smoke: export_bi then export_dashboard_json yields both valid read models.
+
+    Self-contained in its forecast vintage: `build_db` records none, so the test seeds a
+    synthetic one into a throwaway copy of the built database. The synthetic season is a
+    future one no real database carries, so the seed works identically on a machine whose
+    dev ledger already holds real vintages and on a fresh CI build with none. Team code 102
+    exists in the committed archive, so the synthetic club resolves real cross-season form
+    and the form assertion holds; the synthetic player codes carry no form, which the
+    players read model permits (form is nullable).
+    """
+    assert not Path(f"{default_db_path()}.wal").exists(), "dev DB has a WAL; copy would be torn"
+    db = tmp_path / "fpl-copy.duckdb"
+    shutil.copy2(default_db_path(), db)
+    _artifact, run_id = _seed_live_database(db, season="2027-28")
+
     export_dir = export_bi(
-        default_db_path(), tmp_path / "bi-export", created_at=datetime(2026, 8, 25, tzinfo=UTC)
+        db, tmp_path / "bi-export", created_at=datetime(2026, 8, 25, tzinfo=UTC)
     ).output_dir
     result = export_dashboard_json(
         export_dir, tmp_path / "dashboard", generated_at=datetime(2026, 8, 25, tzinfo=UTC)
@@ -703,7 +719,7 @@ def test_archive_parquet_export_feeds_valid_read_models(tmp_path: Path) -> None:
     assert result.fixture_matrix_rows > 0
     assert result.players_rows > 0
     manifest = validate_dashboard_json(result.output_dir)
-    assert manifest["run_ids"]
+    assert run_id in manifest["run_ids"]
 
     teams = json.loads((result.output_dir / FIXTURE_MATRIX_FILENAME).read_text(encoding="utf-8"))[
         "teams"
@@ -716,7 +732,10 @@ def test_archive_parquet_export_feeds_valid_read_models(tmp_path: Path) -> None:
         "opponent_team_id",
         "element_id",
     }
-    form_seasons = {team["form"]["season"] for team in teams if team["form"] is not None}
+    synthetic = [team for team in teams if team["season"] == "2027-28"]
+    assert synthetic, "the seeded vintage must produce fixture-matrix rows"
+    assert all(team["fixtures"] for team in synthetic)
+    form_seasons = {team["form"]["season"] for team in synthetic if team["form"] is not None}
     assert form_seasons  # completed seasons are present in the archive
     for player in players:
         assert {"code", "web_name", "position", "team_code", "fixtures"} <= set(player)

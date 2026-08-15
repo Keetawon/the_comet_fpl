@@ -65,10 +65,10 @@ def _positions() -> tuple[str, ...]:
     return ("GK", "GK", *("DEF",) * 5, *("MID",) * 5, *("FWD",) * 3)
 
 
-def _forecast_artifact() -> ProspectivePointsArtifact:
+def _forecast_artifact(season: str = SEASON) -> ProspectivePointsArtifact:
     rows = tuple(
         ForecastArtifactRow(
-            season=SEASON,
+            season=season,
             gw=1,
             code=code,
             web_name=f"P{code}",
@@ -96,7 +96,7 @@ def _forecast_artifact() -> ProspectivePointsArtifact:
     )
     player_fixture_rows = tuple(
         ForecastPlayerFixtureRow(
-            season=SEASON,
+            season=season,
             gw=1,
             fixture=100,
             code=row.code,
@@ -115,7 +115,7 @@ def _forecast_artifact() -> ProspectivePointsArtifact:
     )
     team_fixture_rows = (
         ForecastTeamFixtureRow(
-            season=SEASON,
+            season=season,
             gw=1,
             fixture=100,
             kickoff_time=KICKOFF,
@@ -130,7 +130,7 @@ def _forecast_artifact() -> ProspectivePointsArtifact:
             stage_a_league_average_team=False,
         ),
         ForecastTeamFixtureRow(
-            season=SEASON,
+            season=season,
             gw=1,
             fixture=100,
             kickoff_time=KICKOFF,
@@ -148,7 +148,7 @@ def _forecast_artifact() -> ProspectivePointsArtifact:
     manifest = ForecastArtifactManifest(
         schema_version=2,
         as_of=AS_OF,
-        season=SEASON,
+        season=season,
         gw_from=1,
         gw_to=1,
         row_count=len(rows),
@@ -334,14 +334,17 @@ def _seed_database(path: Path, *, record: bool) -> tuple[ProspectivePointsArtifa
 _ELEMENT_TYPE = {"GK": 1, "DEF": 2, "MID": 3, "FWD": 4}
 
 
-def _seed_live_database(path: Path) -> tuple[ProspectivePointsArtifact, str]:
+def _seed_live_database(
+    path: Path, *, season: str = SEASON
+) -> tuple[ProspectivePointsArtifact, str]:
     """Seed ONLY the live snapshot registry for the forecast season -- no marts for it.
 
     This is the real deadline shape: the archive marts cover completed seasons only, so the
-    2026-27 forecast's players, clubs, fixtures and gameweeks must resolve through the live-season
-    dimension rows the exporter unions in from the versioned live staging.
+    forecast season's players, clubs, fixtures and gameweeks must resolve through the live-season
+    dimension rows the exporter unions in from the versioned live staging. Pass a season no
+    real database carries (a future one) when seeding on top of existing data.
     """
-    artifact = _forecast_artifact()
+    artifact = _forecast_artifact(season)
     con = initialise(path)
     try:
         con.executemany(
@@ -351,8 +354,8 @@ def _seed_live_database(path: Path) -> tuple[ProspectivePointsArtifact, str]:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                (SEASON, 1, 101, KNOWN_AT, "cap-live", "Alpha", "ALP", 1001),
-                (SEASON, 2, 102, KNOWN_AT, "cap-live", "Beta", "BET", 1002),
+                (season, 1, 101, KNOWN_AT, "cap-live", "Alpha", "ALP", 1001),
+                (season, 2, 102, KNOWN_AT, "cap-live", "Beta", "BET", 1002),
             ],
         )
         con.executemany(
@@ -364,7 +367,7 @@ def _seed_live_database(path: Path) -> tuple[ProspectivePointsArtifact, str]:
             """,
             [
                 (
-                    SEASON,
+                    season,
                     code,
                     code,
                     KNOWN_AT,
@@ -386,7 +389,7 @@ def _seed_live_database(path: Path) -> tuple[ProspectivePointsArtifact, str]:
                 team_h_difficulty, team_a_difficulty, finished
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            [SEASON, 100, KNOWN_AT, "cap-live", 1, KICKOFF, 1, 2, 3, 3, False],
+            [season, 100, KNOWN_AT, "cap-live", 1, KICKOFF, 1, 2, 3, 3, False],
         )
         con.executemany(
             """
@@ -396,10 +399,10 @@ def _seed_live_database(path: Path) -> tuple[ProspectivePointsArtifact, str]:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                (SEASON, 1, 100, KICKOFF, 1, 2, True, 5, KNOWN_AT - timedelta(hours=1), "old"),
-                (SEASON, 1, 100, KICKOFF, 2, 1, False, 5, KNOWN_AT - timedelta(hours=1), "old"),
-                (SEASON, 1, 100, KICKOFF, 1, 2, True, 2, KNOWN_AT, "cap-live"),
-                (SEASON, 1, 100, KICKOFF, 2, 1, False, 4, KNOWN_AT, "cap-live"),
+                (season, 1, 100, KICKOFF, 1, 2, True, 5, KNOWN_AT - timedelta(hours=1), "old"),
+                (season, 1, 100, KICKOFF, 2, 1, False, 5, KNOWN_AT - timedelta(hours=1), "old"),
+                (season, 1, 100, KICKOFF, 1, 2, True, 2, KNOWN_AT, "cap-live"),
+                (season, 1, 100, KICKOFF, 2, 1, False, 4, KNOWN_AT, "cap-live"),
             ],
         )
         return artifact, record_forecast(con, artifact)
