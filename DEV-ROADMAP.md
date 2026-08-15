@@ -498,6 +498,25 @@ its read models render the page; the generated JSON under `dashboard/public/data
 gitignored and regenerable via `dashboard/README.md`. The Players page (P1.7c) reuses the
 tinted scale, ticker, view toggle, and filter bar.
 
+**P1.7c Players page (2026-08-16): implemented.** One additive read-model change ships
+with it: each `players.json` fixture row now also carries the player's CLUB primitives for
+that fixture (`team_lambda_for`, `team_lambda_against`, `team_probability_clean_sheet`),
+joined on the same season-qualified fixture-team key as the ease fields, so the expanded
+player row shows the raw numbers behind the chip colour with no client-side join. No
+model, composer, optimizer, contract table, or Parquet export changed. The page reuses the
+shared FixtureTicker (now generic over team/player fixture shapes), view toggle, colour
+scale + FDR colour-source toggle, and venue/gameweek filter bar, and adds player filters:
+position, team, price range, minimum average minutes (last 5), and availability. The chip
+headline is the fixture xP and its colour follows the active view's club metric (defence
+colours on the club defence ease — the player's own clean-sheet probability is a separate,
+separately-shown measure that is null until the ledger persists it); expanding a row swaps
+attack-detail vs defence-detail column ordering and always shows the muted remainder, the
+form anchor season label, and the full per-fixture primitive set. Unmeasured values stay
+"–" everywhere (a null price or minutes never satisfies a filter bound). Vitest grew to 21
+tests (player chip semantics: xP headline vs colour metric, FDR source, NULL→neutral, null
+xP; page smoke incl. expandable primitives and overlay labelling). Dev read models were
+regenerated from the recorded vintage so the new fields carry real data.
+
 Build only after the export contract and its tests pass. Minimum pages:
 
 1. **GW1 decision:** squad, XI, captain/vice, bench, EV, ownership, availability, flags, and

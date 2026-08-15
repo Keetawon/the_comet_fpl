@@ -53,8 +53,15 @@ published read-model directory.
   horizon, and an expandable row with every primitive beside the composite ease indices
   (raw `lambda_for`/`lambda_against`, clean-sheet probability, official FDR, Stage A
   league-average flag).
-- Summary, Players (P1.7c), Next GW suggestion, Forecast vs actual, Optimizer audit:
-  stubs, in roadmap order.
+- **Players** (implemented, P1.7c): the player-form pivot from `players.json` — one row per
+  (run, player) merging backward form (anchor-season-labelled, 3/5/10/STD window selector)
+  with the vintage's per-fixture xP. Filters: position, team, price range, minimum average
+  minutes (last 5), availability, plus the shared view/venue/gameweek bar. The chip headline
+  is the fixture xP; its colour follows the active view's CLUB metric (or official FDR), and
+  the expanded row exposes every primitive behind the colour (club lambdas, clean sheets,
+  ease indices) beside the player's own probabilities, with attack- vs defence-detail column
+  ordering driven by the view.
+- Summary, Next GW suggestion, Forecast vs actual, Optimizer audit: stubs, in roadmap order.
 
 ## Rules the UI must keep
 

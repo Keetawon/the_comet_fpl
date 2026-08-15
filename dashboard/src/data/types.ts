@@ -104,6 +104,11 @@ export interface PlayerFixture {
   team_defence_ease_index: number | null;
   team_overall_ease_index: number | null;
   team_official_fdr: number | null;
+  /** The player's CLUB primitives for the same fixture (behind the chip colour). */
+  team_lambda_for: number | null;
+  team_lambda_against: number | null;
+  /** The club's clean-sheet probability -- a different measure from the player's own CS. */
+  team_probability_clean_sheet: number | null;
 }
 
 export interface PlayerRecord {

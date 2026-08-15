@@ -5,19 +5,13 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ThemeToggle, initTheme } from "@/components/ThemeToggle";
 import { FixtureMatrixPage } from "@/pages/FixtureMatrixPage";
+import { PlayersPage } from "@/pages/PlayersPage";
 import { StubPage } from "@/pages/StubPage";
 
 const STUBS: Record<string, { phase: string; description: string }> = {
   summary: {
     phase: "later in P1.7",
     description: "Season snapshot: next deadline, latest run, headline EV and risk.",
-  },
-  players: {
-    phase: "P1.7c",
-    description:
-      "Player-form pivot from players.json: position/team/price filters, rolling minutes, " +
-      "starts, xG/xA, goals, assists, bonus/BPS, defensive contribution, points, and " +
-      "upcoming per-fixture EV.",
   },
   "next-gw": {
     phase: "after GW1",
@@ -61,6 +55,8 @@ export default function App() {
         <main className="min-h-0 flex-1 overflow-auto">
           {route === "fixtures" ? (
             <FixtureMatrixPage />
+          ) : route === "players" ? (
+            <PlayersPage />
           ) : stub ? (
             <StubPage
               label={route === "summary" ? "Summary" : route.replace(/-/g, " ")}

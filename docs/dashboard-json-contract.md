@@ -124,13 +124,16 @@ The population is every player with rows in `fact_forecast_player_gameweek` for 
   is `minutes / rostered_fixtures` from the `last_5` window — a per-rostered-match average
   with DNPs included, `null` when there is no window.
 - `fixtures` is every player-fixture row of that vintage (double gameweek = two entries),
-  each carrying the player's own xP/probabilities **plus the player's club ease fields for
+  each carrying the player's own xP/probabilities **plus the player's club fixture fields for
   that fixture** (`team_attack_ease_index`, `team_defence_ease_index`,
-  `team_overall_ease_index`, `team_official_fdr`), joined from
+  `team_overall_ease_index`, `team_official_fdr`, `team_lambda_for`, `team_lambda_against`,
+  `team_probability_clean_sheet`), joined from
   `fact_forecast_team_fixture` on the season-qualified `(run_id, season, fixture, team_id)`
-  key so the UI can colour the chip without a client-side join. A missing team row for a
-  player fixture fails closed rather than rendering an unlabelled chip; legitimately null
-  ease/FDR values stay `null`.
+  key so the UI can colour the chip and show the raw primitives behind the colour without a
+  client-side join. `team_probability_clean_sheet` is the CLUB's clean-sheet probability and
+  is a different measure from the player's own `probability_clean_sheet`. A missing team row
+  for a player fixture fails closed rather than rendering an unlabelled chip; legitimately
+  null ease/FDR values stay `null`.
 
 Sample record (abbreviated):
 
@@ -157,7 +160,8 @@ Sample record (abbreviated):
      "expected_points": 5.5, "probability_appears": null, "probability_sixty_minutes": null,
      "expected_goals": null, "expected_assists": null, "probability_clean_sheet": null,
      "team_attack_ease_index": 120.0, "team_defence_ease_index": 120.0,
-     "team_overall_ease_index": 120.0, "team_official_fdr": 2}
+     "team_overall_ease_index": 120.0, "team_official_fdr": 2,
+     "team_lambda_for": 2.0, "team_lambda_against": 1.0, "team_probability_clean_sheet": 0.4}
   ]
 }
 ```

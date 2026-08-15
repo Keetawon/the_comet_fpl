@@ -16,6 +16,8 @@ interface DifficultyLegendProps {
   easeIndexFormulaVersion: string;
   /** League-mean clean-sheet probability the defence scale is anchored on (0-1). */
   cleanSheetAnchor: number | null;
+  /** What the defence view colours on, when a page differs from the team CS default. */
+  defenceScaleNote?: string;
 }
 
 export function DifficultyLegend({
@@ -23,6 +25,7 @@ export function DifficultyLegend({
   onColorSourceChange,
   easeIndexFormulaVersion,
   cleanSheetAnchor,
+  defenceScaleNote,
 }: DifficultyLegendProps) {
   const legend = colorSource === "ease" ? EASE_LEGEND : FDR_LEGEND;
   return (
@@ -54,10 +57,11 @@ export function DifficultyLegend({
       {colorSource === "ease" ? (
         <span>
           Ease index: 100 = league average, higher = easier (formula{" "}
-          {easeIndexFormulaVersion}). Defence view colours on clean-sheet probability
-          anchored at the league mean (
-          {cleanSheetAnchor == null ? "unavailable" : `${Math.round(cleanSheetAnchor * 100)}%`}
-          ).
+          {easeIndexFormulaVersion}).{" "}
+          {defenceScaleNote ??
+            `Defence view colours on clean-sheet probability anchored at the league mean (${
+              cleanSheetAnchor == null ? "unavailable" : `${Math.round(cleanSheetAnchor * 100)}%`
+            }).`}
         </span>
       ) : (
         <span>Official FDR, 1 = easiest … 5 = hardest; never blended into the model index.</span>

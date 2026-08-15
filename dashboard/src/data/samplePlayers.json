@@ -1,0 +1,112 @@
+{
+  "json_schema_version": 1,
+  "players": [
+    {
+      "run_id": "run-a",
+      "as_of": "2026-08-21T17:30:00+00:00",
+      "season": "2026-27",
+      "code": 1,
+      "web_name": "Alpha",
+      "position": "MID",
+      "team_code": 101,
+      "team_short_name": "ALP",
+      "now_cost": 128,
+      "selected_by_percent": 42.1,
+      "availability_status": "a",
+      "chance_of_playing": null,
+      "availability_multiplier": 1.0,
+      "form": {
+        "season": "2025-26",
+        "as_at_gw": 38,
+        "windows": {
+          "last_3": {
+            "rostered_fixtures": 3, "appearances": 3, "starts": 3, "did_not_play": 0,
+            "minutes": 270, "goals_scored": 1, "assists": 0, "bonus": 3, "bps": 40,
+            "defensive_contribution": null, "expected_goals": 1.1, "expected_assists": 0.4,
+            "expected_goals_per_90": 0.37, "expected_assists_per_90": 0.13,
+            "points_under_rules_2026_27": 16
+          },
+          "last_5": {
+            "rostered_fixtures": 5, "appearances": 5, "starts": 5, "did_not_play": 0,
+            "minutes": 450, "goals_scored": 2, "assists": 1, "bonus": 7, "bps": 90,
+            "defensive_contribution": null, "expected_goals": 1.8, "expected_assists": 0.9,
+            "expected_goals_per_90": 0.36, "expected_assists_per_90": 0.18,
+            "points_under_rules_2026_27": 31
+          },
+          "last_10": {
+            "rostered_fixtures": 10, "appearances": 9, "starts": 9, "did_not_play": 1,
+            "minutes": 810, "goals_scored": 3, "assists": 2, "bonus": 12, "bps": 175,
+            "defensive_contribution": null, "expected_goals": 3.6, "expected_assists": 1.7,
+            "expected_goals_per_90": 0.4, "expected_assists_per_90": 0.19,
+            "points_under_rules_2026_27": 52
+          },
+          "season_to_date": {
+            "rostered_fixtures": 38, "appearances": 35, "starts": 34, "did_not_play": 3,
+            "minutes": 3010, "goals_scored": 18, "assists": 11, "bonus": 44, "bps": 780,
+            "defensive_contribution": null, "expected_goals": 19.4, "expected_assists": 10.2,
+            "expected_goals_per_90": 0.58, "expected_assists_per_90": 0.3,
+            "points_under_rules_2026_27": 241
+          }
+        }
+      },
+      "avg_minutes_last_5": 90.0,
+      "fixtures": [
+        {
+          "gw": 1, "fixture": 100, "kickoff_time": "2026-08-22T14:00:00+00:00",
+          "opponent_team_code": 102, "opponent_short_name": "BET", "was_home": true,
+          "expected_points": 7.4, "probability_appears": null, "probability_sixty_minutes": null,
+          "expected_goals": null, "expected_assists": null, "probability_clean_sheet": null,
+          "team_attack_ease_index": 129.8, "team_defence_ease_index": 112.0,
+          "team_overall_ease_index": 120.5, "team_official_fdr": 2,
+          "team_lambda_for": 2.4, "team_lambda_against": 1.1, "team_probability_clean_sheet": 0.38
+        },
+        {
+          "gw": 2, "fixture": 110, "kickoff_time": "2026-08-29T14:00:00+00:00",
+          "opponent_team_code": 103, "opponent_short_name": "GAM", "was_home": false,
+          "expected_points": 5.1, "probability_appears": null, "probability_sixty_minutes": null,
+          "expected_goals": null, "expected_assists": null, "probability_clean_sheet": null,
+          "team_attack_ease_index": 86.1, "team_defence_ease_index": 88.0,
+          "team_overall_ease_index": 87.0, "team_official_fdr": 4,
+          "team_lambda_for": 1.2, "team_lambda_against": 1.9, "team_probability_clean_sheet": 0.21
+        }
+      ]
+    },
+    {
+      "run_id": "run-a",
+      "as_of": "2026-08-21T17:30:00+00:00",
+      "season": "2026-27",
+      "code": 2,
+      "web_name": "Beta",
+      "position": "GK",
+      "team_code": 102,
+      "team_short_name": "BET",
+      "now_cost": 45,
+      "selected_by_percent": null,
+      "availability_status": "d",
+      "chance_of_playing": 75,
+      "availability_multiplier": 0.75,
+      "form": null,
+      "avg_minutes_last_5": null,
+      "fixtures": [
+        {
+          "gw": 1, "fixture": 100, "kickoff_time": "2026-08-22T14:00:00+00:00",
+          "opponent_team_code": 101, "opponent_short_name": "ALP", "was_home": false,
+          "expected_points": 2.0, "probability_appears": null, "probability_sixty_minutes": null,
+          "expected_goals": null, "expected_assists": null, "probability_clean_sheet": null,
+          "team_attack_ease_index": null, "team_defence_ease_index": null,
+          "team_overall_ease_index": null, "team_official_fdr": null,
+          "team_lambda_for": null, "team_lambda_against": null, "team_probability_clean_sheet": null
+        },
+        {
+          "gw": 3, "fixture": 130, "kickoff_time": "2026-09-06T13:00:00+00:00",
+          "opponent_team_code": 103, "opponent_short_name": "GAM", "was_home": true,
+          "expected_points": null, "probability_appears": null, "probability_sixty_minutes": null,
+          "expected_goals": null, "expected_assists": null, "probability_clean_sheet": null,
+          "team_attack_ease_index": 118.6, "team_defence_ease_index": 104.0,
+          "team_overall_ease_index": 111.0, "team_official_fdr": 3,
+          "team_lambda_for": 1.8, "team_lambda_against": 1.3, "team_probability_clean_sheet": 0.31
+        }
+      ]
+    }
+  ]
+}

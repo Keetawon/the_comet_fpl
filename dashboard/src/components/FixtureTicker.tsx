@@ -3,7 +3,6 @@
 // double gameweek naturally renders two chips. NULL metric -> neutral chip with no number.
 
 import { NULL_BUCKET_CLASS, BUCKET_CLASSES, type DifficultyBucket } from "@/lib/difficulty";
-import type { TeamFixture } from "@/data/types";
 
 export interface ChipMetric {
   /** Numeric headline; null = unmeasured -> blank chip, never 0. */
@@ -14,23 +13,31 @@ export interface ChipMetric {
   title: string;
 }
 
-export interface FixtureTickerProps {
-  /** Venue/GW-filtered fixtures, sorted by (gw, kickoff). */
-  fixtures: TeamFixture[];
-  minGw: number;
-  maxGw: number;
-  metricOf: (fixture: TeamFixture) => ChipMetric;
-  bucketOf: (fixture: TeamFixture) => DifficultyBucket | null;
+/** Any fixture shape the ticker can render: team rows and player rows both satisfy it. */
+export interface TickerFixture {
+  gw: number;
+  fixture: number;
+  opponent_short_name: string;
+  was_home: boolean | null;
 }
 
-export function FixtureTicker({
+export interface FixtureTickerProps<T extends TickerFixture> {
+  /** Venue/GW-filtered fixtures, sorted by (gw, kickoff). */
+  fixtures: T[];
+  minGw: number;
+  maxGw: number;
+  metricOf: (fixture: T) => ChipMetric;
+  bucketOf: (fixture: T) => DifficultyBucket | null;
+}
+
+export function FixtureTicker<T extends TickerFixture>({
   fixtures,
   minGw,
   maxGw,
   metricOf,
   bucketOf,
-}: FixtureTickerProps) {
-  const byGw = new Map<number, TeamFixture[]>();
+}: FixtureTickerProps<T>) {
+  const byGw = new Map<number, T[]>();
   for (const fixture of fixtures) {
     const group = byGw.get(fixture.gw);
     if (group) group.push(fixture);

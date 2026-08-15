@@ -400,6 +400,11 @@ def _build_players(
         pl.col("defence_ease_index").alias("team_defence_ease_index"),
         pl.col("overall_ease_index").alias("team_overall_ease_index"),
         pl.col("official_fdr").alias("team_official_fdr"),
+        # The club primitives behind the player chip's colour, so the expanded player row
+        # can show raw lambdas and the team clean sheet beside the ease indices.
+        pl.col("lambda_for").alias("team_lambda_for"),
+        pl.col("lambda_against").alias("team_lambda_against"),
+        pl.col("probability_clean_sheet").alias("team_probability_clean_sheet"),
     )
     enriched = (
         player_fixture.join(_horizon_projection(runs), on="run_id", how="left")
@@ -444,6 +449,9 @@ def _build_players(
                 "team_defence_ease_index": row["team_defence_ease_index"],
                 "team_overall_ease_index": row["team_overall_ease_index"],
                 "team_official_fdr": row["team_official_fdr"],
+                "team_lambda_for": row["team_lambda_for"],
+                "team_lambda_against": row["team_lambda_against"],
+                "team_probability_clean_sheet": row["team_probability_clean_sheet"],
             }
         )
 

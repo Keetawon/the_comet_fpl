@@ -478,6 +478,17 @@ def test_unmeasured_values_stay_json_null_never_zero(tmp_path: Path) -> None:
     vicario = _player(models, 1)
     assert vicario["fixtures"][0]["probability_appears"] is None
     assert vicario["fixtures"][0]["expected_goals"] is None
+    # the club primitives ride along beside the ease indices: same fixture, same values the
+    # team read model publishes, with the player's own CS still separately null
+    assert vicario["fixtures"][0]["team_lambda_for"] == 2.0
+    assert vicario["fixtures"][0]["team_lambda_against"] == 1.0
+    assert vicario["fixtures"][0]["team_probability_clean_sheet"] == 0.4
+    assert (
+        vicario["fixtures"][0]["team_probability_clean_sheet"]
+        != vicario["fixtures"][0]["probability_clean_sheet"]
+    )
+    by_fixture = {f["fixture"]: f for f in vicario["fixtures"]}
+    assert by_fixture[101]["team_lambda_against"] == 0.0  # the NULL-ease leg keeps its primitive
     assert vicario["form"]["windows"]["last_5"]["starts"] is None
     assert vicario["form"]["windows"]["last_5"]["expected_goals"] is None
     assert alpha["form"]["windows"]["last_5"]["team_xg"] is None
