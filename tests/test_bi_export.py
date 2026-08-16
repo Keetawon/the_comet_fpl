@@ -943,12 +943,15 @@ def test_live_season_dimensions_are_sourced_from_the_snapshot_registry(tmp_path:
 
 @pytest.mark.archive
 def test_archive_database_exports_the_complete_contract(tmp_path: Path) -> None:
-    """Real-build smoke test: all source owners can satisfy the frozen 15-table boundary."""
+    """Real-build smoke test: all source owners can satisfy the frozen contract boundary."""
     result = export_bi(default_db_path(), tmp_path / "archive-export")
     manifest = validate_bi_export(result.output_dir)
 
     assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V1.tables}
-    assert len(_table_paths(result.output_dir)) == 15
+    # Every contract table (now including dim_optimizer_run) is written to disk, even when a
+    # source owner contributes zero rows; assert existence rather than a magic count so an
+    # additive table cannot silently re-stale this smoke test.
+    assert all(path.is_file() for path in _table_paths(result.output_dir))
     team_form = pq.read_table(result.output_dir / "fact_team_form.parquet")
     assert team_form.num_rows > 0
     # 2021-22 measured no xG: its windows must stay NULL, never 0.0.

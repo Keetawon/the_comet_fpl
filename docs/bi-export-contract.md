@@ -191,6 +191,6 @@ characters):
 }
 ```
 
-The real `tables` object always contains all fifteen contract tables. `created_at`, exported
+The real `tables` object always contains all sixteen contract tables. `created_at`, exported
 `run_id`s, source min/max `known_at`, freshness, database hash, per-table row counts, and per-file
 hashes are all required and validated on read.
