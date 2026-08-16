@@ -1,7 +1,7 @@
 # Development roadmap: GW1 decision pack, then BI
 
 Status: active execution plan  
-Last updated: 2026-08-13  
+Last updated: 2026-08-16  
 Target: 2026/27 GW1  
 Deadline: `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok)  
 First kickoff: `2026-08-21T19:00:00Z`
@@ -217,6 +217,38 @@ player looks more plausible.
 
   **The 2026-08-20 slot still stands.** Its value is fresher data, and re-running it then on a newer
   committed snapshot is what makes it a real fallback rather than a relabelled rehearsal.
+
+  **A fresher preliminary pack was produced on 2026-08-16**, at HEAD
+  `301912e06c7fafe33cacd3ed434ff3667da4c6f9`, from the then-latest committed snapshot
+  `2026-08-16T063551Z` (season `2026-27`, 20 teams, 380 fixtures, 587 elements — six more than the
+  08-13 capture). Steps 1-12 ran in order: all `SHA256SUMS` verified, DuckDB rebuilt with all 21
+  committed daily packages loaded, and both forecasts generated before any ledger write on
+  `database_sha256 b68f6e041a0d1a0e101f389052fe84f288d33bd163c605a30d20339f5dded8d9`
+  (`bootstrap_known_at 2026-08-16T06:35:51Z <= as_of 2026-08-21T17:30:00Z`; 2,935 = 581 x 5 plus
+  the six new roster players). Ruff, format, and strict mypy were clean; pytest ran 1,540 passed /
+  4 skipped / 13 failed, where all 13 are the documented WinError-1314 non-elevated-symlink
+  failures in the `test_bi_export.py` publish path (unchanged machine baseline, unrelated to the
+  P0 pipeline) — not the all-green gate of the 08-14 pack.
+
+  **Unlike the 08-14 pack this one changes both decisions**, so it adds information: default
+  `decision_sha256 3ad7a98e…88bcb7` (was `14eff5b3…c8e767`), diagnostic `135b49fb…a96caf` (was
+  `1f63e2c0…182df5`). Chain: default forecast `4bb3879f…d01eac` -> ledger run `881cbd54…7469f6` ->
+  optimizer run `b3e9f2a7…93c3bb`; diagnostic forecast `bc9b72f1…17b69d` -> ledger run
+  `253c2eb2…5ef315` -> optimizer run `f4246357…6002c7`; comparison
+  `79c4785d10dad712fd5f675afb656931d3aff2e033e7ba2bc800743072073eb8`.
+
+  - Default: £100.0m squad, GW1 EV 64.77, GW1-5 EV 322.86, zero hits; XI Donnarumma — Tarkowski,
+    Virgil, Van Hecke, O'Reilly — Gibbs-White (V), Szoboszlai, Mbeumo, E.Le Fée — Watkins, Haaland
+    (C); bench Heaton (GK), Hamer, Bidwell, Scarlett.
+  - Diagnostic: £97.5m squad, GW1 EV 50.17, GW1-5 EV 250.29, zero hits; captain B.Fernandes, vice
+    Tarkowski.
+  - Structure unchanged from the earlier vintages: squad overlap 8/15, GW1 XI overlap 7/11, captain
+    and vice both disagree. Cross-evaluated captain gaps moved to +1.84 xP Haaland over B.Fernandes
+    under the default model (+3.68 armband; was +2.07) and +1.61 xP B.Fernandes over Haaland under
+    the diagnostic (+3.22; was +1.42) — the two models still each prefer their own captain.
+
+  This pack supersedes the 08-14 pack as the standing fallback vintage (same procedure, fresher
+  committed input, changed decisions). The 2026-08-20 and deadline slots are unaffected.
 - On 2026-08-21: capture and commit the latest official data, rerun the sequential pipeline roughly
   2-3 hours before the deadline, and lock the owner decision no later than 30 minutes before the
   deadline. Do not trade reproducibility for a last-minute unrecorded refresh.
