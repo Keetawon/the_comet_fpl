@@ -1,8 +1,9 @@
 """Per-page dashboard read models over the published BI Parquet export.
 
-This is the P1.7a half of the dashboard boundary: it pre-shapes the joins the two
-exploration pages need (fixture matrix and players) into application JSON, so the static
-browser app only renders and ships no client-side query engine.  It reads ONLY the
+This is the dashboard data boundary: it pre-shapes the joins all six read-model pages
+need (fixture matrix, players, summary, next gameweek, forecast versus actual, optimizer
+audit) into application JSON, so the static browser app only renders and ships no
+client-side query engine.  It reads ONLY the
 immutable Parquet export published by :mod:`fpl.publish.export` -- never the production
 DuckDB -- and publishes its own directory through the same atomic generation-swap
 machinery, imported rather than duplicated.
@@ -47,8 +48,9 @@ from fpl.publish.export import (
 )
 
 DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
-# v2: the manifest gains the summary and next-gameweek read models alongside v1's
-# fixture-matrix and players files; the v1 record shapes are unchanged.
+# v2: the manifest gains the summary, next-gameweek, forecast-vs-actual and
+# optimizer-audit read models alongside v1's fixture-matrix and players files; the v1
+# record shapes are unchanged.
 DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 2
 FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
