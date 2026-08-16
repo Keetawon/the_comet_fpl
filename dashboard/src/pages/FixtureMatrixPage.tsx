@@ -233,12 +233,25 @@ export function FixtureMatrixPage() {
     getExpandedRowModel: getExpandedRowModel(),
   });
 
-  if (state.status === "loading") return <p className="p-6 text-muted-foreground">Loading read models…</p>;
+  if (state.status === "loading") {
+    return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
+  }
   if (state.status === "error") {
     return (
       <div className="p-6">
         <h1 className="mb-2 text-lg font-semibold">Fixture matrix</h1>
-        <p className="max-w-xl text-sm text-destructive">{state.message}</p>
+        <p role="alert" className="max-w-xl text-sm text-destructive">{state.message}</p>
+      </div>
+    );
+  }
+  if (!state.teams.length) {
+    return (
+      <div className="p-6">
+        <h1 className="mb-2 text-lg font-semibold">Fixture matrix</h1>
+        <p className="max-w-xl text-sm text-muted-foreground">
+          No recorded forecast vintages in this export. Generate one first (see
+          dashboard/README.md).
+        </p>
       </div>
     );
   }
@@ -288,16 +301,38 @@ export function FixtureMatrixPage() {
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    className={header.column.getCanSort() ? "cursor-pointer select-none" : ""}
-                    onClick={header.column.getToggleSortingHandler()}
-                  >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                    {{ asc: " ↑", desc: " ↓" }[header.column.getIsSorted() as string] ?? ""}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const sorted = header.column.getIsSorted();
+                  return (
+                    <TableHead
+                      key={header.id}
+                      aria-sort={
+                        sorted === "asc"
+                          ? "ascending"
+                          : sorted === "desc"
+                            ? "descending"
+                            : header.column.getCanSort()
+                              ? "none"
+                              : undefined
+                      }
+                    >
+                      {header.column.getCanSort() ? (
+                        <button
+                          type="button"
+                          onClick={header.column.getToggleSortingHandler()}
+                          className="inline-flex cursor-pointer select-none items-center gap-0.5 text-left"
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <span aria-hidden>
+                            {sorted === "asc" ? "↑" : sorted === "desc" ? "↓" : ""}
+                          </span>
+                        </button>
+                      ) : (
+                        flexRender(header.column.columnDef.header, header.getContext())
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>

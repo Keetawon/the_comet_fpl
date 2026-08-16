@@ -1,5 +1,5 @@
-// Left sidebar navigation. All six planned pages are listed in roadmap order; only the
-// Fixture matrix is implemented in P1.7b -- the rest are labelled stubs.
+// Left sidebar navigation. All six roadmap pages are implemented; the hash route in App.tsx
+// owns the page selection.
 
 import {
   CalendarDays,
@@ -15,16 +15,15 @@ export interface PageDef {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  ready: boolean;
 }
 
 const PAGES: readonly PageDef[] = [
-  { id: "summary", label: "Summary", icon: LayoutDashboard, ready: true },
-  { id: "fixtures", label: "Fixture matrix", icon: CalendarDays, ready: true },
-  { id: "players", label: "Players", icon: Users, ready: true },
-  { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList, ready: true },
-  { id: "forecast-vs-actual", label: "Forecast vs actual", icon: LineChart, ready: true },
-  { id: "optimizer", label: "Optimizer audit", icon: Scale, ready: true },
+  { id: "summary", label: "Summary", icon: LayoutDashboard },
+  { id: "fixtures", label: "Fixture matrix", icon: CalendarDays },
+  { id: "players", label: "Players", icon: Users },
+  { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList },
+  { id: "forecast-vs-actual", label: "Forecast vs actual", icon: LineChart },
+  { id: "optimizer", label: "Optimizer audit", icon: Scale },
 ];
 
 interface SidebarProps {
@@ -57,14 +56,10 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
                   active === page.id
                     ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                     : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-                  !page.ready && "opacity-60",
                 )}
               >
                 <Icon className="size-4" />
                 <span className="flex-1">{page.label}</span>
-                {!page.ready && (
-                  <span className="text-[10px] text-muted-foreground">soon</span>
-                )}
               </button>
             </li>
           );

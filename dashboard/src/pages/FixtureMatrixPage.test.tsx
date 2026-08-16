@@ -3,17 +3,20 @@
 // colour-source toggle are all present.
 
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { loadFixtureMatrix } from "@/data/load";
 import sample from "@/data/sampleFixtureMatrix.json";
 import { FixtureMatrixPage } from "./FixtureMatrixPage";
 
-vi.mock("@/data/load", () => ({
-  loadFixtureMatrix: vi.fn().mockResolvedValue({
+vi.mock("@/data/load", () => ({ loadFixtureMatrix: vi.fn() }));
+
+beforeEach(() => {
+  vi.mocked(loadFixtureMatrix).mockResolvedValue({
     teams: sample.teams,
     manifest: null,
     easeIndexFormulaVersion: "fixture-ease-v1",
-  }),
-}));
+  });
+});
 
 describe("FixtureMatrixPage", () => {
   it("renders team rows with anchor-labelled form and fixture chips", async () => {
@@ -27,5 +30,15 @@ describe("FixtureMatrixPage", () => {
     expect(screen.getByText("Official FDR")).toBeInTheDocument();
     expect(screen.getByText("Model ease")).toBeInTheDocument();
     expect(screen.getByText("Attack")).toBeInTheDocument();
+  });
+
+  it("explains when the export carries no recorded vintage", async () => {
+    vi.mocked(loadFixtureMatrix).mockResolvedValueOnce({
+      teams: [],
+      manifest: null,
+      easeIndexFormulaVersion: "fixture-ease-v1",
+    });
+    render(<FixtureMatrixPage />);
+    expect(await screen.findByText(/No recorded forecast vintages/)).toBeInTheDocument();
   });
 });

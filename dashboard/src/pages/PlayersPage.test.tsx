@@ -2,18 +2,18 @@
 // the form anchor-season label, the availability overlay labelling, filter controls, xP
 // chips, and the expandable per-fixture primitives.
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { loadPlayers } from "@/data/load";
 import sample from "@/data/samplePlayers.json";
 import { PlayersPage } from "./PlayersPage";
 
-vi.mock("@/data/load", () => ({
-  loadPlayers: vi.fn().mockResolvedValue({
-    players: sample.players,
-    manifest: null,
-  }),
-}));
+vi.mock("@/data/load", () => ({ loadPlayers: vi.fn() }));
+
+beforeEach(() => {
+  vi.mocked(loadPlayers).mockResolvedValue({ players: sample.players, manifest: null });
+});
 
 describe("PlayersPage", () => {
   it("renders players with form anchor labels, filters, availability overlay, and chips", async () => {
@@ -48,5 +48,30 @@ describe("PlayersPage", () => {
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Beta")).toBeInTheDocument());
     expect(screen.getByText("No form data")).toBeInTheDocument();
+  });
+
+  it("sorts through a keyboard-focusable button that carries aria-sort", async () => {
+    const user = userEvent.setup();
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    const header = screen.getByRole("columnheader", { name: /^Price/ });
+    expect(header).toHaveAttribute("aria-sort", "none");
+    await user.click(within(header).getByRole("button"));
+    // numeric columns sort descending first (tanstack auto sort direction)
+    expect(header).toHaveAttribute("aria-sort", "descending");
+  });
+
+  it("says so when no players match the current filters", async () => {
+    const user = userEvent.setup();
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    await user.type(screen.getByRole("spinbutton", { name: "Minimum price in millions" }), "99");
+    expect(await screen.findByText("No players match the current filters.")).toBeInTheDocument();
+  });
+
+  it("explains when the export carries no players at all", async () => {
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players: [], manifest: null });
+    render(<PlayersPage />);
+    expect(await screen.findByText(/No recorded forecast vintages/)).toBeInTheDocument();
   });
 });

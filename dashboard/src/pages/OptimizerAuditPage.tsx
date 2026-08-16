@@ -87,12 +87,14 @@ export function OptimizerAuditPage() {
     [state, planId],
   );
 
-  if (state.status === "loading") return <p className="p-6 text-muted-foreground">Loading read models…</p>;
+  if (state.status === "loading") {
+    return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
+  }
   if (state.status === "error") {
     return (
       <div className="p-6">
         <h1 className="mb-2 text-lg font-semibold">Optimizer audit</h1>
-        <p className="max-w-xl text-sm text-destructive">{state.message}</p>
+        <p role="alert" className="max-w-xl text-sm text-destructive">{state.message}</p>
       </div>
     );
   }
