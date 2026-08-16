@@ -849,6 +849,25 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
     }
 
 
+def test_complete_source_populates_every_page_read_model(tmp_path: Path) -> None:
+    """A fully-populated source export must populate all six page read models.
+
+    Guards the regeneration flow in dashboard/README.md: a vintage with team-fixture rows
+    feeds the fixture matrix and players pages, a plan per vintage feeds next_gw and the
+    optimizer audit, finalised actuals feed forecast-vs-actual, and summary always has a
+    latest run. A page's file going empty here means the flow stopped feeding it.
+    """
+    models = build_dashboard_read_models(_build_source_export(tmp_path))
+
+    assert models.teams, "fixture_matrix has no teams"
+    assert models.players, "players is empty"
+    assert models.summary["latest_run"] is not None, "summary has no latest run"
+    assert models.next_gw["plans"], "next_gw has no plans"
+    assert models.optimizer_audit["plans"], "optimizer_audit has no plans"
+    assert models.forecast_vs_actual["runs"], "forecast_vs_actual scored nothing"
+    assert models.forecast_vs_actual["has_outcomes"] is True
+
+
 def test_next_gw_plans_join_ev_context_and_modes(tmp_path: Path) -> None:
     models = build_dashboard_read_models(_build_source_export(tmp_path))
     plans = models.next_gw["plans"]

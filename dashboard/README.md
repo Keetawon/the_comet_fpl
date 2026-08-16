@@ -6,25 +6,85 @@ it never queries DuckDB and never reads Parquet in the browser.
 
 ## Generate the data
 
-From the repository root (Windows PowerShell; the venv is `.venv`):
+From the repository root (Windows PowerShell; the venv is `.venv`). A fresh clone has no
+database — build it from the committed archive and daily snapshots first (detail in
+`docs/gw1-deadline-runbook.md` steps 4-5):
 
 ```powershell
-# 1. Forecast + record a schema-v2 vintage (needs a clean Git worktree; see the GW1 runbook)
-.\.venv\Scripts\python.exe -m fpl.jobs.prospective_points_v1 --db data\fpl.duckdb --output <forecast.jsonl>
-.\.venv\Scripts\python.exe -m fpl.jobs.record_forecast --db data\fpl.duckdb <forecast.jsonl>
+.\.venv\Scripts\python.exe -m fpl.jobs.build_db --db data\fpl.duckdb
+Get-ChildItem snapshots\daily\*\* -Directory | Sort-Object FullName | ForEach-Object {
+    .\.venv\Scripts\python.exe -m fpl.jobs.load_snapshots --db data\fpl.duckdb $_.FullName
+}
+```
 
-# 2. Publish the BI Parquet export and the dashboard read models
-.\.venv\Scripts\python.exe -m fpl.jobs.export_bi --db data\fpl.duckdb --output <bi-export-dir>
+Record schema-v2 forecast vintages (needs a clean Git worktree). Record **both** the
+default and the diagnostic architecture so the Next-GW page's default-vs-diagnostic diff
+and the optimizer-audit page each have two plans to show:
+
+```powershell
+.\.venv\Scripts\python.exe -m fpl.jobs.prospective_points_v1 --db data\fpl.duckdb --output gw1_5_default.jsonl
+.\.venv\Scripts\python.exe -m fpl.jobs.record_forecast --db data\fpl.duckdb gw1_5_default.jsonl
+.\.venv\Scripts\python.exe -m fpl.jobs.prospective_points_v1 --db data\fpl.duckdb --attacking v1 --assists v1 --output gw1_5_diagnostic.jsonl
+.\.venv\Scripts\python.exe -m fpl.jobs.record_forecast --db data\fpl.duckdb gw1_5_diagnostic.jsonl
+```
+
+`next_gw.json` and `optimizer_audit.json` need one immutable optimizer plan per recorded
+vintage, optimized from that vintage's own forecast artifact (clean worktree; the job
+fails closed otherwise):
+
+```powershell
+.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad gw1_5_default.jsonl --output plan_default.json
+.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad gw1_5_diagnostic.jsonl --output plan_diagnostic.json
+```
+
+Publish the BI Parquet export and the dashboard read models, then copy the read models
+where the dev server serves them (gitignored):
+
+```powershell
+.\.venv\Scripts\python.exe -m fpl.jobs.export_bi --db data\fpl.duckdb `
+    --optimizer-plan plan_default.json --optimizer-plan plan_diagnostic.json `
+    --output <bi-export-dir>
 .\.venv\Scripts\python.exe -m fpl.jobs.export_dashboard_json --input <bi-export-dir> --output <dashboard-dir>
-
-# 3. Copy the read models where the dev server serves them (gitignored)
 Copy-Item <dashboard-dir>\*.json dashboard\public\data\
 ```
 
-Note: the two publish steps end in an atomic directory-symlink swap, which needs the
-directory-symlink privilege on Windows. Without it (non-elevated shell) the swap is
-refused after the generation is staged; the staged generation under
-`.<name>.*.tmp` is complete and can be copied manually. On Linux/CI this does not apply.
+Note: both publish steps end in an atomic directory-symlink swap, which needs the
+directory-symlink privilege. On Windows that means an elevated shell or Developer Mode;
+on Linux/CI it just works. In a plain non-elevated Windows shell the swap is refused and
+the staged generation is **cleaned up** — there is nothing left to copy manually. Publish
+through the `before_publish` hook instead, which runs after validation and immediately
+before the swap:
+
+```powershell
+@'
+import shutil
+from pathlib import Path
+from fpl.publish.dashboard_json import export_dashboard_json
+from fpl.publish.export import export_bi
+
+
+def keep_staged(target, destination):
+    def hook():
+        staged = next(target.parent.glob(f".{target.name}.*.tmp"))
+        shutil.copytree(staged, destination, dirs_exist_ok=True)
+    return hook
+
+
+plans = [Path("plan_default.json"), Path("plan_diagnostic.json")]
+bi = Path("<bi-export-dir>")
+try:
+    export_bi(Path("data/fpl.duckdb"), bi, optimizer_plan_paths=plans,
+              before_publish=keep_staged(bi, Path("bi-export-copy")))
+except OSError:
+    pass  # swap refused; the validated content is in bi-export-copy
+models = Path("<dashboard-dir>")
+try:
+    export_dashboard_json(Path("bi-export-copy"), models,
+                          before_publish=keep_staged(models, Path("dashboard/public/data")))
+except OSError:
+    pass
+'@ | .\.venv\Scripts\python.exe -
+```
 
 `manifest.json` is optional for the app (every record repeats its `run_id`/`as_of`); copy
 it when available. Each page fetches only its own file(s); `players.json` (the largest) is
