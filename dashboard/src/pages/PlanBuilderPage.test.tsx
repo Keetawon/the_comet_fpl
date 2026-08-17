@@ -5,10 +5,11 @@
 // labelled Reset rules does, in place), and the review screen ends forward with a Done link to
 // the Next GW page -- no destructive or dead-end exit anywhere.
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
+import { fetchPlanStatus, solvePlan } from "@/lib/planServer";
 import playersSample from "@/data/samplePlayers.json";
 import nextGwSample from "@/data/sampleNextGw.json";
 import auditSample from "@/data/sampleOptimizerAudit.json";
@@ -21,6 +22,11 @@ vi.mock("@/data/load", () => ({
   loadOptimizerAudit: vi.fn(),
 }));
 
+vi.mock("@/lib/planServer", () => ({
+  fetchPlanStatus: vi.fn(),
+  solvePlan: vi.fn(),
+}));
+
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
 const audit: OptimizerAuditData = auditSample as unknown as OptimizerAuditData;
 
@@ -28,6 +34,8 @@ beforeEach(() => {
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersSample.players, manifest: null });
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadOptimizerAudit).mockResolvedValue(audit);
+  vi.mocked(fetchPlanStatus).mockResolvedValue(null); // offline unless a test says otherwise
+  vi.mocked(solvePlan).mockReset();
   window.localStorage.clear();
 });
 
@@ -118,5 +126,52 @@ describe("PlanBuilderPage", () => {
     expect(done).toHaveAttribute("href", "#next-gw");
     await user.click(screen.getByRole("button", { name: /Back to rules/ }));
     expect(screen.getByRole("textbox", { name: "Search player" })).toBeInTheDocument();
+  });
+
+  it("solves through the local plan server when it is online, and says so when not", async () => {
+    const user = userEvent.setup();
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Build from scratch →"));
+    await user.type(screen.getByRole("textbox", { name: "Search player" }), "Alpha");
+    await user.click(screen.getByRole("button", { name: /Alpha/ }));
+    await user.click(screen.getByText("25%"));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+    // offline by default: the solve button is disabled and the start command is the fallback
+    expect(await screen.findByText(/plan server online|Offline — start it/)).toBeInTheDocument();
+    expect(screen.getByText(/Offline — start it/)).toBeInTheDocument();
+    const solve = screen.getByRole("button", { name: /Solve now with my rules/ });
+    expect(solve).toBeDisabled();
+    // coming online enables it; solving posts the exact rules and hands off to Next GW
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: true,
+    });
+    await user.click(screen.getByRole("button", { name: /Re-check/ }));
+    expect(await screen.findByText("plan server online")).toBeInTheDocument();
+    vi.mocked(solvePlan).mockResolvedValue({
+      optimizer_run_id: "solved-run-1",
+      decision_sha256: "deadbeef",
+      gw: 1,
+      gw_expected_points: 60.7,
+      horizon_expected_points: 317.2,
+      hit_points: 0,
+      squad_cost_tenths: 995,
+      captain: "Gibbs-White",
+      vice_captain: "O'Reilly",
+    });
+    expect(solve).toBeEnabled();
+    await user.click(solve);
+    await waitFor(() => expect(vi.mocked(solvePlan)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(solvePlan)).toHaveBeenCalledWith(
+      { locks: [1], minBenchAppearance: 0.25 },
+      expect.any(Function),
+    );
+    await waitFor(() => expect(window.localStorage.getItem("fpl-solved-plan")).toBe("solved-run-1"));
+    expect(window.localStorage.getItem("fpl-plan-request")).toBeNull(); // applied, not pending
+    expect(window.location.hash).toBe("#next-gw");
   });
 });

@@ -115,6 +115,15 @@ describe("NextGwPage", () => {
     expect(screen.getByText(/row colours: gold = captain/)).toBeInTheDocument();
   });
 
+  it("preselects the wizard's freshly solved plan when it is in the export", async () => {
+    const solved = plans[1]; // the diagnostic sample plan
+    window.localStorage.setItem("fpl-solved-plan", solved.optimizer_run_id);
+    render(<NextGwPage />);
+    await waitFor(() => expect(screen.getByText(/Next GW suggestion — GW1/)).toBeInTheDocument());
+    // the footer carries the selected plan's own run id, proving the preselect took
+    expect(screen.getByText(new RegExp(solved.optimizer_run_id.slice(0, 12)))).toBeInTheDocument();
+  });
+
   it("shows the wizard's pending rules as not yet applied, dismissable", async () => {
     window.localStorage.setItem(
       "fpl-plan-request",

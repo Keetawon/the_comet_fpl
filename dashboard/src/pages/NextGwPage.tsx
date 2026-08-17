@@ -229,6 +229,12 @@ export function NextGwPage() {
           teams: teamsData.teams,
         });
         setPlanId(defaultPlan(nextGw.plans)?.optimizer_run_id ?? null);
+        // After a wizard "Solve now" the fresh plan's id is stashed; preselect it if it is in
+        // this export (a later republish without it falls back to the default plan above).
+        const solved = window.localStorage.getItem("fpl-solved-plan");
+        if (solved && nextGw.plans.some((p) => p.optimizer_run_id === solved)) {
+          setPlanId(solved);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {

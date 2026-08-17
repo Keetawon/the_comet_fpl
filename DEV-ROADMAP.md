@@ -678,7 +678,11 @@ Only after P0 and the BI MVP are secure:
   the `--min-bench-appearance` bench gate, selling-value-aware budget checks); the
   optimizer-side primitives (`--lock`, `initial_banked_free_transfers`, the bench gate) are
   already implemented and tested — the remaining work is the manager ingest boundary, value
-  accounting, and the dashboard page.
+  accounting, and the dashboard page. **The interactive solving half shipped early
+  (2026-08-17, owner decision — it is needed for the GW1 decision itself):**
+  `fpl.jobs.plan_server` is a localhost trigger that runs the unchanged, fail-closed
+  optimizer and publish chain for the wizard's rules and republishes the read models; see
+  `dashboard/README.md`. It adds vintages beside the runbook flow and replaces no part of it.
 
 These are not GW1 blockers and must not be rushed into the current forecast.
 

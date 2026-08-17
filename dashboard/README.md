@@ -91,6 +91,29 @@ it when available. `players.json` is by far the largest file and is shared by th
 Players, and Next-GW pages; it is fetched and parsed once per browser session (a
 module-level cache in `src/data/load.ts`).
 
+## Solve from the dashboard (local plan server)
+
+The wizard's **Solve now** button targets a tiny local HTTP service (stdlib only, no new
+dependency) that runs the *same* jobs the runbook does — never a reimplementation. From the
+repository root:
+
+```powershell
+.\.venv\Scripts\python.exe -m fpl.jobs.plan_server            # 127.0.0.1:8765
+.\.venv\Scripts\python.exe -m fpl.jobs.plan_server --host 0.0.0.0   # reachable from the LAN preview
+```
+
+`POST /plan {"locks": [code...], "min_bench_appearance": 0.25|null}` runs
+`fpl.jobs.optimize_squad` on the dev-latest default forecast with your rules, writes a unique
+timestamped immutable artifact under `dev-latest\my-rules\`, then republishes the BI export and
+these read models carrying the standing default/diagnostic plans plus the newest interactive
+plan. `GET /status` reports busy/stage/worktree state. The browser never computes anything — it
+asks this process to run the fail-closed jobs and then refetches the published JSON.
+
+Every correctness property is inherited: the optimizer still refuses a dirty Git worktree
+(the UI surfaces that as a pre-check — commit first), runs are serialized one at a time, and
+artifacts stay no-clobber and provenance-bound. The deadline pack itself still comes from the
+sequential runbook; interactive plans are additional dev vintages.
+
 ## Run
 
 ```powershell
@@ -167,8 +190,9 @@ published read-model directory.
   post-deadline; build-from-scratch live), a lock picker with search/position filter and the
   per-position/club-cap/max-5 guards, a live budget pre-flight (locks + cheapest legal
   completion vs the rules snapshot read from a recorded optimizer artifact), the rotation
-  threshold selector, and the exact optimizer command to run. The browser never solves; the
-  result renders through the Next GW page once recorded.
+  threshold selector, and **Solve now** through the local plan server (above) with the exact
+  command as the offline fallback. The browser never solves; the result renders through the
+  Next GW page (preselected automatically) once the plan server records it.
 - **Forecast vs actual** (implemented, P1.7e): each recorded vintage scored against its own
   season's finalised outcomes (points under 2026/27 rules, read-time join at
   `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a

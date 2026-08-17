@@ -27,7 +27,8 @@ import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
 import type { PlayerRecord } from "@/data/types";
 import { isDefaultArchitecture } from "@/lib/nextGw";
-import { writePlanRequest } from "@/lib/planRequest";
+import { clearPlanRequest, writePlanRequest } from "@/lib/planRequest";
+import { fetchPlanStatus, solvePlan } from "@/lib/planServer";
 import { availabilityLabel } from "@/lib/availability";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,14 @@ type PageState =
 
 // Wizard screens: 0 Start, 1 manager import, 2 set rules, 3 review & run.
 type Step = 0 | 1 | 2 | 3;
+
+/** The solve card's view of the local plan server (src/fpl/jobs/plan_server.py). */
+type SolverStatus =
+  | { status: "checking" }
+  | { status: "offline" }
+  | { status: "online" }
+  | { status: "solving"; stage: string | null }
+  | { status: "error"; message: string };
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 const MAX_LOCKS = 5;
@@ -120,6 +129,48 @@ export function PlanBuilderPage() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [copied, setCopied] = useState(false);
+  const [solver, setSolver] = useState<SolverStatus>({ status: "checking" });
+
+  const checkSolver = () => {
+    setSolver({ status: "checking" });
+    void fetchPlanStatus().then((status) =>
+      setSolver(status ? { status: "online" } : { status: "offline" }),
+    );
+  };
+
+  // Entering the review screen probes the local plan server once (manual Re-check retries).
+  useEffect(() => {
+    if (step === 3 && solver.status === "checking") checkSolver();
+  }, [step, solver.status]);
+
+  const solveNow = () => {
+    setSolver({ status: "solving", stage: null });
+    void solvePlan(
+      {
+        locks: locks.map((p) => p.code),
+        minBenchAppearance: thresholdFlag ? Number(thresholdFlag) : null,
+      },
+      (stage) => setSolver((current) => (current.status === "solving" ? { ...current, stage } : current)),
+    )
+      .then((summary) => {
+        // The plan server republished the read models; hand off to the Next GW page with the
+        // fresh plan preselected and reload so the module-level data cache refetches.
+        window.localStorage.setItem("fpl-solved-plan", summary.optimizer_run_id);
+        clearPlanRequest();
+        window.location.hash = "next-gw";
+        try {
+          window.location.reload();
+        } catch {
+          /* jsdom: reload not implemented */
+        }
+      })
+      .catch((error: unknown) => {
+        setSolver({
+          status: "error",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -619,6 +670,64 @@ export function PlanBuilderPage() {
               Frozen prices at the deadline; availability is a reported overlay for the next
               gameweek only. Development-only output.
             </p>
+          </div>
+
+          <div className="rounded-xl border bg-card p-4 shadow-sm" aria-label="Solve">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Solve it now</p>
+              {solver.status === "online" && (
+                <Badge
+                  variant="outline"
+                  className="border-emerald-300 bg-emerald-50 text-[10px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                >
+                  <span className="inline-block size-1.5 rounded-full bg-emerald-500" /> plan server online
+                </Badge>
+              )}
+              {solver.status === "solving" && (
+                <Badge variant="outline" className="text-[10px]">
+                  <span className="inline-block size-1.5 animate-pulse rounded-full bg-sky-500" /> running
+                </Badge>
+              )}
+            </div>
+            <p className="mt-2 text-sm leading-relaxed">
+              Runs the <span className="font-medium">real optimizer</span> on this machine with
+              your locks and threshold, then republishes the read models — about a minute or two.
+              Your squad appears on the Next GW page, selected automatically.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                onClick={solveNow}
+                disabled={solver.status !== "online" || totals.leftover < 0}
+              >
+                <Sparkles className="size-4" />
+                {solver.status === "solving" ? "Solving…" : "Solve now with my rules"}
+              </Button>
+              {solver.status === "offline" && (
+                <Button variant="ghost" size="sm" onClick={checkSolver}>
+                  Re-check
+                </Button>
+              )}
+            </div>
+            {solver.status === "solving" && (
+              <p role="status" className="mt-2 text-xs tabular-nums text-muted-foreground">
+                {solver.stage ?? "starting…"} — the page reloads into Next GW when it finishes.
+              </p>
+            )}
+            {solver.status === "offline" && (
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Offline — start it from the repository root with{" "}
+                <code className="rounded bg-muted px-1 font-mono text-[10px]">
+                  python -m fpl.jobs.plan_server
+                </code>{" "}
+                (see dashboard/README.md), or run the copied command below by hand.
+              </p>
+            )}
+            {solver.status === "error" && (
+              <p role="alert" className="mt-2 text-xs leading-relaxed text-destructive">
+                {solver.message} — the server console carries the full detail; the copied command
+                below remains the manual fallback.
+              </p>
+            )}
           </div>
 
           <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
