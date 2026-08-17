@@ -98,4 +98,19 @@ describe("NextGwPage", () => {
     expect(screen.getAllByText("Alpha").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Beta").length).toBeGreaterThan(0);
   });
+
+  it("colour-codes suggestion rows by role: captain gold, vice pale gold, bench grey", async () => {
+    render(<NextGwPage />);
+    await waitFor(() => expect(screen.getByText(/Next GW suggestion — GW1/)).toBeInTheDocument());
+    const rowsOf = (name: string) =>
+      screen.getAllByText(name).flatMap((element) => {
+        const row = element.closest("tr");
+        return row ? [row] : [];
+      });
+    // Alpha captains the default plan: a gold-highlighted row with an amber accent.
+    expect(rowsOf("Alpha").some((row) => row.className.includes("bg-amber-100"))).toBe(true);
+    // Beta is the vice-captain starter: the paler amber variant.
+    expect(rowsOf("Beta").some((row) => row.className.includes("bg-amber-50"))).toBe(true);
+    expect(screen.getByText(/row colours: gold = captain/)).toBeInTheDocument();
+  });
 });

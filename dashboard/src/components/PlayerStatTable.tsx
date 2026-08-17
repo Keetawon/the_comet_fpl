@@ -64,6 +64,8 @@ export interface PlayerStatTableProps {
   extraColumns?: LegacyColumnDef<PlayerStatRow>[];
   /** Badges after the player name (C/V/bench/in-squad on the Next GW page). */
   nameSuffix?: (player: PlayerRecord) => ReactNode;
+  /** Per-row conditional formatting (e.g. captain/vice/bench row colours). */
+  rowClassName?: (row: PlayerStatRow) => string | undefined;
   emptyMessage?: string;
 }
 
@@ -230,6 +232,7 @@ export function PlayerStatTable({
   beforeFixtureColumns = [],
   extraColumns = [],
   nameSuffix,
+  rowClassName,
   emptyMessage = "No players match the current filters.",
 }: PlayerStatTableProps) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
@@ -433,7 +436,7 @@ export function PlayerStatTable({
             ) : (
               table.getRowModel().rows.flatMap((row) => {
                 const cells = (
-                  <TableRow key={row.id}>
+                  <TableRow key={row.id} className={rowClassName?.(row.original)}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className={CELL_CLASS}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

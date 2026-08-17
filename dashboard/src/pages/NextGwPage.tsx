@@ -341,6 +341,22 @@ export function NextGwPage() {
     );
   };
 
+  /** Row conditional formatting: captain gold, vice pale gold, bench grey, XI default. */
+  const rowClassName = (player: PlayerRecord) => {
+    const squadPlayer = weekByCode.get(player.code);
+    if (!squadPlayer) return undefined;
+    if (squadPlayer.is_captain) {
+      return "bg-amber-100/70 dark:bg-amber-950/40 border-l-4 border-l-amber-500";
+    }
+    if (squadPlayer.is_vice_captain) {
+      return "bg-amber-50 dark:bg-amber-950/20 border-l-4 border-l-amber-300 dark:border-l-amber-700";
+    }
+    if (squadPlayer.role !== "starting_xi") {
+      return "bg-zinc-200 dark:bg-zinc-800/80 border-l-4 border-l-transparent";
+    }
+    return undefined;
+  };
+
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -440,7 +456,8 @@ export function NextGwPage() {
               <ToggleGroupItem value="all">Compare all players</ToggleGroupItem>
             </ToggleGroup>
             <span className="text-xs">
-              {rows.length} rows · chips headline fixture xP and colour on opponent strength
+              {rows.length} rows · chips headline fixture xP and colour on opponent strength ·
+              row colours: gold = captain, pale gold = vice, grey = bench
             </span>
           </div>
           <PlayerFiltersBar filters={playerFilters} onChange={setPlayerFilters} teams={teams} />
@@ -458,6 +475,7 @@ export function NextGwPage() {
         initialSorting={[]}
         beforeFixtureColumns={planColumns}
         nameSuffix={nameSuffix}
+        rowClassName={({ player }) => rowClassName(player)}
         emptyMessage={
           squadOnly === "squad"
             ? "No squad players match the current filters."
