@@ -249,6 +249,38 @@ player looks more plausible.
 
   This pack supersedes the 08-14 pack as the standing fallback vintage (same procedure, fresher
   committed input, changed decisions). The 2026-08-20 and deadline slots are unaffected.
+
+  **A third preliminary pack was produced on 2026-08-17** (rerun at the owner's request to pick
+  up the optimizer fixes), at HEAD `2097842f1517cc82d95b6574581122151cc9f1ea`, from the
+  CI-captured snapshot `2026-08-17T065035Z` (season `2026-27`, 20 teams, 380 fixtures, 587
+  elements). Steps 1-12 ran in order on `database_sha256
+  3032d30b03878573eb2e8ad5928c1e4c1ff78b22048024d98cbe8964adc334b5`
+  (`bootstrap_known_at 2026-08-17T06:50:35Z <= as_of 2026-08-21T17:30:00Z`; 2,935 = 587 x 5).
+  Ruff, format, and strict mypy were clean; pytest ran 1,559 passed / 4 skipped / 13 failed —
+  the same documented WinError-1314 non-elevated-symlink `test_bi_export.py` baseline.
+
+  **This pack is the first run under the fixed optimizer** (commit `85408c0`): the bench
+  tie-break no longer ranks zero-availability players first, so the injured Heaton (status
+  `i`, chance 0) is replaced by Forster as the default bench goalkeeper and the injured
+  Danns is replaced by Destan on the diagnostic bench. The XIs and EVs are otherwise
+  unchanged from the 08-16 pack (bench points are outside the objective, so the fix moves
+  bench composition, not EV): default GW1 EV 64.77 / GW1-5 322.86, diagnostic 50.17 / 250.31.
+
+  Chain: default forecast `05c18f2f…0973ca` -> ledger run `23a90303…f125d` -> optimizer run
+  `b8193a48…05388` (decision `ade247f6…a0bb13`); diagnostic forecast `ce879c5b…d381e6` ->
+  ledger run `5a3f94e2…bc80` -> optimizer run `19df6672…7dbba` (decision `c1b3cfc0…a17fee`);
+  comparison `d5abca8b75874c9c1031db1ea515062bcfbd51daefedcae1ea8324cfdcbb6a24`. Structure
+  is unchanged from the 08-16 pack: squad overlap 8/15, XI overlap 7/11, captain and vice
+  disagree, cross-evaluated captain gaps +1.84/+3.68 (default) and +1.61/+3.22 (diagnostic).
+
+  A clearly-labelled **sensitivity run** with the new `--min-bench-appearance 0.25` bench gate
+  was produced from the same default forecast (optimizer run `32d16478…44d4399`, decision
+  `781ec06c…c6ffd`): identical XI, captain, and EV, with exactly one bench change —
+  Scarlett -> Destan. It is a sensitivity analysis beside the EV result, never a replacement
+  for it, and is not part of the ledger or the comparison.
+
+  This pack supersedes the 08-16 pack as the standing fallback vintage. The 2026-08-20 and
+  deadline slots are unaffected.
 - On 2026-08-21: capture and commit the latest official data, rerun the sequential pipeline roughly
   2-3 hours before the deadline, and lock the owner decision no later than 30 minutes before the
   deadline. Do not trade reproducibility for a last-minute unrecorded refresh.
