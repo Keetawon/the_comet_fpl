@@ -45,6 +45,10 @@ markers = [
 src = ["src", "tests"]
 line-length = 100
 target-version = "py312"
+# Vendored third-party UI/UX skills (`.claude/skills/`) are copied unmodified from
+# upstream (MIT; see .claude/skills/THIRD-PARTY-SKILLS.md); the repo format gate must
+# not require reformatting them.
+extend-exclude = [".claude/skills"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "PT", "SIM", "RUF"]
