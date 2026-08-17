@@ -160,8 +160,9 @@ class SearchPolicy(_Frozen):
     """The complete bounded-search policy that shaped the transfer plan.
 
     Every field is behaviour-defining and enters the ``run_id``. The constraint bounds and the
-    transfer-state parameters come from the squad-rules file; ``risk_lambda`` comes from the CLI;
-    ``search_method`` and ``optimality_scope`` are the planner's own declared scope of exactness.
+    transfer-state parameters come from the squad-rules file; ``risk_lambda`` and
+    ``min_bench_appearance`` come from the CLI; ``search_method`` and ``optimality_scope``
+    are the planner's own declared scope of exactness.
     """
 
     candidate_pool_per_position: int = Field(gt=0)
@@ -173,8 +174,17 @@ class SearchPolicy(_Frozen):
     hit_cost_points: int = Field(ge=0)
     maximum_transfers_per_gameweek: int = Field(gt=0)
     risk_lambda: float = Field(ge=0.0, allow_inf_nan=False)
+    min_bench_appearance: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
+    locked_codes: tuple[int, ...] = ()
     search_method: str
     optimality_scope: str
+
+    @field_validator("locked_codes")
+    @classmethod
+    def _distinct_locks(cls, value: tuple[int, ...]) -> tuple[int, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("locked_codes must be distinct")
+        return tuple(sorted(value))
 
     @model_validator(mode="after")
     def _descriptions_present(self) -> Self:
@@ -568,6 +578,8 @@ def derive_optimizer_run_id(
         "optimizer_commit_sha": provenance.optimizer_commit_sha,
         "decision_sha256": _validate_sha256(decision_sha256),
         "risk_lambda": search_policy.risk_lambda,
+        "min_bench_appearance": search_policy.min_bench_appearance,
+        "locked_codes": list(search_policy.locked_codes),
         "candidate_pool_per_position": search_policy.candidate_pool_per_position,
         "transfer_depth": search_policy.transfer_depth,
         "transition_limit_per_state": search_policy.transition_limit_per_state,

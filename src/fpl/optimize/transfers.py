@@ -12,6 +12,7 @@ from fpl.optimize.squad import (
     OptimizationError,
     SquadSolution,
     WeekSelection,
+    bench_appearance_satisfied,
     exact_lineup,
     row_utility,
     validate_squad,
@@ -94,8 +95,12 @@ def _successor_squads(
     candidate_pool: tuple[int, ...],
     gw: int,
     risk_lambda: float,
+    locked_codes: frozenset[int] = frozenset(),
 ) -> tuple[tuple[int, ...], ...]:
-    """Return the strongest legal same-position swaps within the configured bound."""
+    """Return the strongest legal same-position swaps within the configured bound.
+
+    Locked players never appear in an outgoing swap, so every successor keeps them.
+    """
     current = set(squad)
     candidates_by_position = {
         position: tuple(
@@ -109,6 +114,8 @@ def _successor_squads(
     max_depth = min(rules.search.maximum_planned_transfers_per_gameweek, len(squad))
     for depth in range(1, max_depth + 1):
         for outgoing in combinations(squad, depth):
+            if locked_codes.intersection(outgoing):
+                continue
             incoming_options = [
                 candidates_by_position[index.first_by_code[code].position] for code in outgoing
             ]
@@ -155,30 +162,56 @@ def plan_transfers(
     initial_solution: SquadSolution,
     *,
     risk_lambda: float = 0.0,
+    min_bench_appearance: float = 0.0,
+    locked_codes: tuple[int, ...] = (),
+    initial_banked_free_transfers: int = 0,
 ) -> TransferPlan:
-    """Plan transfers over the artifact horizon with bounded deterministic DP/beam search."""
+    """Plan transfers over the artifact horizon with bounded deterministic DP/beam search.
+
+    ``min_bench_appearance`` (0.0 = disabled, the default) rejects any successor squad whose
+    lineup for the planned gameweek benches an outfield player below the appearance gate --
+    the same gate :func:`fpl.optimize.squad.optimize_initial_squad` applies to squad
+    selection, kept hold of across the transfer path so a later transfer cannot reintroduce
+    a bench player who never plays. ``locked_codes`` are never transferred out. For a
+    manager's existing squad (whose season has already burned or banked transfers),
+    ``initial_banked_free_transfers`` seeds the free-transfer state; 0 is the fresh-season
+    start the initial-squad path always uses.
+    """
     if not math.isfinite(risk_lambda) or risk_lambda < 0.0:
         raise ValueError("risk_lambda must be finite and non-negative")
+    if not math.isfinite(min_bench_appearance) or not 0.0 <= min_bench_appearance <= 1.0:
+        raise ValueError("min_bench_appearance must be finite and within [0, 1]")
+    if not 0 <= initial_banked_free_transfers <= rules.transfers.free_transfer_bank_cap:
+        raise ValueError("initial_banked_free_transfers must be within [0, free_transfer_bank_cap]")
+    locked = frozenset(locked_codes)
     initial_squad = tuple(sorted(initial_solution.codes))
+    if not locked <= set(initial_squad):
+        raise OptimizationError(
+            f"locked codes are not in the initial squad: {sorted(locked - set(initial_squad))}"
+        )
     validate_squad(artifact_index, rules, initial_squad)
     candidate_pool = _candidate_pool(artifact_index, rules, initial_squad, risk_lambda)
     first_gw = artifact_index.gws[0]
     first_lineup = exact_lineup(artifact_index, rules, initial_squad, first_gw, risk_lambda)
+    if not bench_appearance_satisfied(artifact_index, first_lineup, min_bench_appearance):
+        raise OptimizationError(
+            "initial squad lineup violates min_bench_appearance before transfer planning"
+        )
     first_week = TransferWeek(
         gw=first_gw,
         squad=initial_squad,
         transfers_in=(),
         transfers_out=(),
-        free_transfers_before=0,
-        free_transfers_after=0,
+        free_transfers_before=initial_banked_free_transfers,
+        free_transfers_after=initial_banked_free_transfers,
         hit_points=0,
         lineup=first_lineup,
     )
     states: dict[tuple[tuple[int, ...], int], _Path] = {
-        (initial_squad, 0): _Path(
+        (initial_squad, initial_banked_free_transfers): _Path(
             weeks=(first_week,),
             squad=initial_squad,
-            banked_free_transfers=0,
+            banked_free_transfers=initial_banked_free_transfers,
             expected_points=first_lineup.expected_points,
             hit_points=0,
             objective_value=first_lineup.objective_value,
@@ -199,6 +232,7 @@ def plan_transfers(
                 candidate_pool,
                 gw,
                 risk_lambda,
+                locked_codes=locked,
             )
             for squad in successors:
                 incoming, outgoing = _transfer_delta(path.squad, squad)
@@ -206,6 +240,8 @@ def plan_transfers(
                 hit = max(0, transfers - available) * rules.transfers.hit_cost_points
                 banked = max(0, available - transfers)
                 lineup = exact_lineup(artifact_index, rules, squad, gw, risk_lambda)
+                if not bench_appearance_satisfied(artifact_index, lineup, min_bench_appearance):
+                    continue
                 week = TransferWeek(
                     gw=gw,
                     squad=squad,

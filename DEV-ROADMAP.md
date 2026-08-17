@@ -1,7 +1,7 @@
 # Development roadmap: GW1 decision pack, then BI
 
 Status: active execution plan  
-Last updated: 2026-08-16  
+Last updated: 2026-08-17  
 Target: 2026/27 GW1  
 Deadline: `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok)  
 First kickoff: `2026-08-21T19:00:00Z`
@@ -619,7 +619,14 @@ Only after P0 and the BI MVP are secure:
 - monitor recorded real-deadline forecasts against finalized outcomes;
 - decide whether a newly named positional attacking-allocation candidate is warranted;
 - investigate a price-informed starter prior on a fresh, pre-registered validation window;
-- revisit cards only if a real decision is shown to turn on their measured margin.
+- revisit cards only if a real decision is shown to turn on their measured margin;
+- build the manager-team transfer-suggestion wizard per
+  `docs/manager-team-suggestions.md` (manager_id input, own-squad transfer suggestions with
+  exact free-transfer/-4-hit accounting, up to five locked must-keep players via `--lock`,
+  the `--min-bench-appearance` bench gate, selling-value-aware budget checks); the
+  optimizer-side primitives (`--lock`, `initial_banked_free_transfers`, the bench gate) are
+  already implemented and tested — the remaining work is the manager ingest boundary, value
+  accounting, and the dashboard page.
 
 These are not GW1 blockers and must not be rushed into the current forecast.
 

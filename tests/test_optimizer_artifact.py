@@ -259,6 +259,8 @@ def test_changed_provenance_changes_run_id(changed: dict[str, str]) -> None:
     "changed",
     [
         {"risk_lambda": 0.5},
+        {"min_bench_appearance": 0.25},
+        {"locked_codes": (30,)},
         {"candidate_pool_per_position": 8},
         {"transfer_depth": 1},
         {"transition_limit_per_state": 100},
@@ -682,6 +684,59 @@ def test_job_writes_artifact_on_clean_worktree(
     assert plan.provenance.forecast.commit_sha == "forecastcommit"
     assert plan.provenance.squad_rules.contract_version == "1.0"
     assert len(plan.initial_squad.members) == 15
+
+
+def test_job_records_min_bench_appearance_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The gate is provenance: recorded, assumption-documented, and identity-binding.
+
+    Every synthetic outfielder here has appearance bound 1.0, so a 0.25 gate never binds:
+    the decision content is unchanged and only the policy-bound run identity moves.
+    """
+    forecast = _write_forecast(tmp_path)
+    default_out = tmp_path / "plan_default.json"
+    gated_out = tmp_path / "plan_gated.json"
+    _mock_clean_output(monkeypatch)
+    assert main([str(forecast), "--output", str(default_out)]) == 0
+    assert main([str(forecast), "--min-bench-appearance", "0.25", "--output", str(gated_out)]) == 0
+    default_plan = read_optimizer_artifact(default_out)
+    gated_plan = read_optimizer_artifact(gated_out)
+    assert default_plan.search_policy.min_bench_appearance == 0.0
+    assert gated_plan.search_policy.min_bench_appearance == 0.25
+    # The gate never binds on this population (every outfielder's bound is 1.0), so the
+    # selected 15 and every weekly XI are identical; the decision hash still moves because
+    # the decision records its own assumptions, which document the active gate.
+    assert gated_plan.initial_squad == default_plan.initial_squad
+    assert gated_plan.plan.weeks == default_plan.plan.weeks
+    assert gated_plan.decision_sha256 != default_plan.decision_sha256
+    assert gated_plan.run_id != default_plan.run_id
+    assert any("min_bench_appearance=0.25" in line for line in gated_plan.assumptions)
+    assert not any("min_bench_appearance" in line for line in default_plan.assumptions)
+
+
+def test_job_records_locked_players_policy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Locked must-keep players are provenance: policy-recorded and assumption-documented."""
+    forecast = _write_forecast(tmp_path)
+    out = tmp_path / "plan_locked.json"
+    _mock_clean_output(monkeypatch)
+    assert main([str(forecast), "--lock", "30", "--output", str(out)]) == 0
+    plan = read_optimizer_artifact(out)
+    assert plan.search_policy.locked_codes == (30,)
+    assert any("locked players: P30 (30)" in line for line in plan.assumptions)
+
+
+def test_job_rejects_more_than_five_locks_and_unknown_codes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forecast = _write_forecast(tmp_path)
+    _mock_clean_output(monkeypatch)
+    many = [arg for code in (1, 2, 3, 10, 20, 30) for arg in ("--lock", str(code))]
+    assert main([str(forecast), *many, "--output", str(tmp_path / "a.json")]) == 1
+    assert main([str(forecast), "--lock", "9999", "--output", str(tmp_path / "b.json")]) == 1
+    assert not (tmp_path / "a.json").exists()
+    assert not (tmp_path / "b.json").exists()
+    assert capsys.readouterr().out == ""
 
 
 def test_job_output_is_no_clobber(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

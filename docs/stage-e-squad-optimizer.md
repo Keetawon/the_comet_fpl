@@ -79,12 +79,61 @@ The same deadline-known `now_cost` is used for every gameweek in the horizon. Th
 planning assumption, not a forecast of future affordability. The plan must be regenerated at each
 deadline; it does not model future market prices or selling-value profit rules.
 
+### Optional bench-appearance gate (`--min-bench-appearance P`)
+
+Because bench points are absent from the objective, the tie-break otherwise fills the bench with
+the cheapest legal filler, who may be a player who never plays -- useless as a rotation option.
+`--min-bench-appearance P` (default `0.0`, disabled, the historical behaviour) requires every
+OUTFIELD player benched in any planned gameweek to show an appearance probability of at least
+`P`. It is one linear constraint per (player, gameweek) in the ILP
+(`bound >= P * (in_squad - starts)`, since `in_squad - starts` is exactly the benched
+indicator), and the transfer planner rejects any successor whose lineup for a planned gameweek
+benches below the gate, so a later transfer cannot reintroduce dead bench weight.
+
+The measure is `1 - P(0 points)` read from the stored full-points distribution, scaled by the
+availability overlay -- a conservative LOWER bound on appearance probability, because a
+non-appearance lands entirely in the zero-points cell while a player can also appear and score
+nothing. It is derived from the immutable artifact rows, so already-recorded vintages can be
+re-optimized with the gate without re-forecasting. Two exemptions are deliberate: the bench
+GOALKEEPER is exempt (a backup keeper plays only on an unforecastable starter injury, so no
+meaningful threshold is attainable and gating it would make every squad illegal), and a player
+may still be selected with a sub-threshold bound if he STARTS every planned gameweek. A
+threshold no legal squad can satisfy fails closed as an infeasibility error naming the
+threshold. The value is provenance: recorded in the artifact's `search_policy`, bound into the
+`run_id`, and documented in the decision's assumptions.
+
+### Locked must-keep players (`--lock CODE`, at most five)
+
+`--lock CODE` (repeatable; the five-lock cap is an owner product rule, not a rules-engine
+limit) pins a player into the squad: the ILP forces him in and the transfer planner never
+ships him out, so the optimizer assigns every remaining quota around the owner's must-keep
+players. Locks compose with the bench gate rather than overriding it -- a locked player who
+cannot clear `min_bench_appearance` must START every planned gameweek, and a locked set that
+makes no legal squad possible (position quotas, club cap, budget) fails closed naming the
+locks. Locked codes are provenance: recorded in `search_policy.locked_codes`, bound into the
+`run_id`, and listed by name in the decision's assumptions.
+
+### Manager free-transfer state
+
+`plan_transfers(initial_banked_free_transfers=B)` seeds the DP with a manager's carried free
+transfers instead of the fresh-season zero, bounded by the rules' bank cap. The hit arithmetic
+itself is unchanged and was always exact: each gameweek grants one free transfer, unused
+transfers bank up to the cap, and every transfer beyond the grant costs the configured
+-4 hit. This parameter is what a manager-team suggestion (see
+`docs/manager-team-suggestions.md`) passes after deriving the manager's banked state from
+their transfer history.
+
 PuLP/CBC is the one added production dependency. It gives an auditable exact binary linear solve for
 the fixed-squad selection problem, remains small relative to the existing scientific stack, and
 avoids maintaining a custom combinatorial solver. CBC uses its deterministic single-process default
 and a fixed random seed. Bench points remain absent from the primary objective; among exactly tied
 primary optima, a second solve chooses minimum squad cost and then stable code rank so the full
-15-player output is reproducible.
+15-player output is reproducible. One override is ordered before price in that tie-break: a player
+the availability overlay rules out (multiplier 0 in any planned gameweek, e.g. injured with a 0%
+chance) ranks behind every available filler at any price -- otherwise the cheapest injured player
+is the tie-break's favourite bench filler and the plan suggests someone who can never come on
+(measured on the 2026-08-16 preliminary pack: Heaton, status `i`/chance 0, was the default plan's
+bench goalkeeper in GW1-2).
 
 ## Transfers and optimality limits
 

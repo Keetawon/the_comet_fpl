@@ -22,8 +22,11 @@ from fpl.jobs.optimize_squad import main
 from fpl.optimize.rules import SquadRules, load_squad_rules
 from fpl.optimize.squad import (
     ArtifactIndex,
+    OptimizationError,
     SquadMember,
     SquadSolution,
+    appearance_lower_bound,
+    bench_appearance_satisfied,
     exact_lineup,
     optimize_initial_squad,
 )
@@ -39,6 +42,7 @@ class _Player:
     points: tuple[float, ...]
     cost: int = 40
     team_id: int | None = None
+    availability_multiplier: float = 1.0
 
 
 def _distribution(mean: float) -> tuple[float, ...]:
@@ -56,6 +60,7 @@ def _artifact(players: tuple[_Player, ...]) -> ProspectivePointsArtifact:
     for gw in range(1, horizon + 1):
         for player in sorted(players, key=lambda item: item.code):
             expected = player.points[gw - 1]
+            adjusted = player.availability_multiplier * expected
             rows.append(
                 ForecastArtifactRow(
                     season="2026-27",
@@ -69,11 +74,11 @@ def _artifact(players: tuple[_Player, ...]) -> ProspectivePointsArtifact:
                     selected_by_percent=None,
                     availability_status="a",
                     chance_of_playing=None,
-                    availability_multiplier=1.0,
+                    availability_multiplier=player.availability_multiplier,
                     fixture_ids=(gw * 1000 + player.code,),
                     kickoff_times=(datetime(2026, 8, 21 + gw, tzinfo=UTC),),
                     expected_points=expected,
-                    availability_adjusted_expected_points=expected,
+                    availability_adjusted_expected_points=adjusted,
                     expected_bonus=0.0,
                     distribution=_distribution(expected),
                     cold_start_player=False,
@@ -212,6 +217,219 @@ def test_club_cap_binds_across_positions() -> None:
     selected_same_club = same_club.intersection(solution.codes)
     assert len(selected_same_club) == 3
     assert 10 not in selected_same_club
+
+
+# --------------------------------------------------------------------------------------
+# Bench appearance gate (min_bench_appearance)
+# --------------------------------------------------------------------------------------
+
+
+def test_appearance_lower_bound_is_the_zero_points_tail_scaled_by_overlay() -> None:
+    index = ArtifactIndex.build(_artifact(_base_players()), load_squad_rules())
+    never = index.rows[(15, 1)]  # 0 expected points -> all mass at zero -> bound 0
+    starter = index.rows[(10, 1)]  # mean 9 -> no mass at zero -> bound 1
+    assert appearance_lower_bound(never) == 0.0
+    assert appearance_lower_bound(starter) == 1.0
+    doubtful = starter.model_copy(
+        update={
+            "availability_multiplier": 0.5,
+            "availability_adjusted_expected_points": starter.expected_points * 0.5,
+        }
+    )
+    assert appearance_lower_bound(doubtful) == pytest.approx(0.5)
+
+
+def test_min_bench_appearance_keeps_outfield_bench_slots_playable() -> None:
+    fodder = {3, 15, 25, 33}  # one 0-point player per position, made cheaper than everyone
+    players = tuple(
+        replace(player, cost=30) if player.code in fodder else player for player in _base_players()
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+
+    ungated = optimize_initial_squad(artifact, rules)
+    ungated_index = ArtifactIndex.build(artifact, rules)
+    # Without the gate the min-price tie-break benches at least one never-playing filler.
+    assert any(
+        appearance_lower_bound(ungated_index.rows[(code, ungated.weeks[0].gw)]) == 0.0
+        for code in ungated.weeks[0].bench_order
+    )
+
+    gated = optimize_initial_squad(artifact, rules, min_bench_appearance=0.5)
+    index = ArtifactIndex.build(artifact, rules)
+    for week in gated.weeks:
+        assert all(
+            appearance_lower_bound(index.rows[(code, week.gw)]) >= 0.5 for code in week.bench_order
+        )
+    # The never-playing outfielders are gone; the exempt bench goalkeeper (code 3, bound 0)
+    # is still selected and still benches -- a backup keeper cannot clear any gate.
+    assert not ({15, 25, 33} & set(gated.codes))
+    assert 3 in gated.codes
+    assert gated.weeks[0].bench_goalkeeper == 3
+    assert appearance_lower_bound(index.rows[(3, 1)]) == 0.0
+    assert bench_appearance_satisfied(index, gated.weeks[0], 0.5)
+    assert gated.squad_cost_tenths > ungated.squad_cost_tenths  # playable bench costs more
+
+
+def test_min_bench_appearance_above_every_outfielder_is_infeasible() -> None:
+    starts = {"GK": 1, "DEF": 10, "MID": 20, "FWD": 30}
+    counts = {"GK": 3, "DEF": 6, "MID": 6, "FWD": 4}
+    players: list[_Player] = []
+    for position, count in counts.items():
+        for offset in range(count):
+            points = ((10.0, 5.0, 0.0)[offset],) if position == "GK" else (0.5,)
+            players.append(
+                _Player(code=starts[position] + offset, position=position, points=points)
+            )
+    # Every outfielder's appearance bound is 0.5, so a 0.9 gate leaves no legal bench.
+    with pytest.raises(OptimizationError, match=r"min_bench_appearance=0\.9"):
+        optimize_initial_squad(
+            _artifact(tuple(players)), load_squad_rules(), min_bench_appearance=0.9
+        )
+
+
+@pytest.mark.parametrize("value", [-0.1, 1.5])
+def test_min_bench_appearance_rejects_out_of_range_thresholds(value: float) -> None:
+    with pytest.raises(ValueError, match="min_bench_appearance"):
+        optimize_initial_squad(
+            _artifact(_base_players()), load_squad_rules(), min_bench_appearance=value
+        )
+
+
+def test_bench_tie_break_never_suggests_a_zero_availability_player() -> None:
+    """The cheapest keeper is ruled out by the overlay (injured, multiplier 0).
+
+    Bench points are outside the objective, so the min-price tie-break would otherwise love a
+    cheap injured filler. He must rank behind every available player at any price: the bench
+    goalkeeper slot goes to the available backup even though the injured one is cheaper, and
+    the primary-objective XI is unchanged.
+    """
+    players = tuple(
+        replace(player, cost=30, availability_multiplier=0.0)
+        if player.code == 3
+        else replace(player, cost=45, availability_multiplier=0.75)
+        if player.code == 2
+        else player
+        for player in _base_players()
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+    solution = optimize_initial_squad(artifact, rules)
+    assert 3 not in solution.codes
+    assert solution.weeks[0].bench_goalkeeper == 2
+    baseline = optimize_initial_squad(_artifact(_base_players()), rules)
+    assert solution.weeks[0].starting_xi == baseline.weeks[0].starting_xi
+
+
+# --------------------------------------------------------------------------------------
+# Locked must-keep players
+# --------------------------------------------------------------------------------------
+
+
+def test_locked_players_are_pinned_and_compose_with_the_bench_gate() -> None:
+    fodder = {3, 15, 25, 33}
+    players = tuple(
+        replace(player, cost=30) if player.code in fodder else player for player in _base_players()
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+
+    gated = optimize_initial_squad(artifact, rules, min_bench_appearance=0.5)
+    assert 15 not in set(gated.codes)  # the never-playing cheap DEF is dropped by the gate
+
+    locked = optimize_initial_squad(artifact, rules, min_bench_appearance=0.5, locked_codes=(15,))
+    assert 15 in set(locked.codes)
+    # The policies compose rather than override: a locked never-playing player cannot bench
+    # below the gate, so he must START every planned gameweek.
+    for week in locked.weeks:
+        assert 15 in week.starting_xi
+    index = ArtifactIndex.build(artifact, rules)
+    assert bench_appearance_satisfied(index, locked.weeks[0], 0.5)
+    assert locked.locked_codes == (15,)
+
+
+def test_locked_codes_must_be_selectable_players() -> None:
+    with pytest.raises(OptimizationError, match="not selectable"):
+        optimize_initial_squad(_artifact(_base_players()), load_squad_rules(), locked_codes=(9999,))
+
+
+def test_locked_players_are_never_transferred_out() -> None:
+    # 32 is uniquely weak at GW2 and a better FWD candidate exists, so the open plan ships
+    # him out; locking him keeps him for the whole horizon while the plan adapts.
+    players: list[_Player] = []
+    for player in _base_players(horizon=2):
+        if player.code not in set(_INITIAL_SQUAD):
+            continue
+        gw2 = 1.0 if player.code == 32 else 5.0
+        players.append(replace(player, points=(player.points[0], gw2)))
+    players.append(_Player(code=35, position="FWD", points=(0.0, 8.0)))
+    artifact = _artifact(tuple(players))
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+
+    open_plan = plan_transfers(index, rules, initial)
+    assert any(32 in week.transfers_out for week in open_plan.weeks)
+
+    locked_plan = plan_transfers(index, rules, initial, locked_codes=(32,))
+    assert not any(32 in week.transfers_out for week in locked_plan.weeks)
+
+
+def test_plan_transfers_locks_must_be_in_the_initial_squad() -> None:
+    artifact = _transfer_artifact(5.0)
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    with pytest.raises(OptimizationError, match="not in the initial squad"):
+        plan_transfers(index, rules, initial, locked_codes=(15,))
+
+
+def test_plan_transfers_seeds_banked_free_transfers_from_a_manager_season() -> None:
+    artifact = _transfer_artifact(5.0)
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    # With no banked transfer the same plan pays a -4 hit for its second transfer.
+    from_scratch = plan_transfers(index, rules, initial)
+    assert from_scratch.weeks[1].hit_points == 4
+    assert from_scratch.weeks[0].free_transfers_before == 0
+    # A manager carrying one banked free transfer makes both moves free.
+    banked = plan_transfers(index, rules, initial, initial_banked_free_transfers=1)
+    assert banked.weeks[0].free_transfers_before == 1
+    assert banked.weeks[1].hit_points == 0
+    assert banked.hit_points == 0
+
+
+def test_plan_transfers_rejects_banked_free_transfers_above_the_cap() -> None:
+    artifact = _transfer_artifact(5.0)
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    cap = rules.transfers.free_transfer_bank_cap
+    with pytest.raises(ValueError, match="initial_banked_free_transfers"):
+        plan_transfers(index, rules, initial, initial_banked_free_transfers=cap + 1)
+
+
+def test_plan_transfers_holds_the_gate_across_the_horizon() -> None:
+    artifact = _transfer_artifact(5.0)
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    plan = plan_transfers(index, rules, initial, min_bench_appearance=0.5)
+    for week in plan.weeks:
+        assert bench_appearance_satisfied(index, week.lineup, 0.5)
+
+
+def test_plan_transfers_rejects_states_that_bench_below_the_gate() -> None:
+    # The captain collapses to a 0.25-mean GW2: every GW2 lineup benches him, the only FWD
+    # replacement (33) also benches below the gate, and holding benches him too -- so the
+    # search finds no legal state and says so instead of silently relaxing the gate.
+    players: list[_Player] = []
+    for player in _base_players(horizon=2):
+        if player.code not in set(_INITIAL_SQUAD):
+            continue
+        gw2 = 0.25 if player.code == 30 else 5.0
+        players.append(replace(player, points=(player.points[0], gw2)))
+    artifact = _artifact(tuple(players))
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    with pytest.raises(RuntimeError, match="no legal state"):
+        plan_transfers(index, rules, initial, min_bench_appearance=0.5)
 
 
 def _transfer_artifact(second_mid_gain: float) -> ProspectivePointsArtifact:

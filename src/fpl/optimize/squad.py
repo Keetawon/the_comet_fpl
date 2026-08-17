@@ -57,7 +57,12 @@ class SquadSolution:
     objective_value: float
     risk_lambda: float
     solver_status: str
-    bench_policy: str = "bench points and autosub probability excluded from the objective"
+    bench_policy: str = (
+        "bench points and autosub probability excluded from the objective; zero-availability "
+        "players rank last in the bench tie-break"
+    )
+    min_bench_appearance: float = 0.0
+    locked_codes: tuple[int, ...] = ()
 
     @property
     def codes(self) -> tuple[int, ...]:
@@ -115,6 +120,35 @@ def row_utility(row: ForecastArtifactRow, risk_lambda: float) -> float:
         raise ValueError("risk_lambda must be finite and non-negative")
     downside = row.availability_multiplier * downside_deviation(row)
     return row.availability_adjusted_expected_points - risk_lambda * downside
+
+
+def appearance_lower_bound(row: ForecastArtifactRow) -> float:
+    """Conservative lower bound on the player appearing, from the stored distribution alone.
+
+    A non-appearance lands entirely in the zero-points cell, so ``1 - P(0 points)`` bounds
+    P(appears) from below -- a player can also appear and still score nothing, so this
+    understates appearance probability, which is the safe direction for a minimum gate.
+    The availability overlay multiplier is applied under the same scenario assumption the
+    artifact already documents for the EV (the overlay is measured for the next gameweek).
+    """
+    return row.availability_multiplier * (1.0 - row.distribution[0])
+
+
+def bench_appearance_satisfied(
+    index: ArtifactIndex, lineup: WeekSelection, min_bench_appearance: float
+) -> bool:
+    """True when every outfield bench player of this lineup clears the appearance gate.
+
+    The bench goalkeeper is exempt by design: a backup keeper plays only on an
+    unforecastable starter injury or dismissal, so no meaningful threshold is attainable
+    and gating it would make every squad illegal.
+    """
+    if min_bench_appearance <= 0.0:
+        return True
+    return all(
+        appearance_lower_bound(index.rows[(code, lineup.gw)]) >= min_bench_appearance
+        for code in lineup.bench_order
+    )
 
 
 def _member(index: ArtifactIndex, code: int) -> SquadMember:
@@ -258,10 +292,31 @@ def optimize_initial_squad(
     rules: SquadRules,
     *,
     risk_lambda: float = 0.0,
+    min_bench_appearance: float = 0.0,
+    locked_codes: tuple[int, ...] = (),
 ) -> SquadSolution:
-    """Solve the exact fixed-squad, rotating-XI horizon problem with CBC."""
+    """Solve the exact fixed-squad, rotating-XI horizon problem with CBC.
+
+    ``min_bench_appearance`` (0.0 = disabled, the default and the historical behaviour)
+    requires every OUTFIELD player benched in any planned gameweek to show an appearance
+    lower bound of at least that fraction -- see :func:`appearance_lower_bound`. The bench
+    goalkeeper is exempt (see :func:`bench_appearance_satisfied`).
+
+    ``locked_codes`` are pinned into the squad: the owner's must-keep players. The optimizer
+    assigns every remaining quota around them. A locked player still obeys the bench gate,
+    so a locked below-threshold player must START every planned gameweek or the solve is
+    infeasible -- the two policies compose rather than one silently overriding the other.
+    """
+    if not math.isfinite(min_bench_appearance) or not 0.0 <= min_bench_appearance <= 1.0:
+        raise ValueError("min_bench_appearance must be finite and within [0, 1]")
     index = ArtifactIndex.build(artifact, rules)
     codes = index.selectable_codes()
+    locked = tuple(sorted(set(locked_codes)))
+    unselectable = [code for code in locked if code not in set(codes)]
+    if unselectable:
+        raise OptimizationError(
+            f"locked codes are not selectable players in the artifact: {unselectable}"
+        )
     prices = {code: _member(index, code).now_cost for code in codes}
     problem = pulp.LpProblem("stage_e_initial_squad", pulp.LpMaximize)
     squad_vars = {code: pulp.LpVariable(f"squad_{code}", cat=pulp.LpBinary) for code in codes}
@@ -291,6 +346,8 @@ def optimize_initial_squad(
         problem += (
             pulp.lpSum(squad_vars[code] for code in club_codes) <= rules.squad.maximum_per_club
         )
+    for code in locked:
+        problem += squad_vars[code] == 1
     for gw in index.gws:
         problem += pulp.lpSum(starter_vars[(code, gw)] for code in codes) == rules.lineup.starters
         problem += pulp.lpSum(captain_vars[(code, gw)] for code in codes) == 1
@@ -306,6 +363,17 @@ def optimize_initial_squad(
             position_rule = rules.squad.positions[position]
             problem += pulp.lpSum(position_starters) >= position_rule.minimum_starters
             problem += pulp.lpSum(position_starters) <= position_rule.maximum_starters
+        # Bench appearance gate: squad_vars - starter_vars is exactly the benched indicator
+        # (starter <= squad), so one linear constraint per (code, gw) enforces "benched in
+        # this gameweek -> appearance lower bound >= threshold" with no extra variables.
+        # Goalkeepers are exempt: the backup keeper cannot clear any meaningful threshold.
+        if min_bench_appearance > 0.0:
+            for code in codes:
+                if index.first_by_code[code].position == "GK":
+                    continue
+                problem += appearance_lower_bound(
+                    index.rows[(code, gw)]
+                ) >= min_bench_appearance * (squad_vars[code] - starter_vars[(code, gw)])
 
     primary_objective = pulp.lpSum(
         row_utility(index.rows[(code, gw)], risk_lambda)
@@ -323,17 +391,44 @@ def optimize_initial_squad(
     status_code = problem.solve(solver)
     status = str(pulp.LpStatus[status_code])
     if status != "Optimal":
-        raise OptimizationError(f"initial squad solve did not reach optimality: {status}")
+        hints: list[str] = []
+        if status == "Infeasible" and min_bench_appearance > 0.0:
+            hints.append(
+                f"no legal squad satisfies min_bench_appearance={min_bench_appearance} -- "
+                "lower the threshold"
+            )
+        if status == "Infeasible" and locked:
+            hints.append(
+                f"the locked players {locked} cannot all be kept in a legal squad "
+                "(position quotas, club cap, budget, or the bench gate)"
+            )
+        hint = ("; " + "; ".join(hints)) if hints else ""
+        raise OptimizationError(f"initial squad solve did not reach optimality: {status}{hint}")
 
     # Bench points are deliberately absent from the primary objective, which otherwise leaves
     # many equally optimal squad fillers. Resolve only those primary ties by minimum price and
-    # then stable code rank so repeated solves emit the same complete 15-player squad.
+    # then stable code rank so repeated solves emit the same complete 15-player squad -- with
+    # one hard override: a player the availability overlay rules OUT (multiplier 0 in any
+    # planned gameweek, e.g. injured with chance 0) ranks behind every available filler at any
+    # price. Without this the cheapest zero-availability player is the tie-break's favourite
+    # bench filler, and the plan suggests an injured player who can never come on.
     primary_optimum = float(pulp.value(primary_objective))
     problem += primary_objective >= primary_optimum - 1e-8
     rank = {code: index for index, code in enumerate(codes, start=1)}
     price_scale = len(codes) * rules.squad.size + 1
+    zero_availability = {
+        code: any(index.rows[(code, gw)].availability_multiplier <= 0.0 for gw in index.gws)
+        for code in codes
+    }
+    unavailable_penalty = (max(prices.values(), default=0) + 1) * price_scale + len(codes) + 1
     secondary_objective = pulp.lpSum(
-        squad_vars[code] * (prices[code] * price_scale + rank[code]) for code in codes
+        squad_vars[code]
+        * (
+            prices[code] * price_scale
+            + rank[code]
+            + (unavailable_penalty if zero_availability[code] else 0)
+        )
+        for code in codes
     )
     problem.sense = pulp.LpMinimize
     problem.setObjective(secondary_objective)
@@ -384,4 +479,6 @@ def optimize_initial_squad(
         objective_value=sum(week.objective_value for week in weeks),
         risk_lambda=risk_lambda,
         solver_status=status,
+        min_bench_appearance=min_bench_appearance,
+        locked_codes=locked,
     )
