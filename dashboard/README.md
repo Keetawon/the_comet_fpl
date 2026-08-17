@@ -162,6 +162,13 @@ published read-model directory.
   badges on names. When two architectures are present, the default-vs-diagnostic diff is
   set overlaps only. Cross-plan EV is never compared: it measures the models' calibration
   against each other, not squad quality.
+- **Plan builder** (implemented, wizard v1): the configuration side of the manager-wizard
+  design (`docs/manager-team-suggestions.md`) — start screen (manager import marked
+  post-deadline; build-from-scratch live), a lock picker with search/position filter and the
+  per-position/club-cap/max-5 guards, a live budget pre-flight (locks + cheapest legal
+  completion vs the rules snapshot read from a recorded optimizer artifact), the rotation
+  threshold selector, and the exact optimizer command to run. The browser never solves; the
+  result renders through the Next GW page once recorded.
 - **Forecast vs actual** (implemented, P1.7e): each recorded vintage scored against its own
   season's finalised outcomes (points under 2026/27 rules, read-time join at
   `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a

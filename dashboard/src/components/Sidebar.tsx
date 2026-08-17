@@ -9,6 +9,7 @@ import {
   LineChart,
   Scale,
   Users,
+  Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ const PAGES: readonly PageDef[] = [
   { id: "fixtures", label: "Fixture matrix", icon: CalendarDays },
   { id: "players", label: "Players", icon: Users },
   { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList },
+  { id: "plan-builder", label: "Plan builder", icon: Wand2 },
   { id: "forecast-vs-actual", label: "Forecast vs actual", icon: LineChart },
   { id: "optimizer", label: "Optimizer audit", icon: Scale },
 ];

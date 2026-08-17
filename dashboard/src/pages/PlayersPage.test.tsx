@@ -89,6 +89,17 @@ describe("PlayersPage", () => {
     expect(header).toHaveAttribute("aria-sort", "descending");
   });
 
+  it("sorts by the range xP column (the default sort)", async () => {
+    const user = userEvent.setup();
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    const header = screen.getByRole("columnheader", { name: /xP GW1-3/ });
+    // the page opens sorted by xP descending; clicking flips it to ascending
+    expect(header).toHaveAttribute("aria-sort", "descending");
+    await user.click(within(header).getByRole("button"));
+    expect(header).toHaveAttribute("aria-sort", "ascending");
+  });
+
   it("says so when no players match the current filters", async () => {
     const user = userEvent.setup();
     render(<PlayersPage />);

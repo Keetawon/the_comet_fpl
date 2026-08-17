@@ -7,6 +7,7 @@ import { ThemeToggle, initTheme } from "@/components/ThemeToggle";
 import { ForecastVsActualPage } from "@/pages/ForecastVsActualPage";
 import { NextGwPage } from "@/pages/NextGwPage";
 import { OptimizerAuditPage } from "@/pages/OptimizerAuditPage";
+import { PlanBuilderPage } from "@/pages/PlanBuilderPage";
 import { FixtureMatrixPage } from "@/pages/FixtureMatrixPage";
 import { PlayersPage } from "@/pages/PlayersPage";
 import { SummaryPage } from "@/pages/SummaryPage";
@@ -18,6 +19,7 @@ const PAGES: Record<string, React.ComponentType> = {
   fixtures: FixtureMatrixPage,
   players: PlayersPage,
   "next-gw": NextGwPage,
+  "plan-builder": PlanBuilderPage,
   "forecast-vs-actual": ForecastVsActualPage,
   optimizer: OptimizerAuditPage,
 };

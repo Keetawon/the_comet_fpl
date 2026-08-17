@@ -374,6 +374,7 @@ export function PlayerStatTable({
       {
         id: "totalXp",
         header: `xP GW${gwFrom}-${gwTo}`,
+        accessorFn: (row) => row.totalXp,
         cell: ({ row }) => (
           <span className="tabular-nums font-semibold">
             {row.original.totalXp == null ? "–" : row.original.totalXp.toFixed(1)}

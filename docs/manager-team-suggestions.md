@@ -1,9 +1,11 @@
 # Manager-team transfer suggestions — design record
 
-Status: **design only, not implemented** (owner direction 2026-08-17). Delivery slot: after
-the 2026/27 GW1 deadline, as a P2 item (see `DEV-ROADMAP.md`). This document is the plan of
-record for the wizard flow; nothing here changes a model, a frozen evaluation, or the GW1
-decision path.
+Status: **wizard v1 shipped on the dashboard (Plan builder page) 2026-08-17** — Screens 1-3
+plus the command bridge, fresh-squad path only. The manager_id import, the selections-log
+backend, and the hosted mode remain design-only, delivery after the 2026/27 GW1 deadline as
+P2 items (see `DEV-ROADMAP.md`). Nothing here changes a model, a frozen evaluation, or the
+GW1 decision path. The owner confirmed the wizard is END-USER-FACING frontend, not an owner
+tool: its language, guards, and error messages are written for users.
 
 ## 1. The wizard flow (owner sketch 2026-08-17, refined)
 
@@ -220,6 +222,23 @@ user-to-manager_id mapping; the suggestion artifact carries `manager_id`, the ca
 hashes, and the policy (locks, threshold, banked transfers) so an audit can always answer
 "whose team, whose data, which policy produced this". Nothing about the domain changes when
 the paywall arrives; a free tier is simply "one manager_id per account".
+
+## 7a. Selections-log backend (owner direction 2026-08-17, design only)
+
+When the hosted mode arrives, a thin persistence service sits beside the wizard and records
+every user configuration as an append-only log row:
+
+```text
+(user/account id, manager_id when imported, vintage run_id, locked codes,
+rotation threshold, created_at)  ->  later joined to the produced plan's run_id
+```
+
+Purposes: audit and correction of what a user actually selected (the owner's "correct the
+users select logs"), analytics on which locks/thresholds users choose, and the entitlement
+checks behind one-manager-per-account with paid extra seats. The log lives in the service
+layer -- the optimizer and artifact contracts stay pure, and a log row never mutates a
+recorded plan; corrections append a new row with a reason, mirroring the ledger's
+append-only discipline.
 
 ## 8. Suggestion artifact (sketch)
 
