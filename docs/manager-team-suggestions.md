@@ -5,7 +5,88 @@ the 2026/27 GW1 deadline, as a P2 item (see `DEV-ROADMAP.md`). This document is 
 record for the wizard flow; nothing here changes a model, a frozen evaluation, or the GW1
 decision path.
 
-## 1. The user flow
+## 1. The wizard flow (owner sketch 2026-08-17, refined)
+
+The owner's sketch: *have own team? (manager_id → read team) or not → pick up to 5 locked
+players (search + filters; warn when the money left cannot complete a legal squad; rotation
+threshold here too) → confirm (own team shown / suggestion shown + locks + threshold) →
+next → optimize under the conditions → summary.* The refinement below keeps that shape and
+fixes the three things the optimizer's actual contract forces: (a) locks mean "must include"
+on the fresh path but "never sell" on the own-team path; (b) the budget pre-flight only
+exists on the fresh path (an owned squad's affordability is the solver's job); (c) the
+"confirm a suggestion" step cannot precede the run — the pre-run screen confirms the RULES,
+not a team, and the suggested team appears only in the summary.
+
+### Screen 1 — Start
+
+- Choice: **Import my team** (enter `manager_id`) or **Build from scratch**.
+- Import validates inline and previews the entry (team name, overall rank, current GW) so a
+  typo is caught before anything else; error states: not found, no picks saved yet (offer
+  the fresh path), a pick that does not map into the forecast roster (block with names).
+- Horizon selector (GW1-5 default; 1/3/5 bounded by the loaded vintage). The vintage is the
+  default architecture and is displayed, never chosen — cross-model EV comparison is
+  forbidden by P0.3 and the UI must not invite it.
+
+### Screen 2 — Set your rules
+
+- **Own team:** the imported 15 renders read-only with the role-coloured pivot rows
+  (availability, xP, flags), plus the derived banked free transfers and bank — the "-4 per
+  transfer beyond the free grant" rule is stated here, next to the number of free transfers
+  the user actually has.
+- **Lock picker (both paths, max 5):** the Players pivot with a lock toggle — search bar,
+  position/team/price/minutes/availability filters already exist there. Guards computed
+  client-side so the solver never has to fail closed on something the UI knew: per-position
+  quota (locking a 4th FWD is impossible), club cap (no 4 locks from one club), and on the
+  fresh path the **budget pre-flight**: warn when committed cost passes ~90% of budget, and
+  block with numbers when `sum(lock now_cost) + cheapest legal completion of the remaining
+  quotas > budget` (a sum-of-k-cheapest-per-position lower bound; club-cap infeasibility is
+  rare and falls back to the solver's named error). The own-team path shows no budget check
+  on locks — the user already owns them.
+- **Rotation threshold** (both paths): plain-language selector (Off / 25% / 50%) with the
+  semantics inline — outfield bench players must be AT LEAST this likely to appear, bench
+  goalkeeper exempt, measure is a conservative lower bound. The picker shows each player's
+  appearance lower bound so users see who clears the gate before choosing.
+
+### Screen 3 — Review the rules (pre-run confirmation)
+
+A policy card, not a team: locks with photos and prices, threshold, horizon, and per path
+either the budget headroom (fresh) or squad value + bank + banked free transfers + the -4
+rule (own team). Frozen-price and availability-overlay caveats are printed here once, so
+the summary can stay clean. The primary button runs the optimization.
+
+### Screen 4 — Calculate
+
+The near-term reality: the browser cannot solve (PuLP/CBC lives in Python), so this screen
+is the bridge — the wizard emits the **exact command** (`fpl.jobs.suggest_manager_transfers`
+or `optimize_squad --lock ... --min-bench-appearance ...`) to run, and on completion the
+page renders the new suggestion artifact by id. When the hosted backend exists this screen
+becomes a real progress state; the flow above it does not change.
+
+### Screen 5 — Summary
+
+- Fresh path: the 15 with cost and horizon EV, GW1 XI/captain/vice/bench in role-coloured
+  rows, the transfer path with hits, lock icons on pinned players, availability flags, and
+  the standard development-only caveats.
+- Own-team path: **HOLD is presented as a positive recommendation when it is optimal**
+  (it frequently is — banked free transfers are often worth more than a forced move);
+  otherwise per-GW in/out with a "free" or "-4 hit" badge, EV before/after hits, the new
+  XIs, and an explicit "locked players: untouched" line.
+- Optional but recommended: a **cost-of-locks comparison** — the same model re-run without
+  the user's locks beside the locked run, same scale, so the UI can say "keeping your five
+  costs about N xP over the horizon". This is a same-model comparison (legitimate, unlike
+  cross-model EV) and is the wizard's most persuasive screen.
+
+### Wizard control → optimizer flag map
+
+| Wizard control | Fresh path | Own-team path |
+| --- | --- | --- |
+| Import my team | — | manager squad = initial state (no initial-squad ILP) |
+| Banked free transfers (derived) | — (fresh season: 0) | `initial_banked_free_transfers=B` |
+| Lock player (≤5) | `--lock CODE` (must-include) | `--lock CODE` (never-sell) |
+| Rotation threshold | `--min-bench-appearance P` | `--min-bench-appearance P` |
+| Horizon | artifact GW range | artifact GW range |
+
+## 1a. Prior flow summary (superseded by the screen spec above)
 
 A manager who already owns a team wants transfer suggestions for THEIR squad, not a fresh
 15. The wizard flow:
