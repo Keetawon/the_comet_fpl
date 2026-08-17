@@ -66,9 +66,16 @@ interface PlayerFiltersBarProps {
   filters: PlayerFilters;
   onChange: (filters: PlayerFilters) => void;
   teams: [number, string][];
+  /** The form-window select does not apply everywhere (e.g. the plan-builder picker); hide it there. */
+  showFormWindow?: boolean;
 }
 
-export function PlayerFiltersBar({ filters, onChange, teams }: PlayerFiltersBarProps) {
+export function PlayerFiltersBar({
+  filters,
+  onChange,
+  teams,
+  showFormWindow = true,
+}: PlayerFiltersBarProps) {
   const set = (patch: Partial<PlayerFilters>) => onChange({ ...filters, ...patch });
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
@@ -157,24 +164,26 @@ export function PlayerFiltersBar({ filters, onChange, teams }: PlayerFiltersBarP
         <ToggleGroupItem value="available">Available</ToggleGroupItem>
         <ToggleGroupItem value="flagged">Flagged</ToggleGroupItem>
       </ToggleGroup>
-      <div className="flex items-center gap-2">
-        <span>Form window</span>
-        <Select
-          value={filters.formWindow}
-          onValueChange={(value) => set({ formWindow: value as WindowLabel })}
-        >
-          <SelectTrigger size="sm" className="w-28" aria-label="Form window">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {WINDOW_LABELS.map((label) => (
-              <SelectItem key={label} value={label}>
-                {FORM_WINDOW_LABEL[label]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {showFormWindow && (
+        <div className="flex items-center gap-2">
+          <span>Form window</span>
+          <Select
+            value={filters.formWindow}
+            onValueChange={(value) => set({ formWindow: value as WindowLabel })}
+          >
+            <SelectTrigger size="sm" className="w-28" aria-label="Form window">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {WINDOW_LABELS.map((label) => (
+                <SelectItem key={label} value={label}>
+                  {FORM_WINDOW_LABEL[label]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   );
 }

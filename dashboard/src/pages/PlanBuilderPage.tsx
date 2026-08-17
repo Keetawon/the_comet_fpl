@@ -1,24 +1,28 @@
-// Plan builder (the wizard, v1). Screens 1-3 of the design record
-// (docs/manager-team-suggestions.md): Start (import vs scratch), Set your rules (lock picker
+// Plan builder (the wizard, v1). A screen-per-step wizard per the design record
+// (docs/manager-team-suggestions.md): Start (import vs scratch) -> Set your rules (lock picker
 // with search/filters, per-position and club-cap guards, live budget pre-flight, rotation
-// threshold), and Review. Screen 4 is the command bridge: the browser cannot solve (the
-// optimizer is PuLP/CBC in Python), so the wizard emits the exact command to run and the
+// threshold) -> Review & run. The browser cannot solve (the optimizer is PuLP/CBC in Python),
+// so the final screen is the command bridge: the wizard emits the exact command to run and the
 // result renders through the existing Next GW page once recorded. The manager_id import
-// collects the id now and lands as a P2 job after the deadline — never faked.
+// collects the id now and lands as a P2 job after the deadline -- never faked.
+//
+// Flow invariant: every screen has exactly one forward and one backward edge, navigation
+// NEVER clears state (only the explicitly labelled "Reset rules" does, in place), and the
+// review screen ends forward -- "Done" links to the Next GW page where the recorded plan
+// renders, so there is no destructive or dead-end exit anywhere in the wizard.
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, ArrowRight, Check, Download, Lock, RotateCcw, Sparkles, UserRoundSearch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  INITIAL_PLAYER_FILTERS,
+  PlayerFiltersBar,
+  matchesPlayerFilters,
+  type PlayerFilters,
+} from "@/components/PlayerFiltersBar";
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
 import type { PlayerRecord } from "@/data/types";
@@ -31,7 +35,8 @@ type PageState =
   | { status: "error"; message: string }
   | { status: "ready"; players: PlayerRecord[]; runId: string | null };
 
-type Mode = "choose" | "import" | "scratch";
+// Wizard screens: 0 Start, 1 manager import, 2 set rules, 3 review & run.
+type Step = 0 | 1 | 2 | 3;
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 const MAX_LOCKS = 5;
@@ -40,7 +45,7 @@ const THRESHOLDS = [
   { value: "0.25", label: "25%", flag: "0.25" },
   { value: "0.5", label: "50%", flag: "0.5" },
 ] as const;
-const STEPS = ["Start", "Set your rules", "Run it"] as const;
+const STEPS = ["Start", "Set your rules", "Review & run"] as const;
 
 const price = (tenths: number | null) => (tenths == null ? "–" : `£${(tenths / 10).toFixed(1)}m`);
 
@@ -61,13 +66,12 @@ function rulesFromAudit(audit: { plans: { rules_snapshot: { squad_size: number; 
   };
 }
 
-function StepBar({ active }: { active: readonly number[] }) {
-  const first = Math.min(...active);
+function StepBar({ current }: { current: number }) {
   return (
     <ol className="flex flex-wrap items-center gap-2" aria-label="Wizard steps">
       {STEPS.map((label, index) => {
         const step = index + 1;
-        const state = active.includes(step) ? "active" : step < first ? "done" : "todo";
+        const state = step === current ? "active" : step < current ? "done" : "todo";
         return (
           <li key={label} className="flex items-center gap-2">
             <span
@@ -101,12 +105,12 @@ function StepBar({ active }: { active: readonly number[] }) {
 export function PlanBuilderPage() {
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [rules, setRules] = useState<Rules | null>(null);
-  const [mode, setMode] = useState<Mode>("choose");
+  const [step, setStep] = useState<Step>(0);
   const [managerId, setManagerId] = useState("");
   const [locks, setLocks] = useState<PlayerRecord[]>([]);
   const [threshold, setThreshold] = useState<string>("off");
   const [search, setSearch] = useState("");
-  const [position, setPosition] = useState("all");
+  const [filters, setFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -190,7 +194,7 @@ export function PlanBuilderPage() {
     if (state.status !== "ready") return [];
     const term = search.trim().toLowerCase();
     return state.players
-      .filter((p) => (position === "all" || p.position === position) && p.now_cost != null)
+      .filter((p) => matchesPlayerFilters(p, filters) && p.now_cost != null)
       .filter((p) => !term || (p.web_name ?? "").toLowerCase().includes(term))
       .map((p) => ({
         player: p,
@@ -198,9 +202,24 @@ export function PlanBuilderPage() {
       }))
       .sort((a, b) => b.xp - a.xp || (a.player.now_cost ?? 0) - (b.player.now_cost ?? 0))
       .slice(0, 50);
-  }, [state, search, position]);
+  }, [state, search, filters]);
+
+  const teams = useMemo(() => {
+    if (state.status !== "ready") return [] as [number, string][];
+    return Array.from(
+      new Map(state.players.map((p) => [p.team_code, p.team_short_name] as [number, string])),
+    ).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  }, [state]);
+
+  const resetRules = () => {
+    setLocks([]);
+    setThreshold("off");
+    setSearch("");
+    setFilters(INITIAL_PLAYER_FILTERS);
+  };
 
   const thresholdFlag = THRESHOLDS.find((t) => t.value === threshold)?.flag ?? null;
+  const thresholdLabel = THRESHOLDS.find((t) => t.value === threshold)?.label ?? "Off";
   const command = [
     ".\\.venv\\Scripts\\python.exe -m fpl.jobs.optimize_squad <forecast.jsonl>",
     "--risk-lambda 0",
@@ -211,7 +230,6 @@ export function PlanBuilderPage() {
 
   const managerTouched = managerId.trim() !== "";
   const managerValid = /^\d{1,10}$/.test(managerId.trim());
-  const activeSteps = mode === "scratch" ? [2, 3] : [1];
 
   if (state.status === "loading") {
     return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
@@ -245,13 +263,13 @@ export function PlanBuilderPage() {
           wizard v1 (fresh squad); manager import lands after GW1
         </p>
       </div>
-      <StepBar active={activeSteps} />
+      <StepBar current={step === 0 || step === 1 ? 1 : step} />
 
-      {mode === "choose" && (
+      {step === 0 && (
         <section className="mx-auto grid w-full max-w-3xl gap-4 pt-2 md:grid-cols-2" aria-label="Start">
           <button
             type="button"
-            onClick={() => setMode("import")}
+            onClick={() => setStep(1)}
             className="group relative overflow-hidden rounded-xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-400 to-indigo-500" />
@@ -272,7 +290,7 @@ export function PlanBuilderPage() {
           </button>
           <button
             type="button"
-            onClick={() => setMode("scratch")}
+            onClick={() => setStep(2)}
             className="group relative overflow-hidden rounded-xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
@@ -294,7 +312,7 @@ export function PlanBuilderPage() {
         </section>
       )}
 
-      {mode === "import" && (
+      {step === 1 && (
         <section className="mx-auto w-full max-w-2xl space-y-4 pt-2" aria-label="Import my team">
           <div className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -349,15 +367,15 @@ export function PlanBuilderPage() {
             </ul>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setMode("scratch")}>
+            <Button onClick={() => setStep(2)}>
               Continue without import <ArrowRight className="size-4" />
             </Button>
-            <Button variant="ghost" onClick={() => setMode("choose")}>Back</Button>
+            <Button variant="ghost" onClick={() => setStep(0)}>Back</Button>
           </div>
         </section>
       )}
 
-      {mode === "scratch" && totals && (
+      {step === 2 && totals && (
         <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
           <section aria-label="Lock picker" className="rounded-lg border bg-muted/40 p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -386,22 +404,12 @@ export function PlanBuilderPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Select value={position} onValueChange={setPosition}>
-                <SelectTrigger size="sm" className="w-24" aria-label="Position filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {POSITIONS.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <span className="text-xs text-muted-foreground">
                 top {candidates.length} by GW xP
               </span>
+            </div>
+            <div className="mb-2 rounded-md border bg-background/60 px-2 py-1.5">
+              <PlayerFiltersBar filters={filters} onChange={setFilters} teams={teams} showFormWindow={false} />
             </div>
             <ul className="grid gap-1.5 md:grid-cols-1 lg:grid-cols-2">
               {candidates.map(({ player, xp }) => {
@@ -451,33 +459,15 @@ export function PlanBuilderPage() {
             </ul>
           </section>
 
-          <section aria-label="Review" className="flex flex-col gap-3">
+          <section aria-label="Your rules" className="flex flex-col gap-3">
             <div className="rounded-xl border bg-card p-3 shadow-sm">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">Review your rules</p>
-              {locks.length ? (
-                <ul className="flex flex-wrap gap-1.5" aria-label="Locked players">
-                  {locks.map((p) => (
-                    <li
-                      key={p.code}
-                      className="flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-amber-50 py-0.5 pl-1 pr-1.5 text-xs dark:border-amber-700 dark:bg-amber-950/40"
-                    >
-                      <PlayerPhoto code={p.code} name={p.web_name} size="sm" />
-                      <span className="font-medium">{p.web_name}</span>
-                      <span className="text-muted-foreground">{price(p.now_cost)}</span>
-                      <button
-                        type="button"
-                        aria-label={`Remove ${p.web_name}`}
-                        onClick={() => setLocks((current) => current.filter((x) => x.code !== p.code))}
-                        className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-amber-100 hover:text-foreground dark:hover:bg-amber-900/60"
-                      >
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">No locks — the optimizer picks all 15.</p>
-              )}
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Your rules</p>
+              <p className="text-sm">
+                Locks:{" "}
+                <span className="font-medium tabular-nums">
+                  {locks.length ? `${locks.length} of ${MAX_LOCKS}` : "none — the optimizer picks all 15"}
+                </span>
+              </p>
               <div className="mt-3 flex items-center gap-2 text-sm">
                 Rotation threshold
                 <ToggleGroup
@@ -544,51 +534,108 @@ export function PlanBuilderPage() {
                 </div>
               </div>
             </div>
-
-            <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-              <div className="flex items-center justify-between gap-2 border-b bg-zinc-900 px-3 py-1.5 dark:bg-zinc-900">
-                <p className="font-mono text-[11px] text-zinc-300">optimizer command</p>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(command).then(() => {
-                      setCopied(true);
-                      window.setTimeout(() => setCopied(false), 1500);
-                    });
-                  }}
-                >
-                  {copied ? <Check className="size-3" /> : null}
-                  {copied ? "Copied" : "Copy command"}
-                </Button>
-              </div>
-              <pre className="overflow-x-auto bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-100">
-                {command}
-              </pre>
-              <p className="px-3 py-2 text-[10px] text-muted-foreground">
-                The solver lives in Python, so the browser cannot compute it. forecast.jsonl =
-                the default GW1-5 artifact from the latest pack (see the runbook); the written
-                plan.json renders on the Next GW page once the export includes it.
-              </p>
-              <div className="flex items-center gap-2 px-3 pb-3">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setMode("choose");
-                    setLocks([]);
-                    setThreshold("off");
-                    setSearch("");
-                    setPosition("all");
-                  }}
-                >
-                  <RotateCcw className="size-3.5" /> Start over
-                </Button>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => setStep(3)} disabled={totals.leftover < 0}>
+                Next: Review & run <ArrowRight className="size-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={resetRules}>
+                <RotateCcw className="size-3.5" /> Reset rules
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setStep(0)}>
+                Back to start
+              </Button>
             </div>
           </section>
         </div>
+      )}
+
+      {step === 3 && totals && (
+        <section className="mx-auto grid w-full max-w-2xl gap-4 pt-2" aria-label="Review and run">
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Review your rules</p>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                threshold {thresholdLabel} · budget {price(budget)}
+              </span>
+            </div>
+            {locks.length ? (
+              <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Locked players">
+                {locks.map((p) => (
+                  <li
+                    key={p.code}
+                    className="flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-amber-50 py-0.5 pl-1 pr-1.5 text-xs dark:border-amber-700 dark:bg-amber-950/40"
+                  >
+                    <PlayerPhoto code={p.code} name={p.web_name} size="sm" />
+                    <span className="font-medium">{p.web_name}</span>
+                    <span className="text-muted-foreground">{price(p.now_cost)}</span>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${p.web_name}`}
+                      onClick={() => setLocks((current) => current.filter((x) => x.code !== p.code))}
+                      className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-amber-100 hover:text-foreground dark:hover:bg-amber-900/60"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">No locks — the optimizer picks all 15.</p>
+            )}
+            <div
+              className={cn(
+                "mt-3 text-sm tabular-nums",
+                totals.leftover < 0 ? "font-medium text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {totals.leftover < 0
+                ? `over budget by ${price(-totals.leftover)} — go back and unlock a player`
+                : `headroom ${price(totals.leftover)} after the cheapest legal completion`}
+            </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+              Frozen prices at the deadline; availability is a reported overlay for the next
+              gameweek only. Development-only output.
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <div className="flex items-center justify-between gap-2 border-b bg-zinc-900 px-3 py-1.5 dark:bg-zinc-900">
+              <p className="font-mono text-[11px] text-zinc-300">optimizer command</p>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(command).then(() => {
+                    setCopied(true);
+                    window.setTimeout(() => setCopied(false), 1500);
+                  });
+                }}
+              >
+                {copied ? <Check className="size-3" /> : null}
+                {copied ? "Copied" : "Copy command"}
+              </Button>
+            </div>
+            <pre className="overflow-x-auto bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-100">
+              {command}
+            </pre>
+            <p className="px-3 py-2 text-[10px] text-muted-foreground">
+              The solver lives in Python, so the browser cannot compute it. forecast.jsonl =
+              the default GW1-5 artifact from the latest pack (see the runbook); the written
+              plan.json renders on the Next GW page once the export includes it.
+            </p>
+            <div className="flex items-center gap-2 px-3 pb-3">
+              <Button size="sm" variant="outline" onClick={() => setStep(2)}>
+                Back to rules
+              </Button>
+              <Button size="sm" asChild>
+                <a href="#next-gw">
+                  Done — view Next GW <ArrowRight className="size-3.5" />
+                </a>
+              </Button>
+            </div>
+          </div>
+        </section>
       )}
     </div>
   );
