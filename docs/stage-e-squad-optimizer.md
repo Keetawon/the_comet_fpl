@@ -133,7 +133,12 @@ the availability overlay rules out (multiplier 0 in any planned gameweek, e.g. i
 chance) ranks behind every available filler at any price -- otherwise the cheapest injured player
 is the tie-break's favourite bench filler and the plan suggests someone who can never come on
 (measured on the 2026-08-16 preliminary pack: Heaton, status `i`/chance 0, was the default plan's
-bench goalkeeper in GW1-2).
+bench goalkeeper in GW1-2). A second ordered preference follows price: among **equally-priced**
+fillers the tie-break prefers the **most-selected players** (deadline bootstrap ownership) --
+crowd vetting that a cheap pick is a real Premier League rotation option rather than a
+never-playing squad player. Price still dominates (a cheaper unpopular filler always beats a
+costlier popular one); unmeasured ownership carries no preference; the stable code rank still
+breaks exact ties so solves stay reproducible.
 
 ## Transfers and optimality limits
 

@@ -59,7 +59,8 @@ class SquadSolution:
     solver_status: str
     bench_policy: str = (
         "bench points and autosub probability excluded from the objective; zero-availability "
-        "players rank last in the bench tie-break"
+        "players rank last in the bench tie-break, and equally-priced fillers prefer the "
+        "most-selected players"
     )
     min_bench_appearance: float = 0.0
     locked_codes: tuple[int, ...] = ()
@@ -414,7 +415,28 @@ def optimize_initial_squad(
     # bench filler, and the plan suggests an injured player who can never come on.
     primary_optimum = float(pulp.value(primary_objective))
     problem += primary_objective >= primary_optimum - 1e-8
-    rank = {code: index for index, code in enumerate(codes, start=1)}
+    # Owner rule (2026-08-17): among EQUALLY-PRICED fillers the tie-break prefers the
+    # MOST-SELECTED players (deadline bootstrap ownership) -- crowd vetting that a cheap pick
+    # is a real Premier League rotation option, not a never-playing squad player. Price still
+    # dominates (a cheaper unpopular filler always beats a costlier popular one), because
+    # saving budget for the starting XI is the tie-break's purpose. Unmeasured ownership
+    # (null) carries no preference signal and sorts with 0% at its price -- a sort choice,
+    # not a measured statistic; the stable code rank still breaks exact ties so repeated
+    # solves stay reproducible.
+    rank = {
+        code: position
+        for position, code in enumerate(
+            sorted(
+                codes,
+                key=lambda item: (
+                    prices[item],
+                    -(index.first_by_code[item].selected_by_percent or 0.0),
+                    item,
+                ),
+            ),
+            start=1,
+        )
+    }
     price_scale = len(codes) * rules.squad.size + 1
     zero_availability = {
         code: any(index.rows[(code, gw)].availability_multiplier <= 0.0 for gw in index.gws)

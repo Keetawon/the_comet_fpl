@@ -43,6 +43,7 @@ class _Player:
     cost: int = 40
     team_id: int | None = None
     availability_multiplier: float = 1.0
+    selected_by_percent: float | None = None
 
 
 def _distribution(mean: float) -> tuple[float, ...]:
@@ -71,7 +72,7 @@ def _artifact(players: tuple[_Player, ...]) -> ProspectivePointsArtifact:
                     team_id=player.team_id or player.code,
                     team_code=player.team_id or player.code,
                     now_cost=player.cost,
-                    selected_by_percent=None,
+                    selected_by_percent=player.selected_by_percent,
                     availability_status="a",
                     chance_of_playing=None,
                     availability_multiplier=player.availability_multiplier,
@@ -319,6 +320,29 @@ def test_bench_tie_break_never_suggests_a_zero_availability_player() -> None:
     assert solution.weeks[0].bench_goalkeeper == 2
     baseline = optimize_initial_squad(_artifact(_base_players()), rules)
     assert solution.weeks[0].starting_xi == baseline.weeks[0].starting_xi
+
+
+def test_equally_priced_fillers_prefer_the_most_selected_players() -> None:
+    """Owner rule: cheap bench filler must be crowd-vetted, not an alphabetical obscurity.
+
+    The bench-goalkeeper slot is exactly one deterministic filler slot (one GK starts, one
+    benches), so two same-price candidates differ only in ownership. Among them the
+    tie-break takes the highest-ownership player -- but price still dominates: a cheaper
+    unpopular filler beats a costlier popular one, because saving budget for the XI is the
+    tie-break's purpose.
+    """
+    popular = _Player(code=5, position="GK", points=(0.0,), selected_by_percent=30.0)
+    obscure = _Player(code=6, position="GK", points=(0.0,), selected_by_percent=0.1)
+    base = tuple(player for player in _base_players() if player.code != 3)
+    rules = load_squad_rules()
+
+    same_price = optimize_initial_squad(_artifact((*base, popular, obscure)), rules)
+    assert same_price.weeks[0].bench_goalkeeper == 5  # 30% owned beats 0.1%
+
+    cheaper = _Player(code=7, position="GK", points=(0.0,), cost=39, selected_by_percent=0.0)
+    price_first = optimize_initial_squad(_artifact((*base, popular, obscure, cheaper)), rules)
+    assert price_first.weeks[0].bench_goalkeeper == 7  # price beats popularity
+    assert price_first.squad_cost_tenths < same_price.squad_cost_tenths
 
 
 # --------------------------------------------------------------------------------------

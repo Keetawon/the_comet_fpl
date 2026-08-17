@@ -70,7 +70,8 @@ OPTIMIZER_ASSUMPTIONS: tuple[str, ...] = (
     "bench points and autosub probabilities are excluded from the objective; the solver still "
     "emits one bench goalkeeper and a deterministic outfield bench order, and a player the "
     "availability overlay rules out (multiplier 0 in any planned gameweek) ranks behind every "
-    "available filler in the bench tie-break",
+    "available filler in the bench tie-break, while equally-priced fillers prefer the "
+    "most-selected players (deadline ownership; unmeasured ownership carries no preference)",
     "availability is a reported overlay already folded into availability-adjusted expected points; "
     "the deadline chance_of_playing_next_round overlay is valid for GW1 only, and reusing it "
     "across later gameweeks is an explicit scenario assumption, not a measured per-gameweek policy",
