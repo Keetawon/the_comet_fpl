@@ -15,15 +15,27 @@ import type {
 
 const BASE: string = import.meta.env.VITE_DATA_BASE ?? "/data";
 
-async function fetchJson<T>(name: string): Promise<T> {
-  const response = await fetch(`${BASE}/${name}`);
-  if (!response.ok) {
-    throw new Error(
-      `could not load ${BASE}/${name} (${response.status}); generate the read models ` +
-        `first -- see dashboard/README.md`,
-    );
-  }
-  return (await response.json()) as T;
+// Session-level cache: players.json is ~15 MB, so every page fetches it through this
+// map and the browser tab parses it exactly once. A failed fetch is evicted so it can
+// be retried.
+const cache = new Map<string, Promise<unknown>>();
+
+function fetchJson<T>(name: string): Promise<T> {
+  const hit = cache.get(name);
+  if (hit) return hit as Promise<T>;
+  const pending = (async () => {
+    const response = await fetch(`${BASE}/${name}`);
+    if (!response.ok) {
+      throw new Error(
+        `could not load ${BASE}/${name} (${response.status}); generate the read models ` +
+          `first -- see dashboard/README.md`,
+      );
+    }
+    return (await response.json()) as T;
+  })();
+  cache.set(name, pending);
+  pending.catch(() => cache.delete(name));
+  return pending as Promise<T>;
 }
 
 export interface FixtureMatrixData {

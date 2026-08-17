@@ -7,7 +7,13 @@
 
 export type ViewMode = "overall" | "attack" | "defense";
 
-export type ColorSource = "ease" | "fdr";
+/**
+ * What colours a fixture cell: "opponent" = the opponent club's model strength
+ * (higher = stronger opponent = harder, reverse of ease; derived at display time from
+ * the published lambdas), "ease" = the row club's own ease index, "fdr" = the official
+ * FDR. Never blended with one another.
+ */
+export type ColorSource = "opponent" | "ease" | "fdr";
 
 export type DifficultyBucket =
   | "much-easier"
@@ -79,4 +85,13 @@ export const FDR_LEGEND: readonly { bucket: DifficultyBucket; label: string }[] 
   { bucket: "average", label: "FDR 3 average" },
   { bucket: "harder", label: "FDR 4" },
   { bucket: "much-harder", label: "FDR 5 hardest" },
+];
+
+/** Opponent strength: 100 = average club, HIGHER = stronger opponent = harder (red). */
+export const OPPONENT_LEGEND: readonly { bucket: DifficultyBucket; label: string }[] = [
+  { bucket: "much-easier", label: "<= 85 weak opponent" },
+  { bucket: "easier", label: "85-95 below average" },
+  { bucket: "average", label: "95-105 average club" },
+  { bucket: "harder", label: "105-120 strong opponent" },
+  { bucket: "much-harder", label: "> 120 strongest" },
 ];

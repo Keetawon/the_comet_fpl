@@ -1,9 +1,11 @@
 // Next GW suggestion: the development-only optimizer plan for the next gameweek -- XI by
-// position with captain/vice, ordered bench, squad table with horizon EV (1/3/5 GWs bounded
-// by the vintage horizon), ownership/availability overlay, flags, and the transfer path with
-// hits. With two architectures present it shows the default-vs-diagnostic diff as set
-// overlaps and captain agreement ONLY -- cross-plan EV is never compared, because it measures
-// the two models' calibration against each other, not squad quality.
+// position with captain/vice, ordered bench, and the SAME player pivot table as the
+// Players page (form stats, filters, per-GW fixture chips as the last columns) restricted
+// to the squad by default, switchable to the whole roster to compare candidates against
+// the selected 15. Plan EV columns sit before the fixture columns. With two
+// architectures present it shows the default-vs-diagnostic diff as set overlaps and
+// captain agreement ONLY -- cross-plan EV is never compared, because it measures the two
+// models' calibration against each other, not squad quality.
 
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -15,17 +17,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { loadNextGw } from "@/data/load";
-import type { NextGwPlan, PlanPlayer, PlanWeek, SquadContext } from "@/data/types";
+import { FilterPanel } from "@/components/FilterPanel";
+import {
+  FORM_WINDOW_LABEL,
+  INITIAL_PLAYER_FILTERS,
+  PlayerFiltersBar,
+  matchesPlayerFilters,
+  type PlayerFilters,
+} from "@/components/PlayerFiltersBar";
+import { PlayerStatTable, type PlayerStatRow } from "@/components/PlayerStatTable";
+import { loadFixtureMatrix, loadNextGw, loadPlayers } from "@/data/load";
+import type { NextGwPlan, PlanPlayer, PlanWeek, PlayerRecord, SquadContext, TeamRecord } from "@/data/types";
+import { buildOpponentStrength } from "@/lib/opponentStrength";
 import {
   defaultPlan,
   diffPlans,
@@ -33,11 +37,12 @@ import {
   isDefaultArchitecture,
   planLabel,
 } from "@/lib/nextGw";
+import type { LegacyColumnDef } from "@tanstack/react-table/legacy";
 
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; plans: NextGwPlan[] };
+  | { status: "ready"; plans: NextGwPlan[]; players: PlayerRecord[]; teams: TeamRecord[] };
 
 const fmt = (value: number | null | undefined, digits = 1) =>
   value == null ? "–" : value.toFixed(digits);
@@ -45,15 +50,6 @@ const fmt = (value: number | null | undefined, digits = 1) =>
 const price = (value: number | null) => (value == null ? "–" : `£${(value / 10).toFixed(1)}m`);
 
 const POSITION_ORDER = ["GK", "DEF", "MID", "FWD"] as const;
-
-const AVAILABILITY_LABEL: Record<string, string> = {
-  a: "available",
-  d: "doubtful",
-  i: "injured",
-  s: "suspended",
-  u: "unavailable",
-  n: "not available",
-};
 
 function flags(context: SquadContext | undefined): string[] {
   if (!context) return [];
@@ -83,7 +79,7 @@ function XiBlock({ week }: { week: PlanWeek }) {
           {xi.find((p) => p.code === week.vice_captain_code)?.web_name ?? week.vice_captain_code}
         </span>
       </p>
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {POSITION_ORDER.map((position) => (
           <div key={position} className="rounded-md border p-2">
             <p className="mb-1 text-[10px] font-medium text-muted-foreground">{position}</p>
@@ -133,11 +129,6 @@ function BenchBlock({ week }: { week: PlanWeek }) {
             <span className="truncate">
               {p.web_name}
               <span className="ml-1 text-xs text-muted-foreground">{p.position}</span>
-              {p.role === "bench_goalkeeper" && (
-                <Badge variant="outline" className="ml-1 size-fit px-1 text-[9px]">
-                  GK
-                </Badge>
-              )}
             </span>
             <span className="tabular-nums text-xs text-muted-foreground">{fmt(p.expected_points)}</span>
           </li>
@@ -151,21 +142,25 @@ export function NextGwPage() {
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [planId, setPlanId] = useState<string | null>(null);
   const [horizonWeeks, setHorizonWeeks] = useState<number>(1);
+  const [squadOnly, setSquadOnly] = useState<"squad" | "all">("squad");
+  const [playerFilters, setPlayerFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
 
   useEffect(() => {
     let cancelled = false;
-    loadNextGw()
-      .then(({ plans }) => {
+    Promise.all([loadNextGw(), loadPlayers(), loadFixtureMatrix()])
+      .then(([nextGw, playersData, teamsData]) => {
         if (cancelled) return;
-        setState({ status: "ready", plans });
-        setPlanId(defaultPlan(plans)?.optimizer_run_id ?? null);
+        setState({
+          status: "ready",
+          plans: nextGw.plans,
+          players: playersData.players,
+          teams: teamsData.teams,
+        });
+        setPlanId(defaultPlan(nextGw.plans)?.optimizer_run_id ?? null);
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setState({
-            status: "error",
-            message: error instanceof Error ? error.message : String(error),
-          });
+          setState({ status: "error", message: error instanceof Error ? error.message : String(error) });
         }
       });
     return () => {
@@ -187,6 +182,77 @@ export function NextGwPage() {
     const b = state.plans.find((p) => p !== a) ?? null;
     return a && b ? diffPlans(a, b) : null;
   }, [state]);
+
+  const runPlayers = useMemo(
+    () =>
+      state.status === "ready" && plan
+        ? state.players.filter((p) => p.run_id === plan.forecast_run_id)
+        : [],
+    [state, plan],
+  );
+
+  const runTeams = useMemo(
+    () =>
+      state.status === "ready" && plan
+        ? state.teams.filter((t) => t.run_id === plan.forecast_run_id)
+        : [],
+    [state, plan],
+  );
+
+  const opponentStrength = useMemo(() => buildOpponentStrength(runTeams), [runTeams]);
+  const opponentIndexOf = useMemo(
+    () => (teamCode: number) => opponentStrength.get(teamCode)?.index ?? null,
+    [opponentStrength],
+  );
+
+  const teams = useMemo(() => {
+    const seen = new Map<number, string>();
+    for (const p of runPlayers) if (!seen.has(p.team_code)) seen.set(p.team_code, p.team_short_name);
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [runPlayers]);
+
+  /** Squad rows first in the plan's own order (XI by position, then bench), then anyone
+   * else from the same vintage's roster by xP -- so compare mode still reads in order. */
+  const { rows, weekByCode } = useMemo(() => {
+    if (!plan) return { rows: [] as PlayerStatRow[], weekByCode: new Map<number, PlanPlayer>() };
+    const week = plan.weeks[0];
+    const byCode = new Map(week.players.map((p) => [p.code, p]));
+    const roleRank = (p: PlanPlayer) =>
+      p.role === "starting_xi" ? 0 : p.role === "bench_goalkeeper" ? 1 : 2;
+    const squadOrdered = [...week.players].sort(
+      (a, b) =>
+        POSITION_ORDER.indexOf(a.position as (typeof POSITION_ORDER)[number]) -
+          POSITION_ORDER.indexOf(b.position as (typeof POSITION_ORDER)[number]) ||
+        roleRank(a) - roleRank(b) ||
+        (a.bench_order_index ?? 99) - (b.bench_order_index ?? 99) ||
+        a.web_name.localeCompare(b.web_name),
+    );
+    const buildRow = (player: PlayerRecord): PlayerStatRow => {
+      const filtered = [...player.fixtures].sort(
+        (a, b) => a.gw - b.gw || (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? ""),
+      );
+      const xpValues = filtered
+        .map((f) => f.expected_points)
+        .filter((v): v is number => v != null);
+      return {
+        player,
+        filtered,
+        totalXp: xpValues.length ? xpValues.reduce((a, b) => a + b, 0) : null,
+        form: player.form ? player.form.windows[playerFilters.formWindow] : null,
+      };
+    };
+    const squadRows = squadOrdered
+      .map((squadPlayer) => runPlayers.find((p) => p.code === squadPlayer.code))
+      .filter((p): p is PlayerRecord => p != null)
+      .filter((p) => matchesPlayerFilters(p, playerFilters))
+      .map(buildRow);
+    const otherRows = runPlayers
+      .filter((p) => !byCode.has(p.code))
+      .filter((p) => matchesPlayerFilters(p, playerFilters))
+      .map(buildRow)
+      .sort((a, b) => (b.totalXp ?? -1) - (a.totalXp ?? -1));
+    return { rows: squadOnly === "squad" ? squadRows : [...squadRows, ...otherRows], weekByCode: byCode };
+  }, [plan, runPlayers, playerFilters, squadOnly]);
 
   if (state.status === "loading") {
     return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
@@ -216,21 +282,67 @@ export function NextGwPage() {
   const week = plan.weeks[0];
   const options = [1, 3, 5].filter((n) => n <= horizon);
   const weeks = options.includes(horizonWeeks) ? horizonWeeks : options[0];
-  const context = (code: number) => plan.squad_context[String(code)];
 
-  const squadRows: PlanPlayer[] = [...week.players].sort((a, b) => {
-    const rank = (p: PlanPlayer) =>
-      p.role === "starting_xi" ? 0 : p.role === "bench_goalkeeper" ? 1 : 2;
+  const planColumns: LegacyColumnDef<PlayerStatRow>[] = [
+    {
+      id: "plan-flags",
+      header: "Flags",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const ctx = plan.squad_context[String(row.original.player.code)];
+        const labels = flags(ctx);
+        return labels.length ? (
+          <span className="text-[10px] text-muted-foreground">{labels.join(" · ")}</span>
+        ) : (
+          <span className="text-muted-foreground">–</span>
+        );
+      },
+    },
+    {
+      id: "plan-gw-xp",
+      header: `Plan xP GW${week.gw}`,
+      accessorFn: (row) => weekByCode.get(row.player.code)?.expected_points ?? null,
+      cell: ({ row }) => (
+        <span className="tabular-nums">
+          {fmt(weekByCode.get(row.original.player.code)?.expected_points ?? null)}
+        </span>
+      ),
+    },
+    {
+      id: "plan-horizon-xp",
+      header: `EV ${weeks} GW${weeks > 1 ? "s" : ""}`,
+      accessorFn: (row) => horizonXp(plan, row.player.code, weeks),
+      cell: ({ row }) => (
+        <span className="tabular-nums font-medium">
+          {fmt(horizonXp(plan, row.original.player.code, weeks))}
+        </span>
+      ),
+    },
+  ];
+
+  const nameSuffix = (player: PlayerRecord) => {
+    const squadPlayer = weekByCode.get(player.code);
+    if (!squadPlayer) return null;
     return (
-      POSITION_ORDER.indexOf((a.position ?? "FWD") as (typeof POSITION_ORDER)[number]) -
-        POSITION_ORDER.indexOf((b.position ?? "FWD") as (typeof POSITION_ORDER)[number]) ||
-      rank(a) - rank(b) ||
-      a.web_name.localeCompare(b.web_name)
+      <>
+        {squadPlayer.is_captain && <Badge className="px-1 text-[9px]">C</Badge>}
+        {squadPlayer.is_vice_captain && (
+          <Badge variant="outline" className="px-1 text-[9px]">
+            V
+          </Badge>
+        )}
+        {squadPlayer.role !== "starting_xi" && (
+          <span className="text-[10px] text-muted-foreground">bench</span>
+        )}
+        {squadPlayer.transferred_in && (
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">in</span>
+        )}
+      </>
     );
-  });
+  };
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex flex-col gap-4 p-4 lg:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Next GW suggestion — GW{plan.gw_from}</h1>
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -269,15 +381,14 @@ export function NextGwPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>
           squad cost {price(week.squad_cost)} (deadline prices; later-GW affordability is a
           frozen-price scenario)
         </span>
         <span>hit GW{week.gw}: -{fmt(week.hit_points, 0)} pts</span>
         <span>
-          architecture{" "}
-          {isDefaultArchitecture(plan.component_modes) ? "default" : "diagnostic"} ·{" "}
+          architecture {isDefaultArchitecture(plan.component_modes) ? "default" : "diagnostic"} ·{" "}
           {planLabel(plan.component_modes)}
         </span>
       </div>
@@ -313,71 +424,46 @@ export function NextGwPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Player</TableHead>
-              <TableHead>Pos</TableHead>
-              <TableHead>Team</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>TS%</TableHead>
-              <TableHead>Availability (overlay)</TableHead>
-              <TableHead>Flags</TableHead>
-              <TableHead>xP GW{week.gw}</TableHead>
-              <TableHead>xP {weeks} GW{weeks > 1 ? "s" : ""}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {squadRows.map((p) => {
-              const ctx = context(p.code);
-              const status = ctx?.availability_status ?? null;
-              return (
-                <TableRow key={p.code}>
-                  <TableCell>
-                    <span className="font-medium">{p.web_name}</span>
-                    {p.is_captain && <Badge className="ml-1 px-1 text-[9px]">C</Badge>}
-                    {p.is_vice_captain && (
-                      <Badge variant="outline" className="ml-1 px-1 text-[9px]">
-                        V
-                      </Badge>
-                    )}
-                    {p.role !== "starting_xi" && (
-                      <span className="ml-1 text-xs text-muted-foreground">bench</span>
-                    )}
-                    {p.transferred_in && (
-                      <span className="ml-1 text-xs text-emerald-600 dark:text-emerald-400">
-                        transferred in
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{p.position}</TableCell>
-                  <TableCell>{p.team_short_name}</TableCell>
-                  <TableCell className="tabular-nums">{price(p.now_cost)}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {ctx?.selected_by_percent == null ? "–" : ctx.selected_by_percent.toFixed(1)}
-                  </TableCell>
-                  <TableCell>
-                    {status == null ? (
-                      "–"
-                    ) : (
-                      <span className={status === "a" ? "" : "text-amber-600 dark:text-amber-400"}>
-                        {AVAILABILITY_LABEL[status] ?? status}
-                        {ctx?.chance_of_playing != null && ` ${Math.round(ctx.chance_of_playing)}%`}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {flags(ctx).join(" · ") || <span className="text-muted-foreground">–</span>}
-                  </TableCell>
-                  <TableCell className="tabular-nums">{fmt(p.expected_points)}</TableCell>
-                  <TableCell className="tabular-nums">{fmt(horizonXp(plan, p.code, weeks))}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      <FilterPanel>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <ToggleGroup
+              type="single"
+              value={squadOnly}
+              onValueChange={(value) => {
+                if (value) setSquadOnly(value as "squad" | "all");
+              }}
+              variant="outline"
+              aria-label="Roster scope"
+            >
+              <ToggleGroupItem value="squad">Squad only</ToggleGroupItem>
+              <ToggleGroupItem value="all">Compare all players</ToggleGroupItem>
+            </ToggleGroup>
+            <span className="text-xs">
+              {rows.length} rows · chips headline fixture xP and colour on opponent strength
+            </span>
+          </div>
+          <PlayerFiltersBar filters={playerFilters} onChange={setPlayerFilters} teams={teams} />
+        </div>
+      </FilterPanel>
+
+      <PlayerStatTable
+        rows={rows}
+        view="overall"
+        colorSource="opponent"
+        gwFrom={plan.gw_from}
+        gwTo={plan.gw_to}
+        opponentIndexOf={opponentIndexOf}
+        formHeading={FORM_WINDOW_LABEL[playerFilters.formWindow]}
+        initialSorting={[]}
+        beforeFixtureColumns={planColumns}
+        nameSuffix={nameSuffix}
+        emptyMessage={
+          squadOnly === "squad"
+            ? "No squad players match the current filters."
+            : "No players match the current filters."
+        }
+      />
 
       {diff && (
         <div className="rounded-md border p-3">

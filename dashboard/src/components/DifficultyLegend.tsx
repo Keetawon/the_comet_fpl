@@ -1,12 +1,14 @@
 // Direction-labelled legend for the shared difficulty colour scale, with the
-// colour-source toggle: model ease (default) vs official FDR. The two sources are never
-// blended; the toggle switches which one colours chips and cells.
+// colour-source toggle: opponent strength (default), the row club's model ease, or the
+// official FDR. The three sources are never blended; the toggle switches which one
+// colours chips and cells.
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   BUCKET_CLASSES,
   EASE_LEGEND,
   FDR_LEGEND,
+  OPPONENT_LEGEND,
   type ColorSource,
 } from "@/lib/difficulty";
 
@@ -20,6 +22,14 @@ interface DifficultyLegendProps {
   defenceScaleNote?: string;
 }
 
+const SOURCE_ORDER: readonly ColorSource[] = ["opponent", "ease", "fdr"];
+
+const SOURCE_LABEL: Record<ColorSource, string> = {
+  opponent: "Opponent strength",
+  ease: "Club ease",
+  fdr: "Official FDR",
+};
+
 export function DifficultyLegend({
   colorSource,
   onColorSourceChange,
@@ -27,7 +37,12 @@ export function DifficultyLegend({
   cleanSheetAnchor,
   defenceScaleNote,
 }: DifficultyLegendProps) {
-  const legend = colorSource === "ease" ? EASE_LEGEND : FDR_LEGEND;
+  const legend =
+    colorSource === "ease" ? EASE_LEGEND : colorSource === "fdr" ? FDR_LEGEND : OPPONENT_LEGEND;
+  const direction =
+    colorSource === "opponent"
+      ? "Green = weak opponent · Red = strong opponent"
+      : "Green = easier · Red = harder";
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
       <ToggleGroup
@@ -40,11 +55,14 @@ export function DifficultyLegend({
         size="sm"
         aria-label="Colour source"
       >
-        <ToggleGroupItem value="ease">Model ease</ToggleGroupItem>
-        <ToggleGroupItem value="fdr">Official FDR</ToggleGroupItem>
+        {SOURCE_ORDER.map((source) => (
+          <ToggleGroupItem key={source} value={source}>
+            {SOURCE_LABEL[source]}
+          </ToggleGroupItem>
+        ))}
       </ToggleGroup>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="font-medium">Green = easier · Red = harder</span>
+        <span className="font-medium">{direction}</span>
         {legend.map(({ bucket, label }) => (
           <span
             key={bucket}
@@ -54,7 +72,12 @@ export function DifficultyLegend({
           </span>
         ))}
       </div>
-      {colorSource === "ease" ? (
+      {colorSource === "opponent" ? (
+        <span>
+          Opponent strength from the vintage's model λ (100 = average club, higher =
+          stronger opponent; display-time derivation, never blended into ease or FDR).
+        </span>
+      ) : colorSource === "ease" ? (
         <span>
           Ease index: 100 = league average, higher = easier (formula{" "}
           {easeIndexFormulaVersion}).{" "}

@@ -1,7 +1,9 @@
-// Fixture matrix (Team) page. One row per club: recent form (labelled with its anchor
-// season -- at GW1 that is LAST season), the next-N fixture ticker coloured by the active
-// view, and an expandable per-fixture table exposing every primitive beside the composite
-// ease indices (raw lambdas, clean-sheet probability, official FDR).
+// Fixture matrix (Team) page: the fixture pivot. One row per club of the SELECTED
+// vintage, one COLUMN per upcoming gameweek (the pivot), default-sorted by average ease
+// (easiest schedule first). Cells colour on the selected source -- opponent strength by
+// default, so a strong club's row is no longer uniformly green: the colour follows the
+// OPPONENT, not the row club. Expanding a row exposes every primitive (raw lambdas,
+// clean-sheet probability, all ease indices, official FDR) ordered by kickoff time.
 
 import { useEffect, useMemo, useState } from "react";
 import { flexRender } from "@tanstack/react-table";
@@ -22,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -32,18 +33,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
-import { chipBucket, chipMetric, viewMetric } from "@/lib/fixtureChips";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
-import { FixtureTicker } from "@/components/FixtureTicker";
-import { loadFixtureMatrix } from "@/data/load";
-import type { TeamFixture, TeamFormWindow, TeamRecord, WindowLabel } from "@/data/types";
+import { FilterPanel } from "@/components/FilterPanel";
+import { FixtureChip } from "@/components/FixtureTicker";
+import { TeamBadge } from "@/components/Avatars";
+import { VintageSelect } from "@/components/VintageSelect";
+import { loadFixtureMatrix, loadNextGw } from "@/data/load";
+import type { NextGwPlan, TeamFixture, TeamFormWindow, TeamRecord, WindowLabel } from "@/data/types";
 import { WINDOW_LABELS } from "@/data/types";
-import type { ColorSource, ViewMode } from "@/lib/difficulty";
+import { NULL_BUCKET_CLASS, type ColorSource, type ViewMode } from "@/lib/difficulty";
+import { chipBucket, chipMetric, viewMetric } from "@/lib/fixtureChips";
+import { buildOpponentStrength } from "@/lib/opponentStrength";
+import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; teams: TeamRecord[]; easeVersion: string; gwFrom: number; gwTo: number };
+  | {
+      status: "ready";
+      teams: TeamRecord[];
+      plans: NextGwPlan[];
+      runs: { run_id: string; season: string; gw_from: number; gw_to: number }[];
+      easeVersion: string;
+      gwFrom: number;
+      gwTo: number;
+      defaultRunId: string;
+    };
 
 interface TeamRow {
   team: TeamRecord;
@@ -62,49 +77,113 @@ const VIEW_LABEL: Record<ViewMode, string> = {
   defense: "clean-sheet probability",
 };
 
-function FormCell({ row }: { row: TeamRow }) {
-  if (!row.form || !row.formLabel) return <span className="text-muted-foreground">No form data</span>;
-  const f = row.form;
+const HEAD_CLASS = "sticky top-0 z-10 h-8 bg-background px-2 text-xs whitespace-nowrap";
+const CELL_CLASS = "px-2 py-1 text-xs whitespace-nowrap";
+
+const FORM_WINDOW_LABEL: Record<WindowLabel, string> = {
+  last_3: "Last 3",
+  last_5: "Last 5",
+  last_10: "Last 10",
+  season_to_date: "Season",
+};
+
+function TeamGwCell({
+  fixtures,
+  gw,
+  view,
+  colorSource,
+  opponentIndexOf,
+  cleanSheetAnchor,
+}: {
+  fixtures: TeamFixture[];
+  gw: number;
+  view: ViewMode;
+  colorSource: ColorSource;
+  opponentIndexOf: (teamCode: number) => number | null;
+  cleanSheetAnchor: number | null;
+}) {
+  const inGw = fixtures.filter((f) => f.gw === gw);
+  if (!inGw.length) {
+    return (
+      <span
+        data-testid="blank-slot"
+        data-gw={gw}
+        title={`GW${gw}: no fixture`}
+        className={`inline-flex h-8 w-12 items-center justify-center rounded-md text-[10px] ${NULL_BUCKET_CLASS}`}
+      >
+        GW{gw}
+      </span>
+    );
+  }
   return (
-    <div className="text-xs leading-snug">
-      <div className="text-[10px] text-muted-foreground">{row.formLabel}</div>
-      <div className="tabular-nums">
-        W{fmt(f.wins, 0)} D{fmt(f.draws, 0)} L{fmt(f.losses, 0)} · {fmt(f.goals_for, 0)}:
-        {fmt(f.goals_against, 0)} · CS {fmt(f.clean_sheets, 0)}
-      </div>
-      <div className="tabular-nums text-muted-foreground">
-        xG {fmt(f.team_xg_per_match, 2)}/m · xGC {fmt(f.team_xgc_per_match, 2)}/m
-      </div>
-    </div>
+    <span className="inline-flex flex-col items-stretch gap-0.5">
+      {inGw.map((f) => {
+        const opponentIndex = opponentIndexOf(f.opponent_team_code);
+        return (
+          <FixtureChip
+            key={f.fixture}
+            fixture={f}
+            metric={chipMetric(f, view, colorSource, opponentIndex)}
+            bucket={chipBucket(f, view, colorSource, cleanSheetAnchor, opponentIndex)}
+          />
+        );
+      })}
+    </span>
   );
 }
 
 export function FixtureMatrixPage() {
   const [state, setState] = useState<PageState>({ status: "loading" });
-  const [colorSource, setColorSource] = useState<ColorSource>("ease");
+  const [runId, setRunId] = useState<string | null>(null);
+  const [colorSource, setColorSource] = useState<ColorSource>("opponent");
   const [formWindow, setFormWindow] = useState<WindowLabel>("last_5");
   const [filters, setFilters] = useState<FilterState | null>(null);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "avgMetric", desc: true }]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
 
   useEffect(() => {
     let cancelled = false;
-    loadFixtureMatrix()
-      .then((data) => {
+    Promise.all([loadFixtureMatrix(), loadNextGw()])
+      .then(([fixtureData, nextGw]) => {
         if (cancelled) return;
-        const gws = data.teams.flatMap((t) => t.fixtures.map((f) => f.gw));
-        const run = data.manifest?.runs.find(
-          (r) => r.run_id === data.teams[0]?.run_id && r.season === data.teams[0]?.season,
+        const seen = new Map<string, { run_id: string; season: string; gw_from: number; gw_to: number }>();
+        for (const t of fixtureData.teams) {
+          const gws = t.fixtures.map((f) => f.gw);
+          const from = gws.length ? Math.min(...gws) : 0;
+          const to = gws.length ? Math.max(...gws) : 0;
+          const existing = seen.get(t.run_id);
+          if (!existing) seen.set(t.run_id, { run_id: t.run_id, season: t.season, gw_from: from, gw_to: to });
+          else
+            seen.set(t.run_id, {
+              ...existing,
+              gw_from: Math.min(existing.gw_from, from),
+              gw_to: Math.max(existing.gw_to, to),
+            });
+        }
+        const runs =
+          fixtureData.manifest?.runs ??
+          [...seen.values()].sort((a, b) => a.run_id.localeCompare(b.run_id));
+        const defaultRun = defaultVintageRunId(
+          runs,
+          nextGw.plans,
+          fixtureData.manifest?.runs.at(-1)?.run_id ?? null,
         );
-        const gwFrom = run?.gw_from ?? Math.min(...gws);
-        const gwTo = run?.gw_to ?? Math.max(...gws);
+        const first =
+          fixtureData.teams.find((t) => t.run_id === defaultRun) ?? fixtureData.teams[0];
+        const gws = first ? first.fixtures.map((f) => f.gw) : [];
+        const gwFrom = gws.length ? Math.min(...gws) : 1;
+        const gwTo = gws.length ? Math.max(...gws) : 1;
         setState({
           status: "ready",
-          teams: data.teams,
-          easeVersion: data.easeIndexFormulaVersion,
+          teams: fixtureData.teams,
+          plans: nextGw.plans,
+          runs,
+          easeVersion: fixtureData.easeIndexFormulaVersion,
           gwFrom,
           gwTo,
+          defaultRunId: defaultRun ?? first?.run_id ?? "",
         });
+        setRunId(defaultRun ?? first?.run_id ?? null);
         setFilters({ view: "overall", venue: "all", gwFrom, gwTo });
       })
       .catch((error: unknown) => {
@@ -117,17 +196,30 @@ export function FixtureMatrixPage() {
     };
   }, []);
 
+  const runTeams = useMemo(
+    () =>
+      state.status === "ready"
+        ? state.teams.filter((t) => t.run_id === (runId ?? state.defaultRunId))
+        : [],
+    [state, runId],
+  );
+
   const cleanSheetAnchor = useMemo(() => {
-    if (state.status !== "ready") return null;
-    const values = state.teams
+    const values = runTeams
       .flatMap((t) => t.fixtures.map((f) => f.probability_clean_sheet))
       .filter((v): v is number => v != null);
     return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-  }, [state]);
+  }, [runTeams]);
+
+  const opponentStrength = useMemo(() => buildOpponentStrength(runTeams), [runTeams]);
+  const opponentIndexOf = useMemo(
+    () => (teamCode: number) => opponentStrength.get(teamCode)?.index ?? null,
+    [opponentStrength],
+  );
 
   const rows: TeamRow[] = useMemo(() => {
-    if (state.status !== "ready" || !filters) return [];
-    return state.teams.map((team) => {
+    if (!filters) return [];
+    return runTeams.map((team) => {
       const filtered = team.fixtures
         .filter(
           (f) =>
@@ -145,11 +237,11 @@ export function FixtureMatrixPage() {
         team,
         filtered,
         form: form ? form.windows[formWindow] : null,
-        formLabel: form ? `Form ${form.season} · GW${form.as_at_gw}` : null,
+        formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
         avgMetric: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null,
       };
     });
-  }, [state, filters, formWindow]);
+  }, [runTeams, filters, formWindow]);
 
   const columns = useMemo<LegacyColumnDef<TeamRow>[]>(
     () => [
@@ -176,49 +268,63 @@ export function FixtureMatrixPage() {
         accessorKey: "team.short_name",
         header: "Team",
         cell: ({ row }) => (
-          <div>
-            <div className="font-medium">{row.original.team.team_name}</div>
-            <div className="text-xs text-muted-foreground">{row.original.team.season}</div>
+          <div className="flex items-center gap-1.5">
+            <TeamBadge teamCode={row.original.team.team_code} shortName={row.original.team.short_name} />
+            <span className="font-medium">{row.original.team.team_name}</span>
           </div>
         ),
       },
       {
         id: "form",
-        header: "Recent form",
-        cell: ({ row }) => <FormCell row={row.original} />,
+        header: `Form ${FORM_WINDOW_LABEL[formWindow]}`,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const f = row.original.form;
+          if (!f || !row.original.formLabel) return <span className="text-muted-foreground">–</span>;
+          return (
+            <span
+              className="text-xs tabular-nums"
+              title={`Form anchored ${row.original.formLabel} (last season at GW1)`}
+            >
+              W{fmt(f.wins, 0)} D{fmt(f.draws, 0)} L{fmt(f.losses, 0)} · {fmt(f.goals_for, 0)}:
+              {fmt(f.goals_against, 0)} · xG {fmt(f.team_xg_per_match, 2)}/m · xGC{" "}
+              {fmt(f.team_xgc_per_match, 2)}/m
+            </span>
+          );
+        },
       },
       {
         id: "avgMetric",
         header: `Avg ${filters ? VIEW_LABEL[filters.view] : ""}`,
+        accessorFn: (row) => row.avgMetric,
         cell: ({ row }) => {
           const value = row.original.avgMetric;
           if (value == null) return <span className="text-muted-foreground">–</span>;
           const text =
             filters?.view === "defense" ? `${Math.round(value * 100)}%` : value.toFixed(1);
-          return <span className="tabular-nums">{text}</span>;
+          return <span className="tabular-nums font-medium">{text}</span>;
         },
       },
-      {
-        id: "fixtures",
-        header: "Fixtures",
+      ...Array.from(
+        { length: (filters?.gwTo ?? 1) - (filters?.gwFrom ?? 1) + 1 },
+        (_, i) => (filters?.gwFrom ?? 1) + i,
+      ).map((gw) => ({
+        id: `gw-${gw}`,
+        header: `GW${gw}`,
         enableSorting: false,
-        cell: ({ row }) =>
-          row.original.filtered.length ? (
-            <FixtureTicker
-              fixtures={row.original.filtered}
-              minGw={filters?.gwFrom ?? 1}
-              maxGw={filters?.gwTo ?? 1}
-              metricOf={(f) => chipMetric(f, filters?.view ?? "overall", colorSource)}
-              bucketOf={(f) =>
-                chipBucket(f, filters?.view ?? "overall", colorSource, cleanSheetAnchor)
-              }
-            />
-          ) : (
-            <span className="text-xs text-muted-foreground">No fixtures in range</span>
-          ),
-      },
+        cell: ({ row }: { row: { original: TeamRow } }) => (
+          <TeamGwCell
+            fixtures={row.original.filtered}
+            gw={gw}
+            view={filters?.view ?? "overall"}
+            colorSource={colorSource}
+            opponentIndexOf={opponentIndexOf}
+            cleanSheetAnchor={cleanSheetAnchor}
+          />
+        ),
+      })),
     ],
-    [filters, colorSource, cleanSheetAnchor],
+    [filters, colorSource, cleanSheetAnchor, opponentIndexOf, formWindow],
   );
 
   const table = useLegacyTable({
@@ -256,47 +362,62 @@ export function FixtureMatrixPage() {
     );
   }
 
-  const runId = state.teams[0]?.run_id;
-  const asOf = state.teams[0]?.as_of;
+  const activeRunId = runId ?? state.defaultRunId;
+  const activeRun = runTeams[0];
 
   return (
-    <div className="flex flex-col gap-3 p-6">
+    <div className="flex flex-col gap-3 p-4 lg:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-semibold">Fixture matrix</h1>
-        <p className="text-xs text-muted-foreground">
-          run {runId?.slice(0, 12)}… · as of {asOf?.replace("T", " ").slice(0, 16)} UTC ·
-          horizon GW{filters?.gwFrom ?? state.gwFrom}-GW{filters?.gwTo ?? state.gwTo}
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <VintageSelect options={vintageOptions(state.runs, state.plans)} value={activeRunId} onChange={setRunId} />
+          <p className="text-xs text-muted-foreground">
+            {runTeams.length} clubs · as of {activeRun?.as_of?.replace("T", " ").slice(0, 16)} UTC
+            {activeRun?.form ? ` · form anchored ${activeRun.form.season} GW${activeRun.form.as_at_gw}` : ""}
+          </p>
+        </div>
       </div>
-      <FilterBar filters={filters!} onChange={setFilters} minGw={state.gwFrom} maxGw={state.gwTo} />
-      <div className="flex flex-wrap items-center gap-3">
+
+      <FilterPanel>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {filters && (
+            <FilterBar filters={filters} onChange={setFilters} minGw={state.gwFrom} maxGw={state.gwTo} />
+          )}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            Form window
+            <Select
+              value={formWindow}
+              onValueChange={(value) => setFormWindow(value as WindowLabel)}
+            >
+              <SelectTrigger size="sm" className="w-28" aria-label="Form window">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WINDOW_LABELS.map((label) => (
+                  <SelectItem key={label} value={label}>
+                    {FORM_WINDOW_LABEL[label]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </FilterPanel>
+
+      <div className="rounded-lg border bg-card p-2">
         <DifficultyLegend
           colorSource={colorSource}
           onColorSourceChange={setColorSource}
           easeIndexFormulaVersion={state.easeVersion}
           cleanSheetAnchor={cleanSheetAnchor}
         />
-        <Separator orientation="vertical" className="h-6" />
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          Form window
-          <Select
-            value={formWindow}
-            onValueChange={(value) => setFormWindow(value as WindowLabel)}
-          >
-            <SelectTrigger size="sm" className="w-36" aria-label="Form window">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {WINDOW_LABELS.map((label) => (
-                <SelectItem key={label} value={label}>
-                  {label === "season_to_date" ? "Season to date" : label.replace("last_", "Last ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Sorted by average ease, easiest schedule first (click any column to re-sort). One
+          column per gameweek; two chips in a double gameweek.
+        </p>
       </div>
-      <div className="overflow-x-auto rounded-md border">
+
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -306,6 +427,7 @@ export function FixtureMatrixPage() {
                   return (
                     <TableHead
                       key={header.id}
+                      className={HEAD_CLASS}
                       aria-sort={
                         sorted === "asc"
                           ? "ascending"
@@ -341,59 +463,66 @@ export function FixtureMatrixPage() {
               const cells = (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className={CELL_CLASS}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               );
               if (!row.getIsExpanded()) return [cells];
-              const fixtures = row.original.team.fixtures;
+              const byKickoff = [...row.original.team.fixtures].sort(
+                (a, b) =>
+                  (a.kickoff_time ?? "9999").localeCompare(b.kickoff_time ?? "9999") || a.gw - b.gw,
+              );
               return [
                 cells,
                 <TableRow key={`${row.id}-detail`}>
                   <TableCell colSpan={row.getVisibleCells().length} className="bg-muted/40 p-3">
                     <div className="max-w-3xl space-y-1">
                       <p className="text-xs font-medium">
-                        {row.original.team.team_name} — all primitives (ease formula{" "}
+                        {row.original.team.team_name} — all primitives, by kickoff (ease formula{" "}
                         {state.easeVersion})
                       </p>
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>GW</TableHead>
-                            <TableHead>Opponent</TableHead>
-                            <TableHead>Venue</TableHead>
-                            <TableHead>Kickoff (UTC)</TableHead>
-                            <TableHead>λ for</TableHead>
-                            <TableHead>λ against</TableHead>
-                            <TableHead>CS %</TableHead>
-                            <TableHead>Atk ease</TableHead>
-                            <TableHead>Def ease</TableHead>
-                            <TableHead>Ovr ease</TableHead>
-                            <TableHead>FDR</TableHead>
-                            <TableHead>Stage A league avg</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Kickoff (UTC)</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">GW</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Opponent</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Venue</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">λ for</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">λ against</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">CS %</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Atk ease</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Def ease</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Ovr ease</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Opp strength</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">FDR</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Stage A league avg</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {fixtures.map((f) => (
+                          {byKickoff.map((f) => (
                             <TableRow key={f.fixture}>
-                              <TableCell className="tabular-nums">{f.gw}</TableCell>
-                              <TableCell>{f.opponent_short_name}</TableCell>
-                              <TableCell>{f.was_home == null ? "–" : f.was_home ? "H" : "A"}</TableCell>
-                              <TableCell className="tabular-nums">
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
                                 {f.kickoff_time ? f.kickoff_time.replace("T", " ").slice(0, 16) : "–"}
                               </TableCell>
-                              <TableCell className="tabular-nums">{fmt(f.lambda_for, 2)}</TableCell>
-                              <TableCell className="tabular-nums">{fmt(f.lambda_against, 2)}</TableCell>
-                              <TableCell className="tabular-nums">
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{f.gw}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px]">{f.opponent_short_name}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px]">{f.was_home == null ? "–" : f.was_home ? "H" : "A"}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.lambda_for, 2)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.lambda_against, 2)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
                                 {fmt(f.probability_clean_sheet == null ? null : f.probability_clean_sheet * 100, 1)}
                               </TableCell>
-                              <TableCell className="tabular-nums">{fmt(f.attack_ease_index)}</TableCell>
-                              <TableCell className="tabular-nums">{fmt(f.defence_ease_index)}</TableCell>
-                              <TableCell className="tabular-nums">{fmt(f.overall_ease_index)}</TableCell>
-                              <TableCell className="tabular-nums">{fmt(f.official_fdr, 0)}</TableCell>
-                              <TableCell>{f.stage_a_league_average_team ? "yes" : "no"}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.attack_ease_index)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.defence_ease_index)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.overall_ease_index)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                {fmt(opponentIndexOf(f.opponent_team_code), 0)}
+                              </TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.official_fdr, 0)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px]">{f.stage_a_league_average_team ? "yes" : "no"}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

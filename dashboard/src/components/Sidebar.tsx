@@ -1,5 +1,6 @@
 // Left sidebar navigation. All six roadmap pages are implemented; the hash route in App.tsx
-// owns the page selection.
+// owns the page selection. Collapses to icons-only on small screens (phone testing) and
+// expands to labels from md up.
 
 import {
   CalendarDays,
@@ -33,16 +34,19 @@ interface SidebarProps {
 
 export function Sidebar({ active, onNavigate }: SidebarProps) {
   return (
-    <nav aria-label="Pages" className="flex h-full w-56 shrink-0 flex-col border-r bg-sidebar">
-      <div className="flex items-center gap-2 px-4 py-4">
+    <nav
+      aria-label="Pages"
+      className="flex h-full w-14 shrink-0 flex-col border-r bg-sidebar md:w-56"
+    >
+      <div className="flex items-center gap-2 px-3 py-4 md:px-4">
         {/* ponytail: logo is a comet emoji, replace with a real mark if one exists */}
         <span className="text-xl">☄️</span>
-        <div>
+        <div className="hidden md:block">
           <div className="text-sm font-semibold leading-tight">The Comet</div>
           <div className="text-xs text-muted-foreground">FPL decision dashboard</div>
         </div>
       </div>
-      <ul className="flex-1 space-y-1 px-2">
+      <ul className="flex-1 space-y-1 px-1.5 md:px-2">
         {PAGES.map((page) => {
           const Icon = page.icon;
           return (
@@ -51,21 +55,22 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
                 type="button"
                 onClick={() => onNavigate(page.id)}
                 aria-current={active === page.id ? "page" : undefined}
+                title={page.label}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm max-md:justify-center max-md:px-0",
                   active === page.id
                     ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                     : "text-sidebar-foreground hover:bg-sidebar-accent/50",
                 )}
               >
-                <Icon className="size-4" />
-                <span className="flex-1">{page.label}</span>
+                <Icon className="size-4 shrink-0" />
+                <span className="flex-1 truncate max-md:hidden">{page.label}</span>
               </button>
             </li>
           );
         })}
       </ul>
-      <p className="px-4 py-3 text-[10px] leading-snug text-muted-foreground">
+      <p className="hidden px-4 py-3 text-[10px] leading-snug text-muted-foreground md:block">
         Reads only the static JSON read models exported by the publish layer. It never
         queries DuckDB.
       </p>
