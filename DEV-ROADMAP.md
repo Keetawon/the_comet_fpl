@@ -281,6 +281,26 @@ player looks more plausible.
 
   This pack supersedes the 08-16 pack as the standing fallback vintage. The 2026-08-20 and
   deadline slots are unaffected.
+
+  **The pack was rerun the same day (evening 2026-08-17)** at HEAD
+  `60eeb038c8c8ee32cfd9aa4bfe9b19fd08cbff9a` to fold in the equally-priced-filler ownership
+  preference (commit `37a7165`), on the same `2026-08-17T065035Z` snapshot. Steps 1-12 in
+  order, same gate state (Ruff/format/mypy clean; pytest 1,560 passed / 4 skipped / 13
+  environmental failures). Prediction rows are unchanged (same snapshot and roster); the
+  ledger carries more vintages than the morning run, so the forecast manifests record a new
+  `database_sha256 9da73c23…` and new artifact SHAs. Chain: default forecast
+  `c7fc877b…b4b9c` -> ledger run `4a6f9964…78a57` -> optimizer run `92d055c4…1e43f`
+  (decision `3a4c96c1…df8f`); diagnostic forecast `dfa5b846…ead8f` -> ledger run
+  `c3fced75…19846` -> optimizer run `aad4e4e8…db2f58` (decision `bada0ad6…6d68d`);
+  comparison `b6081f9ba45256c300cd105517eb3b89ab70bebddf9500fdeb5489f3e414c3e6`.
+
+  The ownership preference is visible in the recorded default bench: Dubravka (22.1%
+  owned) over Forster (3.2%) in goal, Diop (18.2%) over Bidwell (0.1%), Kusi-Asare (7.1%)
+  over Scarlett (1.6%) -- all at identical prices, GW1 EV unchanged at 64.77, horizon
+  322.86 -> 323.33 (only the transfer path shifts). The `--min-bench-appearance 0.25`
+  sensitivity run (optimizer `95a450db…fc1c`) is now squad-identical to the default plan:
+  the ownership-selected bench already clears the 25% gate, so the threshold does not bind
+  on this vintage. This rerun supersedes the morning pack as the standing fallback vintage.
 - On 2026-08-21: capture and commit the latest official data, rerun the sequential pipeline roughly
   2-3 hours before the deadline, and lock the owner decision no later than 30 minutes before the
   deadline. Do not trade reproducibility for a last-minute unrecorded refresh.
