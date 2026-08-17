@@ -8,7 +8,9 @@
 // models' calibration against each other, not squad quality.
 
 import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -38,6 +40,7 @@ import {
   planLabel,
 } from "@/lib/nextGw";
 import type { LegacyColumnDef } from "@tanstack/react-table/legacy";
+import { clearPlanRequest, readPlanRequest, type PlanRequest } from "@/lib/planRequest";
 
 type PageState =
   | { status: "loading" }
@@ -138,12 +141,81 @@ function BenchBlock({ week }: { week: PlanWeek }) {
   );
 }
 
+/** The wizard's rules travel here (localStorage) and are shown as PENDING: the plans on
+ * this page are immutable recorded artifacts that predate those rules, and the browser
+ * never re-solves. Dismissing only hides the panel; it does not delete anything. */
+function PendingRequestPanel({ request, onDismiss }: { request: PlanRequest; onDismiss: () => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="rounded-lg border border-amber-300/70 bg-amber-50/60 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm font-medium">
+          <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
+          Your wizard rules — not yet applied
+        </p>
+        <div className="flex items-center gap-1">
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => {
+              void navigator.clipboard?.writeText(request.command).then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+          >
+            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+            {copied ? "Copied" : "Copy command"}
+          </Button>
+          <Button size="xs" variant="ghost" onClick={onDismiss}>
+            Dismiss
+          </Button>
+        </div>
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        The plans below were recorded before these rules existed: none of your locks or your
+        threshold is in them, and nothing re-solved when you finished the wizard — the
+        optimizer runs in Python, never in this browser. Run the command, re-publish the read
+        models with the new plan (dashboard/README.md), reload, and your squad appears here.
+      </p>
+      {request.locks.length > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Requested locks">
+          {request.locks.map((p) => (
+            <li
+              key={p.code}
+              className="rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-xs dark:border-amber-700 dark:bg-amber-950/40"
+            >
+              <span className="font-medium">{p.web_name}</span>{" "}
+              <span className="text-muted-foreground">{price(p.now_cost)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-muted-foreground">
+        {request.locks.length
+          ? `${request.locks.length} lock${request.locks.length > 1 ? "s" : ""}`
+          : "no locks"}{" "}
+        · rotation threshold {request.thresholdLabel.toLowerCase()} · saved{" "}
+        {request.createdAt.replace("T", " ").slice(0, 16)}
+      </p>
+      <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-950 p-2 font-mono text-[10px] leading-relaxed text-zinc-100">
+        {request.command}
+      </pre>
+    </div>
+  );
+}
+
 export function NextGwPage() {
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [planId, setPlanId] = useState<string | null>(null);
   const [horizonWeeks, setHorizonWeeks] = useState<number>(1);
   const [squadOnly, setSquadOnly] = useState<"squad" | "all">("squad");
   const [playerFilters, setPlayerFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
+  const [pendingRequest, setPendingRequest] = useState<PlanRequest | null>(null);
+
+  useEffect(() => {
+    setPendingRequest(readPlanRequest());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -408,6 +480,16 @@ export function NextGwPage() {
           {planLabel(plan.component_modes)}
         </span>
       </div>
+
+      {pendingRequest && (
+        <PendingRequestPanel
+          request={pendingRequest}
+          onDismiss={() => {
+            clearPlanRequest();
+            setPendingRequest(null);
+          }}
+        />
+      )}
 
       <XiBlock week={week} />
 

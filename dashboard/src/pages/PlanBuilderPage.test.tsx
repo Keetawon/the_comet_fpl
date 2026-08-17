@@ -76,9 +76,24 @@ describe("PlanBuilderPage", () => {
     const pre = document.querySelector("pre")!; // the command block is the page's only <pre>
     expect(pre.textContent).toContain("--lock 1");
     expect(pre.textContent).toContain("--min-bench-appearance 0.25");
-    // removing the lock through the chip drops it from the command
+    // the command is runnable as-is (dev-latest convention paths, not placeholders) and the
+    // request is persisted for the Next GW page's not-yet-applied panel
+    const saved = JSON.parse(window.localStorage.getItem("fpl-plan-request") ?? "{}") as {
+      locks: unknown[];
+      command: string;
+    };
+    expect(saved.locks).toHaveLength(1);
+    expect(saved.command).toContain("dev-latest\\gw1_5_default.jsonl");
+    expect(saved.command).toContain("--min-bench-appearance 0.25");
+    // removing the lock through the chip drops it from the command AND the saved request
     await user.click(screen.getByRole("button", { name: "Remove Alpha" }));
     expect(pre.textContent).not.toContain("--lock 1");
+    const after = JSON.parse(window.localStorage.getItem("fpl-plan-request") ?? "{}") as {
+      locks: unknown[];
+      command: string;
+    };
+    expect(after.locks).toHaveLength(0);
+    expect(after.command).not.toContain("--lock 1");
   });
 
   it("never strands the user: exits are movement-only and the review ends forward", async () => {

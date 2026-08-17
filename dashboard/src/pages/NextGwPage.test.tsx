@@ -32,6 +32,7 @@ vi.mock("@/data/load", () => ({
 const teamsForRunA: TeamRecord[] = teamsSample.teams.map((t) => ({ ...t, run_id: "run-a" }));
 
 beforeEach(() => {
+  window.localStorage.clear();
   vi.mocked(loadSummary).mockResolvedValue(summarySample);
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersSample.players, manifest: null });
@@ -112,5 +113,34 @@ describe("NextGwPage", () => {
     // Beta is the vice-captain starter: the paler amber variant.
     expect(rowsOf("Beta").some((row) => row.className.includes("bg-amber-50"))).toBe(true);
     expect(screen.getByText(/row colours: gold = captain/)).toBeInTheDocument();
+  });
+
+  it("shows the wizard's pending rules as not yet applied, dismissable", async () => {
+    window.localStorage.setItem(
+      "fpl-plan-request",
+      JSON.stringify({
+        version: 1,
+        createdAt: "2026-08-17T22:00:00.000Z",
+        threshold: "0.25",
+        thresholdLabel: "25%",
+        locks: [{ code: 999, web_name: "LockedOne", now_cost: 55 }],
+        command:
+          "python -m fpl.jobs.optimize_squad gw1_5_default.jsonl --lock 999 --min-bench-appearance 0.25 --output plan_my_rules.json",
+      }),
+    );
+    const user = userEvent.setup();
+    render(<NextGwPage />);
+    await waitFor(() => expect(screen.getByText(/not yet applied/)).toBeInTheDocument());
+    // the panel states the honest gap: the recorded plans predate the rules, nothing re-solved
+    expect(screen.getByText(/none of your locks/)).toBeInTheDocument();
+    expect(screen.getByText("LockedOne")).toBeInTheDocument();
+    expect(screen.getByText(/rotation threshold 25%/)).toBeInTheDocument();
+    expect(document.querySelector("pre")?.textContent).toContain("--min-bench-appearance 0.25");
+    // the recorded plan renders unchanged beside the panel
+    expect(screen.getByText(/Formation/).textContent).toContain("captain Alpha");
+    // dismissing hides the panel without touching the recorded plans
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/not yet applied/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Formation/).textContent).toContain("captain Alpha");
   });
 });

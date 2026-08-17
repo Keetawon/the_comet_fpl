@@ -27,6 +27,7 @@ import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
 import type { PlayerRecord } from "@/data/types";
 import { isDefaultArchitecture } from "@/lib/nextGw";
+import { writePlanRequest } from "@/lib/planRequest";
 import { availabilityLabel } from "@/lib/availability";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,13 @@ const THRESHOLDS = [
   { value: "0.5", label: "50%", flag: "0.5" },
 ] as const;
 const STEPS = ["Start", "Set your rules", "Review & run"] as const;
+
+// Dev-loop convention (dashboard/README.md): the default GW1-5 artifact the README
+// regenerates lives here, and the wizard's own plan output gets a distinct name so it can
+// be passed to the next --optimizer-plan publish without clobbering the recorded pair.
+// ponytail: a fixed local path the owner's machine guarantees, not a config surface.
+const DEV_FORECAST_PATH = "D:\\tmp\\gw1\\dev-latest\\gw1_5_default.jsonl";
+const DEV_PLAN_OUTPUT = "D:\\tmp\\gw1\\dev-latest\\plan_my_rules.json";
 
 const price = (tenths: number | null) => (tenths == null ? "–" : `£${(tenths / 10).toFixed(1)}m`);
 
@@ -221,12 +229,27 @@ export function PlanBuilderPage() {
   const thresholdFlag = THRESHOLDS.find((t) => t.value === threshold)?.flag ?? null;
   const thresholdLabel = THRESHOLDS.find((t) => t.value === threshold)?.label ?? "Off";
   const command = [
-    ".\\.venv\\Scripts\\python.exe -m fpl.jobs.optimize_squad <forecast.jsonl>",
+    ".\\.venv\\Scripts\\python.exe -m fpl.jobs.optimize_squad",
+    DEV_FORECAST_PATH,
     "--risk-lambda 0",
     ...locks.map((p) => `--lock ${p.code}`),
     ...(thresholdFlag ? [`--min-bench-appearance ${thresholdFlag}`] : []),
-    "--output <plan.json>",
+    `--output ${DEV_PLAN_OUTPUT}`,
   ].join(" ");
+
+  // Reaching (or editing on) the review screen records the request: the Next GW page then
+  // shows it as pending until the command is run and the read models are re-published.
+  useEffect(() => {
+    if (step !== 3) return;
+    writePlanRequest({
+      version: 1,
+      createdAt: new Date().toISOString(),
+      threshold,
+      thresholdLabel,
+      locks: locks.map((p) => ({ code: p.code, web_name: p.web_name, now_cost: p.now_cost })),
+      command,
+    });
+  }, [step, locks, threshold, thresholdLabel, command]);
 
   const managerTouched = managerId.trim() !== "";
   const managerValid = /^\d{1,10}$/.test(managerId.trim());
@@ -619,10 +642,14 @@ export function PlanBuilderPage() {
             <pre className="overflow-x-auto bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-100">
               {command}
             </pre>
-            <p className="px-3 py-2 text-[10px] text-muted-foreground">
-              The solver lives in Python, so the browser cannot compute it. forecast.jsonl =
-              the default GW1-5 artifact from the latest pack (see the runbook); the written
-              plan.json renders on the Next GW page once the export includes it.
+            <p className="px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
+              The solver lives in Python, so the browser cannot compute anything — this page
+              only writes your rules down. The command runs from the repository root against
+              the dev-latest default artifact (dashboard/README.md regenerates it; use the
+              runbook pack path on deadline day). After it runs, re-publish the read models
+              passing <span className="font-mono">--optimizer-plan plan_my_rules.json</span>{" "}
+              and reload: your squad appears on the Next GW page. Until then that page shows
+              these rules as <span className="font-medium">not yet applied</span>.
             </p>
             <div className="flex items-center gap-2 px-3 pb-3">
               <Button size="sm" variant="outline" onClick={() => setStep(2)}>
