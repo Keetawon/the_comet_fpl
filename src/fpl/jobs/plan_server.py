@@ -61,6 +61,19 @@ class RequestError(ValueError):
     """A malformed or refused plan request; str() is safe to show in the UI."""
 
 
+def _ui_message(exc: Exception) -> str:
+    """Translate solver failures into a sentence the wizard can act on, keeping the reason."""
+    text = str(exc)
+    if "min_bench_appearance" in text:
+        return (
+            "these rules are infeasible together: a benched player -- often one of the locked "
+            "ones -- does not clear the rotation threshold's appearance lower bound, so the "
+            "squad cannot both bench him and satisfy the gate. Lower or switch off the "
+            f"threshold, or unlock the low-minutes player. ({text})"
+        )
+    return f"solver failed: {text}"
+
+
 def validate_request(body: dict[str, Any]) -> tuple[list[int], float]:
     """Parse and bound a {locks, min_bench_appearance} body, mirroring the CLI's own checks."""
     locks_value = body.get("locks", [])
@@ -285,8 +298,9 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
             except RequestError as exc:
                 state.fail(str(exc))
                 self._respond(409, {"ok": False, "error": str(exc)})
-            except (OSError, ValueError) as exc:
-                message = f"plan run failed: {exc}"
+            except Exception as exc:
+                logger.exception("plan run crashed")
+                message = _ui_message(exc)
                 state.fail(message)
                 self._respond(500, {"ok": False, "error": message})
 

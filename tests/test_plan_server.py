@@ -198,6 +198,32 @@ class TestHttpSurface:
         assert status == 409
         assert "list of player codes" in json.loads(payload)["error"]
 
+    def test_a_crashing_pipeline_returns_a_reason_not_a_dead_socket(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The reported ERR_EMPTY_RESPONSE: an uncaught solver exception must still answer."""
+        monkeypatch.setattr(plan_server, "_git_worktree_clean", lambda repo: True)
+
+        def boom(state: object, locks: list[int], bench: float) -> dict[str, object]:
+            raise RuntimeError(
+                "initial squad lineup violates min_bench_appearance before transfer planning"
+            )
+
+        monkeypatch.setattr(plan_server, "run_plan", boom)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(ServerState(tmp_path)))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            status, _, payload = self._request(
+                server, "/plan", method="POST", body=json.dumps({"locks": []}).encode("utf-8")
+            )
+            body = json.loads(payload)
+            assert status == 500
+            assert "infeasible together" in body["error"]
+            assert "min_bench_appearance" in body["error"]
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_foreign_origin_is_refused(self, loopback_server: ThreadingHTTPServer) -> None:
         url = f"http://127.0.0.1:{loopback_server.server_address[1]}/status"
         request = urllib.request.Request(url, headers={"Origin": "https://evil.example"})
