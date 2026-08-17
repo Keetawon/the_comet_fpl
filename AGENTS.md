@@ -795,12 +795,21 @@ research guardrails; they are not permission to displace the active delivery ord
    A/B/C candidates) needed only to claim measured lift. Shipped on the prospective track so far:
    penalty/set-piece premium, xG-share (embedding the penalty premium) and coupled xA-share for
    assists, the season-boundary appearance correction, the **equal-weighted trailing-5
-   appearance window** replacing the recency-weighted estimate at the boundary, and (latest) the
+   appearance window** replacing the recency-weighted estimate at the boundary, and the
    **shrunk trailing-5 minute-bin estimate** (`models/minutes_shrinkage.py`) replacing the raw
    `counts / n`, which took PIT-80 from 0.74538 to 0.79985 against a nominal 0.80. Its `alpha` was
    selected on 2021-22..2024-25 with 2025-26 held out and **must not be re-tuned against GW29-38**;
    the residual +2.0% appearance over-prediction on the target-roster population needs a fresh
-   out-of-sample window, not a re-fit. A whole-composer
+   out-of-sample window, not a re-fit. Latest is the (owner rule, 2026-08-17)
+   **trailing-history eligibility rule**: every per-player trailing signal (minutes window,
+   prior-season appearance rate, xG/xA share signals, ICT bonus proxies) reads only rows from
+   the most recent archived season or rows recorded at the player's CURRENT club — older rows at
+   a former club are dropped and such a player is a flagged cold start. Measured instance that
+   forced it: a 2023-24 ever-present whose 2026-27 club he joined from outside the PL read as a
+   0.93-ever-present nailed starter with a 22% creator share (19.7 GW1-5 xP, 22nd of 587); under
+   the rule he is a cold start at 14.75 (95th). The rule is applied by the prospective job only;
+   the frozen Phase 4 EV backtest adapter keeps the unfiltered semantics of its immutable run.
+   A whole-composer
    recency audit is complete: appearance was the only recency-weighted signal (now fixed); xG-share,
    xA-share, the DC hit rate, and the pooled GK save rate are equal-weighted or league-pooled and
    were confirmed correct as-is. All three composer repairs have now been confirmed on a second,

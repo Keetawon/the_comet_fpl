@@ -25,10 +25,13 @@ from fpl.jobs.prospective_points_v1 import (
     _expected_points,
     _git_worktree_clean,
     _stage_a_uses_league_average,
+    appeared_attack_signals,
     availability_multiplier,
+    last_team_code,
     live_bootstrap_snapshot,
     player_metadata_live,
     predict_prospective_points,
+    prior_season_appearance_rate,
     resolve_assist_signal_kind,
     resolve_share_signal_kind,
     season_boundary_minutes,
@@ -460,6 +463,135 @@ def test_trailing5_minute_bins_equal_weights_the_last_five() -> None:
         # weighting fixes it at exactly 0.6 -- the mechanism that stops a dead-rubber final
         # gameweek from dominating the appearance estimate.
         assert dist == (0.0, 0.0, 0.4, 0.6)
+    finally:
+        con.close()
+
+
+def _seed_stale_history(con) -> None:
+    """Two archived seasons for three eligibility regimes of the owner's trailing rule.
+
+    2001 is the stale mover (only 2023-24 rows at club 101, current club 102 -- the measured
+    Hamer pattern), 2002 the same-club veteran (2023-24 AND 2024-25 rows at his current club
+    102), 2003 the recent mover (only frontier-season 2024-25 rows at former club 101, current
+    club 102). The frontier season at AS_OF is "2024-25", the latest archived season label.
+    ICT values separate seasons cleanly: 40 in 2023-24, 20 in 2024-25.
+    """
+    con.executemany(
+        "INSERT INTO mart_dim_team (season, team_id, team_code, team_name, short_name, pulse_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            ("2023-24", 1, 101, "T1", "T1", 1001),
+            ("2023-24", 2, 102, "T2", "T2", 1002),
+            ("2024-25", 1, 101, "T1", "T1", 1001),
+            ("2024-25", 2, 102, "T2", "T2", 1002),
+        ],
+    )
+    rows: list[tuple[object, ...]] = []
+    for season, year, gw, code, team_id, influence in [
+        # 2001: six stale rows at club 101 in 2023-24 only
+        *[("2023-24", 2023, gw, 2001, 1, 40.0) for gw in range(1, 7)],
+        # 2002: three old rows + five frontier rows, all at his current club 102
+        *[("2023-24", 2023, gw, 2002, 2, 40.0) for gw in range(1, 4)],
+        *[("2024-25", 2024, gw, 2002, 2, 20.0) for gw in range(1, 6)],
+        # 2003: five frontier rows at former club 101
+        *[("2024-25", 2024, gw, 2003, 1, 20.0) for gw in range(1, 6)],
+    ]:
+        kickoff = datetime(year, 9, 1, tzinfo=UTC) + timedelta(days=7 * gw)
+        rows.append(
+            (
+                season,
+                gw,
+                900 + gw,
+                kickoff,
+                code,
+                "MID",
+                team_id,
+                3 - team_id,
+                True,
+                90,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                20,
+                0,
+                influence,
+                influence,
+                10.0,
+                0.20,
+                0.05,
+            )
+        )
+    con.executemany(
+        """
+        INSERT INTO mart_fact_player_fixture
+            (season, gw, fixture, kickoff_time, code, position, team_id, opponent_team_id,
+             was_home, minutes, goals_scored, assists, clean_sheets, goals_conceded, saves,
+             penalties_saved, bps, bonus, influence, creativity, threat, expected_assists,
+             expected_goals)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        rows,
+    )
+
+
+_CURRENT_CLUB = {2001: 102, 2002: 102, 2003: 102}
+
+
+def test_trailing_eligibility_drops_stale_former_club_rows() -> None:
+    con = initialise(":memory:")
+    _seed_stale_history(con)
+    try:
+        bins = MinuteBins.from_config(load_phase2_evaluation())
+        # ICT: the stale mover is gone; the veteran's OLD rows are at his current club, so they
+        # stay eligible and his mean is over both seasons ((3*40 + 5*20)/8 = 27.5).
+        ict = trailing_ict(con, AS_OF, current_club=_CURRENT_CLUB)
+        assert 2001 not in ict
+        assert ict[2002] == (27.5, 27.5)
+        assert 2003 in ict
+        # prior-season appearance: no trusted rate for the stale mover; the veteran's most
+        # recent eligible season is 2024-25, so his rate is over those rows only (n=5).
+        prior = prior_season_appearance_rate(con, AS_OF, current_club=_CURRENT_CLUB)
+        assert 2001 not in prior
+        assert prior[2002] == (1.0, 5)
+        # minutes window: the stale mover's May-2024 sequence is not his "last five".
+        minutes = trailing5_minute_bins(con, AS_OF, bins, current_club=_CURRENT_CLUB)
+        assert 2001 not in minutes
+        assert minutes[2003][1] == 5
+        # last club: the stale mover has NO last club (cold start, not transfer); the recent
+        # mover's last club is his former one (a flagged transfer with a carried share).
+        teams = last_team_code(con, AS_OF, current_club=_CURRENT_CLUB)
+        assert 2001 not in teams
+        assert teams[2002] == 102
+        assert teams[2003] == 101
+        # share signals: the stale mover carries no attacking history; the veteran keeps every
+        # row (both seasons at his current club).
+        appeared, pooled = appeared_attack_signals(
+            con, AS_OF, kind="expected_goals", current_club=_CURRENT_CLUB
+        )
+        assert 2001 not in appeared
+        assert len(appeared[2002]) == 8
+        assert pooled == pytest.approx(0.05)  # every eligible row carries xG 0.05
+    finally:
+        con.close()
+
+
+def test_trailing_eligibility_off_keeps_the_frozen_unfiltered_semantics() -> None:
+    # The frozen Phase 4 EV backtest adapter calls without current_club: identical inputs must
+    # reproduce the unfiltered behaviour of its immutable run (the stale mover counts).
+    con = initialise(":memory:")
+    _seed_stale_history(con)
+    try:
+        ict = trailing_ict(con, AS_OF)
+        assert 2001 in ict
+        assert ict[2002] == ((3 * 40.0 + 5 * 20.0) / 8, (3 * 40.0 + 5 * 20.0) / 8)
+        prior = prior_season_appearance_rate(con, AS_OF)
+        assert prior[2001] == (1.0, 6)
+        assert prior[2002] == (1.0, 5)  # most-recent season per code: 2024-25 rows only
+        teams = last_team_code(con, AS_OF)
+        assert teams[2001] == 101
     finally:
         con.close()
 

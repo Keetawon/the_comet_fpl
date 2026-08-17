@@ -51,6 +51,17 @@ Prospective-specific behaviour, all documented in the output record:
   * **Promoted clubs get league-average team strength.** ``trailing_goals_attack_defence`` keys
     attack and defence on ``team_code``; a club with no archive history (a genuine cold-start
     promotion) falls back to the league-average multiplier (1.0), not the promoted prior. Flagged.
+  * **Trailing-history eligibility (owner rule, 2026-08-17).** Every per-player trailing signal
+    -- the minutes window, the prior-season appearance rate, the xG/xA share signals, and the
+    ICT bonus proxies -- reads only rows from the most recent archived season (any club) or rows
+    recorded at the player's CURRENT club. Older rows at a former club are dropped: measured
+    instance, a player whose only archive line was an ever-present season at a club he then left
+    for two non-archive years read as a 0.93-ever-present nailed starter carrying a 22% creator
+    share for his new (promoted) club. Such a player is a genuine cold start (position priors,
+    pooled share fill, zero ICT), and his artifact row is flagged cold-start rather than
+    transfer. Recent-season rows at a former club stay eligible -- a player's share travels while
+    the team scale does not. The frozen Phase 4 EV backtest adapter keeps the unfiltered
+    semantics of its immutable 2026-08-07 run.
   * **No transfer rescaling.** Stage C V1 carries a transferred player's own trailing rate to his
     new club without rescaling to the destination team's scale (a documented Stage C V1 limitation).
   * **Availability overlay.** The raw model does NOT consume availability. A transparent post-model
@@ -71,6 +82,7 @@ import math
 import subprocess
 import sys
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -341,11 +353,58 @@ def schedule_capture_ids(
     return tuple(str(row[0]) for row in rows)
 
 
-def trailing_ict(con: duckdb.DuckDBPyConnection, as_of: datetime) -> dict[int, tuple[float, float]]:
+def _trailing_frontier_season(con: duckdb.DuckDBPyConnection, as_of: datetime) -> str | None:
+    """Latest archived season label with any player-fixture row before ``as_of``.
+
+    The mart carries completed seasons only, so at a pre-deadline ``as_of`` this is exactly the
+    "most recent completed season" of the owner's trailing-eligibility rule.
+    """
+    row = con.execute(
+        "SELECT max(season) FROM mart_fact_player_fixture WHERE kickoff_time < ?", [as_of]
+    ).fetchone()
+    return None if row is None or row[0] is None else str(row[0])
+
+
+def _trailing_row_eligible(
+    *,
+    season: str,
+    row_team_code: int | None,
+    code: int,
+    frontier_season: str | None,
+    current_club: Mapping[int, int],
+) -> bool:
+    """Owner rule (2026-08-17): a trailing row counts only if it is from the most recent
+    archived season (any club) or was recorded at the player's CURRENT club.
+
+    Older rows at a former club are dropped. Measured instance that forced the rule: a player
+    whose only archive line is an ever-present season at a club he then left for two
+    non-archive years read as a 0.93-ever-present nailed starter with a 22% creator share for
+    his new (promoted) club -- stale in BOTH time and team. Such a player is a genuine cold
+    start. Recent-season rows at a former club stay eligible (a summer mover keeps his measured
+    share; the repository constant is that a player's share travels while the team scale does
+    not).
+    """
+    if frontier_season is not None and season == frontier_season:
+        return True
+    club = current_club.get(code)
+    return club is not None and row_team_code == club
+
+
+def trailing_ict(
+    con: duckdb.DuckDBPyConnection,
+    as_of: datetime,
+    *,
+    current_club: Mapping[int, int] | None = None,
+) -> dict[int, tuple[float, float]]:
     """``code -> (mean influence, mean creativity)`` over appeared history before ``as_of``.
 
     The BPS residual's ICT proxies for a *future* fixture: a player's own trailing mean, never a
     realised target value. Absent codes fall back to ``(0.0, 0.0)`` at the call site.
+
+    With ``current_club`` (the prospective path), rows are first restricted by the
+    trailing-eligibility rule (:func:`_trailing_row_eligible`). Without it (the frozen Phase 4
+    EV backtest adapter), every row before ``as_of`` counts -- the semantics of the immutable
+    2026-08-07 run, kept bit-identical.
 
     **Bit-reproducible by construction.** This previously read ``avg(influence)`` under a DuckDB
     ``GROUP BY``, which partitions across threads and sums the partials in completion order, so
@@ -367,21 +426,47 @@ def trailing_ict(con: duckdb.DuckDBPyConnection, as_of: datetime) -> dict[int, t
     strictly before ``as_of``, with both ICT components measured. A NULL is skipped, never read as
     zero, and zero-minute rows with measured ICT still count -- identical to the previous filter.
     """
-    rows = con.execute(
-        """
-        SELECT code, influence, creativity
-        FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND kickoff_time < ?
-          AND influence IS NOT NULL AND creativity IS NOT NULL
-        ORDER BY code, kickoff_time, season, fixture
-        """,
-        [as_of],
-    ).fetchall()
+    if current_club is None:
+        rows = [
+            (code, influence, creativity, None, None)
+            for code, influence, creativity in con.execute(
+                """
+                SELECT code, influence, creativity
+                FROM mart_fact_player_fixture
+                WHERE minutes IS NOT NULL AND kickoff_time < ?
+                  AND influence IS NOT NULL AND creativity IS NOT NULL
+                ORDER BY code, kickoff_time, season, fixture
+                """,
+                [as_of],
+            ).fetchall()
+        ]
+        frontier = None
+    else:
+        rows = con.execute(
+            """
+            SELECT f.code, f.influence, f.creativity, f.season, t.team_code
+            FROM mart_fact_player_fixture AS f
+            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
+            WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
+              AND f.influence IS NOT NULL AND f.creativity IS NOT NULL
+            ORDER BY f.code, f.kickoff_time, f.season, f.fixture
+            """,
+            [as_of],
+        ).fetchall()
+        frontier = _trailing_frontier_season(con, as_of)
 
     influence_by_code: dict[int, list[float]] = defaultdict(list)
     creativity_by_code: dict[int, list[float]] = defaultdict(list)
-    for code, influence, creativity in rows:
+    for code, influence, creativity, season, row_team_code in rows:
         player = int(code)
+        if current_club is not None and not _trailing_row_eligible(
+            season=str(season),
+            row_team_code=None if row_team_code is None else int(row_team_code),
+            code=player,
+            frontier_season=frontier,
+            current_club=current_club,
+        ):
+            continue
         influence_by_code[player].append(float(influence))
         creativity_by_code[player].append(float(creativity))
 
@@ -394,22 +479,62 @@ def trailing_ict(con: duckdb.DuckDBPyConnection, as_of: datetime) -> dict[int, t
     }
 
 
-def last_team_code(con: duckdb.DuckDBPyConnection, as_of: datetime) -> dict[int, int]:
-    """``code -> team_code`` of the club a player last appeared for before ``as_of`` (transfer)."""
-    frame = con.execute(
+def last_team_code(
+    con: duckdb.DuckDBPyConnection,
+    as_of: datetime,
+    *,
+    current_club: Mapping[int, int] | None = None,
+) -> dict[int, int]:
+    """``code -> team_code`` of the club a player last appeared for before ``as_of`` (transfer).
+
+    With ``current_club`` (the prospective path) the reduction runs over eligible rows only
+    (:func:`_trailing_row_eligible`), so a player whose every archived row is at a former club
+    has no last club at all -- he is a cold start, not a transfer. Eligible rows arrive in a
+    total ``(kickoff_time, season, fixture, code)`` order (the timestamp is ordered on but never
+    fetched -- TIMESTAMPTZ -> Python goes through pytz, which is not a dependency), so the last
+    eligible assignment per code wins.
+    """
+    if current_club is None:
+        frame = con.execute(
+            """
+            WITH ranked AS (
+                SELECT f.code, t.team_code,
+                       row_number() OVER (PARTITION BY f.code ORDER BY f.kickoff_time DESC) AS rn
+                FROM mart_fact_player_fixture AS f
+                JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
+                WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
+            )
+            SELECT code, team_code FROM ranked WHERE rn = 1
+            """,
+            [as_of],
+        ).pl()
+        return {int(r["code"]): int(r["team_code"]) for r in frame.iter_rows(named=True)}
+    rows = con.execute(
         """
-        WITH ranked AS (
-            SELECT f.code, t.team_code,
-                   row_number() OVER (PARTITION BY f.code ORDER BY f.kickoff_time DESC) AS rn
-            FROM mart_fact_player_fixture AS f
-            JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
-            WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
-        )
-        SELECT code, team_code FROM ranked WHERE rn = 1
+        SELECT f.code, t.team_code, f.season
+        FROM mart_fact_player_fixture AS f
+        LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
+        WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
+        ORDER BY f.kickoff_time, f.season, f.fixture, f.code
         """,
         [as_of],
-    ).pl()
-    return {int(r["code"]): int(r["team_code"]) for r in frame.iter_rows(named=True)}
+    ).fetchall()
+    frontier = _trailing_frontier_season(con, as_of)
+    last: dict[int, int] = {}
+    for code, team_code, season in rows:
+        player = int(code)
+        if team_code is None:
+            continue
+        if not _trailing_row_eligible(
+            season=str(season),
+            row_team_code=int(team_code),
+            code=player,
+            frontier_season=frontier,
+            current_club=current_club,
+        ):
+            continue
+        last[player] = int(team_code)
+    return last
 
 
 # Minimum prior-season appearances for the long-window rate to be trusted over the model estimate.
@@ -417,7 +542,10 @@ _MIN_PRIOR_SEASON_ROWS = 10
 
 
 def prior_season_appearance_rate(
-    con: duckdb.DuckDBPyConnection, as_of: datetime
+    con: duckdb.DuckDBPyConnection,
+    as_of: datetime,
+    *,
+    current_club: Mapping[int, int] | None = None,
 ) -> dict[int, tuple[float, int]]:
     """``code -> (appearance rate, n)`` over the player's most-recent completed season before as_of.
 
@@ -427,24 +555,66 @@ def prior_season_appearance_rate(
     prior-season appearance rate ``P(minutes >= 1)`` is the boundary-robust nailed-ness signal
     (measured: it predicts next-season GW1-6 appearance better than the last-five rows). Point in
     time: only ``kickoff_time < as_of``; the "most recent season" is per ``code``.
+
+    With ``current_club`` (the prospective path), "most recent season" is the most recent
+    season with an ELIGIBLE row (:func:`_trailing_row_eligible`) -- a player whose only history
+    is stale and at a former club has no trusted prior-season rate at all and is absent from the
+    map (the caller's zero-history route), rather than carrying a two-seasons-old rate.
     """
-    frame = con.execute(
+    if current_club is None:
+        frame = con.execute(
+            """
+            WITH elig AS (
+                SELECT code, season,
+                       CASE WHEN minutes >= 1 THEN 1.0 ELSE 0.0 END AS played
+                FROM mart_fact_player_fixture
+                WHERE minutes IS NOT NULL AND kickoff_time < ?
+            ),
+            latest AS (SELECT code, max(season) AS season FROM elig GROUP BY code)
+            SELECT e.code, avg(e.played) AS rate, count(*) AS n
+            FROM elig AS e
+            JOIN latest AS l ON l.code = e.code AND l.season = e.season
+            GROUP BY e.code
+            """,
+            [as_of],
+        ).pl()
+        return {
+            int(r["code"]): (float(r["rate"]), int(r["n"])) for r in frame.iter_rows(named=True)
+        }
+    rows = con.execute(
         """
-        WITH elig AS (
-            SELECT code, season,
-                   CASE WHEN minutes >= 1 THEN 1.0 ELSE 0.0 END AS played
-            FROM mart_fact_player_fixture
-            WHERE minutes IS NOT NULL AND kickoff_time < ?
-        ),
-        latest AS (SELECT code, max(season) AS season FROM elig GROUP BY code)
-        SELECT e.code, avg(e.played) AS rate, count(*) AS n
-        FROM elig AS e
-        JOIN latest AS l ON l.code = e.code AND l.season = e.season
-        GROUP BY e.code
+        SELECT f.code, f.season,
+               CASE WHEN f.minutes >= 1 THEN 1.0 ELSE 0.0 END AS played,
+               t.team_code
+        FROM mart_fact_player_fixture AS f
+        LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
+        WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
+        ORDER BY f.kickoff_time, f.season, f.fixture, f.code
         """,
         [as_of],
-    ).pl()
-    return {int(r["code"]): (float(r["rate"]), int(r["n"])) for r in frame.iter_rows(named=True)}
+    ).fetchall()
+    frontier = _trailing_frontier_season(con, as_of)
+    latest_season: dict[int, str] = {}
+    played_by_code: dict[int, list[float]] = defaultdict(list)
+    for code, season, played, row_team_code in rows:
+        player = int(code)
+        if not _trailing_row_eligible(
+            season=str(season),
+            row_team_code=None if row_team_code is None else int(row_team_code),
+            code=player,
+            frontier_season=frontier,
+            current_club=current_club,
+        ):
+            continue
+        if str(season) > latest_season.get(player, ""):
+            latest_season[player] = str(season)
+            played_by_code[player] = []
+        played_by_code[player].append(float(played))
+    return {
+        code: (math.fsum(values) / len(values), len(values))
+        for code, values in played_by_code.items()
+        if values
+    }
 
 
 # Minimum trailing rows for the equal-weighted recent estimate to be used over the fitted model.
@@ -458,6 +628,7 @@ def trailing5_minute_bins(
     *,
     window: int = 5,
     alpha: float = MINUTES_SHRINKAGE_ALPHA,
+    current_club: Mapping[int, int] | None = None,
 ) -> dict[int, tuple[tuple[float, float, float, float], int]]:
     """``code -> (shrunk minute-bin distribution, n)`` over the most recent ``window`` rows.
 
@@ -481,21 +652,48 @@ def trailing5_minute_bins(
     A player's position is taken from his own most recent historical row rather than from a
     dimension table: position is season-scoped in the same way team membership is, and the
     dimension records only where a player finished.
+
+    With ``current_club`` (the prospective path), rows are restricted by the trailing-eligibility
+    rule (:func:`_trailing_row_eligible`) before the window is taken -- a stale former-club
+    sequence cannot be a player's "last five". The shrinkage priors are built from the same
+    eligible population. Without it, the query and window are exactly the frozen legacy ones.
     """
-    frame = con.execute(
-        """
-        SELECT code, position, minutes
-        FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND kickoff_time < ?
-        ORDER BY code, kickoff_time, fixture
-        """,
-        [as_of],
-    ).pl()
+    if current_club is None:
+        frame = con.execute(
+            """
+            SELECT code, position, minutes
+            FROM mart_fact_player_fixture
+            WHERE minutes IS NOT NULL AND kickoff_time < ?
+            ORDER BY code, kickoff_time, fixture
+            """,
+            [as_of],
+        ).pl()
+        frontier = None
+    else:
+        frame = con.execute(
+            """
+            SELECT f.code, f.position, f.minutes, f.season, t.team_code
+            FROM mart_fact_player_fixture AS f
+            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
+            WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
+            ORDER BY f.code, f.kickoff_time, f.fixture
+            """,
+            [as_of],
+        ).pl()
+        frontier = _trailing_frontier_season(con, as_of)
     n_bins = bins.n_bins()
     by_code: dict[int, list[int]] = defaultdict(list)
     position_of: dict[int, str] = {}
     for r in frame.iter_rows(named=True):
         code = int(r["code"])
+        if current_club is not None and not _trailing_row_eligible(
+            season=str(r["season"]),
+            row_team_code=(None if r["team_code"] is None else int(r["team_code"])),
+            code=code,
+            frontier_season=frontier,
+            current_club=current_club,
+        ):
+            continue
         by_code[code].append(bins.index_of(int(r["minutes"])))
         position_of[code] = str(r["position"])
 
@@ -594,7 +792,11 @@ def season_boundary_minutes(
 
 
 def appeared_attack_signals(
-    con: duckdb.DuckDBPyConnection, as_of: datetime, *, kind: str
+    con: duckdb.DuckDBPyConnection,
+    as_of: datetime,
+    *,
+    kind: str,
+    current_club: Mapping[int, int] | None = None,
 ) -> tuple[dict[int, list[tuple[float, float | None, float | None]]], float]:
     """Trailing attacking-signal history for the team-coupled (V3) goals allocation.
 
@@ -602,19 +804,43 @@ def appeared_attack_signals(
     (``minutes > 0``, ``kickoff_time < as_of``, chronological) and the pooled mean of the chosen
     ``kind`` signal (the cold-start share fill). NULL signal values are preserved as ``None`` (never
     zero-filled). Mirrors Candidate V3's appeared-signal construction so the share primitive is the
-    committed one.
+    committed one. With ``current_club`` (the prospective path), rows are restricted by the
+    trailing-eligibility rule (:func:`_trailing_row_eligible`), and the pooled fill mean is over
+    that eligible population too. Without it, the query is exactly the frozen legacy one.
     """
-    frame = con.execute(
-        """
-        SELECT season, gw, fixture,
-               strftime(CAST(kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ') AS kickoff_time,
-               code, expected_goals, threat
-        FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND minutes > 0 AND CAST(kickoff_time AS TIMESTAMPTZ) < ?
-        ORDER BY CAST(kickoff_time AS TIMESTAMPTZ), season, fixture, code
-        """,
-        [as_of],
-    ).pl()
+    if current_club is None:
+        frame = con.execute(
+            """
+            SELECT season, gw, fixture,
+                   strftime(
+                       CAST(kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ'
+                   ) AS kickoff_time,
+                   code, expected_goals, threat
+            FROM mart_fact_player_fixture
+            WHERE minutes IS NOT NULL AND minutes > 0
+              AND CAST(kickoff_time AS TIMESTAMPTZ) < ?
+            ORDER BY CAST(kickoff_time AS TIMESTAMPTZ), season, fixture, code
+            """,
+            [as_of],
+        ).pl()
+        frontier = None
+    else:
+        frame = con.execute(
+            """
+            SELECT f.season, f.gw, f.fixture,
+                   strftime(
+                       CAST(f.kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ'
+                   ) AS kickoff_time,
+                   f.code, f.expected_goals, f.threat, t.team_code
+            FROM mart_fact_player_fixture AS f
+            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
+            WHERE f.minutes IS NOT NULL AND f.minutes > 0
+              AND CAST(f.kickoff_time AS TIMESTAMPTZ) < ?
+            ORDER BY CAST(f.kickoff_time AS TIMESTAMPTZ), f.season, f.fixture, f.code
+            """,
+            [as_of],
+        ).pl()
+        frontier = _trailing_frontier_season(con, as_of)
     if not frame.is_empty():
         frame = frame.sort(["kickoff_time", "season", "fixture", "code"], maintain_order=True)
     appeared: dict[int, list[tuple[float, float | None, float | None]]] = {}
@@ -623,9 +849,18 @@ def appeared_attack_signals(
     for r in frame.iter_rows(named=True):
         k_ts = datetime.fromisoformat(str(r["kickoff_time"]).replace("Z", "+00:00"))
         epoch = float(k_ts.timestamp())
+        code = int(r["code"])
+        if current_club is not None and not _trailing_row_eligible(
+            season=str(r["season"]),
+            row_team_code=(None if r["team_code"] is None else int(r["team_code"])),
+            code=code,
+            frontier_season=frontier,
+            current_club=current_club,
+        ):
+            continue
         xg = None if r["expected_goals"] is None else float(r["expected_goals"])
         threat = None if r["threat"] is None else float(r["threat"])
-        appeared.setdefault(int(r["code"]), []).append((epoch, xg, threat))
+        appeared.setdefault(code, []).append((epoch, xg, threat))
         value = xg if kind == "expected_goals" else threat
         if value is not None:
             sig_sum += value
@@ -672,7 +907,11 @@ def resolve_assist_signal_kind(season: str, xg_covered: frozenset[str], mode: st
 
 
 def appeared_assist_signals(
-    con: duckdb.DuckDBPyConnection, as_of: datetime, *, kind: str
+    con: duckdb.DuckDBPyConnection,
+    as_of: datetime,
+    *,
+    kind: str,
+    current_club: Mapping[int, int] | None = None,
 ) -> tuple[dict[int, list[tuple[float, float | None, float | None]]], float]:
     """Trailing assist-signal history for the team-coupled assists allocation.
 
@@ -680,19 +919,44 @@ def appeared_assist_signals(
     rows and the pooled mean of the chosen ``kind`` (``expected_assists`` or ``creativity``; the
     cold-start share fill). Packed in the same (measured, fallback) slot order as
     :func:`appeared_attack_signals` so :func:`mean_trailing_signal` is reused for the window.
-    NULL values are preserved (never zero-filled).
+    NULL values are preserved (never zero-filled). With ``current_club`` (the prospective path),
+    rows are restricted by the trailing-eligibility rule
+    (:func:`_trailing_row_eligible`), and the pooled fill mean is over that eligible population.
+    Without it, the query is exactly the frozen legacy one.
     """
-    frame = con.execute(
-        """
-        SELECT season, gw, fixture,
-               strftime(CAST(kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ') AS kickoff_time,
-               code, expected_assists, creativity
-        FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND minutes > 0 AND CAST(kickoff_time AS TIMESTAMPTZ) < ?
-        ORDER BY CAST(kickoff_time AS TIMESTAMPTZ), season, fixture, code
-        """,
-        [as_of],
-    ).pl()
+    if current_club is None:
+        frame = con.execute(
+            """
+            SELECT season, gw, fixture,
+                   strftime(
+                       CAST(kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ'
+                   ) AS kickoff_time,
+                   code, expected_assists, creativity
+            FROM mart_fact_player_fixture
+            WHERE minutes IS NOT NULL AND minutes > 0
+              AND CAST(kickoff_time AS TIMESTAMPTZ) < ?
+            ORDER BY CAST(kickoff_time AS TIMESTAMPTZ), season, fixture, code
+            """,
+            [as_of],
+        ).pl()
+        frontier = None
+    else:
+        frame = con.execute(
+            """
+            SELECT f.season, f.gw, f.fixture,
+                   strftime(
+                       CAST(f.kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ'
+                   ) AS kickoff_time,
+                   f.code, f.expected_assists, f.creativity, t.team_code
+            FROM mart_fact_player_fixture AS f
+            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
+            WHERE f.minutes IS NOT NULL AND f.minutes > 0
+              AND CAST(f.kickoff_time AS TIMESTAMPTZ) < ?
+            ORDER BY CAST(f.kickoff_time AS TIMESTAMPTZ), f.season, f.fixture, f.code
+            """,
+            [as_of],
+        ).pl()
+        frontier = _trailing_frontier_season(con, as_of)
     if not frame.is_empty():
         frame = frame.sort(["kickoff_time", "season", "fixture", "code"], maintain_order=True)
     appeared: dict[int, list[tuple[float, float | None, float | None]]] = {}
@@ -701,9 +965,18 @@ def appeared_assist_signals(
     for r in frame.iter_rows(named=True):
         k_ts = datetime.fromisoformat(str(r["kickoff_time"]).replace("Z", "+00:00"))
         epoch = float(k_ts.timestamp())
+        code = int(r["code"])
+        if current_club is not None and not _trailing_row_eligible(
+            season=str(r["season"]),
+            row_team_code=(None if r["team_code"] is None else int(r["team_code"])),
+            code=code,
+            frontier_season=frontier,
+            current_club=current_club,
+        ):
+            continue
         xa = None if r["expected_assists"] is None else float(r["expected_assists"])
         creativity = None if r["creativity"] is None else float(r["creativity"])
-        appeared.setdefault(int(r["code"]), []).append((epoch, xa, creativity))
+        appeared.setdefault(code, []).append((epoch, xa, creativity))
         value = xa if kind == "expected_assists" else creativity
         if value is not None:
             sig_sum += value
@@ -1041,6 +1314,11 @@ def predict_prospective_points(
     bootstrap = live_bootstrap_snapshot(con, season, as_of)
     team_map = team_code_map_live(bootstrap)
     live_metadata = player_metadata_live(bootstrap)
+    # The trailing-eligibility rule's "current club": the deadline-known registry club, not the
+    # last club a player appeared for (those differ exactly for the stale movers the rule drops).
+    current_club = {
+        code: team_map[m.team_id] for code, m in live_metadata.items() if m.team_id in team_map
+    }
     selected_schedule_capture_ids = schedule_capture_ids(
         con,
         season=season,
@@ -1048,11 +1326,21 @@ def predict_prospective_points(
         gw_from=gw_from,
         gw_to=gw_to,
     )
-    trailing = trailing_ict(con, as_of)
-    last_team = last_team_code(con, as_of)
+    trailing = trailing_ict(con, as_of, current_club=current_club)
+    last_team = last_team_code(con, as_of, current_club=current_club)
+    # "With history" means with ELIGIBLE history (owner rule 2026-08-17): a player whose every
+    # archived row is stale and at a former club is a cold start, not a transfer.
     codes_with_history = set(last_team)
-    prior_appearance = prior_season_appearance_rate(con, as_of) if appearance == "seasonal" else {}
-    trailing5_bins = trailing5_minute_bins(con, as_of, bins) if appearance == "seasonal" else {}
+    prior_appearance = (
+        prior_season_appearance_rate(con, as_of, current_club=current_club)
+        if appearance == "seasonal"
+        else {}
+    )
+    trailing5_bins = (
+        trailing5_minute_bins(con, as_of, bins, current_club=current_club)
+        if appearance == "seasonal"
+        else {}
+    )
 
     # 2. Point-in-time component histories + fitted models (identical construction to the v3 fold).
     minutes_history = tuple(player_fixture_history(con, as_of=as_of))
@@ -1170,7 +1458,9 @@ def predict_prospective_points(
     signal_by_code: dict[int, float | None] = {}
     pos_signal_mean = 0.0
     if attacking == "v3":
-        appeared, pos_signal_mean = appeared_attack_signals(con, as_of, kind=signal_kind)
+        appeared, pos_signal_mean = appeared_attack_signals(
+            con, as_of, kind=signal_kind, current_club=current_club
+        )
         signal_by_code = {
             code: mean_trailing_signal(rows, kind=signal_kind, window=share_window)
             for code, rows in appeared.items()
@@ -1192,7 +1482,7 @@ def predict_prospective_points(
     assist_rate = 0.90
     if assists == "coupled":
         assist_appeared, pos_assist_signal_mean = appeared_assist_signals(
-            con, as_of, kind=assist_kind
+            con, as_of, kind=assist_kind, current_club=current_club
         )
         assist_signal_by_code = {
             code: mean_trailing_signal(rows, kind=assist_slot_kind, window=share_window)
