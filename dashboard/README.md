@@ -120,6 +120,15 @@ platform suggestions downstream. `GET /status` reports busy/stage/worktree state
 never computes anything — it
 asks this process to run the fail-closed jobs and then refetches the published JSON.
 
+Solver readiness in `/status` includes the separately observed PuLP package and CBC binary
+versions, the discovery-attempt count, and a component-specific failure reason. A failed startup
+probe is retried from status after a short cooldown; concurrent status requests return cached
+state instead of queuing CBC launches. Browser diagnostics name only the failed component and
+exception type, while full exception details remain in the server log. Every solve forces a fresh
+probe even after a previously good identity. No retry supplies a default or accepts a partial
+identity, and the isolated optimizer child still re-verifies both versions before it may write the
+provenance-bound artifact.
+
 Every correctness property is inherited: the optimizer still refuses a dirty Git worktree
 (the UI surfaces that as a pre-check — commit first), runs are serialized one at a time, and
 artifacts stay no-clobber and provenance-bound. The deadline pack itself still comes from the

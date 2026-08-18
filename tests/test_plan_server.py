@@ -152,11 +152,123 @@ class TestRunPlanPreChecks:
     def test_unverified_solver_runtime_is_refused_before_solving(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: None)
         state = ServerState(tmp_path)
-        state.solver_binary_version = None
         monkeypatch.setattr(plan_server, "_run_optimizer_cli", lambda _argv: pytest.fail("solved"))
-        with pytest.raises(RequestError, match="cannot verify its PuLP/CBC runtime"):
+        with pytest.raises(RequestError, match="CBC binary version is unavailable"):
             run_plan(state, [], [], 0.0)
+        assert state.solver_package_version == "3.3.2"
+        assert state.solver_binary_version is None
+        assert state.solver_discovery_attempts == 2
+
+    def test_transient_startup_probe_is_retried_by_status(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        clock = [0.0]
+        binary_versions = iter([None, "2.10.3"])
+        monkeypatch.setattr(plan_server, "_monotonic", lambda: clock[0])
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: next(binary_versions))
+
+        state = ServerState(tmp_path)
+        assert state.solver_binary_version is None
+
+        clock[0] = plan_server.SOLVER_PROBE_COOLDOWN_SECONDS
+        runtime = state.snapshot()["runtime"]
+        assert runtime["solver_ready"] is True
+        assert runtime["pulp_package_version"] == "3.3.2"
+        assert runtime["cbc_binary_version"] == "2.10.3"
+        assert runtime["solver_discovery_attempts"] == 2
+        assert runtime["solver_discovery_error"] is None
+
+    def test_solver_probe_exception_is_reported_without_accepting_partial_identity(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+
+        def fail_cbc_probe() -> str:
+            raise OSError("endpoint scanner denied launch")
+
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", fail_cbc_probe)
+        state = ServerState(tmp_path)
+
+        assert state.solver_package_version == "3.3.2"
+        assert state.solver_binary_version is None
+        assert state.solver_discovery_error == ("CBC binary probe failed (OSError)")
+
+    def test_pre_solve_forces_recheck_of_previously_ready_identity(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        package_versions = iter(["3.3.2", None])
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: next(package_versions))
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        assert state.solver_package_version == "3.3.2"
+        assert state.solver_binary_version == "2.10.3"
+        monkeypatch.setattr(plan_server, "_run_optimizer_cli", lambda _argv: pytest.fail("solved"))
+
+        with pytest.raises(RequestError, match="PuLP package version is unavailable"):
+            run_plan(state, [], [], 0.0)
+
+        assert state.solver_package_version is None
+        assert state.solver_binary_version == "2.10.3"
+        assert state.solver_discovery_attempts == 2
+
+    def test_status_probe_cooldown_collapses_concurrent_requests(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        clock = [0.0]
+        probe_entered = threading.Event()
+        release_probe = threading.Event()
+        binary_probe_count = 0
+
+        def binary_probe() -> None:
+            nonlocal binary_probe_count
+            binary_probe_count += 1
+            if binary_probe_count == 2:
+                probe_entered.set()
+                assert release_probe.wait(timeout=5)
+            return None
+
+        monkeypatch.setattr(plan_server, "_monotonic", lambda: clock[0])
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", binary_probe)
+        state = ServerState(tmp_path)
+        clock[0] = plan_server.SOLVER_PROBE_COOLDOWN_SECONDS
+
+        first = threading.Thread(target=state.snapshot)
+        first.start()
+        assert probe_entered.wait(timeout=5)
+        followers = [threading.Thread(target=state.snapshot) for _ in range(4)]
+        for follower in followers:
+            follower.start()
+        for follower in followers:
+            follower.join(timeout=1)
+            assert not follower.is_alive()
+        release_probe.set()
+        first.join(timeout=5)
+        assert not first.is_alive()
+
+        assert binary_probe_count == 2
+        state.snapshot()
+        assert binary_probe_count == 2
+
+    def test_status_diagnostic_does_not_expose_raw_exception_or_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+
+        def fail_cbc_probe() -> str:
+            raise OSError(r"C:\\Users\\owner\\secret-cbc.exe access denied")
+
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", fail_cbc_probe)
+        runtime = ServerState(tmp_path).snapshot()["runtime"]
+
+        assert runtime["solver_discovery_error"] == "CBC binary probe failed (OSError)"
+        rendered = json.dumps(runtime)
+        assert "owner" not in rendered
+        assert "secret-cbc" not in rendered
 
     def test_dirty_worktree_is_refused_before_solving(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -621,6 +733,8 @@ class TestHttpSurface:
         assert body["runtime"]["pulp_package_version"]
         assert body["runtime"]["cbc_binary_version"]
         assert body["runtime"]["solver_ready"] is True
+        assert body["runtime"]["solver_discovery_attempts"] >= 1
+        assert body["runtime"]["solver_discovery_error"] is None
 
     def test_plan_posts_through_to_the_pipeline(self, loopback_server: ThreadingHTTPServer) -> None:
         status, _, payload = self._request(

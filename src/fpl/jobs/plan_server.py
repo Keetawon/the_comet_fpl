@@ -48,8 +48,9 @@ from fpl.config import repo_root
 from fpl.jobs.optimize_squad import (
     MAX_EXCLUDED_PLAYERS,
     MAX_LOCKED_PLAYERS,
+    _cbc_binary_version,
     _git_worktree_clean,
-    _solver_versions,
+    _pulp_package_version,
 )
 from fpl.publish.dashboard_json import NEXT_GW_FILENAME, export_dashboard_json
 from fpl.publish.export import export_bi
@@ -67,6 +68,8 @@ MY_RULES_DIRNAME = "my-rules"
 MAX_BODY_BYTES = 4096
 RISK_LAMBDA = 0.0  # P0 delivery rule: EV is the result; risk runs stay a separate sensitivity
 ACCESS_TOKEN_HEADER = "X-FPL-Plan-Token"
+SOLVER_PROBE_COOLDOWN_SECONDS = 2.0
+_monotonic = time.monotonic
 
 
 class RequestError(ValueError):
@@ -163,14 +166,77 @@ class ServerState:
     def __init__(self, base_dir: Path, *, access_token: str | None = None) -> None:
         self.base_dir = base_dir
         self.access_token = access_token or secrets.token_urlsafe(24)
-        solver_versions = _solver_versions()
-        self.solver_package_version = solver_versions[0] if solver_versions else None
-        self.solver_binary_version = solver_versions[1] if solver_versions else None
         self.run_lock = threading.Lock()
         self.status_lock = threading.Lock()
+        self.solver_probe_lock = threading.Lock()
         self.stage: str | None = None
         self.last_error: str | None = None
         self.last_result: dict[str, Any] | None = None
+        self.solver_package_version: str | None = None
+        self.solver_binary_version: str | None = None
+        self.solver_discovery_attempts = 0
+        self.solver_discovery_error: str | None = None
+        self.solver_last_probe_monotonic: float | None = None
+        self.refresh_solver_versions(force=True)
+
+    def refresh_solver_versions(self, *, force: bool = False) -> bool:
+        """Retry exact runtime discovery after a transient detached-process launch failure.
+
+        The optimizer child independently performs the same fail-closed discovery before it can
+        emit an artifact.  This retry only prevents one failed startup probe from being cached for
+        the lifetime of the HTTP server; it never supplies a default or accepts a partial identity.
+        """
+        acquired = self.solver_probe_lock.acquire(blocking=force)
+        if not acquired:
+            with self.status_lock:
+                return (
+                    self.solver_package_version is not None
+                    and self.solver_binary_version is not None
+                )
+        try:
+            now = _monotonic()
+            with self.status_lock:
+                ready = (
+                    self.solver_package_version is not None
+                    and self.solver_binary_version is not None
+                )
+                if not force and ready:
+                    return True
+                if (
+                    not force
+                    and self.solver_last_probe_monotonic is not None
+                    and now - self.solver_last_probe_monotonic < SOLVER_PROBE_COOLDOWN_SECONDS
+                ):
+                    return ready
+            failures: list[str] = []
+            try:
+                package_version = _pulp_package_version()
+            except Exception as exc:
+                logger.exception("PuLP package-version probe failed")
+                package_version = None
+                failures.append(f"PuLP package probe failed ({type(exc).__name__})")
+            if package_version is None and not failures:
+                failures.append("PuLP package version is unavailable")
+            try:
+                binary_version = _cbc_binary_version()
+            except Exception as exc:
+                logger.exception("CBC binary-version probe failed")
+                binary_version = None
+                failures.append(f"CBC binary probe failed ({type(exc).__name__})")
+            if binary_version is None and not any(
+                failure.startswith("CBC binary") for failure in failures
+            ):
+                failures.append("CBC binary version is unavailable")
+            with self.status_lock:
+                self.solver_discovery_attempts += 1
+                self.solver_last_probe_monotonic = _monotonic()
+                self.solver_package_version = package_version
+                self.solver_binary_version = binary_version
+                ready = package_version is not None and binary_version is not None
+                self.solver_discovery_error = None if ready else "; ".join(failures)
+                return ready
+        finally:
+            self.solver_probe_lock.release()
 
     def set_stage(self, stage: str | None) -> None:
         with self.status_lock:
@@ -184,6 +250,8 @@ class ServerState:
             self.stage = None
 
     def snapshot(self) -> dict[str, Any]:
+        if self.solver_package_version is None or self.solver_binary_version is None:
+            self.refresh_solver_versions()
         with self.status_lock:
             return {
                 "busy": self.run_lock.locked(),
@@ -200,6 +268,8 @@ class ServerState:
                     "cbc_binary_version": self.solver_binary_version,
                     "solver_ready": self.solver_package_version is not None
                     and self.solver_binary_version is not None,
+                    "solver_discovery_attempts": self.solver_discovery_attempts,
+                    "solver_discovery_error": self.solver_discovery_error,
                 },
             }
 
@@ -381,10 +451,12 @@ def run_plan(
         raise RequestError("a plan run is already in progress - wait for it to finish")
     try:
         base = state.base_dir
-        if state.solver_package_version is None or state.solver_binary_version is None:
+        if not state.refresh_solver_versions(force=True):
+            detail = state.solver_discovery_error or "unknown discovery failure"
             raise RequestError(
                 "the plan server cannot verify its PuLP/CBC runtime; restart it from the "
-                "repository with .venv\\Scripts\\python.exe -m fpl.jobs.plan_server"
+                "repository with .venv\\Scripts\\python.exe -m fpl.jobs.plan_server "
+                f"({detail})"
             )
         forecast = base / FORECAST_NAME
         if not forecast.is_file():
