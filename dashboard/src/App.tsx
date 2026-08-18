@@ -24,10 +24,15 @@ const PAGES: Record<string, React.ComponentType> = {
   optimizer: OptimizerAuditPage,
 };
 
+function routeFromHash(): string {
+  const fragment = window.location.hash.slice(1);
+  return fragment.split("?", 1)[0] || DEFAULT_ROUTE;
+}
+
 function useHashRoute(): [string, (id: string) => void] {
-  const [route, setRoute] = useState(() => window.location.hash.slice(1) || DEFAULT_ROUTE);
+  const [route, setRoute] = useState(routeFromHash);
   useEffect(() => {
-    const onHashChange = () => setRoute(window.location.hash.slice(1) || DEFAULT_ROUTE);
+    const onHashChange = () => setRoute(routeFromHash());
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);

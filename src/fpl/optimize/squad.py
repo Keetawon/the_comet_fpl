@@ -64,6 +64,7 @@ class SquadSolution:
     )
     min_bench_appearance: float = 0.0
     locked_codes: tuple[int, ...] = ()
+    excluded_codes: tuple[int, ...] = ()
 
     @property
     def codes(self) -> tuple[int, ...]:
@@ -303,6 +304,7 @@ def optimize_initial_squad(
     risk_lambda: float = 0.0,
     min_bench_appearance: float = 0.0,
     locked_codes: tuple[int, ...] = (),
+    excluded_codes: tuple[int, ...] = (),
 ) -> SquadSolution:
     """Solve the exact fixed-squad, rotating-XI horizon problem with CBC.
 
@@ -316,17 +318,31 @@ def optimize_initial_squad(
     (owner rule, 2026-08-18): the lock is the more deliberate instruction and outranks the
     rotation heuristic, so a locked below-threshold player may bench, and locking him can
     never make the threshold infeasible. Non-locked players obey the gate as before.
+
+    ``excluded_codes`` are removed from the selectable population. A code cannot be both locked
+    and excluded; both policies use stable player ``code`` identity.
     """
     if not math.isfinite(min_bench_appearance) or not 0.0 <= min_bench_appearance <= 1.0:
         raise ValueError("min_bench_appearance must be finite and within [0, 1]")
     index = ArtifactIndex.build(artifact, rules)
-    codes = index.selectable_codes()
+    selectable = set(index.selectable_codes())
     locked = tuple(sorted(set(locked_codes)))
-    unselectable = [code for code in locked if code not in set(codes)]
+    excluded = tuple(sorted(set(excluded_codes)))
+    overlap = sorted(set(locked).intersection(excluded))
+    if overlap:
+        raise OptimizationError("players cannot be both locked and excluded")
+    unselectable = [code for code in locked if code not in selectable]
     if unselectable:
         raise OptimizationError(
             f"locked codes are not selectable players in the artifact: {unselectable}"
         )
+    unselectable = [code for code in excluded if code not in selectable]
+    if unselectable:
+        raise OptimizationError(
+            f"excluded codes are not selectable players in the artifact: {unselectable}"
+        )
+    excluded_set = set(excluded)
+    codes = tuple(code for code in sorted(selectable) if code not in excluded_set)
     prices = {code: _member(index, code).now_cost for code in codes}
     problem = pulp.LpProblem("stage_e_initial_squad", pulp.LpMaximize)
     squad_vars = {code: pulp.LpVariable(f"squad_{code}", cat=pulp.LpBinary) for code in codes}
@@ -412,6 +428,11 @@ def optimize_initial_squad(
         if status == "Infeasible" and locked:
             hints.append(
                 f"the locked players {locked} cannot all be kept in a legal squad "
+                "(position quotas, club cap, or budget)"
+            )
+        if status == "Infeasible" and excluded:
+            hints.append(
+                f"the excluded players {excluded} leave no legal squad completion "
                 "(position quotas, club cap, or budget)"
             )
         hint = ("; " + "; ".join(hints)) if hints else ""
@@ -514,4 +535,5 @@ def optimize_initial_squad(
         solver_status=status,
         min_bench_appearance=min_bench_appearance,
         locked_codes=locked,
+        excluded_codes=excluded,
     )

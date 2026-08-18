@@ -1,5 +1,5 @@
 {
-  "json_schema_version": 2,
+  "json_schema_version": 3,
   "plans": [
     {
       "optimizer_run_id": "opt-default",
@@ -11,6 +11,8 @@
         "attacking_mode": "v3",
         "share_signal_kind": "expected_goals"
       },
+      "plan_kind": "platform_default",
+      "display_label": "Platform default — v3 goals / coupled assists",
       "as_of": "2026-08-21T17:30:00+00:00",
       "season": "2026-27",
       "gw_from": 1,
@@ -43,6 +45,10 @@
         "hit_cost_points": 4,
         "maximum_transfers_per_gameweek": 2,
         "risk_lambda": 0.0,
+        "min_bench_appearance": 0.0,
+        "locked_codes": [],
+        "excluded_codes": [],
+        "plan_origin": "platform",
         "search_method": "bounded deterministic dynamic programme with beam pruning",
         "optimality_scope": "exact lineups within visited states; transfer path is not globally exact"
       },

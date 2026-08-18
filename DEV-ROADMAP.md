@@ -645,6 +645,22 @@ data: the dev ledger carries a diagnostic vintage (run `407668b6…`) beside the
 `90683dfc…`, both `risk_lambda=0`, clean worktree) feed the export, so the Next-GW diff and
 the audit page render real plans.
 
+**P1.7f Platform/custom plan separation + exclusions (2026-08-18): implemented,
+offline-tested.** Dashboard read-model schema version 3 gives every optimizer decision an
+explicit `plan_kind` (`platform_default`, `platform_diagnostic`, or `user_custom`), stable display
+label, and compact lock/exclusion/bench policy. Legacy constrained artifacts without
+`plan_origin` are classified as custom from their recorded constraints; new interactive runs
+record the origin explicitly. Next GW now owns only the formal platform default and diagnostic
+sensitivity, so a custom V3 run can never win by hash order or local storage. Plan Builder owns
+the exact user run id, stays on its own result page after solve, and fails visibly rather than
+substituting another squad when that id is missing. Summary separates the platform recommendation
+from the latest user plan; Optimizer Audit retains all runs with distinct labels. The shared player
+picker supports up to five green locks and fifteen red exclusions. Exclusions are enforced through
+the initial ILP, every future transfer candidate/squad, artifact validation, run-id provenance,
+plan server, read model, and UI; lock/exclusion overlap and unknown/unselectable codes fail closed.
+The `manager_id` is still saved only for the post-deadline importer and is explicitly not applied
+to a GW1 fresh-squad solve.
+
 Build only after the export contract and its tests pass. Minimum pages:
 
 1. **GW1 decision:** squad, XI, captain/vice, bench, EV, ownership, availability, flags, and
@@ -674,12 +690,14 @@ Only after P0 and the BI MVP are secure:
 - revisit cards only if a real decision is shown to turn on their measured margin;
 - build the manager-team transfer-suggestion wizard per
   `docs/manager-team-suggestions.md` (manager_id input, own-squad transfer suggestions with
-  exact free-transfer/-4-hit accounting, up to five locked must-keep players via `--lock`,
-  the `--min-bench-appearance` bench gate, selling-value-aware budget checks); the
-  optimizer-side primitives (`--lock`, `initial_banked_free_transfers`, the bench gate) are
+  exact free-transfer/-4-hit accounting, up to five locked must-keep players via `--lock`, up to
+  fifteen never-buy players via `--exclude`, the `--min-bench-appearance` bench gate, and
+  selling-value-aware budget checks); the optimizer-side primitives (`--lock`, `--exclude`,
+  `initial_banked_free_transfers`, the bench gate) are
   already implemented and tested — the remaining work is the manager ingest boundary, value
   accounting, and the dashboard page. **The interactive solving half shipped early
-  (2026-08-17, owner decision — it is needed for the GW1 decision itself):**
+  (2026-08-17, extended 2026-08-18 with explicit custom-plan identity and exclusions; owner
+  decision — it is needed for the GW1 decision itself):**
   `fpl.jobs.plan_server` is a localhost trigger that runs the unchanged, fail-closed
   optimizer and publish chain for the wizard's rules and republishes the read models; see
   `dashboard/README.md`. It adds vintages beside the runbook flow and replaces no part of it.

@@ -9,6 +9,7 @@ and no live forecast pipeline is used: the forecast input is a small synthetic a
 
 from __future__ import annotations
 
+import json
 import math
 import os
 from collections.abc import Callable
@@ -84,7 +85,7 @@ def _squad_players(horizon: int) -> tuple[_Player, ...]:
         "GK": (2.0, 1.0),
         "DEF": (6.0, 5.0, 4.0, 3.0, 2.0),
         "MID": (9.0, 8.0, 7.0, 6.0, 5.0),
-        "FWD": (10.0, 7.0, 4.0),
+        "FWD": (10.0, 7.0, 4.0, 0.0),
     }
     starts = {"GK": 1, "DEF": 10, "MID": 20, "FWD": 30}
     return tuple(
@@ -240,6 +241,12 @@ def test_run_id_is_stable_for_identical_behaviour_defining_inputs() -> None:
     assert len(first) == 64
 
 
+def test_explicit_platform_origin_preserves_legacy_run_id() -> None:
+    assert _run_id(policy=_policy(plan_origin=None)) == _run_id(
+        policy=_policy(plan_origin="platform")
+    )
+
+
 @pytest.mark.parametrize(
     "changed",
     [
@@ -261,6 +268,8 @@ def test_changed_provenance_changes_run_id(changed: dict[str, str]) -> None:
         {"risk_lambda": 0.5},
         {"min_bench_appearance": 0.25},
         {"locked_codes": (30,)},
+        {"excluded_codes": (31,)},
+        {"plan_origin": "user_custom"},
         {"candidate_pool_per_position": 8},
         {"transfer_depth": 1},
         {"transition_limit_per_state": 100},
@@ -358,6 +367,8 @@ def test_artifact_carries_complete_schema_and_provenance() -> None:
     assert policy.beam_width == 30
     assert policy.maximum_transfers_per_gameweek == 20
     assert policy.risk_lambda == 0.0
+    assert policy.excluded_codes == ()
+    assert policy.plan_origin == "platform"
 
     assert artifact.solver.name == "PULP_CBC_CMD"
     assert artifact.solver.options == ("randomSeed 0",)
@@ -401,6 +412,24 @@ def test_serialised_bytes_are_deterministic_and_round_trip(tmp_path: Path) -> No
     import hashlib
 
     assert digest == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_legacy_artifact_without_plan_origin_reads_as_unknown(tmp_path: Path) -> None:
+    artifact = _build()
+    legacy_policy = artifact.search_policy.model_copy(update={"plan_origin": None})
+    legacy_run_id = derive_optimizer_run_id(
+        artifact.provenance, legacy_policy, artifact.solver, artifact.decision_sha256
+    )
+    assert legacy_run_id == artifact.run_id
+    legacy = artifact.model_copy(update={"search_policy": legacy_policy, "run_id": legacy_run_id})
+    payload = legacy.model_dump(mode="json")
+    payload["search_policy"].pop("plan_origin")
+    path = tmp_path / "legacy-plan.json"
+    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+    parsed = read_optimizer_artifact(path)
+    assert parsed.run_id == artifact.run_id
+    assert parsed.search_policy.plan_origin is None
 
 
 def test_two_runs_from_same_fixture_have_identical_decision_and_run_id() -> None:
@@ -461,6 +490,22 @@ def test_run_id_mismatch_is_rejected_on_construction_and_read(tmp_path: Path) ->
     path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(OptimizerArtifactError, match="run_id"):
         read_optimizer_artifact(path)
+
+
+def test_artifact_independently_rejects_lock_and_exclusion_policy_violations() -> None:
+    artifact = _build()
+    selected = artifact.initial_squad.members[0].code
+    missing = max(member.code for member in artifact.initial_squad.members) + 10_000
+
+    excluded = artifact.model_dump(mode="json", by_alias=True)
+    excluded["search_policy"]["excluded_codes"] = [selected]
+    with pytest.raises(ValidationError, match="contains an excluded player"):
+        OptimizerPlanArtifact.model_validate(excluded)
+
+    locked = artifact.model_dump(mode="json", by_alias=True)
+    locked["search_policy"]["locked_codes"] = [missing]
+    with pytest.raises(ValidationError, match="omits a locked player"):
+        OptimizerPlanArtifact.model_validate(locked)
 
 
 def test_valid_alternative_decision_is_rejected_when_decision_hash_is_stale() -> None:
@@ -726,6 +771,35 @@ def test_job_records_locked_players_policy(tmp_path: Path, monkeypatch: pytest.M
     assert any("locked players: P30 (30)" in line for line in plan.assumptions)
 
 
+def test_job_records_exclusions_and_user_origin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    forecast = _write_forecast(tmp_path)
+    out = tmp_path / "plan_excluded.json"
+    _mock_clean_output(monkeypatch)
+    assert (
+        main(
+            [
+                str(forecast),
+                "--exclude",
+                "33",
+                "--plan-origin",
+                "user_custom",
+                "--output",
+                str(out),
+            ]
+        )
+        == 0
+    )
+    plan = read_optimizer_artifact(out)
+    assert plan.search_policy.excluded_codes == (33,)
+    assert plan.search_policy.plan_origin == "user_custom"
+    assert all(
+        33 not in {member.code for member in week.squad_after_transfers} for week in plan.plan.weeks
+    )
+    assert any("excluded players: P33 (33)" in line for line in plan.assumptions)
+
+
 def test_job_rejects_more_than_five_locks_and_unknown_codes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -736,6 +810,31 @@ def test_job_rejects_more_than_five_locks_and_unknown_codes(
     assert main([str(forecast), "--lock", "9999", "--output", str(tmp_path / "b.json")]) == 1
     assert not (tmp_path / "a.json").exists()
     assert not (tmp_path / "b.json").exists()
+    assert capsys.readouterr().out == ""
+
+
+def test_job_rejects_invalid_exclusions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forecast = _write_forecast(tmp_path)
+    _mock_clean_output(monkeypatch)
+    many = [arg for code in range(100, 116) for arg in ("--exclude", str(code))]
+    assert main([str(forecast), *many, "--output", str(tmp_path / "a.json")]) == 1
+    assert main([str(forecast), "--exclude", "9999", "--output", str(tmp_path / "b.json")]) == 1
+    assert (
+        main(
+            [
+                str(forecast),
+                "--lock",
+                "30",
+                "--exclude",
+                "30",
+                "--output",
+                str(tmp_path / "c.json"),
+            ]
+        )
+        == 1
+    )
     assert capsys.readouterr().out == ""
 
 

@@ -1,5 +1,5 @@
 ﻿{
-  "json_schema_version": 2,
+  "json_schema_version": 3,
   "plans": [
     {
       "optimizer_run_id": "opt-default",
@@ -14,6 +14,13 @@
         "assists_mode": "coupled",
         "attacking_mode": "v3",
         "share_signal_kind": "expected_goals"
+      },
+      "plan_kind": "platform_default",
+      "display_label": "Platform default — v3 goals / coupled assists",
+      "policy": {
+        "locked_codes": [],
+        "excluded_codes": [],
+        "min_bench_appearance": 0.0
       },
       "weeks": [
         {
@@ -83,6 +90,13 @@
         "assists_mode": "v1",
         "attacking_mode": "v1",
         "share_signal_kind": "expected_goals"
+      },
+      "plan_kind": "platform_diagnostic",
+      "display_label": "Diagnostic sensitivity — v1 goals / v1 assists",
+      "policy": {
+        "locked_codes": [],
+        "excluded_codes": [],
+        "min_bench_appearance": 0.0
       },
       "weeks": [
         {

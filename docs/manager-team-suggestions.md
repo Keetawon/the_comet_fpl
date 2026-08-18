@@ -1,7 +1,9 @@
 # Manager-team transfer suggestions — design record
 
-Status: **wizard v1 shipped on the dashboard (Plan builder page) 2026-08-17** — Screens 1-3
-plus the command bridge, fresh-squad path only. The manager_id import, the selections-log
+Status: **wizard v2 shipped on the dashboard (Plan builder page) 2026-08-18** — the
+fresh-squad path now keeps user-specific results on this page, supports up to five green locks
+and fifteen red exclusions through the real optimizer, and keeps the formal platform suggestion
+separate on Next GW. The manager_id import, the selections-log
 backend, and the hosted mode remain design-only, delivery after the 2026/27 GW1 deadline as
 P2 items (see `DEV-ROADMAP.md`). Nothing here changes a model, a frozen evaluation, or the
 GW1 decision path. The owner confirmed the wizard is END-USER-FACING frontend, not an owner
@@ -10,8 +12,9 @@ tool: its language, guards, and error messages are written for users.
 ## 1. The wizard flow (owner sketch 2026-08-17, refined)
 
 The owner's sketch: *have own team? (manager_id → read team) or not → pick up to 5 locked
-players (search + filters; warn when the money left cannot complete a legal squad; rotation
-threshold here too) → confirm (own team shown / suggestion shown + locks + threshold) →
+players and exclude up to 15 avoided players (shared search + filters; warn when the money left
+or remaining population cannot complete a legal squad; rotation threshold here too) → confirm
+(own team shown / suggestion shown + locks + exclusions + threshold) →
 next → optimize under the conditions → summary.* The refinement below keeps that shape and
 fixes the three things the optimizer's actual contract forces: (a) locks mean "must include"
 on the fresh path but "never sell" on the own-team path; (b) the budget pre-flight only
@@ -44,6 +47,10 @@ not a team, and the suggested team appears only in the summary.
   quotas > budget` (a sum-of-k-cheapest-per-position lower bound; club-cap infeasibility is
   rare and falls back to the solver's named error). The own-team path shows no budget check
   on locks — the user already owns them.
+- **Exclude picker (both paths, max 15):** the same search and filters in a separate mode.
+  Locked selections are green and excluded selections red. The sets are disjoint and the UI
+  requires removing one rule before applying the other. Exclusions are omitted from the fresh
+  squad's cheapest-completion preflight and mean never-select initially / never-buy later.
 - **Rotation threshold** (both paths): plain-language selector (Off / 25% / 50%) with the
   semantics inline — outfield bench players must be AT LEAST this likely to appear, bench
   goalkeeper exempt, measure is a conservative lower bound. The picker shows each player's
@@ -51,18 +58,25 @@ not a team, and the suggested team appears only in the summary.
 
 ### Screen 3 — Review the rules (pre-run confirmation)
 
-A policy card, not a team: locks with photos and prices, threshold, horizon, and per path
-either the budget headroom (fresh) or squad value + bank + banked free transfers + the -4
+A policy card, not a team: green locks and red exclusions with photos and prices, threshold,
+horizon, and per path either the budget headroom (fresh) or squad value + bank + banked free
+transfers + the -4
 rule (own team). Frozen-price and availability-overlay caveats are printed here once, so
 the summary can stay clean. The primary button runs the optimization.
 
 ### Screen 4 — Calculate
 
-The near-term reality: the browser cannot solve (PuLP/CBC lives in Python), so this screen
-is the bridge — the wizard emits the **exact command** (`fpl.jobs.suggest_manager_transfers`
-or `optimize_squad --lock ... --min-bench-appearance ...`) to run, and on completion the
-page renders the new suggestion artifact by id. When the hosted backend exists this screen
-becomes a real progress state; the flow above it does not change.
+The browser does not reimplement the solver (PuLP/CBC lives in Python). The local plan server
+invokes the real optimizer with `--lock`, `--exclude`, and `--min-bench-appearance`, republishes
+the read models, and returns the immutable optimizer run id; the exact command remains visible as
+an offline fallback. On completion Plan Builder stays on its own result screen and renders only
+that exact run id. If it is absent after republishing, the page fails visibly instead of showing
+the platform squad or another custom run.
+
+Localhost requests need no credential. For the optional phone/LAN preview, the server prints a
+fresh per-launch token which Plan Builder sends only as `X-FPL-Plan-Token`; all non-loopback
+requests require it. The publish also fails closed unless both formal standing artifacts and the
+exact custom run appear in `next_gw.json`.
 
 ### Screen 5 — Summary
 
@@ -85,6 +99,7 @@ becomes a real progress state; the flow above it does not change.
 | Import my team | — | manager squad = initial state (no initial-squad ILP) |
 | Banked free transfers (derived) | — (fresh season: 0) | `initial_banked_free_transfers=B` |
 | Lock player (≤5) | `--lock CODE` (must-include) | `--lock CODE` (never-sell) |
+| Exclude player (≤15) | `--exclude CODE` (never-select) | `--exclude CODE` (never-buy) |
 | Rotation threshold | `--min-bench-appearance P` | `--min-bench-appearance P` |
 | Horizon | artifact GW range | artifact GW range |
 
@@ -185,12 +200,15 @@ value feeds `plan_transfers(initial_banked_free_transfers=B)` and is displayed i
 
 ## 6. Locks, threshold, and infeasibility UX
 
-Locks (`--lock`, max 5) and the bench gate compose; the wizard must translate solver
+Locks (`--lock`, max 5), exclusions (`--exclude`, max 15), and the bench gate compose; the wizard
+must reject lock/exclude overlap before solving and translate solver
 failures into wizard language:
 
-- locked player below the appearance threshold -> "he will start every gameweek" (the
-  solver does this automatically) or suggest unlocking;
+- locked player below the appearance threshold -> explain that the explicit must-keep rule exempts
+  him from the bench threshold;
 - locked set breaks position/club/budget legality -> name the conflicting locks;
+- excluded or locked code is unknown/unpriced -> name it; excluded players never enter any future
+  transfer squad;
 - threshold no legal squad meets -> suggest lowering it.
 
 The manager's own CURRENT squad is never "illegal" (the game enforces legality), but a

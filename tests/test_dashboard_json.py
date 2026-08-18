@@ -166,8 +166,31 @@ def _player_form_row(gw: int, code: int, window: str, **overrides: Any) -> dict[
     return row
 
 
-def _optimizer_run_row(optimizer_run_id: str, decision: str, *, seed: int = 7) -> dict[str, Any]:
+def _optimizer_run_row(
+    optimizer_run_id: str,
+    decision: str,
+    *,
+    seed: int = 7,
+    plan_origin: str | None = None,
+    locked_codes: tuple[int, ...] = (),
+    excluded_codes: tuple[int, ...] = (),
+    min_bench_appearance: float = 0.0,
+) -> dict[str, Any]:
     """A dim_optimizer_run row mirroring the exporter's run-level provenance."""
+    search_policy: dict[str, Any] = {
+        "beam_width": 8,
+        "candidate_pool_per_position": 30,
+        "excluded_codes": list(excluded_codes),
+        "free_transfer_per_gameweek": 1,
+        "hit_cost_points": 4,
+        "locked_codes": list(locked_codes),
+        "min_bench_appearance": min_bench_appearance,
+        "risk_lambda": 0.0,
+        "search_method": "bounded deterministic dynamic programme with beam pruning",
+        "transfer_depth": 2,
+    }
+    if plan_origin is not None:
+        search_policy["plan_origin"] = plan_origin
     return {
         "optimizer_run_id": optimizer_run_id,
         "decision_sha256": decision,
@@ -193,18 +216,7 @@ def _optimizer_run_row(optimizer_run_id: str, decision: str, *, seed: int = 7) -
         "search_method": "bounded deterministic dynamic programme with beam pruning",
         "optimality_scope": "exact lineups within visited states; path not globally exact",
         "risk_lambda": 0.0,
-        "search_policy": json.dumps(
-            {
-                "beam_width": 8,
-                "candidate_pool_per_position": 30,
-                "free_transfer_per_gameweek": 1,
-                "hit_cost_points": 4,
-                "risk_lambda": 0.0,
-                "search_method": "bounded deterministic dynamic programme with beam pruning",
-                "transfer_depth": 2,
-            },
-            sort_keys=True,
-        ),
+        "search_policy": json.dumps(search_policy, sort_keys=True),
         "rules_snapshot": json.dumps(
             {
                 "budget_tenths": 1000,
@@ -374,7 +386,15 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
         "fact_forecast_player_fixture": player_fixture,
         "dim_optimizer_run": [
             _optimizer_run_row("opt-1", "dec-1"),
-            _optimizer_run_row("opt-2", "dec-2", seed=11),
+            _optimizer_run_row(
+                "opt-2",
+                "dec-2",
+                seed=11,
+                plan_origin="user_custom",
+                locked_codes=(1,),
+                excluded_codes=(99, 42),
+                min_bench_appearance=0.25,
+            ),
         ],
         # Finalised outcomes at player-fixture grain. Code 2's fixture 101 is unfinalised
         # (NULL points) and must stay out of every gameweek sum, never read as 0.
@@ -802,6 +822,8 @@ def test_optimizer_audit_carries_full_provenance(tmp_path: Path) -> None:
 
     plan = plans[0]
     assert plan["decision_sha256"] == "dec-1"
+    assert plan["plan_kind"] == "platform_default"
+    assert plan["display_label"] == "Platform default \N{EM DASH} v3 goals / coupled assists"
     assert plan["component_modes"]["attacking_mode"] == "v3"  # from its forecast run
     assert plan["provenance"]["optimizer_commit_sha"] == "commit-opt"
     assert plan["provenance"]["optimizer_worktree_clean"] is True
@@ -816,13 +838,126 @@ def test_optimizer_audit_carries_full_provenance(tmp_path: Path) -> None:
     assert plan["assumptions"] == ["bench points are excluded from the objective"]
     assert plan["status"] == "development_only_not_a_validated_production_recommendation"
     assert plans[1]["solver"]["seed"] == 11
+    assert plans[1]["plan_kind"] == "user_custom"
+    assert plans[1]["display_label"] == "Your plan \N{EM DASH} v3 goals / coupled assists"
+    assert plans[1]["search_policy"]["plan_origin"] == "user_custom"
 
 
 def test_optimizer_audit_without_plans_is_empty_not_an_error(tmp_path: Path) -> None:
     export_dir = _build_source_export(tmp_path)
     _rewrite_table(export_dir, "dim_optimizer_run", [])
+    _rewrite_table(export_dir, "fact_optimizer_plan", [])
     result = build_dashboard_read_models(export_dir).optimizer_audit
     assert result == {"plans": []}
+
+
+def test_optimizer_fact_without_run_provenance_fails_closed(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["dim_optimizer_run"]
+    _rewrite_table(export_dir, "dim_optimizer_run", rows[1:])
+
+    with pytest.raises(DashboardJsonError, match="absent from dim_optimizer_run"):
+        build_dashboard_read_models(export_dir)
+
+
+def test_plan_classification_uses_origin_then_architecture_not_row_order() -> None:
+    from fpl.publish.dashboard_json import _optimizer_plan_metadata
+
+    diagnostic_modes = pl.DataFrame(
+        [
+            {
+                "run_id": RUN_ID,
+                "component_modes": json.dumps(
+                    {"attacking_mode": "v1", "assists_mode": "v1"}, sort_keys=True
+                ),
+            }
+        ]
+    )
+    platform = _optimizer_run_row("z-platform", "dec-platform")
+    custom = _optimizer_run_row("a-custom", "dec-custom", excluded_codes=(7,))
+    explicit_platform = _optimizer_run_row(
+        "b-explicit-platform",
+        "dec-explicit-platform",
+        plan_origin="platform",
+        locked_codes=(9,),
+    )
+    metadata = _optimizer_plan_metadata(
+        pl.DataFrame([platform, custom, explicit_platform]), diagnostic_modes
+    )
+
+    assert metadata["z-platform"]["plan_kind"] == "platform_diagnostic"
+    assert metadata["z-platform"]["display_label"] == (
+        "Diagnostic sensitivity \N{EM DASH} v1 goals / v1 assists"
+    )
+    assert metadata["a-custom"]["plan_kind"] == "user_custom"
+    assert metadata["a-custom"]["display_label"] == ("Your plan \N{EM DASH} v1 goals / v1 assists")
+    assert metadata["a-custom"]["compact_policy"]["excluded_codes"] == [7]
+    assert metadata["a-custom"]["search_policy"]["plan_origin"] == "user_custom"
+    assert metadata["b-explicit-platform"]["plan_kind"] == "platform_diagnostic"
+
+
+def test_plan_classification_fails_closed_on_unknown_origin() -> None:
+    from fpl.publish.dashboard_json import _optimizer_plan_metadata
+
+    row = _optimizer_run_row("opt-invalid", "dec-invalid", plan_origin="mystery")
+    runs = pl.DataFrame(
+        [
+            {
+                "run_id": RUN_ID,
+                "component_modes": json.dumps(
+                    {"attacking_mode": "v3", "assists_mode": "coupled"}, sort_keys=True
+                ),
+            }
+        ]
+    )
+    with pytest.raises(DashboardJsonError, match="plan_origin"):
+        _optimizer_plan_metadata(pl.DataFrame([row]), runs)
+
+
+def test_legacy_custom_origin_survives_artifact_export_and_dashboard(
+    tmp_path: Path,
+) -> None:
+    from fpl.artifacts.optimizer_plan import derive_optimizer_run_id, read_optimizer_artifact
+    from fpl.publish.dashboard_json import _build_optimizer_audit
+    from fpl.publish.export import _optimizer_run_records
+    from tests.test_bi_export import _optimizer_artifact
+
+    forecast, forecast_run_id = _seed_live_database(tmp_path / "legacy.duckdb")
+    current = _optimizer_artifact(forecast)
+    legacy_policy = current.search_policy.model_copy(
+        update={"locked_codes": (1,), "plan_origin": None}
+    )
+    legacy_run_id = derive_optimizer_run_id(
+        current.provenance, legacy_policy, current.solver, current.decision_sha256
+    )
+    legacy = current.model_copy(update={"search_policy": legacy_policy, "run_id": legacy_run_id})
+    payload = legacy.model_dump(mode="json")
+    payload["search_policy"].pop("plan_origin")
+    path = tmp_path / "legacy-custom.json"
+    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+    parsed = read_optimizer_artifact(path)
+    assert parsed.search_policy.plan_origin is None
+    records = _optimizer_run_records(((parsed, path, forecast_run_id, forecast.manifest.as_of),))
+    exported_policy = json.loads(records[0]["search_policy"])
+    assert exported_policy["plan_origin"] is None
+    runs = pl.DataFrame(
+        [
+            {
+                "run_id": forecast_run_id,
+                "component_modes": json.dumps(
+                    {"attacking_mode": "v3", "assists_mode": "coupled"}, sort_keys=True
+                ),
+            }
+        ]
+    )
+
+    audit = _build_optimizer_audit(pl.DataFrame(records), runs)
+    plan = audit["plans"][0]
+    assert plan["plan_kind"] == "user_custom"
+    assert plan["display_label"] == ("Your plan \N{EM DASH} v3 goals / coupled assists")
+    assert plan["search_policy"]["plan_origin"] == "user_custom"
+    assert plan["search_policy"]["locked_codes"] == [1]
 
 
 def test_optimizer_audit_fails_closed_on_malformed_json_column(tmp_path: Path) -> None:
@@ -883,6 +1018,13 @@ def test_next_gw_plans_join_ev_context_and_modes(tmp_path: Path) -> None:
         "attacking_mode": "v3",
         "share_signal_kind": "expected_goals",
     }
+    assert plan["plan_kind"] == "platform_default"
+    assert plan["display_label"] == "Platform default \N{EM DASH} v3 goals / coupled assists"
+    assert plan["policy"] == {
+        "locked_codes": [],
+        "excluded_codes": [],
+        "min_bench_appearance": 0.0,
+    }
     week1, week2 = plan["weeks"]
     assert (week1["captain_code"], week1["vice_captain_code"]) == (1, 2)
     assert week1["players"][0]["web_name"] == "Vicario"
@@ -900,6 +1042,13 @@ def test_next_gw_plans_join_ev_context_and_modes(tmp_path: Path) -> None:
     # opt-2 carries the GW1 hit points; its vice differs from opt-1's captain/vice pairing
     assert plans[1]["weeks"][0]["hit_points"] == 4
     assert plans[1]["weeks"][0]["vice_captain_code"] == 2
+    assert plans[1]["plan_kind"] == "user_custom"
+    assert plans[1]["display_label"] == "Your plan \N{EM DASH} v3 goals / coupled assists"
+    assert plans[1]["policy"] == {
+        "locked_codes": [1],
+        "excluded_codes": [42, 99],
+        "min_bench_appearance": 0.25,
+    }
 
 
 def test_next_gw_fails_closed_on_unknown_forecast_run(tmp_path: Path) -> None:
@@ -916,6 +1065,13 @@ def test_summary_snapshots_the_latest_run(tmp_path: Path) -> None:
     summary = models.summary
     assert summary["latest_run"]["run_id"] == RUN_ID
     assert summary["latest_run"]["component_modes"]["attacking_mode"] == "v3"
+    assert [plan["plan_kind"] for plan in summary["optimizer_plans"]] == [
+        "platform_default",
+        "user_custom",
+    ]
+    assert summary["optimizer_plans"][1]["display_label"] == (
+        "Your plan \N{EM DASH} v3 goals / coupled assists"
+    )
     assert summary["roster"] == {"players": 2, "teams": 3}
     # next gameweek carries kickoffs; the deadline stays null, never fabricated
     assert summary["next_gameweek"]["gw"] == 1

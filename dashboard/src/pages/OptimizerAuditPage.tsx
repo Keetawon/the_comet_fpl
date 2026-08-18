@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table";
 import { loadNextGw, loadOptimizerAudit } from "@/data/load";
 import type { AuditPlan, NextGwPlan } from "@/data/types";
-import { defaultPlan, planLabel } from "@/lib/nextGw";
+import { defaultPlan, planDisplayLabel } from "@/lib/nextGw";
 
 type PageState =
   | { status: "loading" }
@@ -127,7 +127,7 @@ export function OptimizerAuditPage() {
               <SelectContent>
                 {state.audit.map((p) => (
                   <SelectItem key={p.optimizer_run_id} value={p.optimizer_run_id}>
-                    {planLabel(p.component_modes)}
+                    {planDisplayLabel(p)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -149,7 +149,7 @@ export function OptimizerAuditPage() {
             value={plan.as_of ? `${plan.as_of.replace("T", " ").slice(0, 16)} UTC` : "–"}
           />
           <Row label="horizon" value={`${plan.season} GW${plan.gw_from}-${plan.gw_to}`} />
-          <Row label="architecture" value={planLabel(plan.component_modes)} />
+          <Row label="plan" value={planDisplayLabel(plan)} />
           <Row label="optimizer commit" value={plan.provenance.optimizer_commit_sha} />
           <Row
             label="worktree clean"
@@ -193,6 +193,18 @@ export function OptimizerAuditPage() {
               value={`${policy.hit_cost_points} pts, max ${policy.maximum_transfers_per_gameweek}`}
             />
             <Row label="risk lambda" value={policy.risk_lambda} />
+            <Row
+              label="locked codes"
+              value={policy.locked_codes.length ? policy.locked_codes.join(", ") : "none"}
+            />
+            <Row
+              label="excluded codes"
+              value={policy.excluded_codes.length ? policy.excluded_codes.join(", ") : "none"}
+            />
+            <Row
+              label="bench appearance floor"
+              value={Math.round(policy.min_bench_appearance * 100) + "%"}
+            />
           </Card>
         </div>
       </div>

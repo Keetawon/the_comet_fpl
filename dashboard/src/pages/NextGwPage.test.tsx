@@ -1,7 +1,6 @@
-// Page smoke: Summary and Next GW render from read models -- the landing sections (next
-// GW, optimizer squad summaries, availability watch, players/teams to watch) and the
-// squad pivot (plan EV columns beside the fixture chips, filters, the diff card, and the
-// no-EV-across-plans rule).
+// Page smoke: Summary and Next GW render from read models. Product ownership is explicit:
+// Next GW shows only the platform default and diagnostic, while a user-custom plan remains
+// in Plan Builder (and gets its own clearly labelled Summary card).
 
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -16,11 +15,23 @@ import summarySample from "@/data/sampleSummary.json";
 import nextGwSample from "@/data/sampleNextGw.json";
 import playersSample from "@/data/samplePlayers.json";
 import teamsSample from "@/data/sampleFixtureMatrix.json";
-import type { NextGwPlan, TeamRecord } from "@/data/types";
+import type { NextGwPlan, SummaryData, TeamRecord } from "@/data/types";
 import { NextGwPage } from "./NextGwPage";
 import { SummaryPage } from "./SummaryPage";
 
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
+const customPlan: NextGwPlan = {
+  ...plans[0],
+  optimizer_run_id: "custom-locked-plan",
+  decision_sha256: "custom-decision",
+  plan_kind: "user_custom",
+  display_label: "Your plan — 1 lock, 1 exclusion",
+  policy: {
+    locked_codes: [1],
+    excluded_codes: [2],
+    min_bench_appearance: 0.25,
+  },
+};
 
 vi.mock("@/data/load", () => ({
   loadSummary: vi.fn(),
@@ -33,7 +44,7 @@ const teamsForRunA: TeamRecord[] = teamsSample.teams.map((t) => ({ ...t, run_id:
 
 beforeEach(() => {
   window.localStorage.clear();
-  vi.mocked(loadSummary).mockResolvedValue(summarySample);
+  vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersSample.players, manifest: null });
   vi.mocked(loadFixtureMatrix).mockResolvedValue({
@@ -49,9 +60,9 @@ describe("SummaryPage", () => {
     await waitFor(() => expect(screen.getByText(/2026-27 · GW1-3/)).toBeInTheDocument());
     expect(screen.getByText(/first kickoff 2026-08-22 11:30 UTC/)).toBeInTheDocument();
     expect(screen.getByText(/Deadlines are not sourced/)).toBeInTheDocument();
-    // one summary card per plan, labelled by architecture, never comparing EV
-    expect(screen.getByText(/Optimizer squad — default/)).toBeInTheDocument();
-    expect(screen.getByText(/Optimizer squad — diagnostic/)).toBeInTheDocument();
+    // one platform card per formal plan, labelled by product role, never comparing EV
+    expect(screen.getByText("Platform recommendation — default")).toBeInTheDocument();
+    expect(screen.getByText("Platform diagnostic sensitivity")).toBeInTheDocument();
     expect(screen.getAllByText(/GW1 squad xP/).length).toBe(2); // one card per plan
     // availability watch labels the official overlay status and chance
     expect(screen.getByText(/Availability watch/)).toBeInTheDocument();
@@ -61,12 +72,48 @@ describe("SummaryPage", () => {
     expect(screen.getByText(/easiest schedules/)).toBeInTheDocument();
     expect(screen.getByText(/hardest schedules/)).toBeInTheDocument();
   });
+
+  it("separates a saved custom plan from the formal platform cards", async () => {
+    window.localStorage.setItem("fpl-solved-plan", customPlan.optimizer_run_id);
+    vi.mocked(loadNextGw).mockResolvedValue({ plans: [customPlan, plans[1], plans[0]] });
+
+    render(<SummaryPage />);
+
+    expect(await screen.findByText("Your custom plan")).toBeInTheDocument();
+    expect(screen.getByText(/1 locked · 1 excluded · bench floor 25%/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open your plan in Plan Builder/ })).toHaveAttribute(
+      "href",
+      "#plan-builder?run=custom-locked-plan",
+    );
+    expect(screen.getByText("Platform recommendation — default")).toBeInTheDocument();
+    expect(screen.getByText("Platform diagnostic sensitivity")).toBeInTheDocument();
+  });
+
+  it("still renders when browser storage rejects the saved custom-plan lookup", async () => {
+    vi.mocked(loadNextGw).mockResolvedValue({ plans: [customPlan, plans[1], plans[0]] });
+    const storage = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("storage denied", "SecurityError");
+    });
+    try {
+      render(<SummaryPage />);
+      expect(await screen.findByText("Your custom plan")).toBeInTheDocument();
+      expect(screen.getByText("Platform recommendation — default")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Open your plan in Plan Builder/ })).toHaveAttribute(
+        "href",
+        "#plan-builder?run=custom-locked-plan",
+      );
+    } finally {
+      storage.mockRestore();
+    }
+  });
 });
 
 describe("NextGwPage", () => {
   it("renders the default plan's XI, captain, bench, the squad pivot, and the diff card", async () => {
     render(<NextGwPage />);
-    await waitFor(() => expect(screen.getByText(/Next GW suggestion — GW1/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Platform Next GW suggestion — GW1/)).toBeInTheDocument(),
+    );
     expect(screen.getByText(/Formation/).textContent).toContain("captain Alpha");
     expect(screen.getByText(/Formation/).textContent).toContain("vice Beta");
     expect(screen.getByText(/Bench \(autosub order/)).toBeInTheDocument();
@@ -84,7 +131,9 @@ describe("NextGwPage", () => {
   it("widens the EV horizon via the bounded selector", async () => {
     const user = userEvent.setup();
     render(<NextGwPage />);
-    await waitFor(() => expect(screen.getByText(/Next GW suggestion — GW1/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Platform Next GW suggestion — GW1/)).toBeInTheDocument(),
+    );
     await user.click(screen.getByText("3 GWs"));
     expect(await screen.findByText("19.0")).toBeInTheDocument(); // 7.4 + 6.1 + 5.5
   });
@@ -92,7 +141,9 @@ describe("NextGwPage", () => {
   it("switches the pivot to compare the whole roster", async () => {
     const user = userEvent.setup();
     render(<NextGwPage />);
-    await waitFor(() => expect(screen.getByText(/Next GW suggestion — GW1/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Platform Next GW suggestion — GW1/)).toBeInTheDocument(),
+    );
     await user.click(screen.getByText("Compare all players"));
     // the whole run-a roster (Alpha, Beta) renders -- Gamma has no read-model row
     expect(await screen.findByText("Squad only")).toBeInTheDocument();
@@ -102,7 +153,9 @@ describe("NextGwPage", () => {
 
   it("colour-codes suggestion rows by role: captain gold, vice pale gold, bench grey", async () => {
     render(<NextGwPage />);
-    await waitFor(() => expect(screen.getByText(/Next GW suggestion — GW1/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Platform Next GW suggestion — GW1/)).toBeInTheDocument(),
+    );
     const rowsOf = (name: string) =>
       screen.getAllByText(name).flatMap((element) => {
         const row = element.closest("tr");
@@ -115,41 +168,23 @@ describe("NextGwPage", () => {
     expect(screen.getByText(/row colours: gold = captain/)).toBeInTheDocument();
   });
 
-  it("preselects the wizard's freshly solved plan when it is in the export", async () => {
-    const solved = plans[1]; // the diagnostic sample plan
-    window.localStorage.setItem("fpl-solved-plan", solved.optimizer_run_id);
-    render(<NextGwPage />);
-    await waitFor(() => expect(screen.getByText(/Next GW suggestion — GW1/)).toBeInTheDocument());
-    // the footer carries the selected plan's own run id, proving the preselect took
-    expect(screen.getByText(new RegExp(solved.optimizer_run_id.slice(0, 12)))).toBeInTheDocument();
-  });
+  it("ignores a saved custom V3 plan and keeps the formal selector unique and platform-only", async () => {
+    // Reproduce the screenshot bug exactly: a custom V3 plan sorts before the formal V3 plan,
+    // shares its architecture, and is also the locally saved solved run.
+    window.localStorage.setItem("fpl-solved-plan", customPlan.optimizer_run_id);
+    vi.mocked(loadNextGw).mockResolvedValue({ plans: [customPlan, plans[1], plans[0]] });
 
-  it("shows the wizard's pending rules as not yet applied, dismissable", async () => {
-    window.localStorage.setItem(
-      "fpl-plan-request",
-      JSON.stringify({
-        version: 1,
-        createdAt: "2026-08-17T22:00:00.000Z",
-        threshold: "0.25",
-        thresholdLabel: "25%",
-        locks: [{ code: 999, web_name: "LockedOne", now_cost: 55 }],
-        command:
-          "python -m fpl.jobs.optimize_squad gw1_5_default.jsonl --lock 999 --min-bench-appearance 0.25 --output plan_my_rules.json",
-      }),
-    );
-    const user = userEvent.setup();
     render(<NextGwPage />);
-    await waitFor(() => expect(screen.getByText(/not yet applied/)).toBeInTheDocument());
-    // the panel states the honest gap: the recorded plans predate the rules, nothing re-solved
-    expect(screen.getByText(/none of your locks/)).toBeInTheDocument();
-    expect(screen.getByText("LockedOne")).toBeInTheDocument();
-    expect(screen.getByText(/rotation threshold 25%/)).toBeInTheDocument();
-    expect(document.querySelector("pre")?.textContent).toContain("--min-bench-appearance 0.25");
-    // the recorded plan renders unchanged beside the panel
-    expect(screen.getByText(/Formation/).textContent).toContain("captain Alpha");
-    // dismissing hides the panel without touching the recorded plans
-    await user.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText(/not yet applied/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Formation/).textContent).toContain("captain Alpha");
+    await waitFor(() =>
+      expect(screen.getByText(/Platform Next GW suggestion — GW1/)).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText(/Formal platform recommendation/)).toBeInTheDocument();
+    expect(screen.getByText(/Optimizer run opt-default/)).toBeInTheDocument();
+    expect(screen.queryByText(/custom-locked/)).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Platform model" })).toHaveTextContent(
+      plans[0].display_label,
+    );
+    expect(screen.queryByText(customPlan.display_label)).not.toBeInTheDocument();
   });
 });

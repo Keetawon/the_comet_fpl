@@ -102,11 +102,22 @@ repository root:
 .\.venv\Scripts\python.exe -m fpl.jobs.plan_server --host 0.0.0.0   # reachable from the LAN preview
 ```
 
-`POST /plan {"locks": [code...], "min_bench_appearance": 0.25|null}` runs
+Loopback use is deliberately zero-friction. A LAN-bound server prints a fresh per-launch access
+token; paste it into Plan Builder on the phone. The browser sends it only in the
+`X-FPL-Plan-Token` header. Every non-loopback request requires that token, and only a dashboard
+origin hosted by this machine is accepted.
+
+`POST /plan {"locks": [code...], "excludes": [code...],
+"min_bench_appearance": 0.25|null}` runs
 `fpl.jobs.optimize_squad` on the dev-latest default forecast with your rules, writes a unique
 timestamped immutable artifact under `dev-latest\my-rules\`, then republishes the BI export and
-these read models carrying the standing default/diagnostic plans plus the newest interactive
-plan. `GET /status` reports busy/stage/worktree state. The browser never computes anything — it
+read models carrying the required standing default/diagnostic plans plus that exact interactive
+plan. The server refuses to solve if either standing artifact is absent and verifies all three
+plan kinds in the browser-facing read model before reporting success. The
+artifact records `search_policy.plan_origin=user_custom`; locks are capped at five, exclusions at
+fifteen, and their sets must not overlap. This keeps interactive plans distinguishable from formal
+platform suggestions downstream. `GET /status` reports busy/stage/worktree state. The browser
+never computes anything — it
 asks this process to run the fail-closed jobs and then refetches the published JSON.
 
 Every correctness property is inherited: the optimizer still refuses a dirty Git worktree

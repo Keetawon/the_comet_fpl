@@ -4,7 +4,12 @@
 // the exploratory pages, defaulting to the default architecture referenced by the
 // default optimizer plan.
 
-import { isDefaultArchitecture, type ComponentModes } from "@/lib/nextGw";
+import {
+  isDefaultArchitecture,
+  resolvedPlanKind,
+  type ComponentModes,
+} from "@/lib/nextGw";
+import type { PlanKind } from "@/data/types";
 
 /** Minimal run shape both the manifest runs and page-derived runs satisfy. */
 export interface RunLike {
@@ -23,6 +28,7 @@ export interface VintageOption {
 interface PlanLike {
   forecast_run_id: string;
   component_modes: ComponentModes | null;
+  plan_kind?: PlanKind;
 }
 
 export function vintageOptions(runs: RunLike[], plans: PlanLike[]): VintageOption[] {
@@ -49,7 +55,7 @@ export function defaultVintageRunId(
   plans: PlanLike[],
   fallback: string | null = null,
 ): string | null {
-  const withPlan = plans.find((p) => isDefaultArchitecture(p.component_modes));
+  const withPlan = plans.find((p) => resolvedPlanKind(p) === "platform_default");
   if (withPlan && runs.some((r) => r.run_id === withPlan.forecast_run_id)) {
     return withPlan.forecast_run_id;
   }

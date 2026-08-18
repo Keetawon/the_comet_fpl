@@ -1,4 +1,4 @@
-# Dashboard read-model JSON contract, version 2
+# Dashboard read-model JSON contract, version 3
 
 Status: implemented by DEV-ROADMAP P1.7a (backend publish layer) and extended by P1.7d/P1.7e
 with the summary, next-gameweek, forecast-vs-actual, and optimizer-audit read models. This
@@ -6,6 +6,9 @@ document is the authoritative prose counterpart of `src/fpl/publish/dashboard_js
 static app renders these files and nothing else. Version 2 adds `summary.json`,
 `next_gw.json`, `forecast_vs_actual.json`, and `optimizer_audit.json` to the version-1 file
 set; the version-1 record shapes are unchanged.
+
+Version 3 adds explicit optimizer-plan classification and owner-policy fields. It does not
+infer plan ownership from run-id, hash, input, or row order.
 
 ## Boundary and provenance chain
 
@@ -186,8 +189,16 @@ shows a "no plans" state, never a fabricated squad). Each plan object carries:
 - identity and provenance: `optimizer_run_id`, `decision_sha256`, `forecast_run_id`, `as_of`,
   `season`, `gw_from`, `gw_to`;
 - `component_modes` parsed from that plan's forecast run in `dim_forecast_run`, so the UI can
-  label which architecture produced the plan (`attacking=v3` + `assists=coupled` is the
-  frozen default; anything else is labelled diagnostic) without guessing;
+  show which architecture produced the plan;
+- `plan_kind` and `display_label`, derived first from explicit
+  `search_policy.plan_origin`, then (only for platform plans) from `component_modes`:
+  `platform_default` for v3 goals/coupled assists, `platform_diagnostic` for any other
+  platform architecture, and `user_custom` for every owner-built plan regardless of model;
+  Their display prefixes are exactly "Platform default", "Diagnostic sensitivity", and
+  "Your plan";
+- compact `policy` with sorted `locked_codes`, sorted `excluded_codes`, and
+  `min_bench_appearance`, so the user-plan result can explain its generating constraints
+  without loading the full audit record;
 - `weeks[]`, one per optimizer gameweek: `hit_points`, `squad_cost` (sum of `now_cost`, the
   deadline's static prices), `captain_code` / `vice_captain_code`, and `players[]` with role
   (`starting_xi` / `bench_goalkeeper` / `bench_outfield`), `bench_order_index`,
@@ -204,6 +215,15 @@ shows a "no plans" state, never a fabricated squad). Each plan object carries:
 The emitter fails closed when a plan references a forecast run absent from
 `dim_forecast_run`, spans weeks outside its forecast horizon, mixes decisions, names a player
 the forecast never rated, or lacks exactly one captain and one vice-captain in the XI.
+A `fact_optimizer_plan` row without its matching `dim_optimizer_run` row also fails closed:
+architecture alone is never accepted as a substitute for the search policy.
+It also fails closed on an unknown `plan_origin` or malformed lock/exclusion policy.
+For old optimizer artifacts, missing code lists mean empty lists and a missing
+`min_bench_appearance` means `0.0`. A missing `plan_origin` is classified
+`user_custom` when locks, exclusions, or a positive bench threshold are present; otherwise
+it is `platform`. JSON `null` has the same legacy meaning as a missing field. An explicit
+origin always wins over that compatibility inference, and the emitted audit `search_policy`
+normalises the inferred value to `platform` or `user_custom`.
 
 **The default-vs-diagnostic diff is not precomputed.** Both plans ship complete, and the UI
 derives squad/XI overlap and captaincy agreement as set operations. Cross-plan EV is never
@@ -248,7 +268,9 @@ artifact SHA-256, squad-rule path/contract version/SHA-256 — the solver identi
 package + binary versions, deterministic options, seed, status), the parsed bounded-search
 `search_policy`, the parsed `rules_snapshot` (the constraints the plan obeyed), the explicit
 `assumptions` list, and the development-only `status`. `component_modes` from the plan's
-forecast run labels which architecture produced it.
+forecast run labels which architecture produced it. The same `plan_kind` and
+`display_label` used by `next_gw.json` are repeated here so audit navigation cannot
+silently reclassify a plan.
 
 The three JSON columns are parsed at emit time and fail closed on malformed content. **The
 squad, XI, and transfer path are not duplicated here** — `next_gw.json` already carries them,
@@ -259,7 +281,7 @@ and the audit page reads both files.
 ```json
 {
   "schema": "fpl.dashboard-read-models",
-  "json_schema_version": 2,
+  "json_schema_version": 3,
   "generated_at": "2026-08-15T00:00:00+00:00",
   "source": {
     "export_schema": "fpl.bi-semantic-export",

@@ -1,18 +1,30 @@
-// Plan builder (the wizard, v1). A screen-per-step wizard per the design record
+// Plan builder (the wizard, v2). A screen-per-step wizard per the design record
 // (docs/manager-team-suggestions.md): Start (import vs scratch) -> Set your rules (lock picker
 // with search/filters, per-position and club-cap guards, live budget pre-flight, rotation
 // threshold) -> Review & run. The browser cannot solve (the optimizer is PuLP/CBC in Python),
 // so the final screen is the command bridge: the wizard emits the exact command to run and the
-// result renders through the existing Next GW page once recorded. The manager_id import
+// result stays in this user-specific page once recorded. The formal platform recommendation
+// remains separate on Next GW. The manager_id import
 // collects the id now and lands as a P2 job after the deadline -- never faked.
 //
 // Flow invariant: every screen has exactly one forward and one backward edge, navigation
 // NEVER clears state (only the explicitly labelled "Reset rules" does, in place), and the
-// review screen ends forward -- "Done" links to the Next GW page where the recorded plan
-// renders, so there is no destructive or dead-end exit anywhere in the wizard.
+// review screen ends forward without clearing state, so there is no destructive or dead-end
+// exit anywhere in the wizard.
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, ArrowRight, Check, Download, Lock, RotateCcw, Sparkles, UserRoundSearch } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeftRight,
+  ArrowRight,
+  Ban,
+  Check,
+  Download,
+  Lock,
+  RotateCcw,
+  Sparkles,
+  UserRoundSearch,
+} from "lucide-react";
+import { BenchBlock, TransferPath, XiBlock } from "@/components/PlanOverview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,20 +37,31 @@ import {
 } from "@/components/PlayerFiltersBar";
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
-import type { PlayerRecord } from "@/data/types";
-import { isDefaultArchitecture } from "@/lib/nextGw";
+import type { NextGwPlan, PlayerRecord } from "@/data/types";
+import { resolvedPlanKind } from "@/lib/nextGw";
 import { clearPlanRequest, writePlanRequest } from "@/lib/planRequest";
 import { fetchPlanStatus, solvePlan } from "@/lib/planServer";
+import {
+  loadPlanServerToken,
+  rememberPlanServerToken,
+} from "@/lib/planServerToken";
+import { reloadPublishedReadModels } from "@/lib/readModelReload";
 import { availabilityLabel } from "@/lib/availability";
 import { cn } from "@/lib/utils";
 
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; players: PlayerRecord[]; runId: string | null };
+  | {
+      status: "ready";
+      players: PlayerRecord[];
+      plans: NextGwPlan[];
+      runId: string | null;
+    };
 
-// Wizard screens: 0 Start, 1 manager import, 2 set rules, 3 review & run.
-type Step = 0 | 1 | 2 | 3;
+// Wizard screens: 0 Start, 1 manager import, 2 set rules, 3 review & run, 4 result.
+type Step = 0 | 1 | 2 | 3 | 4;
+type SelectionMode = "lock" | "exclude";
 
 /** The solve card's view of the local plan server (src/fpl/jobs/plan_server.py). */
 type SolverStatus =
@@ -50,19 +73,28 @@ type SolverStatus =
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 const MAX_LOCKS = 5;
+const MAX_EXCLUSIONS = 15;
+const DEFAULT_SQUAD_QUOTA: Record<string, number> = { GK: 2, DEF: 5, MID: 5, FWD: 3 };
 const THRESHOLDS = [
   { value: "off", label: "Off", flag: null },
   { value: "0.25", label: "25%", flag: "0.25" },
   { value: "0.5", label: "50%", flag: "0.5" },
 ] as const;
-const STEPS = ["Start", "Set your rules", "Review & run"] as const;
+const STEPS = ["Start", "Set your rules", "Review & run", "Your plan"] as const;
 
 // Dev-loop convention (dashboard/README.md): the default GW1-5 artifact the README
 // regenerates lives here, and the wizard's own plan output gets a distinct name so it can
 // be passed to the next --optimizer-plan publish without clobbering the recorded pair.
 // ponytail: a fixed local path the owner's machine guarantees, not a config surface.
 const DEV_FORECAST_PATH = "D:\\tmp\\gw1\\dev-latest\\gw1_5_default.jsonl";
-const DEV_PLAN_OUTPUT = "D:\\tmp\\gw1\\dev-latest\\plan_my_rules.json";
+const DEV_PLAN_OUTPUT_DIR = "D:\\tmp\\gw1\\dev-latest";
+
+function newManualPlanOutput(): string {
+  const token =
+    globalThis.crypto?.randomUUID?.().replaceAll("-", "").slice(0, 12) ??
+    (Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+  return DEV_PLAN_OUTPUT_DIR + "\\plan_my_rules_" + token + ".json";
+}
 
 const price = (tenths: number | null) => (tenths == null ? "–" : `£${(tenths / 10).toFixed(1)}m`);
 
@@ -119,50 +151,112 @@ function StepBar({ current }: { current: number }) {
   );
 }
 
+function hashSolvedPlanId(): string | null {
+  const query = window.location.hash.split("?", 2)[1];
+  if (!query) return null;
+  const runId = new URLSearchParams(query).get("run")?.trim();
+  return runId || null;
+}
+
+function storedSolvedPlanId(): string | null {
+  const fromHash = hashSolvedPlanId();
+  if (fromHash) return fromHash;
+  try {
+    return window.localStorage.getItem("fpl-solved-plan");
+  } catch {
+    return null;
+  }
+}
+
+function rememberSolvedPlan(runId: string): boolean {
+  try {
+    window.localStorage.setItem("fpl-solved-plan", runId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function planBuilderRunHash(runId: string, serverToken: string): string {
+  const params = new URLSearchParams({ run: runId });
+  const cleanToken = serverToken.trim();
+  if (cleanToken) params.set("server_token", cleanToken);
+  return "plan-builder?" + params.toString();
+}
+
 export function PlanBuilderPage() {
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [rules, setRules] = useState<Rules | null>(null);
-  const [step, setStep] = useState<Step>(0);
+  const [resultPlanId, setResultPlanId] = useState<string | null>(storedSolvedPlanId);
+  const [step, setStep] = useState<Step>(() => (storedSolvedPlanId() ? 4 : 0));
+  const [manualOutputPath] = useState(newManualPlanOutput);
+  const [manualRunId, setManualRunId] = useState("");
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const [serverToken, setServerToken] = useState(loadPlanServerToken);
+  const [tokenStorageWarning, setTokenStorageWarning] = useState<string | null>(null);
   const [managerId, setManagerId] = useState("");
   const [locks, setLocks] = useState<PlayerRecord[]>([]);
+  const [excludes, setExcludes] = useState<PlayerRecord[]>([]);
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>("lock");
   const [threshold, setThreshold] = useState<string>("off");
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [copied, setCopied] = useState(false);
   const [solver, setSolver] = useState<SolverStatus>({ status: "checking" });
 
-  const checkSolver = () => {
+  const checkSolver = useCallback(() => {
     setSolver({ status: "checking" });
-    void fetchPlanStatus().then((status) =>
+    void fetchPlanStatus(serverToken).then((status) =>
       setSolver(status ? { status: "online" } : { status: "offline" }),
     );
-  };
+  }, [serverToken]);
 
   // Entering the review screen probes the local plan server once (manual Re-check retries).
   useEffect(() => {
     if (step === 3 && solver.status === "checking") checkSolver();
-  }, [step, solver.status]);
+  }, [step, solver.status, checkSolver]);
+
+  const openExactPublishedRun = (rawRunId: string) => {
+    const runId = rawRunId.trim();
+    if (!runId) return;
+    setResultPlanId(runId);
+    setStep(4);
+    const remembered = rememberSolvedPlan(runId);
+    setStorageWarning(
+      remembered
+        ? null
+        : "Browser storage is unavailable. The exact run id is preserved in this page URL.",
+    );
+    window.location.hash = planBuilderRunHash(runId, serverToken);
+    reloadPublishedReadModels();
+  };
 
   const solveNow = () => {
     setSolver({ status: "solving", stage: null });
     void solvePlan(
       {
         locks: locks.map((p) => p.code),
+        excludes: excludes.map((p) => p.code),
         minBenchAppearance: thresholdFlag ? Number(thresholdFlag) : null,
       },
       (stage) => setSolver((current) => (current.status === "solving" ? { ...current, stage } : current)),
+      serverToken,
     )
       .then((summary) => {
-        // The plan server republished the read models; hand off to the Next GW page with the
-        // fresh plan preselected and reload so the module-level data cache refetches.
-        window.localStorage.setItem("fpl-solved-plan", summary.optimizer_run_id);
+        // The plan server republished the read models. Keep the user inside Plan Builder and
+        // reload so the module-level JSON cache refetches the exact returned run id. The URL
+        // is the durable fallback when localStorage is denied (private/security modes).
+        setResultPlanId(summary.optimizer_run_id);
+        setStep(4);
         clearPlanRequest();
-        window.location.hash = "next-gw";
-        try {
-          window.location.reload();
-        } catch {
-          /* jsdom: reload not implemented */
-        }
+        const remembered = rememberSolvedPlan(summary.optimizer_run_id);
+        setStorageWarning(
+          remembered
+            ? null
+            : "Browser storage is unavailable. The exact run id is preserved in this page URL.",
+        );
+        window.location.hash = planBuilderRunHash(summary.optimizer_run_id, serverToken);
+        reloadPublishedReadModels();
       })
       .catch((error: unknown) => {
         setSolver({
@@ -178,15 +272,36 @@ export function PlanBuilderPage() {
       .then(([playersData, nextGw, audit]) => {
         if (cancelled) return;
         const defaultRun =
-          nextGw.plans.find((p) => isDefaultArchitecture(p.component_modes))?.forecast_run_id ??
+          nextGw.plans.find((p) => resolvedPlanKind(p) === "platform_default")
+            ?.forecast_run_id ??
           playersData.manifest?.runs.at(-1)?.run_id ??
           playersData.players[0]?.run_id ??
           null;
+        const availablePlayers = playersData.players.filter((p) => p.run_id === defaultRun);
         setState({
           status: "ready",
-          players: playersData.players.filter((p) => p.run_id === defaultRun),
+          players: availablePlayers,
+          plans: nextGw.plans,
           runId: defaultRun,
         });
+        const savedId = storedSolvedPlanId();
+        const savedPlan = nextGw.plans.find(
+          (plan) =>
+            plan.optimizer_run_id === savedId &&
+            resolvedPlanKind(plan) === "user_custom",
+        );
+        if (savedPlan) {
+          const locked = new Set(savedPlan.policy.locked_codes);
+          const excluded = new Set(savedPlan.policy.excluded_codes);
+          setLocks(availablePlayers.filter((player) => locked.has(player.code)));
+          setExcludes(availablePlayers.filter((player) => excluded.has(player.code)));
+          const savedThreshold = String(savedPlan.policy.min_bench_appearance);
+          setThreshold(
+            THRESHOLDS.some((option) => option.value === savedThreshold)
+              ? savedThreshold
+              : "off",
+          );
+        }
         setRules(rulesFromAudit(audit));
       })
       .catch((error: unknown) => {
@@ -200,7 +315,7 @@ export function PlanBuilderPage() {
   }, []);
 
   const budget = rules?.budgetTenths ?? 1000;
-  const quota = rules?.squadQuota ?? { GK: 2, DEF: 5, MID: 5, FWD: 3 };
+  const quota = rules?.squadQuota ?? DEFAULT_SQUAD_QUOTA;
   const maxPerClub = rules?.maxPerClub ?? 3;
 
   const totals = useMemo(() => {
@@ -212,27 +327,45 @@ export function PlanBuilderPage() {
       lockedByPos[p.position] = (lockedByPos[p.position] ?? 0) + 1;
       lockedByClub[p.team_code] = (lockedByClub[p.team_code] ?? 0) + 1;
     }
-    // Cheapest legal completion is a lower bound: the k cheapest remaining players per
-    // position, ignoring the club cap (rare; the solver names it if it ever binds).
+    // Cheapest position-quota completion is a lower bound. It excludes every explicit avoid
+    // and reports if a position no longer has enough selectable players. The solver remains
+    // authoritative for club-cap feasibility.
     let completion = 0;
+    let completionPossible = true;
+    const lockedCodes = new Set(locks.map((p) => p.code));
+    const excludedCodes = new Set(excludes.map((p) => p.code));
     for (const pos of POSITIONS) {
       const remaining = (quota[pos] ?? 0) - (lockedByPos[pos] ?? 0);
-      const lockedCodes = new Set(locks.map((p) => p.code));
       const cheapest = state.players
-        .filter((p) => p.position === pos && !lockedCodes.has(p.code) && p.now_cost != null)
+        .filter(
+          (p) =>
+            p.position === pos &&
+            !lockedCodes.has(p.code) &&
+            !excludedCodes.has(p.code) &&
+            p.now_cost != null,
+        )
         .map((p) => p.now_cost ?? 0)
         .sort((a, b) => a - b)
         .slice(0, Math.max(0, remaining));
+      if (cheapest.length < Math.max(0, remaining)) completionPossible = false;
       completion += cheapest.reduce((a, b) => a + b, 0);
     }
-    return { lockedCost, completion, leftover: budget - lockedCost - completion, lockedByPos, lockedByClub };
-  }, [state, locks, quota, budget]);
+    return {
+      lockedCost,
+      completion,
+      completionPossible,
+      leftover: budget - lockedCost - completion,
+      lockedByPos,
+      lockedByClub,
+    };
+  }, [state, locks, excludes, quota, budget]);
 
-  const guard = (player: PlayerRecord): string | null => {
+  const lockGuard = (player: PlayerRecord): string | null => {
     if (locks.some((p) => p.code === player.code)) return null;
-    if (locks.length >= MAX_LOCKS) return `max ${MAX_LOCKS} locks`;
+    if (excludes.some((p) => p.code === player.code)) return "remove exclusion first";
+    if (locks.length >= MAX_LOCKS) return "max " + MAX_LOCKS + " locks";
     if ((totals?.lockedByPos[player.position] ?? 0) >= (quota[player.position] ?? 0)) {
-      return `${player.position} quota full`;
+      return player.position + " quota full";
     }
     if ((totals?.lockedByClub[player.team_code] ?? 0) >= maxPerClub) {
       return "club cap (3)";
@@ -240,13 +373,31 @@ export function PlanBuilderPage() {
     return null;
   };
 
-  const toggleLock = (player: PlayerRecord) => {
-    if (guard(player)) return;
-    setLocks((current) =>
-      current.some((p) => p.code === player.code)
-        ? current.filter((p) => p.code !== player.code)
-        : [...current, player],
-    );
+  const excludeGuard = (player: PlayerRecord): string | null => {
+    if (excludes.some((p) => p.code === player.code)) return null;
+    if (locks.some((p) => p.code === player.code)) return "remove lock first";
+    if (excludes.length >= MAX_EXCLUSIONS) return "max " + MAX_EXCLUSIONS + " exclusions";
+    return null;
+  };
+
+  const selectionGuard = (player: PlayerRecord) =>
+    selectionMode === "lock" ? lockGuard(player) : excludeGuard(player);
+
+  const toggleSelection = (player: PlayerRecord) => {
+    if (selectionGuard(player)) return;
+    if (selectionMode === "lock") {
+      setLocks((current) =>
+        current.some((p) => p.code === player.code)
+          ? current.filter((p) => p.code !== player.code)
+          : [...current, player],
+      );
+    } else {
+      setExcludes((current) =>
+        current.some((p) => p.code === player.code)
+          ? current.filter((p) => p.code !== player.code)
+          : [...current, player],
+      );
+    }
   };
 
   const candidates = useMemo(() => {
@@ -272,6 +423,8 @@ export function PlanBuilderPage() {
 
   const resetRules = () => {
     setLocks([]);
+    setExcludes([]);
+    setSelectionMode("lock");
     setThreshold("off");
     setSearch("");
     setFilters(INITIAL_PLAYER_FILTERS);
@@ -283,24 +436,40 @@ export function PlanBuilderPage() {
     ".\\.venv\\Scripts\\python.exe -m fpl.jobs.optimize_squad",
     DEV_FORECAST_PATH,
     "--risk-lambda 0",
+    "--plan-origin user_custom",
     ...locks.map((p) => `--lock ${p.code}`),
+    ...excludes.map((p) => `--exclude ${p.code}`),
     ...(thresholdFlag ? [`--min-bench-appearance ${thresholdFlag}`] : []),
-    `--output ${DEV_PLAN_OUTPUT}`,
+    `--output ${manualOutputPath}`,
   ].join(" ");
 
-  // Reaching (or editing on) the review screen records the request: the Next GW page then
-  // shows it as pending until the command is run and the read models are re-published.
+  // Reaching (or editing on) review records the request so an interrupted manual solve can
+  // resume inside Plan Builder. The formal Next GW suggestion never consumes this state.
   useEffect(() => {
     if (step !== 3) return;
     writePlanRequest({
-      version: 1,
+      version: 2,
       createdAt: new Date().toISOString(),
       threshold,
       thresholdLabel,
       locks: locks.map((p) => ({ code: p.code, web_name: p.web_name, now_cost: p.now_cost })),
+      excludes: excludes.map((p) => ({
+        code: p.code,
+        web_name: p.web_name,
+        now_cost: p.now_cost,
+      })),
       command,
     });
-  }, [step, locks, threshold, thresholdLabel, command]);
+  }, [step, locks, excludes, threshold, thresholdLabel, command]);
+
+  const resultPlan =
+    state.status === "ready" && resultPlanId
+      ? state.plans.find(
+          (plan) =>
+            plan.optimizer_run_id === resultPlanId &&
+            resolvedPlanKind(plan) === "user_custom",
+        ) ?? null
+      : null;
 
   const managerTouched = managerId.trim() !== "";
   const managerValid = /^\d{1,10}$/.test(managerId.trim());
@@ -334,7 +503,7 @@ export function PlanBuilderPage() {
         <h1 className="text-lg font-semibold">Plan builder</h1>
         <p className="text-xs text-muted-foreground">
           vintage {state.runId?.slice(0, 12)}… · rules from the recorded optimizer artifact ·
-          wizard v1 (fresh squad); manager import lands after GW1
+          wizard v2 (fresh squad); manager import lands after GW1
         </p>
       </div>
       <StepBar current={step === 0 || step === 1 ? 1 : step} />
@@ -376,8 +545,8 @@ export function PlanBuilderPage() {
               Ready now
             </Badge>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Lock up to {MAX_LOCKS} must-keep players, set the bench rotation threshold, and
-              take the exact optimizer command from here.
+              Lock up to {MAX_LOCKS} must-keep players, exclude up to {MAX_EXCLUSIONS} players
+              you do not want, and set the bench rotation threshold.
             </p>
             <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary transition-transform group-hover:translate-x-0.5">
               Start configuring <ArrowRight className="size-3" />
@@ -421,7 +590,7 @@ export function PlanBuilderPage() {
             </p>
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
               {managerTouched && managerValid
-                ? `Manager #${managerId.trim()} saved — the importer will read this team first once it ships.`
+                ? `Manager #${managerId.trim()} saved for the future importer. It is not used in this GW1 solve.`
                 : "Your id is remembered on this device; nothing is sent anywhere (this dashboard is static)."}
             </p>
           </div>
@@ -442,8 +611,11 @@ export function PlanBuilderPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => setStep(2)}>
-              Continue without import <ArrowRight className="size-4" />
+              Continue to player rules <ArrowRight className="size-4" />
             </Button>
+            <span className="text-[10px] text-muted-foreground">
+              Builds a fresh squad now; your saved manager id is not applied.
+            </span>
             <Button variant="ghost" onClick={() => setStep(0)}>Back</Button>
           </div>
         </section>
@@ -451,21 +623,56 @@ export function PlanBuilderPage() {
 
       {step === 2 && totals && (
         <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
-          <section aria-label="Lock picker" className="rounded-lg border bg-muted/40 p-3">
+          <section aria-label="Player rules picker" className="rounded-lg border bg-muted/40 p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                Lock picker — pick up to {MAX_LOCKS} must-keep players
+                Player picker — the same search and filters apply to both rules
               </p>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={locks.length ? "default" : "outline"}
-                  className={cn("tabular-nums", locks.length === MAX_LOCKS && "bg-amber-500")}
+              <div className="flex flex-wrap items-center gap-2">
+                <ToggleGroup
+                  type="single"
+                  value={selectionMode}
+                  onValueChange={(value) => value && setSelectionMode(value as SelectionMode)}
+                  variant="outline"
+                  size="sm"
+                  aria-label="Player rule"
                 >
-                  <Lock className="size-3" /> {locks.length}/{MAX_LOCKS}
+                  <ToggleGroupItem value="lock">
+                    <Lock className="size-3" /> Lock
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="exclude">
+                    <Ban className="size-3" /> Exclude
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border-emerald-400 bg-emerald-50 tabular-nums text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+                    locks.length === MAX_LOCKS && "bg-emerald-100 dark:bg-emerald-900",
+                  )}
+                >
+                  <Lock className="size-3" /> Locked {locks.length}/{MAX_LOCKS}
                 </Badge>
-                {locks.length > 0 && (
-                  <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setLocks([])}>
-                    Clear all
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border-red-400 bg-red-50 tabular-nums text-red-700 dark:bg-red-950/40 dark:text-red-300",
+                    excludes.length === MAX_EXCLUSIONS && "bg-red-100 dark:bg-red-900",
+                  )}
+                >
+                  <Ban className="size-3" /> Excluded {excludes.length}/{MAX_EXCLUSIONS}
+                </Badge>
+                {(locks.length > 0 || excludes.length > 0) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px]"
+                    onClick={() => {
+                      setLocks([]);
+                      setExcludes([]);
+                    }}
+                  >
+                    Clear selections
                   </Button>
                 )}
               </div>
@@ -479,7 +686,7 @@ export function PlanBuilderPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
               <span className="text-xs text-muted-foreground">
-                top {candidates.length} by GW xP
+                top {candidates.length} by forecast-horizon xP
               </span>
             </div>
             <div className="mb-2 rounded-md border bg-background/60 px-2 py-1.5">
@@ -488,27 +695,40 @@ export function PlanBuilderPage() {
             <ul className="grid gap-1.5 md:grid-cols-1 lg:grid-cols-2">
               {candidates.map(({ player, xp }) => {
                 const locked = locks.some((p) => p.code === player.code);
-                const blocked = guard(player);
+                const excluded = excludes.some((p) => p.code === player.code);
+                const blocked = selectionGuard(player);
+                const selected = selectionMode === "lock" ? locked : excluded;
                 return (
                   <li key={player.code}>
                     <button
                       type="button"
-                      onClick={() => toggleLock(player)}
-                      disabled={!!blocked && !locked}
-                      aria-pressed={locked}
+                      onClick={() => toggleSelection(player)}
+                      disabled={!!blocked && !selected}
+                      aria-pressed={selected}
                       className={cn(
                         "flex w-full items-center gap-2 rounded-lg border bg-card px-2 py-1.5 text-left text-xs transition-all",
                         locked
-                          ? "border-amber-400/80 bg-amber-50 ring-1 ring-amber-400/60 dark:bg-amber-950/40"
-                          : "hover:-translate-y-px hover:border-primary/40 hover:shadow-sm",
-                        blocked && !locked && "cursor-not-allowed opacity-50 hover:translate-y-0 hover:border-border hover:shadow-none",
+                          ? "border-emerald-400/80 bg-emerald-50 ring-1 ring-emerald-400/60 dark:bg-emerald-950/40"
+                          : excluded
+                            ? "border-red-400/80 bg-red-50 ring-1 ring-red-400/60 dark:bg-red-950/40"
+                            : "hover:-translate-y-px hover:border-primary/40 hover:shadow-sm",
+                        blocked &&
+                          !selected &&
+                          "cursor-not-allowed opacity-50 hover:translate-y-0 hover:border-border hover:shadow-none",
                       )}
                     >
                       <PlayerPhoto code={player.code} name={player.web_name} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">
                           {player.web_name}
-                          {locked && <Badge className="ml-1 px-1 text-[9px]">locked</Badge>}
+                          {locked && (
+                            <Badge className="ml-1 bg-emerald-600 px-1 text-[9px]">locked</Badge>
+                          )}
+                          {excluded && (
+                            <Badge variant="destructive" className="ml-1 px-1 text-[9px]">
+                              excluded
+                            </Badge>
+                          )}
                         </span>
                         <span className="flex items-center gap-1 text-muted-foreground">
                           <TeamBadge teamCode={player.team_code} shortName={player.team_short_name} />
@@ -519,10 +739,12 @@ export function PlanBuilderPage() {
                       </span>
                       <span className="text-right">
                         <span className="block tabular-nums font-medium">{xp.toFixed(1)}</span>
-                        <span className="block text-[9px] text-muted-foreground">GW xP</span>
+                        <span className="block text-[9px] text-muted-foreground">horizon xP</span>
                       </span>
                       {locked ? (
-                        <Lock className="size-3.5 shrink-0 text-amber-500" />
+                        <Lock className="size-3.5 shrink-0 text-emerald-600" />
+                      ) : excluded ? (
+                        <Ban className="size-3.5 shrink-0 text-red-600" />
                       ) : blocked ? (
                         <span className="text-[9px] text-muted-foreground">{blocked}</span>
                       ) : null}
@@ -540,6 +762,12 @@ export function PlanBuilderPage() {
                 Locks:{" "}
                 <span className="font-medium tabular-nums">
                   {locks.length ? `${locks.length} of ${MAX_LOCKS}` : "none — the optimizer picks all 15"}
+                </span>
+              </p>
+              <p className="mt-1 text-sm">
+                Exclusions:{" "}
+                <span className="font-medium tabular-nums">
+                  {excludes.length ? excludes.length + " of " + MAX_EXCLUSIONS : "none"}
                 </span>
               </p>
               <div className="mt-3 flex items-center gap-2 text-sm">
@@ -588,7 +816,7 @@ export function PlanBuilderPage() {
                     <span className="inline-block size-2 rounded-full bg-primary" />
                     locked {price(totals.lockedCost)}
                     <span className="inline-block size-2 rounded-full bg-primary/35" />
-                    cheapest fill {price(totals.completion)}
+                    cheapest position fill {price(totals.completion)}
                   </span>
                   <span className="tabular-nums">budget {price(budget)}</span>
                 </div>
@@ -602,14 +830,19 @@ export function PlanBuilderPage() {
                         : "text-muted-foreground",
                   )}
                 >
-                  {totals.leftover < 0
+                  {!totals.completionPossible
+                    ? "not enough non-excluded players to complete every position"
+                    : totals.leftover < 0
                     ? `over budget by ${price(-totals.leftover)} — unlock a player`
                     : `headroom ${price(totals.leftover)}${totals.lockedCost / budget > 0.9 ? " (warning: >90% committed)" : ""}`}
                 </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={() => setStep(3)} disabled={totals.leftover < 0}>
+              <Button
+                onClick={() => setStep(3)}
+                disabled={totals.leftover < 0 || !totals.completionPossible}
+              >
                 Next: Review & run <ArrowRight className="size-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={resetRules}>
@@ -637,16 +870,16 @@ export function PlanBuilderPage() {
                 {locks.map((p) => (
                   <li
                     key={p.code}
-                    className="flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-amber-50 py-0.5 pl-1 pr-1.5 text-xs dark:border-amber-700 dark:bg-amber-950/40"
+                    className="flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 py-0.5 pl-1 pr-1.5 text-xs dark:border-emerald-700 dark:bg-emerald-950/40"
                   >
                     <PlayerPhoto code={p.code} name={p.web_name} size="sm" />
                     <span className="font-medium">{p.web_name}</span>
                     <span className="text-muted-foreground">{price(p.now_cost)}</span>
                     <button
                       type="button"
-                      aria-label={`Remove ${p.web_name}`}
+                      aria-label={`Unlock ${p.web_name}`}
                       onClick={() => setLocks((current) => current.filter((x) => x.code !== p.code))}
-                      className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-amber-100 hover:text-foreground dark:hover:bg-amber-900/60"
+                      className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-emerald-100 hover:text-foreground dark:hover:bg-emerald-900/60"
                     >
                       ×
                     </button>
@@ -656,6 +889,32 @@ export function PlanBuilderPage() {
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">No locks — the optimizer picks all 15.</p>
             )}
+            {excludes.length ? (
+              <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Excluded players">
+                {excludes.map((p) => (
+                  <li
+                    key={p.code}
+                    className="flex items-center gap-1.5 rounded-full border border-red-300/70 bg-red-50 py-0.5 pl-1 pr-1.5 text-xs dark:border-red-700 dark:bg-red-950/40"
+                  >
+                    <PlayerPhoto code={p.code} name={p.web_name} size="sm" />
+                    <span className="font-medium">{p.web_name}</span>
+                    <span className="text-muted-foreground">{price(p.now_cost)}</span>
+                    <button
+                      type="button"
+                      aria-label={`Remove exclusion ${p.web_name}`}
+                      onClick={() =>
+                        setExcludes((current) => current.filter((x) => x.code !== p.code))
+                      }
+                      className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-red-100 hover:text-foreground dark:hover:bg-red-900/60"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">No excluded players.</p>
+            )}
             <div
               className={cn(
                 "mt-3 text-sm tabular-nums",
@@ -664,7 +923,7 @@ export function PlanBuilderPage() {
             >
               {totals.leftover < 0
                 ? `over budget by ${price(-totals.leftover)} — go back and unlock a player`
-                : `headroom ${price(totals.leftover)} after the cheapest legal completion`}
+                : `headroom ${price(totals.leftover)} after the cheapest position fill`}
             </div>
             <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
               Frozen prices at the deadline; availability is a reported overlay for the next
@@ -691,13 +950,60 @@ export function PlanBuilderPage() {
             </div>
             <p className="mt-2 text-sm leading-relaxed">
               Runs the <span className="font-medium">real optimizer</span> on this machine with
-              your locks and threshold, then republishes the read models — about a minute or two.
-              Your squad appears on the Next GW page, selected automatically.
+              your locks, exclusions, and threshold, then republishes the read models — about a
+              minute or two. Your exact squad remains here; it never replaces the platform
+              suggestion.
             </p>
+            <div className="mt-3 rounded-lg border bg-muted/30 p-2.5">
+              <label htmlFor="plan-server-token" className="text-xs font-medium">
+                Plan server token{" "}
+                <span className="font-normal text-muted-foreground">(LAN only)</span>
+              </label>
+              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                Leave blank on this computer. A phone or other LAN device must use the
+                per-launch token printed by the plan server.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Input
+                  id="plan-server-token"
+                  type="password"
+                  autoComplete="off"
+                  className="h-8 min-w-48 flex-1 font-mono text-xs"
+                  placeholder="per-launch token"
+                  value={serverToken}
+                  onChange={(event) => setServerToken(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const remembered = rememberPlanServerToken(serverToken);
+                    setTokenStorageWarning(
+                      remembered
+                        ? null
+                        : "Token storage is unavailable; this tab will keep using the entered token.",
+                    );
+                    checkSolver();
+                  }}
+                >
+                  Use token &amp; re-check
+                </Button>
+              </div>
+              {tokenStorageWarning && (
+                <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">
+                  {tokenStorageWarning}
+                </p>
+              )}
+            </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button
                 onClick={solveNow}
-                disabled={solver.status !== "online" || totals.leftover < 0}
+                disabled={
+                  solver.status !== "online" ||
+                  totals.leftover < 0 ||
+                  !totals.completionPossible
+                }
               >
                 <Sparkles className="size-4" />
                 {solver.status === "solving" ? "Solving…" : "Solve now with my rules"}
@@ -710,7 +1016,7 @@ export function PlanBuilderPage() {
             </div>
             {solver.status === "solving" && (
               <p role="status" className="mt-2 text-xs tabular-nums text-muted-foreground">
-                {solver.stage ?? "starting…"} — the page reloads into Next GW when it finishes.
+                {solver.stage ?? "starting…"} — this page reloads with your exact plan when done.
               </p>
             )}
             {solver.status === "offline" && (
@@ -753,24 +1059,165 @@ export function PlanBuilderPage() {
             </pre>
             <p className="px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
               The solver lives in Python, so the browser cannot compute anything — this page
-              only writes your rules down. The command runs from the repository root against
-              the dev-latest default artifact (dashboard/README.md regenerates it; use the
-              runbook pack path on deadline day). After it runs, re-publish the read models
-              passing <span className="font-mono">--optimizer-plan plan_my_rules.json</span>{" "}
-              and reload: your squad appears on the Next GW page. Until then that page shows
-              these rules as <span className="font-medium">not yet applied</span>.
+              only writes your rules down. This command uses the unique output{" "}
+              <span className="font-mono">{manualOutputPath}</span>, so it cannot overwrite
+              another custom scenario. After it finishes, re-publish the read models with that
+              exact file as <span className="font-mono">--optimizer-plan</span>. The platform
+              Next GW page intentionally remains unchanged.
             </p>
+            <div
+              className="mx-3 mb-3 rounded-lg border bg-muted/30 p-3"
+              aria-label="Open manually published plan"
+            >
+              <label htmlFor="manual-run-id" className="text-xs font-medium">
+                Published optimizer run id
+              </label>
+              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                Copy <span className="font-mono">optimizer_run_id</span> from the generated plan
+                after publishing. Opening it records only that exact id; a missing or non-custom
+                run fails visibly and never falls back to a platform squad.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Input
+                  id="manual-run-id"
+                  aria-label="Published optimizer run id"
+                  className="h-8 min-w-56 flex-1 font-mono text-xs"
+                  placeholder="paste optimizer_run_id"
+                  value={manualRunId}
+                  onChange={(event) => setManualRunId(event.target.value)}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!manualRunId.trim()}
+                  onClick={() => openExactPublishedRun(manualRunId)}
+                >
+                  Open exact custom plan
+                </Button>
+              </div>
+            </div>
             <div className="flex items-center gap-2 px-3 pb-3">
               <Button size="sm" variant="outline" onClick={() => setStep(2)}>
                 Back to rules
               </Button>
               <Button size="sm" asChild>
                 <a href="#next-gw">
-                  Done — view Next GW <ArrowRight className="size-3.5" />
+                  View platform suggestion <ArrowRight className="size-3.5" />
                 </a>
               </Button>
             </div>
           </div>
+        </section>
+      )}
+
+      {step === 4 && (
+        <section className="space-y-4" aria-label="Your plan result">
+          {!resultPlan ? (
+            <div className="mx-auto max-w-2xl rounded-xl border border-red-300 bg-red-50 p-5 dark:border-red-800 dark:bg-red-950/30">
+              <h2 className="font-semibold">Your solved plan is not in the published read model</h2>
+              <p role="alert" className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Expected optimizer run{" "}
+                <span className="font-mono text-foreground">{resultPlanId ?? "unknown"}</span>.
+                Plan Builder will not silently show the platform squad or a different custom run.
+                Re-publish that exact artifact, then reload.
+              </p>
+              {storageWarning && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  {storageWarning}
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button onClick={reloadPublishedReadModels}>Reload read models</Button>
+                <Button variant="outline" onClick={() => setStep(2)}>
+                  Edit rules
+                </Button>
+                <Button variant="ghost" asChild>
+                  <a href="#next-gw">View platform suggestion</a>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    Your plan — GW{resultPlan.gw_from}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Your rule-specific scenario. It is deliberately separate from the formal
+                    platform suggestion.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5 text-xs">
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  >
+                    <Lock className="size-3" /> {resultPlan.policy.locked_codes.length} locked
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="border-red-400 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                  >
+                    <Ban className="size-3" /> {resultPlan.policy.excluded_codes.length} excluded
+                  </Badge>
+                  <Badge variant="outline">
+                    bench floor{" "}
+                    {Math.round(resultPlan.policy.min_bench_appearance * 100)}%
+                  </Badge>
+                </div>
+              </div>
+              {storageWarning && (
+                <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                  {storageWarning}
+                </p>
+              )}
+
+              {(resultPlan.policy.locked_codes.length > 0 ||
+                resultPlan.policy.excluded_codes.length > 0) && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {resultPlan.policy.locked_codes.map((code) => (
+                    <span
+                      key={"lock-" + code}
+                      className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                    >
+                      locked ·{" "}
+                      {state.players.find((player) => player.code === code)?.web_name ?? code}
+                    </span>
+                  ))}
+                  {resultPlan.policy.excluded_codes.map((code) => (
+                    <span
+                      key={"exclude-" + code}
+                      className="rounded-full border border-red-300 bg-red-50 px-2 py-1 text-red-800 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200"
+                    >
+                      excluded ·{" "}
+                      {state.players.find((player) => player.code === code)?.web_name ?? code}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <XiBlock week={resultPlan.weeks[0]} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <BenchBlock week={resultPlan.weeks[0]} />
+                <TransferPath weeks={resultPlan.weeks} />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  optimizer run {resultPlan.optimizer_run_id.slice(0, 12)}… · development-only ·
+                  frozen deadline prices
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setStep(2)}>
+                    Edit and solve again
+                  </Button>
+                  <Button asChild>
+                    <a href="#next-gw">View platform suggestion</a>
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </section>
       )}
     </div>

@@ -1,5 +1,5 @@
 ﻿{
-  "json_schema_version": 2,
+  "json_schema_version": 3,
   "latest_run": {
     "run_id": "86a072ade6dd4d56",
     "as_of": "2026-08-21T17:30:00+00:00",
@@ -46,12 +46,16 @@
       "optimizer_run_id": "opt-default",
       "decision_sha256": "dec-default-0000",
       "forecast_run_id": "run-a",
+      "plan_kind": "platform_default",
+      "display_label": "Platform default — v3 goals / coupled assists",
       "component_modes": {"attacking_mode": "v3", "assists_mode": "coupled", "appearance_mode": "seasonal", "share_signal_kind": "expected_goals"}
     },
     {
       "optimizer_run_id": "opt-diagnostic",
       "decision_sha256": "dec-diag-1111",
       "forecast_run_id": "run-b",
+      "plan_kind": "platform_diagnostic",
+      "display_label": "Diagnostic sensitivity — v1 goals / v1 assists",
       "component_modes": {"attacking_mode": "v1", "assists_mode": "v1", "appearance_mode": "seasonal", "share_signal_kind": "expected_goals"}
     }
   ],

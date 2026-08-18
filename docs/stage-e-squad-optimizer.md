@@ -108,10 +108,24 @@ threshold. The value is provenance: recorded in the artifact's `search_policy`, 
 limit) pins a player into the squad: the ILP forces him in and the transfer planner never
 ships him out, so the optimizer assigns every remaining quota around the owner's must-keep
 players. Locks compose with the bench gate rather than overriding it -- a locked player who
-cannot clear `min_bench_appearance` must START every planned gameweek, and a locked set that
-makes no legal squad possible (position quotas, club cap, budget) fails closed naming the
-locks. Locked codes are provenance: recorded in `search_policy.locked_codes`, bound into the
-`run_id`, and listed by name in the decision's assumptions.
+cannot clear `min_bench_appearance` is exempt because the explicit must-keep instruction outranks
+the rotation heuristic. A locked set that makes no legal squad possible (position quotas, club
+cap, budget) fails closed naming the locks. Locked codes are provenance: recorded in
+`search_policy.locked_codes`, bound into the `run_id`, and listed by name in the decision's
+assumptions.
+
+### Excluded players (`--exclude CODE`, at most fifteen)
+
+`--exclude CODE` is repeatable and uses stable player `code`. An excluded player is removed from
+the initial ILP population and the bounded transfer candidate pool, so he cannot appear in the
+initial squad or enter in any later gameweek. A player cannot be both locked and excluded;
+unknown or unpriced codes, overlaps, and more than fifteen exclusions fail closed. Exclusions are
+recorded in `search_policy.excluded_codes`, enter the `run_id` only when non-empty (preserving old
+v1 artifact identities), and are listed by name in the assumptions. Interactive runs also record
+`search_policy.plan_origin=user_custom`; current platform jobs record `platform` explicitly.
+Artifacts written before origin provenance was introduced read it as legacy `null`, preserving
+their original run IDs. The dashboard then infers a constrained legacy plan as user-custom and
+normalises the emitted read-model policy; the durable artifact itself is never rewritten.
 
 ### Manager free-transfer state
 

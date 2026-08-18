@@ -159,8 +159,10 @@ class SolverIdentity(_Frozen):
 class SearchPolicy(_Frozen):
     """The complete bounded-search policy that shaped the transfer plan.
 
-    Every field is behaviour-defining and enters the ``run_id``. The constraint bounds and the
-    transfer-state parameters come from the squad-rules file; ``risk_lambda`` and
+    Every field is behaviour-defining. The original fields enter the ``run_id``; additive
+    exclusions enter when non-empty, and only the non-default user-custom origin enters, so
+    schema-v1 identities written before those fields existed remain stable. The constraint bounds
+    and transfer-state parameters come from the squad-rules file; ``risk_lambda`` and
     ``min_bench_appearance`` come from the CLI; ``search_method`` and ``optimality_scope``
     are the planner's own declared scope of exactness.
     """
@@ -176,6 +178,11 @@ class SearchPolicy(_Frozen):
     risk_lambda: float = Field(ge=0.0, allow_inf_nan=False)
     min_bench_appearance: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
     locked_codes: tuple[int, ...] = ()
+    excluded_codes: tuple[int, ...] = ()
+    # None exists only for schema-v1 artifacts written before origin provenance was added.
+    # Every current producer passes an explicit value; retaining None on read lets downstream
+    # compatibility logic distinguish a constrained legacy user plan from a platform plan.
+    plan_origin: Literal["platform", "user_custom"] | None = None
     search_method: str
     optimality_scope: str
 
@@ -186,8 +193,17 @@ class SearchPolicy(_Frozen):
             raise ValueError("locked_codes must be distinct")
         return tuple(sorted(value))
 
+    @field_validator("excluded_codes")
+    @classmethod
+    def _distinct_exclusions(cls, value: tuple[int, ...]) -> tuple[int, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("excluded_codes must be distinct")
+        return tuple(sorted(value))
+
     @model_validator(mode="after")
     def _descriptions_present(self) -> Self:
+        if set(self.locked_codes).intersection(self.excluded_codes):
+            raise ValueError("players cannot be both locked and excluded")
         if not self.search_method.strip() or not self.optimality_scope.strip():
             raise ValueError("search_method and optimality_scope are required")
         return self
@@ -463,6 +479,10 @@ class OptimizerPlanArtifact(_Frozen):
             rules=self.rules,
             context="initial squad",
         )
+        if not set(self.search_policy.locked_codes).issubset(previous):
+            raise ValueError("initial squad omits a locked player")
+        if set(self.search_policy.excluded_codes).intersection(previous):
+            raise ValueError("initial squad contains an excluded player")
         expected_gws = tuple(
             range(self.provenance.forecast.gw_from, self.provenance.forecast.gw_to + 1)
         )
@@ -484,6 +504,10 @@ class OptimizerPlanArtifact(_Frozen):
             outgoing = _check_refs(
                 week.transfers_out, previous, context=f"GW{week.gw} transfers out"
             )
+            if not set(self.search_policy.locked_codes).issubset(current):
+                raise ValueError(f"GW{week.gw} squad omits a locked player")
+            if set(self.search_policy.excluded_codes).intersection(current):
+                raise ValueError(f"GW{week.gw} squad contains an excluded player")
             if any(code in previous for code in incoming):
                 raise ValueError(f"GW{week.gw} transfers in an existing squad member")
             if any(code not in previous for code in outgoing):
@@ -598,6 +622,11 @@ def derive_optimizer_run_id(
         "solver_seed": solver.seed,
         "solver_status": solver.status,
     }
+    # Preserve legacy run ids: new policy fields enter identity only when non-default.
+    if search_policy.excluded_codes:
+        identity["excluded_codes"] = list(search_policy.excluded_codes)
+    if search_policy.plan_origin == "user_custom":
+        identity["plan_origin"] = search_policy.plan_origin
     blob = json.dumps(identity, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 

@@ -51,7 +51,9 @@ DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
 # v2: the manifest gains the summary, next-gameweek, forecast-vs-actual and
 # optimizer-audit read models alongside v1's fixture-matrix and players files; the v1
 # record shapes are unchanged.
-DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 2
+# v3: optimizer plans carry an explicit platform/default/diagnostic/user classification,
+# a display label, and the compact owner policy needed by the plan-builder result view.
+DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 3
 FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
 SUMMARY_SCHEMA: Final[str] = "fpl.dashboard-summary"
@@ -577,6 +579,7 @@ def _player_identity_maps(
 
 def _build_next_gw(
     plans_frame: pl.DataFrame,
+    dim_optimizer_run: pl.DataFrame,
     runs: pl.DataFrame,
     player_gameweek: pl.DataFrame,
     player_season: pl.DataFrame,
@@ -594,6 +597,7 @@ def _build_next_gw(
         return {"plans": ()}
 
     modes = _component_modes(runs)
+    plan_metadata = _optimizer_plan_metadata(dim_optimizer_run, runs)
     horizon = {row["run_id"]: row for row in _horizon_projection(runs).iter_rows(named=True)}
     names, _ = _player_identity_maps(player_season)
     by_code, by_id = _short_name_maps(team_season)
@@ -650,6 +654,12 @@ def _build_next_gw(
             raise DashboardJsonError(
                 f"optimizer run {optimizer_run_id} references forecast run absent from "
                 "dim_forecast_run"
+            )
+        metadata = plan_metadata.get(optimizer_run_id)
+        if metadata is None:
+            raise DashboardJsonError(
+                f"optimizer run {optimizer_run_id} is absent from dim_optimizer_run; "
+                "cannot classify a plan without its search policy"
             )
         seasons = sub.get_column("season").unique().to_list()
         if seasons != [run["run_season"]]:
@@ -761,6 +771,9 @@ def _build_next_gw(
                 "gw_from": run["gw_from"],
                 "gw_to": run["gw_to"],
                 "component_modes": modes.get(forecast_run_id),
+                "plan_kind": metadata["plan_kind"],
+                "display_label": metadata["display_label"],
+                "policy": metadata["compact_policy"],
                 "weeks": weeks,
                 "player_xp": player_xp,
                 "squad_context": {
@@ -806,6 +819,7 @@ def _build_summary(
     player_season: pl.DataFrame,
     team_season: pl.DataFrame,
     plans_frame: pl.DataFrame,
+    dim_optimizer_run: pl.DataFrame,
     ease_version: str | None,
 ) -> dict[str, Any]:
     """summary.json: the landing snapshot -- latest run, roster coverage, headline EV and
@@ -907,13 +921,22 @@ def _build_summary(
     optimizer_plans = []
     if plans_frame.height:
         plan_modes = _component_modes(runs)
+        plan_metadata = _optimizer_plan_metadata(dim_optimizer_run, runs)
         seen: dict[str, dict[str, Any]] = {}
         for row in plans_frame.iter_rows(named=True):
+            metadata = plan_metadata.get(row["optimizer_run_id"])
+            if metadata is None:
+                raise DashboardJsonError(
+                    f"optimizer run {row['optimizer_run_id']} is absent from "
+                    "dim_optimizer_run; cannot classify a plan without its search policy"
+                )
             seen[row["optimizer_run_id"]] = {
                 "optimizer_run_id": row["optimizer_run_id"],
                 "decision_sha256": row["decision_sha256"],
                 "forecast_run_id": row["forecast_run_id"],
                 "component_modes": plan_modes.get(row["forecast_run_id"]),
+                "plan_kind": metadata["plan_kind"],
+                "display_label": metadata["display_label"],
             }
         optimizer_plans = [seen[key] for key in sorted(seen)]
 
@@ -1132,18 +1155,107 @@ def _parse_json_column(raw: object, subject: str) -> Any:
         raise DashboardJsonError(f"{subject} is not JSON: {exc}") from exc
 
 
+def _policy_codes(policy: Mapping[str, Any], key: str, subject: str) -> list[int]:
+    raw = policy.get(key, [])
+    if not isinstance(raw, list) or any(
+        isinstance(code, bool) or not isinstance(code, int) for code in raw
+    ):
+        raise DashboardJsonError(f"{subject} {key} must be a JSON array of player codes")
+    if len(set(raw)) != len(raw):
+        raise DashboardJsonError(f"{subject} {key} must contain distinct player codes")
+    return sorted(raw)
+
+
+def _architecture_label(modes: Mapping[str, Any]) -> str:
+    attacking = modes.get("attacking_mode")
+    assists = modes.get("assists_mode")
+    return f"{attacking} goals / {assists} assists"
+
+
+def _optimizer_plan_metadata(
+    dim_optimizer_run: pl.DataFrame, runs: pl.DataFrame
+) -> dict[str, dict[str, Any]]:
+    """Classify optimizer decisions from explicit provenance, never row/hash ordering."""
+    if dim_optimizer_run.height == 0:
+        return {}
+    modes = _component_modes(runs)
+    metadata: dict[str, dict[str, Any]] = {}
+    for row in dim_optimizer_run.sort("optimizer_run_id").iter_rows(named=True):
+        optimizer_run_id = row["optimizer_run_id"]
+        if optimizer_run_id in metadata:
+            raise DashboardJsonError(f"duplicate dim_optimizer_run row {optimizer_run_id}")
+        run_modes = modes.get(row["forecast_run_id"])
+        if run_modes is None:
+            raise DashboardJsonError(
+                f"optimizer run {optimizer_run_id} references forecast run absent from "
+                "dim_forecast_run"
+            )
+        subject = f"optimizer run {optimizer_run_id} policy"
+        policy = _parse_json_column(row["search_policy"], subject)
+        if not isinstance(policy, dict):
+            raise DashboardJsonError(f"{subject} is not an object")
+        locked_codes = _policy_codes(policy, "locked_codes", subject)
+        excluded_codes = _policy_codes(policy, "excluded_codes", subject)
+        threshold = policy.get("min_bench_appearance", 0.0)
+        if (
+            isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+            or not 0.0 <= float(threshold) <= 1.0
+        ):
+            raise DashboardJsonError(f"{subject} min_bench_appearance must be within [0, 1]")
+        explicit_origin = policy.get("plan_origin")
+        origin = explicit_origin
+        if origin is None:
+            origin = (
+                "user_custom"
+                if locked_codes or excluded_codes or float(threshold) > 0.0
+                else "platform"
+            )
+        if origin not in {"platform", "user_custom"}:
+            raise DashboardJsonError(
+                f"{subject} plan_origin must be platform or user_custom, found {origin!r}"
+            )
+        is_default = (
+            run_modes.get("attacking_mode") == "v3" and run_modes.get("assists_mode") == "coupled"
+        )
+        if origin == "user_custom":
+            plan_kind = "user_custom"
+            label_prefix = "Your plan"
+        elif is_default:
+            plan_kind = "platform_default"
+            label_prefix = "Platform default"
+        else:
+            plan_kind = "platform_diagnostic"
+            label_prefix = "Diagnostic sensitivity"
+        normalized_policy = dict(policy)
+        normalized_policy["plan_origin"] = origin
+        metadata[optimizer_run_id] = {
+            "plan_kind": plan_kind,
+            "display_label": f"{label_prefix} \u2014 {_architecture_label(run_modes)}",
+            "compact_policy": {
+                "locked_codes": locked_codes,
+                "excluded_codes": excluded_codes,
+                "min_bench_appearance": float(threshold),
+            },
+            "search_policy": normalized_policy,
+        }
+    return metadata
+
+
 def _build_optimizer_audit(dim_optimizer_run: pl.DataFrame, runs: pl.DataFrame) -> dict[str, Any]:
     """optimizer_audit.json: the full provenance behind each optimizer decision -- solver
     identity and status, Git heads, squad-rule snapshot (the constraints), bounded-search
     policy, and explicit assumptions.  The squad and transfer path themselves are NOT
     duplicated here: next_gw.json already carries them, and the audit page reads both."""
     modes = _component_modes(runs) if dim_optimizer_run.height else {}
+    plan_metadata = _optimizer_plan_metadata(dim_optimizer_run, runs)
     if dim_optimizer_run.height == 0:
         return {"plans": []}
     plans: list[dict[str, Any]] = []
     for row in dim_optimizer_run.sort("optimizer_run_id").iter_rows(named=True):
         optimizer_run_id = row["optimizer_run_id"]
         subject = f"optimizer run {optimizer_run_id}"
+        metadata = plan_metadata[optimizer_run_id]
         if row["forecast_run_id"] not in modes:
             raise DashboardJsonError(
                 f"{subject} references forecast run absent from dim_forecast_run"
@@ -1154,6 +1266,8 @@ def _build_optimizer_audit(dim_optimizer_run: pl.DataFrame, runs: pl.DataFrame) 
                 "decision_sha256": row["decision_sha256"],
                 "forecast_run_id": row["forecast_run_id"],
                 "component_modes": modes[row["forecast_run_id"]],
+                "plan_kind": metadata["plan_kind"],
+                "display_label": metadata["display_label"],
                 "as_of": _iso_or_none(row["as_of"]),
                 "season": row["season"],
                 "gw_from": row["gw_from"],
@@ -1176,7 +1290,7 @@ def _build_optimizer_audit(dim_optimizer_run: pl.DataFrame, runs: pl.DataFrame) 
                     "seed": row["solver_seed"],
                     "status": row["solver_status"],
                 },
-                "search_policy": _parse_json_column(row["search_policy"], f"{subject} policy"),
+                "search_policy": metadata["search_policy"],
                 "rules_snapshot": _parse_json_column(row["rules_snapshot"], f"{subject} rules"),
                 "assumptions": _parse_json_column(row["assumptions"], f"{subject} assumptions"),
                 "status": row["status"],
@@ -1233,6 +1347,7 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
     )
     next_gw = _build_next_gw(
         frames["fact_optimizer_plan"],
+        frames["dim_optimizer_run"],
         frames["dim_forecast_run"],
         frames["fact_forecast_player_gameweek"],
         frames["dim_player_season"],
@@ -1246,6 +1361,7 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_player_season"],
         frames["dim_team_season"],
         frames["fact_optimizer_plan"],
+        frames["dim_optimizer_run"],
         ease_version,
     )
     forecast_vs_actual = _build_forecast_vs_actual(

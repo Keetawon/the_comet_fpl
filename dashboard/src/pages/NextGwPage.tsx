@@ -1,16 +1,15 @@
-// Next GW suggestion: the development-only optimizer plan for the next gameweek -- XI by
+// Next GW suggestion: the platform's development-only optimizer plans for the next gameweek -- XI by
 // position with captain/vice, ordered bench, and the SAME player pivot table as the
 // Players page (form stats, filters, per-GW fixture chips as the last columns) restricted
 // to the squad by default, switchable to the whole roster to compare candidates against
 // the selected 15. Plan EV columns sit before the fixture columns. With two
-// architectures present it shows the default-vs-diagnostic diff as set overlaps and
+// platform architectures present it shows the default-vs-diagnostic diff as set overlaps and
 // captain agreement ONLY -- cross-plan EV is never compared, because it measures the two
-// models' calibration against each other, not squad quality.
+// models' calibration against each other, not squad quality. User-constrained plans live
+// only in Plan Builder and can never hijack this page through hash ordering or localStorage.
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -37,10 +36,11 @@ import {
   diffPlans,
   horizonXp,
   isDefaultArchitecture,
-  planLabel,
+  planDisplayLabel,
+  platformComparisonPlans,
+  platformPlans,
 } from "@/lib/nextGw";
 import type { LegacyColumnDef } from "@tanstack/react-table/legacy";
-import { clearPlanRequest, readPlanRequest, type PlanRequest } from "@/lib/planRequest";
 
 type PageState =
   | { status: "loading" }
@@ -141,100 +141,26 @@ function BenchBlock({ week }: { week: PlanWeek }) {
   );
 }
 
-/** The wizard's rules travel here (localStorage) and are shown as PENDING: the plans on
- * this page are immutable recorded artifacts that predate those rules, and the browser
- * never re-solves. Dismissing only hides the panel; it does not delete anything. */
-function PendingRequestPanel({ request, onDismiss }: { request: PlanRequest; onDismiss: () => void }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="rounded-lg border border-amber-300/70 bg-amber-50/60 p-3 dark:border-amber-800 dark:bg-amber-950/30">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-sm font-medium">
-          <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
-          Your wizard rules — not yet applied
-        </p>
-        <div className="flex items-center gap-1">
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => {
-              void navigator.clipboard?.writeText(request.command).then(() => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1500);
-              });
-            }}
-          >
-            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-            {copied ? "Copied" : "Copy command"}
-          </Button>
-          <Button size="xs" variant="ghost" onClick={onDismiss}>
-            Dismiss
-          </Button>
-        </div>
-      </div>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        The plans below were recorded before these rules existed: none of your locks or your
-        threshold is in them, and nothing re-solved when you finished the wizard — the
-        optimizer runs in Python, never in this browser. Run the command, re-publish the read
-        models with the new plan (dashboard/README.md), reload, and your squad appears here.
-      </p>
-      {request.locks.length > 0 && (
-        <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Requested locks">
-          {request.locks.map((p) => (
-            <li
-              key={p.code}
-              className="rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-xs dark:border-amber-700 dark:bg-amber-950/40"
-            >
-              <span className="font-medium">{p.web_name}</span>{" "}
-              <span className="text-muted-foreground">{price(p.now_cost)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="mt-2 text-xs text-muted-foreground">
-        {request.locks.length
-          ? `${request.locks.length} lock${request.locks.length > 1 ? "s" : ""}`
-          : "no locks"}{" "}
-        · rotation threshold {request.thresholdLabel.toLowerCase()} · saved{" "}
-        {request.createdAt.replace("T", " ").slice(0, 16)}
-      </p>
-      <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-950 p-2 font-mono text-[10px] leading-relaxed text-zinc-100">
-        {request.command}
-      </pre>
-    </div>
-  );
-}
-
 export function NextGwPage() {
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [planId, setPlanId] = useState<string | null>(null);
   const [horizonWeeks, setHorizonWeeks] = useState<number>(1);
   const [squadOnly, setSquadOnly] = useState<"squad" | "all">("squad");
   const [playerFilters, setPlayerFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
-  const [pendingRequest, setPendingRequest] = useState<PlanRequest | null>(null);
-
-  useEffect(() => {
-    setPendingRequest(readPlanRequest());
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([loadNextGw(), loadPlayers(), loadFixtureMatrix()])
       .then(([nextGw, playersData, teamsData]) => {
         if (cancelled) return;
+        const officialPlans = platformPlans(nextGw.plans);
         setState({
           status: "ready",
-          plans: nextGw.plans,
+          plans: officialPlans,
           players: playersData.players,
           teams: teamsData.teams,
         });
-        setPlanId(defaultPlan(nextGw.plans)?.optimizer_run_id ?? null);
-        // After a wizard "Solve now" the fresh plan's id is stashed; preselect it if it is in
-        // this export (a later republish without it falls back to the default plan above).
-        const solved = window.localStorage.getItem("fpl-solved-plan");
-        if (solved && nextGw.plans.some((p) => p.optimizer_run_id === solved)) {
-          setPlanId(solved);
-        }
+        setPlanId(defaultPlan(officialPlans)?.optimizer_run_id ?? null);
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -255,10 +181,9 @@ export function NextGwPage() {
   );
 
   const diff = useMemo(() => {
-    if (state.status !== "ready" || state.plans.length < 2) return null;
-    const a = defaultPlan(state.plans);
-    const b = state.plans.find((p) => p !== a) ?? null;
-    return a && b ? diffPlans(a, b) : null;
+    if (state.status !== "ready") return null;
+    const pair = platformComparisonPlans(state.plans);
+    return pair ? diffPlans(pair.defaultPlan, pair.diagnosticPlan) : null;
   }, [state]);
 
   const runPlayers = useMemo(
@@ -348,8 +273,8 @@ export function NextGwPage() {
       <div className="p-6">
         <h1 className="mb-2 text-lg font-semibold">Next GW suggestion</h1>
         <p className="max-w-xl text-sm text-muted-foreground">
-          No optimizer plans in this export. Rebuild it passing the optimizer decision
-          artifacts via --optimizer-plan (see dashboard/README.md).
+          No platform optimizer plans are present in this export. User-specific scenarios stay
+          in Plan Builder and never substitute for the platform recommendation.
         </p>
       </div>
     );
@@ -438,17 +363,23 @@ export function NextGwPage() {
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">Next GW suggestion — GW{plan.gw_from}</h1>
+        <div>
+          <h1 className="text-lg font-semibold">Platform Next GW suggestion — GW{plan.gw_from}</h1>
+          <p className="text-xs text-muted-foreground">
+            Formal platform recommendation; your locks, exclusions, and thresholds live in Plan
+            Builder.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           {state.plans.length > 1 && (
             <Select value={plan.optimizer_run_id} onValueChange={setPlanId}>
-              <SelectTrigger size="sm" className="w-72" aria-label="Plan">
+              <SelectTrigger size="sm" className="w-80" aria-label="Platform model">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {state.plans.map((p) => (
                   <SelectItem key={p.optimizer_run_id} value={p.optimizer_run_id}>
-                    {planLabel(p.component_modes)}
+                    {planDisplayLabel(p)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -483,19 +414,9 @@ export function NextGwPage() {
         <span>hit GW{week.gw}: -{fmt(week.hit_points, 0)} pts</span>
         <span>
           architecture {isDefaultArchitecture(plan.component_modes) ? "default" : "diagnostic"} ·{" "}
-          {planLabel(plan.component_modes)}
+          {planDisplayLabel(plan)}
         </span>
       </div>
-
-      {pendingRequest && (
-        <PendingRequestPanel
-          request={pendingRequest}
-          onDismiss={() => {
-            clearPlanRequest();
-            setPendingRequest(null);
-          }}
-        />
-      )}
 
       <XiBlock week={week} />
 

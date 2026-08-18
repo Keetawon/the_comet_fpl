@@ -213,12 +213,18 @@ defect is fixed: the current squad is reserved in every successor set, so holdin
 transfer cannot be truncated away. The optimizer now has a versioned, immutable, fail-closed
 artifact contract that binds the complete decision to the forecast, rules, Git HEAD, search policy,
 and fully discovered solver identity; its reader independently revalidates squad, lineup, captain,
-bench, transfer, horizon, and aggregate legality. Two operational gaps remain:
+bench, transfer, horizon, and aggregate legality. Owner-specific runs support up to five locked
+players and fifteen excluded players end-to-end; exclusions are absent from the initial squad and
+every future transfer squad, and lock/exclusion overlap fails closed. Dashboard read-model schema
+version 3 explicitly separates formal platform default/diagnostic plans from user-custom plans, so
+hash ordering or browser-local state cannot replace the formal Next-GW recommendation. Two
+operational gaps remain:
 `chance_of_playing_next_round` is repeated across the whole horizon, and future transfers use the
 deadline's static prices with no price-change or selling-value model. The append-only prediction
 ledger is implemented in `src/fpl/storage/ledger.py` and records immutable player-gameweek forecast
-vintages from the JSONL artifact, with outcomes held separately. It still lacks player-fixture
-forecast distributions, the finalized-outcome ingestion job, and the BI read/export layer. See
+vintages from the JSONL artifact, with outcomes held separately. The versioned BI semantic export,
+static JSON publish boundary, and six-page decision dashboard are implemented; player-fixture
+forecast distributions and the finalized-outcome ingestion job remain open. See
 `docs/phase4-*`, `docs/prospective-points-artifact.md`, `docs/prediction-ledger.md`, and
 `docs/stage-e-squad-optimizer.md`.
 
@@ -860,9 +866,10 @@ research guardrails; they are not permission to displace the active delivery ord
    Diagnosing it is legitimate follow-up work; reinterpreting it as a promotion verdict is not.
    Prospective changes must stay point-in-time safe and must not silently re-run or re-judge any
    frozen historical evaluation.
-9. The append-only player-gameweek prediction ledger is implemented. Next extend its contract for
-   **player-fixture forecasts**, build finalized-outcome ingestion, and build the **BI semantic
-   export before dashboard UI**. Retain both player-fixture and player-gameweek predictions for
+9. The append-only player-gameweek prediction ledger, BI semantic export, static dashboard read
+   models, and six-page dashboard are implemented. Next extend the ledger contract for
+   **player-fixture forecasts** and build finalized-outcome ingestion. Retain both player-fixture
+   and player-gameweek predictions for
    every pre-deadline run, never overwrite a vintage, and join actual outcomes only after
    finalisation.
    The decision layer should support: upcoming 1/3/5-GW player EV and risk; fixture difficulty split

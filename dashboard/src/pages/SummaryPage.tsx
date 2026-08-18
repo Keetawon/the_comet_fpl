@@ -27,7 +27,11 @@ import type {
 import { availabilityLabel } from "@/lib/availability";
 import { chipBucket, chipMetric } from "@/lib/fixtureChips";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
-import { isDefaultArchitecture, planLabel } from "@/lib/nextGw";
+import {
+  planDisplayLabel,
+  platformPlans,
+  resolvedPlanKind,
+} from "@/lib/nextGw";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 
 type PageState =
@@ -63,6 +67,14 @@ function horizonXpSum(player: PlayerRecord, gwFrom: number, gwTo: number): numbe
     .map((f) => f.expected_points)
     .filter((v): v is number => v != null);
   return values.length ? values.reduce((a, b) => a + b, 0) : null;
+}
+
+function savedCustomPlanId(): string | null {
+  try {
+    return window.localStorage.getItem("fpl-solved-plan");
+  } catch {
+    return null;
+  }
 }
 
 function Card({
@@ -222,6 +234,11 @@ export function SummaryPage() {
 
   const { summary } = state;
   const first = view.players[0];
+  const officialPlans = platformPlans(state.plans);
+  const customPlans = state.plans.filter((plan) => resolvedPlanKind(plan) === "user_custom");
+  const savedCustomId = savedCustomPlanId();
+  const customPlan =
+    customPlans.find((plan) => plan.optimizer_run_id === savedCustomId) ?? customPlans[0] ?? null;
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -256,7 +273,7 @@ export function SummaryPage() {
           )}
         </Card>
 
-        {state.plans.map((plan) => {
+        {officialPlans.map((plan) => {
           const week = plan.weeks[0];
           const squadXp = week.players.reduce((a, p) => a + (p.expected_points ?? 0), 0);
           const totalHits = plan.weeks.reduce((a, w) => a + w.hit_points, 0);
@@ -267,7 +284,11 @@ export function SummaryPage() {
           return (
             <Card
               key={plan.optimizer_run_id}
-              title={`Optimizer squad — ${isDefaultArchitecture(plan.component_modes) ? "default" : "diagnostic"}`}
+              title={
+                resolvedPlanKind(plan) === "platform_default"
+                  ? "Platform recommendation — default"
+                  : "Platform diagnostic sensitivity"
+              }
             >
               <p className="text-sm">
                 <span className="text-2xl font-semibold tabular-nums">{fmt(squadXp)}</span>{" "}
@@ -287,13 +308,44 @@ export function SummaryPage() {
                 {bench.map((p) => p.web_name).join(", ")}
               </p>
               <p className="mt-1 text-[10px] text-muted-foreground">
-                {planLabel(plan.component_modes)} · development-only · see the Next GW page
+                {planDisplayLabel(plan)} · development-only · see the Next GW page
               </p>
             </Card>
           );
         })}
-        {!state.plans.length && (
-          <Card title="Optimizer squads">
+        {customPlan && (
+          <Card title="Your custom plan">
+            <p className="text-sm">
+              <span className="text-2xl font-semibold tabular-nums">
+                {fmt(
+                  customPlan.weeks[0].players.reduce(
+                    (total, player) => total + (player.expected_points ?? 0),
+                    0,
+                  ),
+                )}
+              </span>{" "}
+              <span className="text-xs text-muted-foreground">
+                GW{customPlan.weeks[0].gw} squad xP
+              </span>
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {customPlan.policy.locked_codes.length} locked ·{" "}
+              {customPlan.policy.excluded_codes.length} excluded · bench floor{" "}
+              {Math.round(customPlan.policy.min_bench_appearance * 100)}%
+            </p>
+            <p className="mt-2 text-xs">
+              This rule-specific scenario stays separate from the platform recommendation.
+            </p>
+            <a
+              className="mt-2 inline-block text-xs font-medium text-primary"
+              href={`#plan-builder?run=${encodeURIComponent(customPlan.optimizer_run_id)}`}
+            >
+              Open your plan in Plan Builder →
+            </a>
+          </Card>
+        )}
+        {!officialPlans.length && (
+          <Card title="Platform optimizer squads">
             <p className="text-xs text-muted-foreground">
               none in this export — rebuild it with --optimizer-plan inputs
             </p>

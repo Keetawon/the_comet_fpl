@@ -402,6 +402,20 @@ def test_locked_codes_must_be_selectable_players() -> None:
         optimize_initial_squad(_artifact(_base_players()), load_squad_rules(), locked_codes=(9999,))
 
 
+def test_excluded_player_is_absent_from_initial_squad_and_policy_sets_do_not_overlap() -> None:
+    artifact = _artifact(_base_players())
+    rules = load_squad_rules()
+    baseline = optimize_initial_squad(artifact, rules)
+    assert 10 in baseline.codes
+    excluded = optimize_initial_squad(artifact, rules, excluded_codes=(10,))
+    assert 10 not in excluded.codes
+    assert excluded.excluded_codes == (10,)
+    with pytest.raises(OptimizationError, match="both locked and excluded"):
+        optimize_initial_squad(artifact, rules, locked_codes=(10,), excluded_codes=(10,))
+    with pytest.raises(OptimizationError, match="excluded codes are not selectable"):
+        optimize_initial_squad(artifact, rules, excluded_codes=(9999,))
+
+
 def test_locked_players_are_never_transferred_out() -> None:
     # 32 is uniquely weak at GW2 and a better FWD candidate exists, so the open plan ships
     # him out; locking him keeps him for the whole horizon while the plan adapts.
@@ -421,6 +435,25 @@ def test_locked_players_are_never_transferred_out() -> None:
 
     locked_plan = plan_transfers(index, rules, initial, locked_codes=(32,))
     assert not any(32 in week.transfers_out for week in locked_plan.weeks)
+
+
+def test_excluded_player_never_enters_a_future_squad() -> None:
+    players: list[_Player] = []
+    for player in _base_players(horizon=2):
+        if player.code not in set(_INITIAL_SQUAD):
+            continue
+        gw2 = 1.0 if player.code == 32 else 5.0
+        players.append(replace(player, points=(player.points[0], gw2)))
+    players.append(_Player(code=35, position="FWD", points=(0.0, 8.0)))
+    artifact = _artifact(tuple(players))
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+
+    open_plan = plan_transfers(index, rules, initial)
+    assert any(35 in week.transfers_in for week in open_plan.weeks)
+    excluded_plan = plan_transfers(index, rules, initial, excluded_codes=(35,))
+    assert 35 not in excluded_plan.candidate_pool
+    assert not any(35 in week.squad for week in excluded_plan.weeks)
 
 
 def test_plan_transfers_locks_must_be_in_the_initial_squad() -> None:

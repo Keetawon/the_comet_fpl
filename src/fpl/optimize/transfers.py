@@ -70,13 +70,16 @@ def _candidate_pool(
     rules: SquadRules,
     initial_squad: tuple[int, ...],
     risk_lambda: float,
+    excluded_codes: frozenset[int] = frozenset(),
 ) -> tuple[int, ...]:
+    if excluded_codes.intersection(initial_squad):
+        raise OptimizationError("the initial squad contains an excluded player")
     pool = set(initial_squad)
     for position in POSITIONS:
         eligible = [
             code
             for code in index.selectable_codes()
-            if index.first_by_code[code].position == position
+            if code not in excluded_codes and index.first_by_code[code].position == position
         ]
         eligible.sort(
             key=lambda code: (
@@ -164,6 +167,7 @@ def plan_transfers(
     risk_lambda: float = 0.0,
     min_bench_appearance: float = 0.0,
     locked_codes: tuple[int, ...] = (),
+    excluded_codes: tuple[int, ...] = (),
     initial_banked_free_transfers: int = 0,
 ) -> TransferPlan:
     """Plan transfers over the artifact horizon with bounded deterministic DP/beam search.
@@ -174,7 +178,9 @@ def plan_transfers(
     kept hold of across the transfer path so a later transfer cannot reintroduce a bench
     player who never plays. Locked players share the goalkeeper's exemption (owner rule,
     2026-08-18): the must-keep instruction outranks the rotation heuristic. ``locked_codes``
-    are never transferred out. For a manager's existing squad (whose season has already
+    are never transferred out. `excluded_codes` are absent from the initial squad, transfer
+    candidate pool, and every successor squad. For a manager's existing squad (whose season has
+    already
     burned or banked transfers), ``initial_banked_free_transfers`` seeds the free-transfer
     state; 0 is the fresh-season start the initial-squad path always uses.
     """
@@ -185,13 +191,27 @@ def plan_transfers(
     if not 0 <= initial_banked_free_transfers <= rules.transfers.free_transfer_bank_cap:
         raise ValueError("initial_banked_free_transfers must be within [0, free_transfer_bank_cap]")
     locked = frozenset(locked_codes)
+    excluded = frozenset(excluded_codes)
+    overlap = sorted(locked.intersection(excluded))
+    if overlap:
+        raise OptimizationError("players cannot be both locked and excluded")
     initial_squad = tuple(sorted(initial_solution.codes))
     if not locked <= set(initial_squad):
         raise OptimizationError(
             f"locked codes are not in the initial squad: {sorted(locked - set(initial_squad))}"
         )
+    if excluded.intersection(initial_squad):
+        raise OptimizationError("excluded codes are in the initial squad")
+    selectable = set(artifact_index.selectable_codes())
+    unselectable = sorted(excluded - selectable)
+    if unselectable:
+        raise OptimizationError(
+            f"excluded codes are not selectable players in the artifact: {unselectable}"
+        )
     validate_squad(artifact_index, rules, initial_squad)
-    candidate_pool = _candidate_pool(artifact_index, rules, initial_squad, risk_lambda)
+    candidate_pool = _candidate_pool(
+        artifact_index, rules, initial_squad, risk_lambda, excluded_codes=excluded
+    )
     first_gw = artifact_index.gws[0]
     first_lineup = exact_lineup(artifact_index, rules, initial_squad, first_gw, risk_lambda)
     if not bench_appearance_satisfied(

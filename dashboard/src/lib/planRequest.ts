@@ -1,8 +1,8 @@
 // The plan-builder wizard cannot run the optimizer (the solver is PuLP/CBC in Python; the
 // dashboard is a static renderer of recorded artifacts). When the owner finishes the wizard
-// we persist their request here so the Next GW page can show it as explicitly NOT YET
-// APPLIED -- the recorded plans predate the rules, and nothing re-solves until the emitted
-// command is run and the read models are re-published (dashboard/README.md).
+// we persist their request here so Plan Builder can recover an interrupted manual solve.
+// The formal Next GW page never consumes this browser-local state and therefore cannot
+// confuse a pending/custom scenario with the platform recommendation.
 
 export interface PlanRequestLock {
   code: number;
@@ -11,11 +11,12 @@ export interface PlanRequestLock {
 }
 
 export interface PlanRequest {
-  version: 1;
+  version: 2;
   createdAt: string;
   threshold: string;
   thresholdLabel: string;
   locks: PlanRequestLock[];
+  excludes: PlanRequestLock[];
   command: string;
 }
 
@@ -25,11 +26,19 @@ export function readPlanRequest(): PlanRequest | null {
   try {
     const raw = window.localStorage.getItem(PLAN_REQUEST_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as PlanRequest;
-    if (parsed?.version !== 1 || !Array.isArray(parsed.locks) || typeof parsed.command !== "string") {
+    const parsed = JSON.parse(raw) as PlanRequest & { version: number; excludes?: PlanRequestLock[] };
+    if (
+      ![1, 2].includes(parsed?.version) ||
+      !Array.isArray(parsed.locks) ||
+      typeof parsed.command !== "string"
+    ) {
       return null;
     }
-    return parsed;
+    return {
+      ...parsed,
+      version: 2,
+      excludes: Array.isArray(parsed.excludes) ? parsed.excludes : [],
+    };
   } catch {
     return null; // corrupted or private mode: no panel, never a crash
   }

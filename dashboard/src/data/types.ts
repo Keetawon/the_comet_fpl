@@ -187,6 +187,14 @@ export interface SquadContext {
   transferred_no_rescale: boolean;
 }
 
+export type PlanKind = "platform_default" | "platform_diagnostic" | "user_custom";
+
+export interface PlanPolicySummary {
+  locked_codes: number[];
+  excluded_codes: number[];
+  min_bench_appearance: number;
+}
+
 export interface NextGwPlan {
   optimizer_run_id: string;
   decision_sha256: string;
@@ -196,6 +204,9 @@ export interface NextGwPlan {
   gw_from: number;
   gw_to: number;
   component_modes: ComponentModes | null;
+  plan_kind: PlanKind;
+  display_label: string;
+  policy: PlanPolicySummary;
   weeks: PlanWeek[];
   player_xp: Record<string, Record<string, number | null>>;
   squad_context: Record<string, SquadContext>;
@@ -224,6 +235,8 @@ export interface SummaryPlan {
   decision_sha256: string;
   forecast_run_id: string;
   component_modes: ComponentModes | null;
+  plan_kind: PlanKind;
+  display_label: string;
 }
 
 export interface SummaryData {
@@ -327,6 +340,10 @@ export interface SearchPolicy {
   hit_cost_points: number;
   maximum_transfers_per_gameweek: number;
   risk_lambda: number;
+  min_bench_appearance: number;
+  locked_codes: number[];
+  excluded_codes: number[];
+  plan_origin: "platform" | "user_custom";
   search_method: string;
   optimality_scope: string;
   [key: string]: unknown;
@@ -358,6 +375,8 @@ export interface AuditPlan {
   decision_sha256: string;
   forecast_run_id: string;
   component_modes: ComponentModes | null;
+  plan_kind: PlanKind;
+  display_label: string;
   as_of: string | null;
   season: string;
   gw_from: number;

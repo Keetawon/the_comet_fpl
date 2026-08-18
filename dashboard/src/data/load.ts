@@ -8,6 +8,7 @@ import type {
   ForecastVsActualData,
   NextGwPlan,
   OptimizerAuditData,
+  PlanKind,
   PlayerRecord,
   SummaryData,
   TeamRecord,
@@ -19,6 +20,12 @@ const BASE: string = import.meta.env.VITE_DATA_BASE ?? "/data";
 // map and the browser tab parses it exactly once. A failed fetch is evicted so it can
 // be retried.
 const cache = new Map<string, Promise<unknown>>();
+const NEXT_GW_SCHEMA_VERSION = 3;
+const PLAN_KINDS = new Set<PlanKind>([
+  "platform_default",
+  "platform_diagnostic",
+  "user_custom",
+]);
 
 function fetchJson<T>(name: string): Promise<T> {
   const hit = cache.get(name);
@@ -81,8 +88,53 @@ export async function loadPlayers(): Promise<PlayersData> {
 }
 
 export async function loadNextGw(): Promise<{ plans: NextGwPlan[] }> {
-  const payload = await fetchJson<{ plans: NextGwPlan[] }>("next_gw.json");
-  return { plans: payload.plans };
+  const payload = await fetchJson<unknown>("next_gw.json");
+  if (!payload || typeof payload !== "object") {
+    throw new Error("invalid next_gw.json: expected a schema-v3 object");
+  }
+  const candidate = payload as {
+    json_schema_version?: unknown;
+    plans?: unknown;
+  };
+  if (candidate.json_schema_version !== NEXT_GW_SCHEMA_VERSION) {
+    throw new Error(
+      "unsupported next_gw.json schema: expected version 3 with explicit plan ownership; " +
+        "republish the dashboard read models",
+    );
+  }
+  if (!Array.isArray(candidate.plans)) {
+    throw new Error("invalid next_gw.json schema v3: plans must be an array");
+  }
+  for (const [index, rawPlan] of candidate.plans.entries()) {
+    if (!rawPlan || typeof rawPlan !== "object") {
+      throw new Error(`invalid next_gw.json schema v3: plan ${index} must be an object`);
+    }
+    const plan = rawPlan as {
+      optimizer_run_id?: unknown;
+      plan_kind?: unknown;
+      display_label?: unknown;
+      policy?: unknown;
+    };
+    const runId =
+      typeof plan.optimizer_run_id === "string" && plan.optimizer_run_id
+        ? plan.optimizer_run_id
+        : `index ${index}`;
+    if (typeof plan.plan_kind !== "string" || !PLAN_KINDS.has(plan.plan_kind as PlanKind)) {
+      throw new Error(
+        `invalid next_gw.json schema v3: plan ${runId} has no valid plan_kind; ` +
+          "ownership is never inferred from model architecture",
+      );
+    }
+    if (typeof plan.display_label !== "string" || !plan.display_label.trim()) {
+      throw new Error(
+        `invalid next_gw.json schema v3: plan ${runId} has no display_label`,
+      );
+    }
+    if (!plan.policy || typeof plan.policy !== "object") {
+      throw new Error(`invalid next_gw.json schema v3: plan ${runId} has no policy`);
+    }
+  }
+  return { plans: candidate.plans as NextGwPlan[] };
 }
 
 export async function loadSummary(): Promise<SummaryData> {

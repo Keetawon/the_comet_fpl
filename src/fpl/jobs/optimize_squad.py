@@ -28,7 +28,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fpl.artifacts.optimizer_plan import (
     ForecastInputProvenance,
@@ -89,9 +89,15 @@ OPTIMIZER_ASSUMPTIONS: tuple[str, ...] = (
 # Owner product rule (2026-08-17): a suggestion may pin at most five must-keep players;
 # the optimizer assigns every remaining quota around them.
 MAX_LOCKED_PLAYERS = 5
+# Owner product rule (2026-08-18): a personal plan may exclude at most fifteen players.
+MAX_EXCLUDED_PLAYERS = 15
 
 
-def _assumptions(min_bench_appearance: float, locked_label: str | None = None) -> tuple[str, ...]:
+def _assumptions(
+    min_bench_appearance: float,
+    locked_label: str | None = None,
+    excluded_label: str | None = None,
+) -> tuple[str, ...]:
     """The recorded assumptions, plus the active policies' semantics."""
     extras: list[str] = []
     if min_bench_appearance > 0.0:
@@ -108,6 +114,11 @@ def _assumptions(min_bench_appearance: float, locked_label: str | None = None) -
         extras.append(
             f"locked players: {locked_label} -- pinned into the squad and never transferred "
             "out; the optimizer assigns every remaining quota around them"
+        )
+    if excluded_label:
+        extras.append(
+            f"excluded players: {excluded_label} -- removed from the initial-squad population "
+            "and from every future transfer candidate set"
         )
     if not extras:
         return OPTIMIZER_ASSUMPTIONS
@@ -287,6 +298,7 @@ def _solve(
     risk_lambda: float,
     min_bench_appearance: float = 0.0,
     locked_codes: tuple[int, ...] = (),
+    excluded_codes: tuple[int, ...] = (),
 ) -> tuple[SquadSolution, ArtifactIndex, TransferPlan, dict[int, str | None]]:
     """Run the exact fixed-squad ILP and the bounded transfer plan once for a given input."""
     initial = optimize_initial_squad(
@@ -295,6 +307,7 @@ def _solve(
         risk_lambda=risk_lambda,
         min_bench_appearance=min_bench_appearance,
         locked_codes=locked_codes,
+        excluded_codes=excluded_codes,
     )
     index = ArtifactIndex.build(artifact, rules)
     plan = plan_transfers(
@@ -304,6 +317,7 @@ def _solve(
         risk_lambda=risk_lambda,
         min_bench_appearance=min_bench_appearance,
         locked_codes=locked_codes,
+        excluded_codes=excluded_codes,
     )
     names = {code: row.web_name for code, row in index.first_by_code.items()}
     return initial, index, plan, names
@@ -356,6 +370,8 @@ def _search_policy(
     risk_lambda: float,
     min_bench_appearance: float = 0.0,
     locked_codes: tuple[int, ...] = (),
+    excluded_codes: tuple[int, ...] = (),
+    plan_origin: Literal["platform", "user_custom"] = "platform",
 ) -> SearchPolicy:
     return SearchPolicy(
         candidate_pool_per_position=rules.search.candidate_pool_per_position,
@@ -369,6 +385,8 @@ def _search_policy(
         risk_lambda=risk_lambda,
         min_bench_appearance=min_bench_appearance,
         locked_codes=tuple(sorted(set(locked_codes))),
+        excluded_codes=tuple(sorted(set(excluded_codes))),
+        plan_origin=plan_origin,
         search_method=plan.search_method,
         optimality_scope=plan.optimality_scope,
     )
@@ -460,6 +478,8 @@ def assemble_optimizer_artifact(
     solver_binary_version: str,
     min_bench_appearance: float = 0.0,
     locked_codes: tuple[int, ...] = (),
+    excluded_codes: tuple[int, ...] = (),
+    plan_origin: Literal["platform", "user_custom"] = "platform",
 ) -> OptimizerPlanArtifact:
     """Map a solved squad/plan plus injected provenance into a validated optimizer artifact.
 
@@ -479,14 +499,27 @@ def assemble_optimizer_artifact(
     locked_label = ", ".join(
         f"{names.get(code) or code} ({code})" for code in sorted(set(locked_codes))
     )
+    excluded_label = ", ".join(
+        f"{names.get(code) or code} ({code})" for code in sorted(set(excluded_codes))
+    )
     return build_optimizer_plan_artifact(
         provenance=provenance,
-        search_policy=_search_policy(rules, plan, risk_lambda, min_bench_appearance, locked_codes),
+        search_policy=_search_policy(
+            rules,
+            plan,
+            risk_lambda,
+            min_bench_appearance,
+            locked_codes,
+            excluded_codes,
+            plan_origin,
+        ),
         solver=solver,
         rules=_rules_snapshot(rules),
         initial_squad=_initial_squad_record(initial),
         plan=_plan_record_model(plan, names, index),
-        assumptions=_assumptions(min_bench_appearance, locked_label or None),
+        assumptions=_assumptions(
+            min_bench_appearance, locked_label or None, excluded_label or None
+        ),
     )
 
 
@@ -519,6 +552,23 @@ def main(argv: list[str] | None = None) -> int:
             "remaining quota around the must-keep players and never transfers them out; "
             f"repeatable, at most {MAX_LOCKED_PLAYERS} locks"
         ),
+    )
+    parser.add_argument(
+        "--exclude",
+        type=int,
+        action="append",
+        default=[],
+        metavar="CODE",
+        help=(
+            "exclude this player (stable code) from the initial squad and every future "
+            f"transfer candidate set; repeatable, at most {MAX_EXCLUDED_PLAYERS} exclusions"
+        ),
+    )
+    parser.add_argument(
+        "--plan-origin",
+        choices=("platform", "user_custom"),
+        default="platform",
+        help="record whether this is a platform suggestion or an interactive user plan",
     )
     parser.add_argument(
         "--output",
@@ -563,21 +613,45 @@ def main(argv: list[str] | None = None) -> int:
         forecast_sha256 = _bytes_sha256(forecast_bytes)
 
     locked_codes = tuple(sorted(set(args.lock)))
+    excluded_codes = tuple(sorted(set(args.exclude)))
     if len(locked_codes) > MAX_LOCKED_PLAYERS:
         logger.error(
             "at most %d players may be locked (got %d)", MAX_LOCKED_PLAYERS, len(locked_codes)
         )
         return 1
-    known_codes = {row.code for row in artifact.rows}
-    unknown_locks = [code for code in locked_codes if code not in known_codes]
+    if len(excluded_codes) > MAX_EXCLUDED_PLAYERS:
+        logger.error(
+            "at most %d players may be excluded (got %d)",
+            MAX_EXCLUDED_PLAYERS,
+            len(excluded_codes),
+        )
+        return 1
+    overlap = sorted(set(locked_codes).intersection(excluded_codes))
+    if overlap:
+        logger.error("players cannot be both locked and excluded: %s", overlap)
+        return 1
+    selectable_codes = {row.code for row in artifact.rows if row.now_cost is not None}
+    unknown_locks = [code for code in locked_codes if code not in selectable_codes]
     if unknown_locks:
-        logger.error("locked codes are not players in the artifact: %s", unknown_locks)
+        logger.error("locked codes are not selectable players in the artifact: %s", unknown_locks)
+        return 1
+    unknown_exclusions = [code for code in excluded_codes if code not in selectable_codes]
+    if unknown_exclusions:
+        logger.error(
+            "excluded codes are not selectable players in the artifact: %s", unknown_exclusions
+        )
         return 1
 
     initial, index, plan, names = _solve(
-        artifact, rules, args.risk_lambda, args.min_bench_appearance, locked_codes
+        artifact,
+        rules,
+        args.risk_lambda,
+        args.min_bench_appearance,
+        locked_codes,
+        excluded_codes,
     )
     locked_label = ", ".join(f"{names.get(code) or code} ({code})" for code in locked_codes)
+    excluded_label = ", ".join(f"{names.get(code) or code} ({code})" for code in excluded_codes)
     report = {
         "status": "development_only_not_a_validated_production_recommendation",
         "artifact": {
@@ -597,13 +671,17 @@ def main(argv: list[str] | None = None) -> int:
             "source_payload_sha256": rules.provenance.bootstrap_payload_sha256,
         },
         "locked_codes": list(locked_codes),
+        "excluded_codes": list(excluded_codes),
+        "plan_origin": args.plan_origin,
         "initial_squad": {
             "cost_tenths": initial.squad_cost_tenths,
             "solver_status": initial.solver_status,
             "members": [_member_record(member) for member in initial.members],
         },
         "plan": _plan_record(plan, names),
-        "assumptions": list(_assumptions(args.min_bench_appearance, locked_label or None)),
+        "assumptions": list(
+            _assumptions(args.min_bench_appearance, locked_label or None, excluded_label or None)
+        ),
     }
 
     if args.output is not None:
@@ -619,6 +697,8 @@ def main(argv: list[str] | None = None) -> int:
             risk_lambda=args.risk_lambda,
             min_bench_appearance=args.min_bench_appearance,
             locked_codes=locked_codes,
+            excluded_codes=excluded_codes,
+            plan_origin=args.plan_origin,
             solver_package_version=solver_package_version,
             solver_binary_version=solver_binary_version,
         )
@@ -639,6 +719,8 @@ def _write_artifact(
     risk_lambda: float,
     min_bench_appearance: float = 0.0,
     locked_codes: tuple[int, ...] = (),
+    excluded_codes: tuple[int, ...] = (),
+    plan_origin: Literal["platform", "user_custom"] = "platform",
     solver_package_version: str,
     solver_binary_version: str,
 ) -> int:
@@ -667,6 +749,8 @@ def _write_artifact(
             risk_lambda=risk_lambda,
             min_bench_appearance=min_bench_appearance,
             locked_codes=locked_codes,
+            excluded_codes=excluded_codes,
+            plan_origin=plan_origin,
             solver_package_version=solver_package_version,
             solver_binary_version=solver_binary_version,
         )

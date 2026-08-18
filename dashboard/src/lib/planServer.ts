@@ -32,9 +32,20 @@ export interface PlanSummary {
 }
 
 /** null means the server is not running (offline chip; the command stays the fallback). */
-export async function fetchPlanStatus(): Promise<PlanServerStatus | null> {
+function tokenHeaders(token?: string | null): Record<string, string> {
+  const clean = token?.trim();
+  // This non-simple header intentionally triggers the browser-managed CORS OPTIONS preflight.
+  // JavaScript cannot attach credentials to that preflight; the server must advertise this
+  // header in Access-Control-Allow-Headers and authenticate the following GET/POST request.
+  return clean ? { "X-FPL-Plan-Token": clean } : {};
+}
+
+export async function fetchPlanStatus(token?: string | null): Promise<PlanServerStatus | null> {
   try {
-    const response = await fetch(`${planServerUrl()}/status`, { signal: AbortSignal.timeout(4000) });
+    const response = await fetch(`${planServerUrl()}/status`, {
+      headers: tokenHeaders(token),
+      signal: AbortSignal.timeout(4000),
+    });
     if (!response.ok) return null;
     return (await response.json()) as PlanServerStatus;
   } catch {
@@ -44,6 +55,7 @@ export async function fetchPlanStatus(): Promise<PlanServerStatus | null> {
 
 export interface SolveRequest {
   locks: number[];
+  excludes: number[];
   minBenchAppearance: number | null;
 }
 
@@ -52,16 +64,18 @@ export interface SolveRequest {
 export async function solvePlan(
   request: SolveRequest,
   onStage?: (stage: string | null) => void,
+  token?: string | null,
 ): Promise<PlanSummary> {
   const poll = window.setInterval(() => {
-    void fetchPlanStatus().then((status) => onStage?.(status?.stage ?? null));
+    void fetchPlanStatus(token).then((status) => onStage?.(status?.stage ?? null));
   }, 2500);
   try {
     const response = await fetch(`${planServerUrl()}/plan`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...tokenHeaders(token) },
       body: JSON.stringify({
         locks: request.locks,
+        excludes: request.excludes,
         min_bench_appearance: request.minBenchAppearance,
       }),
       signal: AbortSignal.timeout(10 * 60 * 1000),

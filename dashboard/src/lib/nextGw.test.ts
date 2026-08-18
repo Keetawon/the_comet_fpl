@@ -1,5 +1,5 @@
-// Next-GW helpers: architecture labelling from component modes, horizon EV sums (a null
-// gameweek makes the total null, never a partial sum), and the default-vs-diagnostic diff.
+// Next-GW helpers: explicit product ownership, architecture labelling, horizon EV sums (a
+// null gameweek makes the total null, never a partial sum), and the platform-only diff.
 
 import { describe, expect, it } from "vitest";
 import sample from "@/data/sampleNextGw.json";
@@ -9,7 +9,11 @@ import {
   diffPlans,
   horizonXp,
   isDefaultArchitecture,
+  planDisplayLabel,
   planLabel,
+  platformComparisonPlans,
+  platformPlans,
+  resolvedPlanKind,
 } from "@/lib/nextGw";
 
 const plans = sample.plans as unknown as NextGwPlan[];
@@ -26,6 +30,40 @@ describe("plan labelling", () => {
   it("falls back to the first plan when none matches the default architecture", () => {
     const diagnostic = plans.filter((p) => !isDefaultArchitecture(p.component_modes));
     expect(defaultPlan(diagnostic)).toBe(diagnostic[0]);
+  });
+
+  it("uses plan_kind rather than architecture or array order to separate custom plans", () => {
+    const custom: NextGwPlan = {
+      ...plans[0],
+      optimizer_run_id: "custom-first",
+      plan_kind: "user_custom",
+      display_label: "Your plan — locked squad",
+      policy: {
+        locked_codes: [1],
+        excluded_codes: [2],
+        min_bench_appearance: 0.25,
+      },
+    };
+    const shuffled = [custom, plans[1], plans[0]];
+
+    expect(resolvedPlanKind(custom)).toBe("user_custom");
+    expect(planDisplayLabel(custom)).toBe("Your plan — locked squad");
+    expect(platformPlans(shuffled)).toEqual([plans[1], plans[0]]);
+    expect(defaultPlan(platformPlans(shuffled))).toBe(plans[0]);
+    expect(platformComparisonPlans(shuffled)).toEqual({
+      defaultPlan: plans[0],
+      diagnosticPlan: plans[1],
+    });
+  });
+
+  it("fails closed when ownership is missing even for the default V3 architecture", () => {
+    const stale = {
+      component_modes: plans[0].component_modes,
+      display_label: "stale V3 plan",
+    };
+    expect(() => resolvedPlanKind(stale)).toThrow(
+      /plan_kind is required; product ownership is never inferred/,
+    );
   });
 });
 
