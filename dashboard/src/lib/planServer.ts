@@ -4,6 +4,8 @@
 // static read models; the page then refetches them like any other reload.
 
 export const PLAN_SERVER_PORT = 8765;
+export const PLAN_SERVER_START_COMMAND =
+  ".\\.venv\\Scripts\\python.exe -m fpl.jobs.plan_server";
 
 export function planServerUrl(): string {
   // hostname-relative so it works from localhost dev AND the LAN preview on a phone.
@@ -17,6 +19,16 @@ export interface PlanServerStatus {
   last_result: PlanSummary | null;
   worktree_clean: boolean;
   forecast_ready: boolean;
+  /** Optional only for compatibility with an already-running pre-handshake server. */
+  runtime?: PlanServerRuntime | null;
+}
+
+export interface PlanServerRuntime {
+  python_executable: string;
+  python_prefix: string;
+  pulp_package_version: string | null;
+  cbc_binary_version: string | null;
+  solver_ready: boolean;
 }
 
 export interface PlanSummary {

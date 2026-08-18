@@ -40,7 +40,11 @@ import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
 import type { NextGwPlan, PlayerRecord } from "@/data/types";
 import { resolvedPlanKind } from "@/lib/nextGw";
 import { clearPlanRequest, writePlanRequest } from "@/lib/planRequest";
-import { fetchPlanStatus, solvePlan } from "@/lib/planServer";
+import {
+  fetchPlanStatus,
+  PLAN_SERVER_START_COMMAND,
+  solvePlan,
+} from "@/lib/planServer";
 import {
   loadPlanServerToken,
   rememberPlanServerToken,
@@ -68,12 +72,16 @@ type SolverStatus =
   | { status: "checking" }
   | { status: "offline" }
   | { status: "online" }
+  | { status: "runtime-unready" }
+  | { status: "worktree-dirty" }
+  | { status: "forecast-missing" }
   | { status: "solving"; stage: string | null }
   | { status: "error"; message: string };
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 const MAX_LOCKS = 5;
 const MAX_EXCLUSIONS = 15;
+const PLAYER_PAGE_SIZE = 50;
 const DEFAULT_SQUAD_QUOTA: Record<string, number> = { GK: 2, DEF: 5, MID: 5, FWD: 3 };
 const THRESHOLDS = [
   { value: "off", label: "Off", flag: null },
@@ -201,14 +209,27 @@ export function PlanBuilderPage() {
   const [threshold, setThreshold] = useState<string>("off");
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
+  const [candidatePage, setCandidatePage] = useState(0);
   const [copied, setCopied] = useState(false);
   const [solver, setSolver] = useState<SolverStatus>({ status: "checking" });
 
   const checkSolver = useCallback(() => {
     setSolver({ status: "checking" });
-    void fetchPlanStatus(serverToken).then((status) =>
-      setSolver(status ? { status: "online" } : { status: "offline" }),
-    );
+    void fetchPlanStatus(serverToken).then((status) => {
+      if (!status) {
+        setSolver({ status: "offline" });
+      } else if (status.runtime?.solver_ready !== true) {
+        // A 200 from an older/broken server proves only that HTTP is alive. It must never
+        // enable a solve whose PuLP/CBC provenance cannot be resolved.
+        setSolver({ status: "runtime-unready" });
+      } else if (!status.worktree_clean) {
+        setSolver({ status: "worktree-dirty" });
+      } else if (!status.forecast_ready) {
+        setSolver({ status: "forecast-missing" });
+      } else {
+        setSolver({ status: "online" });
+      }
+    });
   }, [serverToken]);
 
   // Entering the review screen probes the local plan server once (manual Re-check retries).
@@ -410,9 +431,30 @@ export function PlanBuilderPage() {
         player: p,
         xp: p.fixtures.reduce((sum, f) => sum + (f.expected_points ?? 0), 0),
       }))
-      .sort((a, b) => b.xp - a.xp || (a.player.now_cost ?? 0) - (b.player.now_cost ?? 0))
-      .slice(0, 50);
+      .sort(
+        (a, b) =>
+          b.xp - a.xp ||
+          (a.player.now_cost ?? 0) - (b.player.now_cost ?? 0) ||
+          a.player.code - b.player.code,
+      );
   }, [state, search, filters]);
+
+  const candidatePageCount = Math.max(1, Math.ceil(candidates.length / PLAYER_PAGE_SIZE));
+  const visibleCandidates = useMemo(
+    () =>
+      candidates.slice(
+        candidatePage * PLAYER_PAGE_SIZE,
+        (candidatePage + 1) * PLAYER_PAGE_SIZE,
+      ),
+    [candidates, candidatePage],
+  );
+
+  // A filter can make the current page disappear. Clamp instead of leaving an empty picker;
+  // direct search/filter edits reset to page one below so the matching result is immediately
+  // visible. Every eligible priced player remains reachable through the page controls.
+  useEffect(() => {
+    setCandidatePage((current) => Math.min(current, candidatePageCount - 1));
+  }, [candidatePageCount]);
 
   const teams = useMemo(() => {
     if (state.status !== "ready") return [] as [number, string][];
@@ -428,6 +470,7 @@ export function PlanBuilderPage() {
     setThreshold("off");
     setSearch("");
     setFilters(INITIAL_PLAYER_FILTERS);
+    setCandidatePage(0);
   };
 
   const thresholdFlag = THRESHOLDS.find((t) => t.value === threshold)?.flag ?? null;
@@ -683,17 +726,66 @@ export function PlanBuilderPage() {
                 aria-label="Search player"
                 className="h-8 w-44"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCandidatePage(0);
+                }}
               />
               <span className="text-xs text-muted-foreground">
-                top {candidates.length} by forecast-horizon xP
+                {candidates.length === 0
+                  ? "No eligible priced players match"
+                  : "Players " +
+                    (candidatePage * PLAYER_PAGE_SIZE + 1) +
+                    "–" +
+                    Math.min((candidatePage + 1) * PLAYER_PAGE_SIZE, candidates.length) +
+                    " of " +
+                    candidates.length +
+                    " by forecast-horizon xP"}
               </span>
             </div>
             <div className="mb-2 rounded-md border bg-background/60 px-2 py-1.5">
-              <PlayerFiltersBar filters={filters} onChange={setFilters} teams={teams} showFormWindow={false} />
+              <PlayerFiltersBar
+                filters={filters}
+                onChange={(nextFilters) => {
+                  setFilters(nextFilters);
+                  setCandidatePage(0);
+                }}
+                teams={teams}
+                showFormWindow={false}
+              />
             </div>
+            <nav
+              aria-label="Player picker pages"
+              className="mb-2 flex items-center justify-between gap-2 rounded-md border bg-background/60 px-2 py-1.5"
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() => setCandidatePage((page) => Math.max(0, page - 1))}
+                disabled={candidatePage === 0}
+              >
+                Previous players
+              </Button>
+              <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
+                Page {candidatePage + 1} of {candidatePageCount}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() =>
+                  setCandidatePage((page) => Math.min(candidatePageCount - 1, page + 1))
+                }
+                disabled={candidatePage >= candidatePageCount - 1}
+              >
+                Next players
+              </Button>
+            </nav>
             <ul className="grid gap-1.5 md:grid-cols-1 lg:grid-cols-2">
-              {candidates.map(({ player, xp }) => {
+              {visibleCandidates.map(({ player, xp }) => {
                 const locked = locks.some((p) => p.code === player.code);
                 const excluded = excludes.some((p) => p.code === player.code);
                 const blocked = selectionGuard(player);
@@ -942,6 +1034,30 @@ export function PlanBuilderPage() {
                   <span className="inline-block size-1.5 rounded-full bg-emerald-500" /> plan server online
                 </Badge>
               )}
+              {solver.status === "runtime-unready" && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-300 bg-amber-50 text-[10px] text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                >
+                  solver runtime unavailable
+                </Badge>
+              )}
+              {solver.status === "worktree-dirty" && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-300 bg-amber-50 text-[10px] text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                >
+                  commit required
+                </Badge>
+              )}
+              {solver.status === "forecast-missing" && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-300 bg-amber-50 text-[10px] text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                >
+                  forecast unavailable
+                </Badge>
+              )}
               {solver.status === "solving" && (
                 <Badge variant="outline" className="text-[10px]">
                   <span className="inline-block size-1.5 animate-pulse rounded-full bg-sky-500" /> running
@@ -1008,7 +1124,10 @@ export function PlanBuilderPage() {
                 <Sparkles className="size-4" />
                 {solver.status === "solving" ? "Solving…" : "Solve now with my rules"}
               </Button>
-              {solver.status === "offline" && (
+              {(solver.status === "offline" ||
+                solver.status === "runtime-unready" ||
+                solver.status === "worktree-dirty" ||
+                solver.status === "forecast-missing") && (
                 <Button variant="ghost" size="sm" onClick={checkSolver}>
                   Re-check
                 </Button>
@@ -1023,9 +1142,31 @@ export function PlanBuilderPage() {
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 Offline — start it from the repository root with{" "}
                 <code className="rounded bg-muted px-1 font-mono text-[10px]">
-                  python -m fpl.jobs.plan_server
+                  {PLAN_SERVER_START_COMMAND}
                 </code>{" "}
                 (see dashboard/README.md), or run the copied command below by hand.
+              </p>
+            )}
+            {solver.status === "runtime-unready" && (
+              <p role="alert" className="mt-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                The plan server answered, but its PuLP/CBC solver runtime is not ready. Stop it,
+                then restart it from the repository root with{" "}
+                <code className="rounded bg-muted px-1 font-mono text-[10px]">
+                  {PLAN_SERVER_START_COMMAND}
+                </code>
+                . Solve stays disabled until the restarted server reports a verified runtime.
+              </p>
+            )}
+            {solver.status === "worktree-dirty" && (
+              <p role="alert" className="mt-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                The Git worktree has pending changes. Commit them, then re-check. The optimizer
+                refuses to publish a decision that cannot be pinned to an exact commit.
+              </p>
+            )}
+            {solver.status === "forecast-missing" && (
+              <p role="alert" className="mt-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                The required forecast artifact is missing. Regenerate it using the exact
+                development workflow in dashboard/README.md, then re-check.
               </p>
             )}
             {solver.status === "error" && (

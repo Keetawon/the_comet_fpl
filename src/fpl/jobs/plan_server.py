@@ -48,6 +48,7 @@ from fpl.jobs.optimize_squad import (
     MAX_EXCLUDED_PLAYERS,
     MAX_LOCKED_PLAYERS,
     _git_worktree_clean,
+    _solver_versions,
 )
 from fpl.publish.dashboard_json import NEXT_GW_FILENAME, export_dashboard_json
 from fpl.publish.export import export_bi
@@ -161,6 +162,9 @@ class ServerState:
     def __init__(self, base_dir: Path, *, access_token: str | None = None) -> None:
         self.base_dir = base_dir
         self.access_token = access_token or secrets.token_urlsafe(24)
+        solver_versions = _solver_versions()
+        self.solver_package_version = solver_versions[0] if solver_versions else None
+        self.solver_binary_version = solver_versions[1] if solver_versions else None
         self.run_lock = threading.Lock()
         self.status_lock = threading.Lock()
         self.stage: str | None = None
@@ -188,6 +192,14 @@ class ServerState:
                 "worktree_clean": _git_worktree_clean(repo_root()),
                 "forecast_ready": (self.base_dir / FORECAST_NAME).is_file(),
                 "base_dir": str(self.base_dir),
+                "runtime": {
+                    "python_executable": sys.executable,
+                    "python_prefix": sys.prefix,
+                    "pulp_package_version": self.solver_package_version,
+                    "cbc_binary_version": self.solver_binary_version,
+                    "solver_ready": self.solver_package_version is not None
+                    and self.solver_binary_version is not None,
+                },
             }
 
 
@@ -259,6 +271,11 @@ def run_plan(
         raise RequestError("a plan run is already in progress - wait for it to finish")
     try:
         base = state.base_dir
+        if state.solver_package_version is None or state.solver_binary_version is None:
+            raise RequestError(
+                "the plan server cannot verify its PuLP/CBC runtime; restart it from the "
+                "repository with .venv\\Scripts\\python.exe -m fpl.jobs.plan_server"
+            )
         forecast = base / FORECAST_NAME
         if not forecast.is_file():
             raise RequestError(

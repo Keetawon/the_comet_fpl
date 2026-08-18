@@ -266,10 +266,19 @@ def _capture_input_snapshot(forecast_path: Path, rules_path: Path) -> _InputSnap
 
 
 def _pulp_package_version() -> str | None:
+    """Return the imported PuLP package version without accepting an ambiguous identity."""
     try:
-        return importlib.metadata.version("pulp")
+        metadata_version = importlib.metadata.version("pulp").strip()
     except importlib.metadata.PackageNotFoundError:
+        metadata_version = ""
+    try:
+        import pulp
+    except ImportError:
         return None
+    module_version = str(getattr(pulp, "__version__", "")).strip()
+    if metadata_version and module_version and metadata_version != module_version:
+        return None
+    return metadata_version or module_version or None
 
 
 def _cbc_binary_version() -> str | None:
@@ -280,16 +289,37 @@ def _cbc_binary_version() -> str | None:
         path = getattr(pulp.PULP_CBC_CMD(msg=False), "path", None)
         if not path:
             return None
-        result = subprocess.run(
-            [str(path), "--version"], capture_output=True, text=True, timeout=10, check=False
-        )
-        text = f"{result.stdout}\n{result.stderr}"
-        for line in text.splitlines():
-            if "Version" in line:
-                return line.split(":", 1)[-1].strip() if ":" in line else line.strip()
+        # CBC accepts both spellings across distributions. A second probe also makes discovery
+        # robust to a transient first-process launch failure on Windows (for example first-use
+        # endpoint scanning) without ever inventing or defaulting a version.
+        for version_flag in ("--version", "-version"):
+            try:
+                result = subprocess.run(
+                    [str(path), version_flag],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    check=False,
+                )
+            except (OSError, subprocess.SubprocessError):
+                continue
+            text = f"{result.stdout}\n{result.stderr}"
+            for line in text.splitlines():
+                label, separator, value = line.partition(":")
+                if separator and label.strip().casefold() == "version" and value.strip():
+                    return value.strip()
         return None
-    except (OSError, subprocess.SubprocessError):
+    except ImportError:
         return None
+
+
+def _solver_versions() -> tuple[str, str] | None:
+    """Discover the complete runtime identity, or fail closed with no partial identity."""
+    package_version = _pulp_package_version()
+    binary_version = _cbc_binary_version()
+    if not package_version or not binary_version:
+        return None
+    return package_version, binary_version
 
 
 def _solve(
@@ -599,13 +629,16 @@ def main(argv: list[str] | None = None) -> int:
         artifact = snapshot.artifact
         rules = snapshot.rules
         forecast_sha256 = snapshot.forecast_sha256
-        solver_package_version = _pulp_package_version()
-        solver_binary_version = _cbc_binary_version()
-        if not solver_package_version or not solver_binary_version:
+        solver_versions = _solver_versions()
+        if solver_versions is None:
             logger.error(
-                "cannot resolve complete PuLP/CBC solver versions; refusing artifact output"
+                "cannot resolve complete PuLP/CBC solver versions in %s; refusing artifact "
+                "output (install the locked environment and launch with "
+                ".venv\\Scripts\\python.exe)",
+                sys.executable,
             )
             return 1
+        solver_package_version, solver_binary_version = solver_versions
     else:
         forecast_bytes = args.artifact.read_bytes()
         artifact = read_artifact_bytes(forecast_bytes)

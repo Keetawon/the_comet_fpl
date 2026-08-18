@@ -18,6 +18,13 @@ const status: PlanServerStatus = {
   last_result: null,
   worktree_clean: true,
   forecast_ready: true,
+  runtime: {
+    python_executable: "D:\\repo\\.venv\\Scripts\\python.exe",
+    python_prefix: "D:\\repo\\.venv",
+    pulp_package_version: "3.3.0",
+    cbc_binary_version: "2.10.3",
+    solver_ready: true,
+  },
 };
 
 function response(payload: unknown): Response {
@@ -98,6 +105,26 @@ describe("plan server token transport", () => {
     expect(fetchMock.mock.calls[0][1]).toEqual(
       expect.objectContaining({ headers: {} }),
     );
+  });
+
+  it("preserves solver_ready=false from a successful HTTP 200 status", async () => {
+    const unready = {
+      ...status,
+      runtime: {
+        ...status.runtime!,
+        pulp_package_version: null,
+        cbc_binary_version: null,
+        solver_ready: false,
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(response(unready));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const received = await fetchPlanStatus();
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(received).not.toBeNull();
+    expect(received?.runtime?.solver_ready).toBe(false);
   });
 });
 

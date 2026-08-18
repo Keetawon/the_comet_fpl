@@ -148,6 +148,15 @@ class TestRunPlanPreChecks:
         with pytest.raises(RequestError, match="forecast artifact missing"):
             run_plan(state, [], [], 0.0)
 
+    def test_unverified_solver_runtime_is_refused_before_solving(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        state = ServerState(tmp_path)
+        state.solver_binary_version = None
+        monkeypatch.setattr(plan_server, "_run_optimizer_cli", lambda _argv: pytest.fail("solved"))
+        with pytest.raises(RequestError, match="cannot verify its PuLP/CBC runtime"):
+            run_plan(state, [], [], 0.0)
+
     def test_dirty_worktree_is_refused_before_solving(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -404,6 +413,11 @@ class TestHttpSurface:
         assert body["busy"] is False
         assert body["worktree_clean"] is True
         assert body["forecast_ready"] is False
+        assert body["runtime"]["python_executable"]
+        assert body["runtime"]["python_prefix"]
+        assert body["runtime"]["pulp_package_version"]
+        assert body["runtime"]["cbc_binary_version"]
+        assert body["runtime"]["solver_ready"] is True
 
     def test_plan_posts_through_to_the_pipeline(self, loopback_server: ThreadingHTTPServer) -> None:
         status, _, payload = self._request(

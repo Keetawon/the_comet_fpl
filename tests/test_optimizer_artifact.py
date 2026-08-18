@@ -859,6 +859,68 @@ def test_job_refuses_incomplete_solver_identity(
     assert not out.exists()
 
 
+def test_pulp_version_falls_back_to_imported_module_when_metadata_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pulp
+
+    def missing(_name: str) -> str:
+        raise optimize_squad.importlib.metadata.PackageNotFoundError
+
+    monkeypatch.setattr(optimize_squad.importlib.metadata, "version", missing)
+    monkeypatch.setattr(pulp, "__version__", "3.3.2")
+    assert optimize_squad._pulp_package_version() == "3.3.2"
+
+
+def test_pulp_version_refuses_conflicting_metadata_and_module_versions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pulp
+
+    monkeypatch.setattr(optimize_squad.importlib.metadata, "version", lambda _name: "3.3.2")
+    monkeypatch.setattr(pulp, "__version__", "9.9.9")
+    assert optimize_squad._pulp_package_version() is None
+
+
+def test_cbc_version_retries_and_accepts_only_an_explicit_version_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pulp
+
+    class Solver:
+        path = "cbc.exe"
+
+    outcomes = iter(
+        (
+            OSError("transient launch failure"),
+            optimize_squad.subprocess.CompletedProcess(
+                args=["cbc.exe", "-version"],
+                returncode=0,
+                stdout="Welcome to CBC\nVersion: 2.10.3\n",
+                stderr="",
+            ),
+        )
+    )
+
+    def run(*_args: object, **_kwargs: object) -> object:
+        outcome = next(outcomes)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(pulp, "PULP_CBC_CMD", lambda **_kwargs: Solver())
+    monkeypatch.setattr(optimize_squad.subprocess, "run", run)
+    assert optimize_squad._cbc_binary_version() == "2.10.3"
+
+
+def test_solver_versions_never_returns_a_partial_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(optimize_squad, "_pulp_package_version", lambda: "3.3.2")
+    monkeypatch.setattr(optimize_squad, "_cbc_binary_version", lambda: None)
+    assert optimize_squad._solver_versions() is None
+
+
 def test_job_removes_output_when_forecast_drifts_during_solve(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

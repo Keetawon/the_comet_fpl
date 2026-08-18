@@ -211,6 +211,14 @@ into the typed records.
   seed, and solve status; and the complete search policy
   (candidate pool, transfer depth, transition limit, beam width, free-transfer state, `risk_lambda`,
   search method, and declared optimality scope).
+- **Solver discovery.** PuLP's installed-distribution version and imported-module version must
+  agree when both are available (the module version is accepted only when distribution metadata is
+  unavailable). CBC must print an explicit `Version: ...` line from its actual configured binary;
+  the job retries the two supported version flags for transient Windows first-launch failures, but
+  never substitutes a default or an inferred version. Any unresolved or conflicting identity still
+  refuses durable artifact output. The local plan server performs the same preflight at startup and
+  exposes its Python executable/prefix and the two verified versions in `GET /status`; the
+  optimizer child independently repeats discovery before writing an artifact.
 - **Decision and offline legality.** The chosen 15-player squad and cost, plus every gameweek's
   post-transfer 15, XI, captain, vice-captain, bench goalkeeper, ordered bench, transfers,
   free-transfer state, hits, and explicit assumptions. Reading validates budget, club cap, position

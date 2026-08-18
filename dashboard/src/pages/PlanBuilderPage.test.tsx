@@ -21,6 +21,7 @@ vi.mock("@/data/load", () => ({
 }));
 
 vi.mock("@/lib/planServer", () => ({
+  PLAN_SERVER_START_COMMAND: ".\\.venv\\Scripts\\python.exe -m fpl.jobs.plan_server",
   fetchPlanStatus: vi.fn(),
   solvePlan: vi.fn(),
 }));
@@ -78,6 +79,14 @@ const customPlan: NextGwPlan = {
     min_bench_appearance: 0.25,
   },
 };
+
+const readyRuntime = {
+  python_executable: "D:\\repo\\.venv\\Scripts\\python.exe",
+  python_prefix: "D:\\repo\\.venv",
+  pulp_package_version: "3.3.0",
+  cbc_binary_version: "2.10.3",
+  solver_ready: true,
+} as const;
 
 beforeEach(() => {
   vi.mocked(loadPlayers).mockResolvedValue({ players: builderPlayers, manifest: null });
@@ -234,6 +243,57 @@ describe("PlanBuilderPage", () => {
     expect(sixteenth).toHaveTextContent("max 15 exclusions");
   });
 
+  it("pages through every eligible priced player and selects one beyond the first 50", async () => {
+    const user = userEvent.setup();
+    const pagedPlayers = Array.from({ length: 60 }, (_, index) => ({
+      ...clonePlayer(
+        samplePlayers[0],
+        300 + index,
+        "Paged Player " + String(index + 1).padStart(2, "0"),
+        "MID",
+      ),
+      // Keep these below the compact base roster in the xP ordering. Stable player code is the
+      // deterministic tie-breaker, so the later-page target is independent of browser locale.
+      fixtures: [],
+    }));
+    vi.mocked(loadPlayers).mockResolvedValue({
+      players: [...builderPlayers, ...pagedPlayers],
+      manifest: null,
+    });
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Build from scratch →"));
+
+    expect(screen.getByText(/Players 1–50 of 76/)).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Paged Player 60/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous players" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Next players" }));
+
+    expect(screen.getByText(/Players 51–76 of 76/)).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next players" })).toBeDisabled();
+    const laterPlayer = screen.getByRole("button", { name: /Paged Player 60/ });
+    await user.click(laterPlayer);
+    expect(laterPlayer).toHaveAttribute("aria-pressed", "true");
+    expect(laterPlayer).toHaveTextContent("locked");
+    expect(laterPlayer.className).toContain("emerald");
+
+    // Searching from a later page resets to the first matching page. The off-page selection
+    // remains durable and reaches the v2 optimizer request.
+    await user.type(screen.getByRole("textbox", { name: "Search player" }), "Alpha");
+    expect(screen.getByText("Page 1 of 1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Paged Player 60/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+    const saved = JSON.parse(window.localStorage.getItem("fpl-plan-request") ?? "{}") as {
+      locks: { code: number }[];
+      command: string;
+    };
+    expect(saved.locks.map((player) => player.code)).toEqual([359]);
+    expect(saved.command).toContain("--lock 359");
+  });
+
   it("never strands the user: navigation preserves rules and review links to the platform page", async () => {
     const user = userEvent.setup();
     render(<PlanBuilderPage />);
@@ -337,6 +397,7 @@ describe("PlanBuilderPage", () => {
     // offline by default: the solve button is disabled and the start command is the fallback
     expect(await screen.findByText(/plan server online|Offline — start it/)).toBeInTheDocument();
     expect(screen.getByText(/Offline — start it/)).toBeInTheDocument();
+    expect(screen.getByText(".\\.venv\\Scripts\\python.exe -m fpl.jobs.plan_server")).toBeInTheDocument();
     const solve = screen.getByRole("button", { name: /Solve now with my rules/ });
     expect(solve).toBeDisabled();
     // coming online enables it; solving posts the exact rules and hands off to Next GW
@@ -347,6 +408,7 @@ describe("PlanBuilderPage", () => {
       last_result: null,
       worktree_clean: true,
       forecast_ready: true,
+      runtime: readyRuntime,
     });
     await user.click(screen.getByRole("button", { name: /Re-check/ }));
     expect(await screen.findByText("plan server online")).toBeInTheDocument();
@@ -381,6 +443,107 @@ describe("PlanBuilderPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("solved-run-1");
   });
 
+  it("does not enable solve when HTTP status succeeds but the solver runtime is unready", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: true,
+      runtime: {
+        ...readyRuntime,
+        pulp_package_version: null,
+        cbc_binary_version: null,
+        solver_ready: false,
+      },
+    });
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Build from scratch →"));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+
+    expect(await screen.findByText("solver runtime unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("plan server online")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Solve now with my rules" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Re-check" })).toBeEnabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      ".\\.venv\\Scripts\\python.exe -m fpl.jobs.plan_server",
+    );
+    expect(solvePlan).not.toHaveBeenCalled();
+  });
+
+  it("requires restart when an older status response omits the runtime handshake", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: true,
+    });
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Build from scratch →"));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+
+    expect(await screen.findByText("solver runtime unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Solve now with my rules" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      ".\\.venv\\Scripts\\python.exe -m fpl.jobs.plan_server",
+    );
+  });
+
+  it("blocks solve when the server reports a dirty worktree", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: false,
+      forecast_ready: true,
+      runtime: readyRuntime,
+    });
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Build from scratch →"));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+
+    expect(await screen.findByText("commit required")).toBeInTheDocument();
+    expect(screen.queryByText("plan server online")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Solve now with my rules" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Commit them, then re-check",
+    );
+  });
+
+  it("blocks solve when the server reports the forecast is missing", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: false,
+      runtime: readyRuntime,
+    });
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Build from scratch →"));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+
+    expect(await screen.findByText("forecast unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("plan server online")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Solve now with my rules" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Regenerate it using the exact development workflow in dashboard/README.md",
+    );
+  });
+
   it("does not turn a successful solve into an error when localStorage rejects writes", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchPlanStatus).mockResolvedValue({
@@ -390,6 +553,7 @@ describe("PlanBuilderPage", () => {
       last_result: null,
       worktree_clean: true,
       forecast_ready: true,
+      runtime: readyRuntime,
     });
     vi.mocked(solvePlan).mockResolvedValue({
       optimizer_run_id: "storage-safe-run",
@@ -435,6 +599,7 @@ describe("PlanBuilderPage", () => {
       last_result: null,
       worktree_clean: true,
       forecast_ready: true,
+      runtime: readyRuntime,
     });
     vi.mocked(solvePlan).mockResolvedValue({
       optimizer_run_id: "lan-solved-run",
