@@ -23,6 +23,7 @@ from fpl.jobs.plan_server import (
     RequestError,
     ServerState,
     _allowed_origin,
+    _publish_dashboard_generations,
     _run_optimizer_cli,
     make_handler,
     run_plan,
@@ -238,9 +239,9 @@ class TestRunPlanPreChecks:
             *,
             before_publish: object,
         ) -> None:
-            public = tmp_path / "dashboard" / "public" / "data"
-            public.mkdir(parents=True)
-            (public / plan_server.NEXT_GW_FILENAME).write_text(
+            staged = output_dir.parent / f".{output_dir.name}.fake.tmp"
+            staged.mkdir(parents=True)
+            (staged / plan_server.NEXT_GW_FILENAME).write_text(
                 json.dumps(
                     {
                         "plans": [
@@ -261,6 +262,8 @@ class TestRunPlanPreChecks:
                 ),
                 encoding="utf-8",
             )
+            assert callable(before_publish)
+            before_publish()
 
         monkeypatch.setattr(plan_server, "_run_optimizer_cli", fake_optimizer)
         monkeypatch.setattr(plan_server, "export_bi", fake_bi)
@@ -271,6 +274,8 @@ class TestRunPlanPreChecks:
         assert written is not None
         assert result["output"] == str(written)
         assert written.name != "plan-stale.json"
+        public = tmp_path / "dashboard" / "public" / "data"
+        assert run_id in (public / plan_server.NEXT_GW_FILENAME).read_text(encoding="utf-8")
 
     def test_publish_io_error_fails_instead_of_reporting_success(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -356,6 +361,204 @@ class TestRunPlanPreChecks:
         )
         with pytest.raises(RuntimeError, match="platform_diagnostic"):
             plan_server._verify_dashboard_plans_published(tmp_path, "wanted")
+
+    def test_dashboard_generation_reaches_public_and_static_preview_atomically(
+        self, tmp_path: Path
+    ) -> None:
+        run_id = "wanted"
+        source = tmp_path / "source"
+        source.mkdir()
+        payload = {
+            "plans": [
+                {"optimizer_run_id": run_id, "plan_kind": "user_custom"},
+                {"optimizer_run_id": "default", "plan_kind": "platform_default"},
+                {"optimizer_run_id": "diagnostic", "plan_kind": "platform_diagnostic"},
+            ]
+        }
+        (source / plan_server.NEXT_GW_FILENAME).write_text(json.dumps(payload), encoding="utf-8")
+        (source / "players.json").write_text('{"generation":"new"}', encoding="utf-8")
+        public = tmp_path / "public" / "data"
+        preview = tmp_path / "dist" / "data"
+        for target in (public, preview):
+            target.mkdir(parents=True)
+            (target / plan_server.NEXT_GW_FILENAME).write_text("old", encoding="utf-8")
+            (target / "stale.json").write_text("old-only", encoding="utf-8")
+
+        _publish_dashboard_generations(source, [public, preview], run_id)
+
+        for target in (public, preview):
+            assert (
+                json.loads((target / plan_server.NEXT_GW_FILENAME).read_text())["plans"]
+                == payload["plans"]
+            )
+            assert (target / "players.json").read_text(encoding="utf-8") == '{"generation":"new"}'
+            assert not (target / "stale.json").exists()
+        assert not list(tmp_path.rglob(".*.tmp"))
+        assert not list(tmp_path.rglob(".*.previous"))
+
+    def test_invalid_generation_leaves_every_served_target_unchanged(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        source.mkdir()
+        (source / plan_server.NEXT_GW_FILENAME).write_text(
+            json.dumps(
+                {
+                    "plans": [
+                        {"optimizer_run_id": "other", "plan_kind": "user_custom"},
+                        {"optimizer_run_id": "default", "plan_kind": "platform_default"},
+                        {"optimizer_run_id": "diagnostic", "plan_kind": "platform_diagnostic"},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        targets = [tmp_path / "public" / "data", tmp_path / "dist" / "data"]
+        for target in targets:
+            target.mkdir(parents=True)
+            (target / "sentinel").write_text("unchanged", encoding="utf-8")
+
+        with pytest.raises(RuntimeError, match="exact solved optimizer run"):
+            _publish_dashboard_generations(source, targets, "wanted")
+
+        for target in targets:
+            assert (target / "sentinel").read_text(encoding="utf-8") == "unchanged"
+
+    def test_generation_promotion_failure_restores_previous_directory(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = "wanted"
+        source = tmp_path / "source"
+        source.mkdir()
+        (source / plan_server.NEXT_GW_FILENAME).write_text(
+            json.dumps(
+                {
+                    "plans": [
+                        {"optimizer_run_id": run_id, "plan_kind": "user_custom"},
+                        {"optimizer_run_id": "default", "plan_kind": "platform_default"},
+                        {"optimizer_run_id": "diagnostic", "plan_kind": "platform_diagnostic"},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        target = tmp_path / "public" / "data"
+        target.mkdir(parents=True)
+        (target / "sentinel").write_text("previous", encoding="utf-8")
+        real_replace = Path.replace
+
+        def fail_generation_promotion(path: Path, destination: Path) -> Path:
+            if path.name.endswith(".tmp") and destination == target:
+                raise OSError("injected promotion failure")
+            return real_replace(path, destination)
+
+        monkeypatch.setattr(Path, "replace", fail_generation_promotion)
+
+        with pytest.raises(OSError, match="injected promotion failure"):
+            _publish_dashboard_generations(source, [target], run_id)
+
+        assert (target / "sentinel").read_text(encoding="utf-8") == "previous"
+        assert not list(tmp_path.rglob(".*.tmp"))
+        assert not list(tmp_path.rglob(".*.previous"))
+
+    def test_second_target_promotion_failure_rolls_both_targets_back(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = "wanted"
+        source = self._valid_dashboard_source(tmp_path, run_id)
+        public = tmp_path / "public" / "data"
+        preview = tmp_path / "dist" / "data"
+        for target, marker in ((public, "old-public"), (preview, "old-preview")):
+            target.mkdir(parents=True)
+            (target / "sentinel").write_text(marker, encoding="utf-8")
+        real_replace = Path.replace
+
+        def fail_preview_promotion(path: Path, destination: Path) -> Path:
+            if path.name.endswith(".tmp") and destination == preview:
+                raise OSError("injected second promotion failure")
+            return real_replace(path, destination)
+
+        monkeypatch.setattr(Path, "replace", fail_preview_promotion)
+
+        with pytest.raises(OSError, match="injected second promotion failure"):
+            _publish_dashboard_generations(source, [public, preview], run_id)
+
+        assert (public / "sentinel").read_text(encoding="utf-8") == "old-public"
+        assert (preview / "sentinel").read_text(encoding="utf-8") == "old-preview"
+        assert not list(tmp_path.rglob(".*.tmp"))
+        assert not list(tmp_path.rglob(".*.previous"))
+
+    def test_partial_copy_failure_cleans_staged_generation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = "wanted"
+        source = self._valid_dashboard_source(tmp_path, run_id)
+        target = tmp_path / "public" / "data"
+        target.mkdir(parents=True)
+        (target / "sentinel").write_text("previous", encoding="utf-8")
+
+        def partial_copy(_source: Path, destination: Path) -> None:
+            destination.mkdir()
+            (destination / "partial.json").write_text("partial", encoding="utf-8")
+            raise OSError("injected partial copy failure")
+
+        monkeypatch.setattr(plan_server.shutil, "copytree", partial_copy)
+
+        with pytest.raises(OSError, match="injected partial copy failure"):
+            _publish_dashboard_generations(source, [target], run_id)
+
+        assert (target / "sentinel").read_text(encoding="utf-8") == "previous"
+        assert not list(tmp_path.rglob(".*.tmp"))
+        assert not list(tmp_path.rglob(".*.previous"))
+
+    def test_double_failure_preserves_backup_and_restores_earlier_target(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run_id = "wanted"
+        source = self._valid_dashboard_source(tmp_path, run_id)
+        public = tmp_path / "public" / "data"
+        preview = tmp_path / "dist" / "data"
+        for target, marker in ((public, "old-public"), (preview, "old-preview")):
+            target.mkdir(parents=True)
+            (target / "sentinel").write_text(marker, encoding="utf-8")
+        real_replace = Path.replace
+
+        def fail_preview_promotion_and_restore(path: Path, destination: Path) -> Path:
+            if destination == preview and (
+                path.name.endswith(".tmp") or path.name.endswith(".previous")
+            ):
+                raise OSError("injected preview promotion/restore failure")
+            return real_replace(path, destination)
+
+        monkeypatch.setattr(Path, "replace", fail_preview_promotion_and_restore)
+
+        with pytest.raises(RuntimeError, match="preserved for manual recovery") as excinfo:
+            _publish_dashboard_generations(source, [public, preview], run_id)
+
+        assert (public / "sentinel").read_text(encoding="utf-8") == "old-public"
+        assert not preview.exists()
+        backups = list((tmp_path / "dist").glob(".data.*.previous"))
+        assert len(backups) == 1
+        assert (backups[0] / "sentinel").read_text(encoding="utf-8") == "old-preview"
+        assert str(backups[0]) in str(excinfo.value)
+        assert str(preview) in str(excinfo.value)
+        assert not list(tmp_path.rglob(".*.tmp"))
+
+    @staticmethod
+    def _valid_dashboard_source(tmp_path: Path, run_id: str) -> Path:
+        source = tmp_path / f"source-{run_id}"
+        source.mkdir()
+        (source / plan_server.NEXT_GW_FILENAME).write_text(
+            json.dumps(
+                {
+                    "plans": [
+                        {"optimizer_run_id": run_id, "plan_kind": "user_custom"},
+                        {"optimizer_run_id": "default", "plan_kind": "platform_default"},
+                        {"optimizer_run_id": "diagnostic", "plan_kind": "platform_diagnostic"},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        return source
 
 
 @pytest.fixture

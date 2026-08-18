@@ -148,7 +148,13 @@ npx vite preview --host 0.0.0.0 --port 4173   # http://<your-LAN-IP>:4173/
 The data location is configurable: `VITE_DATA_BASE` (default `/data`, i.e. `public/data`).
 A static build serves whatever JSON was in `public/data` at build time; to deploy, build
 after copying fresh read models, or serve `dist/` behind a `/data` route pointing at a
-published read-model directory.
+published read-model directory. The local plan server also generation-swaps both `public/data`
+and an existing `dist/data` after validating the exact custom run, so the documented
+`vite preview` loop sees the same complete read-model generation without rebuilding the
+JavaScript bundle. A failed swap cannot be reported as a successful solve. The server restores
+every target it can; if the operating system also blocks restoration, it preserves the
+`.previous` directory and reports the exact backup-to-target recovery path instead of deleting
+the last good generation.
 
 ## Vintages and images
 

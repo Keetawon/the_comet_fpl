@@ -756,7 +756,7 @@ export function PlanBuilderPage() {
             </div>
             <nav
               aria-label="Player picker pages"
-              className="mb-2 flex items-center justify-between gap-2 rounded-md border bg-background/60 px-2 py-1.5"
+              className="sticky top-2 z-10 mb-2 flex items-center justify-between gap-2 rounded-md border bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur"
             >
               <Button
                 type="button"
@@ -768,8 +768,18 @@ export function PlanBuilderPage() {
               >
                 Previous players
               </Button>
-              <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
+              <span
+                className="text-center text-xs tabular-nums text-muted-foreground"
+                aria-live="polite"
+              >
                 Page {candidatePage + 1} of {candidatePageCount}
+                {candidates.length > 0 && (
+                  <span className="hidden sm:inline">
+                    {" "}· showing {candidatePage * PLAYER_PAGE_SIZE + 1}–
+                    {Math.min((candidatePage + 1) * PLAYER_PAGE_SIZE, candidates.length)} of{" "}
+                    {candidates.length}
+                  </span>
+                )}
               </span>
               <Button
                 type="button"

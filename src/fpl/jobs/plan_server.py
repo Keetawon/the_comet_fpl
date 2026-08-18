@@ -38,6 +38,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -260,6 +261,115 @@ def _verify_dashboard_plans_published(directory: Path, optimizer_run_id: str) ->
         )
 
 
+def _remove_publish_path(path: Path) -> None:
+    """Remove one precisely named publish generation without following directory symlinks."""
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+    elif path.exists():
+        shutil.rmtree(path)
+
+
+@dataclass
+class _DashboardGenerationTarget:
+    target: Path
+    staged: Path
+    backup: Path
+    had_previous: bool = False
+    previous_moved: bool = False
+    new_installed: bool = False
+
+
+def _rollback_dashboard_generations(
+    records: list[_DashboardGenerationTarget],
+) -> list[tuple[_DashboardGenerationTarget, Exception]]:
+    """Best-effort rollback, retaining every backup that could not be restored."""
+    failures: list[tuple[_DashboardGenerationTarget, Exception]] = []
+    for record in reversed(records):
+        if record.new_installed:
+            try:
+                _remove_publish_path(record.target)
+                record.new_installed = False
+            except Exception as exc:
+                failures.append((record, exc))
+                continue
+        if record.previous_moved:
+            try:
+                record.backup.replace(record.target)
+                record.previous_moved = False
+            except Exception as exc:
+                failures.append((record, exc))
+    return failures
+
+
+def _publish_dashboard_generations(
+    source: Path, targets: list[Path], optimizer_run_id: str
+) -> None:
+    """Publish one validated read-model generation to every locally served endpoint.
+
+    ``vite preview`` serves ``dist/data`` captured at build time while ``vite dev`` serves
+    ``public/data``.  Stage and validate a complete sibling generation for every applicable
+    target before changing any endpoint, then swap directories and retain the old generations
+    until all targets verify.  Any swap or verification failure rolls every changed target back.
+    """
+    _verify_dashboard_plans_published(source, optimizer_run_id)
+    records: list[_DashboardGenerationTarget] = []
+    try:
+        for target in targets:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            generation_id = uuid.uuid4().hex
+            staged = target.parent / f".{target.name}.{generation_id}.tmp"
+            backup = target.parent / f".{target.name}.{generation_id}.previous"
+            record = _DashboardGenerationTarget(target, staged, backup)
+            # Register before copying so even a partial ``copytree`` is cleaned below.
+            records.append(record)
+            shutil.copytree(source, staged)
+            _verify_dashboard_plans_published(staged, optimizer_run_id)
+
+        for record in records:
+            record.had_previous = record.target.exists() or record.target.is_symlink()
+            if record.had_previous:
+                record.target.replace(record.backup)
+                record.previous_moved = True
+            record.staged.replace(record.target)
+            record.new_installed = True
+
+        for record in records:
+            _verify_dashboard_plans_published(record.target, optimizer_run_id)
+    except Exception as publish_error:
+        rollback_failures = _rollback_dashboard_generations(records)
+        if rollback_failures:
+            recovery_paths = "; ".join(
+                f"restore {record.backup} to {record.target} ({failure})"
+                for record, failure in rollback_failures
+                if record.previous_moved
+            )
+            if not recovery_paths:
+                recovery_paths = "; ".join(
+                    f"inspect {record.target} ({failure})" for record, failure in rollback_failures
+                )
+            raise RuntimeError(
+                "dashboard read-model publish failed and automatic rollback was incomplete; "
+                f"the previous generation was preserved for manual recovery: {recovery_paths}"
+            ) from publish_error
+        raise
+    else:
+        for record in records:
+            if record.had_previous:
+                _remove_publish_path(record.backup)
+                record.previous_moved = False
+    finally:
+        for record in records:
+            try:
+                _remove_publish_path(record.staged)
+                # Never delete the only recoverable old generation after a failed restore.
+                if not record.previous_moved:
+                    _remove_publish_path(record.backup)
+            except OSError as cleanup_error:
+                logger.error(
+                    "dashboard publish cleanup failed for %s: %s", record.target, cleanup_error
+                )
+
+
 def run_plan(
     state: ServerState,
     locks: list[int],
@@ -327,15 +437,27 @@ def run_plan(
             )
         )
         models_dir = base / "dashboard-models"
-        public_data = repo_root() / "dashboard" / "public" / "data"
-        _publish_with_windows_copy_fallback(
-            lambda: export_dashboard_json(
-                base / "bi-export-copy",
-                models_dir,
-                before_publish=_keep_staged_copy(models_dir, public_data),
+        validated_models = base / f".dashboard-read-models.{uuid.uuid4().hex}.tmp"
+        dashboard_root = repo_root() / "dashboard"
+        public_data = dashboard_root / "public" / "data"
+        try:
+            _publish_with_windows_copy_fallback(
+                lambda: export_dashboard_json(
+                    base / "bi-export-copy",
+                    models_dir,
+                    before_publish=_keep_staged_copy(models_dir, validated_models),
+                )
             )
-        )
-        _verify_dashboard_plans_published(public_data, str(summary["optimizer_run_id"]))
+            served_targets = [public_data]
+            if (dashboard_root / "dist" / "index.html").is_file():
+                served_targets.append(dashboard_root / "dist" / "data")
+            _publish_dashboard_generations(
+                validated_models,
+                served_targets,
+                str(summary["optimizer_run_id"]),
+            )
+        finally:
+            _remove_publish_path(validated_models)
         with state.status_lock:
             state.last_result = summary
             state.last_error = None

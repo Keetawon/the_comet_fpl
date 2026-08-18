@@ -266,6 +266,12 @@ describe("PlanBuilderPage", () => {
 
     expect(screen.getByText(/Players 1–50 of 76/)).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Player picker pages" })).toHaveClass(
+      "sticky",
+    );
+    expect(screen.getByRole("navigation", { name: "Player picker pages" })).toHaveTextContent(
+      "showing 1–50 of 76",
+    );
     expect(screen.queryByRole("button", { name: /Paged Player 60/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Previous players" })).toBeDisabled();
 
