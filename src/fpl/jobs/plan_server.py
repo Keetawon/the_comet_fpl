@@ -29,6 +29,8 @@ import json
 import logging
 import shutil
 import socket
+import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -39,7 +41,6 @@ from urllib.parse import urlparse
 
 from fpl.config import repo_root
 from fpl.jobs.optimize_squad import MAX_LOCKED_PLAYERS, _git_worktree_clean
-from fpl.jobs.optimize_squad import main as optimize_main
 from fpl.publish.dashboard_json import export_dashboard_json
 from fpl.publish.export import export_bi
 
@@ -71,7 +72,29 @@ def _ui_message(exc: Exception) -> str:
             "squad cannot both bench him and satisfy the gate. Lower or switch off the "
             f"threshold, or unlock the low-minutes player. ({text})"
         )
-    return f"solver failed: {text}"
+    return text
+
+
+def _run_optimizer_cli(argv: list[str]) -> None:
+    """Run the optimizer exactly as the runbook does: a fresh child interpreter.
+
+    The solve never shares this server's process. An in-thread PuLP/CBC run whose ILP raised
+    once took the whole server down after the handler had already answered (fatal
+    ``PyEval_SaveThread`` GIL error in the main thread), so isolation is a correctness
+    requirement here, not an optimization. Failing closed with the CLI's own stderr tail.
+    """
+    result = subprocess.run(
+        [sys.executable, "-m", "fpl.jobs.optimize_squad", *argv],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+        cwd=repo_root(),
+    )
+    if result.returncode != 0:
+        lines = (result.stderr or "").strip().splitlines()
+        tail = lines[-1] if lines else f"exit code {result.returncode}"
+        raise RequestError(f"optimizer run failed: {tail}")
 
 
 def validate_request(body: dict[str, Any]) -> tuple[list[int], float]:
@@ -185,9 +208,7 @@ def run_plan(state: ServerState, locks: list[int], min_bench_appearance: float) 
             argv += ["--min-bench-appearance", str(min_bench_appearance)]
         argv += ["--output", str(output)]
         state.set_stage("solving squad (exact ILP + bounded transfer search)")
-        exit_code = optimize_main(argv)
-        if exit_code != 0:
-            raise RequestError("optimizer run failed - see the plan-server console for the reason")
+        _run_optimizer_cli(argv)
         state.set_stage("publishing BI export and dashboard read models")
         newest = max(my_rules_dir.glob("plan-*.json"), key=lambda p: p.stat().st_mtime)
         plan_paths = [base / name for name in STANDING_PLANS if (base / name).is_file()] + [newest]
@@ -296,8 +317,9 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                 summary = run_plan(state, locks, bench)
                 self._respond(200, {"ok": True, **summary})
             except RequestError as exc:
-                state.fail(str(exc))
-                self._respond(409, {"ok": False, "error": str(exc)})
+                message = _ui_message(exc)
+                state.fail(message)
+                self._respond(409, {"ok": False, "error": message})
             except Exception as exc:
                 logger.exception("plan run crashed")
                 message = _ui_message(exc)

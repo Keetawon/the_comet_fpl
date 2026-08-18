@@ -23,6 +23,7 @@ from fpl.jobs.plan_server import (
     RequestError,
     ServerState,
     _allowed_origin,
+    _run_optimizer_cli,
     make_handler,
     run_plan,
     summarize_artifact,
@@ -91,6 +92,11 @@ class TestSummarizeArtifact:
 
 
 class TestRunPlanPreChecks:
+    def test_optimizer_cli_failure_surfaces_the_stderr_tail(self) -> None:
+        """The solve runs in a child interpreter; its refusal text must reach the UI."""
+        with pytest.raises(RequestError, match="optimizer run failed"):
+            _run_optimizer_cli(["--not-a-real-flag"])
+
     def test_busy_server_refuses_a_second_run(self) -> None:
         state = ServerState(Path("unused"))
         assert state.run_lock.acquire(blocking=False)
