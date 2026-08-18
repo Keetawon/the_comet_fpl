@@ -67,10 +67,10 @@ def _ui_message(exc: Exception) -> str:
     text = str(exc)
     if "min_bench_appearance" in text:
         return (
-            "these rules are infeasible together: a benched player -- often one of the locked "
-            "ones -- does not clear the rotation threshold's appearance lower bound, so the "
-            "squad cannot both bench him and satisfy the gate. Lower or switch off the "
-            f"threshold, or unlock the low-minutes player. ({text})"
+            "the rotation threshold is too high: every legal squad would have to bench a "
+            "non-locked player whose appearance lower bound is below it (locked players and "
+            "the bench goalkeeper are exempt). Lower or switch off the threshold. "
+            f"({text})"
         )
     return text
 

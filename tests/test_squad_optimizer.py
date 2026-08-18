@@ -350,7 +350,7 @@ def test_equally_priced_fillers_prefer_the_most_selected_players() -> None:
 # --------------------------------------------------------------------------------------
 
 
-def test_locked_players_are_pinned_and_compose_with_the_bench_gate() -> None:
+def test_locked_players_are_exempt_from_the_bench_gate() -> None:
     fodder = {3, 15, 25, 33}
     players = tuple(
         replace(player, cost=30) if player.code in fodder else player for player in _base_players()
@@ -361,15 +361,40 @@ def test_locked_players_are_pinned_and_compose_with_the_bench_gate() -> None:
     gated = optimize_initial_squad(artifact, rules, min_bench_appearance=0.5)
     assert 15 not in set(gated.codes)  # the never-playing cheap DEF is dropped by the gate
 
+    # Owner rule, 2026-08-18: the lock is the more deliberate instruction and outranks the
+    # rotation heuristic -- a locked below-gate player stays selectable AND may bench, where
+    # previously he was forced to start every planned gameweek (and made the transfer
+    # planner's independent lineup pre-check infeasible).
     locked = optimize_initial_squad(artifact, rules, min_bench_appearance=0.5, locked_codes=(15,))
     assert 15 in set(locked.codes)
-    # The policies compose rather than override: a locked never-playing player cannot bench
-    # below the gate, so he must START every planned gameweek.
-    for week in locked.weeks:
-        assert 15 in week.starting_xi
     index = ArtifactIndex.build(artifact, rules)
-    assert bench_appearance_satisfied(index, locked.weeks[0], 0.5)
+    for week in locked.weeks:
+        if 15 not in week.starting_xi:
+            assert 15 in week.bench_order
+    # with the exemption the lineup is legal; without it, this lineup is exactly the
+    # violation the old composition rule refused
+    assert bench_appearance_satisfied(index, locked.weeks[0], 0.5, locked_codes=(15,))
+    if 15 in locked.weeks[0].bench_order:
+        assert not bench_appearance_satisfied(index, locked.weeks[0], 0.5)
     assert locked.locked_codes == (15,)
+
+
+def test_locked_below_gate_player_survives_transfer_planning() -> None:
+    """The reported infeasibility: lock + 25%+ threshold must always be solvable together."""
+    fodder = {3, 15, 25, 33}
+    players = tuple(
+        replace(player, cost=30) if player.code in fodder else player for player in _base_players()
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+    index = ArtifactIndex.build(artifact, rules)
+
+    # any legal initial squad containing the never-playing DEF 15, planned with the gate on
+    initial = optimize_initial_squad(artifact, rules, min_bench_appearance=0.5, locked_codes=(15,))
+    plan = plan_transfers(index, rules, initial, min_bench_appearance=0.5, locked_codes=(15,))
+    for week in plan.weeks:
+        assert 15 not in week.transfers_out
+        assert bench_appearance_satisfied(index, week.lineup, 0.5, locked_codes=(15,))
 
 
 def test_locked_codes_must_be_selectable_players() -> None:

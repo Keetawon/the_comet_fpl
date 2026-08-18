@@ -96,12 +96,13 @@ def _assumptions(min_bench_appearance: float, locked_label: str | None = None) -
     extras: list[str] = []
     if min_bench_appearance > 0.0:
         extras.append(
-            f"min_bench_appearance={min_bench_appearance}: every outfield player benched in "
+            f"min_bench_appearance={min_bench_appearance}: every gated player benched in "
             "any planned gameweek must show an appearance lower bound of at least that "
             "fraction (1 - P(0 points) read from the stored distribution and scaled by the "
             "availability overlay, which understates true appearance probability); the bench "
             "goalkeeper is exempt because a backup keeper plays only on an unforecastable "
-            "starter injury",
+            "starter injury, and locked players are exempt because the owner's must-keep "
+            "instruction outranks the rotation heuristic (owner rule, 2026-08-18)",
         )
     if locked_label:
         extras.append(

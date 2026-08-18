@@ -46,3 +46,10 @@ Thumbs.db
 
 # Dashboard app build state (dashboard/.gitignore covers node_modules/dist)
 dashboard/public/data/
+
+# Owner scratch files at the repo root (2026-08-18): kept on disk, untracked on purpose so
+# the optimizer's clean-worktree guard stays satisfied. Delete these lines to track them.
+/check_dc.py
+/check_defs.py
+/get_defcon.py
+/output_dc.json

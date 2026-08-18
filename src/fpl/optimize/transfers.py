@@ -169,13 +169,14 @@ def plan_transfers(
     """Plan transfers over the artifact horizon with bounded deterministic DP/beam search.
 
     ``min_bench_appearance`` (0.0 = disabled, the default) rejects any successor squad whose
-    lineup for the planned gameweek benches an outfield player below the appearance gate --
-    the same gate :func:`fpl.optimize.squad.optimize_initial_squad` applies to squad
-    selection, kept hold of across the transfer path so a later transfer cannot reintroduce
-    a bench player who never plays. ``locked_codes`` are never transferred out. For a
-    manager's existing squad (whose season has already burned or banked transfers),
-    ``initial_banked_free_transfers`` seeds the free-transfer state; 0 is the fresh-season
-    start the initial-squad path always uses.
+    lineup for the planned gameweek benches a gated player below the appearance gate -- the
+    same gate :func:`fpl.optimize.squad.optimize_initial_squad` applies to squad selection,
+    kept hold of across the transfer path so a later transfer cannot reintroduce a bench
+    player who never plays. Locked players share the goalkeeper's exemption (owner rule,
+    2026-08-18): the must-keep instruction outranks the rotation heuristic. ``locked_codes``
+    are never transferred out. For a manager's existing squad (whose season has already
+    burned or banked transfers), ``initial_banked_free_transfers`` seeds the free-transfer
+    state; 0 is the fresh-season start the initial-squad path always uses.
     """
     if not math.isfinite(risk_lambda) or risk_lambda < 0.0:
         raise ValueError("risk_lambda must be finite and non-negative")
@@ -193,7 +194,9 @@ def plan_transfers(
     candidate_pool = _candidate_pool(artifact_index, rules, initial_squad, risk_lambda)
     first_gw = artifact_index.gws[0]
     first_lineup = exact_lineup(artifact_index, rules, initial_squad, first_gw, risk_lambda)
-    if not bench_appearance_satisfied(artifact_index, first_lineup, min_bench_appearance):
+    if not bench_appearance_satisfied(
+        artifact_index, first_lineup, min_bench_appearance, locked_codes=locked
+    ):
         raise OptimizationError(
             "initial squad lineup violates min_bench_appearance before transfer planning"
         )
@@ -240,7 +243,9 @@ def plan_transfers(
                 hit = max(0, transfers - available) * rules.transfers.hit_cost_points
                 banked = max(0, available - transfers)
                 lineup = exact_lineup(artifact_index, rules, squad, gw, risk_lambda)
-                if not bench_appearance_satisfied(artifact_index, lineup, min_bench_appearance):
+                if not bench_appearance_satisfied(
+                    artifact_index, lineup, min_bench_appearance, locked_codes=locked
+                ):
                     continue
                 week = TransferWeek(
                     gw=gw,

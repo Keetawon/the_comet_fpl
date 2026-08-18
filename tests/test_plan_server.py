@@ -224,7 +224,7 @@ class TestHttpSurface:
             )
             body = json.loads(payload)
             assert status == 500
-            assert "infeasible together" in body["error"]
+            assert "threshold is too high" in body["error"]
             assert "min_bench_appearance" in body["error"]
         finally:
             server.shutdown()

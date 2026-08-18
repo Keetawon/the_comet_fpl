@@ -136,19 +136,27 @@ def appearance_lower_bound(row: ForecastArtifactRow) -> float:
 
 
 def bench_appearance_satisfied(
-    index: ArtifactIndex, lineup: WeekSelection, min_bench_appearance: float
+    index: ArtifactIndex,
+    lineup: WeekSelection,
+    min_bench_appearance: float,
+    *,
+    locked_codes: tuple[int, ...] | frozenset[int] = (),
 ) -> bool:
-    """True when every outfield bench player of this lineup clears the appearance gate.
+    """True when every gated bench player of this lineup clears the appearance gate.
 
-    The bench goalkeeper is exempt by design: a backup keeper plays only on an
-    unforecastable starter injury or dismissal, so no meaningful threshold is attainable
-    and gating it would make every squad illegal.
+    Two exemptions are by design, not omissions. The bench goalkeeper plays only on an
+    unforecastable starter injury or dismissal, so no meaningful threshold is attainable.
+    Locked players (owner rule, 2026-08-18) are the owner's explicit must-keep instruction,
+    which outranks the rotation heuristic: a locked player may sit on the bench below the
+    gate, otherwise locking any low-minutes player plus a threshold would be infeasible.
     """
     if min_bench_appearance <= 0.0:
         return True
+    locked = frozenset(locked_codes)
     return all(
         appearance_lower_bound(index.rows[(code, lineup.gw)]) >= min_bench_appearance
         for code in lineup.bench_order
+        if code not in locked
     )
 
 
@@ -304,9 +312,10 @@ def optimize_initial_squad(
     goalkeeper is exempt (see :func:`bench_appearance_satisfied`).
 
     ``locked_codes`` are pinned into the squad: the owner's must-keep players. The optimizer
-    assigns every remaining quota around them. A locked player still obeys the bench gate,
-    so a locked below-threshold player must START every planned gameweek or the solve is
-    infeasible -- the two policies compose rather than one silently overriding the other.
+    assigns every remaining quota around them. A locked player is EXEMPT from the bench gate
+    (owner rule, 2026-08-18): the lock is the more deliberate instruction and outranks the
+    rotation heuristic, so a locked below-threshold player may bench, and locking him can
+    never make the threshold infeasible. Non-locked players obey the gate as before.
     """
     if not math.isfinite(min_bench_appearance) or not 0.0 <= min_bench_appearance <= 1.0:
         raise ValueError("min_bench_appearance must be finite and within [0, 1]")
@@ -367,10 +376,12 @@ def optimize_initial_squad(
         # Bench appearance gate: squad_vars - starter_vars is exactly the benched indicator
         # (starter <= squad), so one linear constraint per (code, gw) enforces "benched in
         # this gameweek -> appearance lower bound >= threshold" with no extra variables.
-        # Goalkeepers are exempt: the backup keeper cannot clear any meaningful threshold.
+        # Goalkeepers are exempt (the backup keeper cannot clear any meaningful threshold),
+        # and so are locked players (owner rule, 2026-08-18): the must-keep instruction
+        # outranks the rotation heuristic, so a locked player may bench below the gate.
         if min_bench_appearance > 0.0:
             for code in codes:
-                if index.first_by_code[code].position == "GK":
+                if index.first_by_code[code].position == "GK" or code in locked:
                     continue
                 problem += appearance_lower_bound(
                     index.rows[(code, gw)]
@@ -401,7 +412,7 @@ def optimize_initial_squad(
         if status == "Infeasible" and locked:
             hints.append(
                 f"the locked players {locked} cannot all be kept in a legal squad "
-                "(position quotas, club cap, budget, or the bench gate)"
+                "(position quotas, club cap, or budget)"
             )
         hint = ("; " + "; ".join(hints)) if hints else ""
         raise OptimizationError(f"initial squad solve did not reach optimality: {status}{hint}")
