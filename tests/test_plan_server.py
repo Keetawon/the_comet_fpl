@@ -60,6 +60,11 @@ class TestAllowedOrigin:
         assert _allowed_origin("http://localhost:5173") is True
         assert _allowed_origin("http://127.0.0.1:4173") is True
 
+    def test_private_lan_origins_pass(self) -> None:
+        # the LAN preview (phone) resolves to a private-range host; hostname resolution is
+        # flaky on Windows, so the private-range rule must carry it without resolution
+        assert _allowed_origin("http://192.168.1.37:4173") is True
+
     def test_other_sites_are_refused(self) -> None:
         assert _allowed_origin("https://evil.example") is False
 

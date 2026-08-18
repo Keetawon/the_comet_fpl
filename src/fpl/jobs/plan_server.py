@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import ipaddress
 import json
 import logging
 import shutil
@@ -243,7 +244,9 @@ def run_plan(state: ServerState, locks: list[int], min_bench_appearance: float) 
 
 
 def _allowed_origin(origin: str | None) -> bool:
-    """Same-machine origins only: loopback, or any address this machine answers on."""
+    """Same-machine origins only: loopback, this machine's own addresses, or a private-range
+    LAN host (the dashboard is served on the same home network). Hostname resolution proved
+    flaky across processes on Windows, so the private-range check carries the LAN case."""
     if not origin:
         return True  # not a browser (curl, tests): no Origin header
     try:
@@ -251,6 +254,12 @@ def _allowed_origin(origin: str | None) -> bool:
     except ValueError:
         return False
     if host in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False  # not an address literal; never resolve names on the request path
+    if address.is_private or address.is_loopback:
         return True
     try:
         local_ips = {
