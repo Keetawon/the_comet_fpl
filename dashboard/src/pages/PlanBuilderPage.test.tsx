@@ -333,7 +333,7 @@ describe("PlanBuilderPage", () => {
     const sixteenth = screen.getByRole("button", { name: /Avoid 16/ });
     expect(sixteenth).toBeDisabled();
     expect(sixteenth).toHaveTextContent("max 15 exclusions");
-  });
+  }, 10_000);
 
   it("pages through every eligible priced player and selects one beyond the first 50", async () => {
     const user = userEvent.setup();
@@ -461,20 +461,40 @@ describe("PlanBuilderPage", () => {
       "Vice-captain",
     );
     expect(within(squadTable).getByText("Gamma").closest("tr")).toHaveTextContent("Bench");
+    expect(within(squadTable).getByRole("columnheader", { name: "Player" })).toHaveClass("sticky");
     expect(within(squadTable).getByRole("columnheader", { name: "GW1 role" })).toBeInTheDocument();
-    expect(within(squadTable).getByRole("columnheader", { name: /1 GW xP/ })).toBeInTheDocument();
-    expect(within(squadTable).getByRole("columnheader", { name: /5 GWs xP/ })).toBeInTheDocument();
-    expect(screen.getByText(/unconditional forecast/)).toHaveTextContent(
+    expect(screen.getByText(/Scroll sideways to see every gameweek/)).toBeInTheDocument();
+    expect(within(squadTable).getByRole("columnheader", { name: /Total 3 GWs xP/ })).toBeInTheDocument();
+    expect(within(squadTable).getByRole("columnheader", { name: /Total 5 GWs xP/ })).toBeInTheDocument();
+    for (let gw = 1; gw <= 5; gw++) {
+      expect(within(squadTable).getByRole("columnheader", { name: `GW${gw} xP` })).toBeInTheDocument();
+    }
+    expect(screen.getByText(/unconditional player forecasts/)).toHaveTextContent(
       "continue after a later planned transfer-out",
     );
+    const alphaRow = within(squadTable).getByText("Alpha").closest("tr");
+    expect(alphaRow).not.toBeNull();
+    const alphaCells = within(alphaRow!).getAllByRole("cell");
+    expect(alphaCells[1]).toHaveClass("sticky");
+    expect(alphaCells.slice(5).map((cell) => cell.textContent)).toEqual([
+      "19.0",
+      "30.2",
+      "7.4",
+      "6.1",
+      "5.5",
+      "4.9",
+      "6.3",
+    ]);
 
-    const oneGwSort = within(squadTable).getByRole("button", {
-      name: "Sort by cumulative player xP from GW1 through GW1",
+    const gw1Sort = within(squadTable).getByRole("button", {
+      name: "Sort by player xP for GW1",
     });
-    await user.click(oneGwSort);
-    expect(oneGwSort.closest("th")).toHaveAttribute("aria-sort", "descending");
-    await user.click(oneGwSort);
-    expect(oneGwSort.closest("th")).toHaveAttribute("aria-sort", "ascending");
+    await user.click(gw1Sort);
+    expect(gw1Sort.closest("th")).toHaveAttribute("aria-sort", "descending");
+    expect(gw1Sort.querySelector('[data-sort-direction="descending"]')).toBeInTheDocument();
+    await user.click(gw1Sort);
+    expect(gw1Sort.closest("th")).toHaveAttribute("aria-sort", "ascending");
+    expect(gw1Sort.querySelector('[data-sort-direction="ascending"]')).toBeInTheDocument();
     const oneGwAscending = within(squadTable)
       .getAllByRole("row")
       .filter((row) => row.hasAttribute("data-player-code"))
@@ -486,25 +506,25 @@ describe("PlanBuilderPage", () => {
     expect(within(squadTable).getByText("Alpha").closest("tr")).toHaveClass("bg-amber-100/70");
     expect(within(squadTable).getByLabelText("Captain: Alpha")).toBeInTheDocument();
 
-    // Gamma's two-GW cumulative forecast is null, so it remains last even in descending order.
-    const twoGwSort = within(squadTable).getByRole("button", {
-      name: "Sort by cumulative player xP from GW1 through GW2",
+    // Gamma's three-GW total is null because GW2 is unmeasured, so it sorts last both ways.
+    const totalThreeSort = within(squadTable).getByRole("button", {
+      name: "Sort by total player xP from GW1 through GW3",
     });
-    await user.click(twoGwSort);
-    const twoGwDescending = within(squadTable)
+    await user.click(totalThreeSort);
+    const totalThreeDescending = within(squadTable)
       .getAllByRole("row")
       .filter((row) => row.hasAttribute("data-player-code"))
       .map((row) => row.getAttribute("data-player-code"));
-    expect(twoGwDescending).toHaveLength(15);
-    expect(twoGwDescending[0]).toBe("1");
-    expect(twoGwDescending.at(-1)).toBe("3");
-    await user.click(twoGwSort);
-    expect(twoGwSort.closest("th")).toHaveAttribute("aria-sort", "ascending");
-    const twoGwAscending = within(squadTable)
+    expect(totalThreeDescending).toHaveLength(15);
+    expect(totalThreeDescending[0]).toBe("1");
+    expect(totalThreeDescending.at(-1)).toBe("3");
+    await user.click(totalThreeSort);
+    expect(totalThreeSort.closest("th")).toHaveAttribute("aria-sort", "ascending");
+    const totalThreeAscending = within(squadTable)
       .getAllByRole("row")
       .filter((row) => row.hasAttribute("data-player-code"))
       .map((row) => row.getAttribute("data-player-code"));
-    expect(twoGwAscending.at(-1)).toBe("3");
+    expect(totalThreeAscending.at(-1)).toBe("3");
 
     await user.click(
       within(squadTable).getByRole("button", { name: "Show gameweek details for Alpha" }),

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDownUp, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowDown, ArrowDownUp, ArrowUp, ChevronDown, ChevronRight } from "lucide-react";
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,14 +57,40 @@ function membershipLabel(player: PlanPlayer | undefined): string {
 }
 
 type SortDirection = "asc" | "desc";
+type PlanSortKey = "total-3" | "total-5" | `gw-${number}`;
 interface PlanSort {
-  weeks: number;
+  key: PlanSortKey;
   direction: SortDirection;
 }
 
+const TOTAL_XP_COLUMNS = [
+  { key: "total-3", weeks: 3, label: "Total 3 GWs xP" },
+  { key: "total-5", weeks: 5, label: "Total 5 GWs xP" },
+] as const;
+
+function gameweekXp(plan: NextGwPlan, code: number, gw: number): number | null {
+  return plan.player_xp[String(code)]?.[String(gw)] ?? null;
+}
+
+function planSortValue(plan: NextGwPlan, code: number, key: PlanSortKey): number | null {
+  if (key === "total-3") return horizonXp(plan, code, 3);
+  if (key === "total-5") return horizonXp(plan, code, 5);
+  return gameweekXp(plan, code, Number(key.slice(3)));
+}
+
+function SortIndicator({ direction }: { direction: SortDirection | null }) {
+  if (direction === "asc") {
+    return <ArrowUp className="size-3" data-sort-direction="ascending" aria-hidden />;
+  }
+  if (direction === "desc") {
+    return <ArrowDown className="size-3" data-sort-direction="descending" aria-hidden />;
+  }
+  return <ArrowDownUp className="size-3" data-sort-direction="none" aria-hidden />;
+}
+
 /** A compact, plan-bound analysis table. The fifteen rows and all role styling are fixed to
- * GW1; sorting changes display order only. Cumulative values come strictly from the artifact's
- * player_xp map, so no other forecast vintage can be substituted. */
+ * GW1; sorting changes display order only. Total and single-gameweek values come strictly from
+ * the artifact's player_xp map, so no other forecast vintage can be substituted. */
 export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
   const [sort, setSort] = useState<PlanSort | null>(null);
   const [expandedCodes, setExpandedCodes] = useState<Set<number>>(() => new Set());
@@ -107,13 +133,12 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
     );
   }
   const horizon = Math.min(5, Math.max(0, plan.gw_to - plan.gw_from + 1));
-  const horizons = Array.from({ length: horizon }, (_, index) => index + 1);
-  const horizonGws = horizons.map((weeks) => plan.gw_from + weeks - 1);
+  const horizonGws = Array.from({ length: horizon }, (_, index) => plan.gw_from + index);
   const baseline = [...firstWeek.players].sort(planPlayerOrder);
   const rows = sort
     ? [...baseline].sort((left, right) => {
-        const leftXp = horizonXp(plan, left.code, sort.weeks);
-        const rightXp = horizonXp(plan, right.code, sort.weeks);
+        const leftXp = planSortValue(plan, left.code, sort.key);
+        const rightXp = planSortValue(plan, right.code, sort.key);
         if (leftXp == null && rightXp == null) return left.code - right.code;
         if (leftXp == null) return 1;
         if (rightXp == null) return -1;
@@ -122,10 +147,10 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
       })
     : baseline;
 
-  const toggleSort = (weeks: number) => {
+  const toggleSort = (key: PlanSortKey) => {
     setSort((current) => {
-      if (!current || current.weeks !== weeks) return { weeks, direction: "desc" };
-      if (current.direction === "desc") return { weeks, direction: "asc" };
+      if (!current || current.key !== key) return { key, direction: "desc" };
+      if (current.direction === "desc") return { key, direction: "asc" };
       return null;
     });
   };
@@ -142,8 +167,11 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
     <div className="space-y-2">
       <p className="text-xs leading-relaxed text-muted-foreground">
         Row colours and role labels show the fixed GW{firstWeek.gw} decision; sorting changes
-        display order only. Select a cumulative xP heading to rank the squad, or expand a player
-        for gameweek detail.
+        display order only. Select any xP heading to rank the squad, or expand a player for
+        gameweek detail.
+        <span className="mt-1 block font-medium text-foreground/80">
+          Scroll sideways to see every gameweek; Player stays visible.
+        </span>
       </p>
       <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <Table aria-label={`GW${firstWeek.gw} custom squad analysis`}>
@@ -152,16 +180,16 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
               <TableHead className="h-8 w-8 px-1">
                 <span className="sr-only">Gameweek details</span>
               </TableHead>
-              <TableHead className="h-8 text-xs">Player</TableHead>
+              <TableHead className="sticky left-0 z-20 h-8 bg-muted text-xs">Player</TableHead>
               <TableHead className="h-8 text-xs">GW{firstWeek.gw} role</TableHead>
               <TableHead className="h-8 text-xs">Position</TableHead>
               <TableHead className="h-8 text-xs">Price</TableHead>
-              {horizons.map((weeks) => {
-                const direction = sort?.weeks === weeks ? sort.direction : null;
-                const throughGw = plan.gw_from + weeks - 1;
+              {TOTAL_XP_COLUMNS.map((column) => {
+                const direction = sort?.key === column.key ? sort.direction : null;
+                const throughGw = plan.gw_from + column.weeks - 1;
                 return (
                   <TableHead
-                    key={weeks}
+                    key={column.key}
                     className="h-8 text-right text-xs"
                     aria-sort={
                       direction === "asc"
@@ -173,12 +201,39 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
                   >
                     <button
                       type="button"
-                      onClick={() => toggleSort(weeks)}
+                      onClick={() => toggleSort(column.key)}
                       className="ml-auto inline-flex items-center gap-1 whitespace-nowrap font-medium"
-                      aria-label={`Sort by cumulative player xP from GW${plan.gw_from} through GW${throughGw}`}
+                      aria-label={`Sort by total player xP from GW${plan.gw_from} through GW${throughGw}`}
                     >
-                      {weeks} GW{weeks === 1 ? "" : "s"} xP
-                      <ArrowDownUp className="size-3" aria-hidden />
+                      {column.label}
+                      <SortIndicator direction={direction} />
+                    </button>
+                  </TableHead>
+                );
+              })}
+              {horizonGws.map((gw) => {
+                const key: PlanSortKey = `gw-${gw}`;
+                const direction = sort?.key === key ? sort.direction : null;
+                return (
+                  <TableHead
+                    key={key}
+                    className="h-8 text-right text-xs"
+                    aria-sort={
+                      direction === "asc"
+                        ? "ascending"
+                        : direction === "desc"
+                          ? "descending"
+                          : undefined
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(key)}
+                      className="ml-auto inline-flex items-center gap-1 whitespace-nowrap font-medium"
+                      aria-label={`Sort by player xP for GW${gw}`}
+                    >
+                      GW{gw} xP
+                      <SortIndicator direction={direction} />
                     </button>
                   </TableHead>
                 );
@@ -197,6 +252,13 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
                   : bench
                     ? "border-l-4 border-l-transparent bg-zinc-200 dark:bg-zinc-800/80"
                     : undefined;
+              const stickyPlayerBackground = player.is_captain
+                ? "bg-amber-100 dark:bg-amber-950"
+                : player.is_vice_captain
+                  ? "bg-amber-50 dark:bg-amber-950"
+                  : bench
+                    ? "bg-zinc-200 dark:bg-zinc-800"
+                    : "bg-card";
               const mainRow = (
                 <TableRow key={`player-${player.code}`} data-player-code={player.code} className={rowClass}>
                   <TableCell className="px-1 py-1.5">
@@ -217,7 +279,9 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
                       )}
                     </Button>
                   </TableCell>
-                  <TableCell className="py-1.5">
+                  <TableCell
+                    className={cn("sticky left-0 z-10 py-1.5", stickyPlayerBackground)}
+                  >
                     <div className="flex min-w-44 items-center gap-1.5">
                       <PlayerPhoto code={player.code} name={player.web_name} />
                       <div className="min-w-0">
@@ -260,9 +324,20 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
                   <TableCell className="py-1.5 text-xs tabular-nums">
                     {price(player.now_cost)}
                   </TableCell>
-                  {horizons.map((weeks) => (
-                    <TableCell key={weeks} className="py-1.5 text-right text-xs font-medium tabular-nums">
-                      {fmt(horizonXp(plan, player.code, weeks))}
+                  {TOTAL_XP_COLUMNS.map((column) => (
+                    <TableCell
+                      key={column.key}
+                      className="py-1.5 text-right text-xs font-medium tabular-nums"
+                    >
+                      {fmt(horizonXp(plan, player.code, column.weeks))}
+                    </TableCell>
+                  ))}
+                  {horizonGws.map((gw) => (
+                    <TableCell
+                      key={gw}
+                      className="py-1.5 text-right text-xs font-medium tabular-nums"
+                    >
+                      {fmt(gameweekXp(plan, player.code, gw))}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -271,14 +346,17 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
               return [
                 mainRow,
                 <TableRow key={`details-${player.code}`} className="bg-muted/20 hover:bg-muted/20">
-                  <TableCell colSpan={5 + horizons.length} className="p-0 whitespace-normal">
+                  <TableCell
+                    colSpan={5 + TOTAL_XP_COLUMNS.length + horizonGws.length}
+                    className="p-0 whitespace-normal"
+                  >
                     <div id={detailId} className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-5">
                       {horizonGws.map((gw) => {
                         const planWeek = plan.weeks.find((candidate) => candidate.gw === gw);
                         const membership = planWeek?.players.find(
                           (candidate) => candidate.code === player.code,
                         );
-                        const rawXp = plan.player_xp[String(player.code)]?.[String(gw)];
+                        const rawXp = gameweekXp(plan, player.code, gw);
                         return (
                           <div key={gw} className="rounded-md border bg-background/80 p-2">
                             <div className="flex items-center justify-between gap-2">
@@ -302,9 +380,10 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
         </Table>
       </div>
       <p className="text-[10px] leading-relaxed text-muted-foreground">
-        Cumulative columns are the player's unconditional forecast from GW{plan.gw_from} onward.
-        They continue after a later planned transfer-out and are not plan contribution, captain
-        weighting, or bench weighting. Null stays unmeasured and sorts last. Gold = captain · pale
+        Total 3/5 GWs xP is cumulative from GW{plan.gw_from}; each GW xP column is that gameweek
+        only. Both are unconditional player forecasts, continue after a later planned transfer-out,
+        and are not plan contribution or captain/bench weighting. Null stays unmeasured and sorts
+        last. Gold = captain · pale
         gold = vice-captain · grey = bench.
       </p>
     </div>
