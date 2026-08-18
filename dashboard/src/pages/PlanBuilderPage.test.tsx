@@ -2,7 +2,7 @@
 // picker supports mutually-exclusive green locks and red exclusions; Next GW remains the
 // platform-owned recommendation and is never replaced by a custom solve.
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
@@ -11,7 +11,7 @@ import { reloadPublishedReadModels } from "@/lib/readModelReload";
 import playersSample from "@/data/samplePlayers.json";
 import nextGwSample from "@/data/sampleNextGw.json";
 import auditSample from "@/data/sampleOptimizerAudit.json";
-import type { NextGwPlan, OptimizerAuditData, PlayerRecord } from "@/data/types";
+import type { NextGwPlan, OptimizerAuditData, PlanPlayer, PlayerRecord } from "@/data/types";
 import { PlanBuilderPage } from "./PlanBuilderPage";
 
 vi.mock("@/data/load", () => ({
@@ -67,6 +67,96 @@ const builderPlayers: PlayerRecord[] = [
   ),
 ];
 
+const makePlanPlayer = (
+  code: number,
+  webName: string,
+  position: string,
+  role: PlanPlayer["role"],
+  expectedPoints: number,
+  options: {
+    benchOrder?: number;
+    captain?: boolean;
+    viceCaptain?: boolean;
+  } = {},
+): PlanPlayer => ({
+  ...plans[0].weeks[0].players[0],
+  code,
+  web_name: webName,
+  position,
+  team_code: 100 + code,
+  team_short_name: `T${code}`,
+  now_cost: 40 + code,
+  role,
+  bench_order_index: options.benchOrder ?? null,
+  is_captain: options.captain ?? false,
+  is_vice_captain: options.viceCaptain ?? false,
+  transferred_in: false,
+  transferred_out: false,
+  expected_points: expectedPoints,
+});
+
+const customGw1Players: PlanPlayer[] = [
+  makePlanPlayer(1, "Alpha", "MID", "starting_xi", 7.4, { captain: true }),
+  makePlanPlayer(2, "Beta", "GK", "starting_xi", 3.9, { viceCaptain: true }),
+  makePlanPlayer(4, "Delta", "DEF", "starting_xi", 3.8),
+  makePlanPlayer(5, "Echo", "DEF", "starting_xi", 3.7),
+  makePlanPlayer(6, "Foxtrot", "DEF", "starting_xi", 3.6),
+  makePlanPlayer(7, "Hotel", "DEF", "starting_xi", 3.5),
+  makePlanPlayer(8, "India", "MID", "starting_xi", 3.4),
+  makePlanPlayer(9, "Juliet", "MID", "starting_xi", 3.3),
+  makePlanPlayer(10, "Kilo", "MID", "starting_xi", 3.2),
+  makePlanPlayer(11, "Lima", "FWD", "starting_xi", 3.1),
+  makePlanPlayer(12, "Mike", "FWD", "starting_xi", 3.0),
+  makePlanPlayer(13, "Bench Keeper", "GK", "bench_goalkeeper", 2.4),
+  makePlanPlayer(3, "Gamma", "FWD", "bench_outfield", 2.1, { benchOrder: 1 }),
+  makePlanPlayer(14, "Bench Two", "MID", "bench_outfield", 2.3, { benchOrder: 2 }),
+  makePlanPlayer(15, "Bench Three", "DEF", "bench_outfield", 2.2, { benchOrder: 3 }),
+];
+
+const replacement = makePlanPlayer(99, "Replacement", "MID", "starting_xi", 5.0, {
+  captain: true,
+});
+const customPlanWeeks = Array.from({ length: 5 }, (_, index) => {
+  const gw = index + 1;
+  if (gw === 1) {
+    return {
+      ...plans[0].weeks[0],
+      gw,
+      captain_code: 1,
+      vice_captain_code: 2,
+      players: customGw1Players,
+    };
+  }
+  return {
+    ...plans[0].weeks[0],
+    gw,
+    captain_code: 99,
+    vice_captain_code: 2,
+    players: [
+      ...customGw1Players
+        .filter((player) => player.code !== 1)
+        .map((player) => ({ ...player, transferred_in: false })),
+      { ...replacement, transferred_in: gw === 2 },
+    ],
+  };
+});
+
+const customPlayerXp: NextGwPlan["player_xp"] = Object.fromEntries(
+  customGw1Players.map((player) => [
+    String(player.code),
+    Object.fromEntries(
+      Array.from({ length: 5 }, (_, index) => [
+        String(index + 1),
+        Number(((player.expected_points ?? 0) - index * 0.1).toFixed(1)),
+      ]),
+    ),
+  ]),
+);
+customPlayerXp["1"] = { "1": 7.4, "2": 6.1, "3": 5.5, "4": 4.9, "5": 6.3 };
+customPlayerXp["2"] = { "1": 3.9, "2": 3.4, "3": 3.8, "4": 3.1, "5": 4.0 };
+customPlayerXp["3"] = { "1": 2.1, "2": null, "3": 2.4, "4": 2.8, "5": 2.2 };
+customPlayerXp["99"] = { "1": 5.0, "2": 5.1, "3": 5.2, "4": 5.3, "5": 5.4 };
+
 const customPlan: NextGwPlan = {
   ...plans[0],
   optimizer_run_id: "solved-custom-run",
@@ -78,6 +168,8 @@ const customPlan: NextGwPlan = {
     excluded_codes: [2],
     min_bench_appearance: 0.25,
   },
+  weeks: customPlanWeeks,
+  player_xp: customPlayerXp,
 };
 
 const readyRuntime = {
@@ -265,21 +357,36 @@ describe("PlanBuilderPage", () => {
     await user.click(await screen.findByText("Build from scratch →"));
 
     expect(screen.getByText(/Players 1–50 of 76/)).toBeInTheDocument();
-    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Player picker pages" })).toHaveClass(
-      "sticky",
-    );
-    expect(screen.getByRole("navigation", { name: "Player picker pages" })).toHaveTextContent(
-      "showing 1–50 of 76",
-    );
+    expect(screen.getAllByText("Page 1 of 2")).toHaveLength(2);
+    const topPager = screen.getByRole("navigation", {
+      name: "Player picker pages (top)",
+    });
+    const bottomPager = screen.getByRole("navigation", {
+      name: "Player picker pages (bottom)",
+    });
+    expect(topPager).toHaveClass("sticky");
+    expect(bottomPager).not.toHaveClass("sticky");
+    expect(topPager.querySelector('[aria-live="polite"]')).toBeInTheDocument();
+    expect(bottomPager.querySelector('[aria-live="polite"]')).not.toBeInTheDocument();
+    expect(topPager).toHaveTextContent("showing 1–50 of 76");
+    expect(bottomPager).toHaveTextContent("showing 1–50 of 76");
     expect(screen.queryByRole("button", { name: /Paged Player 60/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Previous players" })).toBeDisabled();
+    expect(within(bottomPager).getByRole("button", { name: "Previous players" })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Next players" }));
+    // The lower control is reachable immediately after scanning the last player; there is no
+    // need to scroll back to the top to continue through the complete roster.
+    await user.click(within(bottomPager).getByRole("button", { name: "Next players" }));
 
     expect(screen.getByText(/Players 51–76 of 76/)).toBeInTheDocument();
-    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next players" })).toBeDisabled();
+    expect(screen.getAllByText("Page 2 of 2")).toHaveLength(2);
+    const secondPageList = screen.getByRole("list", { name: "Player candidates page 2" });
+    expect(secondPageList.querySelector("button:not(:disabled)")).toHaveFocus();
+    expect(
+      within(screen.getByRole("navigation", { name: "Player picker pages (bottom)" })).getByRole(
+        "button",
+        { name: "Next players" },
+      ),
+    ).toBeDisabled();
     const laterPlayer = screen.getByRole("button", { name: /Paged Player 60/ });
     await user.click(laterPlayer);
     expect(laterPlayer).toHaveAttribute("aria-pressed", "true");
@@ -289,7 +396,7 @@ describe("PlanBuilderPage", () => {
     // Searching from a later page resets to the first matching page. The off-page selection
     // remains durable and reaches the v2 optimizer request.
     await user.type(screen.getByRole("textbox", { name: "Search player" }), "Alpha");
-    expect(screen.getByText("Page 1 of 1")).toBeInTheDocument();
+    expect(screen.getAllByText("Page 1 of 1")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: /Paged Player 60/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
     const saved = JSON.parse(window.localStorage.getItem("fpl-plan-request") ?? "{}") as {
@@ -325,6 +432,7 @@ describe("PlanBuilderPage", () => {
   });
 
   it("renders only the exact custom run carried in the URL and never falls back", async () => {
+    const user = userEvent.setup();
     window.location.hash = "#plan-builder?run=" + customPlan.optimizer_run_id;
     vi.mocked(loadNextGw).mockResolvedValue({
       plans: [plans[0], customPlan, plans[1]],
@@ -338,8 +446,172 @@ describe("PlanBuilderPage", () => {
     expect(screen.getByText(/locked ·/).parentElement).toHaveTextContent("Alpha");
     expect(screen.getByText(/excluded ·/).parentElement).toHaveTextContent("Beta");
     expect(screen.getByText(/optimizer run solved-custo/)).toBeInTheDocument();
+    const squadTable = screen.getByRole("table", { name: "GW1 custom squad analysis" });
+    const mainRows = within(squadTable)
+      .getAllByRole("row")
+      .filter((row) => row.hasAttribute("data-player-code"));
+    expect(mainRows).toHaveLength(15);
+    expect(mainRows.some((row) => row.getAttribute("data-player-code") === "99")).toBe(false);
+    expect(within(squadTable).getByText("Alpha").closest("tr")).toHaveClass("bg-amber-100/70");
+    expect(within(squadTable).getByText("Beta").closest("tr")).toHaveClass("bg-amber-50");
+    expect(within(squadTable).getByText("Gamma").closest("tr")).toHaveClass("bg-zinc-200");
+    expect(within(squadTable).getByLabelText("Captain: Alpha")).toHaveAttribute("title", "Captain");
+    expect(within(squadTable).getByLabelText("Vice-captain: Beta")).toHaveAttribute(
+      "title",
+      "Vice-captain",
+    );
+    expect(within(squadTable).getByText("Gamma").closest("tr")).toHaveTextContent("Bench");
+    expect(within(squadTable).getByRole("columnheader", { name: "GW1 role" })).toBeInTheDocument();
+    expect(within(squadTable).getByRole("columnheader", { name: /1 GW xP/ })).toBeInTheDocument();
+    expect(within(squadTable).getByRole("columnheader", { name: /5 GWs xP/ })).toBeInTheDocument();
+    expect(screen.getByText(/unconditional forecast/)).toHaveTextContent(
+      "continue after a later planned transfer-out",
+    );
+
+    const oneGwSort = within(squadTable).getByRole("button", {
+      name: "Sort by cumulative player xP from GW1 through GW1",
+    });
+    await user.click(oneGwSort);
+    expect(oneGwSort.closest("th")).toHaveAttribute("aria-sort", "descending");
+    await user.click(oneGwSort);
+    expect(oneGwSort.closest("th")).toHaveAttribute("aria-sort", "ascending");
+    const oneGwAscending = within(squadTable)
+      .getAllByRole("row")
+      .filter((row) => row.hasAttribute("data-player-code"))
+      .map((row) => row.getAttribute("data-player-code"));
+    expect(oneGwAscending).toHaveLength(15);
+    expect(oneGwAscending[0]).toBe("3");
+    expect(oneGwAscending.at(-1)).toBe("1");
+    // Sorting changes order, but code-keyed role colour/captaincy stays attached to Alpha.
+    expect(within(squadTable).getByText("Alpha").closest("tr")).toHaveClass("bg-amber-100/70");
+    expect(within(squadTable).getByLabelText("Captain: Alpha")).toBeInTheDocument();
+
+    // Gamma's two-GW cumulative forecast is null, so it remains last even in descending order.
+    const twoGwSort = within(squadTable).getByRole("button", {
+      name: "Sort by cumulative player xP from GW1 through GW2",
+    });
+    await user.click(twoGwSort);
+    const twoGwDescending = within(squadTable)
+      .getAllByRole("row")
+      .filter((row) => row.hasAttribute("data-player-code"))
+      .map((row) => row.getAttribute("data-player-code"));
+    expect(twoGwDescending).toHaveLength(15);
+    expect(twoGwDescending[0]).toBe("1");
+    expect(twoGwDescending.at(-1)).toBe("3");
+    await user.click(twoGwSort);
+    expect(twoGwSort.closest("th")).toHaveAttribute("aria-sort", "ascending");
+    const twoGwAscending = within(squadTable)
+      .getAllByRole("row")
+      .filter((row) => row.hasAttribute("data-player-code"))
+      .map((row) => row.getAttribute("data-player-code"));
+    expect(twoGwAscending.at(-1)).toBe("3");
+
+    await user.click(
+      within(squadTable).getByRole("button", { name: "Show gameweek details for Alpha" }),
+    );
+    expect(
+      within(squadTable).getByRole("button", { name: "Hide gameweek details for Alpha" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(within(squadTable).getByText("Starting XI · captain")).toBeInTheDocument();
+    expect(within(squadTable).getAllByText(/^GW[1-5]$/)).toHaveLength(5);
+    expect(within(squadTable).getByText("6.1 xP")).toBeInTheDocument();
+    expect(within(squadTable).getAllByText("Not in post-transfer squad")).toHaveLength(4);
     expect(screen.queryByText(/Platform Next GW suggestion/)).not.toBeInTheDocument();
     expect(window.localStorage.getItem("fpl-solved-plan")).toBeNull();
+  });
+
+  it("fails visibly instead of rendering a malformed custom squad", async () => {
+    const malformedPlan: NextGwPlan = {
+      ...customPlan,
+      optimizer_run_id: "malformed-custom-run",
+      weeks: [
+        { ...customPlan.weeks[0], players: customPlan.weeks[0].players.slice(0, 14) },
+        ...customPlan.weeks.slice(1),
+      ],
+    };
+    window.location.hash = "#plan-builder?run=" + malformedPlan.optimizer_run_id;
+    vi.mocked(loadNextGw).mockResolvedValue({ plans: [malformedPlan] });
+
+    render(<PlanBuilderPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The exact custom plan failed the GW1 squad contract",
+    );
+    expect(
+      screen.queryByRole("table", { name: "GW1 custom squad analysis" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows honest staged progress while the local optimizer is running", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: true,
+      runtime: readyRuntime,
+    });
+    let reportStage: ((stage: string | null) => void) | undefined;
+    let resolvePlan!: (summary: Awaited<ReturnType<typeof solvePlan>>) => void;
+    vi.mocked(solvePlan).mockImplementation((_request, onStage) => {
+      reportStage = onStage;
+      return new Promise((resolve) => {
+        resolvePlan = resolve;
+      });
+    });
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Build from scratch →"));
+    await user.type(screen.getByRole("textbox", { name: "Search player" }), "Alpha");
+    await user.click(screen.getByRole("button", { name: /Alpha/ }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+    expect(await screen.findByText("plan server online")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Solve now with my rules" }));
+
+    const progress = await screen.findByRole("status");
+    expect(screen.getByLabelText("Solve")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Unlock Alpha" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Back to rules" })).toBeDisabled();
+    expect(progress).toHaveTextContent("Preparing your optimization");
+    expect(progress).toHaveTextContent("cannot provide a trustworthy completion percentage");
+    expect(screen.getByRole("button", { name: "Solving…" })).toBeDisabled();
+
+    await act(async () => {
+      reportStage?.("solving squad (exact ILP + bounded transfer search)");
+    });
+    expect(progress).toHaveTextContent("Searching for your best legal squad");
+    expect(progress).toHaveTextContent("usually the longest step");
+
+    await act(async () => {
+      reportStage?.("publishing BI export and dashboard read models");
+    });
+    expect(progress).toHaveTextContent("Publishing your exact plan");
+    expect(progress).toHaveTextContent("validating its provenance");
+
+    // A final null status poll must not regress the visible stage back to "preparing".
+    await act(async () => {
+      reportStage?.(null);
+    });
+    expect(progress).toHaveTextContent("Publishing your exact plan");
+
+    await act(async () => {
+      resolvePlan({
+        optimizer_run_id: "progress-run",
+        decision_sha256: "deadbeef",
+        gw: 1,
+        gw_expected_points: 60,
+        horizon_expected_points: 300,
+        hit_points: 0,
+        squad_cost_tenths: 990,
+        captain: "Alpha",
+        vice_captain: "Beta",
+      });
+    });
+    expect(
+      await screen.findByText("Your solved plan is not in the published read model"),
+    ).toBeInTheDocument();
   });
 
   it("opens an explicitly entered manual run id after publishing", async () => {
@@ -353,6 +625,9 @@ describe("PlanBuilderPage", () => {
 
     const command = document.querySelector("pre")?.textContent ?? "";
     expect(command).toMatch(/plan_my_rules_[a-z0-9]+\.json/i);
+    expect(screen.getByText(/primary button sends these rules/)).toHaveTextContent(
+      "transparent manual fallback",
+    );
     expect(screen.getByText(/unique output/)).toHaveTextContent(
       command.match(/D:\\tmp\\gw1\\dev-latest\\plan_my_rules_[a-z0-9]+\.json/i)?.[0] ?? "",
     );

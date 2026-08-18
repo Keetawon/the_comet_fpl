@@ -12,19 +12,20 @@
 // review screen ends forward without clearing state, so there is no destructive or dead-end
 // exit anywhere in the wizard.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   ArrowRight,
   Ban,
   Check,
   Download,
+  LoaderCircle,
   Lock,
   RotateCcw,
   Sparkles,
   UserRoundSearch,
 } from "lucide-react";
-import { BenchBlock, TransferPath, XiBlock } from "@/components/PlanOverview";
+import { PlanSquadTable, TransferPath } from "@/components/PlanOverview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,6 +160,144 @@ function StepBar({ current }: { current: number }) {
   );
 }
 
+interface PlayerPickerPagerProps {
+  page: number;
+  pageCount: number;
+  total: number;
+  placement: "top" | "bottom";
+  onPageChange: (page: number) => void;
+}
+
+function PlayerPickerPager({
+  page,
+  pageCount,
+  total,
+  placement,
+  onPageChange,
+}: PlayerPickerPagerProps) {
+  const first = total === 0 ? 0 : page * PLAYER_PAGE_SIZE + 1;
+  const last = Math.min((page + 1) * PLAYER_PAGE_SIZE, total);
+  return (
+    <nav
+      aria-label={`Player picker pages (${placement})`}
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-md border bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur",
+        placement === "top" ? "sticky top-2 z-10 mb-2" : "mt-3",
+      )}
+    >
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-7"
+        onClick={() => onPageChange(Math.max(0, page - 1))}
+        disabled={page === 0}
+      >
+        Previous players
+      </Button>
+      <span
+        className="text-center text-xs tabular-nums text-muted-foreground"
+        aria-live={placement === "top" ? "polite" : undefined}
+      >
+        Page {page + 1} of {pageCount}
+        {total > 0 && (
+          <span className="hidden sm:inline">
+            {" "}· showing {first}–{last} of {total}
+          </span>
+        )}
+      </span>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-7"
+        onClick={() => onPageChange(Math.min(pageCount - 1, page + 1))}
+        disabled={page >= pageCount - 1}
+      >
+        Next players
+      </Button>
+    </nav>
+  );
+}
+
+function SolverProgress({ stage }: { stage: string | null }) {
+  const publishing = stage?.toLowerCase().includes("publishing") ?? false;
+  const optimizing = stage?.toLowerCase().includes("solving squad") ?? false;
+  const current = publishing ? 2 : optimizing ? 1 : 0;
+  const title = publishing
+    ? "Publishing your exact plan"
+    : optimizing
+      ? "Searching for your best legal squad"
+      : "Preparing your optimization";
+  const detail = publishing
+    ? "The squad is solved. We are validating its provenance and refreshing the dashboard read models."
+    : optimizing
+      ? "PuLP/CBC is comparing legal squads and transfer paths. This is usually the longest step."
+      : "Your rules are being validated and the local solver is starting.";
+  const steps = ["Prepare run", "Optimize squad", "Publish plan"];
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="mt-3 overflow-hidden rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 via-background to-indigo-50 p-4 shadow-sm dark:border-sky-900 dark:from-sky-950/40 dark:via-background dark:to-indigo-950/30"
+    >
+      <div className="flex items-start gap-3">
+        <div className="relative flex size-12 shrink-0 items-center justify-center" aria-hidden>
+          <span className="absolute inset-0 animate-pulse rounded-full bg-sky-300/30 motion-reduce:animate-none dark:bg-sky-500/20" />
+          <span className="absolute inset-1 rounded-full border border-sky-300/70 dark:border-sky-700" />
+          <LoaderCircle className="size-7 animate-spin text-sky-600 motion-reduce:animate-none dark:text-sky-300" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{title}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{detail}</p>
+          {stage && !publishing && !optimizing && (
+            <p className="mt-1 break-words font-mono text-[10px] text-muted-foreground">
+              Server stage: {stage}
+            </p>
+          )}
+        </div>
+      </div>
+      <ol className="mt-4 grid grid-cols-3 gap-2" aria-label="Optimization stages">
+        {steps.map((label, index) => {
+          const done = index < current;
+          const active = index === current;
+          return (
+            <li key={label} className="min-w-0">
+              <div
+                aria-hidden
+                className={cn(
+                  "mb-1 h-1.5 overflow-hidden rounded-full bg-muted",
+                  done && "bg-emerald-500",
+                  active && "bg-sky-200 dark:bg-sky-950",
+                )}
+              >
+                {active && (
+                  <span className="block h-full w-full animate-pulse rounded-full bg-sky-500 motion-reduce:animate-none" />
+                )}
+              </div>
+              <span
+                className={cn(
+                  "block truncate text-[10px]",
+                  done && "text-emerald-700 dark:text-emerald-300",
+                  active ? "font-medium text-sky-700 dark:text-sky-300" : "text-muted-foreground",
+                )}
+              >
+                {done ? "✓ " : ""}{label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+        Usually 1–2 minutes. Keep this tab open; your exact custom plan will open automatically.
+        Progress is stage-based because the solver cannot provide a trustworthy completion percentage.
+      </p>
+    </div>
+  );
+}
+
 function hashSolvedPlanId(): string | null {
   const query = window.location.hash.split("?", 2)[1];
   if (!query) return null;
@@ -210,6 +349,8 @@ export function PlanBuilderPage() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [candidatePage, setCandidatePage] = useState(0);
+  const candidateListRef = useRef<HTMLUListElement>(null);
+  const focusCandidatePageRef = useRef(false);
   const [copied, setCopied] = useState(false);
   const [solver, setSolver] = useState<SolverStatus>({ status: "checking" });
 
@@ -260,7 +401,12 @@ export function PlanBuilderPage() {
         excludes: excludes.map((p) => p.code),
         minBenchAppearance: thresholdFlag ? Number(thresholdFlag) : null,
       },
-      (stage) => setSolver((current) => (current.status === "solving" ? { ...current, stage } : current)),
+      (stage) =>
+        setSolver((current) =>
+          current.status === "solving"
+            ? { ...current, stage: stage ?? current.stage }
+            : current,
+        ),
       serverToken,
     )
       .then((summary) => {
@@ -456,6 +602,28 @@ export function PlanBuilderPage() {
     setCandidatePage((current) => Math.min(current, candidatePageCount - 1));
   }, [candidatePageCount]);
 
+  const changeCandidatePage = (page: number) => {
+    const next = Math.min(candidatePageCount - 1, Math.max(0, page));
+    if (next === candidatePage) return;
+    focusCandidatePageRef.current = true;
+    setCandidatePage(next);
+  };
+
+  // Paging from the bottom returns the reader to the first selectable result on the new page.
+  // Search/filter resets do not move focus unexpectedly because only pager actions set the flag.
+  useEffect(() => {
+    if (!focusCandidatePageRef.current) return;
+    focusCandidatePageRef.current = false;
+    const list = candidateListRef.current;
+    if (!list) return;
+    if (typeof list.scrollIntoView === "function") {
+      list.scrollIntoView({ behavior: "auto", block: "start" });
+    }
+    const firstSelectable = list.querySelector<HTMLButtonElement>("button:not(:disabled)");
+    if (firstSelectable) firstSelectable.focus({ preventScroll: true });
+    else list.focus({ preventScroll: true });
+  }, [candidatePage]);
+
   const teams = useMemo(() => {
     if (state.status !== "ready") return [] as [number, string][];
     return Array.from(
@@ -475,6 +643,7 @@ export function PlanBuilderPage() {
 
   const thresholdFlag = THRESHOLDS.find((t) => t.value === threshold)?.flag ?? null;
   const thresholdLabel = THRESHOLDS.find((t) => t.value === threshold)?.label ?? "Off";
+  const isSolving = solver.status === "solving";
   const command = [
     ".\\.venv\\Scripts\\python.exe -m fpl.jobs.optimize_squad",
     DEV_FORECAST_PATH,
@@ -754,47 +923,19 @@ export function PlanBuilderPage() {
                 showFormWindow={false}
               />
             </div>
-            <nav
-              aria-label="Player picker pages"
-              className="sticky top-2 z-10 mb-2 flex items-center justify-between gap-2 rounded-md border bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur"
+            <PlayerPickerPager
+              page={candidatePage}
+              pageCount={candidatePageCount}
+              total={candidates.length}
+              placement="top"
+              onPageChange={changeCandidatePage}
+            />
+            <ul
+              ref={candidateListRef}
+              tabIndex={-1}
+              aria-label={`Player candidates page ${candidatePage + 1}`}
+              className="grid scroll-mt-14 gap-1.5 md:grid-cols-1 lg:grid-cols-2"
             >
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7"
-                onClick={() => setCandidatePage((page) => Math.max(0, page - 1))}
-                disabled={candidatePage === 0}
-              >
-                Previous players
-              </Button>
-              <span
-                className="text-center text-xs tabular-nums text-muted-foreground"
-                aria-live="polite"
-              >
-                Page {candidatePage + 1} of {candidatePageCount}
-                {candidates.length > 0 && (
-                  <span className="hidden sm:inline">
-                    {" "}· showing {candidatePage * PLAYER_PAGE_SIZE + 1}–
-                    {Math.min((candidatePage + 1) * PLAYER_PAGE_SIZE, candidates.length)} of{" "}
-                    {candidates.length}
-                  </span>
-                )}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7"
-                onClick={() =>
-                  setCandidatePage((page) => Math.min(candidatePageCount - 1, page + 1))
-                }
-                disabled={candidatePage >= candidatePageCount - 1}
-              >
-                Next players
-              </Button>
-            </nav>
-            <ul className="grid gap-1.5 md:grid-cols-1 lg:grid-cols-2">
               {visibleCandidates.map(({ player, xp }) => {
                 const locked = locks.some((p) => p.code === player.code);
                 const excluded = excludes.some((p) => p.code === player.code);
@@ -855,6 +996,13 @@ export function PlanBuilderPage() {
                 );
               })}
             </ul>
+            <PlayerPickerPager
+              page={candidatePage}
+              pageCount={candidatePageCount}
+              total={candidates.length}
+              placement="bottom"
+              onPageChange={changeCandidatePage}
+            />
           </section>
 
           <section aria-label="Your rules" className="flex flex-col gap-3">
@@ -980,8 +1128,9 @@ export function PlanBuilderPage() {
                     <button
                       type="button"
                       aria-label={`Unlock ${p.web_name}`}
+                      disabled={isSolving}
                       onClick={() => setLocks((current) => current.filter((x) => x.code !== p.code))}
-                      className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-emerald-100 hover:text-foreground dark:hover:bg-emerald-900/60"
+                      className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-emerald-100 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-emerald-900/60"
                     >
                       ×
                     </button>
@@ -1004,10 +1153,11 @@ export function PlanBuilderPage() {
                     <button
                       type="button"
                       aria-label={`Remove exclusion ${p.web_name}`}
+                      disabled={isSolving}
                       onClick={() =>
                         setExcludes((current) => current.filter((x) => x.code !== p.code))
                       }
-                      className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-red-100 hover:text-foreground dark:hover:bg-red-900/60"
+                      className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-red-100 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-900/60"
                     >
                       ×
                     </button>
@@ -1033,7 +1183,11 @@ export function PlanBuilderPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border bg-card p-4 shadow-sm" aria-label="Solve">
+          <div
+            className="rounded-xl border bg-card p-4 shadow-sm"
+            aria-label="Solve"
+            aria-busy={isSolving}
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium text-muted-foreground">Solve it now</p>
               {solver.status === "online" && (
@@ -1097,12 +1251,14 @@ export function PlanBuilderPage() {
                   className="h-8 min-w-48 flex-1 font-mono text-xs"
                   placeholder="per-launch token"
                   value={serverToken}
+                  disabled={isSolving}
                   onChange={(event) => setServerToken(event.target.value)}
                 />
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
+                  disabled={isSolving}
                   onClick={() => {
                     const remembered = rememberPlanServerToken(serverToken);
                     setTokenStorageWarning(
@@ -1144,9 +1300,7 @@ export function PlanBuilderPage() {
               )}
             </div>
             {solver.status === "solving" && (
-              <p role="status" className="mt-2 text-xs tabular-nums text-muted-foreground">
-                {solver.stage ?? "starting…"} — this page reloads with your exact plan when done.
-              </p>
+              <SolverProgress stage={solver.stage} />
             )}
             {solver.status === "offline" && (
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
@@ -1209,8 +1363,8 @@ export function PlanBuilderPage() {
               {command}
             </pre>
             <p className="px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
-              The solver lives in Python, so the browser cannot compute anything — this page
-              only writes your rules down. This command uses the unique output{" "}
+              The primary button sends these rules to the local Python optimizer and publishes
+              your exact result automatically. This transparent manual fallback uses the unique output{" "}
               <span className="font-mono">{manualOutputPath}</span>, so it cannot overwrite
               another custom scenario. After it finishes, re-publish the read models with that
               exact file as <span className="font-mono">--optimizer-plan</span>. The platform
@@ -1235,12 +1389,13 @@ export function PlanBuilderPage() {
                   className="h-8 min-w-56 flex-1 font-mono text-xs"
                   placeholder="paste optimizer_run_id"
                   value={manualRunId}
+                  disabled={isSolving}
                   onChange={(event) => setManualRunId(event.target.value)}
                 />
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={!manualRunId.trim()}
+                  disabled={isSolving || !manualRunId.trim()}
                   onClick={() => openExactPublishedRun(manualRunId)}
                 >
                   Open exact custom plan
@@ -1248,7 +1403,12 @@ export function PlanBuilderPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 px-3 pb-3">
-              <Button size="sm" variant="outline" onClick={() => setStep(2)}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isSolving}
+                onClick={() => setStep(2)}
+              >
                 Back to rules
               </Button>
               <Button size="sm" asChild>
@@ -1348,11 +1508,8 @@ export function PlanBuilderPage() {
                 </div>
               )}
 
-              <XiBlock week={resultPlan.weeks[0]} />
-              <div className="grid gap-3 md:grid-cols-2">
-                <BenchBlock week={resultPlan.weeks[0]} />
-                <TransferPath weeks={resultPlan.weeks} />
-              </div>
+              <PlanSquadTable plan={resultPlan} />
+              <TransferPath weeks={resultPlan.weeks} />
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                   optimizer run {resultPlan.optimizer_run_id.slice(0, 12)}… · development-only ·
