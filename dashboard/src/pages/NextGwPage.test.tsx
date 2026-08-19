@@ -2,7 +2,7 @@
 // Next GW shows only the platform default and diagnostic, while a user-custom plan remains
 // in Plan Builder (and gets its own clearly labelled Summary card).
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -32,6 +32,64 @@ const customPlan: NextGwPlan = {
     min_bench_appearance: 0.25,
   },
 };
+
+function completeFiveWeekPlan(): NextGwPlan {
+  const benchPerPlayer = [1, 2, 3, 4, 2];
+  const positionFor = (code: number) => {
+    if (code === 1 || code === 12) return "GK";
+    if (code <= 5 || code === 13) return "DEF";
+    if (code <= 9 || code === 14) return "MID";
+    return "FWD";
+  };
+  const weeks = Array.from({ length: 5 }, (_, index) => {
+    const gw = index + 1;
+    return {
+      gw,
+      hit_points: 0,
+      squad_cost: 1000,
+      captain_code: 1,
+      vice_captain_code: 2,
+      players: Array.from({ length: 15 }, (_, playerIndex) => {
+        const code = playerIndex + 1;
+        const isStarter = code <= 11;
+        return {
+          code,
+          web_name: `Player ${code}`,
+          position: positionFor(code),
+          team_code: 100 + code,
+          team_short_name: `T${code}`,
+          now_cost: 50,
+          role: isStarter
+            ? "starting_xi"
+            : code === 12
+              ? "bench_goalkeeper"
+              : "bench_outfield",
+          bench_order_index: code >= 13 ? code - 12 : null,
+          is_captain: code === 1,
+          is_vice_captain: code === 2,
+          transferred_in: false,
+          transferred_out: false,
+          expected_points: isStarter ? 2 : benchPerPlayer[index],
+        };
+      }),
+    };
+  });
+  const player_xp = Object.fromEntries(
+    Array.from({ length: 15 }, (_, playerIndex) => {
+      const code = playerIndex + 1;
+      return [
+        String(code),
+        Object.fromEntries(
+          weeks.map((week, index) => [
+            String(week.gw),
+            code <= 11 ? 2 : benchPerPlayer[index],
+          ]),
+        ),
+      ];
+    }),
+  );
+  return { ...plans[0], weeks, player_xp } as NextGwPlan;
+}
 
 vi.mock("@/data/load", () => ({
   loadSummary: vi.fn(),
@@ -186,5 +244,61 @@ describe("NextGwPage", () => {
       plans[0].display_label,
     );
     expect(screen.queryByText(customPlan.display_label)).not.toBeInTheDocument();
+  });
+
+  it("shows full post-transfer plan xP sums as player-table footer rows", async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadNextGw).mockResolvedValue({
+      plans: [completeFiveWeekPlan(), plans[1]],
+    });
+
+    render(<NextGwPage />);
+    await screen.findByText(/Platform Next GW suggestion/);
+
+    expect(
+      screen.queryByRole("region", { name: "Squad xP and Bench Boost outlook" }),
+    ).not.toBeInTheDocument();
+    const footer = screen.getByRole("rowgroup", { name: "Planned squad xP totals" });
+    const xiRow = within(footer).getByRole("rowheader", {
+      name: "Planned XI xP (11)",
+    }).closest("tr");
+    const benchRow = within(footer).getByRole("rowheader", {
+      name: "Planned bench xP (4)",
+    }).closest("tr");
+    const squadRow = within(footer).getByRole("rowheader", {
+      name: "Planned squad xP (15)",
+    }).closest("tr");
+
+    expect(xiRow).toHaveTextContent("110.0");
+    expect(xiRow).toHaveTextContent("22.0");
+    expect(benchRow).toHaveTextContent("48.0");
+    expect(benchRow).toHaveTextContent("4.0");
+    expect(benchRow).toHaveTextContent("8.0");
+    expect(benchRow).toHaveTextContent("12.0");
+    expect(benchRow).toHaveTextContent("16.0");
+    expect(squadRow).toHaveTextContent("158.0");
+    expect(squadRow).toHaveTextContent("26.0");
+    expect(
+      within(footer).getByTitle(
+        "Highest complete planned bench xP in the loaded horizon",
+      ),
+    ).toHaveTextContent("16.0");
+    expect(within(footer).getAllByRole("row").at(-1)).toBe(squadRow);
+    expect(footer).not.toHaveTextContent("Full selected post-transfer plan");
+    expect(
+      screen.getByText(
+        /Full selected post-transfer plan; raw player xP sums, unaffected by table filters/,
+      ),
+    ).toHaveTextContent(
+      "Highest complete bench xP in this loaded horizon: GW4.",
+    );
+
+    await user.click(screen.getByText("3 GWs"));
+    expect(benchRow).toHaveTextContent("24.0");
+    expect(squadRow).toHaveTextContent("90.0");
+
+    await user.click(screen.getByText("Compare all players"));
+    expect(benchRow).toHaveTextContent("48.0");
+    expect(squadRow).toHaveTextContent("158.0");
   });
 });

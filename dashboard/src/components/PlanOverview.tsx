@@ -7,11 +7,16 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import type { NextGwPlan, PlanPlayer, PlanWeek } from "@/data/types";
+import {
+  buildPlanChipOutlook,
+  type PlanWeekChipOutlook,
+} from "@/lib/chipOutlook";
 import { horizonXp } from "@/lib/nextGw";
 import { cn } from "@/lib/utils";
 
@@ -68,8 +73,35 @@ const TOTAL_XP_COLUMNS = [
   { key: "total-5", weeks: 5, label: "Total 5 GWs xP" },
 ] as const;
 
+type PlanFooterMetric = "startingXiXp" | "benchXp" | "squadXp";
+
+const PLAN_FOOTER_ROWS: {
+  key: PlanFooterMetric;
+  label: string;
+}[] = [
+  { key: "startingXiXp", label: "Planned XI xP (11)" },
+  { key: "benchXp", label: "Planned bench xP (4)" },
+  { key: "squadXp", label: "Planned squad xP (15)" },
+];
+
 function gameweekXp(plan: NextGwPlan, code: number, gw: number): number | null {
   return plan.player_xp[String(code)]?.[String(gw)] ?? null;
+}
+
+function footerHorizonValue(
+  weeks: PlanWeekChipOutlook[],
+  gwFrom: number,
+  count: number,
+  metric: PlanFooterMetric,
+): number | null {
+  let total = 0;
+  for (let offset = 0; offset < count; offset += 1) {
+    const week = weeks.find((candidate) => candidate.gw === gwFrom + offset);
+    const value = week?.[metric] ?? null;
+    if (value == null || !Number.isFinite(value)) return null;
+    total += value;
+  }
+  return total;
 }
 
 function planSortValue(plan: NextGwPlan, code: number, key: PlanSortKey): number | null {
@@ -134,6 +166,7 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
   }
   const horizon = Math.min(5, Math.max(0, plan.gw_to - plan.gw_from + 1));
   const horizonGws = Array.from({ length: horizon }, (_, index) => plan.gw_from + index);
+  const planTotals = buildPlanChipOutlook(plan);
   const baseline = [...firstWeek.players].sort(planPlayerOrder);
   const rows = sort
     ? [...baseline].sort((left, right) => {
@@ -377,6 +410,82 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
               ];
             })}
           </TableBody>
+          <TableFooter aria-label="Planned squad xP totals">
+            {PLAN_FOOTER_ROWS.map((footerRow) => (
+              <TableRow
+                key={footerRow.key}
+                className={cn(
+                  "hover:bg-inherit",
+                  footerRow.key === "squadXp" && "border-t-2 font-semibold",
+                )}
+                data-plan-total={footerRow.key}
+              >
+                <TableCell
+                  colSpan={5}
+                  role="rowheader"
+                  className="sticky left-0 z-10 bg-inherit py-1.5 text-xs font-semibold"
+                >
+                  {footerRow.label}
+                </TableCell>
+                {TOTAL_XP_COLUMNS.map((column) => (
+                  <TableCell
+                    key={column.key}
+                    className="py-1.5 text-right text-xs tabular-nums"
+                  >
+                    {fmt(
+                      footerHorizonValue(
+                        planTotals.weeks,
+                        plan.gw_from,
+                        column.weeks,
+                        footerRow.key,
+                      ),
+                    )}
+                  </TableCell>
+                ))}
+                {horizonGws.map((gw) => {
+                  const week = planTotals.weeks.find((candidate) => candidate.gw === gw);
+                  const value = week?.[footerRow.key] ?? null;
+                  const highestBench =
+                    footerRow.key === "benchXp" && planTotals.highestBenchXpGw === gw;
+                  return (
+                    <TableCell
+                      key={gw}
+                      className={cn(
+                        "py-1.5 text-right text-xs tabular-nums",
+                        highestBench &&
+                          "bg-emerald-100 font-semibold ring-1 ring-inset ring-emerald-300 dark:bg-emerald-900/60 dark:ring-emerald-700",
+                      )}
+                      aria-label={
+                        highestBench
+                          ? "GW" +
+                            gw +
+                            " " +
+                            footerRow.label +
+                            ", highest complete bench xP in loaded horizon: " +
+                            fmt(value)
+                          : undefined
+                      }
+                      title={
+                        highestBench
+                          ? "Highest complete bench xP in the loaded horizon"
+                          : undefined
+                      }
+                    >
+                      <span>{fmt(value)}</span>
+                      {highestBench && (
+                        <Badge
+                          variant="outline"
+                          className="ml-1 px-1 py-0 text-[8px] uppercase"
+                        >
+                          highest
+                        </Badge>
+                      )}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableFooter>
         </Table>
       </div>
       <p className="text-[10px] leading-relaxed text-muted-foreground">
@@ -385,6 +494,15 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
         and are not plan contribution or captain/bench weighting. Null stays unmeasured and sorts
         last. Gold = captain · pale
         gold = vice-captain · grey = bench.
+      </p>
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        Planned footer totals are raw, unconditional player xP from each gameweek&apos;s
+        post-transfer squad: 11 planned starters, four planned bench players, and all 15
+        players. They exclude captain multipliers, vice-captain fallback, transfer hits, and
+        autosubs. Sorting the fixed GW{firstWeek.gw} player rows does not change these totals;
+        later transfer membership can differ from the visible body rows. Null or a missing week
+        keeps the affected total unmeasured. Green marks the highest complete bench xP in the
+        loaded horizon.
       </p>
     </div>
   );

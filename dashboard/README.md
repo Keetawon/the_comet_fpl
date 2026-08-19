@@ -214,7 +214,11 @@ interactive Plan builder.
   columns (GW1 xP, 1/3/5-GW EV selector) before the per-GW fixture chips, and C/V/bench
   badges on names. When two architectures are present, the default-vs-diagnostic diff is
   set overlaps only. Cross-plan EV is never compared: it measures the models' calibration
-  against each other, not squad quality.
+  against each other, not squad quality. Three rows in the player table footer use only the
+  selected platform plan: planned XI xP (11), planned bench xP (4), and planned squad xP
+  (15). They are derived from each gameweek's post-transfer plan and remain fixed while the
+  comparison rows are sorted, filtered, paginated, or expanded to the whole player pool.
+  The highest complete bench-xP gameweek inside the loaded horizon is marked.
 - **Plan builder** (implemented, wizard v2, fresh-squad path only): the interactive side of
   the manager-wizard design (`docs/manager-team-suggestions.md`). The manager-id field currently
   performs a format check and a best-effort `localStorage` write only; it does not call FPL,
@@ -229,7 +233,9 @@ interactive Plan builder.
   read model does not contain it; it never replaces or redirects to the formal Next GW suggestion.
   Its result is a sortable 15-player table whose GW1 XI/captain/vice/ordered-bench roles remain
   fixed while sorting. It exposes `Total 3 GWs xP`, `Total 5 GWs xP`, raw GW1-GW5 xP columns, and
-  an expanded per-gameweek membership/role view.
+  an expanded per-gameweek membership/role view. Its footer is bound to the exact custom plan and
+  shows the same planned XI, bench, and 15-player raw xP sums, calculated from each week's
+  post-transfer roles rather than the fixed GW1 display membership.
 - **Forecast vs actual** (implemented, P1.7e): each recorded vintage scored against its own
   season's finalised outcomes (points under 2026/27 rules, read-time join at
   `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a
@@ -258,3 +264,9 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
 - Primitives stay visible beside any composite (expand a row; hover a chip).
 - Availability is a reported overlay valid for the next gameweek only; it is passed
   through and never folded into a distribution or EV.
+- Plan-table footer totals are raw player-model xP summaries for one selected plan. The captain
+  is counted once like every other player; captain multipliers, hits, normal autosubs, and
+  vice-captain fallback are excluded. Nulls propagate, and sorting or filtering the player rows
+  never changes the full plan totals. The highest bench-xP marker is a loaded-horizon screen, not
+  season advice: chip inventory, competing chip windows, the full season, and future measured
+  availability are unavailable, and the optimizer itself does not optimize bench points.

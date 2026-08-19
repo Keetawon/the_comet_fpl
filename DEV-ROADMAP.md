@@ -768,6 +768,22 @@ GW1 even when sorted; sortable columns expose `Total 3 GWs xP`, `Total 5 GWs xP`
 Missing or malformed exact-run data fails visibly. The remaining gap is still the post-deadline
 manager import and selling-value workflow, not fresh-squad solving.
 
+**P1.7h Per-gameweek squad xP and Bench Boost screen (2026-08-19): implemented and
+dashboard-tested.** Next GW and Plan Builder append three selected-plan-only rows to the player
+table footer: `Planned XI xP (11)`, `Planned bench xP (4)`, and `Planned squad xP (15)`. Each
+gameweek is derived from that `PlanWeek`'s exact post-transfer membership and roles; cumulative
+columns sum the corresponding complete weekly groups. These are raw player-model xP sums, so the
+captain appears once like every other player and captain multipliers, hits, autosubs, and
+vice-captain fallback are deliberately excluded. Null player xP, missing gameweeks, and malformed
+squads fail closed rather than publishing partial totals. Sorting, filters, pagination, and the
+Next GW compare-all scope do not change the selected plan's footer. The highest complete bench-xP
+gameweek is marked, with an exact tie resolved to the earliest GW. This is only a loaded-horizon
+screen: the optimizer does not optimize bench points, and the read model has no chip inventory or
+competing chip windows, full-season forecast, or measured future availability. It is not a
+best-season Bench Boost recommendation and never compares totals across model architectures. This
+P1 addition changes no delivery gate: the 08-20 fallback pack, 08-21 final pack, and owner's
+manual FPL verification remain the sole P0 priority and acceptance path.
+
 ### P1.8 — Complete Players-page form exposure after P0
 
 **Status (2026-08-19): exported data ready; UI exposure remains.** The semantic/Parquet export is

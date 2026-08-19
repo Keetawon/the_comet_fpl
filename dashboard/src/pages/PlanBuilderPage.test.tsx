@@ -469,6 +469,53 @@ describe("PlanBuilderPage", () => {
     for (let gw = 1; gw <= 5; gw++) {
       expect(within(squadTable).getByRole("columnheader", { name: `GW${gw} xP` })).toBeInTheDocument();
     }
+    const plannedXi = within(squadTable).getByRole("row", {
+      name: /Planned XI xP \(11\)/,
+    });
+    const plannedBench = within(squadTable).getByRole("row", {
+      name: /Planned bench xP \(4\)/,
+    });
+    const plannedSquad = within(squadTable).getByRole("row", {
+      name: /Planned squad xP \(15\)/,
+    });
+    expect(within(plannedXi).getAllByRole("cell").map((cell) => cell.textContent)).toEqual([
+      "120.9",
+      "199.9",
+      "41.9",
+      "39.5",
+      "39.5",
+      "39.5",
+      "39.5",
+    ]);
+    expect(within(plannedBench).getAllByRole("cell").map((cell) => cell.textContent)).toEqual([
+      "27.0",
+      "45.0",
+      "9.0highest",
+      "9.0",
+      "9.0",
+      "9.0",
+      "9.0",
+    ]);
+    expect(within(plannedSquad).getAllByRole("cell").map((cell) => cell.textContent)).toEqual([
+      "147.9",
+      "244.9",
+      "50.9",
+      "48.5",
+      "48.5",
+      "48.5",
+      "48.5",
+    ]);
+    expect(
+      within(squadTable).getByLabelText(
+        "GW1 Planned bench xP (4), highest complete bench xP in loaded horizon: 9.0",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/post-transfer squad: 11 planned starters/)).toHaveTextContent(
+      "Sorting the fixed GW1 player rows does not change these totals",
+    );
+    expect(
+      screen.queryByRole("region", { name: "Squad xP and Bench Boost outlook" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/unconditional player forecasts/)).toHaveTextContent(
       "continue after a later planned transfer-out",
     );

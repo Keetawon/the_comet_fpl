@@ -8,7 +8,7 @@
 // models' calibration against each other, not squad quality. User-constrained plans live
 // only in Plan Builder and can never hijack this page through hash ordering or localStorage.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -27,10 +27,18 @@ import {
   matchesPlayerFilters,
   type PlayerFilters,
 } from "@/components/PlayerFiltersBar";
-import { PlayerStatTable, type PlayerStatRow } from "@/components/PlayerStatTable";
+import {
+  PlayerStatTable,
+  type PlayerStatRow,
+  type PlayerStatSummaryRow,
+} from "@/components/PlayerStatTable";
 import { loadFixtureMatrix, loadNextGw, loadPlayers } from "@/data/load";
 import type { NextGwPlan, PlanPlayer, PlanWeek, PlayerRecord, SquadContext, TeamRecord } from "@/data/types";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
+import {
+  buildPlanChipOutlook,
+  type PlanWeekChipOutlook,
+} from "@/lib/chipOutlook";
 import {
   defaultPlan,
   diffPlans,
@@ -53,6 +61,69 @@ const fmt = (value: number | null | undefined, digits = 1) =>
 const price = (value: number | null) => (value == null ? "–" : `£${(value / 10).toFixed(1)}m`);
 
 const POSITION_ORDER = ["GK", "DEF", "MID", "FWD"] as const;
+
+type RawPlanXpMetric = "startingXiXp" | "benchXp" | "squadXp";
+
+const RAW_PLAN_XP_ROWS: ReadonlyArray<{
+  id: string;
+  label: string;
+  metric: RawPlanXpMetric;
+}> = [
+  { id: "planned-xi-xp", label: "Planned XI xP (11)", metric: "startingXiXp" },
+  { id: "planned-bench-xp", label: "Planned bench xP (4)", metric: "benchXp" },
+  { id: "planned-squad-xp", label: "Planned squad xP (15)", metric: "squadXp" },
+];
+
+function completePlanXpSum(
+  byGw: ReadonlyMap<number, PlanWeekChipOutlook>,
+  gws: number[],
+  metric: RawPlanXpMetric,
+): number | null {
+  if (gws.length === 0) return null;
+  let total = 0;
+  for (const gw of gws) {
+    const value = byGw.get(gw)?.[metric] ?? null;
+    if (value == null || !Number.isFinite(value)) return null;
+    total += value;
+  }
+  return total;
+}
+
+function planXpSummaryRows(
+  plan: NextGwPlan,
+  horizonWeeks: number,
+): { rows: PlayerStatSummaryRow[]; highestBenchXpGw: number | null } {
+  const outlook = buildPlanChipOutlook(plan);
+  const byGw = new Map(outlook.weeks.map((week) => [week.gw, week]));
+  const allGws = Array.from(
+    { length: Math.max(0, plan.gw_to - plan.gw_from + 1) },
+    (_, index) => plan.gw_from + index,
+  );
+  const selectedGws = allGws.slice(0, horizonWeeks);
+  const rows = RAW_PLAN_XP_ROWS.map(({ id, label, metric }) => {
+    const values: Record<string, ReactNode> = {
+      totalXp: fmt(completePlanXpSum(byGw, allGws, metric)),
+      "plan-gw-xp": fmt(completePlanXpSum(byGw, [plan.gw_from], metric)),
+      "plan-horizon-xp": fmt(completePlanXpSum(byGw, selectedGws, metric)),
+    };
+    for (const gw of allGws) {
+      const value = completePlanXpSum(byGw, [gw], metric);
+      const isHighestBench = metric === "benchXp" && outlook.highestBenchXpGw === gw;
+      values[`gw-${gw}`] = isHighestBench ? (
+        <span
+          className="inline-flex rounded bg-emerald-100 px-1 font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+          title="Highest complete planned bench xP in the loaded horizon"
+        >
+          {fmt(value)}
+        </span>
+      ) : (
+        fmt(value)
+      );
+    }
+    return { id, label, values };
+  });
+  return { rows, highestBenchXpGw: outlook.highestBenchXpGw };
+}
 
 function flags(context: SquadContext | undefined): string[] {
   if (!context) return [];
@@ -285,6 +356,7 @@ export function NextGwPage() {
   const week = plan.weeks[0];
   const options = [1, 3, 5].filter((n) => n <= horizon);
   const weeks = options.includes(horizonWeeks) ? horizonWeeks : options[0];
+  const planTotals = planXpSummaryRows(plan, weeks);
 
   const planColumns: LegacyColumnDef<PlayerStatRow>[] = [
     {
@@ -485,6 +557,16 @@ export function NextGwPage() {
         beforeFixtureColumns={planColumns}
         nameSuffix={nameSuffix}
         rowClassName={({ player }) => rowClassName(player)}
+        summaryRows={planTotals.rows}
+        summaryNote={
+          <>
+            Full selected post-transfer plan; raw player xP sums, unaffected by table filters,
+            sorting, or pagination. Bench xP is the marginal Bench Boost signal.{" "}
+            {planTotals.highestBenchXpGw == null
+              ? "No complete bench total is available."
+              : `Highest complete bench xP in this loaded horizon: GW${planTotals.highestBenchXpGw}.`}
+          </>
+        }
         emptyMessage={
           squadOnly === "squad"
             ? "No squad players match the current filters."

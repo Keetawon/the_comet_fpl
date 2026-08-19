@@ -25,6 +25,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -43,6 +44,15 @@ export interface PlayerStatRow {
   filtered: PlayerFixture[];
   totalXp: number | null;
   form: PlayerFormWindow | null;
+}
+
+/** One plan-bound summary row rendered after the paginated player rows. */
+export interface PlayerStatSummaryRow {
+  id: string;
+  label: ReactNode;
+  /** Values are keyed by the table column id (for example `totalXp` or `gw-1`). */
+  values: Readonly<Record<string, ReactNode>>;
+  className?: string;
 }
 
 export interface PlayerStatTableProps {
@@ -66,6 +76,9 @@ export interface PlayerStatTableProps {
   nameSuffix?: (player: PlayerRecord) => ReactNode;
   /** Per-row conditional formatting (e.g. captain/vice/bench row colours). */
   rowClassName?: (row: PlayerStatRow) => string | undefined;
+  /** Plan-bound totals. These do not derive from the visible/filterable table rows. */
+  summaryRows?: PlayerStatSummaryRow[];
+  summaryNote?: ReactNode;
   emptyMessage?: string;
 }
 
@@ -233,6 +246,8 @@ export function PlayerStatTable({
   extraColumns = [],
   nameSuffix,
   rowClassName,
+  summaryRows = [],
+  summaryNote,
   emptyMessage = "No players match the current filters.",
 }: PlayerStatTableProps) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
@@ -498,8 +513,34 @@ export function PlayerStatTable({
               })
             )}
           </TableBody>
+          {summaryRows.length > 0 && (
+            <TableFooter aria-label="Planned squad xP totals">
+              {summaryRows.map((summary) => (
+                <TableRow key={summary.id} className={summary.className}>
+                  {table.getVisibleLeafColumns().map((column, columnIndex) =>
+                    columnIndex === 1 ? (
+                      <TableHead
+                        key={column.id}
+                        scope="row"
+                        className={`${CELL_CLASS} h-auto text-left font-semibold`}
+                      >
+                        {summary.label}
+                      </TableHead>
+                    ) : (
+                      <TableCell key={column.id} className={`${CELL_CLASS} tabular-nums`}>
+                        {columnIndex === 0 ? null : summary.values[column.id] ?? null}
+                      </TableCell>
+                    ),
+                  )}
+                </TableRow>
+              ))}
+            </TableFooter>
+          )}
         </Table>
       </div>
+      {summaryRows.length > 0 && summaryNote != null && (
+        <p className="px-2 text-[10px] text-muted-foreground">{summaryNote}</p>
+      )}
       {rows.length > pageSize && (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
