@@ -3,13 +3,48 @@
 Status: **wizard v2 shipped on the dashboard (Plan builder page) 2026-08-18** — the
 fresh-squad path now keeps user-specific results on this page, supports up to five green locks
 and fifteen red exclusions through the real optimizer, and keeps the formal platform suggestion
-separate on Next GW. The manager_id import, the selections-log
-backend, and the hosted mode remain design-only, delivery after the 2026/27 GW1 deadline as
-P2 items (see `DEV-ROADMAP.md`). Nothing here changes a model, a frozen evaluation, or the
-GW1 decision path. The owner confirmed the wizard is END-USER-FACING frontend, not an owner
-tool: its language, guards, and error messages are written for users.
+separate on Next GW. The manager-id import, own-squad value/state boundary, selections-log
+backend, and hosted mode remain design-only P2 work after the 2026/27 GW1 deadline (see
+`DEV-ROADMAP.md`). Nothing here changes a model, a frozen evaluation, or the GW1 decision path.
+The owner confirmed the wizard is END-USER-FACING frontend, not an owner tool: its language,
+guards, and error messages are written for users.
 
-## 1. The wizard flow (owner sketch 2026-08-17, refined)
+## Current shipped boundary (as of 2026-08-19)
+
+- **Fresh squad only.** Build from scratch is live. The manager-id field performs a format check
+  and a best-effort browser `localStorage` write only. It makes no FPL request, verifies no entry,
+  is not restored on load, and neither imports nor applies a manager squad. **Continue without
+  import** and continuing after an id both use the same fresh-squad path.
+- **Fixed loaded horizon.** The solve uses the gameweek range in the loaded default forecast
+  artifact (currently GW1-5); there is no shipped 1/3/5 horizon selector.
+- **Rules picker.** The complete eligible priced population is available through shared search and
+  filters, 50 rows per page, with pagination above and below the list. Users may choose at most five
+  green locks and fifteen red exclusions. The sets must be disjoint, and position, club-cap,
+  remaining-population, and cheapest-legal-completion budget guards run before submission. The
+  rotation threshold is applied by the real optimizer.
+- **Truthful solve state.** Plan Builder checks the forecast, clean worktree, Python environment,
+  PuLP, and CBC through the local plan server. During a run it reports the real preparation,
+  optimization, and publication stages without inventing a completion percentage.
+- **Exact custom result.** Publication must contain the requested immutable `user_custom` run id or
+  the page fails visibly. The result remains on Plan Builder and never replaces the formal platform
+  plan on Next GW. Its sortable 15-player table keeps the solved GW1 XI, captain, vice-captain, and
+  ordered bench fixed while sorting; it shows `Total 3 GWs xP`, `Total 5 GWs xP`, raw GW1-GW5 xP,
+  and an expanded per-gameweek squad/role view.
+
+## Target P2 boundary (not shipped)
+
+The target own-team path will add a bounded network capture that verifies the manager entry,
+previews the manager, imports the current 15, and records bank, banked free transfers, purchase and
+selling prices, and capture provenance. The optimizer will then start from that imported squad.
+The public current-event picks endpoint may have no saved picks before the first deadline, so its
+live shape and pre-GW1 failure behavior must be measured and fixture-tested rather than assumed.
+Restoration of the saved manager id, the selections log, hosted authentication, and any paid tier
+also remain P2. None of those behaviors should be inferred from the current format-only field.
+
+## 1. Target wizard flow (owner sketch 2026-08-17, refined)
+
+The screen-level target below preserves the shipped fresh-squad subset and specifies the remaining
+own-team additions; unqualified manager-import behavior in this section is a P2 target.
 
 The owner's sketch: *have own team? (manager_id → read team) or not → pick up to 5 locked
 players and exclude up to 15 avoided players (shared search + filters; warn when the money left
@@ -25,10 +60,11 @@ not a team, and the suggested team appears only in the summary.
 ### Screen 1 — Start
 
 - Choice: **Import my team** (enter `manager_id`) or **Build from scratch**.
-- Import validates inline and previews the entry (team name, overall rank, current GW) so a
+- **Target P2:** import validates against FPL and previews the entry (team name, overall rank,
+  current GW) so a
   typo is caught before anything else; error states: not found, no picks saved yet (offer
   the fresh path), a pick that does not map into the forecast roster (block with names).
-- Horizon selector (GW1-5 default; 1/3/5 bounded by the loaded vintage). The vintage is the
+- **Target P2:** horizon selector (GW1-5 default; 1/3/5 bounded by the loaded vintage). The vintage is the
   default architecture and is displayed, never chosen — cross-model EV comparison is
   forbidden by P0.3 and the UI must not invite it.
 
@@ -38,8 +74,8 @@ not a team, and the suggested team appears only in the summary.
   (availability, xP, flags), plus the derived banked free transfers and bank — the "-4 per
   transfer beyond the free grant" rule is stated here, next to the number of free transfers
   the user actually has.
-- **Lock picker (both paths, max 5):** the Players pivot with a lock toggle — search bar,
-  position/team/price/minutes/availability filters already exist there. Guards computed
+- **Lock picker (both paths, max 5):** the full eligible priced population with a lock toggle,
+  shared search/filters, 50 rows per page, and top/bottom pagination. Guards computed
   client-side so the solver never has to fail closed on something the UI knew: per-position
   quota (locking a 4th FWD is impossible), club cap (no 4 locks from one club), and on the
   fresh path the **budget pre-flight**: warn when committed cost passes ~90% of budget, and
@@ -78,11 +114,17 @@ fresh per-launch token which Plan Builder sends only as `X-FPL-Plan-Token`; all 
 requests require it. The publish also fails closed unless both formal standing artifacts and the
 exact custom run appear in `next_gw.json`.
 
+The shipped fresh path also exposes the readiness checks before submission and the real
+prepare/optimize/publish stage while the solve is running. A stage is not converted into a fake
+percentage or ETA.
+
 ### Screen 5 — Summary
 
-- Fresh path: the 15 with cost and horizon EV, GW1 XI/captain/vice/bench in role-coloured
-  rows, the transfer path with hits, lock icons on pinned players, availability flags, and
-  the standard development-only caveats.
+- Fresh path: a sortable 15-player table with cost and horizon EV. Solved GW1
+  XI/captain/vice/ordered-bench roles remain fixed while sorting; `Total 3 GWs xP`, `Total 5 GWs
+  xP`, raw GW1-GW5 xP, and the expanded per-gameweek membership/role view expose the horizon
+  detail. The transfer path, locks, exclusions, availability flags, and development-only caveats
+  remain visible.
 - Own-team path: **HOLD is presented as a positive recommendation when it is optimal**
   (it frequently is — banked free transfers are often worth more than a forced move);
   otherwise per-GW in/out with a "free" or "-4 hit" badge, EV before/after hits, the new
@@ -139,8 +181,9 @@ The hard parts exist and are tested:
 | "Bench must be playable" | `--min-bench-appearance` gate, held across transfers |
 | Auditable, immutable suggestions | the optimizer artifact contract |
 
-What is genuinely NEW is the data boundary (manager fetch + mapping + value accounting) and
-the UI. Nothing about the forecast, composer, or the frozen evaluation history changes.
+What is genuinely new for P2 is the manager data boundary (fetch + mapping + value accounting)
+and the own-team UI/state. The fresh-squad UI is already shipped. Nothing about the forecast,
+composer, or the frozen evaluation history changes.
 
 ## 3. Data boundary (the only new network surface)
 
@@ -247,7 +290,7 @@ When the hosted mode arrives, a thin persistence service sits beside the wizard 
 every user configuration as an append-only log row:
 
 ```text
-(user/account id, manager_id when imported, vintage run_id, locked codes,
+(user/account id, manager_id when imported, vintage run_id, locked codes, excluded codes,
 rotation threshold, created_at)  ->  later joined to the produced plan's run_id
 ```
 
@@ -274,5 +317,6 @@ remain mandatory fields. Immutability and no-clobber behavior are inherited unch
    manager with a known state.
 3. Decide the candidate-pool policy for a manager search (the pool bound currently ranks by
    horizon utility; managers may want "only players I can afford now").
-4. Post-deadline sequencing: this is P2 work and must not displace the GW1 decision pack or
-   the BI MVP.
+4. Post-deadline sequencing: this is P2 work and must not displace the remaining GW1 decision-pack
+   operations. The BI/dashboard MVP is already implemented development-only; this import is not
+   required to complete it.

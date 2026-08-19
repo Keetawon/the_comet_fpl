@@ -12,8 +12,10 @@ different answers:
 
 A single `xP` answers only the first.
 
-**Current status: the data foundation and the development-only forward pipeline through Stage E
-are implemented; no forecast component or squad recommendation is promoted as production-valid.**
+**Current status: the data foundation, development-only forward pipeline through Stage E,
+append-only forecast/outcome ledger, versioned BI semantic export, atomic static publish boundary,
+and seven-route decision dashboard are implemented; no forecast component or squad recommendation
+is promoted as production-valid.**
 Phase 1 Candidates V1 and V2 were fitted under the fixed walk-forward contract and correctly not
 promoted. Candidate V3's development result was invalidated for leakage; its leakage-safe successor
 V4 was evaluated once and also missed the fixed gate, so `trailing_goals_attack_defence` remains the
@@ -78,9 +80,15 @@ change to a measured-optimal blend -- and recorded in
 `docs/phase4-season-boundary-appearance-underprediction.md`. The no-transfer pruning defect is
 fixed, and the optimiser now emits an immutable, provenance-bearing decision artifact whose reader
 revalidates legality offline. Before operational use, horizon availability semantics and future
-price/selling-value handling remain explicit unmeasured scenario gaps. The append-only
-player-gameweek prediction ledger is implemented; outcome ingestion, player-fixture forecasts, BI
-semantic exports, the static `publish` boundary, and real-deadline prospective validation remain.
+price/selling-value handling remain explicit unmeasured scenario gaps. The append-only ledger now
+retains player-gameweek, player-fixture, and team-fixture forecast vintages, with finalized outcomes
+attached separately. The versioned BI semantic/star export, atomic Parquet/static-JSON publish
+boundary, platform/custom-plan separation, lock/exclusion flow, and dashboard are implemented
+development-only. The dashboard exposes six read-only analytic/decision routes plus Plan Builder;
+after P0, its remaining Goal 2 UI-completeness task is to show the already-exported starts, xG/90,
+xA/90, bonus, BPS, and defensive-contribution measures on the Players page. Plan Builder produces
+fresh-squad custom scenarios; manager-team import and selling-value-aware own-team planning are
+separate P2 work, not part of that UI task. Real-deadline prospective validation remains open.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
@@ -343,8 +351,8 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
 | 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 development-evaluated; exposure-weighted goals V4 (-0.44% vs baseline, ties V3) and assists V2 (+1.85% vs baseline, -0.11% vs the incumbent V1) each run once, development-only, neither promoted; Stage D v3 composer, prospective forecast, and the GW29-38 EV backtest all run and development-only, with the V1 comparator outscoring the V3 primary |
-| 3b | Stage E optimiser + prediction ledger + `publish` | optimiser, stable input/decision artifacts, no-transfer repair, and append-only player-gameweek ledger implemented development-only; horizon availability/prices, outcome ingestion, BI exports, and static `publish` remain |
-| 4 | Dashboard v1 | not started |
+| 3b | Stage E optimiser + prediction ledger | optimiser, stable input/decision artifacts, no-transfer repair, and append-only player-gameweek/player-fixture/team-fixture ledger with finalized-outcome attachment implemented development-only; horizon availability, future prices/selling values, and manager-team import remain open |
+| 4 | BI semantic export + dashboard | versioned semantic/star export, atomic Parquet and static-JSON publish, platform/custom plan separation, locks/exclusions, six analytic routes plus Plan Builder implemented development-only; real-deadline validation and hosted/manager-import operation remain open |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
 
 Phase 3b is an addition to the original phasing, which ended Phase 3 at simulation and had no
@@ -354,16 +362,17 @@ multi-GW transfer path is explicitly bounded. See
 [`docs/stage-e-squad-optimizer.md`](docs/stage-e-squad-optimizer.md) and
 [`docs/prospective-points-artifact.md`](docs/prospective-points-artifact.md).
 
-The immutable forecast ledger now retains every recorded pre-deadline player-gameweek vintage with
-its `as_of`, input hashes, and model/component identities; historical vintages are never overwritten.
-It still needs finalized-outcome ingestion and player-fixture forecast grain. Those additions plus
-the BI semantic export become the source for model monitoring, fixture-difficulty matrices,
-player-form pivots, EV-versus-actual analysis, and optimiser audits.
-
-`publish` remains unimplemented. It will atomically export versioned JSON for the application and
-pivot-friendly columnar tables for BI from the internal ledger/marts. Dashboards and BI tools consume
-those read-only exports, never the mutable production DuckDB. `docs/publish-contract.md` fixes the
-existing application boundary; the BI star-schema extension must be versioned before implementation.
+The immutable forecast ledger retains every recorded pre-deadline player-gameweek,
+player-fixture, and team-fixture vintage with its `as_of`, input hashes, and model/component
+identities; historical vintages are never overwritten. Finalized outcomes attach through a
+separate append-only job. The versioned BI semantic export publishes pivot-friendly Parquet, and
+the atomic static publisher derives the dashboard's JSON read models from that export. Dashboards
+and BI tools consume those read-only outputs, never the mutable production DuckDB. The seven
+dashboard routes are Summary, Fixture matrix, Players, Next GW suggestion, Forecast vs actual,
+Optimizer audit, and Plan Builder. Formal platform default/diagnostic plans remain separate from
+fresh-squad user-custom plans; manager-id import and selling-value-aware own-team planning are not
+implemented. See `docs/bi-semantic-contract.md`, `docs/bi-export-contract.md`,
+`docs/dashboard-json-contract.md`, and `dashboard/README.md`.
 
 `docs/phase0-design.md` records the audit behind the schema decisions, including where
 measured values diverged from the original specification and why.

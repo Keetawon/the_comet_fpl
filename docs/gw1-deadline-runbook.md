@@ -12,6 +12,23 @@ the authority for correctness and frozen contracts, and `DEV-ROADMAP.md` for del
 - **Default forecast horizon:** GW1-5. The GW1 row is read from that artifact; GW1 is never
   forecast a second time on its own.
 
+## Current execution status — 2026-08-19
+
+- The standing verified fallback is
+  `D:\tmp\gw1\20260817T120028Z-60eeb038c8c8-preliminary`, comparison id
+  `b6081f9b…c3e6`. Keep it immutable.
+- The latest committed live package is
+  `snapshots\daily\2026-08-18\2026-08-18T063918Z` (590 players). The currently published formal
+  forecast/read-model artifacts still use the 2026-08-17 capture (587 players), so they are useful
+  for analysis and rehearsal only, not the final decision pack.
+- This audit found six reviewed implementation commits ahead of `origin/main` before the current
+  documentation reconciliation. Do **not** begin a formal run until the owner authorizes committing
+  and pushing the complete approved history and Step 1 proves a clean worktree with
+  `HEAD == origin/main`; never erase local commits to manufacture parity.
+- The 2026-08-20 preliminary/fallback run and the 2026-08-21 deadline run are both outstanding.
+  Complete them in that order. The Aug20 pack becomes the preferred fallback if the Aug21 capture
+  or machine fails.
+
 ## Invariants this runbook must not violate
 
 - **The GW1 view is read from the GW1-5 artifact.** The five-gameweek horizon informs initial squad
@@ -319,7 +336,25 @@ The comparison is a decision aid, not a promotion test. Do not choose a model be
 looks more plausible. The GW1 lineup and captaincy are read from the GW1 (first) week of the default
 optimizer artifact; the GW1-5 horizon informs initial squad value.
 
-## After Step 12 — BI export and dashboard read models (optional, never a deadline blocker)
+## Step 13 — Enter, verify, and save the owner decision in official FPL
+
+The software produces an auditable recommendation; it **never submits a team to FPL**. For the
+deadline run, the owner must use the chosen recorded artifact (or a separately recorded late
+override) to enter the team in the official FPL UI and then verify all of the following before
+leaving the page:
+
+- exactly the chosen 15 players and a legal total budget;
+- exactly the chosen starting XI and formation;
+- captain and vice-captain are distinct and match the decision;
+- bench goalkeeper and outfield bench order match the recorded decision.
+
+Save timestamped evidence of the successful official-FPL state (for example a screenshot plus a
+short note naming the optimizer `run_id` and comparison id) in the immutable out-of-repository run
+directory. If late news causes a manual override, record its time, player changes, and reason beside
+that evidence; do not edit the forecast, optimizer artifact, or comparison to make it appear
+model-generated.
+
+## After Step 13 — BI export and dashboard read models (optional, never a deadline blocker)
 
 Once the decision procedure is complete and recorded, the read-only BI boundary can be
 published from the same committed database. This is P1 output, not part of the deadline
@@ -385,6 +420,7 @@ if ((git status --porcelain --untracked-files=all)) {
 }
 ```
 
-- **No later than 30 minutes before the deadline:** lock the owner decision. Do not trade
+- **No later than 30 minutes before the deadline:** lock the owner decision and finish the Step 13
+  official-FPL save and timestamped evidence. Do not trade
   reproducibility for a last-minute unrecorded refresh; any late news-driven override is recorded
   separately from the model output, with its time and reason.

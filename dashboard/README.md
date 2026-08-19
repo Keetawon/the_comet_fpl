@@ -177,6 +177,10 @@ the last good generation.
 
 ## Pages
 
+The app has seven routes: the six analytical/read-model pages below (Summary, Fixture
+matrix, Players, Next GW suggestion, Forecast vs actual, and Optimizer audit) plus the
+interactive Plan builder.
+
 - **Fixture matrix** (implemented, P1.7b): the fixture pivot — one row per club of the
   selected vintage, **one column per gameweek** (two chips in a double gameweek), default
   sorted by average ease (easiest first, any column re-sorts). Recent form is one compact
@@ -211,14 +215,21 @@ the last good generation.
   badges on names. When two architectures are present, the default-vs-diagnostic diff is
   set overlaps only. Cross-plan EV is never compared: it measures the models' calibration
   against each other, not squad quality.
-- **Plan builder** (implemented, wizard v1): the configuration side of the manager-wizard
-  design (`docs/manager-team-suggestions.md`) — start screen (manager import marked
-  post-deadline; build-from-scratch live), a lock picker with search/position filter and the
-  per-position/club-cap/max-5 guards, a live budget pre-flight (locks + cheapest legal
-  completion vs the rules snapshot read from a recorded optimizer artifact), the rotation
-  threshold selector, and **Solve now** through the local plan server (above) with the exact
-  command as the offline fallback. The browser never solves; the result renders through the
-  Next GW page (preselected automatically) once the plan server records it.
+- **Plan builder** (implemented, wizard v2, fresh-squad path only): the interactive side of
+  the manager-wizard design (`docs/manager-team-suggestions.md`). The manager-id field currently
+  performs a format check and a best-effort `localStorage` write only; it does not call FPL,
+  restore, import, or apply a manager squad, so continuing still starts a fresh-squad solve.
+  The picker exposes the full eligible priced population with shared search/filters, 50 rows per
+  page, and pagination at both the top and bottom. Users can select up to five green locks and
+  fifteen red exclusions; the sets are disjoint and position, club-cap, population, and live
+  cheapest-completion budget guards run before submission. **Solve now** checks the forecast,
+  clean worktree, Python environment, PuLP, and CBC through the local plan server, then shows
+  honest stage-based preparation/optimization/publication feedback rather than a fabricated
+  percentage. The exact `user_custom` run stays on Plan Builder and fails visibly if the published
+  read model does not contain it; it never replaces or redirects to the formal Next GW suggestion.
+  Its result is a sortable 15-player table whose GW1 XI/captain/vice/ordered-bench roles remain
+  fixed while sorting. It exposes `Total 3 GWs xP`, `Total 5 GWs xP`, raw GW1-GW5 xP columns, and
+  an expanded per-gameweek membership/role view.
 - **Forecast vs actual** (implemented, P1.7e): each recorded vintage scored against its own
   season's finalised outcomes (points under 2026/27 rules, read-time join at
   `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a

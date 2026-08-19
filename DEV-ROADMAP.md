@@ -1,7 +1,7 @@
 # Development roadmap: GW1 decision pack, then BI
 
 Status: active execution plan  
-Last updated: 2026-08-17  
+Last updated: 2026-08-19<br>
 Target: 2026/27 GW1  
 Deadline: `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok)  
 First kickoff: `2026-08-21T19:00:00Z`
@@ -19,30 +19,61 @@ owner goals below, defer it unless it is required to keep the deadline path corr
 
 The goals are ordered. Goal 1 may not be delayed by dashboard polish or new model research.
 
+## Bird's-eye goal status
+
+- **Goal 1 is operationally ready but not complete.** The forecast, ledger, optimizer, comparison,
+  and Plan Builder paths are implemented and rehearsed, and the immutable 2026-08-17 evening pack
+  remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
+  the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
+- **Goal 2 is substantially implemented.** The versioned semantic export, player-fixture forecast
+  transport, outcome attachment, atomic static-JSON boundary, six analytic pages, and Plan Builder
+  are shipped development-only. The remaining owner-goal UI gap is exposing the already-exported
+  starts, xG/90, xA/90, bonus, BPS, and defensive-contribution form fields on the Players page,
+  followed by a final read-model refresh. Manager-team import belongs to P2, not Goal 2. Neither
+  item may delay Goal 1.
+
 ## Current baseline
 
-Verified on `main` at `c158df1` on 2026-08-13; re-check HEAD and the latest snapshot before acting.
+The 2026-08-19 audit found clean local `main` at `299de22`, with six reviewed implementation
+commits ahead of `origin/main` and zero behind. This documentation reconciliation must be reviewed
+and committed with that implementation history; push the complete approved history without
+rewriting it before any new deadline artifact is produced.
 
-- The latest committed live snapshot was captured at `2026-08-13T07:23:48Z` and contains 581
-  elements, 20 teams, 38 events, and 380 fixtures.
+- The latest committed live snapshot was captured at `2026-08-18T06:39:18Z` and contains 590
+  elements, 20 teams, 38 events, and 380 fixtures. Its first kickoff is
+  `2026-08-21T19:00:00Z`; its deadline is `2026-08-21T17:30:00Z`.
+- The current local DuckDB, formal development forecasts, optimizer plans, and published dashboard
+  read models still derive from the `2026-08-17T06:50:35Z` snapshot with 587 players and 2,935
+  player-gameweek rows. They are a development vintage, not an 08-18 refresh or the final team.
 - The prospective pipeline emits a canonical, provenance-bearing player-gameweek JSONL artifact.
 - The append-only DuckDB prediction ledger is implemented in `src/fpl/storage/ledger.py`, with the
-  thin `fpl.jobs.record_forecast` entry point. It currently records player-gameweek forecasts and
-  separate player-fixture outcomes.
+  thin `fpl.jobs.record_forecast` entry point. It records player-gameweek and player-fixture
+  forecast distributions, with outcomes attached separately.
 - Stage E selects a legal 15-player squad and exact weekly lineup/captain, then performs a bounded
-  multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed.
-- The full repository gate was green after the ledger and optimizer fixes: 1,326 tests passed,
-  Ruff was clean, formatting was clean, and strict mypy passed. This is historical evidence, not a
-  substitute for rerunning the gate after changes.
+  multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed, and immutable
+  platform/default, diagnostic, and custom-plan identities are separated fail-closed.
+- The BI semantic/star export, fixture difficulty and player/team form facts, atomic static JSON,
+  six analytic dashboard pages, and the Plan Builder are implemented development-only. The browser
+  reads only published JSON and never DuckDB.
+- The localhost plan service was live and ready at audit time (PuLP 3.3.2, CBC 2.10.3, clean and
+  idle), and the dashboard preview served the latest frontend. These are transient service checks,
+  not substitutes for the final immutable artifacts.
+- The dashboard gate is green (80 tests, production build, and lint with 12 pre-existing warnings).
+  Today's full Python run reached 1,623 passed, 4 skipped, and 13 failures; every failure is the
+  same known Windows `WinError 1314` directory-symlink privilege case in the BI-export publish
+  tests. No model or optimizer regression was observed. This is still not an unqualified green
+  formal gate: use a symlink-capable/elevated environment or an explicitly approved and documented
+  run before declaring the formal gate green.
 - The local database is rebuildable. Daily snapshots are the irreplaceable source and must remain
   committed.
 
 Open operational gaps:
 
+- the 2026-08-20 fallback and 2026-08-21 final deadline runs and official-FPL submission remain;
 - `chance_of_playing_next_round` is repeated across GW1-5;
 - future prices use deadline `now_cost`; price changes and selling value are not modelled;
-- the ledger lacks player-fixture forecast distributions and an outcome-ingestion job;
-- the versioned BI semantic/star-schema export and dashboard do not exist.
+- manager-team import and selling-value accounting remain post-deadline work;
+- real forecast-versus-actual monitoring must wait for finalized 2026/27 outcomes.
 
 ## Delivery rules until the GW1 deadline
 
@@ -63,7 +94,34 @@ Open operational gaps:
 
 ## P0: GW1 decision pack
 
-P0 blocks BI implementation. Work top to bottom.
+P0 remains the only deadline gate. P1 shipped early and may be refreshed only after the decision
+artifacts are secure; no further BI polish may delay P0. Work top to bottom.
+
+### P0.0 — Immediate sync and code freeze
+
+**Audit status (2026-08-19): action required before the next artifact run.** The audit found local
+`main` clean at `299de22`, with six reviewed implementation commits ahead of `origin/main` and zero
+behind. Review and commit this documentation reconciliation with the approved implementation
+history, then push the complete history without rewrite. The committed 08-18 snapshot has 590
+players, while the current DuckDB and published development forecasts still use the 08-17
+587-player snapshot. Never relabel those older artifacts as 08-18 or final output.
+
+Execute in this order:
+
+1. Preserve today's exact Python and dashboard evidence. Before calling the formal gate
+   unqualified green, use a symlink-capable/elevated environment or obtain explicit approval for
+   the documented `WinError 1314` environmental result.
+2. Review and commit the documentation reconciliation with the six audited implementation
+   commits, then push the complete approved history to `origin/main` without rewriting history.
+3. Verify a clean worktree and `origin/main...HEAD` divergence of `0 0`.
+4. Freeze code and component defaults until after the deadline, except for a demonstrated blocker
+   in the deadline path. Do not spend the remaining window on model research or dashboard polish.
+5. Treat the mandatory 2026-08-20 pack as the next authorized forecast refresh; do not create an
+   ad hoc 08-18/08-19 recommendation between audited slots.
+
+Acceptance: `git status --porcelain` is empty;
+`git rev-list --left-right --count origin/main...HEAD` returns `0 0`; both gates and their exact
+results are recorded; and the frozen component modes remain `v3`/`coupled`/`seasonal`/`auto`.
 
 ### P0.1 — Durable optimizer artifact
 
@@ -301,17 +359,51 @@ player looks more plausible.
   sensitivity run (optimizer `95a450db…fc1c`) is now squad-identical to the default plan:
   the ownership-selected bench already clears the 25% gate, so the threshold does not bind
   on this vintage. This rerun supersedes the morning pack as the standing fallback vintage.
-- On 2026-08-21: capture and commit the latest official data, rerun the sequential pipeline roughly
-  2-3 hours before the deadline, and lock the owner decision no later than 30 minutes before the
-  deadline. Do not trade reproducibility for a last-minute unrecorded refresh.
 
-P0 is complete only when the owner has the final legal GW1 team and the forecast, ledger, optimizer,
-and comparison artifacts can be traced by immutable IDs and SHA-256 values.
+  **2026-08-19 audit:** the retained 08-17 evening pack at
+  `D:\tmp\gw1\20260817T120028Z-60eeb038c8c8-preliminary` remains the standing fallback;
+  comparison
+  `b6081f9ba45256c300cd105517eb3b89ab70bebddf9500fdeb5489f3e414c3e6` and producing HEAD
+  `60eeb038c8c8ee32cfd9aa4bfe9b19fd08cbff9a` remain immutable historical identities. The newly
+  committed 08-18 snapshot has 590 players, but the local database and development read models
+  still contain the 08-17/587-player vintage. The 08-20 slot is therefore mandatory, not optional.
+
+  **2026-08-20 fallback acceptance:** from the clean, synchronized, frozen HEAD, execute runbook
+  Steps 1-12 on the newest committed snapshot. Generate the default and diagnostic forecasts before
+  either ledger mutation; require identical cutoff, database, live inputs, seed, draws, and
+  contracts except for their declared component modes. Re-read and validate both ledger vintages,
+  both optimizer artifacts, and the comparison; record all run IDs, decision hashes, artifact
+  SHA-256 values, snapshot identity, database hash, and exact gate results. Copy the complete pack
+  to a second location, verify that copy, and designate it as the standing fallback. Publishing BI
+  read models is optional and comes only after the decision pack and verified copy are secure.
+
+- On 2026-08-21: capture, checksum, commit, and push the latest official data; verify the repository
+  is clean and synchronized; then execute Steps 1-12 sequentially roughly 2-3 hours before the
+  deadline (about 21:30-22:30 Asia/Bangkok on 2026-08-21). Validate the default/diagnostic
+  comparison and immutable artifact chain. If that run fails closed, use the verified 08-20 pack;
+  do not trade reproducibility for a last-minute unrecorded refresh.
+- After choosing the final plan, **manually submit it in the official FPL UI**. Enter all 15
+  players; verify the budget, maximum-three-per-club rule, legal formation, starting XI, captain,
+  vice-captain, and ordered bench; save/confirm before
+  `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok). Lock the owner decision no later
+  than `2026-08-21T17:00:00Z` (`2026-08-22 00:00` Asia/Bangkok), and retain a confirmation
+  timestamp plus screenshot or official reference. Any owner override is recorded separately with
+  time and reason. The optimizer and dashboard never submit a team automatically.
+
+P0 is complete only when the owner has a confirmed legal GW1 team in the official FPL UI, the
+submission evidence is retained, and the final forecast, ledger, optimizer, and comparison
+artifacts can be traced by immutable IDs and SHA-256 values.
 
 ## P1: BI semantic export and decision dashboard
 
-Begin after P0 is rehearsed and safe. Build the semantic/export boundary before UI work. BI and the
-dashboard must never query the mutable production DuckDB directly.
+**Bird's-eye status (2026-08-19): substantially implemented development-only.** The semantic
+contract/export, fixture-grain forecast transport, outcome attachment, atomic static publish
+boundary, fixture difficulty and player/team form views, all six analytic pages, and Plan Builder
+are present. The browser reads only static JSON and never the mutable production DuckDB. The
+remaining owner-goal UI gap is exposing already-exported starts, xG/90, xA/90, bonus, BPS, and
+defensive contribution on the Players page; forecast-versus-actual becomes informative only after
+outcomes finalize. Manager import remains separate P2 work. Refresh the read models from the final
+decision vintage and finish the form columns only after P0 artifacts and their backup are secure.
 
 ### P1.1 — Freeze semantic contract v1
 
@@ -554,8 +646,9 @@ indices, official FDR, xG/xA, rates, not-yet-persisted fixture probabilities); o
 `run_id` + `season` + `team_code`/`code` only; club labels resolve season-safely through
 `dim_team_season`; player fixture chips carry the club's ease/FDR joined on the
 season-qualified fixture-team key; availability is a passed-through reported overlay. The
-read models cover the two exploration pages only; the summary / next-GW / forecast-vs-actual /
-optimizer pages are later additive files. Contract: `docs/dashboard-json-contract.md`; the
+At that milestone the read models covered the two exploration pages only; the summary / next-GW /
+forecast-vs-actual / optimizer pages were later additive files. Contract:
+`docs/dashboard-json-contract.md`; the
 runbook notes the emitter as optional post-decision output. Tests:
 `tests/test_dashboard_json.py` (publication tests need the directory-symlink privilege, as
 for `tests/test_bi_export.py`; the archive smoke test is self-contained — it seeds a
@@ -564,8 +657,9 @@ any machine with `build_db` run, with or without recorded real vintages).
 
 **P1.7b UI part 1 (2026-08-16): implemented.** `dashboard/` is a new self-contained Vite +
 React + TypeScript + Tailwind + shadcn/ui + @tanstack/react-table app reading ONLY the
-static JSON read models (never DuckDB, never Parquet in-browser). The sidebar lists all six
-pages in roadmap order with the five unimplemented ones as labelled stubs. Shipped: the
+static JSON read models (never DuckDB, never Parquet in-browser). At that milestone the sidebar
+listed all six analytic pages in roadmap order with the five unimplemented ones as labelled stubs.
+Shipped then: the
 shared direction-labelled difficulty colour scale with legend and a model-ease vs official
 FDR colour-source toggle (never blended); the FixtureTicker (opponent + venue + headline,
 NULL → neutral dashed chip with no number, blank gameweek → empty slot, double gameweek →
@@ -639,7 +733,8 @@ identity/options/seed/status, the bounded-search policy, the rules snapshot, the
 and the development-only status as three deterministic JSON columns plus scalars. The audit
 page renders provenance, solver, policy with its declared optimality scope, constraints,
 assumptions, and the transfer path with hits; the squad/XI themselves are not duplicated —
-the page reads `next_gw.json`. The app shell now routes all six pages with no stubs. Dev
+the page reads `next_gw.json`. The app shell routes all six original analytic pages with no stubs;
+Plan Builder is the seventh route. Dev
 data: the dev ledger carries a diagnostic vintage (run `407668b6…`) beside the default
 (`86a072ad…`), and two dev-only optimizer plans (default `7ce5b0c8…`, diagnostic
 `90683dfc…`, both `risk_lambda=0`, clean worktree) feed the export, so the Next-GW diff and
@@ -660,6 +755,32 @@ the initial ILP, every future transfer candidate/squad, artifact validation, run
 plan server, read model, and UI; lock/exclusion overlap and unknown/unselectable codes fail closed.
 The `manager_id` is still saved only for the post-deadline importer and is explicitly not applied
 to a GW1 fresh-squad solve.
+
+**P1.7g Plan Builder decision UX (2026-08-19): implemented and focused-tested.** The fresh-squad
+wizard exposes the eligible pool with reusable top and bottom pagination; a bottom-page change
+returns focus to the first result without forcing the user to scroll back up. Locks remain green,
+exclusions red, and the submitted rule snapshot is frozen while the optimizer runs. The solve card
+uses an accessible, calm, indeterminate staged state with honest messages and no fabricated
+percentage. A solved custom plan stays separate from the platform recommendation and renders an
+exact 15-player sortable analysis table: captain, vice, bench roles, and row colours are fixed to
+GW1 even when sorted; sortable columns expose `Total 3 GWs xP`, `Total 5 GWs xP`, and raw
+`GW1 xP` through `GW5 xP`; expanded rows show each gameweek's forecast and in-plan role/status.
+Missing or malformed exact-run data fails visibly. The remaining gap is still the post-deadline
+manager import and selling-value workflow, not fresh-squad solving.
+
+### P1.8 — Complete Players-page form exposure after P0
+
+**Status (2026-08-19): exported data ready; UI exposure remains.** The semantic/Parquet export is
+already pivot-ready for starts, xG/90, xA/90, bonus, BPS, and defensive contribution. After the
+08-20 fallback and 08-21 final decision pack are secure, carry those existing fields through the
+static Players read model where necessary and render them in the Players-page table/detail view.
+Preserve form-window and anchor-season labels and every NULL/unmeasured semantic. Direct 1/3/5
+window presets are optional convenience controls after the required columns work.
+
+Acceptance: the Players page exposes starts, xG/90, xA/90, bonus, BPS, and defensive contribution
+from the published semantic data; focused tests cover measured and NULL values without client-side
+recalculation; the final decision vintage is republished through the static boundary; and this work
+does not delay or mutate any P0 artifact. Manager-team import remains P2.
 
 Build only after the export contract and its tests pass. Minimum pages:
 
@@ -695,7 +816,8 @@ Only after P0 and the BI MVP are secure:
   selling-value-aware budget checks); the optimizer-side primitives (`--lock`, `--exclude`,
   `initial_banked_free_transfers`, the bench gate) are
   already implemented and tested — the remaining work is the manager ingest boundary, value
-  accounting, and the dashboard page. **The interactive solving half shipped early
+  accounting, and their integration inside the existing Plan Builder page. **The interactive
+  solving half shipped early
   (2026-08-17, extended 2026-08-18 with explicit custom-plan identity and exclusions; owner
   decision — it is needed for the GW1 decision itself):**
   `fpl.jobs.plan_server` is a localhost trigger that runs the unchanged, fail-closed
@@ -713,7 +835,22 @@ Run jobs sequentially. Before any implementation handoff:
 .\.venv\Scripts\ruff.exe check src tests
 .\.venv\Scripts\ruff.exe format --check .
 .\.venv\Scripts\mypy.exe src
+Push-Location dashboard
+npm test
+npm run build
+npm run lint
+Pop-Location
 ```
+
+Before any 08-20 or 08-21 artifact run, also require:
+
+```powershell
+git status --porcelain
+git rev-list --left-right --count origin/main...HEAD
+```
+
+The first command must emit nothing and the second must emit `0 0`. Record the exact Python and
+dashboard gate results; historical green runs are evidence, not a replacement for this check.
 
 Report changed files, tests and exact results, output schemas with one sample record, measured
 constants for any non-trivial policy, unresolved assumptions, generated run IDs/hashes, and the
