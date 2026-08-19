@@ -177,6 +177,11 @@ describe("NextGwPage", () => {
     expect(screen.getByText(/Bench \(autosub order/)).toBeInTheDocument();
     // the squad table is the shared pivot: plan EV columns beside the GW fixture chips
     expect(screen.getByRole("columnheader", { name: /Plan xP GW1/ })).toBeInTheDocument();
+    // Players-page view switching must not widen this decision table's legacy form profile.
+    expect(screen.getByRole("columnheader", { name: "G" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Starts" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "CS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "DC" })).not.toBeInTheDocument();
     expect(screen.getAllByTestId("chip").length).toBeGreaterThan(0);
     // captain badge marks Alpha in the table
     expect(screen.getAllByText("C").length).toBeGreaterThan(0);

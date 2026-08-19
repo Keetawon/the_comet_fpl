@@ -161,6 +161,10 @@ def _player_form_row(gw: int, code: int, window: str, **overrides: Any) -> dict[
         "expected_goals_per_90": None,
         "expected_assists_per_90": None,
         "points_under_rules_2026_27": 2,
+        "clean_sheets": 0,
+        "goals_conceded": 0,
+        "saves": 0,
+        "expected_goals_conceded": None,
     }
     row.update(overrides)
     return row
@@ -527,6 +531,10 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 assists=1,
                 bonus=3,
                 bps=60,
+                clean_sheets=2,
+                goals_conceded=4,
+                saves=11,
+                expected_goals_conceded=3.4,
                 expected_assists=0.6,
                 expected_assists_per_90=0.2,
                 points_under_rules_2026_27=20,
@@ -676,6 +684,10 @@ def test_unmeasured_values_stay_json_null_never_zero(tmp_path: Path) -> None:
     assert by_fixture[101]["team_lambda_against"] == 0.0  # the NULL-ease leg keeps its primitive
     assert vicario["form"]["windows"]["last_5"]["starts"] is None
     assert vicario["form"]["windows"]["last_5"]["expected_goals"] is None
+    assert vicario["form"]["windows"]["last_5"]["clean_sheets"] == 2
+    assert vicario["form"]["windows"]["last_5"]["goals_conceded"] == 4
+    assert vicario["form"]["windows"]["last_5"]["saves"] == 11
+    assert vicario["form"]["windows"]["last_5"]["expected_goals_conceded"] == 3.4
     assert alpha["form"]["windows"]["last_5"]["team_xg"] is None
 
     payload = render_read_model_files(models)[FIXTURE_MATRIX_FILENAME].decode("utf-8")

@@ -7,7 +7,7 @@
 // Used by the Players page (whole roster) and the Next GW page (squad rows beside plan
 // EV columns via extraColumns).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { flexRender } from "@tanstack/react-table";
 import {
@@ -67,6 +67,8 @@ export interface PlayerStatTableProps {
   formHeading: string;
   /** Tooltip for the form columns: anchor season/gameweek of the window. */
   formTitle?: string;
+  /** Players uses view-aware form columns; other consumers retain the compact legacy profile. */
+  formColumnProfile?: "legacy" | "players";
   initialSorting?: SortingState;
   pageSize?: number;
   /** Columns inserted just BEFORE the per-gameweek fixture columns (fixtures stay last). */
@@ -89,6 +91,27 @@ const price = (value: number | null) => (value == null ? "–" : `£${(value / 1
 
 const HEAD_CLASS = "sticky top-0 z-10 h-8 bg-background px-2 text-xs whitespace-nowrap";
 const CELL_CLASS = "px-2 py-1 text-xs whitespace-nowrap";
+const DEFAULT_SORTING: SortingState = [{ id: "totalXp", desc: true }];
+
+const ATTACK_FORM_COLUMN_IDS = new Set([
+  "form-goals_scored",
+  "form-assists",
+  "form-expected_goals",
+  "form-expected_assists",
+  "form-expected_goals_per_90",
+  "form-expected_assists_per_90",
+]);
+const DEFENSE_FORM_COLUMN_IDS = new Set([
+  "form-clean_sheets",
+  "form-goals_conceded",
+  "form-saves",
+  "form-defensive_contribution",
+  "form-expected_goals_conceded",
+]);
+const VIEW_SPECIFIC_FORM_COLUMN_IDS = new Set([
+  ...ATTACK_FORM_COLUMN_IDS,
+  ...DEFENSE_FORM_COLUMN_IDS,
+]);
 
 /** One per-fixture detail cell: value text plus whether the active view emphasises it. */
 interface DetailColumn {
@@ -98,7 +121,7 @@ interface DetailColumn {
   muted: boolean;
 }
 
-/** The expanded per-fixture table: the view's own stats lead, the others stay visible but muted. */
+/** The expanded per-fixture table: selected-view primitives lead; Overall treats both honestly. */
 function detailColumns(view: ViewMode): DetailColumn[] {
   const pct = (v: number | null) => (v == null ? "–" : `${Math.round(v * 100)}%`);
   const clubCs = (f: PlayerFixture) => pct(f.team_probability_clean_sheet);
@@ -124,12 +147,6 @@ function detailColumns(view: ViewMode): DetailColumn[] {
     { key: "expected_assists", label: "xA", value: (f) => fmt(f.expected_assists, 2), muted: false },
     { key: "team_lambda_for", label: "Club λ for", value: (f) => fmt(f.team_lambda_for, 2), muted: false },
     { key: "team_attack_ease_index", label: "Atk ease", value: (f) => fmt(f.team_attack_ease_index, 0), muted: false },
-    { key: "probability_appears", label: "P(plays)", value: (f) => pct(f.probability_appears), muted: true },
-    { key: "probability_sixty_minutes", label: "P(60+)", value: (f) => pct(f.probability_sixty_minutes), muted: true },
-    { key: "probability_clean_sheet", label: "CS (own)", value: (f) => pct(f.probability_clean_sheet), muted: true },
-    { key: "team_probability_clean_sheet", label: "Club CS", value: clubCs, muted: true },
-    { key: "team_lambda_against", label: "Club λ against", value: (f) => fmt(f.team_lambda_against, 2), muted: true },
-    { key: "team_defence_ease_index", label: "Def ease", value: (f) => fmt(f.team_defence_ease_index, 0), muted: true },
   ];
   const defense: DetailColumn[] = [
     { key: "probability_appears", label: "P(plays)", value: (f) => pct(f.probability_appears), muted: false },
@@ -138,16 +155,19 @@ function detailColumns(view: ViewMode): DetailColumn[] {
     { key: "team_lambda_against", label: "Club λ against", value: (f) => fmt(f.team_lambda_against, 2), muted: false },
     { key: "team_probability_clean_sheet", label: "Club CS", value: clubCs, muted: false },
     { key: "team_defence_ease_index", label: "Def ease", value: (f) => fmt(f.team_defence_ease_index, 0), muted: false },
-    { key: "expected_goals", label: "xG", value: (f) => fmt(f.expected_goals, 2), muted: true },
-    { key: "expected_assists", label: "xA", value: (f) => fmt(f.expected_assists, 2), muted: true },
-    { key: "team_lambda_for", label: "Club λ for", value: (f) => fmt(f.team_lambda_for, 2), muted: true },
-    { key: "team_attack_ease_index", label: "Atk ease", value: (f) => fmt(f.team_attack_ease_index, 0), muted: true },
   ];
   const tail: DetailColumn[] = [
     { key: "team_overall_ease_index", label: "Ovr ease", value: (f) => fmt(f.team_overall_ease_index, 0), muted: false },
     { key: "team_official_fdr", label: "FDR", value: (f) => fmt(f.team_official_fdr, 0), muted: false },
   ];
-  return [...base, ...(view === "attack" ? attack : defense), ...tail];
+  const muted = (columns: DetailColumn[]) => columns.map((column) => ({ ...column, muted: true }));
+  const viewed =
+    view === "attack"
+      ? [...attack, ...muted(defense)]
+      : view === "defense"
+        ? [...defense, ...muted(attack)]
+        : [...attack, ...defense];
+  return [...base, ...viewed, ...tail];
 }
 
 function GwCell({
@@ -240,7 +260,8 @@ export function PlayerStatTable({
   opponentIndexOf,
   formHeading,
   formTitle,
-  initialSorting = [{ id: "totalXp", desc: true }],
+  formColumnProfile = "legacy",
+  initialSorting = DEFAULT_SORTING,
   pageSize = 50,
   beforeFixtureColumns = [],
   extraColumns = [],
@@ -253,18 +274,59 @@ export function PlayerStatTable({
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
   const [expanded, setExpanded] = useState<ExpandedState>({});
 
+  useEffect(() => {
+    if (formColumnProfile !== "players") return;
+    const visibleViewColumns =
+      view === "attack"
+        ? ATTACK_FORM_COLUMN_IDS
+        : view === "defense"
+          ? DEFENSE_FORM_COLUMN_IDS
+          : VIEW_SPECIFIC_FORM_COLUMN_IDS;
+    setSorting((current) =>
+      current.some(
+        ({ id }) => VIEW_SPECIFIC_FORM_COLUMN_IDS.has(id) && !visibleViewColumns.has(id),
+      )
+        ? [...initialSorting]
+        : current,
+    );
+  }, [formColumnProfile, initialSorting, view]);
+
   const columns = useMemo<LegacyColumnDef<PlayerStatRow>[]>(() => {
     const formStat = (
       key: keyof PlayerFormWindow,
       label: string,
-      digits = 0,
+      options: {
+        digits?: number;
+        positions?: readonly string[];
+        headerTitle?: string;
+      } = {},
     ): LegacyColumnDef<PlayerStatRow> => ({
       id: `form-${key}`,
-      header: label,
-      accessorFn: (row) => (row.form ? row.form[key] : null),
+      header: options.headerTitle
+        ? () => <span title={options.headerTitle}>{label}</span>
+        : label,
+      accessorFn: (row) => {
+        if (options.positions && !options.positions.includes(row.player.position)) return undefined;
+        const value = row.form?.[key];
+        return value == null ? undefined : value;
+      },
+      sortUndefined: "last",
       cell: ({ row }) => {
-        const value = row.original.form ? row.original.form[key] : null;
-        return <span className="tabular-nums">{fmt(value, digits)}</span>;
+        const { player, form } = row.original;
+        const applicable = !options.positions || options.positions.includes(player.position);
+        const value = applicable ? form?.[key] : null;
+        const title = !applicable
+          ? `${label} is not applicable to ${player.position}`
+          : value == null
+            ? form == null
+              ? `No observed form is available for ${label}`
+              : `${label} is unmeasured in this form window`
+            : `Observed ${label}: ${fmt(value, options.digits ?? 0)}`;
+        return (
+          <span className="tabular-nums" title={title}>
+            {fmt(value, options.digits ?? 0)}
+          </span>
+        );
       },
     });
     const minutesPerGame: LegacyColumnDef<PlayerStatRow> = {
@@ -273,14 +335,22 @@ export function PlayerStatTable({
       accessorFn: (row) =>
         row.form?.appearances != null && row.form.appearances > 0 && row.form.minutes != null
           ? row.form.minutes / row.form.appearances
-          : null,
+          : undefined,
+      sortUndefined: "last",
       cell: ({ row }) => {
         const f = row.original.form;
         const value =
           f?.appearances != null && f.appearances > 0 && f.minutes != null
             ? f.minutes / f.appearances
             : null;
-        return <span className="tabular-nums">{fmt(value, 0)}</span>;
+        return (
+          <span
+            className="tabular-nums"
+            title={value == null ? "Minutes per appearance is unmeasured" : `Observed Min/g: ${fmt(value, 0)}`}
+          >
+            {fmt(value, 0)}
+          </span>
+        );
       },
     };
     const gwColumns: LegacyColumnDef<PlayerStatRow>[] = Array.from(
@@ -300,6 +370,69 @@ export function PlayerStatTable({
         />
       ),
     }));
+    const commonFormColumns = [
+      formStat("appearances", `${formHeading} App`),
+      formStat("starts", "Starts"),
+      minutesPerGame,
+    ];
+    const attackFormColumns = [
+      formStat("goals_scored", "G"),
+      formStat("assists", "A"),
+      formStat("expected_goals", "xG", { digits: 1 }),
+      formStat("expected_assists", "xA", { digits: 1 }),
+      formStat("expected_goals_per_90", "xG/90", { digits: 2 }),
+      formStat("expected_assists_per_90", "xA/90", { digits: 2 }),
+    ];
+    const defenseFormColumns = [
+      formStat("clean_sheets", "CS", {
+        positions: ["GK", "DEF", "MID"],
+        headerTitle: "Observed clean sheets credited to the player",
+      }),
+      formStat("goals_conceded", "GC", {
+        positions: ["GK", "DEF"],
+        headerTitle: "Observed goals conceded while the player was on the pitch",
+      }),
+      formStat("saves", "Saves", {
+        positions: ["GK"],
+        headerTitle: "Observed goalkeeper saves",
+      }),
+      formStat("defensive_contribution", "DC", {
+        positions: ["DEF", "MID", "FWD"],
+        headerTitle: "Observed defensive-contribution count; raw actions, not fantasy points",
+      }),
+      formStat("expected_goals_conceded", "xGC", {
+        digits: 1,
+        positions: ["GK", "DEF"],
+        headerTitle: "Observed expected goals conceded while the player was on the pitch",
+      }),
+    ];
+    const outcomeFormColumns = [
+      formStat("bonus", "Bonus"),
+      formStat("bps", "BPS"),
+      formStat("points_under_rules_2026_27", "Pts"),
+    ];
+    const playerFormColumns =
+      view === "attack"
+        ? [...commonFormColumns, ...attackFormColumns, ...outcomeFormColumns]
+        : view === "defense"
+          ? [...commonFormColumns, ...defenseFormColumns, ...outcomeFormColumns]
+          : [
+              ...commonFormColumns,
+              ...attackFormColumns,
+              ...defenseFormColumns,
+              ...outcomeFormColumns,
+            ];
+    const legacyFormColumns = [
+      formStat("appearances", `${formHeading} App`),
+      minutesPerGame,
+      formStat("goals_scored", "G"),
+      formStat("assists", "A"),
+      formStat("expected_goals", "xG", { digits: 1 }),
+      formStat("expected_assists", "xA", { digits: 1 }),
+      formStat("points_under_rules_2026_27", "Pts"),
+    ];
+    const visibleFormColumns =
+      formColumnProfile === "players" ? playerFormColumns : legacyFormColumns;
     return [
       {
         id: "expander",
@@ -379,13 +512,7 @@ export function PlayerStatTable({
           );
         },
       },
-      formStat("appearances", `${formHeading} App`),
-      minutesPerGame,
-      formStat("goals_scored", "G"),
-      formStat("assists", "A"),
-      formStat("expected_goals", "xG", 1),
-      formStat("expected_assists", "xA", 1),
-      formStat("points_under_rules_2026_27", "Pts"),
+      ...visibleFormColumns,
       {
         id: "totalXp",
         header: `xP GW${gwFrom}-${gwTo}`,
@@ -400,7 +527,18 @@ export function PlayerStatTable({
       ...gwColumns,
       ...extraColumns,
     ];
-  }, [view, colorSource, gwFrom, gwTo, formHeading, nameSuffix, beforeFixtureColumns, extraColumns, opponentIndexOf]);
+  }, [
+    view,
+    colorSource,
+    gwFrom,
+    gwTo,
+    formHeading,
+    formColumnProfile,
+    nameSuffix,
+    beforeFixtureColumns,
+    extraColumns,
+    opponentIndexOf,
+  ]);
 
   const table = useLegacyTable({
     data: rows,

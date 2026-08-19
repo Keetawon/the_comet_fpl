@@ -897,6 +897,32 @@ FACT_PLAYER_FORM = Table(
             "unknown_until_finalised",
             "Replayed points over appeared fixtures in the window.",
         ),
+        _nullable(
+            "clean_sheets",
+            "int",
+            "not_applicable",
+            "Clean sheets credited over appeared fixtures. NULL when the player did not appear.",
+        ),
+        _nullable(
+            "goals_conceded",
+            "int",
+            "not_applicable",
+            "Goals conceded while the player was on the pitch, summed over appeared fixtures. "
+            "NULL when the player did not appear.",
+        ),
+        _nullable(
+            "saves",
+            "int",
+            "not_applicable",
+            "Saves over appeared fixtures. NULL when the player did not appear.",
+        ),
+        _nullable(
+            "expected_goals_conceded",
+            "float",
+            "unmeasured",
+            "xGC summed over appeared fixtures where xGC was measured. NULL when there was no "
+            "measured appeared fixture; never zero-filled.",
+        ),
     ),
     joins=(
         Join(to_table="dim_player", on=(("code", "code"),), cardinality="many_to_one"),
@@ -919,6 +945,8 @@ FACT_PLAYER_FORM = Table(
         "A per-90 rate is a display measure. Never multiply it by expected minutes in the "
         "reporting layer to synthesise a forecast; that is the model's job.",
         "Never zero-fill an unmeasured xG or xA to make a window look complete.",
+        "Basic defensive counts use appeared fixtures and stay NULL when there was no appearance; "
+        "xGC additionally preserves source measurement coverage.",
     ),
 )
 

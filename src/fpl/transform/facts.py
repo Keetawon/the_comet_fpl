@@ -270,9 +270,11 @@ def build_player_form(con: duckdb.DuckDBPyConnection) -> int:
     so a double gameweek is complete at its one player-gameweek row while a later gameweek cannot
     leak backwards.
 
-    ``expected_goals`` and ``expected_assists`` retain their measurement coverage: their sums and
-    per-90 denominators include only appeared rows where the respective signal is non-NULL.  A
-    starts total is NULL if any rostered source row in the window has unmeasured starts; treating
+    ``expected_goals``, ``expected_assists``, and ``expected_goals_conceded`` retain their
+    measurement coverage: their sums include only appeared rows where the respective signal is
+    non-NULL, and the attacking per-90 denominators use those same measured rows.  Basic observed
+    defensive counts are summed over appeared fixtures and stay NULL when there was no appearance.
+    A starts total is NULL if any rostered source row in the window has unmeasured starts; treating
     the entirely unmeasured 2021-22 column as zero would manufacture availability data.
     """
     _assert_player_form_source_grain(con)
@@ -283,7 +285,8 @@ def build_player_form(con: duckdb.DuckDBPyConnection) -> int:
             season, gw, code, "window", rostered_fixtures, appearances, starts, did_not_play,
             minutes, goals_scored, assists, bonus, bps, defensive_contribution, expected_goals,
             expected_assists, expected_goals_per_90, expected_assists_per_90,
-            points_under_rules_2026_27
+            points_under_rules_2026_27, clean_sheets, goals_conceded, saves,
+            expected_goals_conceded
         )
         WITH rostered AS (
             SELECT
@@ -296,11 +299,15 @@ def build_player_form(con: duckdb.DuckDBPyConnection) -> int:
                 f.starts,
                 f.goals_scored,
                 f.assists,
+                f.clean_sheets,
+                f.goals_conceded,
+                f.saves,
                 f.bonus,
                 f.bps,
                 f.defensive_contribution,
                 f.expected_goals,
                 f.expected_assists,
+                f.expected_goals_conceded,
                 t.points_under_rules_2026_27
             FROM mart_fact_player_fixture AS f
             LEFT JOIN mart_target_player_fixture AS t
@@ -337,11 +344,15 @@ def build_player_form(con: duckdb.DuckDBPyConnection) -> int:
                 r.starts,
                 r.goals_scored,
                 r.assists,
+                r.clean_sheets,
+                r.goals_conceded,
+                r.saves,
                 r.bonus,
                 r.bps,
                 r.defensive_contribution,
                 r.expected_goals,
                 r.expected_assists,
+                r.expected_goals_conceded,
                 r.points_under_rules_2026_27,
                 row_number() OVER (
                     PARTITION BY a.season, a.gw, a.code, w.window_label
@@ -406,7 +417,13 @@ def build_player_form(con: duckdb.DuckDBPyConnection) -> int:
                 ELSE CAST(
                     sum(points_under_rules_2026_27) FILTER (WHERE minutes >= 1) AS INTEGER
                 )
-            END AS points_under_rules_2026_27
+            END AS points_under_rules_2026_27,
+            CAST(sum(clean_sheets) FILTER (WHERE minutes >= 1) AS INTEGER) AS clean_sheets,
+            CAST(sum(goals_conceded) FILTER (WHERE minutes >= 1) AS INTEGER) AS goals_conceded,
+            CAST(sum(saves) FILTER (WHERE minutes >= 1) AS INTEGER) AS saves,
+            sum(expected_goals_conceded) FILTER (
+                WHERE minutes >= 1
+            ) AS expected_goals_conceded
         FROM selected
         GROUP BY season, gw, code, window_label
         """
@@ -613,6 +630,21 @@ def _assert_player_form_source_grain(con: duckdb.DuckDBPyConnection) -> None:
         raise PlayerFormSourceError(
             f"mart_fact_player_fixture has {null_minutes} NULL minutes value(s); "
             "rostered availability cannot be reported without a measured minutes outcome"
+        )
+    incomplete_defensive_counts = _scalar(
+        con,
+        """
+        SELECT count(*)
+        FROM mart_fact_player_fixture
+        WHERE minutes >= 1
+          AND (clean_sheets IS NULL OR goals_conceded IS NULL OR saves IS NULL)
+        """,
+    )
+    if incomplete_defensive_counts:
+        raise PlayerFormSourceError(
+            "mart_fact_player_fixture has "
+            f"{incomplete_defensive_counts} appeared row(s) with a NULL clean_sheets, "
+            "goals_conceded, or saves value; observed defensive form would silently undercount"
         )
 
 

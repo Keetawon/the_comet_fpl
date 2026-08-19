@@ -220,6 +220,10 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "expected_goals_per_90",
         "expected_assists_per_90",
         "points_under_rules_2026_27",
+        "clean_sheets",
+        "goals_conceded",
+        "saves",
+        "expected_goals_conceded",
     ),
     "ledger_forecast_run": (
         "run_id",
@@ -718,7 +722,8 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
                    did_not_play, minutes, goals_scored, assists, bonus, bps,
                    defensive_contribution, expected_goals, expected_assists,
                    expected_goals_per_90, expected_assists_per_90,
-                   points_under_rules_2026_27
+                   points_under_rules_2026_27, clean_sheets, goals_conceded, saves,
+                   expected_goals_conceded
             FROM mart_fact_player_form
         """,
         "fact_team_form": """

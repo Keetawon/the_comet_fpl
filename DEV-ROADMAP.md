@@ -15,7 +15,8 @@ owner goals below, defer it unless it is required to keep the deadline path corr
 1. Produce an auditable, legal GW1 squad, starting XI, captain, vice-captain, and bench before the
    deadline.
 2. Produce a decision dashboard/export for fixture difficulty and player form, including pivot-ready
-   xG, xA, minutes, starts, goals, assists, bonus/BPS, defensive contribution, points, and EV.
+   xG, xA, minutes, starts, goals, assists, bonus/BPS, defensive contribution, clean sheets,
+   on-pitch goals conceded, saves, xGC, points, and EV.
 
 The goals are ordered. Goal 1 may not be delayed by dashboard polish or new model research.
 
@@ -27,10 +28,11 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
 - **Goal 2 is substantially implemented.** The versioned semantic export, player-fixture forecast
   transport, outcome attachment, atomic static-JSON boundary, six analytic pages, and Plan Builder
-  are shipped development-only. The remaining owner-goal UI gap is exposing the already-exported
-  starts, xG/90, xA/90, bonus, BPS, and defensive-contribution form fields on the Players page,
-  followed by a final read-model refresh. Manager-team import belongs to P2, not Goal 2. Neither
-  item may delay Goal 1.
+  are shipped development-only. P1.8's full Players-page form matrix and additive observed
+  defensive fields are implemented in code and focused tests; the failure-atomic local database
+  rebuild and atomic BI/static republish completed on 2026-08-19, so they are visible locally.
+  The final deadline vintage still requires the same controlled refresh inside Goal 1. Manager-team
+  import belongs to P2, not Goal 2. Neither item may delay Goal 1.
 
 ## Current baseline
 
@@ -400,10 +402,12 @@ artifacts can be traced by immutable IDs and SHA-256 values.
 contract/export, fixture-grain forecast transport, outcome attachment, atomic static publish
 boundary, fixture difficulty and player/team form views, all six analytic pages, and Plan Builder
 are present. The browser reads only static JSON and never the mutable production DuckDB. The
-remaining owner-goal UI gap is exposing already-exported starts, xG/90, xA/90, bonus, BPS, and
-defensive contribution on the Players page; forecast-versus-actual becomes informative only after
-outcomes finalize. Manager import remains separate P2 work. Refresh the read models from the final
-decision vintage and finish the form columns only after P0 artifacts and their backup are secure.
+Players form-column repair is implemented in code/tests, including observed clean sheets, on-pitch
+goals conceded, saves, and xGC. The local development database and BI/static read models were
+refreshed successfully and atomically on 2026-08-19. The final deadline vintage must still be
+rebuilt, exported, and republished through the P0 sequence; the local refresh does not replace that
+artifact. Forecast-versus-actual becomes informative only after outcomes finalize. Manager import
+remains separate P2 work.
 
 ### P1.1 — Freeze semantic contract v1
 
@@ -593,7 +597,7 @@ not blend official FDR into the model index.
 
 ### P1.6 — Player-form contract
 
-**Implementation status (2026-08-14): implemented and offline-tested.**
+**Implementation status (updated 2026-08-19): implemented and offline-tested.**
 `fpl.transform.facts:build_player_form` materializes `mart_fact_player_form` at the long
 `(season, gw, code, window)` grain and `build_db` rebuilds it after the component and target marts.
 It treats the existence of a `mart_fact_player_fixture` row as rostered, uses observed gameweek
@@ -601,15 +605,18 @@ anchors and their latest kickoff as the point-in-time boundary, preserves both l
 gameweek, and never creates a row for a missing gameweek. Availability aggregates rostered rows;
 productivity aggregates `minutes >= 1` rows only. xG/xA sums and per-90 denominators use only the
 matching measured rows, points come only from `mart_target_player_fixture.points_under_rules_2026_27`,
-and unmeasured starts, xG/xA, and DC stay NULL rather than becoming zero. P1.6 sources the last
-semantic-contract table, so `contract.NOT_YET_SOURCED` is now empty.
+and unmeasured starts, xG/xA, DC, and xGC stay NULL rather than becoming zero. The P1.8 additive
+extension also transports clean sheets, on-pitch goals conceded, saves, and xGC. Basic defensive
+counts sum appeared rows and are NULL when there was no appearance; an appeared source row with a
+missing basic count fails closed. xGC sums measured appeared rows and is NULL only when none was
+measured. P1.6 sources the last semantic-contract table, so `contract.NOT_YET_SOURCED` is now empty.
 
 Keep availability and productivity separate:
 
 - availability windows use recent rostered player-fixture rows and report appearances, starts,
   minutes, and DNPs;
 - productivity windows use appeared rows and report xG, xA, goals, assists, bonus, BPS, defensive
-  contribution, and points;
+  contribution, clean sheets, on-pitch goals conceded, saves, xGC, and points;
 - expose rolling 3/5/10 windows and season-to-date values;
 - calculate xG/90 and xA/90 only over rows where the signal is measured:
 
@@ -786,17 +793,22 @@ manual FPL verification remain the sole P0 priority and acceptance path.
 
 ### P1.8 — Complete Players-page form exposure after P0
 
-**Status (2026-08-19): exported data ready; UI exposure remains.** The semantic/Parquet export is
-already pivot-ready for starts, xG/90, xA/90, bonus, BPS, and defensive contribution. After the
-08-20 fallback and 08-21 final decision pack are secure, carry those existing fields through the
-static Players read model where necessary and render them in the Players-page table/detail view.
-Preserve form-window and anchor-season labels and every NULL/unmeasured semantic. Direct 1/3/5
-window presets are optional convenience controls after the required columns work.
+**Status (2026-08-19): implementation, focused tests, and local development publication
+complete.** The semantic contract, form mart, Parquet export, static emitter, and Players UI now
+carry starts, xG/90, xA/90, bonus, BPS, DC, clean sheets, on-pitch goals conceded, saves, and xGC.
+The view matrix is explicit: Overall shows common + attack + defence + outcome form columns;
+Attack shows common + attack + outcome; Defence shows common + defence + outcome. CS applies to
+GK/DEF/MID, GC and xGC to GK/DEF, saves to GK, and DC to DEF/MID/FWD; inapplicable and unmeasured
+cells stay dashes with distinct explanations. These are backward-looking observed form measures.
+Future player-level saves/DC/GC/xGC forecasts remain unavailable and are never inferred from club
+forecast primitives.
 
-Acceptance: the Players page exposes starts, xG/90, xA/90, bonus, BPS, and defensive contribution
-from the published semantic data; focused tests cover measured and NULL values without client-side
-recalculation; the final decision vintage is republished through the static boundary; and this work
-does not delay or mutate any P0 artifact. Manager-team import remains P2.
+Acceptance state: focused schema, transform, export, static-read-model, and UI tests cover measured,
+NULL, view, and position-applicability behavior without client-side recalculation. A failure-atomic
+local database rebuild populated the additive columns and the local BI/static generation was
+atomically republished successfully. Migration alone still leaves pre-existing rows NULL. The final
+deadline vintage must repeat rebuild/export/republish through P0; this local development refresh
+does not satisfy or replace that deadline artifact. Manager-team import remains P2.
 
 Build only after the export contract and its tests pass. Minimum pages:
 
@@ -806,7 +818,8 @@ Build only after the export contract and its tests pass. Minimum pages:
    lambdas and home/away filters. The **Team** view also shows recent form from `fact_team_form`
    (last 3/5/10 and season-to-date).
 3. **Player-form pivot:** position/team/price filters; rolling 3/5/10 minutes, starts, xG, xA,
-   xG/90, xA/90, goals, assists, bonus/BPS, DC, points, and upcoming EV.
+   xG/90, xA/90, goals, assists, bonus/BPS, DC, clean sheets, on-pitch goals conceded, saves,
+   xGC, points, and upcoming EV.
 4. **Forecast versus actual:** EV/actual, bias, CRPS/calibration, and rank/capture by position and
    horizon after outcomes exist.
 5. **Optimizer audit:** run provenance, constraints, selected squad, transfer path, hits, solver

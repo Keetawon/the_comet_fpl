@@ -210,14 +210,15 @@ minutes.
 
 ### `fact_player_form` — grain `(season, gw, code, window)`
 
-**Sourced by P1.6** as `mart_fact_player_form`, built from `mart_fact_player_fixture` and the
-separately owned `points_under_rules_2026_27` target in `mart_target_player_fixture`. Long format,
-one row per window (`last_3`, `last_5`, `last_10`, `season_to_date`), so a pivot can put window on
-an axis.
+**Sourced by P1.6 and additively extended by P1.8 (2026-08-19)** as
+`mart_fact_player_form`, built from `mart_fact_player_fixture` and the separately owned
+`points_under_rules_2026_27` target in `mart_target_player_fixture`. Long format, one row per
+window (`last_3`, `last_5`, `last_10`, `season_to_date`), so a pivot can put window on an axis.
 
 **Availability and productivity have different denominators and must not be mixed.** Availability
 counts *rostered* fixtures (appearances, starts, minutes, DNPs); productivity counts *appeared*
-fixtures (goals, assists, bonus, BPS, DC, xG, xA). Here **rostered means that a
+fixtures (goals, assists, bonus, BPS, DC, clean sheets, on-pitch goals conceded, saves, xG, xA,
+xGC). Here **rostered means that a
 `mart_fact_player_fixture` row exists** -- the registered player-fixture population, not an inferred
 matchday squad. A zero-minute row is therefore rostered and is counted as a DNP, but contributes no
 productivity measure.
@@ -232,6 +233,21 @@ season.
 the 2021-22 archive did not measure starts at all, so reporting zero there would create a false
 availability fact.
 
+`clean_sheets`, `goals_conceded`, and `saves` are sums over appeared fixtures. They are NULL when
+the player made no appearance in the window, not zero. An appeared source row with any of those
+three fields missing fails the form build closed instead of silently undercounting it.
+`goals_conceded` is the recorded **on-pitch** value; never derive it from club goals conceded or a
+player's share of minutes. `expected_goals_conceded` sums only appeared rows where xGC was measured.
+Partial measured coverage is retained, and a window with no measured appeared xGC row is NULL,
+never zero-filled.
+
+| Additive field | Type | Window meaning | NULL meaning |
+| --- | --- | --- | --- |
+| `clean_sheets` | nullable integer | Sum of credited clean sheets on appeared rows | No appearance in the window |
+| `goals_conceded` | nullable integer | Sum of recorded on-pitch goals conceded on appeared rows | No appearance in the window |
+| `saves` | nullable integer | Sum of saves on appeared rows | No appearance in the window |
+| `expected_goals_conceded` | nullable double | Sum over measured-xGC appeared rows | No appeared row measured xGC |
+
 Per-90 rates use only the matching measured rows:
 
 ```text
@@ -241,6 +257,14 @@ xA_per_90 = 90 * sum(expected_assists) / sum(minutes on those same measured-xA r
 
 NULL when that denominator is zero. A per-90 is a **display** measure: never multiply it by expected
 minutes in the reporting layer to synthesise a forecast.
+
+The four defensive columns are additive database columns. `CREATE TABLE IF NOT EXISTS` does not
+backfill an existing `mart_fact_player_form`; the additive migration creates the columns as NULL
+and an intentional database/form rebuild must repopulate them before the next BI and static-JSON
+publication. That failure-atomic rebuild and atomic publication completed successfully for the
+local development generation on 2026-08-19, so its values are populated and visible locally. The
+final deadline vintage must still repeat rebuild/export/republish through P0; the local generation
+does not replace it.
 
 ### `fact_team_form` — grain `(season, gw, team_code, window)`
 

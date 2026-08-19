@@ -192,15 +192,25 @@ interactive Plan builder.
   every primitive (raw `lambda_for`/`lambda_against`, clean-sheet probability, all ease
   indices, opponent strength, official FDR, Stage A league-average flag) ordered by
   kickoff time.
-- **Players** (implemented, P1.7c): the player-form pivot from `players.json` — one row per
-  player of the selected vintage (photo + club badge) merging backward form (3/5/10/STD
-  window selector; App, Min/g, G, A, xG, xA, Pts columns) with per-gameweek xP chip
-  columns and a range-total xP. Filters: position, team, price range, minimum average
-  minutes (last 5), availability, plus the shared view/venue/gameweek bar, all inside a
-  distinct Filters panel. Rows are compact and paginated; the expanded row exposes every
-  primitive behind the chip colour ordered by kickoff time, with attack- vs defence-detail
-  column ordering driven by the view. The same shared table (`PlayerStatTable`) powers the
-  Next GW squad table.
+- **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
+  `players.json` — one row per player of the selected vintage (photo + club badge) merging
+  backward form (3/5/10/STD window selector) with per-gameweek xP chips and a range-total xP.
+  The form-column matrix is view-specific: **Overall** = App, Starts, Min/g, G, A, xG, xA,
+  xG/90, xA/90, CS, GC, Saves, DC, xGC, Bonus, BPS, Pts; **Attack** = App, Starts, Min/g, G,
+  A, xG, xA, xG/90, xA/90, Bonus, BPS, Pts; **Defence** = App, Starts, Min/g, CS, GC, Saves,
+  DC, xGC, Bonus, BPS, Pts. Position applicability is explicit: CS = GK/DEF/MID, GC and xGC
+  = GK/DEF, Saves = GK, and DC = DEF/MID/FWD. A dash remains a dash for both an inapplicable
+  position and an unmeasured value; the cell tooltip distinguishes the reason. These are observed
+  form measures only. Future player-level saves/DC/GC/xGC forecasts are unavailable and are not
+  inferred from club lambdas or clean-sheet probabilities. Filters: position, team, price range,
+  minimum average minutes (last 5), availability, plus the shared view/venue/gameweek bar, all
+  inside a distinct Filters panel. Rows are compact and paginated; the expanded row exposes every
+  transported fixture primitive behind the chip colour ordered by kickoff time, with attack- vs
+  defence-detail ordering driven by the view. The same shared table (`PlayerStatTable`) powers the
+  Next GW squad table. The failure-atomic local development database rebuild and atomic BI/static
+  republish completed on 2026-08-19, so P1.8 values are visible in the local static UI. An existing
+  database's additive columns remain NULL until rebuilt, and the final deadline vintage must repeat
+  rebuild/export/republish through P0.
 - **Summary** (implemented, P1.7d): the landing page — next gameweek kickoff (deadlines are
   not sourced, so none is shown), one optimizer squad summary card per plan (GW1 squad xP,
   cost, hits, captain/vice, XI and bench lines), an availability watch (the official

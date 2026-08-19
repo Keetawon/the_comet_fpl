@@ -290,8 +290,9 @@ def _seed_database(path: Path, *, record: bool) -> tuple[ProspectivePointsArtifa
                 season, gw, code, "window", rostered_fixtures, appearances, starts,
                 did_not_play, minutes, goals_scored, assists, bonus, bps,
                 defensive_contribution, expected_goals, expected_assists,
-                expected_goals_per_90, expected_assists_per_90, points_under_rules_2026_27
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                expected_goals_per_90, expected_assists_per_90, points_under_rules_2026_27,
+                clean_sheets, goals_conceded, saves, expected_goals_conceded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 SEASON,
@@ -313,6 +314,10 @@ def _seed_database(path: Path, *, record: bool) -> tuple[ProspectivePointsArtifa
                 None,
                 0.2,
                 7,
+                1,
+                0,
+                3,
+                0.8,
             ],
         )
         con.execute(
@@ -560,6 +565,11 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     assert actual.column("expected_goals").to_pylist() == [None]
     assert actual.column("total_points_as_recorded").to_pylist() == [6]
     assert actual.column("points_under_rules_2026_27").to_pylist() == [7]
+    player_form = pq.read_table(output / "fact_player_form.parquet")
+    assert player_form.column("clean_sheets").to_pylist() == [1]
+    assert player_form.column("goals_conceded").to_pylist() == [0]
+    assert player_form.column("saves").to_pylist() == [3]
+    assert player_form.column("expected_goals_conceded").to_pylist() == pytest.approx([0.8])
     fixture_forecast = pq.read_table(output / "fact_forecast_player_fixture.parquet")
     assert fixture_forecast.column("expected_minutes").to_pylist() == [None] * 15
     optimizer = pq.read_table(output / "fact_optimizer_plan.parquet")

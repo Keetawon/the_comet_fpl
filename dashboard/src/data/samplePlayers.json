@@ -21,29 +21,37 @@
         "windows": {
           "last_3": {
             "rostered_fixtures": 3, "appearances": 3, "starts": 3, "did_not_play": 0,
-            "minutes": 270, "goals_scored": 1, "assists": 0, "bonus": 3, "bps": 40,
-            "defensive_contribution": null, "expected_goals": 1.1, "expected_assists": 0.4,
+            "minutes": 270, "goals_scored": 1, "assists": 0,
+            "clean_sheets": 1, "goals_conceded": 3, "saves": 0,
+            "bonus": 3, "bps": 40, "defensive_contribution": 18,
+            "expected_goals": 1.1, "expected_assists": 0.4, "expected_goals_conceded": 2.8,
             "expected_goals_per_90": 0.37, "expected_assists_per_90": 0.13,
             "points_under_rules_2026_27": 16
           },
           "last_5": {
             "rostered_fixtures": 5, "appearances": 5, "starts": 5, "did_not_play": 0,
-            "minutes": 450, "goals_scored": 2, "assists": 1, "bonus": 7, "bps": 90,
-            "defensive_contribution": null, "expected_goals": 1.8, "expected_assists": 0.9,
+            "minutes": 450, "goals_scored": 2, "assists": 1,
+            "clean_sheets": 2, "goals_conceded": 5, "saves": 0,
+            "bonus": 7, "bps": 90, "defensive_contribution": 25,
+            "expected_goals": 1.8, "expected_assists": 0.9, "expected_goals_conceded": 4.7,
             "expected_goals_per_90": 0.36, "expected_assists_per_90": 0.18,
             "points_under_rules_2026_27": 31
           },
           "last_10": {
             "rostered_fixtures": 10, "appearances": 9, "starts": 9, "did_not_play": 1,
-            "minutes": 810, "goals_scored": 3, "assists": 2, "bonus": 12, "bps": 175,
-            "defensive_contribution": null, "expected_goals": 3.6, "expected_assists": 1.7,
+            "minutes": 810, "goals_scored": 3, "assists": 2,
+            "clean_sheets": 3, "goals_conceded": 11, "saves": 0,
+            "bonus": 12, "bps": 175, "defensive_contribution": 44,
+            "expected_goals": 3.6, "expected_assists": 1.7, "expected_goals_conceded": 9.4,
             "expected_goals_per_90": 0.4, "expected_assists_per_90": 0.19,
             "points_under_rules_2026_27": 52
           },
           "season_to_date": {
             "rostered_fixtures": 38, "appearances": 35, "starts": 34, "did_not_play": 3,
-            "minutes": 3010, "goals_scored": 18, "assists": 11, "bonus": 44, "bps": 780,
-            "defensive_contribution": null, "expected_goals": 19.4, "expected_assists": 10.2,
+            "minutes": 3010, "goals_scored": 18, "assists": 11,
+            "clean_sheets": 12, "goals_conceded": 39, "saves": 0,
+            "bonus": 44, "bps": 780, "defensive_contribution": 136,
+            "expected_goals": 19.4, "expected_assists": 10.2, "expected_goals_conceded": 37.2,
             "expected_goals_per_90": 0.58, "expected_assists_per_90": 0.3,
             "points_under_rules_2026_27": 241
           }

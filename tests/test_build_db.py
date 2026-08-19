@@ -136,11 +136,18 @@ def test_rebuild_applies_additive_schema_migrations_to_a_cloned_database(
         "mart_fact_player_fixture": {"threat", "creativity", "influence"},
         "mart_fact_player_fixture_live": {"threat", "creativity", "influence"},
         "mart_dim_team": {"team_code"},
+        "mart_fact_player_form": {
+            "clean_sheets",
+            "goals_conceded",
+            "saves",
+            "expected_goals_conceded",
+        },
     }
     con = duckdb.connect(str(target))
     try:
         for table in migrated_columns:
             con.execute(f"CREATE TABLE {table} (legacy_marker INTEGER)")
+        con.execute("INSERT INTO mart_fact_player_form (legacy_marker) VALUES (1)")
     finally:
         con.close()
     _stub_successful_pipeline(monkeypatch)
@@ -151,6 +158,13 @@ def test_rebuild_applies_additive_schema_migrations_to_a_cloned_database(
         for table, expected in migrated_columns.items():
             columns = set(table_columns(con, table))
             assert expected <= columns
+        assert con.execute(
+            """
+            SELECT clean_sheets, goals_conceded, saves, expected_goals_conceded
+            FROM mart_fact_player_form
+            WHERE legacy_marker = 1
+            """
+        ).fetchone() == (None, None, None, None)
     finally:
         con.close()
 

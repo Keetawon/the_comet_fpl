@@ -71,11 +71,16 @@ export interface PlayerFormWindow {
   minutes: number | null;
   goals_scored: number | null;
   assists: number | null;
+  clean_sheets: number | null;
+  /** Goals conceded while the player was on the pitch, not the club's full-match total. */
+  goals_conceded: number | null;
+  saves: number | null;
   bonus: number | null;
   bps: number | null;
   defensive_contribution: number | null;
   expected_goals: number | null;
   expected_assists: number | null;
+  expected_goals_conceded: number | null;
   expected_goals_per_90: number | null;
   expected_assists_per_90: number | null;
   points_under_rules_2026_27: number | null;

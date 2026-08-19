@@ -36,11 +36,15 @@ def _insert_rostered(
     starts: int | None,
     goals: int = 0,
     assists: int = 0,
+    clean_sheets: int = 0,
+    goals_conceded: int = 0,
+    saves: int = 0,
     bonus: int = 0,
     bps: int = 0,
     defensive_contribution: int | None = None,
     expected_goals: float | None = None,
     expected_assists: float | None = None,
+    expected_goals_conceded: float | None = None,
     points: int | None = 0,
 ) -> None:
     kickoff_time = KICKOFF + timedelta(days=offset_days)
@@ -48,9 +52,10 @@ def _insert_rostered(
         """
         INSERT INTO mart_fact_player_fixture (
             season, gw, fixture, kickoff_time, code, position, team_id, opponent_team_id,
-            was_home, minutes, starts, goals_scored, assists, bonus, bps,
-            defensive_contribution, expected_goals, expected_assists
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            was_home, minutes, starts, goals_scored, assists, clean_sheets, goals_conceded,
+            saves, bonus, bps, defensive_contribution, expected_goals, expected_assists,
+            expected_goals_conceded
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             season,
@@ -66,11 +71,15 @@ def _insert_rostered(
             starts,
             goals,
             assists,
+            clean_sheets,
+            goals_conceded,
+            saves,
             bonus,
             bps,
             defensive_contribution,
             expected_goals,
             expected_assists,
+            expected_goals_conceded,
         ],
     )
     con.execute(
@@ -92,11 +101,14 @@ def _seed_player_with_double_gameweek(con: duckdb.DuckDBPyConnection) -> None:
         minutes=90,
         starts=1,
         goals=1,
+        clean_sheets=1,
+        saves=3,
         bonus=3,
         bps=30,
         defensive_contribution=4,
         expected_goals=0.6,
         expected_assists=0.2,
+        expected_goals_conceded=0.7,
         points=8,
     )
     # The first leg is a DNP.  Its nine replayed points intentionally prove that productivity
@@ -108,6 +120,10 @@ def _seed_player_with_double_gameweek(con: duckdb.DuckDBPyConnection) -> None:
         offset_days=7,
         minutes=0,
         starts=0,
+        clean_sheets=1,
+        goals_conceded=2,
+        saves=4,
+        expected_goals_conceded=1.2,
         points=9,
     )
     _insert_rostered(
@@ -118,6 +134,7 @@ def _seed_player_with_double_gameweek(con: duckdb.DuckDBPyConnection) -> None:
         minutes=60,
         starts=1,
         assists=1,
+        goals_conceded=1,
         bonus=1,
         bps=20,
         defensive_contribution=2,
@@ -133,9 +150,11 @@ def _seed_player_with_double_gameweek(con: duckdb.DuckDBPyConnection) -> None:
         offset_days=16,
         minutes=30,
         starts=1,
+        goals_conceded=1,
         bps=10,
         defensive_contribution=1,
         expected_assists=0.3,
+        expected_goals_conceded=0.4,
         points=2,
     )
     _insert_rostered(
@@ -200,7 +219,8 @@ def _form_row(
         SELECT rostered_fixtures, appearances, starts, did_not_play, minutes,
                goals_scored, assists, bonus, bps, defensive_contribution,
                expected_goals, expected_assists, expected_goals_per_90,
-               expected_assists_per_90, points_under_rules_2026_27
+               expected_assists_per_90, points_under_rules_2026_27,
+               clean_sheets, goals_conceded, saves, expected_goals_conceded
         FROM mart_fact_player_form
         WHERE season = ? AND gw = ? AND code = ? AND "window" = ?
         """,
@@ -225,6 +245,10 @@ def test_availability_and_productivity_use_different_populations_in_a_double_gam
         assert row[13] == pytest.approx(0.2)
         # The zero-minute leg's nine points are not a productivity contribution.
         assert row[14] == 13
+        # Defensive form uses the same appeared population; the deliberately non-zero DNP
+        # components are excluded, while measured xGC keeps its partial-coverage semantics.
+        assert row[15:18] == (1, 1, 3)
+        assert row[18] == pytest.approx(0.7)
     finally:
         con.close()
 
@@ -256,7 +280,7 @@ def test_per_90_uses_matching_measured_minutes_and_zero_appearance_rates_are_nul
         assert row[13] == pytest.approx(0.375)
 
         no_appearance = _form_row(con, gw=1, code=20, window="season_to_date")
-        assert no_appearance[5:15] == (None, None, None, None, None, None, None, None, None, None)
+        assert no_appearance[5:19] == (None,) * 14
     finally:
         con.close()
 
@@ -283,6 +307,8 @@ def test_unmeasured_signals_and_starts_remain_null_not_zero() -> None:
         assert row[:10] == (1, 1, None, 0, 90, 1, 0, 0, 0, None)
         assert row[10:14] == (None, None, None, None)
         assert row[14] == 6
+        assert row[15:18] == (0, 0, 0)
+        assert row[18] is None
     finally:
         con.close()
 
@@ -359,6 +385,32 @@ def test_duplicate_player_fixture_source_key_fails_closed() -> None:
         )
 
         with pytest.raises(PlayerFormSourceError, match="duplicate player-fixture"):
+            build_player_form(con)
+    finally:
+        con.close()
+
+
+def test_appeared_fixture_with_missing_basic_defensive_count_fails_closed() -> None:
+    con = _con()
+    try:
+        _insert_rostered(
+            con,
+            fixture=401,
+            gw=1,
+            offset_days=0,
+            minutes=90,
+            starts=1,
+        )
+        con.execute(
+            """
+            UPDATE mart_fact_player_fixture
+            SET saves = NULL
+            WHERE season = ? AND fixture = ? AND code = ?
+            """,
+            [SEASON, 401, 10],
+        )
+
+        with pytest.raises(PlayerFormSourceError, match="NULL clean_sheets"):
             build_player_form(con)
     finally:
         con.close()

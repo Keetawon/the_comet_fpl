@@ -545,6 +545,13 @@ CREATE TABLE IF NOT EXISTS mart_fact_player_form (
     expected_goals_per_90        DOUBLE,
     expected_assists_per_90      DOUBLE,
     points_under_rules_2026_27   INTEGER,
+    -- Observed defensive form is productivity, so these aggregates are NULL when the player
+    -- made no appearance in the window.  xGC additionally remains NULL where the source did
+    -- not measure it; it is never zero-filled.
+    clean_sheets                 INTEGER,
+    goals_conceded               INTEGER,
+    saves                        INTEGER,
+    expected_goals_conceded      DOUBLE,
     PRIMARY KEY (season, gw, code, "window"),
     CHECK ("window" IN ('last_3', 'last_5', 'last_10', 'season_to_date'))
 );
@@ -597,8 +604,8 @@ CREATE TABLE IF NOT EXISTS mart_target_completeness (
 -- `CREATE TABLE IF NOT EXISTS` does not evolve a table that already exists. Full rebuilds
 -- intentionally clone the current database so irreplaceable live captures survive, which
 -- means additive schema changes must also upgrade that clone before any layer is rebuilt.
--- Existing rows receive NULL: these fields were unmeasured in the old schema and must never
--- be backfilled as zero.
+-- Existing rows receive NULL: these fields were unmeasured or not materialized in the old schema
+-- and must never be backfilled as zero. Rebuilding their owning layer derives measured values.
 ALTER TABLE stg_player_fixture
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE stg_player_fixture
@@ -625,3 +632,11 @@ ALTER TABLE mart_fact_player_fixture_live
     ADD COLUMN IF NOT EXISTS influence DOUBLE;
 ALTER TABLE mart_dim_team
     ADD COLUMN IF NOT EXISTS team_code INTEGER;
+ALTER TABLE mart_fact_player_form
+    ADD COLUMN IF NOT EXISTS clean_sheets INTEGER;
+ALTER TABLE mart_fact_player_form
+    ADD COLUMN IF NOT EXISTS goals_conceded INTEGER;
+ALTER TABLE mart_fact_player_form
+    ADD COLUMN IF NOT EXISTS saves INTEGER;
+ALTER TABLE mart_fact_player_form
+    ADD COLUMN IF NOT EXISTS expected_goals_conceded DOUBLE;

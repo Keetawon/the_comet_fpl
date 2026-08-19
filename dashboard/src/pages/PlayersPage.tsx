@@ -225,8 +225,9 @@ export function PlayersPage() {
           defenceScaleNote="Defence view colours on the club's defence ease index (higher = the club concedes less)."
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Chip headline is the fixture xP; the colour follows the selected source. GW columns
-          are the pivot -- one column per gameweek, two chips in a double gameweek.
+          Observed form columns follow Overall, Attack, or Defense. Chip headline is fixture xP;
+          its colour follows the selected source. GW columns are the pivot -- one per gameweek,
+          two chips in a double gameweek.
         </p>
       </div>
 
@@ -240,6 +241,7 @@ export function PlayersPage() {
           opponentIndexOf={opponentIndexOf}
           formHeading={FORM_WINDOW_LABEL[playerFilters.formWindow]}
           formTitle={`Form window ${FORM_WINDOW_LABEL[playerFilters.formWindow]}, anchored ${formAnchor} (last season at GW1)`}
+          formColumnProfile="players"
         />
       )}
 

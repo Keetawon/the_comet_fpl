@@ -132,7 +132,11 @@ The population is every player with rows in `fact_forecast_player_gameweek` for 
   through, never folded into any distribution or EV.
 - `form` follows the same latest-anchor rule as teams, at `code` grain; `avg_minutes_last_5`
   is `minutes / rostered_fixtures` from the `last_5` window — a per-rostered-match average
-  with DNPs included, `null` when there is no window.
+  with DNPs included, `null` when there is no window. Each form window carries the observed
+  `clean_sheets`, on-pitch `goals_conceded`, `saves`, and `expected_goals_conceded` fields in
+  addition to the existing availability, attack, bonus/BPS, DC, and points measures. The first
+  three are `null` when the player did not appear; xGC is `null` when no appeared row measured it
+  and otherwise sums the measured appeared rows, including a partially measured window.
 - `fixtures` is every player-fixture row of that vintage (double gameweek = two entries),
   each carrying the player's own xP/probabilities **plus the player's club fixture fields for
   that fixture** (`team_attack_ease_index`, `team_defence_ease_index`,
@@ -179,6 +183,18 @@ Sample record (abbreviated):
 The player-fixture probability/expected-minute fields are `null` until the ledger persists
 them (P1.2 exports them as typed NULLs); they are never reconstructed from a convolved
 gameweek distribution.
+
+The observed form fields above do **not** add future player-level defensive forecasts. Expected
+saves, defensive contributions, goals conceded, or xGC per future player-fixture remain absent;
+the UI may show the already transported player/club clean-sheet probabilities and club lambda
+against, but must not convert those club primitives into fabricated player forecasts.
+
+P1.8 is implemented in the schema, form builder, semantic export, static emitter, and focused
+tests. An existing DuckDB gains the four additive columns as NULL, so code or migration alone does
+not populate `players.json`. The failure-atomic local development database rebuild and atomic
+BI/static publication completed successfully on 2026-08-19, and that local generation now contains
+the populated values. The final deadline vintage must still repeat rebuild/export/republish through
+P0; the refreshed development generation does not replace the deadline artifact.
 
 ## next_gw.json — one object per optimizer plan (P1.7d)
 

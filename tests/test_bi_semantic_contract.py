@@ -194,9 +194,23 @@ def test_every_nullable_column_declares_what_its_null_means() -> None:
 
 def test_unmeasured_signals_are_nullable_never_zero_filled() -> None:
     actual = CONTRACT.table("fact_player_fixture_actual")
-    for name in ("expected_goals", "expected_assists"):
+    for name in ("expected_goals", "expected_assists", "expected_goals_conceded"):
         column = next(c for c in actual.columns if c.name == name)
         assert column.nullable and column.null_means == "unmeasured"
+
+
+def test_player_form_defensive_measures_preserve_population_and_measurement_nulls() -> None:
+    form = CONTRACT.table("fact_player_form")
+    by_name = {column.name: column for column in form.columns}
+    for name in ("clean_sheets", "goals_conceded", "saves"):
+        column = by_name[name]
+        assert column.nullable and column.dtype == "int"
+        assert column.null_means == "not_applicable"
+        assert "did not appear" in column.description
+    xgc = by_name["expected_goals_conceded"]
+    assert xgc.nullable and xgc.dtype == "float"
+    assert xgc.null_means == "unmeasured"
+    assert "never zero-filled" in xgc.description
 
 
 def test_per_90_rates_document_their_matching_minutes_denominator() -> None:

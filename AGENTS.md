@@ -236,11 +236,16 @@ player-fixture, and team-fixture forecast vintages from the JSONL artifact. Fina
 outcomes are attached separately and append-only. The versioned BI semantic export, atomic static
 JSON publish boundary, and dashboard are implemented development-only. The application has six
 read-only analytic/decision routes (Summary, Fixture matrix, Players, Next GW suggestion, Forecast
-vs actual, and Optimizer audit) plus the interactive Plan Builder route. After P0, Goal 2's
-remaining UI-completeness task is to surface the already-exported starts, xG/90, xA/90, bonus, BPS,
-and defensive-contribution measures on the Players page. That is a presentation task, not missing
-BI data; manager-team import is separate P2 work. Player-level future component primitives that are
-not persisted remain explicit NULLs in the read model rather than being fabricated. See
+vs actual, and Optimizer audit) plus the interactive Plan Builder route. Goal 2's
+Players-page form repair is implemented in code and focused tests: Overall, Attack, and Defence
+views expose their explicit form-column matrices, including observed clean sheets, on-pitch goals
+conceded, saves, and xGC with position-aware applicability. A failure-atomic local development
+database rebuild and atomic BI/static republish completed on 2026-08-19, so those values are now
+visible in the local dashboard. Additive migration alone still leaves existing form rows NULL, and
+the final deadline vintage must run the same rebuild/export/republish sequence inside P0. These
+fields are backward-looking form, not future player-level defensive forecasts. Future
+saves/DC/GC/xGC primitives are unavailable and must remain absent/NULL rather than being inferred
+from club lambdas or clean-sheet probabilities. Manager-team import is separate P2 work. See
 `docs/phase4-*`, `docs/prospective-points-artifact.md`, `docs/prediction-ledger.md`, and
 `docs/stage-e-squad-optimizer.md`.
 

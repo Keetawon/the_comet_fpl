@@ -85,10 +85,15 @@ retains player-gameweek, player-fixture, and team-fixture forecast vintages, wit
 attached separately. The versioned BI semantic/star export, atomic Parquet/static-JSON publish
 boundary, platform/custom-plan separation, lock/exclusion flow, and dashboard are implemented
 development-only. The dashboard exposes six read-only analytic/decision routes plus Plan Builder;
-after P0, its remaining Goal 2 UI-completeness task is to show the already-exported starts, xG/90,
-xA/90, bonus, BPS, and defensive-contribution measures on the Players page. Plan Builder produces
-fresh-squad custom scenarios; manager-team import and selling-value-aware own-team planning are
-separate P2 work, not part of that UI task. Real-deadline prospective validation remains open.
+the Players form repair is implemented in code/tests with view-specific starts, xG/90, xA/90,
+bonus, BPS, DC, clean-sheet, on-pitch goals-conceded, saves, and xGC columns. Those defensive
+fields are backward-looking observed form only; future player-level saves/DC/GC/xGC forecasts
+remain unavailable and are never synthesized from club primitives. A failure-atomic local
+development database rebuild and atomic BI/static republish completed on 2026-08-19, so the fields
+are visible locally; migration alone would leave existing rows NULL. The final deadline vintage
+must still repeat rebuild/export/republish through P0. Plan Builder produces fresh-squad custom
+scenarios; manager-team import and selling-value-aware own-team planning are separate P2 work, not
+part of that UI task. Real-deadline prospective validation remains open.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
