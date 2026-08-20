@@ -233,6 +233,7 @@ export function PlayersPage() {
 
       {filters && (
         <PlayerStatTable
+          fullscreenLabel="Players table"
           rows={rows}
           view={filters.view}
           colorSource={colorSource}

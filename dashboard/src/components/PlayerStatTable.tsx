@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { FixtureChip } from "@/components/FixtureTicker";
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
+import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import { NULL_BUCKET_CLASS } from "@/lib/difficulty";
 import type { ColorSource, ViewMode } from "@/lib/difficulty";
 import { playerChipBucket, playerChipMetric } from "@/lib/playerChips";
@@ -56,6 +57,7 @@ export interface PlayerStatSummaryRow {
 }
 
 export interface PlayerStatTableProps {
+  fullscreenLabel: string;
   rows: PlayerStatRow[];
   view: ViewMode;
   colorSource: ColorSource;
@@ -252,6 +254,7 @@ function SortableHead({
 }
 
 export function PlayerStatTable({
+  fullscreenLabel,
   rows,
   view,
   colorSource,
@@ -558,9 +561,15 @@ export function PlayerStatTable({
   const pageIndex = table.getState().pagination.pageIndex;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="max-h-[calc(100vh-12rem)] overflow-auto rounded-md border">
-        <Table>
+    <DecisionTableFullscreen label={fullscreenLabel}>
+      {({ isFullscreen }) => (
+        <div className={`flex flex-col gap-2 ${isFullscreen ? "min-h-0 flex-1" : ""}`}>
+          <div
+            className={`${
+              isFullscreen ? "min-h-0 max-h-none flex-1" : "max-h-[calc(100vh-12rem)]"
+            } overflow-auto overscroll-contain`}
+          >
+        <Table containerClassName="overflow-visible">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -675,7 +684,7 @@ export function PlayerStatTable({
             </TableFooter>
           )}
         </Table>
-      </div>
+          </div>
       {summaryRows.length > 0 && summaryNote != null && (
         <p className="px-2 text-[10px] text-muted-foreground">{summaryNote}</p>
       )}
@@ -710,6 +719,8 @@ export function PlayerStatTable({
           </div>
         </div>
       )}
-    </div>
+        </div>
+      )}
+    </DecisionTableFullscreen>
   );
 }

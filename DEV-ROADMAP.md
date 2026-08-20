@@ -672,8 +672,8 @@ FDR colour-source toggle (never blended); the FixtureTicker (opponent + venue + 
 NULL → neutral dashed chip with no number, blank gameweek → empty slot, double gameweek →
 two chips); the Overall/Attack/Defense view toggle (defence colours on clean-sheet
 probability anchored at the loaded league mean); the venue + gameweek-range filter bar
-bounded by the vintage horizon; and the Fixture matrix (Team) page — one row per club,
-recent form from `fact_team_form` labelled with its anchor season (last season at GW1),
+  bounded by the vintage horizon; and the Fixture matrix (Team) page — one row per club,
+  recent form from `fact_team_form` labelled with its anchor season (last season at GW1),
 expandable per-fixture table exposing raw lambdas, clean-sheet probability, all three ease
 indices, official FDR, and the Stage A league-average flag beside the composite. Vitest
 component tests (12) cover bucket direction, NULL→neutral, and DGW two-chip behaviour;
@@ -681,6 +681,15 @@ component tests (12) cover bucket direction, NULL→neutral, and DGW two-chip be
 (GW1-5 default architecture, run `86a072ade6dd4d56…`) is recorded in the dev ledger and
 its read models render the page; the generated JSON under `dashboard/public/data/` is
 gitignored and regenerable via `dashboard/README.md`.
+
+**P1.7b additive fixture horizon (2026-08-20): implemented in code/tests, uncommitted.**
+`fixture_matrix.json` now carries a separately versioned current-at-export schedule overlay
+from the full official `dim_fixture` season, bound to the BI export timestamp and database
+hash. The Fixture Matrix offers 5/10/15-GW views. Forecast chips, colours, primitives, and
+average-ease sorting remain confined to the recorded model horizon; later gameweeks show
+neutral opponent/home-away/kickoff fixture context only. The overlay is explicitly not the
+schedule known at an older forecast vintage and does not widen the forecast, ledger, or
+optimizer. This dashboard-only work must not delay or alter the P0 deadline artifacts.
 
 **P1.7d Summary + Next GW pages (2026-08-16): implemented.** The read-model manifest grows
 to schema version 2 with two additive files (v1 record shapes unchanged):

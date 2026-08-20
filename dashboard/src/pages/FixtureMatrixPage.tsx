@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Table,
   TableBody,
@@ -33,13 +34,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
+import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FixtureChip } from "@/components/FixtureTicker";
 import { TeamBadge } from "@/components/Avatars";
 import { VintageSelect } from "@/components/VintageSelect";
 import { loadFixtureMatrix, loadNextGw } from "@/data/load";
-import type { NextGwPlan, TeamFixture, TeamFormWindow, TeamRecord, WindowLabel } from "@/data/types";
+import type {
+  FixtureScheduleOverlay,
+  NextGwPlan,
+  ScheduleFixture,
+  TeamFixture,
+  TeamFormWindow,
+  TeamRecord,
+  WindowLabel,
+} from "@/data/types";
 import { WINDOW_LABELS } from "@/data/types";
 import { NULL_BUCKET_CLASS, type ColorSource, type ViewMode } from "@/lib/difficulty";
 import { chipBucket, chipMetric, viewMetric } from "@/lib/fixtureChips";
@@ -52,6 +62,7 @@ type PageState =
   | {
       status: "ready";
       teams: TeamRecord[];
+      schedule: FixtureScheduleOverlay;
       plans: NextGwPlan[];
       runs: { run_id: string; season: string; gw_from: number; gw_to: number }[];
       easeVersion: string;
@@ -63,10 +74,17 @@ type PageState =
 interface TeamRow {
   team: TeamRecord;
   filtered: TeamFixture[];
+  scheduleOnly: ScheduleFixture[];
   form: TeamFormWindow | null;
   formLabel: string | null;
   avgMetric: number | null;
 }
+
+type FixtureHorizon = 5 | 10 | 15;
+
+type DetailFixture =
+  | { status: "modelled"; fixture: TeamFixture }
+  | { status: "schedule_only"; fixture: ScheduleFixture };
 
 const fmt = (value: number | null | undefined, digits = 1) =>
   value == null ? "–" : value.toFixed(digits);
@@ -89,6 +107,7 @@ const FORM_WINDOW_LABEL: Record<WindowLabel, string> = {
 
 function TeamGwCell({
   fixtures,
+  scheduleOnly,
   gw,
   view,
   colorSource,
@@ -96,6 +115,7 @@ function TeamGwCell({
   cleanSheetAnchor,
 }: {
   fixtures: TeamFixture[];
+  scheduleOnly: ScheduleFixture[];
   gw: number;
   view: ViewMode;
   colorSource: ColorSource;
@@ -103,7 +123,8 @@ function TeamGwCell({
   cleanSheetAnchor: number | null;
 }) {
   const inGw = fixtures.filter((f) => f.gw === gw);
-  if (!inGw.length) {
+  const scheduleInGw = scheduleOnly.filter((f) => f.gw === gw);
+  if (!inGw.length && !scheduleInGw.length) {
     return (
       <span
         data-testid="blank-slot"
@@ -128,6 +149,32 @@ function TeamGwCell({
           />
         );
       })}
+      {scheduleInGw.map((fixture) => {
+        const venue =
+          fixture.was_home == null ? "" : fixture.was_home ? "(H)" : "(A)";
+        const kickoff = fixture.kickoff_time
+          ? fixture.kickoff_time.replace("T", " ").slice(0, 16)
+          : "kickoff TBC";
+        const label =
+          `GW${fixture.gw} vs ${fixture.opponent_short_name} ${venue}: current official ` +
+          `schedule only — no model forecast or ease in this vintage; ${kickoff} UTC`;
+        return (
+          <span
+            key={fixture.fixture}
+            data-testid="schedule-chip"
+            data-gw={fixture.gw}
+            title={label}
+            aria-label={label}
+            className="inline-flex h-8 min-w-12 flex-col justify-center rounded-md border border-border bg-muted px-1 text-center text-muted-foreground"
+          >
+            <span className="text-[10px] leading-tight font-semibold">
+              {fixture.opponent_short_name}
+              <span className="ml-0.5 font-normal">{venue}</span>
+            </span>
+            <span className="text-[9px] leading-tight tabular-nums">GW{fixture.gw} · fixture</span>
+          </span>
+        );
+      })}
     </span>
   );
 }
@@ -137,6 +184,7 @@ export function FixtureMatrixPage() {
   const [runId, setRunId] = useState<string | null>(null);
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
   const [formWindow, setFormWindow] = useState<WindowLabel>("last_5");
+  const [horizon, setHorizon] = useState<FixtureHorizon>(5);
   const [filters, setFilters] = useState<FilterState | null>(null);
   const [sorting, setSorting] = useState<SortingState>([{ id: "avgMetric", desc: true }]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
@@ -176,6 +224,7 @@ export function FixtureMatrixPage() {
         setState({
           status: "ready",
           teams: fixtureData.teams,
+          schedule: fixtureData.schedule,
           plans: nextGw.plans,
           runs,
           easeVersion: fixtureData.easeIndexFormulaVersion,
@@ -204,6 +253,40 @@ export function FixtureMatrixPage() {
     [state, runId],
   );
 
+  const runBounds = useMemo(() => {
+    const gws = runTeams.flatMap((team) => team.fixtures.map((fixture) => fixture.gw));
+    return {
+      from: gws.length ? Math.min(...gws) : 1,
+      to: gws.length ? Math.max(...gws) : 1,
+      season: runTeams[0]?.season ?? null,
+    };
+  }, [runTeams]);
+
+  const scheduleTeams = useMemo(() => {
+    if (state.status !== "ready" || runBounds.season == null) return [];
+    return state.schedule.teams.filter((team) => team.season === runBounds.season);
+  }, [state, runBounds.season]);
+
+  const scheduleByTeam = useMemo(
+    () => new Map(scheduleTeams.map((team) => [team.team_code, team])),
+    [scheduleTeams],
+  );
+
+  const scheduleMaxGw = useMemo(() => {
+    const gws = scheduleTeams.flatMap((team) => team.fixtures.map((fixture) => fixture.gw));
+    return gws.length ? Math.max(...gws) : runBounds.to;
+  }, [scheduleTeams, runBounds.to]);
+
+  useEffect(() => {
+    setFilters((current) => {
+      if (!current || !runTeams.length) return current;
+      const nextTo = Math.min(runBounds.from + horizon - 1, scheduleMaxGw);
+      if (current.gwFrom === runBounds.from && current.gwTo === nextTo) return current;
+      return { ...current, gwFrom: runBounds.from, gwTo: nextTo };
+    });
+    setExpanded({});
+  }, [horizon, runBounds.from, runTeams.length, scheduleMaxGw]);
+
   const cleanSheetAnchor = useMemo(() => {
     const values = runTeams
       .flatMap((t) => t.fixtures.map((f) => f.probability_clean_sheet))
@@ -229,6 +312,23 @@ export function FixtureMatrixPage() {
               (filters.venue === "home" ? f.was_home === true : f.was_home === false)),
         )
         .sort((a, b) => a.gw - b.gw || (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? ""));
+      const scheduleOnly = (scheduleByTeam.get(team.team_code)?.fixtures ?? [])
+        .filter(
+          (fixture) =>
+            fixture.gw > runBounds.to &&
+            fixture.gw >= filters.gwFrom &&
+            fixture.gw <= filters.gwTo &&
+            (filters.venue === "all" ||
+              (filters.venue === "home"
+                ? fixture.was_home === true
+                : fixture.was_home === false)),
+        )
+        .sort(
+          (a, b) =>
+            a.gw - b.gw ||
+            (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? "") ||
+            a.fixture - b.fixture,
+        );
       const values = filtered
         .map((f) => viewMetric(f, filters.view))
         .filter((v): v is number => v != null);
@@ -236,12 +336,13 @@ export function FixtureMatrixPage() {
       return {
         team,
         filtered,
+        scheduleOnly,
         form: form ? form.windows[formWindow] : null,
         formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
         avgMetric: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null,
       };
     });
-  }, [runTeams, filters, formWindow]);
+  }, [runTeams, filters, formWindow, scheduleByTeam, runBounds.to]);
 
   const columns = useMemo<LegacyColumnDef<TeamRow>[]>(
     () => [
@@ -295,7 +396,7 @@ export function FixtureMatrixPage() {
       },
       {
         id: "avgMetric",
-        header: `Avg ${filters ? VIEW_LABEL[filters.view] : ""}`,
+        header: `Avg modelled ${filters ? VIEW_LABEL[filters.view] : ""} (GW${runBounds.from}–${runBounds.to})`,
         accessorFn: (row) => row.avgMetric,
         cell: ({ row }) => {
           const value = row.original.avgMetric;
@@ -315,6 +416,7 @@ export function FixtureMatrixPage() {
         cell: ({ row }: { row: { original: TeamRow } }) => (
           <TeamGwCell
             fixtures={row.original.filtered}
+            scheduleOnly={row.original.scheduleOnly}
             gw={gw}
             view={filters?.view ?? "overall"}
             colorSource={colorSource}
@@ -324,7 +426,15 @@ export function FixtureMatrixPage() {
         ),
       })),
     ],
-    [filters, colorSource, cleanSheetAnchor, opponentIndexOf, formWindow],
+    [
+      filters,
+      colorSource,
+      cleanSheetAnchor,
+      opponentIndexOf,
+      formWindow,
+      runBounds.from,
+      runBounds.to,
+    ],
   );
 
   const table = useLegacyTable({
@@ -381,8 +491,32 @@ export function FixtureMatrixPage() {
       <FilterPanel>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {filters && (
-            <FilterBar filters={filters} onChange={setFilters} minGw={state.gwFrom} maxGw={state.gwTo} />
+            <FilterBar
+              filters={filters}
+              onChange={setFilters}
+              minGw={state.gwFrom}
+              maxGw={state.gwTo}
+              showGameweekRange={false}
+            />
           )}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            Fixture horizon
+            <ToggleGroup
+              type="single"
+              value={String(horizon)}
+              onValueChange={(value) => {
+                if (value) setHorizon(Number(value) as FixtureHorizon);
+              }}
+              variant="outline"
+              aria-label="Fixture horizon"
+            >
+              {([5, 10, 15] as const).map((weeks) => (
+                <ToggleGroupItem key={weeks} value={String(weeks)}>
+                  {weeks} GWs
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             Form window
             <Select
@@ -412,13 +546,25 @@ export function FixtureMatrixPage() {
           cleanSheetAnchor={cleanSheetAnchor}
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Sorted by average ease, easiest schedule first (click any column to re-sort). One
-          column per gameweek; two chips in a double gameweek.
+          Sorted by average modelled ease, easiest schedule first (click any column to re-sort).
+          One column per gameweek; two chips in a double gameweek. Neutral chips beyond
+          GW{runBounds.to} are current official fixtures only and never affect the average.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Current schedule overlay exported{" "}
+          {state.schedule.export_created_at.replace("T", " ").slice(0, 16)} UTC; it is separate
+          from the selected forecast vintage and may include later schedule amendments.
         </p>
       </div>
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-md border">
-        <Table>
+      <DecisionTableFullscreen label="Fixture matrix table">
+        {({ isFullscreen }) => (
+      <div
+        className={`${
+          isFullscreen ? "min-h-0 max-h-none flex-1" : "max-h-[calc(100vh-14rem)]"
+        } overflow-auto overscroll-contain`}
+      >
+        <Table aria-label="Fixture matrix" containerClassName="overflow-visible">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -470,9 +616,20 @@ export function FixtureMatrixPage() {
                 </TableRow>
               );
               if (!row.getIsExpanded()) return [cells];
-              const byKickoff = [...row.original.team.fixtures].sort(
+              const byKickoff: DetailFixture[] = [
+                ...row.original.filtered.map(
+                  (fixture): DetailFixture => ({ status: "modelled", fixture }),
+                ),
+                ...row.original.scheduleOnly.map(
+                  (fixture): DetailFixture => ({ status: "schedule_only", fixture }),
+                ),
+              ].sort(
                 (a, b) =>
-                  (a.kickoff_time ?? "9999").localeCompare(b.kickoff_time ?? "9999") || a.gw - b.gw,
+                  (a.fixture.kickoff_time ?? "9999").localeCompare(
+                    b.fixture.kickoff_time ?? "9999",
+                  ) ||
+                  a.fixture.gw - b.fixture.gw ||
+                  a.fixture.fixture - b.fixture.fixture,
               );
               return [
                 cells,
@@ -480,8 +637,8 @@ export function FixtureMatrixPage() {
                   <TableCell colSpan={row.getVisibleCells().length} className="bg-muted/40 p-3">
                     <div className="max-w-3xl space-y-1">
                       <p className="text-xs font-medium">
-                        {row.original.team.team_name} — all primitives, by kickoff (ease formula{" "}
-                        {state.easeVersion})
+                        {row.original.team.team_name} — selected fixtures by kickoff. Model
+                        primitives end at GW{runBounds.to}; later rows are schedule only.
                       </p>
                       <Table>
                         <TableHeader>
@@ -490,6 +647,7 @@ export function FixtureMatrixPage() {
                             <TableHead className="h-7 px-2 text-[11px]">GW</TableHead>
                             <TableHead className="h-7 px-2 text-[11px]">Opponent</TableHead>
                             <TableHead className="h-7 px-2 text-[11px]">Venue</TableHead>
+                            <TableHead className="h-7 px-2 text-[11px]">Status</TableHead>
                             <TableHead className="h-7 px-2 text-[11px]">λ for</TableHead>
                             <TableHead className="h-7 px-2 text-[11px]">λ against</TableHead>
                             <TableHead className="h-7 px-2 text-[11px]">CS %</TableHead>
@@ -502,29 +660,38 @@ export function FixtureMatrixPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {byKickoff.map((f) => (
-                            <TableRow key={f.fixture}>
+                          {byKickoff.map((detail) => {
+                            const f = detail.fixture;
+                            const model = detail.status === "modelled" ? detail.fixture : null;
+                            return (
+                            <TableRow key={`${detail.status}-${f.fixture}`}>
                               <TableCell className="px-2 py-1 text-[11px] tabular-nums">
                                 {f.kickoff_time ? f.kickoff_time.replace("T", " ").slice(0, 16) : "–"}
                               </TableCell>
                               <TableCell className="px-2 py-1 text-[11px] tabular-nums">{f.gw}</TableCell>
                               <TableCell className="px-2 py-1 text-[11px]">{f.opponent_short_name}</TableCell>
                               <TableCell className="px-2 py-1 text-[11px]">{f.was_home == null ? "–" : f.was_home ? "H" : "A"}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.lambda_for, 2)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.lambda_against, 2)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {fmt(f.probability_clean_sheet == null ? null : f.probability_clean_sheet * 100, 1)}
+                              <TableCell className="px-2 py-1 text-[11px]">
+                                {detail.status === "modelled" ? "Modelled" : "Schedule only"}
                               </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.attack_ease_index)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.defence_ease_index)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.overall_ease_index)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.lambda_for, 2)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.lambda_against, 2)}</TableCell>
                               <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {fmt(opponentIndexOf(f.opponent_team_code), 0)}
+                                {fmt(model?.probability_clean_sheet == null ? null : model.probability_clean_sheet * 100, 1)}
                               </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(f.official_fdr, 0)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px]">{f.stage_a_league_average_team ? "yes" : "no"}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.attack_ease_index)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.defence_ease_index)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.overall_ease_index)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                {model ? fmt(opponentIndexOf(f.opponent_team_code), 0) : "–"}
+                              </TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.official_fdr, 0)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px]">
+                                {model ? (model.stage_a_league_average_team ? "yes" : "no") : "–"}
+                              </TableCell>
                             </TableRow>
-                          ))}
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>
@@ -535,10 +702,12 @@ export function FixtureMatrixPage() {
           </TableBody>
         </Table>
       </div>
+        )}
+      </DecisionTableFullscreen>
       <p className="text-xs text-muted-foreground">
         Availability and chance-of-playing are reported overlays valid for the next gameweek;
-        they are not shown here and never fold into these distributions. Later-gameweek
-        schedule context beyond this vintage horizon is unknown.
+        they are not shown here and never fold into these distributions. The 10- and 15-GW
+        extensions add current official fixtures only; no later model difficulty is implied.
       </p>
     </div>
   );

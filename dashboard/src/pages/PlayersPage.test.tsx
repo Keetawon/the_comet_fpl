@@ -50,6 +50,13 @@ beforeEach(() => {
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersSample.players, manifest: null });
   vi.mocked(loadFixtureMatrix).mockResolvedValue({
     teams: teamsForRunA,
+    schedule: {
+      schema_version: 1,
+      semantics: "current_at_export_not_forecast_vintage",
+      export_created_at: "2026-08-20T00:00:00+00:00",
+      database_sha256: "d".repeat(64),
+      teams: [],
+    },
     manifest: null,
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
@@ -60,6 +67,9 @@ describe("PlayersPage", () => {
   it("renders the pivot: players, form columns, availability overlay, GW chips", async () => {
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    expect(
+      screen.getByRole("button", { name: "Enter Players table fullscreen" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Beta")).toBeInTheDocument();
     // the form window is a named column set anchored to the season it measured
     expect(screen.getByText("Last 5 App")).toBeInTheDocument();

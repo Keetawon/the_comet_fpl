@@ -4,6 +4,7 @@
 // framework and says why -- never zero-filled numbers.
 
 import { useEffect, useState } from "react";
+import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import {
   Table,
   TableBody,
@@ -115,8 +116,15 @@ export function ForecastVsActualPage() {
               </span>
             </p>
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
+              <DecisionTableFullscreen
+                label={`Forecast by position table for run ${run.run_id.slice(0, 12)}`}
+              >
+                {({ isFullscreen }) => (
+                <div className={isFullscreen ? "min-h-0 flex-1 overflow-auto" : "overflow-x-auto"}>
+                <Table
+                  aria-label={`Forecast scores by position for run ${run.run_id}`}
+                  containerClassName="overflow-visible"
+                >
                   <TableHeader>
                     <TableRow>
                       <TableHead>Position</TableHead>
@@ -132,9 +140,18 @@ export function ForecastVsActualPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
+                </div>
+                )}
+              </DecisionTableFullscreen>
+              <DecisionTableFullscreen
+                label={`Forecast by gameweek table for run ${run.run_id.slice(0, 12)}`}
+              >
+                {({ isFullscreen }) => (
+                <div className={isFullscreen ? "min-h-0 flex-1 overflow-auto" : "overflow-x-auto"}>
+                <Table
+                  aria-label={`Forecast scores by gameweek for run ${run.run_id}`}
+                  containerClassName="overflow-visible"
+                >
                   <TableHeader>
                     <TableRow>
                       <TableHead>Gameweek</TableHead>
@@ -150,10 +167,19 @@ export function ForecastVsActualPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
+                )}
+              </DecisionTableFullscreen>
             </div>
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
+            <DecisionTableFullscreen
+              label={`Forecast calibration table for run ${run.run_id.slice(0, 12)}`}
+            >
+              {({ isFullscreen }) => (
+              <div className={isFullscreen ? "min-h-0 flex-1 overflow-auto" : "overflow-x-auto"}>
+              <Table
+                aria-label={`Forecast calibration for run ${run.run_id}`}
+                containerClassName="overflow-visible"
+              >
                 <TableHeader>
                   <TableRow>
                     <TableHead>P(≥ {run.calibration[0]?.threshold_points ?? 2} pts) bucket</TableHead>
@@ -177,7 +203,9 @@ export function ForecastVsActualPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
+              )}
+            </DecisionTableFullscreen>
           </div>
         ))
       )}

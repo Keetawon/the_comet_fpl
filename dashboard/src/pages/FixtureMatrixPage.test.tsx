@@ -3,15 +3,68 @@
 // default sort by average ease (easiest first), and opponent-strength colouring direction
 // (a weak opponent colours green, a strong opponent red, regardless of the row club).
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadFixtureMatrix, loadNextGw } from "@/data/load";
 import sample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
-import type { NextGwPlan } from "@/data/types";
+import type { FixtureScheduleOverlay, NextGwPlan } from "@/data/types";
 import { FixtureMatrixPage } from "./FixtureMatrixPage";
 
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
+const schedule: FixtureScheduleOverlay = {
+  schema_version: 1,
+  semantics: "current_at_export_not_forecast_vintage",
+  export_created_at: "2026-08-20T12:00:00+00:00",
+  database_sha256: "d".repeat(64),
+  teams: [
+    {
+      season: "2026-27",
+      team_code: 101,
+      team_name: "Alpha",
+      short_name: "ALP",
+      fixtures: [
+        ...Array.from({ length: 11 }, (_, index) => {
+          const gw = index + 5;
+          return {
+            gw,
+            fixture: gw === 6 ? 100 : 200 + gw,
+            kickoff_time: `2026-10-${String(gw).padStart(2, "0")}T14:00:00+00:00`,
+            opponent_team_code: 102,
+            opponent_short_name: "BET",
+            was_home: gw % 2 === 1,
+          };
+        }),
+        {
+          gw: 6,
+          fixture: 906,
+          kickoff_time: "2026-10-06T18:00:00+00:00",
+          opponent_team_code: 103,
+          opponent_short_name: "GAM",
+          was_home: true,
+        },
+      ],
+    },
+    {
+      season: "2026-27",
+      team_code: 102,
+      team_name: "Beta",
+      short_name: "BET",
+      fixtures: Array.from({ length: 11 }, (_, index) => {
+        const gw = index + 5;
+        return {
+          gw,
+          fixture: gw === 6 ? 100 : 200 + gw,
+          kickoff_time: `2026-10-${String(gw).padStart(2, "0")}T14:00:00+00:00`,
+          opponent_team_code: 101,
+          opponent_short_name: "ALP",
+          was_home: gw % 2 === 0,
+        };
+      }).filter((fixture) => fixture.gw !== 7),
+    },
+  ],
+};
 
 vi.mock("@/data/load", () => ({
   loadFixtureMatrix: vi.fn(),
@@ -21,6 +74,7 @@ vi.mock("@/data/load", () => ({
 beforeEach(() => {
   vi.mocked(loadFixtureMatrix).mockResolvedValue({
     teams: sample.teams,
+    schedule,
     manifest: null,
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
@@ -31,6 +85,10 @@ describe("FixtureMatrixPage", () => {
   it("renders one row per club with per-GW chips, blank slots, and all colour sources", async () => {
     render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    expect(
+      screen.getByRole("button", { name: "Enter Fixture matrix table fullscreen" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Fixture matrix table fullscreen/ })).toHaveLength(1);
     expect(screen.getAllByText("Beta").length).toBeGreaterThan(0);
     // recent form from the anchor season, one compact line
     expect(screen.getByText(/W3 D1 L1/)).toBeInTheDocument();
@@ -72,9 +130,60 @@ describe("FixtureMatrixPage", () => {
     expect(firstTeamRow!.textContent).toContain("Beta");
   });
 
+  it("extends to 10 or 15 gameweeks with neutral schedule-only fixtures", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<FixtureMatrixPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+
+    expect(screen.getByRole("columnheader", { name: "GW5" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "GW6" })).not.toBeInTheDocument();
+    const firstTeamBefore = [...container.querySelectorAll("tbody > tr")].find(
+      (row) => row.textContent?.includes("Beta") || row.textContent?.includes("Alpha"),
+    )?.textContent;
+    const betaBefore = screen.getByText("Beta").closest("tr");
+    expect(betaBefore).not.toBeNull();
+    expect(within(betaBefore!).getByText("118.6")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "10 GWs" }));
+    expect(screen.getByRole("columnheader", { name: "GW10" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "GW11" })).not.toBeInTheDocument();
+    const gw6 = screen.getAllByTestId("schedule-chip").find((chip) => chip.dataset.gw === "6");
+    expect(gw6).toBeDefined();
+    expect(gw6!.className).toContain("bg-muted");
+    expect(gw6!.className).not.toMatch(/bg-(green|red)/);
+    expect(gw6).toHaveAccessibleName(/schedule only.*no model forecast or ease/i);
+    const alphaRow = screen.getByText("Alpha").closest("tr");
+    expect(alphaRow).not.toBeNull();
+    expect(
+      within(alphaRow!)
+        .getAllByTestId("schedule-chip")
+        .filter((chip) => chip.dataset.gw === "6"),
+    ).toHaveLength(2);
+    const betaAfter = screen.getByText("Beta").closest("tr");
+    expect(betaAfter).not.toBeNull();
+    expect(within(betaAfter!).getByText("118.6")).toBeInTheDocument();
+    expect(
+      within(betaAfter!)
+        .getAllByTestId("blank-slot")
+        .some((slot) => slot.dataset.gw === "7"),
+    ).toBe(true);
+    const firstTeamAfter = [...container.querySelectorAll("tbody > tr")].find(
+      (row) => row.textContent?.includes("Beta") || row.textContent?.includes("Alpha"),
+    )?.textContent;
+    expect(firstTeamAfter?.includes(firstTeamBefore?.includes("Beta") ? "Beta" : "Alpha")).toBe(true);
+
+    await user.click(within(alphaRow!).getByRole("button", { name: "Expand fixtures" }));
+    expect(screen.getAllByText("Schedule only").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("radio", { name: "15 GWs" }));
+    expect(screen.getByRole("columnheader", { name: "GW15" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "GW16" })).not.toBeInTheDocument();
+  });
+
   it("explains when the export carries no recorded vintage", async () => {
     vi.mocked(loadFixtureMatrix).mockResolvedValueOnce({
       teams: [],
+      schedule: { ...schedule, teams: [] },
       manifest: null,
       easeIndexFormulaVersion: "fixture-ease-v1",
     });

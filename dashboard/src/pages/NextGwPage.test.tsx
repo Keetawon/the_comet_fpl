@@ -107,6 +107,13 @@ beforeEach(() => {
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersSample.players, manifest: null });
   vi.mocked(loadFixtureMatrix).mockResolvedValue({
     teams: teamsForRunA,
+    schedule: {
+      schema_version: 1,
+      semantics: "current_at_export_not_forecast_vintage",
+      export_created_at: "2026-08-20T00:00:00+00:00",
+      database_sha256: "d".repeat(64),
+      teams: [],
+    },
     manifest: null,
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
@@ -173,6 +180,11 @@ describe("NextGwPage", () => {
       expect(screen.getByText(/Platform Next GW suggestion — GW1/)).toBeInTheDocument(),
     );
     expect(screen.getByText(/Formation/).textContent).toContain("captain Alpha");
+    expect(
+      screen.getByRole("button", {
+        name: "Enter Next GW suggestion players table fullscreen",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Formation/).textContent).toContain("vice Beta");
     expect(screen.getByText(/Bench \(autosub order/)).toBeInTheDocument();
     // the squad table is the shared pivot: plan EV columns beside the GW fixture chips

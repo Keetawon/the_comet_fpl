@@ -84,6 +84,23 @@ legacy schema-1 vintage with no fixture transport contributes zero team objects.
   fixture id — both legs of a double gameweek are separate entries. `kickoff_time` may be
   `null` for an unscheduled fixture and orders last, never first.
 
+The file also carries a separately versioned `schedule` object
+(`schedule.schema_version: 1`). It is a **current-at-BI-export official schedule overlay**,
+not part of any selected forecast vintage:
+
+- `semantics` is exactly `current_at_export_not_forecast_vintage`;
+- `export_created_at` and `database_sha256` bind the overlay to the source BI export;
+- `schedule.teams` is one object per `(season, team_code)`, with directed fixture rows
+  containing only gameweek, fixture id, kickoff, opponent identity, and home/away;
+- schedule rows never carry lambdas, clean-sheet probabilities, ease indices, or FDR.
+
+The Fixture Matrix keeps the model horizon unchanged and offers 5/10/15-GW display windows.
+Rows after the forecast horizon are neutral schedule-only chips. They never enter model-ease
+averages or sorting and must be labelled as current schedule context that may post-date an
+older selected vintage. A moved fixture may therefore appear once in the recorded vintage and
+again at its current schedule gameweek; that is explicit vintage-versus-current context, not a
+duplicate forecast.
+
 Sample record (abbreviated):
 
 ```json

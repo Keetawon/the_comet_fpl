@@ -5,6 +5,7 @@
 
 import type {
   DashboardManifest,
+  FixtureScheduleOverlay,
   ForecastVsActualData,
   NextGwPlan,
   OptimizerAuditData,
@@ -47,6 +48,7 @@ function fetchJson<T>(name: string): Promise<T> {
 
 export interface FixtureMatrixData {
   teams: TeamRecord[];
+  schedule: FixtureScheduleOverlay;
   manifest: DashboardManifest | null;
   easeIndexFormulaVersion: string;
 }
@@ -67,13 +69,27 @@ async function loadManifest(): Promise<DashboardManifest | null> {
 
 export async function loadFixtureMatrix(): Promise<FixtureMatrixData> {
   const [payload, manifest] = await Promise.all([
-    fetchJson<{ teams: TeamRecord[] }>("fixture_matrix.json"),
+    fetchJson<{ teams: TeamRecord[]; schedule?: unknown }>("fixture_matrix.json"),
     loadManifest(),
   ]);
   const teams = payload.teams;
+  const schedule = payload.schedule as Partial<FixtureScheduleOverlay> | undefined;
+  if (
+    schedule?.schema_version !== 1 ||
+    schedule?.semantics !== "current_at_export_not_forecast_vintage" ||
+    typeof schedule.export_created_at !== "string" ||
+    typeof schedule.database_sha256 !== "string" ||
+    !Array.isArray(schedule.teams)
+  ) {
+    throw new Error(
+      "invalid fixture_matrix.json: current official schedule overlay is missing; " +
+        "republish the dashboard read models",
+    );
+  }
   const versions = new Set(teams.flatMap((t) => t.fixtures.map((f) => f.ease_index_formula_version)));
   return {
     teams,
+    schedule: schedule as FixtureScheduleOverlay,
     manifest,
     easeIndexFormulaVersion: versions.size === 1 ? [...versions][0] : [...versions].join(", "),
   };

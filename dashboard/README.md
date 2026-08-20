@@ -182,8 +182,15 @@ matrix, Players, Next GW suggestion, Forecast vs actual, and Optimizer audit) pl
 interactive Plan builder.
 
 - **Fixture matrix** (implemented, P1.7b): the fixture pivot — one row per club of the
-  selected vintage, **one column per gameweek** (two chips in a double gameweek), default
-  sorted by average ease (easiest first, any column re-sorts). Recent form is one compact
+  selected vintage, **one column per gameweek** (two chips in a double gameweek), with
+  5/10/15-GW display controls. The forecast remains bounded to its recorded horizon
+  (currently GW1-5); GW6-10/15 comes from a separately versioned current official-schedule
+  overlay and renders as neutral opponent/home-away/kickoff context with no invented ease,
+  lambda, clean-sheet probability, or FDR. The overlay carries the BI-export timestamp and
+  database hash and is explicitly not the schedule known at an older forecast vintage.
+  The matrix is default
+  sorted by average **modelled** ease (easiest first, any column re-sorts); changing to 10
+  or 15 GWs cannot alter that average or ordering. Recent form is one compact
   line labelled with its anchor season (at GW1 that is *last* season). Colour source is a
   three-way toggle: **opponent strength** (default; a display-time club-quality index
   derived from the vintage's published lambdas — 100 = average club, higher = stronger
@@ -191,7 +198,8 @@ interactive Plan builder.
   model ease (overall/attack/clean-sheet views), or official FDR. Expanding a row exposes
   every primitive (raw `lambda_for`/`lambda_against`, clean-sheet probability, all ease
   indices, opponent strength, official FDR, Stage A league-average flag) ordered by
-  kickoff time.
+  kickoff time. Expanded schedule-only rows show identity/kickoff and dashes for every
+  unavailable model primitive.
 - **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
   `players.json` — one row per player of the selected vintage (photo + club badge) merging
   backward form (3/5/10/STD window selector) with per-gameweek xP chips and a range-total xP.

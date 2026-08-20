@@ -28,6 +28,11 @@ describe("OptimizerAuditPage", () => {
     expect(screen.getByText("bounded deterministic dynamic programme with beam pruning")).toBeInTheDocument();
     // constraints snapshot
     expect(screen.getByText("Constraints (verified squad-rule snapshot)")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Enter Optimizer position constraints table fullscreen",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText("£100.0m")).toBeInTheDocument(); // budget_tenths 1000
     // assumptions list
     expect(screen.getByText(/bench points and autosub probabilities/)).toBeInTheDocument();

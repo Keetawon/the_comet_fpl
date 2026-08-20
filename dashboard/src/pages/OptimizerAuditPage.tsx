@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import {
   Select,
   SelectContent,
@@ -222,8 +223,13 @@ export function OptimizerAuditPage() {
               value={`${rules.goalkeeper_bench_slots} GK + ${rules.outfield_bench_slots} outfield`}
             />
           </div>
-          <div className="overflow-x-auto">
-            <Table>
+          <DecisionTableFullscreen label="Optimizer position constraints table">
+            {({ isFullscreen }) => (
+            <div className={isFullscreen ? "min-h-0 flex-1 overflow-auto" : "overflow-x-auto"}>
+            <Table
+              aria-label="Optimizer position constraints"
+              containerClassName="overflow-visible"
+            >
               <TableHeader>
                 <TableRow>
                   <TableHead>Position</TableHead>
@@ -243,7 +249,9 @@ export function OptimizerAuditPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
+            )}
+          </DecisionTableFullscreen>
         </div>
       </Card>
 

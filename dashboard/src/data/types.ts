@@ -52,6 +52,35 @@ export interface TeamFixture {
   stage_a_league_average_team: boolean;
 }
 
+/**
+ * Official fixture identity from the latest BI export. These rows deliberately carry no
+ * forecast/ease fields: they are current schedule context, not part of a recorded vintage.
+ */
+export interface ScheduleFixture {
+  gw: number;
+  fixture: number;
+  kickoff_time: string | null;
+  opponent_team_code: number;
+  opponent_short_name: string;
+  was_home: boolean | null;
+}
+
+export interface ScheduleTeam {
+  season: string;
+  team_code: number;
+  team_name: string;
+  short_name: string;
+  fixtures: ScheduleFixture[];
+}
+
+export interface FixtureScheduleOverlay {
+  schema_version: 1;
+  semantics: "current_at_export_not_forecast_vintage";
+  export_created_at: string;
+  database_sha256: string;
+  teams: ScheduleTeam[];
+}
+
 export interface TeamRecord {
   run_id: string;
   as_of: string;

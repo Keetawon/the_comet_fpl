@@ -129,6 +129,7 @@ class DashboardReadModels:
 
     runs: tuple[dict[str, Any], ...]
     teams: tuple[dict[str, Any], ...]
+    schedule: dict[str, Any]
     players: tuple[dict[str, Any], ...]
     summary: dict[str, Any]
     next_gw: dict[str, Any]
@@ -370,6 +371,171 @@ def _build_teams(
             }
         )
     return tuple(teams), (versions[0] if versions else None)
+
+
+def _build_current_schedule(
+    dim_fixture: pl.DataFrame,
+    team_season: pl.DataFrame,
+    runs: pl.DataFrame,
+    manifest: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build a current-at-export schedule overlay, deliberately outside forecast vintages.
+
+    The overlay contains the complete scheduled season for every season represented by an
+    exported forecast run. It is never joined to a run and carries no forecast or ease fields;
+    consumers must not mistake a later schedule amendment for point-in-time forecast input.
+    """
+    export_created_at = manifest.get("created_at")
+    database_sha256 = manifest.get("database_sha256")
+    if not isinstance(export_created_at, str) or not export_created_at:
+        raise DashboardJsonError("source export created_at is missing or invalid")
+    if (
+        not isinstance(database_sha256, str)
+        or len(database_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in database_sha256)
+    ):
+        raise DashboardJsonError("source export database_sha256 is missing or invalid")
+
+    run_seasons = sorted(
+        {str(season) for season in runs.get_column("season").to_list() if season is not None}
+    )
+    if not run_seasons:
+        return {
+            "schema_version": 1,
+            "semantics": "current_at_export_not_forecast_vintage",
+            "export_created_at": export_created_at,
+            "database_sha256": database_sha256,
+            "teams": [],
+        }
+
+    scheduled = dim_fixture.filter(pl.col("season").is_in(run_seasons) & pl.col("gw").is_not_null())
+    _require_no_nulls(
+        scheduled,
+        (
+            "season",
+            "fixture",
+            "gw",
+            "home_team_id",
+            "away_team_id",
+            "home_team_code",
+            "away_team_code",
+        ),
+        "a scheduled fixture is missing its season, gameweek, fixture, or club identity",
+    )
+
+    duplicate_fixtures = scheduled.group_by(["season", "fixture"]).len().filter(pl.col("len") != 1)
+    if duplicate_fixtures.height:
+        raise DashboardJsonError(
+            "the current schedule has duplicate (season, fixture) rows; refusing an ambiguous "
+            "schedule overlay"
+        )
+
+    season_labels = team_season.filter(pl.col("season").is_in(run_seasons))
+    duplicate_team_ids = (
+        season_labels.group_by(["season", "team_id"]).len().filter(pl.col("len") != 1)
+    )
+    duplicate_team_codes = (
+        season_labels.group_by(["season", "team_code"]).len().filter(pl.col("len") != 1)
+    )
+    if duplicate_team_ids.height or duplicate_team_codes.height:
+        raise DashboardJsonError(
+            "dim_team_season is not unique by season-qualified team id and code"
+        )
+
+    labels: dict[tuple[str, int], dict[str, Any]] = {}
+    for row in season_labels.sort(["season", "team_id"]).iter_rows(named=True):
+        if any(row[name] is None for name in ("team_id", "team_code", "team_name", "short_name")):
+            raise DashboardJsonError(
+                "a current-schedule club label is incomplete in dim_team_season"
+            )
+        labels[(str(row["season"]), int(row["team_id"]))] = {
+            "team_code": int(row["team_code"]),
+            "team_name": row["team_name"],
+            "short_name": row["short_name"],
+        }
+
+    fixture_sides: dict[tuple[str, int], list[tuple[int, dict[str, Any]]]] = {}
+    team_fixtures: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    team_labels: dict[tuple[str, int], dict[str, Any]] = {}
+    side_keys: set[tuple[str, int, int]] = set()
+    ordered = scheduled.sort(["season", "gw", "kickoff_time", "fixture"], nulls_last=True)
+    for row in ordered.iter_rows(named=True):
+        season = str(row["season"])
+        fixture = int(row["fixture"])
+        home_id = int(row["home_team_id"])
+        away_id = int(row["away_team_id"])
+        if home_id == away_id:
+            raise DashboardJsonError("a current-schedule fixture names the same club on both sides")
+        try:
+            home = labels[(season, home_id)]
+            away = labels[(season, away_id)]
+        except KeyError as exc:
+            raise DashboardJsonError(
+                "a current-schedule club failed to resolve through dim_team_season on "
+                "(season, team_id)"
+            ) from exc
+        if (
+            int(row["home_team_code"]) != home["team_code"]
+            or int(row["away_team_code"]) != away["team_code"]
+        ):
+            raise DashboardJsonError(
+                "a current-schedule team_code disagrees with its season-qualified club label"
+            )
+
+        for own, opponent, was_home in ((home, away, True), (away, home, False)):
+            own_code = int(own["team_code"])
+            side_key = (season, own_code, fixture)
+            if side_key in side_keys:
+                raise DashboardJsonError(
+                    "the current schedule has a duplicate (season, team_code, fixture) side"
+                )
+            side_keys.add(side_key)
+            identity = (season, own_code)
+            team_labels[identity] = own
+            side = {
+                "gw": int(row["gw"]),
+                "fixture": fixture,
+                "kickoff_time": _iso_or_none(row["kickoff_time"]),
+                "opponent_team_code": int(opponent["team_code"]),
+                "opponent_short_name": opponent["short_name"],
+                "was_home": was_home,
+            }
+            team_fixtures.setdefault(identity, []).append(side)
+            fixture_sides.setdefault((season, fixture), []).append((own_code, side))
+
+    for sides in fixture_sides.values():
+        if len(sides) != 2:
+            raise DashboardJsonError(
+                "a current-schedule fixture does not have exactly two reciprocal club sides"
+            )
+        (first_code, first), (second_code, second) = sides
+        if (
+            first["opponent_team_code"] != second_code
+            or second["opponent_team_code"] != first_code
+            or first["was_home"] == second["was_home"]
+        ):
+            raise DashboardJsonError("a current-schedule fixture has non-reciprocal club sides")
+
+    teams: list[dict[str, Any]] = []
+    for identity in sorted(team_fixtures):
+        season, team_code = identity
+        label = team_labels[identity]
+        teams.append(
+            {
+                "season": season,
+                "team_code": team_code,
+                "team_name": label["team_name"],
+                "short_name": label["short_name"],
+                "fixtures": team_fixtures[identity],
+            }
+        )
+    return {
+        "schema_version": 1,
+        "semantics": "current_at_export_not_forecast_vintage",
+        "export_created_at": export_created_at,
+        "database_sha256": database_sha256,
+        "teams": teams,
+    }
 
 
 def _avg_minutes_last_5(form: dict[str, Any] | None) -> float | None:
@@ -1335,6 +1501,12 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_forecast_run"],
         frames["fact_team_form"],
     )
+    schedule = _build_current_schedule(
+        frames["dim_fixture"],
+        frames["dim_team_season"],
+        frames["dim_forecast_run"],
+        manifest,
+    )
     players = _build_players(
         frames["fact_forecast_player_gameweek"],
         frames["fact_forecast_player_fixture"],
@@ -1375,6 +1547,7 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
     return DashboardReadModels(
         runs=runs,
         teams=teams,
+        schedule=schedule,
         players=players,
         summary=summary,
         next_gw=next_gw,
@@ -1398,6 +1571,7 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
                 "schema": FIXTURE_MATRIX_SCHEMA,
                 "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
                 "teams": list(models.teams),
+                "schedule": models.schedule,
             },
             indent=2,
         ),

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowDownUp, ArrowUp, ChevronDown, ChevronRight } from "lucide-react";
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
+import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -197,7 +198,12 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
   };
 
   return (
-    <div className="space-y-2">
+    <DecisionTableFullscreen
+      label={`GW${firstWeek.gw} custom plan players table`}
+      className="shadow-sm"
+    >
+      {({ isFullscreen }) => (
+    <div className={cn("space-y-2", isFullscreen && "flex min-h-0 flex-1 flex-col p-2")}>
       <p className="text-xs leading-relaxed text-muted-foreground">
         Row colours and role labels show the fixed GW{firstWeek.gw} decision; sorting changes
         display order only. Select any xP heading to rank the squad, or expand a player for
@@ -206,8 +212,11 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
           Scroll sideways to see every gameweek; Player stays visible.
         </span>
       </p>
-      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
-        <Table aria-label={`GW${firstWeek.gw} custom squad analysis`}>
+      <div className={cn("overflow-auto bg-card overscroll-contain", isFullscreen && "min-h-0 flex-1")}>
+        <Table
+          aria-label={`GW${firstWeek.gw} custom squad analysis`}
+          containerClassName="overflow-visible"
+        >
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead className="h-8 w-8 px-1">
@@ -505,6 +514,8 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
         loaded horizon.
       </p>
     </div>
+      )}
+    </DecisionTableFullscreen>
   );
 }
 

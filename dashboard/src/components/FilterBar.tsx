@@ -24,12 +24,19 @@ interface FilterBarProps {
   onChange: (filters: FilterState) => void;
   minGw: number;
   maxGw: number;
+  showGameweekRange?: boolean;
 }
 
 const gwOptions = (from: number, to: number) =>
   Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
-export function FilterBar({ filters, onChange, minGw, maxGw }: FilterBarProps) {
+export function FilterBar({
+  filters,
+  onChange,
+  minGw,
+  maxGw,
+  showGameweekRange = true,
+}: FilterBarProps) {
   const gwFromOptions = gwOptions(minGw, filters.gwTo);
   const gwToOptions = gwOptions(filters.gwFrom, maxGw);
   return (
@@ -60,7 +67,7 @@ export function FilterBar({ filters, onChange, minGw, maxGw }: FilterBarProps) {
         <ToggleGroupItem value="home">Home</ToggleGroupItem>
         <ToggleGroupItem value="away">Away</ToggleGroupItem>
       </ToggleGroup>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      {showGameweekRange && <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>Gameweeks</span>
         <Select
           value={String(filters.gwFrom)}
@@ -97,7 +104,7 @@ export function FilterBar({ filters, onChange, minGw, maxGw }: FilterBarProps) {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </div>}
     </div>
   );
 }

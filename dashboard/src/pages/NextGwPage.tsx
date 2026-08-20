@@ -546,6 +546,7 @@ export function NextGwPage() {
       </FilterPanel>
 
       <PlayerStatTable
+        fullscreenLabel="Next GW suggestion players table"
         rows={rows}
         view="overall"
         colorSource="opponent"

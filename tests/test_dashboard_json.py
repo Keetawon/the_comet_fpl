@@ -709,6 +709,66 @@ def test_double_gameweek_keeps_both_legs_ordered_by_kickoff(tmp_path: Path) -> N
     assert [f["opponent_team_code"] for f in vicario["fixtures"]] == [102, 103, 102]
 
 
+def test_current_schedule_overlay_extends_without_widening_the_forecast(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    later_kickoff = datetime(2026, 9, 12, 14, tzinfo=UTC)
+    fixture_rows = _source_tables()["dim_fixture"] + [
+        {
+            "season": SEASON,
+            "fixture": 103,
+            "gw": 3,
+            "kickoff_time": later_kickoff,
+            "home_team_id": 1,
+            "away_team_id": 2,
+            "home_team_code": 101,
+            "away_team_code": 102,
+            "pulse_id": None,
+            "finished": False,
+        }
+    ]
+    _rewrite_table(export_dir, "dim_fixture", fixture_rows)
+
+    models = build_dashboard_read_models(export_dir)
+    assert [fixture["fixture"] for fixture in _team(models, 101)["fixtures"]] == [100, 101, 102]
+    assert models.schedule["semantics"] == "current_at_export_not_forecast_vintage"
+    assert models.schedule["schema_version"] == 1
+    assert models.schedule["export_created_at"] == CREATED_AT.isoformat()
+    assert models.schedule["database_sha256"] == DATABASE_SHA
+    schedule_alpha = next(
+        team
+        for team in models.schedule["teams"]
+        if team["season"] == SEASON and team["team_code"] == 101
+    )
+    assert [fixture["fixture"] for fixture in schedule_alpha["fixtures"]] == [100, 101, 102, 103]
+    later = schedule_alpha["fixtures"][-1]
+    assert later == {
+        "gw": 3,
+        "fixture": 103,
+        "kickoff_time": later_kickoff.isoformat(),
+        "opponent_team_code": 102,
+        "opponent_short_name": "BET",
+        "was_home": True,
+    }
+    assert not set(later) & {
+        "lambda_for",
+        "lambda_against",
+        "probability_clean_sheet",
+        "overall_ease_index",
+        "official_fdr",
+    }
+    rendered = json.loads(render_read_model_files(models)[FIXTURE_MATRIX_FILENAME].decode("utf-8"))
+    assert rendered["schedule"] == models.schedule
+
+
+def test_current_schedule_overlay_fails_closed_on_duplicate_fixture(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    fixture_rows = _source_tables()["dim_fixture"]
+    fixture_rows.append(dict(fixture_rows[0]))
+    _rewrite_table(export_dir, "dim_fixture", fixture_rows)
+    with pytest.raises(DashboardJsonError, match="duplicate"):
+        build_dashboard_read_models(export_dir)
+
+
 def test_horizon_is_the_vintage_horizon_and_outside_rows_fail_closed(tmp_path: Path) -> None:
     export_dir = _build_source_export(tmp_path)
     models = build_dashboard_read_models(export_dir)

@@ -19,6 +19,7 @@ describe("ForecastVsActualPage", () => {
     expect(screen.getAllByText(/Bias \(actual − EV\)/).length).toBe(2); // position + gw tables
     expect(screen.getByText(/P\(≥ 2 pts\) bucket/)).toBeInTheDocument();
     expect(screen.getAllByText("+1.00").length).toBeGreaterThan(0); // GK bias
+    expect(screen.getAllByRole("button", { name: /Forecast .* table .* fullscreen/ })).toHaveLength(3);
   });
 
   it("shows the explicit empty state when no vintage has finalised outcomes", async () => {
@@ -30,5 +31,6 @@ describe("ForecastVsActualPage", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getByText(/never read as zero/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Forecast .* fullscreen/ })).not.toBeInTheDocument();
   });
 });

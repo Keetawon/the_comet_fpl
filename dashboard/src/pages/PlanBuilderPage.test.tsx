@@ -442,6 +442,11 @@ describe("PlanBuilderPage", () => {
 
     expect(await screen.findByText("Your plan — GW1")).toBeInTheDocument();
     expect(screen.getByText("1 locked")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Enter GW1 custom plan players table fullscreen",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText("1 excluded")).toBeInTheDocument();
     expect(screen.getByText(/locked ·/).parentElement).toHaveTextContent("Alpha");
     expect(screen.getByText(/excluded ·/).parentElement).toHaveTextContent("Beta");
