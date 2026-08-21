@@ -71,6 +71,15 @@ describe("UserDraftPage", () => {
     const { container } = render(<UserDraftPage />);
     await screen.findByRole("heading", { name: "Squad Draft" });
 
+    for (const emptyGroup of [
+      "Goalkeepers (0/2)",
+      "Defenders (0/5)",
+      "Midfielders (0/5)",
+      "Forwards (0/3)",
+    ]) {
+      expect(screen.getByRole("rowgroup", { name: emptyGroup })).toBeInTheDocument();
+    }
+
     for (const player of draftPlayers) {
       await user.click(screen.getByRole("button", { name: `Add ${player.web_name}` }));
     }
@@ -87,6 +96,39 @@ describe("UserDraftPage", () => {
     expect(footerText).toContain("45.0");
     expect(footerText).toContain("75.0");
     expect(footerText.match(/15\.0/g)).toHaveLength(5);
+
+    const groupExpectations = [
+      { label: "Goalkeepers (2/2)", position: "GK", codes: [1, 2] },
+      { label: "Defenders (5/5)", position: "DEF", codes: [3, 4, 5, 6, 7] },
+      { label: "Midfielders (5/5)", position: "MID", codes: [8, 9, 10, 11, 12] },
+      { label: "Forwards (3/3)", position: "FWD", codes: [13, 14, 15] },
+    ];
+    const groupedBodies = groupExpectations.map(({ label, position, codes }) => {
+      const body = screen.getByRole("rowgroup", { name: label });
+      const sectionHead = body.querySelector('th[scope="rowgroup"]');
+      expect(sectionHead).toHaveTextContent(label);
+      const playerRows = [...body.querySelectorAll<HTMLElement>("tr[data-player-code]")];
+      expect(playerRows.map((row) => Number(row.dataset.playerCode))).toEqual(codes);
+      expect(playerRows.every((row) => row.dataset.position === position)).toBe(true);
+      return body;
+    });
+    expect(groupedBodies.map((body) => body.getAttribute("aria-label"))).toEqual(
+      groupExpectations.map(({ label }) => label),
+    );
+
+    const footerBeforeSort = footer!.textContent;
+    await user.click(screen.getByRole("button", { name: "Sort by Player" }));
+    await user.click(screen.getByRole("button", { name: "Sort by Player" }));
+    expect(screen.getByRole("columnheader", { name: /Player/ })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    expect(
+      [...screen.getByRole("rowgroup", { name: "Goalkeepers (2/2)" })
+        .querySelectorAll<HTMLElement>("tr[data-player-code]")]
+        .map((row) => Number(row.dataset.playerCode)),
+    ).toEqual([2, 1]);
+    expect(container.querySelector("tfoot")?.textContent).toBe(footerBeforeSort);
 
     expect(screen.getByText(/Highest measured bench after choosing the best legal XI/))
       .toHaveTextContent("GW1");
@@ -116,6 +158,10 @@ describe("UserDraftPage", () => {
     expect(container.querySelector("tfoot")?.textContent).toContain(
       "Draft squad total (1/15)",
     );
+    expect(screen.getByRole("rowgroup", { name: "Goalkeepers (1/2)" })).toBeInTheDocument();
+    expect(screen.getByRole("rowgroup", { name: "Defenders (0/5)" })).toBeInTheDocument();
+    expect(screen.getByRole("rowgroup", { name: "Midfielders (0/5)" })).toBeInTheDocument();
+    expect(screen.getByRole("rowgroup", { name: "Forwards (0/3)" })).toBeInTheDocument();
     const selectedButton = screen.getByRole("button", {
       name: "Remove Draft 01 from draft",
     });
@@ -124,6 +170,7 @@ describe("UserDraftPage", () => {
 
     await user.click(selectedButton);
     expect(await screen.findByText("0/15 players")).toBeInTheDocument();
+    expect(screen.getByRole("rowgroup", { name: "Goalkeepers (0/2)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Draft 01" })).toHaveAttribute(
       "aria-pressed",
       "false",

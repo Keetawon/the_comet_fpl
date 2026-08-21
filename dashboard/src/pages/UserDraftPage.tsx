@@ -62,6 +62,13 @@ export const USER_DRAFT_STORAGE_KEY = "the-comet-user-draft-v1";
 type SortKey = "player" | "price" | "total3" | "total5" | `gw:${number}`;
 type SortDirection = "asc" | "desc";
 
+const POSITION_LABELS: Readonly<Record<string, string>> = {
+  GK: "Goalkeepers",
+  DEF: "Defenders",
+  MID: "Midfielders",
+  FWD: "Forwards",
+};
+
 interface ReadyState {
   status: "ready";
   plan: NextGwPlan;
@@ -356,7 +363,7 @@ function DraftSquadTable({
     [selected, loadedGws],
   );
 
-  const sorted = useMemo(() => {
+  const sortedByPosition = useMemo(() => {
     const valueOf = (player: PlayerRecord): string | number | null => {
       const projection = projections.get(player.code);
       if (sortKey === "player") return player.web_name.toLocaleLowerCase();
@@ -365,7 +372,7 @@ function DraftSquadTable({
       if (sortKey === "total5") return projection?.totalFiveGameweeksXp ?? null;
       return rawPlayerGameweekXp(player, Number(sortKey.slice(3)));
     };
-    return [...selected].sort((left, right) => {
+    const comparePlayers = (left: PlayerRecord, right: PlayerRecord) => {
       const leftValue = valueOf(left);
       const rightValue = valueOf(right);
       if (leftValue == null && rightValue == null) return left.code - right.code;
@@ -376,8 +383,15 @@ function DraftSquadTable({
           ? leftValue.localeCompare(rightValue)
           : Number(leftValue) - Number(rightValue);
       return (direction === "asc" ? comparison : -comparison) || left.code - right.code;
-    });
-  }, [selected, projections, sortKey, direction]);
+    };
+    return rules.positions.map((rule) => ({
+      ...rule,
+      label: POSITION_LABELS[rule.position] ?? rule.position,
+      players: selected
+        .filter((player) => player.position === rule.position)
+        .sort(comparePlayers),
+    }));
+  }, [selected, projections, sortKey, direction, rules.positions]);
 
   const chooseSort = (next: SortKey) => {
     if (next === sortKey) setDirection((current) => (current === "asc" ? "desc" : "asc"));
@@ -447,8 +461,8 @@ function DraftSquadTable({
               <TableHead className="text-right">Remove</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {sorted.length === 0 ? (
+          {selected.length === 0 && (
+            <TableBody aria-label="Draft selection status">
               <TableRow>
                 <TableCell
                   colSpan={7 + loadedGws.length}
@@ -457,11 +471,30 @@ function DraftSquadTable({
                   No players selected. Add anyone from the full player list below.
                 </TableCell>
               </TableRow>
-            ) : (
-              sorted.map((player) => {
+            </TableBody>
+          )}
+          {sortedByPosition.map((group) => (
+            <TableBody
+              key={group.position}
+              aria-label={`${group.label} (${group.players.length}/${group.squad})`}
+            >
+              <TableRow className="border-y bg-muted/40 hover:bg-muted/40">
+                <TableHead
+                  scope="rowgroup"
+                  colSpan={7 + loadedGws.length}
+                  className="h-8 px-3 text-xs font-semibold text-foreground"
+                >
+                  {group.label} ({group.players.length}/{group.squad})
+                </TableHead>
+              </TableRow>
+              {group.players.map((player) => {
                 const projection = projections.get(player.code);
                 return (
-                  <TableRow key={player.code}>
+                  <TableRow
+                    key={player.code}
+                    data-player-code={player.code}
+                    data-position={player.position}
+                  >
                     <TableCell className="sticky left-0 z-[1] bg-background">
                       <div className="flex items-center gap-2">
                         <PlayerPhoto code={player.code} name={player.web_name} />
@@ -506,9 +539,9 @@ function DraftSquadTable({
                     </TableCell>
                   </TableRow>
                 );
-              })
-            )}
-          </TableBody>
+              })}
+            </TableBody>
+          ))}
           <TableFooter aria-label="Draft squad totals">
             <TableRow>
               <TableCell colSpan={3} role="rowheader" className="font-semibold">
@@ -725,7 +758,8 @@ export function UserDraftPage() {
         <div>
           <h2 id="draft-table-heading" className="font-semibold">Your selected players</h2>
           <p className="text-xs text-muted-foreground">
-            Raw player xP only. Sort order never changes the totals in the final row.
+            Raw player xP only. Positions stay grouped; sorting ranks players within each position
+            and never changes the totals in the final row.
           </p>
         </div>
         <DraftSquadTable
