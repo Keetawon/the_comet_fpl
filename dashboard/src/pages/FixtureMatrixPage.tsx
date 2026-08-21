@@ -102,6 +102,8 @@ const VIEW_LABEL: Record<ViewMode, string> = {
 
 const HEAD_CLASS = "sticky top-0 z-10 h-8 bg-background px-2 text-xs whitespace-nowrap";
 const CELL_CLASS = "px-2 py-1 text-xs whitespace-nowrap";
+const GW_COLUMN_WIDTH_CLASS = "box-border w-20 min-w-20 max-w-20";
+const FIXTURE_CARD_WIDTH_CLASS = "w-16 min-w-16 max-w-16";
 
 const FORM_WINDOW_LABEL: Record<WindowLabel, string> = {
   last_3: "Last 3",
@@ -139,14 +141,18 @@ function TeamGwCell({
         data-testid="blank-slot"
         data-gw={gw}
         title={`GW${gw}: no fixture`}
-        className={`inline-flex h-8 w-12 items-center justify-center rounded-md text-[10px] ${NULL_BUCKET_CLASS}`}
+        className={`inline-flex h-8 ${FIXTURE_CARD_WIDTH_CLASS} items-center justify-center rounded-md text-[10px] ${NULL_BUCKET_CLASS}`}
       >
         GW{gw}
       </span>
     );
   }
   return (
-    <span className="inline-flex flex-col items-stretch gap-0.5">
+    <span
+      data-testid="fixture-card-stack"
+      data-gw={gw}
+      className={`inline-flex ${FIXTURE_CARD_WIDTH_CLASS} flex-col items-stretch gap-0.5`}
+    >
       {inGw.map((f) => {
         const opponentIndex = opponentIndexOf(f.opponent_team_code);
         return (
@@ -155,6 +161,7 @@ function TeamGwCell({
             fixture={f}
             metric={chipMetric(f, view, colorSource, opponentIndex)}
             bucket={chipBucket(f, view, colorSource, cleanSheetAnchor, opponentIndex)}
+            className={FIXTURE_CARD_WIDTH_CLASS}
           />
         );
       })}
@@ -187,7 +194,7 @@ function TeamGwCell({
             data-bucket={opponentBucket ?? "null"}
             title={label}
             aria-label={label}
-            className={`inline-flex h-8 min-w-12 flex-col justify-center rounded-md px-1 text-center ${
+            className={`inline-flex h-8 ${FIXTURE_CARD_WIDTH_CLASS} flex-col justify-center rounded-md px-1 text-center ${
               opponentBucket
                 ? BUCKET_CLASSES[opponentBucket]
                 : "border border-border bg-muted text-muted-foreground"
@@ -199,8 +206,8 @@ function TeamGwCell({
             </span>
             <span className="text-[9px] leading-tight tabular-nums">
               GW{fixture.gw} ·{opponentBucket && opponentIndex != null
-                ? ` Opp ${opponentIndex.toFixed(0)}`
-                : " fixture"}
+                ? ` ${opponentIndex.toFixed(0)}`
+                : " \u2013"}
             </span>
           </span>
         );
@@ -607,7 +614,10 @@ export function FixtureMatrixPage() {
                   return (
                     <TableHead
                       key={header.id}
-                      className={HEAD_CLASS}
+                      data-column-kind={header.column.id.startsWith("gw-") ? "gameweek" : undefined}
+                      className={`${HEAD_CLASS} ${
+                        header.column.id.startsWith("gw-") ? GW_COLUMN_WIDTH_CLASS : ""
+                      }`}
                       aria-sort={
                         sorted === "asc"
                           ? "ascending"
@@ -643,7 +653,13 @@ export function FixtureMatrixPage() {
               const cells = (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className={CELL_CLASS}>
+                    <TableCell
+                      key={cell.id}
+                      data-column-kind={cell.column.id.startsWith("gw-") ? "gameweek" : undefined}
+                      className={`${CELL_CLASS} ${
+                        cell.column.id.startsWith("gw-") ? GW_COLUMN_WIDTH_CLASS : ""
+                      }`}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

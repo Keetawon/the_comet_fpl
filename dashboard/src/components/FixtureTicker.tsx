@@ -10,6 +10,7 @@ import {
   type DifficultyBucket,
 } from "@/lib/difficulty";
 import type { ChipMetric } from "@/lib/fixtureChips";
+import { cn } from "@/lib/utils";
 
 /** Any fixture shape the chip can render: team rows and player rows both satisfy it. */
 export interface TickerFixture {
@@ -24,9 +25,16 @@ export interface FixtureChipProps<T extends TickerFixture> {
   /** Chip headline + primitives resolved by the caller (metric + colour source). */
   metric: ChipMetric;
   bucket: DifficultyBucket | null;
+  /** Optional layout override for a consuming table's fixed column geometry. */
+  className?: string;
 }
 
-export function FixtureChip<T extends TickerFixture>({ fixture, metric, bucket }: FixtureChipProps<T>) {
+export function FixtureChip<T extends TickerFixture>({
+  fixture,
+  metric,
+  bucket,
+  className,
+}: FixtureChipProps<T>) {
   const venue = fixture.was_home == null ? "" : fixture.was_home ? "(H)" : "(A)";
   const label =
     `GW${fixture.gw} vs ${fixture.opponent_short_name} ${venue}: ` +
@@ -38,9 +46,11 @@ export function FixtureChip<T extends TickerFixture>({ fixture, metric, bucket }
       data-bucket={bucket ?? "null"}
       title={label}
       aria-label={label}
-      className={`inline-flex h-8 min-w-12 flex-col justify-center rounded-md px-1 text-center ${
-        bucket ? BUCKET_CLASSES[bucket] : NULL_BUCKET_CLASS
-      }`}
+      className={cn(
+        "inline-flex h-8 min-w-12 flex-col justify-center rounded-md px-1 text-center",
+        bucket ? BUCKET_CLASSES[bucket] : NULL_BUCKET_CLASS,
+        className,
+      )}
     >
       <span className="text-[10px] leading-tight font-semibold">
         {fixture.opponent_short_name}

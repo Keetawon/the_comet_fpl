@@ -155,7 +155,7 @@ describe("FixtureMatrixPage", () => {
     expect(alphaGw6).toBeDefined();
     expect(alphaGw6).toHaveAttribute("data-bucket", "easier");
     expect(alphaGw6!.className).toContain("bg-green");
-    expect(alphaGw6).toHaveTextContent(/Opp \d+/);
+    expect(alphaGw6).toHaveTextContent(/GW6 · \d+/);
     expect(alphaGw6).toHaveAccessibleName(
       /derived from selected-vintage GW1-GW4 team lambdas, not a GW6 forecast/i,
     );
@@ -211,6 +211,59 @@ describe("FixtureMatrixPage", () => {
     await user.click(screen.getByRole("radio", { name: "15 GWs" }));
     expect(screen.getByRole("columnheader", { name: "GW15" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "GW16" })).not.toBeInTheDocument();
+  });
+
+  it("keeps every modelled, blank, and schedule-only GW card in identical fixed columns", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<FixtureMatrixPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+
+    const expectFixedGameweekLayout = (expectedColumnCount: number) => {
+      const headers = screen
+        .getAllByRole("columnheader")
+        .filter((header) => header.getAttribute("data-column-kind") === "gameweek");
+      expect(headers).toHaveLength(expectedColumnCount);
+      for (const header of headers) {
+        expect(header).toHaveClass("w-20", "min-w-20", "max-w-20");
+      }
+
+      const gameweekCells = [
+        ...container.querySelectorAll<HTMLElement>('td[data-column-kind="gameweek"]'),
+      ];
+      expect(gameweekCells.length).toBeGreaterThan(0);
+      for (const cell of gameweekCells) {
+        expect(cell).toHaveClass("w-20", "min-w-20", "max-w-20");
+      }
+
+      const modelledCards = screen.queryAllByTestId("chip");
+      const blankCards = screen.queryAllByTestId("blank-slot");
+      const scheduleCards = screen.queryAllByTestId("schedule-chip");
+      expect(modelledCards.length).toBeGreaterThan(0);
+      for (const card of [...modelledCards, ...blankCards, ...scheduleCards]) {
+        expect(card).toHaveClass("w-16", "min-w-16", "max-w-16");
+      }
+      for (const stack of screen.queryAllByTestId("fixture-card-stack")) {
+        expect(stack).toHaveClass("w-16", "min-w-16", "max-w-16");
+      }
+    };
+
+    expectFixedGameweekLayout(5);
+
+    await user.click(screen.getByRole("radio", { name: "10 GWs" }));
+    expectFixedGameweekLayout(10);
+    const gw6Proxy = screen
+      .getAllByTestId("schedule-chip")
+      .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
+    expect(gw6Proxy).toHaveTextContent(/GW6 · \d+/);
+    expect(gw6Proxy).toHaveAccessibleName(/selected-vintage opponent strength proxy/i);
+
+    await user.click(screen.getByRole("radio", { name: "15 GWs" }));
+    expectFixedGameweekLayout(15);
+    expect(screen.getByRole("columnheader", { name: "GW15" })).toHaveClass(
+      "w-20",
+      "min-w-20",
+      "max-w-20",
+    );
   });
 
   it("explains when the export carries no recorded vintage", async () => {
