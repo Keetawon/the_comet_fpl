@@ -266,6 +266,34 @@ describe("PlayersPage", () => {
     expect(await screen.findByText("No players match the current filters.")).toBeInTheDocument();
   });
 
+  it("clears both fixture and player filters back to the Players defaults", async () => {
+    const user = userEvent.setup();
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+
+    const view = screen.getByRole("radiogroup", { name: "View" });
+    const venue = screen.getByRole("radiogroup", { name: "Venue filter" });
+    const availability = screen.getByRole("radiogroup", { name: "Availability filter" });
+    const minPrice = screen.getByRole("spinbutton", { name: "Minimum price in millions" });
+
+    await user.click(within(view).getByRole("radio", { name: "Defense" }));
+    await user.click(within(venue).getByRole("radio", { name: "Away" }));
+    await user.click(within(availability).getByRole("radio", { name: "Flagged" }));
+    await user.type(minPrice, "99");
+    expect(await screen.findByText("No players match the current filters.")).toBeInTheDocument();
+
+    const clear = screen.getByRole("button", { name: "Clear filters" });
+    await user.click(clear);
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(within(view).getByRole("radio", { name: "Overall" })).toBeChecked();
+    expect(within(venue).getByRole("radio", { name: "All" })).toBeChecked();
+    expect(within(availability).getByRole("radio", { name: "All" })).toBeChecked();
+    expect(minPrice).toHaveValue(null);
+    expect(clear).toHaveFocus();
+  });
+
   it("explains when the export carries no players at all", async () => {
     vi.mocked(loadPlayers).mockResolvedValueOnce({ players: [], manifest: null });
     render(<PlayersPage />);

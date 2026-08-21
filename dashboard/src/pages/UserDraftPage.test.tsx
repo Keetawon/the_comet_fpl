@@ -99,7 +99,8 @@ describe("UserDraftPage", () => {
     expect(saved.playerCodes).toEqual(draftPlayers.map((player) => player.code));
   });
 
-  it("restores only the separate exact-vintage browser draft", async () => {
+  it("restores the exact-vintage draft and lets Selected remove the player", async () => {
+    const user = userEvent.setup();
     window.localStorage.setItem(
       USER_DRAFT_STORAGE_KEY,
       JSON.stringify({
@@ -115,8 +116,21 @@ describe("UserDraftPage", () => {
     expect(container.querySelector("tfoot")?.textContent).toContain(
       "Draft squad total (1/15)",
     );
-    expect(screen.getByRole("button", { name: "Draft 01: Already selected" }))
-      .toBeDisabled();
+    const selectedButton = screen.getByRole("button", {
+      name: "Remove Draft 01 from draft",
+    });
+    expect(selectedButton).toBeEnabled();
+    expect(selectedButton).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(selectedButton);
+    expect(await screen.findByText("0/15 players")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Draft 01" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(
+      JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
+    ).toMatchObject({ playerCodes: [] });
     expect(window.localStorage.getItem("fpl-solved-plan")).toBeNull();
   });
 

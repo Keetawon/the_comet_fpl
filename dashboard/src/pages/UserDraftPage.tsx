@@ -824,6 +824,7 @@ export function UserDraftPage() {
           <ul aria-label="Squad Draft player list" className="grid gap-2 lg:grid-cols-2">
             {visibleCandidates.map(({ player, projection }) => {
               const guard = userDraftSelectionGuard(selected, player, state.rules);
+              const isSelected = guard.reason === "duplicate_player";
               const reason = guardReasonLabel(guard.reason);
               return (
                 <li
@@ -850,18 +851,32 @@ export function UserDraftPage() {
                   <Button
                     type="button"
                     size="sm"
-                    variant={guard.reason === "duplicate_player" ? "outline" : "default"}
-                    disabled={!guard.allowed}
-                    title={reason}
-                    aria-label={guard.allowed ? `Add ${player.web_name}` : `${player.web_name}: ${reason}`}
-                    onClick={() => persistSelection(state, [...selected, player])}
+                    variant={isSelected ? "outline" : "default"}
+                    disabled={!isSelected && !guard.allowed}
+                    title={isSelected ? `Remove ${player.web_name} from draft` : reason}
+                    aria-label={
+                      isSelected
+                        ? `Remove ${player.web_name} from draft`
+                        : guard.allowed
+                          ? `Add ${player.web_name}`
+                          : `${player.web_name}: ${reason}`
+                    }
+                    aria-pressed={isSelected}
+                    onClick={() =>
+                      persistSelection(
+                        state,
+                        isSelected
+                          ? selected.filter((selectedPlayer) => selectedPlayer.code !== player.code)
+                          : [...selected, player],
+                      )
+                    }
                   >
-                    {guard.reason === "duplicate_player" ? (
+                    {isSelected ? (
                       <Check className="size-3.5" />
                     ) : (
                       <Plus className="size-3.5" />
                     )}
-                    {guard.reason === "duplicate_player" ? "Selected" : "Add"}
+                    {isSelected ? "Selected" : "Add"}
                   </Button>
                 </li>
               );

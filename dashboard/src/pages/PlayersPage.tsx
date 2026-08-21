@@ -6,6 +6,7 @@
 // primitive behind the colour, ordered by kickoff time.
 
 import { useEffect, useMemo, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
@@ -18,6 +19,7 @@ import {
 } from "@/components/PlayerFiltersBar";
 import { PlayerStatTable, type PlayerStatRow } from "@/components/PlayerStatTable";
 import { VintageSelect } from "@/components/VintageSelect";
+import { Button } from "@/components/ui/button";
 import { loadFixtureMatrix, loadNextGw, loadPlayers } from "@/data/load";
 import type { NextGwPlan, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
@@ -189,6 +191,10 @@ export function PlayersPage() {
   const formAnchor = activeRun?.form
     ? `${activeRun.form.season} GW${activeRun.form.as_at_gw}`
     : "anchor unknown";
+  const clearFilters = () => {
+    setFilters({ view: "overall", venue: "all", gwFrom: state.gwFrom, gwTo: state.gwTo });
+    setPlayerFilters({ ...INITIAL_PLAYER_FILTERS });
+  };
 
   return (
     <div className="flex flex-col gap-3 p-4 lg:p-6">
@@ -210,7 +216,18 @@ export function PlayersPage() {
       <FilterPanel>
         <div className="flex flex-col gap-2">
           {filters && (
-            <FilterBar filters={filters} onChange={setFilters} minGw={state.gwFrom} maxGw={state.gwTo} />
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <FilterBar
+                filters={filters}
+                onChange={setFilters}
+                minGw={state.gwFrom}
+                maxGw={state.gwTo}
+              />
+              <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                <RotateCcw className="size-3.5" aria-hidden />
+                Clear filters
+              </Button>
+            </div>
           )}
           <PlayerFiltersBar filters={playerFilters} onChange={setPlayerFilters} teams={teams} />
         </div>
