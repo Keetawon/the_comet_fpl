@@ -1,0 +1,11 @@
+{
+  "asset_name": "dashboard-public-data.zip",
+  "asset_sha256": "f7469a80fcf4d95c6dc7ad4d32676eb87f1e5441026dadc11d3757d9ef884e8b",
+  "asset_size_bytes": 3403992,
+  "manifest_content_sha256": "c89ba1fb0ba9f006c31cafc4dc4b570ee80d819ece86210e8a50a3b031bd9b83",
+  "release_tag": "dashboard-data-c89ba1fb0ba9",
+  "repository": "Keetawon/the_comet_fpl",
+  "schema": "fpl.dashboard-public-release-pin",
+  "schema_version": 1,
+  "status": "published"
+}
