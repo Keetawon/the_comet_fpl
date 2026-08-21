@@ -27,8 +27,9 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
 - **Goal 2 is substantially implemented.** The versioned semantic export, player-fixture forecast
-  transport, outcome attachment, atomic static-JSON boundary, six analytic pages, and Plan Builder
-  are shipped development-only. P1.8's full Players-page form matrix and additive observed
+  transport, outcome attachment, atomic static-JSON boundary, six analytic pages, Plan Builder,
+  and the browser-only Squad Draft sandbox are shipped development-only. P1.8's full Players-page
+  form matrix and additive observed
   defensive fields are implemented in code and focused tests; the failure-atomic local database
   rebuild and atomic BI/static republish completed on 2026-08-19, so they are visible locally.
   The final deadline vintage still requires the same controlled refresh inside Goal 1. Manager-team
@@ -400,8 +401,9 @@ artifacts can be traced by immutable IDs and SHA-256 values.
 
 **Bird's-eye status (2026-08-19): substantially implemented development-only.** The semantic
 contract/export, fixture-grain forecast transport, outcome attachment, atomic static publish
-boundary, fixture difficulty and player/team form views, all six analytic pages, and Plan Builder
-are present. The browser reads only static JSON and never the mutable production DuckDB. The
+boundary, fixture difficulty and player/team form views, all six analytic pages, Plan Builder, and
+the browser-only Squad Draft sandbox are present. The browser reads only static JSON and never the
+mutable production DuckDB. The
 Players form-column repair is implemented in code/tests, including observed clean sheets, on-pitch
 goals conceded, saves, and xGC. The local development database and BI/static read models were
 refreshed successfully and atomically on 2026-08-19. The final deadline vintage must still be
@@ -750,7 +752,7 @@ and the development-only status as three deterministic JSON columns plus scalars
 page renders provenance, solver, policy with its declared optimality scope, constraints,
 assumptions, and the transfer path with hits; the squad/XI themselves are not duplicated —
 the page reads `next_gw.json`. The app shell routes all six original analytic pages with no stubs;
-Plan Builder is the seventh route. Dev
+Plan Builder is the seventh route and Squad Draft is the eighth. Dev
 data: the dev ledger carries a diagnostic vintage (run `407668b6…`) beside the default
 (`86a072ad…`), and two dev-only optimizer plans (default `7ce5b0c8…`, diagnostic
 `90683dfc…`, both `risk_lambda=0`, clean worktree) feed the export, so the Next-GW diff and
@@ -799,6 +801,20 @@ competing chip windows, full-season forecast, or measured future availability. I
 best-season Bench Boost recommendation and never compares totals across model architectures. This
 P1 addition changes no delivery gate: the 08-20 fallback pack, 08-21 final pack, and owner's
 manual FPL verification remain the sole P0 priority and acceptance path.
+
+**P1.7i Browser-only Squad Draft sandbox (2026-08-21): implemented and dashboard-tested.**
+Squad Draft binds to exactly one formal platform-default forecast vintage and its exact recorded
+rules snapshot. It permits a partial or complete manual selection up to 15 players, enforces FPL
+position maxima and three-per-club, and deliberately treats £100m as an advisory rather than a
+constraint so users can explore high-value hypothetical squads. Its sortable/fullscreen table
+shows deadline-vintage price, raw GW1-GW5 xP, strict Total 3/5-GW xP, and a sorting-invariant final
+footer row with selected cost and xP totals. Complete legal 15-player drafts may show a
+best-legal-XI/bench loaded-horizon screen and individual xP shortlist, but neither is a chip
+recommendation: manager ownership, chip inventory, transfers/hits, autosubs, captain fallback,
+competing windows, later gameweeks, and future measured availability are unavailable. State is
+versioned and browser-local; the route never calls the plan server, emits an optimizer artifact,
+or changes the formal/custom plan read models. This optional P1 surface may not delay the P0 final
+capture, official-FPL entry, or immutable evidence.
 
 ### P1.8 — Complete Players-page form exposure after P0
 

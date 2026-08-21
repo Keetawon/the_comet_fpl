@@ -177,17 +177,20 @@ the last good generation.
 
 ## Pages
 
-The app has seven routes: the six analytical/read-model pages below (Summary, Fixture
-matrix, Players, Next GW suggestion, Forecast vs actual, and Optimizer audit) plus the
-interactive Plan builder.
+The app has eight routes: the six analytical/read-model pages below (Summary, Fixture
+matrix, Players, Next GW suggestion, Forecast vs actual, and Optimizer audit), the
+interactive Plan builder, and the browser-only Squad draft sandbox.
 
 - **Fixture matrix** (implemented, P1.7b): the fixture pivot — one row per club of the
   selected vintage, **one column per gameweek** (two chips in a double gameweek), with
   5/10/15-GW display controls. The forecast remains bounded to its recorded horizon
   (currently GW1-5); GW6-10/15 comes from a separately versioned current official-schedule
-  overlay and renders as neutral opponent/home-away/kickoff context with no invented ease,
-  lambda, clean-sheet probability, or FDR. The overlay carries the BI-export timestamp and
-  database hash and is explicitly not the schedule known at an older forecast vintage.
+  overlay with no invented ease, lambda, clean-sheet probability, or FDR. Under **Opponent
+  strength**, later chips may be conditionally formatted by the selected vintage's display-time
+  club-strength proxy derived from its GW1-5 team lambdas; the visible value and tooltip state
+  that this is not a forecast for the later fixture. Under **Club ease** or **Official FDR** the
+  later chips remain neutral. The overlay carries the BI-export timestamp and database hash and
+  is explicitly not the schedule known at an older forecast vintage.
   The matrix is default
   sorted by average **modelled** ease (easiest first, any column re-sorts); changing to 10
   or 15 GWs cannot alter that average or ordering. Recent form is one compact
@@ -254,6 +257,17 @@ interactive Plan builder.
   an expanded per-gameweek membership/role view. Its footer is bound to the exact custom plan and
   shows the same planned XI, bench, and 15-player raw xP sums, calculated from each week's
   post-transfer roles rather than the fixed GW1 display membership.
+- **Squad draft** (implemented, browser-only manual sandbox): binds to exactly one formal
+  platform-default forecast vintage and its recorded squad rules, then lets the user select
+  zero to 15 players manually. It enforces duplicate, position, squad-size, and three-per-club
+  limits but deliberately does not enforce the standard £100m budget; an over-budget draft is
+  labelled as such rather than blocked. The sortable/fullscreen selected-player table shows
+  deadline-vintage cost, raw GW1-GW5 xP, strict Total 3/5-GW xP, and a final footer row whose cost
+  and xP totals remain invariant under sorting. Draft state is isolated in versioned
+  run-qualified browser storage and never calls the optimizer or replaces a platform/custom
+  plan. Its best-legal-XI/bench and highest-player screens are loaded-horizon planning context,
+  not chip recommendations: manager ownership, chip inventory, autosubs, captain fallback,
+  competing chip windows, and the rest of the season are unavailable.
 - **Forecast vs actual** (implemented, P1.7e): each recorded vintage scored against its own
   season's finalised outcomes (points under 2026/27 rules, read-time join at
   `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a
@@ -288,3 +302,6 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
   never changes the full plan totals. The highest bench-xP marker is a loaded-horizon screen, not
   season advice: chip inventory, competing chip windows, the full season, and future measured
   availability are unavailable, and the optimizer itself does not optimize bench points.
+- Squad Draft totals use only the selected browser draft and one exact formal forecast vintage.
+  A true blank gameweek contributes zero, while missing or non-finite forecast values make the
+  dependent total unmeasured; partial sums are never shown as complete totals.

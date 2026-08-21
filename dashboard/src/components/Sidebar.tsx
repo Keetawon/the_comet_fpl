@@ -1,5 +1,5 @@
-// Left sidebar navigation. All six roadmap pages are implemented; the hash route in App.tsx
-// owns the page selection. Collapses to icons-only on small screens (phone testing) and
+// Left sidebar navigation. The hash route in App.tsx owns page selection. Collapses to
+// icons-only on small screens (phone testing) and
 // expands to labels from md up.
 
 import {
@@ -7,6 +7,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LineChart,
+  ListPlus,
   Scale,
   Users,
   Wand2,
@@ -25,6 +26,7 @@ const PAGES: readonly PageDef[] = [
   { id: "players", label: "Players", icon: Users },
   { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList },
   { id: "plan-builder", label: "Plan builder", icon: Wand2 },
+  { id: "squad-draft", label: "Squad draft", icon: ListPlus },
   { id: "forecast-vs-actual", label: "Forecast vs actual", icon: LineChart },
   { id: "optimizer", label: "Optimizer audit", icon: Scale },
 ];

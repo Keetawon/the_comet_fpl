@@ -130,7 +130,7 @@ describe("FixtureMatrixPage", () => {
     expect(firstTeamRow!.textContent).toContain("Beta");
   });
 
-  it("extends to 10 or 15 gameweeks with neutral schedule-only fixtures", async () => {
+  it("colours later fixtures only with the selected-vintage opponent proxy", async () => {
     const user = userEvent.setup();
     const { container } = render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
@@ -147,13 +147,30 @@ describe("FixtureMatrixPage", () => {
     await user.click(screen.getByRole("radio", { name: "10 GWs" }));
     expect(screen.getByRole("columnheader", { name: "GW10" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "GW11" })).not.toBeInTheDocument();
-    const gw6 = screen.getAllByTestId("schedule-chip").find((chip) => chip.dataset.gw === "6");
-    expect(gw6).toBeDefined();
-    expect(gw6!.className).toContain("bg-muted");
-    expect(gw6!.className).not.toMatch(/bg-(green|red)/);
-    expect(gw6).toHaveAccessibleName(/schedule only.*no model forecast or ease/i);
     const alphaRow = screen.getByText("Alpha").closest("tr");
     expect(alphaRow).not.toBeNull();
+    const alphaGw6 = within(alphaRow!)
+      .getAllByTestId("schedule-chip")
+      .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
+    expect(alphaGw6).toBeDefined();
+    expect(alphaGw6).toHaveAttribute("data-bucket", "easier");
+    expect(alphaGw6!.className).toContain("bg-green");
+    expect(alphaGw6).toHaveTextContent(/Opp \d+/);
+    expect(alphaGw6).toHaveAccessibleName(
+      /derived from selected-vintage GW1-GW4 team lambdas, not a GW6 forecast/i,
+    );
+    const gammaGw6 = within(alphaRow!)
+      .getAllByTestId("schedule-chip")
+      .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("GAM"));
+    expect(gammaGw6).toHaveAttribute("data-bucket", "null");
+    expect(gammaGw6!.className).toContain("bg-muted");
+    const betaRow = screen.getByText("Beta").closest("tr");
+    expect(betaRow).not.toBeNull();
+    const betaGw6 = within(betaRow!)
+      .getAllByTestId("schedule-chip")
+      .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("ALP"));
+    expect(betaGw6).toHaveAttribute("data-bucket", "harder");
+    expect(betaGw6!.className).toContain("bg-red");
     expect(
       within(alphaRow!)
         .getAllByTestId("schedule-chip")
@@ -171,6 +188,22 @@ describe("FixtureMatrixPage", () => {
       (row) => row.textContent?.includes("Beta") || row.textContent?.includes("Alpha"),
     )?.textContent;
     expect(firstTeamAfter?.includes(firstTeamBefore?.includes("Beta") ? "Beta" : "Alpha")).toBe(true);
+
+    await user.click(screen.getByRole("radio", { name: "Club ease" }));
+    const easeGw6 = within(alphaRow!)
+      .getAllByTestId("schedule-chip")
+      .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
+    expect(easeGw6).toHaveAttribute("data-bucket", "null");
+    expect(easeGw6!.className).toContain("bg-muted");
+    expect(easeGw6!.className).not.toMatch(/bg-(green|red)/);
+
+    await user.click(screen.getByRole("radio", { name: "Official FDR" }));
+    const fdrGw6 = within(alphaRow!)
+      .getAllByTestId("schedule-chip")
+      .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
+    expect(fdrGw6).toHaveAttribute("data-bucket", "null");
+    expect(fdrGw6!.className).toContain("bg-muted");
+    expect(fdrGw6!.className).not.toMatch(/bg-(green|red)/);
 
     await user.click(within(alphaRow!).getByRole("button", { name: "Expand fixtures" }));
     expect(screen.getAllByText("Schedule only").length).toBeGreaterThan(0);

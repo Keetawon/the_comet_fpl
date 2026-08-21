@@ -14,7 +14,7 @@ A single `xP` answers only the first.
 
 **Current status: the data foundation, development-only forward pipeline through Stage E,
 append-only forecast/outcome ledger, versioned BI semantic export, atomic static publish boundary,
-and seven-route decision dashboard are implemented; no forecast component or squad recommendation
+and eight-route decision dashboard are implemented; no forecast component or squad recommendation
 is promoted as production-valid.**
 Phase 1 Candidates V1 and V2 were fitted under the fixed walk-forward contract and correctly not
 promoted. Candidate V3's development result was invalidated for leakage; its leakage-safe successor
@@ -84,7 +84,10 @@ price/selling-value handling remain explicit unmeasured scenario gaps. The appen
 retains player-gameweek, player-fixture, and team-fixture forecast vintages, with finalized outcomes
 attached separately. The versioned BI semantic/star export, atomic Parquet/static-JSON publish
 boundary, platform/custom-plan separation, lock/exclusion flow, and dashboard are implemented
-development-only. The dashboard exposes six read-only analytic/decision routes plus Plan Builder;
+development-only. The dashboard exposes six read-only analytic/decision routes plus Plan Builder
+and a browser-only Squad Draft sandbox. Squad Draft remains bound to one formal forecast vintage,
+enforces roster shape and club caps, reports deadline-price cost and xP, and deliberately does not
+enforce the standard budget; it is not optimizer output or an imported manager squad;
 the Players form repair is implemented in code/tests with view-specific starts, xG/90, xA/90,
 bonus, BPS, DC, clean-sheet, on-pitch goals-conceded, saves, and xGC columns. Those defensive
 fields are backward-looking observed form only; future player-level saves/DC/GC/xGC forecasts
@@ -357,7 +360,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
 | 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 development-evaluated; exposure-weighted goals V4 (-0.44% vs baseline, ties V3) and assists V2 (+1.85% vs baseline, -0.11% vs the incumbent V1) each run once, development-only, neither promoted; Stage D v3 composer, prospective forecast, and the GW29-38 EV backtest all run and development-only, with the V1 comparator outscoring the V3 primary |
 | 3b | Stage E optimiser + prediction ledger | optimiser, stable input/decision artifacts, no-transfer repair, and append-only player-gameweek/player-fixture/team-fixture ledger with finalized-outcome attachment implemented development-only; horizon availability, future prices/selling values, and manager-team import remain open |
-| 4 | BI semantic export + dashboard | versioned semantic/star export, atomic Parquet and static-JSON publish, platform/custom plan separation, locks/exclusions, six analytic routes plus Plan Builder implemented development-only; real-deadline validation and hosted/manager-import operation remain open |
+| 4 | BI semantic export + dashboard | versioned semantic/star export, atomic Parquet and static-JSON publish, platform/custom plan separation, locks/exclusions, six analytic routes plus Plan Builder and browser-only Squad Draft implemented development-only; real-deadline validation and hosted/manager-import operation remain open |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
 
 Phase 3b is an addition to the original phasing, which ended Phase 3 at simulation and had no
@@ -372,11 +375,12 @@ player-fixture, and team-fixture vintage with its `as_of`, input hashes, and mod
 identities; historical vintages are never overwritten. Finalized outcomes attach through a
 separate append-only job. The versioned BI semantic export publishes pivot-friendly Parquet, and
 the atomic static publisher derives the dashboard's JSON read models from that export. Dashboards
-and BI tools consume those read-only outputs, never the mutable production DuckDB. The seven
+and BI tools consume those read-only outputs, never the mutable production DuckDB. The eight
 dashboard routes are Summary, Fixture matrix, Players, Next GW suggestion, Forecast vs actual,
-Optimizer audit, and Plan Builder. Formal platform default/diagnostic plans remain separate from
-fresh-squad user-custom plans; manager-id import and selling-value-aware own-team planning are not
-implemented. See `docs/bi-semantic-contract.md`, `docs/bi-export-contract.md`,
+Optimizer audit, Plan Builder, and Squad Draft. Formal platform default/diagnostic plans remain
+separate from fresh-squad user-custom plans and browser-local manual drafts; manager-id import and
+selling-value-aware own-team planning are not implemented. See `docs/bi-semantic-contract.md`,
+`docs/bi-export-contract.md`,
 `docs/dashboard-json-contract.md`, and `dashboard/README.md`.
 
 `docs/phase0-design.md` records the audit behind the schema decisions, including where

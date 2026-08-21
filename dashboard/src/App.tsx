@@ -1,5 +1,5 @@
-// App shell: sidebar navigation over a tiny hash route (no router dependency). All six
-// roadmap pages are implemented; an unknown hash falls back to the Summary landing page.
+// App shell: sidebar navigation over a tiny hash route (no router dependency). An unknown
+// hash falls back to the Summary landing page.
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
@@ -11,6 +11,7 @@ import { PlanBuilderPage } from "@/pages/PlanBuilderPage";
 import { FixtureMatrixPage } from "@/pages/FixtureMatrixPage";
 import { PlayersPage } from "@/pages/PlayersPage";
 import { SummaryPage } from "@/pages/SummaryPage";
+import { UserDraftPage } from "@/pages/UserDraftPage";
 
 const DEFAULT_ROUTE = "summary";
 
@@ -20,6 +21,7 @@ const PAGES: Record<string, React.ComponentType> = {
   players: PlayersPage,
   "next-gw": NextGwPage,
   "plan-builder": PlanBuilderPage,
+  "squad-draft": UserDraftPage,
   "forecast-vs-actual": ForecastVsActualPage,
   optimizer: OptimizerAuditPage,
 };

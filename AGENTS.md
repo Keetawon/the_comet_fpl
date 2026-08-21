@@ -236,7 +236,10 @@ player-fixture, and team-fixture forecast vintages from the JSONL artifact. Fina
 outcomes are attached separately and append-only. The versioned BI semantic export, atomic static
 JSON publish boundary, and dashboard are implemented development-only. The application has six
 read-only analytic/decision routes (Summary, Fixture matrix, Players, Next GW suggestion, Forecast
-vs actual, and Optimizer audit) plus the interactive Plan Builder route. Goal 2's
+vs actual, and Optimizer audit), the interactive Plan Builder route, and a browser-only Squad Draft
+sandbox. Squad Draft uses one formal forecast vintage, enforces roster shape and club caps, and
+reports price/xP without enforcing the standard budget; it is neither optimizer output nor an
+imported manager squad. Goal 2's
 Players-page form repair is implemented in code and focused tests: Overall, Attack, and Defence
 views expose their explicit form-column matrices, including observed clean sheets, on-pitch goals
 conceded, saves, and xGC with position-aware applicability. A failure-atomic local development
@@ -381,7 +384,7 @@ with one atomic replacement only after success.
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
 append-only prediction ledger, player/team fixture-grain forecast transport, finalized-outcome
-attachment, BI semantic export, atomic static publish boundary, and seven-route dashboard are all
+attachment, BI semantic export, atomic static publish boundary, and eight-route dashboard are all
 implemented development-only. The dashboard reads only versioned static JSON derived from the
 published Parquet export; it never queries the mutable production DuckDB. `DEV-ROADMAP.md` is the
 canonical delivery order for the remaining GW1 decision work and post-deadline operational gaps.
@@ -892,9 +895,10 @@ displace the active delivery order.
    frozen historical evaluation.
 9. The append-only player-gameweek/player-fixture/team-fixture prediction ledger, finalized-outcome
    ingestion, BI semantic export, atomic static dashboard read models, and dashboard are
-   implemented development-only. The six read-only analytic/decision routes are separate from the
-   seventh route, Plan Builder, whose custom runs build a fresh squad and are not manager-team
-   imports. Retain both player-fixture and player-gameweek predictions for every pre-deadline run,
+   implemented development-only. The six read-only analytic/decision routes are separate from
+   Plan Builder, whose custom runs build a fresh squad, and Squad Draft, whose browser-local manual
+   selections ignore affordability while retaining roster shape and club caps. Neither route is a
+   manager-team import. Retain both player-fixture and player-gameweek predictions for every pre-deadline run,
    never overwrite a vintage, and join actual outcomes only after finalisation.
    The decision layer should support: upcoming 1/3/5-GW player EV and risk; fixture difficulty split
    into overall, attack, and defence; actual-versus-predicted player and team performance; player

@@ -95,11 +95,15 @@ not part of any selected forecast vintage:
 - schedule rows never carry lambdas, clean-sheet probabilities, ease indices, or FDR.
 
 The Fixture Matrix keeps the model horizon unchanged and offers 5/10/15-GW display windows.
-Rows after the forecast horizon are neutral schedule-only chips. They never enter model-ease
-averages or sorting and must be labelled as current schedule context that may post-date an
-older selected vintage. A moved fixture may therefore appear once in the recorded vintage and
-again at its current schedule gameweek; that is explicit vintage-versus-current context, not a
-duplicate forecast.
+Rows after the forecast horizon are schedule-only chips. With the **Opponent strength** colour
+source they may reuse the selected vintage's display-time club-strength proxy derived from its
+GW1-5 team lambdas; the chip must visibly identify that proxy and state that it is not a forecast
+for the later fixture. With **Club ease** or **Official FDR** selected they remain neutral because
+the overlay carries neither later fixture forecasts nor FDR. Later rows never enter model-ease
+averages or sorting and must be labelled as current schedule context that may post-date an older
+selected vintage. A moved fixture may therefore appear once in the recorded vintage and again at
+its current schedule gameweek; that is explicit vintage-versus-current context, not a duplicate
+forecast.
 
 Sample record (abbreviated):
 
