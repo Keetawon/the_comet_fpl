@@ -70,6 +70,7 @@ type SelectionMode = "lock" | "exclude";
 
 /** The solve card's view of the local plan server (src/fpl/jobs/plan_server.py). */
 type SolverStatus =
+  | { status: "hosted-static" }
   | { status: "checking" }
   | { status: "offline" }
   | { status: "online" }
@@ -332,6 +333,7 @@ function planBuilderRunHash(runId: string, serverToken: string): string {
 }
 
 export function PlanBuilderPage() {
+  const hostedStatic = import.meta.env.VITE_HOSTED_STATIC === "true";
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [rules, setRules] = useState<Rules | null>(null);
   const [resultPlanId, setResultPlanId] = useState<string | null>(storedSolvedPlanId);
@@ -352,9 +354,15 @@ export function PlanBuilderPage() {
   const candidateListRef = useRef<HTMLUListElement>(null);
   const focusCandidatePageRef = useRef(false);
   const [copied, setCopied] = useState(false);
-  const [solver, setSolver] = useState<SolverStatus>({ status: "checking" });
+  const [solver, setSolver] = useState<SolverStatus>(() =>
+    hostedStatic ? { status: "hosted-static" } : { status: "checking" },
+  );
 
   const checkSolver = useCallback(() => {
+    if (hostedStatic) {
+      setSolver({ status: "hosted-static" });
+      return;
+    }
     setSolver({ status: "checking" });
     void fetchPlanStatus(serverToken).then((status) => {
       if (!status) {
@@ -371,7 +379,7 @@ export function PlanBuilderPage() {
         setSolver({ status: "online" });
       }
     });
-  }, [serverToken]);
+  }, [hostedStatic, serverToken]);
 
   // Entering the review screen probes the local plan server once (manual Re-check retries).
   useEffect(() => {
@@ -394,6 +402,10 @@ export function PlanBuilderPage() {
   };
 
   const solveNow = () => {
+    if (hostedStatic) {
+      setSolver({ status: "hosted-static" });
+      return;
+    }
     setSolver({ status: "solving", stage: null });
     void solvePlan(
       {
@@ -1183,11 +1195,40 @@ export function PlanBuilderPage() {
             </p>
           </div>
 
-          <div
-            className="rounded-xl border bg-card p-4 shadow-sm"
-            aria-label="Solve"
-            aria-busy={isSolving}
-          >
+          {hostedStatic ? (
+            <div
+              className="rounded-xl border border-sky-200 bg-sky-50/60 p-5 shadow-sm dark:border-sky-900 dark:bg-sky-950/20"
+              aria-label="Hosted Plan Builder boundary"
+            >
+              <Badge variant="outline" className="border-sky-300 text-sky-700 dark:border-sky-800 dark:text-sky-300">
+                Hosted read-only
+              </Badge>
+              <h3 className="mt-3 font-semibold">Optimization stays on your trusted machine</h3>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                This public dashboard is read-only for optimization. It never contacts or exposes
+                the local Python/PuLP plan server. Use Squad draft for browser-only planning, or
+                open this same commit on a trusted machine to solve and publish an exact custom
+                plan.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button asChild>
+                  <a href="#squad-draft">Open Squad draft</a>
+                </Button>
+                <Button variant="outline" onClick={() => setStep(2)}>
+                  Back to rules
+                </Button>
+                <Button variant="ghost" asChild>
+                  <a href="#next-gw">View platform suggestion</a>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div
+                className="rounded-xl border bg-card p-4 shadow-sm"
+                aria-label="Solve"
+                aria-busy={isSolving}
+              >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium text-muted-foreground">Solve it now</p>
               {solver.status === "online" && (
@@ -1339,9 +1380,9 @@ export function PlanBuilderPage() {
                 below remains the manual fallback.
               </p>
             )}
-          </div>
+              </div>
 
-          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+              <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
             <div className="flex items-center justify-between gap-2 border-b bg-zinc-900 px-3 py-1.5 dark:bg-zinc-900">
               <p className="font-mono text-[11px] text-zinc-300">optimizer command</p>
               <Button
@@ -1417,7 +1458,9 @@ export function PlanBuilderPage() {
                 </a>
               </Button>
             </div>
-          </div>
+              </div>
+            </>
+          )}
         </section>
       )}
 

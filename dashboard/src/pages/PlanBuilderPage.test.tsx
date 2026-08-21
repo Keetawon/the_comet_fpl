@@ -181,6 +181,7 @@ const readyRuntime = {
 } as const;
 
 beforeEach(() => {
+  vi.unstubAllEnvs();
   vi.mocked(loadPlayers).mockResolvedValue({ players: builderPlayers, manifest: null });
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadOptimizerAudit).mockResolvedValue(audit);
@@ -192,6 +193,30 @@ beforeEach(() => {
 });
 
 describe("PlanBuilderPage", () => {
+  it("keeps the hosted build read-only and never probes the local plan server", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    vi.mocked(fetchPlanStatus).mockClear();
+    const user = userEvent.setup();
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText(/Build from scratch/));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+
+    expect(
+      screen.getByRole("heading", { name: "Optimization stays on your trusted machine" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/public dashboard is read-only for optimization/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Squad draft" })).toHaveAttribute(
+      "href",
+      "#squad-draft",
+    );
+    expect(screen.queryByLabelText("Solve")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Plan server token/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy command" })).not.toBeInTheDocument();
+    expect(fetchPlanStatus).not.toHaveBeenCalled();
+    expect(solvePlan).not.toHaveBeenCalled();
+  });
+
   it("starts with the two entry cards; import is clickable and labelled post-deadline", async () => {
     render(<PlanBuilderPage />);
     expect(await screen.findByText("Import my team")).toBeInTheDocument();

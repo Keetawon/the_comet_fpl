@@ -1,0 +1,232 @@
+name: Deploy dashboard to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-dashboard.yml"
+      - "dashboard/**"
+      - "src/fpl/jobs/package_public_dashboard.py"
+      - "src/fpl/publish/contract.py"
+      - "src/fpl/publish/dashboard_json.py"
+      - "src/fpl/publish/export.py"
+      - "src/fpl/publish/public_dashboard.py"
+      - "tests/test_public_dashboard.py"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release-pin:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.pin.outputs.enabled }}
+      release_tag: ${{ steps.pin.outputs.release_tag }}
+      asset_name: ${{ steps.pin.outputs.asset_name }}
+      asset_sha256: ${{ steps.pin.outputs.asset_sha256 }}
+      asset_size_bytes: ${{ steps.pin.outputs.asset_size_bytes }}
+      manifest_content_sha256: ${{ steps.pin.outputs.manifest_content_sha256 }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate immutable dashboard-data pin
+        id: pin
+        run: |
+          set -euo pipefail
+          pin="dashboard/public-data-release.json"
+          test "$(jq -er '.schema' "${pin}")" = "fpl.dashboard-public-release-pin"
+          test "$(jq -er '.schema_version' "${pin}")" = "1"
+          test "$(jq -er '.repository' "${pin}")" = "${GITHUB_REPOSITORY}"
+          status="$(jq -er '.status' "${pin}")"
+
+          if [ "${status}" = "unpublished" ]; then
+            jq -e '
+              .release_tag == null and
+              .asset_name == null and
+              .asset_sha256 == null and
+              .asset_size_bytes == null and
+              .manifest_content_sha256 == null
+            ' "${pin}" > /dev/null
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+              echo "::error::No immutable public dashboard-data release is pinned yet."
+              exit 1
+            fi
+            echo "::notice::Dashboard deployment skipped until a sanitized release is pinned."
+            exit 0
+          fi
+
+          if [ "${status}" != "published" ]; then
+            echo "::error::Unknown public dashboard release status: ${status}"
+            exit 1
+          fi
+
+          release_tag="$(jq -er '.release_tag | strings' "${pin}")"
+          asset_name="$(jq -er '.asset_name | strings' "${pin}")"
+          asset_sha256="$(jq -er '.asset_sha256 | strings' "${pin}")"
+          asset_size_bytes="$(jq -er '.asset_size_bytes | numbers' "${pin}")"
+          manifest_content_sha256="$(jq -er '.manifest_content_sha256 | strings' "${pin}")"
+          [[ "${release_tag}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]
+          [[ "${asset_name}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$ ]]
+          [[ "${asset_sha256}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${manifest_content_sha256}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${asset_size_bytes}" =~ ^[1-9][0-9]*$ ]]
+
+          echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
+          echo "asset_name=${asset_name}" >> "${GITHUB_OUTPUT}"
+          echo "asset_sha256=${asset_sha256}" >> "${GITHUB_OUTPUT}"
+          echo "asset_size_bytes=${asset_size_bytes}" >> "${GITHUB_OUTPUT}"
+          echo "manifest_content_sha256=${manifest_content_sha256}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    if: needs.release-pin.outputs.enabled == 'true'
+    needs: release-pin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Download pinned public dashboard data
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DATA_RELEASE_TAG: ${{ needs.release-pin.outputs.release_tag }}
+          DATA_ASSET_NAME: ${{ needs.release-pin.outputs.asset_name }}
+          DATA_ASSET_SHA256: ${{ needs.release-pin.outputs.asset_sha256 }}
+          DATA_ASSET_SIZE_BYTES: ${{ needs.release-pin.outputs.asset_size_bytes }}
+        run: |
+          set -euo pipefail
+          release_dir="${RUNNER_TEMP}/dashboard-release"
+          mkdir -p "${release_dir}"
+          gh release download "${DATA_RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${DATA_ASSET_NAME}" \
+            --dir "${release_dir}"
+          archive="${release_dir}/${DATA_ASSET_NAME}"
+          test -f "${archive}"
+          test "$(stat -c '%s' "${archive}")" = "${DATA_ASSET_SIZE_BYTES}"
+          printf '%s  %s\n' "${DATA_ASSET_SHA256}" "${archive}" | sha256sum --check --strict -
+
+          python3 - "${archive}" <<'PY'
+          import sys
+          import zipfile
+
+          expected = {
+              "fixture_matrix.json",
+              "forecast_vs_actual.json",
+              "manifest.json",
+              "next_gw.json",
+              "optimizer_audit.json",
+              "players.json",
+              "summary.json",
+          }
+          with zipfile.ZipFile(sys.argv[1]) as release:
+              names = {entry.filename for entry in release.infolist() if not entry.is_dir()}
+              if names != expected or any(entry.is_dir() for entry in release.infolist()):
+                  raise SystemExit(
+                      f"dashboard release must contain exactly {sorted(expected)} at ZIP root; "
+                      f"found {sorted(names)}"
+                  )
+          PY
+
+          mkdir -p dashboard/public/data
+          unzip -q "${archive}" -d dashboard/public/data
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install locked Python environment
+        run: uv sync --frozen
+
+      - name: Test public-data privacy boundary
+        run: uv run pytest tests/test_public_dashboard.py
+
+      - name: Re-sanitize and compare pinned public data
+        run: |
+          set -euo pipefail
+          checked_dir="${RUNNER_TEMP}/checked-public-data"
+          checked_archive="${RUNNER_TEMP}/checked-public-data.zip"
+          uv run python -m fpl.jobs.package_public_dashboard \
+            --input dashboard/public/data \
+            --output "${checked_dir}" \
+            --archive "${checked_archive}"
+          diff --recursive --brief dashboard/public/data "${checked_dir}"
+
+      - name: Validate pinned dashboard generation
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.release-pin.outputs.manifest_content_sha256 }}
+        run: |
+          set -euo pipefail
+          uv run python -c \
+            "from pathlib import Path; from fpl.publish.dashboard_json import validate_dashboard_json; manifest = validate_dashboard_json(Path('dashboard/public/data')); assert manifest['content_sha256'] == '${EXPECTED_MANIFEST_SHA256}', 'manifest pin mismatch'"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dashboard dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Test dashboard
+        working-directory: dashboard
+        run: npm test -- --run
+
+      - name: Lint dashboard
+        working-directory: dashboard
+        run: npm run lint
+
+      - name: Build hosted dashboard
+        working-directory: dashboard
+        env:
+          VITE_DATA_BASE: ${{ steps.pages.outputs.base_path }}/data
+          VITE_HOSTED_STATIC: "true"
+        run: |
+          ./node_modules/.bin/tsc -b
+          ./node_modules/.bin/vite build --base="${{ steps.pages.outputs.base_path }}/"
+
+      - name: Revalidate copied build data
+        run: uv run python -c "from pathlib import Path; from fpl.publish.dashboard_json import validate_dashboard_json; validate_dashboard_json(Path('dashboard/dist/data'))"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dashboard/dist
+
+  deploy:
+    if: needs.release-pin.outputs.enabled == 'true'
+    needs: [release-pin, build]
+    permissions:
+      contents: none
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

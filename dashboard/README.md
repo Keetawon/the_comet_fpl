@@ -165,6 +165,17 @@ every target it can; if the operating system also blocks restoration, it preserv
 `.previous` directory and reports the exact backup-to-target recovery path instead of deleting
 the last good generation.
 
+## Public hosting
+
+The supported zero-cost hosted shape is GitHub Pages plus an immutable, sanitized dashboard-data
+ZIP pinned in `public-data-release.json`. The hosted build is read-only: analytical pages and
+Squad Draft work in the browser, while Plan Builder never probes a visitor's local optimizer and
+directs exact solves back to a trusted machine. The public-data packager removes user-custom plans
+and rejects workstation paths or secret-like values before rebuilding and validating the manifest.
+
+See [Public dashboard deployment](../docs/dashboard-deployment.md) for the one-time Pages setting,
+release/pin workflow, privacy boundary, refresh, and rollback procedure.
+
 ## Vintages and images
 
 - An export carries **every recorded forecast vintage** (each recorded run), so the
