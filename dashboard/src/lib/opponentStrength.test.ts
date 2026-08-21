@@ -7,6 +7,7 @@ import type { TeamRecord } from "@/data/types";
 import {
   buildOpponentStrength,
   opponentStrengthBucket,
+  scheduleEaseProxy,
 } from "@/lib/opponentStrength";
 
 const teams = sample.teams as TeamRecord[];
@@ -26,6 +27,26 @@ describe("buildOpponentStrength", () => {
       { ...teams[0], team_code: 999, fixtures: [] },
     ]);
     expect(strength.has(999)).toBe(false);
+  });
+});
+
+describe("scheduleEaseProxy", () => {
+  it("composes the selected-vintage club and opponent averages without a later forecast", () => {
+    const strength = buildOpponentStrength(teams);
+    const proxy = scheduleEaseProxy(strength.get(101), strength.get(102));
+    expect(proxy.attackEase).toBeCloseTo(135.8, 1);
+    expect(proxy.defenceEase).toBeCloseTo(128.6, 1);
+    expect(proxy.overallEase).toBeCloseTo(132.1, 1);
+    expect(proxy.probabilityCleanSheet).toBeCloseTo(Math.exp(-1.05), 6);
+  });
+
+  it("preserves missing inputs as null instead of fabricating an average fixture", () => {
+    expect(scheduleEaseProxy(undefined, undefined)).toEqual({
+      attackEase: null,
+      defenceEase: null,
+      overallEase: null,
+      probabilityCleanSheet: null,
+    });
   });
 });
 

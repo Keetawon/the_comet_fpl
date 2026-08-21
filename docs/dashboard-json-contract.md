@@ -85,22 +85,35 @@ legacy schema-1 vintage with no fixture transport contributes zero team objects.
   `null` for an unscheduled fixture and orders last, never first.
 
 The file also carries a separately versioned `schedule` object
-(`schedule.schema_version: 1`). It is a **current-at-BI-export official schedule overlay**,
+(`schedule.schema_version: 2`). It is a **current-at-BI-export official schedule overlay**,
 not part of any selected forecast vintage:
 
 - `semantics` is exactly `current_at_export_not_forecast_vintage`;
 - `export_created_at` and `database_sha256` bind the overlay to the source BI export;
 - `schedule.teams` is one object per `(season, team_code)`, with directed fixture rows
-  containing only gameweek, fixture id, kickoff, opponent identity, and home/away;
-- schedule rows never carry lambdas, clean-sheet probabilities, ease indices, or FDR.
+  containing gameweek, fixture id, kickoff, opponent identity, home/away, and nullable current
+  `official_fdr`;
+- schedule rows never carry lambdas, clean-sheet probabilities, or ease indices. Schema v1 remains
+  readable as a legacy overlay with no `official_fdr`.
 
 The Fixture Matrix keeps the model horizon unchanged and offers 5/10/15-GW display windows.
-Rows after the forecast horizon are schedule-only chips. With the **Opponent strength** colour
-source they may reuse the selected vintage's display-time club-strength proxy derived from its
-GW1-5 team lambdas; the chip must visibly identify that proxy and state that it is not a forecast
-for the later fixture. With **Club ease** or **Official FDR** selected they remain neutral because
-the overlay carries neither later fixture forecasts nor FDR. Later rows never enter model-ease
-averages or sorting and must be labelled as current schedule context that may post-date an older
+Rows after the forecast horizon are schedule-only chips. **Official FDR** uses the current
+schedule-owned `official_fdr`. **Opponent strength** may reuse the selected vintage's display-time
+club-strength proxy. **Club ease** uses display proxy `fixture-ease-proxy-v1`, composed from the
+selected vintage's average club lambdas:
+
+```text
+lambda_for_proxy     = own_avg_for * opponent_avg_against / league_average
+lambda_against_proxy = own_avg_against * opponent_avg_for / league_average
+attack_ease_proxy    = 100 * lambda_for_proxy / league_average
+defence_ease_proxy   = 100 * league_average / lambda_against_proxy
+overall_ease_proxy   = sqrt(attack_ease_proxy * defence_ease_proxy)
+clean_sheet_proxy    = exp(-lambda_against_proxy)
+```
+
+The proxy has no later fixture model, venue adjustment, or new forecast input. Every later chip
+identifies whether its colour is current FDR or a selected-vintage proxy. Later rows never enter
+model-ease averages or sorting and remain current schedule context that may post-date an older
 selected vintage. A moved fixture may therefore appear once in the recorded vintage and again at
 its current schedule gameweek; that is explicit vintage-versus-current context, not a duplicate
 forecast.
@@ -323,7 +336,7 @@ and the audit page reads both files.
   "source": {
     "export_schema": "fpl.bi-semantic-export",
     "export_schema_version": 1,
-    "semantic_contract_version": 1,
+    "semantic_contract_version": 2,
     "export_content_sha256": "…",
     "export_created_at": "…",
     "database_sha256": "…"

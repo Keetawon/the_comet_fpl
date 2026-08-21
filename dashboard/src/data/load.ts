@@ -75,7 +75,7 @@ export async function loadFixtureMatrix(): Promise<FixtureMatrixData> {
   const teams = payload.teams;
   const schedule = payload.schedule as Partial<FixtureScheduleOverlay> | undefined;
   if (
-    schedule?.schema_version !== 1 ||
+    (schedule?.schema_version !== 1 && schedule?.schema_version !== 2) ||
     schedule?.semantics !== "current_at_export_not_forecast_vintage" ||
     typeof schedule.export_created_at !== "string" ||
     typeof schedule.database_sha256 !== "string" ||

@@ -34,7 +34,7 @@ import pyarrow as pa  # type: ignore[import-untyped]
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 from fpl.artifacts.optimizer_plan import OptimizerPlanArtifact, read_optimizer_artifact
-from fpl.publish.contract import SEMANTIC_CONTRACT_V1, Column, Table
+from fpl.publish.contract import SEMANTIC_CONTRACT_V2, Column, Table
 from fpl.storage.db import connect, table_columns, table_exists
 
 BI_EXPORT_SCHEMA: Final[str] = "fpl.bi-semantic-export"
@@ -653,6 +653,8 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
             SELECT fixture.season, fixture.fixture, fixture.gw, fixture.kickoff_time,
                    fixture.team_h AS home_team_id, fixture.team_a AS away_team_id,
                    home.team_code AS home_team_code, away.team_code AS away_team_code,
+                   home_fdr.fdr AS home_official_fdr,
+                   away_fdr.fdr AS away_official_fdr,
                    fixture.pulse_id, fixture.finished
             FROM stg_fixture AS fixture
             LEFT JOIN mart_dim_team AS home
@@ -661,16 +663,34 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
             LEFT JOIN mart_dim_team AS away
               ON away.season = fixture.season
              AND away.team_id = fixture.team_a
+            LEFT JOIN ({_OFFICIAL_FDR}) AS home_fdr
+              ON home_fdr.season = fixture.season
+             AND home_fdr.fixture = fixture.fixture
+             AND home_fdr.team_id = fixture.team_h
+            LEFT JOIN ({_OFFICIAL_FDR}) AS away_fdr
+              ON away_fdr.season = fixture.season
+             AND away_fdr.fixture = fixture.fixture
+             AND away_fdr.team_id = fixture.team_a
             UNION ALL
             SELECT lf.season, lf.fixture, lf.gw, lf.kickoff_time,
                    lf.team_h AS home_team_id, lf.team_a AS away_team_id,
                    home.team_code AS home_team_code, away.team_code AS away_team_code,
+                   home_fdr.fdr AS home_official_fdr,
+                   away_fdr.fdr AS away_official_fdr,
                    CAST(NULL AS INTEGER) AS pulse_id, lf.finished
             FROM ({_LIVE_FIXTURE_LATEST}) AS lf
             LEFT JOIN ({_LIVE_TEAM_LATEST}) AS home
               ON home.season = lf.season AND home.team_id = lf.team_h
             LEFT JOIN ({_LIVE_TEAM_LATEST}) AS away
               ON away.season = lf.season AND away.team_id = lf.team_a
+            LEFT JOIN ({_OFFICIAL_FDR}) AS home_fdr
+              ON home_fdr.season = lf.season
+             AND home_fdr.fixture = lf.fixture
+             AND home_fdr.team_id = lf.team_h
+            LEFT JOIN ({_OFFICIAL_FDR}) AS away_fdr
+              ON away_fdr.season = lf.season
+             AND away_fdr.fixture = lf.fixture
+             AND away_fdr.team_id = lf.team_a
             WHERE lf.season NOT IN (SELECT DISTINCT season FROM stg_fixture)
         """,
         "dim_gameweek": f"""
@@ -736,7 +756,7 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
     }
     if not ledger_present:
         for table_name in _FORECAST_TABLE_NAMES:
-            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V1.table(table_name))
+            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V2.table(table_name))
         return queries
 
     queries.update(
@@ -911,11 +931,11 @@ def _validate_table_frame(
 def _validate_referential_integrity(tables: Mapping[str, pa.Table]) -> None:
     con = duckdb.connect(":memory:")
     try:
-        for table in SEMANTIC_CONTRACT_V1.tables:
+        for table in SEMANTIC_CONTRACT_V2.tables:
             con.register(table.name, tables[table.name])
-        for child in SEMANTIC_CONTRACT_V1.tables:
+        for child in SEMANTIC_CONTRACT_V2.tables:
             for join in child.joins:
-                parent = SEMANTIC_CONTRACT_V1.table(join.to_table)
+                parent = SEMANTIC_CONTRACT_V2.table(join.to_table)
                 on = " AND ".join(
                     f"child.{_quote_identifier(local)} = parent.{_quote_identifier(remote)}"
                     for local, remote in join.on
@@ -1259,7 +1279,7 @@ def _manifest(
     payload: dict[str, Any] = {
         "schema": BI_EXPORT_SCHEMA,
         "schema_version": BI_EXPORT_SCHEMA_VERSION,
-        "semantic_contract_version": SEMANTIC_CONTRACT_V1.version,
+        "semantic_contract_version": SEMANTIC_CONTRACT_V2.version,
         "created_at": _isoformat(created_at),
         "database_sha256": database_sha256,
         "exported_run_ids": list(exported_run_ids),
@@ -1333,8 +1353,8 @@ def _assert_manifest_shape(manifest: Mapping[str, Any]) -> None:
         or manifest["schema_version"] != BI_EXPORT_SCHEMA_VERSION
     ):
         raise BiExportValidationError("manifest export schema/version does not match this exporter")
-    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V1.version:
-        raise BiExportValidationError("manifest semantic contract version does not match v1")
+    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V2.version:
+        raise BiExportValidationError("manifest semantic contract version does not match v2")
     _manifest_timestamp(manifest["created_at"], "created_at")
     if not _is_sha256(manifest["database_sha256"]):
         raise BiExportValidationError("manifest database_sha256 must be a SHA-256 string")
@@ -1398,14 +1418,14 @@ def _validate_export_directory(
     table_metadata = manifest["tables"]
     if not isinstance(table_metadata, dict):
         raise BiExportValidationError("manifest tables must be an object")
-    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V1.tables}
+    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V2.tables}
     if set(table_metadata) != expected_table_names:
         raise BiExportValidationError(
             "manifest does not enumerate exactly the semantic contract tables"
         )
     expected_files = {MANIFEST_FILENAME}
     frames: dict[str, pa.Table] = {}
-    for table in SEMANTIC_CONTRACT_V1.tables:
+    for table in SEMANTIC_CONTRACT_V2.tables:
         entry = table_metadata[table.name]
         if not isinstance(entry, dict) or set(entry) != {"file", "row_count", "sha256"}:
             raise BiExportValidationError(f"manifest entry for {table.name} is malformed")
@@ -1620,7 +1640,7 @@ def export_bi(
                 }
                 table_exports: dict[str, TableExport] = {}
                 expected_null_counts: dict[str, dict[str, int]] = {}
-                for table in SEMANTIC_CONTRACT_V1.tables:
+                for table in SEMANTIC_CONTRACT_V2.tables:
                     if table.name in injected:
                         rows = injected[table.name]
                         frame = (

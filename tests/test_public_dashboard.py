@@ -203,7 +203,7 @@ def _write_generation(directory: Path, documents: dict[str, dict[str, Any]]) -> 
         "source": {
             "export_schema": "fpl.bi-semantic-export",
             "export_schema_version": 1,
-            "semantic_contract_version": 1,
+            "semantic_contract_version": 2,
             "export_content_sha256": _sha("2"),
             "export_created_at": "2026-08-21T11:59:00+00:00",
             "database_sha256": _sha("3"),

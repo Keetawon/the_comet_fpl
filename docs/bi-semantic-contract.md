@@ -1,6 +1,9 @@
-# BI semantic contract, version 1
+# BI semantic contract, version 2
 
 Status: **frozen** (DEV-ROADMAP P1.1). Development-only data, like everything upstream of it.
+
+Version 2 is an additive schedule-context revision: it adds nullable directed official FDR for
+both sides of `dim_fixture`. Version 1 remains historical; no forecast fact or ease formula changed.
 
 This is the authoritative description of what the BI export publishes. Its executable counterpart is
 `src/fpl/publish/contract.py`, which declares the same schema as typed data and validates it; the two
@@ -106,7 +109,10 @@ through here, season-qualified.
 
 One match. `gw` and `kickoff_time` are nullable because a fixture may be unscheduled or postponed.
 `kickoff_time` is **event time** and governs which outcomes were observable; it is not knowledge
-time, and schedules are themselves versioned by `known_at` upstream.
+time, and schedules are themselves versioned by `known_at` upstream. `home_official_fdr` and
+`away_official_fdr` are the current directed official schedule values at export time, sourced
+from the historical match mart or latest live capture. They remain NULL where unavailable and are
+never blended into model ease.
 
 ### `dim_gameweek` — grain `(season, gw)`
 
@@ -124,8 +130,8 @@ declared optimality scope, risk lambda, and three deterministic JSON columns —
 bounded-search `search_policy`, the verified `rules_snapshot` (the constraints), and the
 `assumptions` list. Joins many-to-one to `dim_forecast_run` on `forecast_run_id`: one vintage
 can back several plans (default and diagnostic architectures), never the reverse. Sourced and
-declared in the same change, so it was never in `NOT_YET_SOURCED`; the contract stays at v1
-(an additive table, exactly as `fact_team_form` was added).
+declared in the same change, so it was never in `NOT_YET_SOURCED`; that addition did not itself
+change the then-current v1 contract. The current v2 revision is limited to schedule FDR.
 
 ## Facts
 
@@ -315,8 +321,8 @@ the work. Three were added, each forced by a documented invariant rather than by
 
 ## Source completeness
 
-Every v1 table now has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
+Every current v2 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
 P1.6 supplies `fact_player_form`, and P1.6b adds `fact_team_form` (declared and sourced in the same
 change, so it is never in `NOT_YET_SOURCED`). Consequently `contract.NOT_YET_SOURCED` is empty; P1.4
-can require the complete v1 contract rather than silently emitting an apparently complete partial
+can require the complete v2 contract rather than silently emitting an apparently complete partial
 export.

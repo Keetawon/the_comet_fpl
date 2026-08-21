@@ -201,6 +201,9 @@ describe("NextGwPage", () => {
     expect(screen.getByText(/Default vs diagnostic \(GW1\)/)).toBeInTheDocument();
     expect(screen.getByText(/squad overlap 2\/3/)).toBeInTheDocument();
     expect(screen.getByText(/captain differs/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Forward team to Squad Draft" }),
+    ).toHaveAttribute("href", "#squad-draft?optimizer_run_id=opt-default");
   });
 
   it("widens the EV horizon via the bounded selector", async () => {

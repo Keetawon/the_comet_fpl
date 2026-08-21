@@ -51,6 +51,7 @@ import {
   rememberPlanServerToken,
 } from "@/lib/planServerToken";
 import { reloadPublishedReadModels } from "@/lib/readModelReload";
+import { squadDraftHandoffHref } from "@/lib/squadDraftHandoff";
 import { availabilityLabel } from "@/lib/availability";
 import { cn } from "@/lib/utils";
 
@@ -1563,6 +1564,11 @@ export function PlanBuilderPage() {
                     Edit and solve again
                   </Button>
                   <Button asChild>
+                    <a href={squadDraftHandoffHref(resultPlan.optimizer_run_id)}>
+                      Forward team to Squad Draft
+                    </a>
+                  </Button>
+                  <Button asChild variant="outline">
                     <a href="#next-gw">View platform suggestion</a>
                   </Button>
                 </div>

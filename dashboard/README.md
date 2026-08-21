@@ -196,12 +196,12 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   selected vintage, **one column per gameweek** (two chips in a double gameweek), with
   5/10/15-GW display controls. The forecast remains bounded to its recorded horizon
   (currently GW1-5); GW6-10/15 comes from a separately versioned current official-schedule
-  overlay with no invented ease, lambda, clean-sheet probability, or FDR. Under **Opponent
-  strength**, later chips may be conditionally formatted by the selected vintage's display-time
-  club-strength proxy derived from its GW1-5 team lambdas; the visible value and tooltip state
-  that this is not a forecast for the later fixture. Under **Club ease** or **Official FDR** the
-  later chips remain neutral. The overlay carries the BI-export timestamp and database hash and
-  is explicitly not the schedule known at an older forecast vintage.
+  overlay. It carries current official FDR but no later fixture lambdas, forecasts, or ease
+  indices. Under **Opponent strength** and **Club ease**, later chips use explicitly labelled
+  display proxies composed from the selected vintage's GW1-5 club-average lambdas; they have no
+  later fixture model or venue adjustment. **Official FDR** uses the current schedule-owned value.
+  The overlay carries the BI-export timestamp and database hash and is explicitly not the schedule
+  known at an older forecast vintage.
   The matrix is default
   sorted by average **modelled** ease (easiest first, any column re-sorts); changing to 10
   or 15 GWs cannot alter that average or ordering. Recent form is one compact
@@ -212,8 +212,8 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   model ease (overall/attack/clean-sheet views), or official FDR. Expanding a row exposes
   every primitive (raw `lambda_for`/`lambda_against`, clean-sheet probability, all ease
   indices, opponent strength, official FDR, Stage A league-average flag) ordered by
-  kickoff time. Expanded schedule-only rows show identity/kickoff and dashes for every
-  unavailable model primitive.
+  kickoff time. Expanded schedule-only rows show identity/kickoff, current FDR, and `~`-prefixed
+  display proxies; unavailable model primitives remain dashes.
 - **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
   `players.json` — one row per player of the selected vintage (photo + club badge) merging
   backward form (3/5/10/STD window selector) with per-gameweek xP chips and a range-total xP.
@@ -250,7 +250,8 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   selected platform plan: planned XI xP (11), planned bench xP (4), and planned squad xP
   (15). They are derived from each gameweek's post-transfer plan and remain fixed while the
   comparison rows are sorted, filtered, paginated, or expanded to the whole player pool.
-  The highest complete bench-xP gameweek inside the loaded horizon is marked.
+  The highest complete bench-xP gameweek inside the loaded horizon is marked. **Forward team to
+  Squad Draft** seeds the exact selected optimizer run's first-week 15 in the browser sandbox.
 - **Plan builder** (implemented, wizard v2, fresh-squad path only): the interactive side of
   the manager-wizard design (`docs/manager-team-suggestions.md`). The manager-id field currently
   performs a format check and a best-effort `localStorage` write only; it does not call FPL,
@@ -267,10 +268,15 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   fixed while sorting. It exposes `Total 3 GWs xP`, `Total 5 GWs xP`, raw GW1-GW5 xP columns, and
   an expanded per-gameweek membership/role view. Its footer is bound to the exact custom plan and
   shows the same planned XI, bench, and 15-player raw xP sums, calculated from each week's
-  post-transfer roles rather than the fixed GW1 display membership.
-- **Squad draft** (implemented, browser-only manual sandbox): binds to exactly one formal
-  platform-default forecast vintage and its recorded squad rules, then lets the user select
-  zero to 15 players manually. It enforces duplicate, position, squad-size, and three-per-club
+  post-transfer roles rather than the fixed GW1 display membership. Once that exact result is
+  published, its forward button seeds the result's first-week squad into Squad Draft.
+- **Squad draft** (implemented, browser-only manual sandbox): without a handoff it binds to exactly
+  one formal platform-default forecast vintage. An explicit `optimizer_run_id` handoff from Next GW
+  or Plan Builder instead resolves that exact plan, matching audit/rules snapshot, and forecast
+  vintage, then replaces the browser draft with its first-week optimized 15. The handoff fails
+  closed on a missing/ambiguous run, mismatched audit, missing player, or structurally invalid
+  squad. The user can then select zero to 15 players manually. It enforces duplicate, position,
+  squad-size, and three-per-club
   limits but deliberately does not enforce the standard £100m budget; an over-budget draft is
   labelled as such rather than blocked. The sortable/fullscreen selected-player table shows
   deadline-vintage cost, raw GW1-GW5 xP, strict Total 3/5-GW xP, and a final footer row whose cost

@@ -380,6 +380,8 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "away_team_id": away,
                 "home_team_code": 100 + home,
                 "away_team_code": 100 + away,
+                "home_official_fdr": 2,
+                "away_official_fdr": 4,
                 "pulse_id": None,
                 "finished": False,
             }
@@ -554,7 +556,7 @@ def _write_manifest(export_dir: Path, tables: dict[str, dict[str, Any]]) -> None
     manifest: dict[str, Any] = {
         "schema": "fpl.bi-semantic-export",
         "schema_version": 1,
-        "semantic_contract_version": 1,
+        "semantic_contract_version": 2,
         "created_at": CREATED_AT.isoformat(),
         "database_sha256": DATABASE_SHA,
         "exported_run_ids": [RUN_ID],
@@ -722,6 +724,8 @@ def test_current_schedule_overlay_extends_without_widening_the_forecast(tmp_path
             "away_team_id": 2,
             "home_team_code": 101,
             "away_team_code": 102,
+            "home_official_fdr": 4,
+            "away_official_fdr": 2,
             "pulse_id": None,
             "finished": False,
         }
@@ -731,7 +735,7 @@ def test_current_schedule_overlay_extends_without_widening_the_forecast(tmp_path
     models = build_dashboard_read_models(export_dir)
     assert [fixture["fixture"] for fixture in _team(models, 101)["fixtures"]] == [100, 101, 102]
     assert models.schedule["semantics"] == "current_at_export_not_forecast_vintage"
-    assert models.schedule["schema_version"] == 1
+    assert models.schedule["schema_version"] == 2
     assert models.schedule["export_created_at"] == CREATED_AT.isoformat()
     assert models.schedule["database_sha256"] == DATABASE_SHA
     schedule_alpha = next(
@@ -748,13 +752,13 @@ def test_current_schedule_overlay_extends_without_widening_the_forecast(tmp_path
         "opponent_team_code": 102,
         "opponent_short_name": "BET",
         "was_home": True,
+        "official_fdr": 4,
     }
     assert not set(later) & {
         "lambda_for",
         "lambda_against",
         "probability_clean_sheet",
         "overall_ease_index",
-        "official_fdr",
     }
     rendered = json.loads(render_read_model_files(models)[FIXTURE_MATRIX_FILENAME].decode("utf-8"))
     assert rendered["schedule"] == models.schedule
@@ -1352,6 +1356,8 @@ def test_stale_fixture_kickoff_orders_after_current_gw(tmp_path: Path) -> None:
             "away_team_id": 3,
             "home_team_code": 101,
             "away_team_code": 103,
+            "home_official_fdr": 2,
+            "away_official_fdr": 4,
             "pulse_id": None,
             "finished": False,
         }

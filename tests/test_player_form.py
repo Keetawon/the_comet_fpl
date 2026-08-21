@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 import duckdb
 import pytest
 
-from fpl.publish.contract import SEMANTIC_CONTRACT_V1
+from fpl.publish.contract import SEMANTIC_CONTRACT_V2
 from fpl.storage.db import initialise, table_columns
 from fpl.transform.facts import PlayerFormSourceError, build_player_form
 
@@ -421,7 +421,7 @@ def test_archive_player_form_mart_has_the_contract_shape_and_grain(
     db: duckdb.DuckDBPyConnection,
 ) -> None:
     """A rebuilt archive supplies every contract column and exactly four windows per anchor."""
-    form = SEMANTIC_CONTRACT_V1.table("fact_player_form")
+    form = SEMANTIC_CONTRACT_V2.table("fact_player_form")
     assert set(table_columns(db, "mart_fact_player_form")) == form.column_names
 
     duplicate_keys = db.execute(

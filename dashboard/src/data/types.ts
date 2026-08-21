@@ -53,8 +53,8 @@ export interface TeamFixture {
 }
 
 /**
- * Official fixture identity from the latest BI export. These rows deliberately carry no
- * forecast/ease fields: they are current schedule context, not part of a recorded vintage.
+ * Official fixture identity from the latest BI export. These rows carry current official FDR
+ * but no forecast/ease fields: they are current schedule context, not a recorded vintage.
  */
 export interface ScheduleFixture {
   gw: number;
@@ -63,6 +63,8 @@ export interface ScheduleFixture {
   opponent_team_code: number;
   opponent_short_name: string;
   was_home: boolean | null;
+  /** Added in schedule schema v2; absent in legacy v1 read models. */
+  official_fdr?: number | null;
 }
 
 export interface ScheduleTeam {
@@ -74,7 +76,7 @@ export interface ScheduleTeam {
 }
 
 export interface FixtureScheduleOverlay {
-  schema_version: 1;
+  schema_version: 1 | 2;
   semantics: "current_at_export_not_forecast_vintage";
   export_created_at: string;
   database_sha256: string;

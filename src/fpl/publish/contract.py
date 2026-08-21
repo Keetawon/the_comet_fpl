@@ -1,4 +1,4 @@
-"""The frozen BI semantic contract, version 1.
+"""The frozen BI semantic contract, version 2.
 
 DEV-ROADMAP P1.1 requires each published table's grain, keys, null semantics, source owner, and
 allowed joins to be settled **before** the exporter exists, so P1.2-P1.4 build against a fixed
@@ -37,7 +37,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SEMANTIC_CONTRACT_VERSION = 1
+SEMANTIC_CONTRACT_VERSION = 2
 
 #: Season-scoped identifiers. A join may use one only when ``season`` is bound in the same join.
 SEASON_SCOPED_KEYS: frozenset[str] = frozenset({"element_id", "team_id", "opponent_team_id"})
@@ -469,7 +469,9 @@ DIM_FIXTURE = Table(
     grain=("season", "fixture"),
     grain_note="One row per fixture per season. Fixture ids are season-scoped.",
     source_owner=(
-        "fpl.transform.facts:stg_fixture + fpl.ingest.live_snapshot:stg_live_fixture_version"
+        "fpl.transform.facts:stg_fixture + fpl.transform.facts:mart_fact_team_match + "
+        "fpl.ingest.live_snapshot:stg_live_fixture_version + "
+        "fpl.ingest.live_snapshot:mart_team_fixture_live"
     ),
     columns=(
         _key("season", "string", "Season."),
@@ -485,6 +487,18 @@ DIM_FIXTURE = Table(
         _key("away_team_id", "int", "Season-scoped away club id."),
         _key("home_team_code", "int", "Permanent home club identity."),
         _key("away_team_code", "int", "Permanent away club identity."),
+        _nullable(
+            "home_official_fdr",
+            "int",
+            "unmeasured",
+            "Current official difficulty for the home club; NULL where unavailable.",
+        ),
+        _nullable(
+            "away_official_fdr",
+            "int",
+            "unmeasured",
+            "Current official difficulty for the away club; NULL where unavailable.",
+        ),
         _nullable("pulse_id", "int", "optional_attribute", "External Pulse identifier."),
         _key("finished", "bool", "Whether the fixture has been played and finalised."),
     ),
@@ -1169,7 +1183,7 @@ DIM_OPTIMIZER_RUN = Table(
     ),
 )
 
-SEMANTIC_CONTRACT_V1 = SemanticContract(
+SEMANTIC_CONTRACT_V2 = SemanticContract(
     version=SEMANTIC_CONTRACT_VERSION,
     tables=(
         DIM_FORECAST_RUN,
@@ -1191,8 +1205,30 @@ SEMANTIC_CONTRACT_V1 = SemanticContract(
     ),
 )
 
-#: Every table in semantic contract v1 now has a concrete source owner.  P1.4 can therefore reject
-#: only a genuinely future partial contract rather than silently treating a v1 table as optional.
+# The executable v1 declaration remains importable for readers of historical manifests. Its only
+# structural difference from v2 is that dim_fixture predates current directed schedule FDR.
+_DIM_FIXTURE_V1 = DIM_FIXTURE.model_copy(
+    update={
+        "source_owner": (
+            "fpl.transform.facts:stg_fixture + fpl.ingest.live_snapshot:stg_live_fixture_version"
+        ),
+        "columns": tuple(
+            column
+            for column in DIM_FIXTURE.columns
+            if column.name not in {"home_official_fdr", "away_official_fdr"}
+        ),
+    }
+)
+SEMANTIC_CONTRACT_V1 = SemanticContract(
+    version=1,
+    tables=tuple(
+        _DIM_FIXTURE_V1 if table.name == "dim_fixture" else table
+        for table in SEMANTIC_CONTRACT_V2.tables
+    ),
+)
+
+#: Every table in semantic contract v2 has a concrete source owner. P1.4 can therefore reject
+#: only a genuinely future partial contract rather than silently treating a v2 table as optional.
 NOT_YET_SOURCED: frozenset[str] = frozenset()
 
 
@@ -1201,6 +1237,7 @@ __all__ = [
     "NOT_YET_SOURCED",
     "SEASON_SCOPED_KEYS",
     "SEMANTIC_CONTRACT_V1",
+    "SEMANTIC_CONTRACT_V2",
     "SEMANTIC_CONTRACT_VERSION",
     "Column",
     "Join",

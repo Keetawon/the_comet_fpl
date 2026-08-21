@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ import {
 import { loadFixtureMatrix, loadNextGw, loadPlayers } from "@/data/load";
 import type { NextGwPlan, PlanPlayer, PlanWeek, PlayerRecord, SquadContext, TeamRecord } from "@/data/types";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
+import { squadDraftHandoffHref } from "@/lib/squadDraftHandoff";
 import {
   buildPlanChipOutlook,
   type PlanWeekChipOutlook,
@@ -475,6 +477,11 @@ export function NextGwPage() {
               ))}
             </ToggleGroup>
           </div>
+          <Button asChild size="sm" variant="outline">
+            <a href={squadDraftHandoffHref(plan.optimizer_run_id)}>
+              Forward team to Squad Draft
+            </a>
+          </Button>
         </div>
       </div>
 

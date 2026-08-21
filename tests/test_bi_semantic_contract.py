@@ -1,4 +1,4 @@
-"""Executable tests for the frozen BI semantic contract, version 1.
+"""Executable tests for the frozen BI semantic contract, version 2.
 
 The contract's value is that it is enforced, not that it is written down, so most of these tests are
 negative: they construct a contract that breaks an invariant and prove the validator rejects it.
@@ -18,6 +18,7 @@ from fpl.publish.contract import (
     NOT_YET_SOURCED,
     SEASON_SCOPED_KEYS,
     SEMANTIC_CONTRACT_V1,
+    SEMANTIC_CONTRACT_V2,
     Column,
     Join,
     SemanticContract,
@@ -25,7 +26,7 @@ from fpl.publish.contract import (
     Table,
 )
 
-CONTRACT = SEMANTIC_CONTRACT_V1
+CONTRACT = SEMANTIC_CONTRACT_V2
 LEDGER_SOURCE_TABLES = frozenset(
     {
         "ledger_forecast_run",
@@ -42,7 +43,7 @@ LEDGER_SOURCE_TABLES = frozenset(
 
 
 def test_contract_publishes_the_expected_tables() -> None:
-    assert CONTRACT.version == 1
+    assert CONTRACT.version == 2
     assert {table.name for table in CONTRACT.tables} == {
         # dimensions
         "dim_forecast_run",
@@ -63,6 +64,13 @@ def test_contract_publishes_the_expected_tables() -> None:
         "fact_team_form",
         "fact_optimizer_plan",
     }
+
+
+def test_historical_v1_contract_remains_importable_without_schedule_fdr() -> None:
+    assert SEMANTIC_CONTRACT_V1.version == 1
+    fixture = SEMANTIC_CONTRACT_V1.table("dim_fixture")
+    assert "home_official_fdr" not in fixture.column_names
+    assert "away_official_fdr" not in fixture.column_names
 
 
 @pytest.mark.parametrize(
@@ -176,6 +184,16 @@ def test_team_fixture_ease_columns_are_additive_directed_and_versioned() -> None
         assert "100 is league average" in by_name[name].description
         assert "higher means" in by_name[name].description
     assert "never blended" in by_name["official_fdr"].description
+
+
+def test_fixture_dimension_carries_current_official_fdr_for_both_sides() -> None:
+    fixture = CONTRACT.table("dim_fixture")
+    by_name = {column.name: column for column in fixture.columns}
+    assert {"home_official_fdr", "away_official_fdr"} <= by_name.keys()
+    for name in ("home_official_fdr", "away_official_fdr"):
+        assert by_name[name].nullable
+        assert by_name[name].dtype == "int"
+        assert by_name[name].null_means == "unmeasured"
 
 
 # --------------------------------------------------------------------------------------

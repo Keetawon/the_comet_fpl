@@ -38,7 +38,7 @@ from fpl.artifacts.prospective_points import (
     ProspectivePointsArtifact,
     artifact_bytes,
 )
-from fpl.publish.contract import SEMANTIC_CONTRACT_V1
+from fpl.publish.contract import SEMANTIC_CONTRACT_V2
 from fpl.publish.export import (
     EASE_INDEX_FORMULA_VERSION,
     BiExportConcurrentWriterError,
@@ -531,7 +531,7 @@ def _write_optimizer_plan(path: Path, artifact: ProspectivePointsArtifact) -> Pa
 
 
 def _table_paths(output_dir: Path) -> tuple[Path, ...]:
-    return tuple(output_dir / f"{table.name}.parquet" for table in SEMANTIC_CONTRACT_V1.tables)
+    return tuple(output_dir / f"{table.name}.parquet" for table in SEMANTIC_CONTRACT_V2.tables)
 
 
 def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> None:
@@ -550,7 +550,7 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     manifest = validate_bi_export(output)
 
     assert output.is_symlink()
-    assert set(result.tables) == {table.name for table in SEMANTIC_CONTRACT_V1.tables}
+    assert set(result.tables) == {table.name for table in SEMANTIC_CONTRACT_V2.tables}
     assert manifest["exported_run_ids"] == [run_id]
     assert manifest["source_known_at"] == {
         "minimum": KNOWN_AT.isoformat(),
@@ -843,7 +843,7 @@ def test_exports_are_byte_deterministic_except_manifest_created_at(tmp_path: Pat
         created_at=datetime(2026, 8, 26, tzinfo=UTC),
     )
 
-    for table in SEMANTIC_CONTRACT_V1.tables:
+    for table in SEMANTIC_CONTRACT_V2.tables:
         assert (first / f"{table.name}.parquet").read_bytes() == (
             second / f"{table.name}.parquet"
         ).read_bytes()
@@ -941,6 +941,8 @@ def test_live_season_dimensions_are_sourced_from_the_snapshot_registry(tmp_path:
     fixture = pq.read_table(output / "dim_fixture.parquet")
     assert fixture.column("home_team_code").to_pylist() == [101]
     assert fixture.column("away_team_code").to_pylist() == [102]
+    assert fixture.column("home_official_fdr").to_pylist() == [2]
+    assert fixture.column("away_official_fdr").to_pylist() == [4]
 
     gameweek = pq.read_table(output / "dim_gameweek.parquet")
     assert (gameweek.column("season").to_pylist(), gameweek.column("gw").to_pylist()) == (
@@ -957,7 +959,7 @@ def test_archive_database_exports_the_complete_contract(tmp_path: Path) -> None:
     result = export_bi(default_db_path(), tmp_path / "archive-export")
     manifest = validate_bi_export(result.output_dir)
 
-    assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V1.tables}
+    assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V2.tables}
     # Every contract table (now including dim_optimizer_run) is written to disk, even when a
     # source owner contributes zero rows; assert existence rather than a magic count so an
     # additive table cannot silently re-stale this smoke test.

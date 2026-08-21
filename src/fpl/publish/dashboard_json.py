@@ -382,8 +382,9 @@ def _build_current_schedule(
     """Build a current-at-export schedule overlay, deliberately outside forecast vintages.
 
     The overlay contains the complete scheduled season for every season represented by an
-    exported forecast run. It is never joined to a run and carries no forecast or ease fields;
-    consumers must not mistake a later schedule amendment for point-in-time forecast input.
+    exported forecast run. It is never joined to a run and carries no forecast or ease fields.
+    Official FDR is carried as a current schedule property; consumers must not mistake a later
+    schedule amendment or display proxy for point-in-time forecast input.
     """
     export_created_at = manifest.get("created_at")
     database_sha256 = manifest.get("database_sha256")
@@ -401,7 +402,7 @@ def _build_current_schedule(
     )
     if not run_seasons:
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "semantics": "current_at_export_not_forecast_vintage",
             "export_created_at": export_created_at,
             "database_sha256": database_sha256,
@@ -482,7 +483,10 @@ def _build_current_schedule(
                 "a current-schedule team_code disagrees with its season-qualified club label"
             )
 
-        for own, opponent, was_home in ((home, away, True), (away, home, False)):
+        for own, opponent, was_home, official_fdr in (
+            (home, away, True, row["home_official_fdr"]),
+            (away, home, False, row["away_official_fdr"]),
+        ):
             own_code = int(own["team_code"])
             side_key = (season, own_code, fixture)
             if side_key in side_keys:
@@ -499,6 +503,7 @@ def _build_current_schedule(
                 "opponent_team_code": int(opponent["team_code"]),
                 "opponent_short_name": opponent["short_name"],
                 "was_home": was_home,
+                "official_fdr": int(official_fdr) if official_fdr is not None else None,
             }
             team_fixtures.setdefault(identity, []).append(side)
             fixture_sides.setdefault((season, fixture), []).append((own_code, side))
@@ -530,7 +535,7 @@ def _build_current_schedule(
             }
         )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "semantics": "current_at_export_not_forecast_vintage",
         "export_created_at": export_created_at,
         "database_sha256": database_sha256,

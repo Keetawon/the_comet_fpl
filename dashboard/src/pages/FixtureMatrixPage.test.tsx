@@ -14,7 +14,7 @@ import { FixtureMatrixPage } from "./FixtureMatrixPage";
 
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
 const schedule: FixtureScheduleOverlay = {
-  schema_version: 1,
+  schema_version: 2,
   semantics: "current_at_export_not_forecast_vintage",
   export_created_at: "2026-08-20T12:00:00+00:00",
   database_sha256: "d".repeat(64),
@@ -34,6 +34,7 @@ const schedule: FixtureScheduleOverlay = {
             opponent_team_code: 102,
             opponent_short_name: "BET",
             was_home: gw % 2 === 1,
+            official_fdr: 2,
           };
         }),
         {
@@ -43,6 +44,7 @@ const schedule: FixtureScheduleOverlay = {
           opponent_team_code: 103,
           opponent_short_name: "GAM",
           was_home: true,
+          official_fdr: null,
         },
       ],
     },
@@ -60,6 +62,7 @@ const schedule: FixtureScheduleOverlay = {
           opponent_team_code: 101,
           opponent_short_name: "ALP",
           was_home: gw % 2 === 0,
+          official_fdr: 4,
         };
       }).filter((fixture) => fixture.gw !== 7),
     },
@@ -130,7 +133,7 @@ describe("FixtureMatrixPage", () => {
     expect(firstTeamRow!.textContent).toContain("Beta");
   });
 
-  it("colours later fixtures only with the selected-vintage opponent proxy", async () => {
+  it("colours later fixtures with explicit proxies and current official FDR", async () => {
     const user = userEvent.setup();
     const { container } = render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
@@ -193,17 +196,19 @@ describe("FixtureMatrixPage", () => {
     const easeGw6 = within(alphaRow!)
       .getAllByTestId("schedule-chip")
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
-    expect(easeGw6).toHaveAttribute("data-bucket", "null");
-    expect(easeGw6!.className).toContain("bg-muted");
-    expect(easeGw6!.className).not.toMatch(/bg-(green|red)/);
+    expect(easeGw6).toHaveAttribute("data-bucket", "much-easier");
+    expect(easeGw6!.className).toContain("bg-green");
+    expect(easeGw6).toHaveTextContent(/GW6 · \d+/);
+    expect(easeGw6).toHaveAccessibleName(/fixture-ease-proxy-v1/i);
 
     await user.click(screen.getByRole("radio", { name: "Official FDR" }));
     const fdrGw6 = within(alphaRow!)
       .getAllByTestId("schedule-chip")
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
-    expect(fdrGw6).toHaveAttribute("data-bucket", "null");
-    expect(fdrGw6!.className).toContain("bg-muted");
-    expect(fdrGw6!.className).not.toMatch(/bg-(green|red)/);
+    expect(fdrGw6).toHaveAttribute("data-bucket", "easier");
+    expect(fdrGw6!.className).toContain("bg-green");
+    expect(fdrGw6).toHaveTextContent("GW6 · FDR 2");
+    expect(fdrGw6).toHaveAccessibleName(/current official FDR 2/i);
 
     await user.click(within(alphaRow!).getByRole("button", { name: "Expand fixtures" }));
     expect(screen.getAllByText("Schedule only").length).toBeGreaterThan(0);

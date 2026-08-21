@@ -54,11 +54,20 @@ import { WINDOW_LABELS } from "@/data/types";
 import {
   BUCKET_CLASSES,
   NULL_BUCKET_CLASS,
+  cleanSheetBucket,
+  easeBucket,
+  fdrBucket,
   type ColorSource,
   type ViewMode,
 } from "@/lib/difficulty";
 import { chipBucket, chipMetric, viewMetric } from "@/lib/fixtureChips";
-import { buildOpponentStrength, opponentStrengthBucket } from "@/lib/opponentStrength";
+import {
+  SCHEDULE_EASE_PROXY_FORMULA,
+  buildOpponentStrength,
+  opponentStrengthBucket,
+  scheduleEaseProxy,
+  type OpponentStrength,
+} from "@/lib/opponentStrength";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 
 type PageState =
@@ -93,6 +102,8 @@ type DetailFixture =
 
 const fmt = (value: number | null | undefined, digits = 1) =>
   value == null ? "–" : value.toFixed(digits);
+const fmtProxy = (value: number | null | undefined, digits = 1) =>
+  value == null ? "–" : `~${value.toFixed(digits)}`;
 
 const VIEW_LABEL: Record<ViewMode, string> = {
   overall: "overall ease",
@@ -115,20 +126,24 @@ const FORM_WINDOW_LABEL: Record<WindowLabel, string> = {
 function TeamGwCell({
   fixtures,
   scheduleOnly,
+  teamCode,
   gw,
   view,
   colorSource,
   opponentIndexOf,
+  strengthOf,
   cleanSheetAnchor,
   modelGwFrom,
   modelGwTo,
 }: {
   fixtures: TeamFixture[];
   scheduleOnly: ScheduleFixture[];
+  teamCode: number;
   gw: number;
   view: ViewMode;
   colorSource: ColorSource;
   opponentIndexOf: (teamCode: number) => number | null;
+  strengthOf: (teamCode: number) => OpponentStrength | null;
   cleanSheetAnchor: number | null;
   modelGwFrom: number;
   modelGwTo: number;
@@ -166,37 +181,74 @@ function TeamGwCell({
         );
       })}
       {scheduleInGw.map((fixture) => {
-        const opponentIndex = opponentIndexOf(fixture.opponent_team_code);
-        const opponentBucket =
-          colorSource === "opponent" ? opponentStrengthBucket(opponentIndex) : null;
+        const opponentStrength = strengthOf(fixture.opponent_team_code);
+        const opponentIndex = opponentStrength?.index ?? null;
+        const easeProxy = scheduleEaseProxy(strengthOf(teamCode), opponentStrength);
+        const easeValue =
+          view === "attack"
+            ? easeProxy.attackEase
+            : view === "defense"
+              ? easeProxy.probabilityCleanSheet
+              : easeProxy.overallEase;
+        const scheduleBucket =
+          colorSource === "opponent"
+            ? opponentStrengthBucket(opponentIndex)
+            : colorSource === "fdr"
+              ? fdrBucket(fixture.official_fdr)
+              : view === "defense"
+                ? cleanSheetBucket(easeValue, cleanSheetAnchor)
+                : easeBucket(easeValue);
         const venue =
           fixture.was_home == null ? "" : fixture.was_home ? "(H)" : "(A)";
         const kickoff = fixture.kickoff_time
           ? fixture.kickoff_time.replace("T", " ").slice(0, 16)
           : "kickoff TBC";
-        const proxyLabel =
+        const colourLabel =
           colorSource === "opponent" && opponentIndex != null
             ? `colour uses selected-vintage opponent strength proxy ${opponentIndex.toFixed(0)}, ` +
               `derived from selected-vintage GW${modelGwFrom}-GW${modelGwTo} team lambdas, ` +
               `not a GW${fixture.gw} forecast`
             : colorSource === "opponent"
               ? "selected-vintage opponent strength proxy unavailable; no later-fixture forecast"
-              : `no ${colorSource === "ease" ? "club-ease" : "official-FDR"} value is ` +
-                "available beyond the recorded forecast horizon";
+              : colorSource === "fdr" && fixture.official_fdr != null
+                ? `colour uses current official FDR ${fixture.official_fdr} from the schedule overlay, ` +
+                  "not the selected forecast vintage"
+                : colorSource === "fdr"
+                  ? "current official FDR unavailable"
+                  : easeValue != null
+                    ? `colour uses selected-vintage ${view === "defense" ? "clean-sheet" : "club-ease"} ` +
+                      `proxy ${view === "defense" ? `${Math.round(easeValue * 100)}%` : easeValue.toFixed(0)} ` +
+                      `(${SCHEDULE_EASE_PROXY_FORMULA}), composed from GW${modelGwFrom}-GW${modelGwTo} ` +
+                      "club averages with no later fixture model or venue adjustment"
+                    : "selected-vintage club-ease proxy unavailable";
         const label =
           `GW${fixture.gw} vs ${fixture.opponent_short_name} ${venue}: current official ` +
-          `schedule only; ${proxyLabel}; ${kickoff} UTC`;
+          `schedule only; ${colourLabel}; ${kickoff} UTC`;
+        const display =
+          colorSource === "opponent"
+            ? opponentIndex == null
+              ? "-"
+              : opponentIndex.toFixed(0)
+            : colorSource === "fdr"
+              ? fixture.official_fdr == null
+                ? "-"
+                : `FDR ${fixture.official_fdr}`
+              : easeValue == null
+                ? "-"
+                : view === "defense"
+                  ? `${Math.round(easeValue * 100)}%`
+                  : easeValue.toFixed(0);
         return (
           <span
             key={fixture.fixture}
             data-testid="schedule-chip"
             data-gw={fixture.gw}
-            data-bucket={opponentBucket ?? "null"}
+            data-bucket={scheduleBucket ?? "null"}
             title={label}
             aria-label={label}
             className={`inline-flex h-8 ${FIXTURE_CARD_WIDTH_CLASS} flex-col justify-center rounded-md px-1 text-center ${
-              opponentBucket
-                ? BUCKET_CLASSES[opponentBucket]
+              scheduleBucket
+                ? BUCKET_CLASSES[scheduleBucket]
                 : "border border-border bg-muted text-muted-foreground"
             }`}
           >
@@ -205,9 +257,7 @@ function TeamGwCell({
               <span className="ml-0.5 font-normal">{venue}</span>
             </span>
             <span className="text-[9px] leading-tight tabular-nums">
-              GW{fixture.gw} ·{opponentBucket && opponentIndex != null
-                ? ` ${opponentIndex.toFixed(0)}`
-                : " \u2013"}
+              GW{fixture.gw} · {display}
             </span>
           </span>
         );
@@ -332,9 +382,13 @@ export function FixtureMatrixPage() {
   }, [runTeams]);
 
   const opponentStrength = useMemo(() => buildOpponentStrength(runTeams), [runTeams]);
-  const opponentIndexOf = useMemo(
-    () => (teamCode: number) => opponentStrength.get(teamCode)?.index ?? null,
+  const strengthOf = useMemo(
+    () => (teamCode: number) => opponentStrength.get(teamCode) ?? null,
     [opponentStrength],
+  );
+  const opponentIndexOf = useMemo(
+    () => (teamCode: number) => strengthOf(teamCode)?.index ?? null,
+    [strengthOf],
   );
 
   const rows: TeamRow[] = useMemo(() => {
@@ -454,10 +508,12 @@ export function FixtureMatrixPage() {
           <TeamGwCell
             fixtures={row.original.filtered}
             scheduleOnly={row.original.scheduleOnly}
+            teamCode={row.original.team.team_code}
             gw={gw}
             view={filters?.view ?? "overall"}
             colorSource={colorSource}
             opponentIndexOf={opponentIndexOf}
+            strengthOf={strengthOf}
             cleanSheetAnchor={cleanSheetAnchor}
             modelGwFrom={runBounds.from}
             modelGwTo={runBounds.to}
@@ -470,6 +526,7 @@ export function FixtureMatrixPage() {
       colorSource,
       cleanSheetAnchor,
       opponentIndexOf,
+      strengthOf,
       formWindow,
       runBounds.from,
       runBounds.to,
@@ -587,9 +644,9 @@ export function FixtureMatrixPage() {
         <p className="mt-1 text-xs text-muted-foreground">
           Sorted by average modelled ease, easiest schedule first (click any column to re-sort).
           One column per gameweek; two chips in a double gameweek. Beyond GW{runBounds.to},
-          current official fixtures use the fixed selected-vintage opponent-strength proxy only
-          in Opponent strength view; Club ease and Official FDR stay neutral. Later fixtures never
-          affect the modelled average.
+          current official fixtures use current schedule FDR or fixed selected-vintage display
+          proxies for opponent strength and club ease. Those later cards never affect the
+          modelled average.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Current schedule overlay exported{" "}
@@ -688,7 +745,8 @@ export function FixtureMatrixPage() {
                     <div className="max-w-3xl space-y-1">
                       <p className="text-xs font-medium">
                         {row.original.team.team_name} — selected fixtures by kickoff. Model
-                        primitives end at GW{runBounds.to}; later rows are schedule only.
+                        primitives end at GW{runBounds.to}; later rows are schedule only, with
+                        current FDR and ~-prefixed selected-vintage display proxies.
                       </p>
                       <Table>
                         <TableHeader>
@@ -713,6 +771,13 @@ export function FixtureMatrixPage() {
                           {byKickoff.map((detail) => {
                             const f = detail.fixture;
                             const model = detail.status === "modelled" ? detail.fixture : null;
+                            const proxy =
+                              detail.status === "schedule_only"
+                                ? scheduleEaseProxy(
+                                    strengthOf(row.original.team.team_code),
+                                    strengthOf(f.opponent_team_code),
+                                  )
+                                : null;
                             return (
                             <TableRow key={`${detail.status}-${f.fixture}`}>
                               <TableCell className="px-2 py-1 text-[11px] tabular-nums">
@@ -727,15 +792,41 @@ export function FixtureMatrixPage() {
                               <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.lambda_for, 2)}</TableCell>
                               <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.lambda_against, 2)}</TableCell>
                               <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {fmt(model?.probability_clean_sheet == null ? null : model.probability_clean_sheet * 100, 1)}
+                                {model
+                                  ? fmt(
+                                      model.probability_clean_sheet == null
+                                        ? null
+                                        : model.probability_clean_sheet * 100,
+                                      1,
+                                    )
+                                  : fmtProxy(
+                                      proxy?.probabilityCleanSheet == null
+                                        ? null
+                                        : proxy.probabilityCleanSheet * 100,
+                                      1,
+                                    )}
                               </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.attack_ease_index)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.defence_ease_index)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.overall_ease_index)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                {model
+                                  ? fmt(model.attack_ease_index)
+                                  : fmtProxy(proxy?.attackEase)}
+                              </TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                {model
+                                  ? fmt(model.defence_ease_index)
+                                  : fmtProxy(proxy?.defenceEase)}
+                              </TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                {model
+                                  ? fmt(model.overall_ease_index)
+                                  : fmtProxy(proxy?.overallEase)}
+                              </TableCell>
                               <TableCell className="px-2 py-1 text-[11px] tabular-nums">
                                 {fmt(opponentIndexOf(f.opponent_team_code), 0)}
                               </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.official_fdr, 0)}</TableCell>
+                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                {fmt(model ? model.official_fdr : f.official_fdr, 0)}
+                              </TableCell>
                               <TableCell className="px-2 py-1 text-[11px]">
                                 {model ? (model.stage_a_league_average_team ? "yes" : "no") : "–"}
                               </TableCell>
@@ -757,9 +848,9 @@ export function FixtureMatrixPage() {
       <p className="text-xs text-muted-foreground">
         Availability and chance-of-playing are reported overlays valid for the next gameweek;
         they are not shown here and never fold into these distributions. The 10- and 15-GW
-        extensions add current official fixtures only. Their fixed selected-vintage opponent
-        proxy is display context, not a later fixture-specific forecast; no later Club ease or
-        Official FDR is implied.
+        extensions add current official fixtures and FDR only. Their fixed selected-vintage
+        opponent-strength and club-ease proxies are display context, not later fixture-specific
+        forecasts; hover a card for its exact source.
       </p>
     </div>
   );

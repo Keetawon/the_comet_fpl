@@ -1,7 +1,11 @@
-# BI export contract, version 1
+# BI export contract, version 2
 
 Status: implemented by DEV-ROADMAP P1.4. This document describes the durable, read-only BI
 boundary; `src/fpl/publish/contract.py` remains the frozen semantic schema authority.
+
+Version 2 additively carries current directed `home_official_fdr` and
+`away_official_fdr` on `dim_fixture` for the separately versioned schedule overlay. Forecast
+facts and the fixture-ease formula are unchanged.
 
 ## Boundary
 
@@ -135,7 +139,9 @@ never infinity. The formula identity remains non-null even on a row whose indice
 seasons use `mart_fact_team_match.fdr`. A season absent from that archive mart uses
 `mart_team_fixture_live.fdr`, selecting the latest `(known_at, capture_id)` per
 `(season, fixture, team_id)`, consistent with the live-dimension current-registry policy. Missing FDR
-stays NULL. It is never an input to the denominator or any ease index.
+stays NULL. The same source populates the two directed FDR columns on `dim_fixture` so the current
+schedule overlay can extend beyond a forecast horizon. It is never an input to the denominator or
+any ease index.
 
 ## Validation
 
@@ -168,7 +174,7 @@ characters):
 {
   "schema": "fpl.bi-semantic-export",
   "schema_version": 1,
-  "semantic_contract_version": 1,
+  "semantic_contract_version": 2,
   "created_at": "2026-08-14T00:00:00+00:00",
   "database_sha256": "…",
   "exported_run_ids": [],

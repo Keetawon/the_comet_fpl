@@ -15,11 +15,20 @@ import type { TeamRecord } from "@/data/types";
 import type { DifficultyBucket } from "@/lib/difficulty";
 
 export const OPPONENT_STRENGTH_FORMULA = "opponent-strength-v1";
+export const SCHEDULE_EASE_PROXY_FORMULA = "fixture-ease-proxy-v1";
 
 export interface OpponentStrength {
   index: number | null;
   avgFor: number | null;
   avgAgainst: number | null;
+  leagueAverage: number | null;
+}
+
+export interface ScheduleEaseProxy {
+  attackEase: number | null;
+  defenceEase: number | null;
+  overallEase: number | null;
+  probabilityCleanSheet: number | null;
 }
 
 export function buildOpponentStrength(teams: TeamRecord[]): Map<number, OpponentStrength> {
@@ -47,9 +56,60 @@ export function buildOpponentStrength(teams: TeamRecord[]): Map<number, Opponent
       league != null && league > 0
         ? 100 * Math.sqrt((avgFor / league) * (league / avgAgainst))
         : null;
-    result.set(code, { index, avgFor, avgAgainst });
+    result.set(code, { index, avgFor, avgAgainst, leagueAverage: league });
   }
   return result;
+}
+
+/**
+ * Display-only later-schedule proxy. It composes the selected vintage's average club attack and
+ * defence levels for the named club and its opponent. It deliberately has no later fixture model,
+ * venue adjustment, or schedule input beyond the opponent identity.
+ */
+export function scheduleEaseProxy(
+  own: OpponentStrength | null | undefined,
+  opponent: OpponentStrength | null | undefined,
+): ScheduleEaseProxy {
+  const unavailable: ScheduleEaseProxy = {
+    attackEase: null,
+    defenceEase: null,
+    overallEase: null,
+    probabilityCleanSheet: null,
+  };
+  const league = own?.leagueAverage;
+  if (
+    own == null ||
+    opponent == null ||
+    league == null ||
+    !Number.isFinite(league) ||
+    league <= 0 ||
+    own.avgFor == null ||
+    own.avgAgainst == null ||
+    opponent.avgFor == null ||
+    opponent.avgAgainst == null
+  ) {
+    return unavailable;
+  }
+
+  const lambdaFor = (own.avgFor * opponent.avgAgainst) / league;
+  const lambdaAgainst = (own.avgAgainst * opponent.avgFor) / league;
+  if (
+    !Number.isFinite(lambdaFor) ||
+    lambdaFor < 0 ||
+    !Number.isFinite(lambdaAgainst) ||
+    lambdaAgainst < 0
+  ) {
+    return unavailable;
+  }
+  const attackEase = (100 * lambdaFor) / league;
+  const defenceEase = lambdaAgainst > 0 ? (100 * league) / lambdaAgainst : null;
+  return {
+    attackEase,
+    defenceEase,
+    overallEase:
+      defenceEase == null ? null : Math.sqrt(Math.max(0, attackEase * defenceEase)),
+    probabilityCleanSheet: Math.exp(-lambdaAgainst),
+  };
 }
 
 /**

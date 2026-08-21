@@ -11,6 +11,7 @@ import type {
   OptimizerAuditData,
   PlayerFixture,
   PlayerRecord,
+  PlanPlayer,
 } from "@/data/types";
 import { USER_DRAFT_STORAGE_KEY, UserDraftPage } from "./UserDraftPage";
 
@@ -60,6 +61,7 @@ const draftPlayers = positions.map((_, index) => draftPlayer(index));
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  window.location.hash = "#squad-draft";
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadOptimizerAudit).mockResolvedValue(audit);
   vi.mocked(loadPlayers).mockResolvedValue({ players: draftPlayers, manifest: null });
@@ -146,7 +148,8 @@ describe("UserDraftPage", () => {
     window.localStorage.setItem(
       USER_DRAFT_STORAGE_KEY,
       JSON.stringify({
-        version: 1,
+        version: 2,
+        optimizerRunId: plans[0].optimizer_run_id,
         forecastRunId: plans[0].forecast_run_id,
         season: plans[0].season,
         playerCodes: [1],
@@ -179,6 +182,88 @@ describe("UserDraftPage", () => {
       JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
     ).toMatchObject({ playerCodes: [] });
     expect(window.localStorage.getItem("fpl-solved-plan")).toBeNull();
+  });
+
+  it("replaces the draft with the exact optimized squad from an explicit handoff", async () => {
+    const planPlayers: PlanPlayer[] = draftPlayers.map((player, index) => {
+      const isBenchGoalkeeper = index === 1;
+      const isBenchOutfield = index === 11 || index === 13 || index === 14;
+      return {
+        code: player.code,
+        web_name: player.web_name,
+        position: player.position,
+        team_code: player.team_code,
+        team_short_name: player.team_short_name,
+        now_cost: player.now_cost,
+        role: isBenchGoalkeeper
+          ? "bench_goalkeeper"
+          : isBenchOutfield
+            ? "bench_outfield"
+            : "starting_xi",
+        bench_order_index: isBenchGoalkeeper ? 0 : isBenchOutfield ? index : null,
+        is_captain: index === 0,
+        is_vice_captain: index === 2,
+        transferred_in: false,
+        transferred_out: false,
+        expected_points: 1,
+      };
+    });
+    const handoffPlan: NextGwPlan = {
+      ...plans[0],
+      optimizer_run_id: "custom-handoff",
+      decision_sha256: "custom-handoff-decision",
+      plan_kind: "user_custom",
+      display_label: "Your optimized handoff",
+      weeks: [
+        { ...plans[0].weeks[0], players: planPlayers },
+        ...plans[0].weeks.slice(1),
+      ],
+    };
+    const handoffAudit = {
+      ...audit.plans[0],
+      optimizer_run_id: handoffPlan.optimizer_run_id,
+      decision_sha256: handoffPlan.decision_sha256,
+      forecast_run_id: handoffPlan.forecast_run_id,
+      plan_kind: handoffPlan.plan_kind,
+      display_label: handoffPlan.display_label,
+      as_of: handoffPlan.as_of,
+      season: handoffPlan.season,
+      gw_from: handoffPlan.gw_from,
+      gw_to: handoffPlan.gw_to,
+    };
+    vi.mocked(loadNextGw).mockResolvedValue({ plans: [...plans, handoffPlan] });
+    vi.mocked(loadOptimizerAudit).mockResolvedValue({
+      ...audit,
+      plans: [...audit.plans, handoffAudit],
+    });
+    window.localStorage.setItem(
+      USER_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        version: 2,
+        optimizerRunId: plans[0].optimizer_run_id,
+        forecastRunId: plans[0].forecast_run_id,
+        season: plans[0].season,
+        playerCodes: [1],
+      }),
+    );
+    window.location.hash = "#squad-draft?optimizer_run_id=custom-handoff";
+
+    const { container } = render(<UserDraftPage />);
+
+    expect(await screen.findByText("15/15 players")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Forwarded 15 optimized players from Your optimized handoff",
+    );
+    expect(container.querySelectorAll("tr[data-player-code]")).toHaveLength(15);
+    expect(
+      JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
+    ).toMatchObject({
+      version: 2,
+      optimizerRunId: handoffPlan.optimizer_run_id,
+      forecastRunId: handoffPlan.forecast_run_id,
+      playerCodes: draftPlayers.map((player) => player.code),
+    });
+    expect(window.location.hash).toBe("#squad-draft");
   });
 
   it("fails closed when the platform plan has no exact audit rules snapshot", async () => {

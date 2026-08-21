@@ -476,6 +476,12 @@ describe("PlanBuilderPage", () => {
     expect(screen.getByText(/locked ·/).parentElement).toHaveTextContent("Alpha");
     expect(screen.getByText(/excluded ·/).parentElement).toHaveTextContent("Beta");
     expect(screen.getByText(/optimizer run solved-custo/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Forward team to Squad Draft" }),
+    ).toHaveAttribute(
+      "href",
+      "#squad-draft?optimizer_run_id=solved-custom-run",
+    );
     const squadTable = screen.getByRole("table", { name: "GW1 custom squad analysis" });
     const mainRows = within(squadTable)
       .getAllByRole("row")

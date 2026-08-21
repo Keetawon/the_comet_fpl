@@ -1,7 +1,8 @@
-// Browser-only squad sandbox. It binds to the one formal platform-default forecast
-// vintage and the matching recorded rules snapshot, but never runs the optimizer or
-// writes a decision artifact. Structural FPL squad rules are enforced while budget is
-// deliberately advisory so managers can explore future value-growth scenarios.
+// Browser-only squad sandbox. By default it binds to the one formal platform-default forecast;
+// an explicit optimizer-run hash handoff may instead seed that exact plan's first-week squad.
+// The matching forecast and recorded rules snapshot are always resolved together. This page never
+// runs the optimizer or writes a decision artifact. Structural FPL squad rules are enforced while
+// budget is deliberately advisory so managers can explore future value-growth scenarios.
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -54,6 +55,10 @@ import {
   userDraftTotals,
   type UserDraftRules,
 } from "@/lib/userDraft";
+import {
+  clearSquadDraftHandoff,
+  squadDraftHandoffRunId,
+} from "@/lib/squadDraftHandoff";
 import { cn } from "@/lib/utils";
 
 const PLAYER_PAGE_SIZE = 40;
@@ -84,7 +89,8 @@ type PageState =
   | ReadyState;
 
 interface StoredDraft {
-  version: 1;
+  version: 2;
+  optimizerRunId: string;
   forecastRunId: string;
   season: string;
   playerCodes: number[];
@@ -109,6 +115,21 @@ function platformDefaultPlan(plans: readonly NextGwPlan[]): NextGwPlan {
   return defaults[0];
 }
 
+function planForHandoff(
+  plans: readonly NextGwPlan[],
+  optimizerRunId: string | null,
+): NextGwPlan {
+  if (optimizerRunId == null) return platformDefaultPlan(plans);
+  const matches = plans.filter((plan) => plan.optimizer_run_id === optimizerRunId);
+  if (matches.length !== 1) {
+    throw new Error(
+      `Squad Draft cannot find one optimizer plan for handoff ${optimizerRunId}; found ${matches.length}. ` +
+        "Re-publish the dashboard read models.",
+    );
+  }
+  return matches[0];
+}
+
 function matchingAuditPlan(
   plan: NextGwPlan,
   audit: OptimizerAuditData,
@@ -118,7 +139,7 @@ function matchingAuditPlan(
       candidate.optimizer_run_id === plan.optimizer_run_id &&
       candidate.decision_sha256 === plan.decision_sha256 &&
       candidate.forecast_run_id === plan.forecast_run_id &&
-      candidate.plan_kind === "platform_default" &&
+      candidate.plan_kind === plan.plan_kind &&
       candidate.season === plan.season &&
       candidate.gw_from === plan.gw_from &&
       candidate.gw_to === plan.gw_to &&
@@ -126,7 +147,7 @@ function matchingAuditPlan(
   );
   if (matches.length !== 1) {
     throw new Error(
-      "Squad Draft cannot find one exact rules snapshot for the platform-default plan. " +
+      "Squad Draft cannot find one exact rules snapshot for the selected optimizer plan. " +
         "Re-publish next_gw.json and optimizer_audit.json together.",
     );
   }
@@ -137,13 +158,14 @@ function resolveReadyState(
   allPlayers: readonly PlayerRecord[],
   plans: readonly NextGwPlan[],
   audit: OptimizerAuditData,
+  optimizerRunId: string | null,
 ): ReadyState {
-  const plan = platformDefaultPlan(plans);
+  const plan = planForHandoff(plans, optimizerRunId);
   const auditPlan = matchingAuditPlan(plan, audit);
   const snapshot: RulesSnapshot = auditPlan.rules_snapshot;
   if (snapshot.season !== plan.season || auditPlan.season !== plan.season) {
     throw new Error(
-      "Squad Draft rules and platform forecast belong to different seasons. " +
+      "Squad Draft rules and selected forecast belong to different seasons. " +
         "Re-publish the dashboard read models together.",
     );
   }
@@ -167,12 +189,12 @@ function resolveReadyState(
   const codes = new Set(runPlayers.map((player) => player.code));
   if (codes.size !== runPlayers.length) {
     throw new Error(
-      "Squad Draft found duplicate players in the platform-default forecast vintage.",
+      "Squad Draft found duplicate players in the selected forecast vintage.",
     );
   }
   if (runPlayers.length === 0) {
     throw new Error(
-      "Squad Draft found no priced players for the platform-default forecast vintage.",
+      "Squad Draft found no priced players for the selected forecast vintage.",
     );
   }
   return { status: "ready", plan, auditPlan, players: runPlayers, rules, loadedGws };
@@ -203,13 +225,15 @@ function restoreDraft(
   }
   const stored = candidate as Partial<StoredDraft>;
   if (
-    stored.version !== 1 ||
+    stored.version !== 2 ||
+    stored.optimizerRunId !== state.plan.optimizer_run_id ||
     stored.forecastRunId !== state.plan.forecast_run_id ||
     stored.season !== state.plan.season
   ) {
     return {
       players: [],
-      warning: "A saved draft belongs to another forecast vintage, so a new draft was started.",
+      warning:
+        "A saved draft belongs to another optimizer run or forecast vintage, so a new draft was started.",
     };
   }
   if (!Array.isArray(stored.playerCodes)) {
@@ -237,6 +261,62 @@ function restoreDraft(
       ? "Some saved players were unavailable or broke the current structural rules and were omitted."
       : null,
   };
+}
+
+function forwardedDraft(state: ReadyState): PlayerRecord[] {
+  const weeks = state.plan.weeks.filter((week) => week.gw === state.plan.gw_from);
+  if (weeks.length !== 1) {
+    throw new Error(
+      "Squad Draft handoff requires exactly one first-gameweek optimizer squad.",
+    );
+  }
+  const planPlayers = weeks[0].players;
+  if (planPlayers.length !== state.rules.squadSize) {
+    throw new Error(
+      `Squad Draft handoff expected ${state.rules.squadSize} optimized players; ` +
+        `found ${planPlayers.length}.`,
+    );
+  }
+
+  const byCode = new Map(state.players.map((player) => [player.code, player]));
+  const selected: PlayerRecord[] = [];
+  for (const planPlayer of planPlayers) {
+    const player = byCode.get(planPlayer.code);
+    if (!player) {
+      throw new Error(
+        `Squad Draft handoff player ${planPlayer.code} is missing from forecast ` +
+          `${state.plan.forecast_run_id}.`,
+      );
+    }
+    const guard = userDraftSelectionGuard(selected, player, state.rules);
+    if (!guard.allowed) {
+      throw new Error(
+        `Squad Draft handoff is not structurally legal at player ${planPlayer.code} ` +
+          `(${guard.reason ?? "unknown rule"}).`,
+      );
+    }
+    selected.push(player);
+  }
+  if (!userDraftStructure(selected, state.rules).isComplete) {
+    throw new Error("Squad Draft handoff did not produce a complete structural squad.");
+  }
+  return selected;
+}
+
+function storeDraft(state: ReadyState, players: readonly PlayerRecord[]): string | null {
+  const payload: StoredDraft = {
+    version: 2,
+    optimizerRunId: state.plan.optimizer_run_id,
+    forecastRunId: state.plan.forecast_run_id,
+    season: state.plan.season,
+    playerCodes: players.map((player) => player.code),
+  };
+  try {
+    window.localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+    return null;
+  } catch {
+    return "Browser storage is unavailable; this draft will last only for this tab.";
+  }
 }
 
 function guardReasonLabel(reason: ReturnType<typeof userDraftSelectionGuard>["reason"]): string {
@@ -574,20 +654,50 @@ export function UserDraftPage() {
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [selected, setSelected] = useState<PlayerRecord[]>([]);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    let optimizerRunId: string | null;
+    try {
+      optimizerRunId = squadDraftHandoffRunId(window.location.hash);
+    } catch (error: unknown) {
+      setState({
+        status: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
     Promise.all([loadPlayers(), loadNextGw(), loadOptimizerAudit()])
       .then(([playersData, nextGw, audit]) => {
         if (cancelled) return;
-        const ready = resolveReadyState(playersData.players, nextGw.plans, audit);
-        const restored = restoreDraft(ready);
+        const ready = resolveReadyState(
+          playersData.players,
+          nextGw.plans,
+          audit,
+          optimizerRunId,
+        );
+        const restored =
+          optimizerRunId == null
+            ? restoreDraft(ready)
+            : {
+                players: forwardedDraft(ready),
+                warning: null,
+              };
+        const warning =
+          optimizerRunId == null ? restored.warning : storeDraft(ready, restored.players);
         setState(ready);
         setSelected(restored.players);
-        setStorageWarning(restored.warning);
+        setStorageWarning(warning);
+        if (optimizerRunId != null) {
+          setHandoffNotice(
+            `Forwarded ${restored.players.length} optimized players from ${ready.plan.display_label}.`,
+          );
+          clearSquadDraftHandoff();
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -604,18 +714,7 @@ export function UserDraftPage() {
 
   const persistSelection = (ready: ReadyState, next: PlayerRecord[]) => {
     setSelected(next);
-    const payload: StoredDraft = {
-      version: 1,
-      forecastRunId: ready.plan.forecast_run_id,
-      season: ready.plan.season,
-      playerCodes: next.map((player) => player.code),
-    };
-    try {
-      window.localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify(payload));
-      setStorageWarning(null);
-    } catch {
-      setStorageWarning("Browser storage is unavailable; this draft will last only for this tab.");
-    }
+    setStorageWarning(storeDraft(ready, next));
   };
 
   const teams = useMemo(() => {
@@ -690,15 +789,16 @@ export function UserDraftPage() {
         <div className="max-w-3xl">
           <h1 className="text-lg font-semibold">Squad Draft</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Build a manual what-if squad from the platform forecast. Position quotas and the
-            maximum-per-club rule are enforced; cost is shown but never blocks an experimental
-            draft. Nothing here runs or replaces the optimizer.
+            Build a manual what-if squad from the selected optimizer forecast. A handoff starts
+            from that run's optimized first-week squad; you can then edit it freely. Position
+            quotas and the maximum-per-club rule are enforced; cost is shown but never blocks an
+            experimental draft. Nothing here re-runs or replaces the optimizer.
           </p>
         </div>
         <div className="text-right text-xs text-muted-foreground">
           <p>{state.plan.season} · GW{state.loadedGws[0]}–GW{state.loadedGws.at(-1)}</p>
           <p title={state.plan.forecast_run_id}>
-            platform forecast {state.plan.forecast_run_id.slice(0, 12)}…
+            {state.plan.display_label} · forecast {state.plan.forecast_run_id.slice(0, 12)}…
           </p>
         </div>
       </div>
@@ -709,6 +809,15 @@ export function UserDraftPage() {
           className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
         >
           {storageWarning}
+        </p>
+      )}
+
+      {handoffNotice && (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+        >
+          {handoffNotice} This is now an editable browser draft.
         </p>
       )}
 
@@ -821,7 +930,7 @@ export function UserDraftPage() {
           <div>
             <h2 id="add-player-heading" className="font-semibold">Add players</h2>
             <p className="text-xs text-muted-foreground">
-              Full priced roster for the exact platform-default forecast vintage.
+              Full priced roster for the exact selected optimizer forecast vintage.
             </p>
           </div>
           <Input
