@@ -176,11 +176,17 @@ def _member(index: ArtifactIndex, code: int) -> SquadMember:
     )
 
 
-def validate_squad(index: ArtifactIndex, rules: SquadRules, codes: tuple[int, ...]) -> None:
+def validate_squad(
+    index: ArtifactIndex,
+    rules: SquadRules,
+    codes: tuple[int, ...],
+    *,
+    enforce_budget: bool = True,
+) -> None:
     if len(codes) != rules.squad.size or len(set(codes)) != len(codes):
         raise OptimizationError("squad must contain the configured number of distinct players")
     members = tuple(_member(index, code) for code in codes)
-    if sum(member.now_cost for member in members) > rules.squad.budget_tenths:
+    if enforce_budget and sum(member.now_cost for member in members) > rules.squad.budget_tenths:
         raise OptimizationError("squad exceeds the budget")
     for position in POSITIONS:
         actual = sum(member.position == position for member in members)
@@ -229,9 +235,11 @@ def exact_lineup(
     squad: tuple[int, ...],
     gw: int,
     risk_lambda: float,
+    *,
+    enforce_budget: bool = True,
 ) -> WeekSelection:
     """Exact additive lineup/captain solution for a fixed legal 15-player squad."""
-    validate_squad(index, rules, squad)
+    validate_squad(index, rules, squad, enforce_budget=enforce_budget)
     by_position = {
         position: tuple(code for code in squad if index.first_by_code[code].position == position)
         for position in POSITIONS
@@ -294,6 +302,66 @@ def exact_lineup(
         bench_order=bench_order,
         expected_points=expected,
         objective_value=value,
+    )
+
+
+def solution_for_existing_squad(
+    artifact: ProspectivePointsArtifact,
+    rules: SquadRules,
+    codes: tuple[int, ...],
+    *,
+    risk_lambda: float = 0.0,
+    min_bench_appearance: float = 0.0,
+    locked_codes: tuple[int, ...] = (),
+    excluded_codes: tuple[int, ...] = (),
+) -> SquadSolution:
+    """Build exact weekly lineups for an imported manager squad without a fresh-team budget test.
+
+    An existing FPL squad is governed by its bank and each owned player's selling value, not by
+    the sum of current market prices. A legal squad can therefore have a current-price total above
+    the nominal 100.0 starting budget. Position and club limits still apply exactly; affordability
+    of each proposed transfer is checked by the transfer planner against the imported cash state.
+    """
+    if not math.isfinite(min_bench_appearance) or not 0.0 <= min_bench_appearance <= 1.0:
+        raise ValueError("min_bench_appearance must be finite and within [0, 1]")
+    index = ArtifactIndex.build(artifact, rules)
+    selected = tuple(sorted(codes))
+    selectable = set(index.selectable_codes())
+    unknown = sorted(set(selected) - selectable)
+    if unknown:
+        raise OptimizationError(
+            f"existing squad codes are not selectable players in the artifact: {unknown}"
+        )
+    locked = tuple(sorted(set(locked_codes)))
+    excluded = tuple(sorted(set(excluded_codes)))
+    overlap = sorted(set(locked).intersection(excluded))
+    if overlap:
+        raise OptimizationError("players cannot be both locked and excluded")
+    missing_locks = sorted(set(locked) - set(selected))
+    if missing_locks:
+        raise OptimizationError(
+            f"locked codes are not in the existing squad: {missing_locks}"
+        )
+    validate_squad(index, rules, selected, enforce_budget=False)
+    # These are an auditable view of the imported starting state, not the manager plan itself.
+    # Do not apply the bench gate here: the manager planner may repair a below-threshold bench (or
+    # force an owned exclusion out) at the first actionable forecast deadline.
+    weeks = tuple(
+        exact_lineup(index, rules, selected, gw, risk_lambda, enforce_budget=False)
+        for gw in index.gws
+    )
+    members = tuple(_member(index, code) for code in selected)
+    return SquadSolution(
+        members=members,
+        squad_cost_tenths=sum(member.now_cost for member in members),
+        weeks=weeks,
+        expected_points=sum(week.expected_points for week in weeks),
+        objective_value=sum(week.objective_value for week in weeks),
+        risk_lambda=risk_lambda,
+        solver_status="Imported",
+        min_bench_appearance=min_bench_appearance,
+        locked_codes=locked,
+        excluded_codes=excluded,
     )
 
 

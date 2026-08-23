@@ -110,6 +110,7 @@ from fpl.config import (
     repo_root,
 )
 from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
+from fpl.ingest.player_registry import selectable_player_registry_sha256
 from fpl.models.attacking_assists_baselines import AssistHistoryRow
 from fpl.models.attacking_baselines import (
     PlayerHistoryRow,
@@ -1211,6 +1212,7 @@ class ProspectivePointsResult:
     bootstrap_known_at: datetime
     bootstrap_payload_sha256: str
     schedule_capture_ids: tuple[str, ...]
+    selectable_player_registry_sha256: str
 
 
 def _stage_a_uses_league_average(
@@ -1941,6 +1943,10 @@ def predict_prospective_points(
         bootstrap_known_at=bootstrap.known_at,
         bootstrap_payload_sha256=bootstrap.payload_sha256,
         schedule_capture_ids=selected_schedule_capture_ids,
+        selectable_player_registry_sha256=selectable_player_registry_sha256(
+            bootstrap.data,
+            season=season,
+        ),
     )
 
 
@@ -2168,6 +2174,7 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
             bootstrap_known_at=result.bootstrap_known_at,
             bootstrap_payload_sha256=result.bootstrap_payload_sha256,
             schedule_capture_ids=result.schedule_capture_ids,
+            selectable_player_registry_sha256=result.selectable_player_registry_sha256,
         ),
     )
     return ProspectivePointsArtifact(

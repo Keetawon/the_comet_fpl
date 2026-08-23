@@ -29,8 +29,14 @@ from fpl.optimize.squad import (
     bench_appearance_satisfied,
     exact_lineup,
     optimize_initial_squad,
+    solution_for_existing_squad,
 )
-from fpl.optimize.transfers import _successor_squads, plan_transfers
+from fpl.optimize.transfers import (
+    ManagerFinancialState,
+    OwnedPlayerFinancials,
+    _successor_squads,
+    plan_transfers,
+)
 
 HASH = "a" * 64
 
@@ -549,6 +555,168 @@ def test_transfer_planner_takes_hit_only_when_incremental_gain_repays_it(
 
 
 _INITIAL_SQUAD = (1, 2, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24, 30, 31, 32)
+
+
+def _manager_financials(
+    index: ArtifactIndex,
+    codes: tuple[int, ...] = _INITIAL_SQUAD,
+    *,
+    bank_tenths: int = 0,
+    free_transfers: int = 0,
+    selling_overrides: dict[int, int] | None = None,
+) -> ManagerFinancialState:
+    overrides = selling_overrides or {}
+    return ManagerFinancialState(
+        bank_tenths=bank_tenths,
+        free_transfers_available=free_transfers,
+        owned_players=tuple(
+            OwnedPlayerFinancials(
+                code=code,
+                purchase_price_tenths=index.first_by_code[code].now_cost or 0,
+                selling_price_tenths=overrides.get(
+                    code, index.first_by_code[code].now_cost or 0
+                ),
+            )
+            for code in codes
+        ),
+    )
+
+
+def test_imported_existing_squad_can_exceed_fresh_market_budget() -> None:
+    players = tuple(
+        replace(player, cost=70)
+        for player in _base_players()
+        if player.code in set(_INITIAL_SQUAD)
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+    imported = solution_for_existing_squad(artifact, rules, _INITIAL_SQUAD)
+    assert imported.squad_cost_tenths == 1050
+    assert imported.solver_status == "Imported"
+
+
+def test_manager_plan_can_transfer_in_first_forecast_gw_and_charges_new_hit() -> None:
+    players = (
+        *(
+            player
+            for player in _base_players(horizon=2)
+            if player.code in set(_INITIAL_SQUAD)
+        ),
+        _Player(code=35, position="FWD", points=(20.0, 20.0)),
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    plan = plan_transfers(
+        index,
+        rules,
+        initial,
+        manager_financial_state=_manager_financials(index),
+    )
+    first = plan.weeks[0]
+    assert first.transfers_out == (32,)
+    assert first.transfers_in == (35,)
+    assert first.free_transfers_before == 0
+    assert first.hit_points == 4
+    assert first.bank_before_tenths == 0
+    assert first.bank_after_tenths == 0
+    assert plan.hit_points == 4
+
+
+def test_manager_plan_uses_selling_value_not_owned_now_cost_for_affordability() -> None:
+    players = (
+        *(
+            replace(player, cost=50) if player.code == 32 else player
+            for player in _base_players()
+            if player.code in set(_INITIAL_SQUAD)
+        ),
+        _Player(code=35, position="FWD", points=(20.0,), cost=50),
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    plan = plan_transfers(
+        index,
+        rules,
+        initial,
+        manager_financial_state=_manager_financials(
+            index, free_transfers=1, selling_overrides={32: 45}
+        ),
+    )
+    first = plan.weeks[0]
+    assert first.transfers_in == ()
+    assert first.squad == _INITIAL_SQUAD
+    assert first.bank_after_tenths == 0
+    assert first.free_transfers_after == 1
+
+
+def test_manager_owned_exclusion_is_forced_out_in_first_actionable_gw() -> None:
+    players = (
+        *(player for player in _base_players() if player.code in set(_INITIAL_SQUAD)),
+        _Player(code=35, position="FWD", points=(6.0,)),
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    plan = plan_transfers(
+        index,
+        rules,
+        initial,
+        excluded_codes=(32,),
+        manager_financial_state=_manager_financials(index, free_transfers=1),
+    )
+    assert plan.weeks[0].transfers_out == (32,)
+    assert 32 not in plan.weeks[0].squad
+    assert plan.weeks[0].hit_points == 0
+
+
+def test_manager_affordability_filters_before_transition_pruning() -> None:
+    players = (
+        *(player for player in _base_players() if player.code in set(_INITIAL_SQUAD)),
+        _Player(code=35, position="FWD", points=(30.0,), cost=100, team_id=35),
+        _Player(code=36, position="FWD", points=(20.0,), cost=40, team_id=36),
+    )
+    artifact = _artifact(players)
+    rules = _with_search(
+        load_squad_rules(),
+        transition_limit_per_state=1,
+        maximum_planned_transfers_per_gameweek=1,
+    )
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    plan = plan_transfers(
+        index,
+        rules,
+        initial,
+        excluded_codes=(32,),
+        manager_financial_state=_manager_financials(index, free_transfers=1),
+    )
+    assert plan.weeks[0].transfers_out == (32,)
+    assert plan.weeks[0].transfers_in == (36,)
+    assert plan.weeks[0].bank_after_tenths == 0
+
+
+def test_manager_remaining_free_transfers_are_not_regranted_in_first_week() -> None:
+    players = (
+        *(
+            player
+            for player in _base_players(horizon=2)
+            if player.code in set(_INITIAL_SQUAD)
+        ),
+        _Player(code=35, position="FWD", points=(20.0, 20.0)),
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+    index, initial = _manual_solution(artifact, rules, _INITIAL_SQUAD)
+    plan = plan_transfers(
+        index,
+        rules,
+        initial,
+        manager_financial_state=_manager_financials(index, free_transfers=1),
+    )
+    assert plan.weeks[0].free_transfers_before == 1
+    assert plan.weeks[0].hit_points == 0
+    assert plan.weeks[0].free_transfers_after == 0
+    assert plan.weeks[1].free_transfers_before == 1
 
 
 def _with_search(rules: SquadRules, **overrides: int) -> SquadRules:

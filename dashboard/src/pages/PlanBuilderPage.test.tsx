@@ -6,7 +6,15 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
-import { fetchPlanStatus, solvePlan } from "@/lib/planServer";
+import {
+  fetchManagerTeam,
+  fetchManagerTeamCapture,
+  fetchPlanStatus,
+  solveManagerPlan,
+  solvePlan,
+  type ManagerTeamPreview,
+  type PlanSummary,
+} from "@/lib/planServer";
 import { reloadPublishedReadModels } from "@/lib/readModelReload";
 import playersSample from "@/data/samplePlayers.json";
 import nextGwSample from "@/data/sampleNextGw.json";
@@ -22,7 +30,10 @@ vi.mock("@/data/load", () => ({
 
 vi.mock("@/lib/planServer", () => ({
   PLAN_SERVER_START_COMMAND: ".\\.venv\\Scripts\\python.exe -m fpl.jobs.plan_server",
+  fetchManagerTeam: vi.fn(),
+  fetchManagerTeamCapture: vi.fn(),
   fetchPlanStatus: vi.fn(),
+  solveManagerPlan: vi.fn(),
   solvePlan: vi.fn(),
 }));
 
@@ -172,6 +183,108 @@ const customPlan: NextGwPlan = {
   player_xp: customPlayerXp,
 };
 
+const managerOwnedCodes = [1, 2, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+const managerPreview: ManagerTeamPreview = {
+  capture_id: "manager-capture-001",
+  captured_at: "2026-08-23T09:15:00Z",
+  manager_id: 1234567,
+  entry_name: "Test Eleven",
+  picks_event: 1,
+  planning_gw: 2,
+  bank_tenths: 15,
+  squad_selling_value_tenths: 985,
+  free_transfers_available: 0,
+  free_transfers_source: "reconstructed_transfer_history",
+  existing_hit_points: 4,
+  players: managerOwnedCodes.map((code, index) => {
+    const player = builderPlayers.find((candidate) => candidate.code === code);
+    if (!player) throw new Error(`Missing manager preview player ${code}`);
+    return {
+      element_id: 1000 + code,
+      code,
+      web_name: player.web_name,
+      position: player.position as ManagerTeamPreview["players"][number]["position"],
+      team_id: index + 1,
+      team_code: player.team_code,
+      now_cost: player.now_cost ?? 65,
+      purchase_price: index === 0 ? 87 : 62,
+      selling_price: index === 0 ? 89 : 64,
+    };
+  }),
+};
+
+const managerPlanWeeks = customPlanWeeks.map((week, index) => ({
+  ...week,
+  gw: index + 2,
+}));
+const managerPlayerXp: NextGwPlan["player_xp"] = Object.fromEntries(
+  Object.entries(customPlayerXp).map(([code, gameweeks]) => [
+    code,
+    Object.fromEntries(
+      Object.entries(gameweeks).map(([gw, expectedPoints]) => [
+        String(Number(gw) + 1),
+        expectedPoints,
+      ]),
+    ),
+  ]),
+);
+const managerPlan: NextGwPlan = {
+  ...customPlan,
+  optimizer_run_id: "manager-solved-run",
+  decision_sha256: "manager-solved-decision",
+  display_label: "Your imported-team transfer plan",
+  gw_from: 2,
+  gw_to: 6,
+  policy: {
+    locked_codes: [1],
+    excluded_codes: [10],
+    min_bench_appearance: 0,
+  },
+  weeks: managerPlanWeeks,
+  player_xp: managerPlayerXp,
+};
+
+const solvedManagerSummary: PlanSummary = {
+  optimizer_run_id: managerPlan.optimizer_run_id,
+  decision_sha256: managerPlan.decision_sha256,
+  gw: 2,
+  gw_expected_points: 61.2,
+  horizon_expected_points: 308.4,
+  hit_points: 4,
+  squad_cost_tenths: 1007,
+  captain: "Alpha",
+  vice_captain: "Beta",
+  manager_capture_id: managerPreview.capture_id,
+  manager_entry_name: managerPreview.entry_name,
+  manager_planning_gw: managerPreview.planning_gw,
+  manager_existing_hit_points: managerPreview.existing_hit_points,
+  manager_initial_free_transfers: 0,
+  manager_bank_tenths: managerPreview.bank_tenths,
+  manager_squad_selling_value_tenths: managerPreview.squad_selling_value_tenths,
+  manager_weeks: [
+    {
+      gw: 2,
+      transfers_in: [{ code: 99, web_name: "Replacement" }],
+      transfers_out: [{ code: 16, web_name: "Midfielder 1" }],
+      free_transfers_before: 0,
+      free_transfers_after: 0,
+      hit_points: 4,
+      bank_before_tenths: 15,
+      bank_after_tenths: 7,
+    },
+    {
+      gw: 3,
+      transfers_in: [],
+      transfers_out: [],
+      free_transfers_before: 1,
+      free_transfers_after: 2,
+      hit_points: 0,
+      bank_before_tenths: 7,
+      bank_after_tenths: 7,
+    },
+  ],
+};
+
 const readyRuntime = {
   python_executable: "D:\\repo\\.venv\\Scripts\\python.exe",
   python_prefix: "D:\\repo\\.venv",
@@ -185,7 +298,10 @@ beforeEach(() => {
   vi.mocked(loadPlayers).mockResolvedValue({ players: builderPlayers, manifest: null });
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadOptimizerAudit).mockResolvedValue(audit);
+  vi.mocked(fetchManagerTeam).mockReset();
+  vi.mocked(fetchManagerTeamCapture).mockReset();
   vi.mocked(fetchPlanStatus).mockResolvedValue(null); // offline unless a test says otherwise
+  vi.mocked(solveManagerPlan).mockReset();
   vi.mocked(solvePlan).mockReset();
   vi.mocked(reloadPublishedReadModels).mockReset();
   window.localStorage.clear();
@@ -217,25 +333,316 @@ describe("PlanBuilderPage", () => {
     expect(solvePlan).not.toHaveBeenCalled();
   });
 
-  it("starts with the two entry cards; import is clickable and labelled post-deadline", async () => {
+  it("starts with both entry cards and marks manager import ready on local development", async () => {
     render(<PlanBuilderPage />);
     expect(await screen.findByText("Import my team")).toBeInTheDocument();
-    expect(screen.getByText(/Lands after the GW1 deadline/)).toBeInTheDocument();
+    expect(screen.getByText("Ready on local development")).toBeInTheDocument();
+    expect(screen.getByText(/banked free transfers and -4 hits accounted/)).toBeInTheDocument();
     expect(screen.getByText("Build from scratch →")).toBeInTheDocument();
   });
 
-  it("opens the import screen, validates the manager id, and offers the scratch fallback", async () => {
+  it("requires a valid manager id and an exact capture before continuing", async () => {
     const user = userEvent.setup();
+    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+
     render(<PlanBuilderPage />);
     await user.click(await screen.findByText("Import my team"));
+
+    const continueButton = screen.getByRole("button", {
+      name: /Choose locked and excluded players/,
+    });
+    expect(continueButton).toBeDisabled();
     const input = await screen.findByLabelText("FPL manager id");
     await user.type(input, "12a4");
     expect(screen.getByText(/Digits only/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Get your team" })).toBeDisabled();
+    expect(continueButton).toBeDisabled();
+
     await user.clear(input);
     await user.type(input, "1234567");
-    expect(screen.getByText(/Manager #1234567 saved/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Continue to player rules/ }));
+    await user.click(screen.getByRole("button", { name: "Get your team" }));
+
+    expect(fetchManagerTeam).toHaveBeenCalledWith("1234567", "");
+    expect(await screen.findByText("Test Eleven")).toBeInTheDocument();
+    expect(screen.getByText(/Public squad after GW1/)).toHaveTextContent(
+      "planning GW2 · 15 players reconciled",
+    );
+    expect(screen.getByText("Bank").parentElement).toHaveTextContent("£1.5m");
+    expect(screen.getByText("Selling value").parentElement).toHaveTextContent("£98.5m");
+    expect(screen.getByText("Remaining FT").parentElement).toHaveTextContent("0");
+    expect(screen.getByText("Already-paid hits").parentElement).toHaveTextContent("-4");
+    expect(continueButton).toBeEnabled();
+
+    await user.click(continueButton);
     expect(screen.getByLabelText("Search player")).toBeInTheDocument();
+    expect(window.localStorage.getItem("fpl-manager-id")).toBe("1234567");
+  });
+
+  it("solves the imported squad with owned-only locks, any-player exclusions, hits, and both draft handoffs", async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadNextGw).mockResolvedValue({
+      plans: [plans[0], managerPlan, plans[1]],
+    });
+    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: true,
+      runtime: readyRuntime,
+    });
+    vi.mocked(solveManagerPlan).mockResolvedValue(solvedManagerSummary);
+
+    const firstRender = render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Import my team"));
+    await user.type(screen.getByLabelText("FPL manager id"), "1234567");
+    await user.click(screen.getByRole("button", { name: "Get your team" }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: /Choose locked and excluded players/,
+      }),
+    );
+
+    expect(screen.getByText("Imported manager transfer state")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /^Budget meter/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/cheapest position fill/)).not.toBeInTheDocument();
+
+    const search = screen.getByRole("textbox", { name: "Search player" });
+    await user.type(search, "Keeper Two");
+    let keeperTwo = screen.getByRole("button", { name: /Keeper Two/ });
+    expect(keeperTwo).toBeDisabled();
+    expect(keeperTwo).toHaveTextContent("not in imported squad");
+
+    await user.clear(search);
+    await user.type(search, "Alpha");
+    await user.click(screen.getByRole("button", { name: /Alpha/ }));
+    expect(screen.getByText("locked")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "Exclude" }));
+    await user.clear(search);
+    await user.type(search, "Keeper Two");
+    keeperTwo = screen.getByRole("button", { name: /Keeper Two/ });
+    expect(keeperTwo).toBeEnabled();
+    await user.click(keeperTwo);
+    expect(keeperTwo).toHaveTextContent("excluded");
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Remaining free transfers" }),
+      "0",
+    );
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+
+    expect(await screen.findByText("plan server online")).toBeInTheDocument();
+    expect(screen.queryByText(/headroom .*cheapest position fill/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Imported public squad:/).parentElement).toHaveTextContent(
+      "selling value £98.5m · cash £1.5m",
+    );
+    expect(screen.getByText(/Effective remaining FT:/)).toHaveTextContent(
+      "0 (user override) · already-paid hits -4",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Solve now with my rules" }));
+    await waitFor(() =>
+      expect(solveManagerPlan).toHaveBeenCalledWith(
+        {
+          captureId: managerPreview.capture_id,
+          locks: [1],
+          excludes: [10],
+          minBenchAppearance: null,
+          freeTransfersOverride: 0,
+        },
+        expect.any(Function),
+        "",
+      ),
+    );
+
+    expect(await screen.findByText("Your plan — GW2")).toBeInTheDocument();
+    const recommendation = screen.getByRole("region", {
+      name: "Manager transfer recommendations",
+    });
+    expect(within(recommendation).getByText("sunk hits -4")).toBeInTheDocument();
+    expect(within(recommendation).getByText("new hits -4")).toBeInTheDocument();
+    const gw2 = within(recommendation).getByText("GW2").closest("li");
+    expect(gw2).not.toBeNull();
+    expect(gw2).toHaveTextContent(
+      "FT 0 → 0 · bank £1.5m → £0.7m · hit -4",
+    );
+    expect(within(gw2!).getByText("OUT").parentElement).toHaveTextContent(
+      "Midfielder 1",
+    );
+    expect(within(gw2!).getByText("IN").parentElement).toHaveTextContent("Replacement");
+    const gw3 = within(recommendation).getByText("GW3").closest("li");
+    expect(gw3).toHaveTextContent("FT 1 → 2 · bank £0.7m → £0.7m");
+    expect(within(gw3!).getByText(/HOLD — bank the free transfer/)).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("link", { name: "Forward suggested team to Squad Draft" }),
+    ).toHaveAttribute(
+      "href",
+      "#squad-draft?optimizer_run_id=manager-solved-run&source=optimized",
+    );
+    expect(
+      screen.getByRole("link", { name: "Use captured current team in Squad Draft" }),
+    ).toHaveAttribute(
+      "href",
+      "#squad-draft?optimizer_run_id=manager-solved-run&source=manager_current&manager_capture_id=manager-capture-001",
+    );
+
+    expect(window.localStorage.getItem("fpl-solved-plan")).toBe("manager-solved-run");
+    expect(
+      JSON.parse(
+        window.localStorage.getItem("fpl-solved-manager-result-v1") ?? "{}",
+      ),
+    ).toMatchObject({
+      version: 1,
+      optimizerRunId: "manager-solved-run",
+      managerCaptureId: managerPreview.capture_id,
+      summary: {
+        optimizer_run_id: "manager-solved-run",
+        manager_capture_id: managerPreview.capture_id,
+        hit_points: 4,
+        manager_existing_hit_points: 4,
+      },
+    });
+    expect(window.localStorage.getItem("fpl-solved-manager-capture")).toBeNull();
+    expect(window.localStorage.getItem("fpl-solved-manager-summary")).toBeNull();
+    expect(window.localStorage.getItem("fpl-plan-request")).toBeNull();
+    expect(window.location.hash).toBe(
+      "#plan-builder?run=manager-solved-run&manager_capture_id=manager-capture-001",
+    );
+    expect(reloadPublishedReadModels).toHaveBeenCalledTimes(1);
+
+    firstRender.unmount();
+    vi.mocked(fetchManagerTeamCapture).mockResolvedValue(managerPreview);
+    render(<PlanBuilderPage />);
+    expect(await screen.findByText("Your plan — GW2")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Manager transfer recommendations" }),
+    ).toHaveTextContent("HOLD — bank the free transfer");
+    expect(
+      screen.getByRole("link", { name: "Use captured current team in Squad Draft" }),
+    ).toHaveAttribute(
+      "href",
+      "#squad-draft?optimizer_run_id=manager-solved-run&source=manager_current&manager_capture_id=manager-capture-001",
+    );
+    expect(fetchManagerTeam).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Edit and solve again" }));
+    expect(await screen.findByText("Imported manager transfer state")).toBeInTheDocument();
+    expect(fetchManagerTeamCapture).toHaveBeenCalledWith(
+      managerPreview.capture_id,
+      "",
+    );
+    expect(screen.getByRole("button", { name: /Next: Review & run/ })).toBeEnabled();
+  });
+
+  it("caps owned manager exclusions at the current first-week transfer depth", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Import my team"));
+    await user.type(screen.getByLabelText("FPL manager id"), "1234567");
+    await user.click(screen.getByRole("button", { name: "Get your team" }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: /Choose locked and excluded players/,
+      }),
+    );
+    await user.click(screen.getByRole("radio", { name: "Exclude" }));
+    const search = screen.getByRole("textbox", { name: "Search player" });
+    for (const name of ["Alpha", "Beta"]) {
+      await user.clear(search);
+      await user.type(search, name);
+      await user.click(screen.getByRole("button", { name: new RegExp(name) }));
+    }
+
+    expect(screen.getByText(/Owned players forced OUT:/)).toHaveTextContent("2/2");
+    await user.clear(search);
+    await user.type(search, "Keeper Three");
+    const thirdOwned = screen.getByRole("button", { name: /Keeper Three/ });
+    expect(thirdOwned).toBeDisabled();
+    expect(thirdOwned).toHaveTextContent("first-week transfer depth (2)");
+
+    await user.clear(search);
+    await user.type(search, "Keeper Two");
+    expect(screen.getByRole("button", { name: /Keeper Two/ })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+    expect(
+      screen.getByRole("alert", { name: "" }),
+    ).toHaveTextContent(/Manual manager-result opening is unavailable/);
+    expect(
+      screen.queryByRole("textbox", { name: "Published optimizer run id" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not attach a stored manager capture to a different custom run", async () => {
+    window.location.hash = "#plan-builder?run=" + customPlan.optimizer_run_id;
+    window.localStorage.setItem("fpl-solved-plan", managerPlan.optimizer_run_id);
+    window.localStorage.setItem(
+      "fpl-solved-manager-result-v1",
+      JSON.stringify({
+        version: 1,
+        optimizerRunId: managerPlan.optimizer_run_id,
+        managerCaptureId: managerPreview.capture_id,
+        summary: solvedManagerSummary,
+      }),
+    );
+    vi.mocked(loadNextGw).mockResolvedValue({
+      plans: [plans[0], customPlan, managerPlan, plans[1]],
+    });
+
+    render(<PlanBuilderPage />);
+
+    expect(await screen.findByText("Your plan — GW1")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Forward team to Squad Draft" }),
+    ).toHaveAttribute(
+      "href",
+      "#squad-draft?optimizer_run_id=solved-custom-run",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Use captured current team in Squad Draft" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Manager transfer recommendations" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("discards a malformed stored manager summary without losing an explicit run/capture handoff", async () => {
+    window.location.hash =
+      "#plan-builder?run=manager-solved-run&manager_capture_id=manager-capture-001";
+    window.localStorage.setItem(
+      "fpl-solved-manager-result-v1",
+      JSON.stringify({
+        version: 1,
+        optimizerRunId: managerPlan.optimizer_run_id,
+        managerCaptureId: managerPreview.capture_id,
+        summary: {
+          optimizer_run_id: managerPlan.optimizer_run_id,
+          manager_capture_id: managerPreview.capture_id,
+          manager_weeks: {},
+        },
+      }),
+    );
+    vi.mocked(loadNextGw).mockResolvedValue({
+      plans: [plans[0], managerPlan, plans[1]],
+    });
+
+    render(<PlanBuilderPage />);
+
+    expect(await screen.findByText("Your plan — GW2")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Manager transfer recommendations" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Use captured current team in Squad Draft" }),
+    ).toHaveAttribute(
+      "href",
+      "#squad-draft?optimizer_run_id=manager-solved-run&source=manager_current&manager_capture_id=manager-capture-001",
+    );
   });
 
   it("locks a searched player in green, advances to review, and emits the exact command", async () => {
@@ -482,6 +889,15 @@ describe("PlanBuilderPage", () => {
       "href",
       "#squad-draft?optimizer_run_id=solved-custom-run",
     );
+    expect(
+      screen.queryByRole("link", { name: "Use captured current team in Squad Draft" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Manager transfer recommendations" }),
+    ).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("fpl-solved-manager-capture")).toBeNull();
+    expect(window.localStorage.getItem("fpl-solved-manager-summary")).toBeNull();
+    expect(window.localStorage.getItem("fpl-solved-manager-result-v1")).toBeNull();
     const squadTable = screen.getByRole("table", { name: "GW1 custom squad analysis" });
     const mainRows = within(squadTable)
       .getAllByRole("row")

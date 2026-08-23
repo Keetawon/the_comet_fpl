@@ -199,6 +199,96 @@ class ElementSummary(_Payload):
     history_past: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ManagerEntry(_Payload):
+    """Public identity and season boundary for one FPL entry."""
+
+    id: int = Field(gt=0)
+    started_event: int = Field(gt=0)
+    current_event: int = Field(gt=0)
+    name: str
+    player_first_name: str = ""
+    player_last_name: str = ""
+    summary_overall_points: int | None = None
+    summary_overall_rank: int | None = None
+
+
+class ManagerPick(_Payload):
+    """One public event pick.
+
+    The live 2026/27 payload does not expose purchase or selling prices. Consumers must
+    reconstruct that ownership state from deadline snapshots and permanent transfers.
+    """
+
+    element: int = Field(gt=0)
+    position: int = Field(ge=1, le=15)
+    multiplier: int = Field(ge=0)
+    is_captain: bool
+    is_vice_captain: bool
+
+
+class ManagerAutomaticSub(_Payload):
+    entry: int = Field(gt=0)
+    element_in: int = Field(gt=0)
+    element_out: int = Field(gt=0)
+    event: int = Field(gt=0)
+
+
+class ManagerEventHistory(_Payload):
+    event: int = Field(gt=0)
+    points: int
+    total_points: int
+    rank: int | None = None
+    rank_sort: int | None = None
+    overall_rank: int | None = None
+    percentile_rank: int | None = None
+    bank: int = Field(ge=0)
+    value: int = Field(ge=0)
+    event_transfers: int = Field(ge=0)
+    event_transfers_cost: int = Field(ge=0)
+    points_on_bench: int
+
+
+class ManagerEventPicks(_Payload):
+    active_chip: str | None = None
+    automatic_subs: list[ManagerAutomaticSub] = Field(default_factory=list)
+    entry_history: ManagerEventHistory
+    picks: list[ManagerPick]
+
+    _normalise_chip = field_validator("active_chip", mode="before")(_empty_to_none)
+
+
+class ManagerTransfer(_Payload):
+    element_in: int = Field(gt=0)
+    element_in_cost: int = Field(ge=0)
+    element_out: int = Field(gt=0)
+    element_out_cost: int = Field(ge=0)
+    entry: int = Field(gt=0)
+    event: int = Field(gt=0)
+    time: datetime
+
+
+class ManagerHistoryRow(ManagerEventHistory):
+    """One finalized/revealed event row from the public entry history endpoint."""
+
+
+class ManagerPastSeason(_Payload):
+    season_name: str
+    total_points: int
+    rank: int | None = None
+
+
+class ManagerChip(_Payload):
+    name: str
+    time: datetime
+    event: int = Field(gt=0)
+
+
+class ManagerHistory(_Payload):
+    current: list[ManagerHistoryRow] = Field(default_factory=list)
+    past: list[ManagerPastSeason] = Field(default_factory=list)
+    chips: list[ManagerChip] = Field(default_factory=list)
+
+
 @dataclass(frozen=True, slots=True)
 class SeasonSkew:
     """Whether the fixtures payload belongs to the same season as bootstrap-static.
@@ -355,3 +445,36 @@ class FplApiClient:
 
     def element_summary(self, element_id: int) -> ElementSummary:
         return ElementSummary.model_validate(self.raw_element_summary(element_id))
+
+    def raw_manager_entry(self, manager_id: int) -> Any:
+        path = self._config.endpoints["entry"].format(manager_id=manager_id)
+        return self.get_json(path)
+
+    def manager_entry(self, manager_id: int) -> ManagerEntry:
+        return ManagerEntry.model_validate(self.raw_manager_entry(manager_id))
+
+    def raw_manager_event_picks(self, manager_id: int, event: int) -> Any:
+        path = self._config.endpoints["entry_event_picks"].format(
+            manager_id=manager_id, event=event
+        )
+        return self.get_json(path)
+
+    def manager_event_picks(self, manager_id: int, event: int) -> ManagerEventPicks:
+        return ManagerEventPicks.model_validate(self.raw_manager_event_picks(manager_id, event))
+
+    def raw_manager_transfers(self, manager_id: int) -> Any:
+        path = self._config.endpoints["entry_transfers"].format(manager_id=manager_id)
+        return self.get_json(path)
+
+    def manager_transfers(self, manager_id: int) -> list[ManagerTransfer]:
+        payload = self.raw_manager_transfers(manager_id)
+        if not isinstance(payload, list):
+            raise ApiResponseError("manager transfers endpoint did not return a list")
+        return [ManagerTransfer.model_validate(item) for item in payload]
+
+    def raw_manager_history(self, manager_id: int) -> Any:
+        path = self._config.endpoints["entry_history"].format(manager_id=manager_id)
+        return self.get_json(path)
+
+    def manager_history(self, manager_id: int) -> ManagerHistory:
+        return ManagerHistory.model_validate(self.raw_manager_history(manager_id))

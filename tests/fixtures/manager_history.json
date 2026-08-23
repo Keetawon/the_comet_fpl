@@ -1,0 +1,20 @@
+{
+  "current": [
+    {
+      "event": 1,
+      "points": 71,
+      "total_points": 71,
+      "rank": 1000,
+      "rank_sort": 1000,
+      "overall_rank": 1234,
+      "percentile_rank": 1,
+      "bank": 50,
+      "value": 950,
+      "event_transfers": 0,
+      "event_transfers_cost": 0,
+      "points_on_bench": 4
+    }
+  ],
+  "past": [{"season_name": "2025/26", "total_points": 2200, "rank": 5000}],
+  "chips": []
+}

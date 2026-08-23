@@ -1,0 +1,11 @@
+{
+  "id": 42,
+  "started_event": 1,
+  "current_event": 1,
+  "name": "Fixture XI",
+  "player_first_name": "Ada",
+  "player_last_name": "Lovelace",
+  "summary_overall_points": 71,
+  "summary_overall_rank": 1234,
+  "future_upstream_field": {"ignored": true}
+}

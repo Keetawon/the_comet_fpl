@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,12 +13,21 @@ import type {
   PlayerRecord,
   PlanPlayer,
 } from "@/data/types";
+import {
+  fetchManagerTeam,
+  fetchManagerTeamCapture,
+  type ManagerTeamPreview,
+} from "@/lib/planServer";
 import { USER_DRAFT_STORAGE_KEY, UserDraftPage } from "./UserDraftPage";
 
 vi.mock("@/data/load", () => ({
   loadNextGw: vi.fn(),
   loadOptimizerAudit: vi.fn(),
   loadPlayers: vi.fn(),
+}));
+vi.mock("@/lib/planServer", () => ({
+  fetchManagerTeam: vi.fn(),
+  fetchManagerTeamCapture: vi.fn(),
 }));
 
 const plans = nextGwSample.plans as unknown as NextGwPlan[];
@@ -58,16 +67,71 @@ function draftPlayer(index: number): PlayerRecord {
 
 const draftPlayers = positions.map((_, index) => draftPlayer(index));
 
+const managerPreview: ManagerTeamPreview = {
+  capture_id: "capture-1",
+  captured_at: "2026-08-23T10:00:00Z",
+  manager_id: 123456,
+  entry_name: "Manager Test XI",
+  picks_event: plans[0].gw_from,
+  planning_gw: plans[0].gw_from,
+  bank_tenths: 5,
+  squad_selling_value_tenths: 750,
+  free_transfers_available: 1,
+  free_transfers_source: "derived from captured transfers",
+  existing_hit_points: 0,
+  players: draftPlayers.map((player, index) => ({
+    element_id: index + 1,
+    code: player.code,
+    web_name: player.web_name,
+    position: player.position as "GK" | "DEF" | "MID" | "FWD",
+    team_id: index + 1,
+    team_code: player.team_code,
+    now_cost: player.now_cost ?? 0,
+    purchase_price: 50,
+    selling_price: 50,
+  })),
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
   window.localStorage.clear();
   window.location.hash = "#squad-draft";
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadOptimizerAudit).mockResolvedValue(audit);
   vi.mocked(loadPlayers).mockResolvedValue({ players: draftPlayers, manifest: null });
+  vi.mocked(fetchManagerTeam).mockReset();
+  vi.mocked(fetchManagerTeamCapture).mockReset();
 });
 
 describe("UserDraftPage", () => {
+  it("keeps hosted Squad Draft manual and never exposes manager import controls", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+
+    render(<UserDraftPage />);
+
+    expect(await screen.findByRole("heading", { name: "Squad Draft" })).toBeInTheDocument();
+    expect(screen.getByText(/Current-team import is intentionally local-only/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("FPL manager ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Plan server token/)).not.toBeInTheDocument();
+    expect(fetchManagerTeam).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Add Draft 01" })).toBeEnabled();
+  });
+
+  it("blocks captured-manager handoffs on hosted builds without probing a Plan Server", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    window.location.hash =
+      `#squad-draft?optimizer_run_id=${encodeURIComponent(plans[0].optimizer_run_id)}` +
+      "&source=manager_current&manager_capture_id=capture-1";
+
+    render(<UserDraftPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /require the trusted local Plan Server/i,
+    );
+    expect(fetchManagerTeamCapture).not.toHaveBeenCalled();
+  });
+
   it("allows an over-budget legal 15 and keeps cost/xP totals in the final row", async () => {
     const user = userEvent.setup();
     const { container } = render(<UserDraftPage />);
@@ -180,7 +244,11 @@ describe("UserDraftPage", () => {
     );
     expect(
       JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
-    ).toMatchObject({ playerCodes: [] });
+    ).toMatchObject({
+      version: 3,
+      seedSource: "manual",
+      playerCodes: [],
+    });
     expect(window.localStorage.getItem("fpl-solved-plan")).toBeNull();
   });
 
@@ -258,12 +326,176 @@ describe("UserDraftPage", () => {
     expect(
       JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
     ).toMatchObject({
-      version: 2,
+      version: 3,
+      seedSource: "optimized",
+      managerCaptureId: null,
       optimizerRunId: handoffPlan.optimizer_run_id,
       forecastRunId: handoffPlan.forecast_run_id,
       playerCodes: draftPlayers.map((player) => player.code),
     });
     expect(window.location.hash).toBe("#squad-draft");
+  });
+
+  it("loads the exact captured current team from a typed handoff", async () => {
+    vi.mocked(fetchManagerTeamCapture).mockResolvedValue(managerPreview);
+    window.location.hash =
+      `#squad-draft?optimizer_run_id=${encodeURIComponent(plans[0].optimizer_run_id)}` +
+      "&source=manager_current&manager_capture_id=capture-1";
+
+    const { container } = render(<UserDraftPage />);
+
+    expect(await screen.findByText("15/15 players")).toBeInTheDocument();
+    expect(fetchManagerTeamCapture).toHaveBeenCalledWith("capture-1", "");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Forwarded 15 players from Manager Test XI's captured current team",
+    );
+    expect(container.querySelectorAll("tr[data-player-code]")).toHaveLength(15);
+    expect(screen.getByLabelText("Imported manager values")).toHaveTextContent(
+      "Current selling value",
+    );
+    expect(screen.getByLabelText("Imported manager values")).toHaveTextContent(
+      "£75.0m",
+    );
+    expect(screen.getByLabelText("Imported manager values")).toHaveTextContent(
+      "Bank£0.5m",
+    );
+    expect(
+      JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
+    ).toMatchObject({
+      version: 3,
+      seedSource: "manager_current",
+      managerCaptureId: "capture-1",
+      optimizerRunId: plans[0].optimizer_run_id,
+      forecastRunId: plans[0].forecast_run_id,
+      season: plans[0].season,
+      playerCodes: draftPlayers.map((player) => player.code),
+    });
+    expect(window.location.hash).toBe("#squad-draft");
+  });
+
+  it("atomically replaces the draft through the direct Manager ID shortcut", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      USER_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        version: 3,
+        seedSource: "manual",
+        optimizerRunId: plans[0].optimizer_run_id,
+        forecastRunId: plans[0].forecast_run_id,
+        season: plans[0].season,
+        managerCaptureId: null,
+        playerCodes: [1],
+      }),
+    );
+    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+    render(<UserDraftPage />);
+    await screen.findByText("1/15 players");
+
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Fetch current team" }));
+
+    expect(await screen.findByText("15/15 players")).toBeInTheDocument();
+    expect(fetchManagerTeam).toHaveBeenCalledWith("123456", "");
+    expect(screen.getByText(/does not optimize transfers/i)).toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
+    ).toMatchObject({
+      version: 3,
+      seedSource: "manager_current",
+      managerCaptureId: "capture-1",
+      playerCodes: draftPlayers.map((player) => player.code),
+    });
+  });
+
+  it("accepts and explicitly remembers a LAN token for the direct shortcut", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+    render(<UserDraftPage />);
+    await screen.findByText("0/15 players");
+
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.type(screen.getByLabelText(/Plan server token/), "lan-secret");
+    await user.click(
+      screen.getByRole("button", { name: "Remember token on this browser" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Fetch current team" }));
+
+    expect(fetchManagerTeam).toHaveBeenCalledWith("123456", "lan-secret");
+    expect(window.localStorage.getItem("fpl-plan-server-token")).toBe("lan-secret");
+    expect(await screen.findByText("15/15 players")).toBeInTheDocument();
+  });
+
+  it("explains invalid IDs and freezes draft mutations while an import is pending", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      USER_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        version: 3,
+        seedSource: "manual",
+        optimizerRunId: plans[0].optimizer_run_id,
+        forecastRunId: plans[0].forecast_run_id,
+        season: plans[0].season,
+        managerCaptureId: null,
+        playerCodes: [1],
+      }),
+    );
+    let resolveImport: ((preview: ManagerTeamPreview) => void) | null = null;
+    vi.mocked(fetchManagerTeam).mockReturnValue(
+      new Promise((resolve) => {
+        resolveImport = resolve;
+      }),
+    );
+    render(<UserDraftPage />);
+    await screen.findByText("1/15 players");
+
+    const managerId = screen.getByLabelText("FPL manager ID");
+    await user.type(managerId, "0");
+    expect(screen.getByText(/value greater than zero/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fetch current team" })).toBeDisabled();
+    await user.clear(managerId);
+    await user.type(managerId, "123456");
+    await user.click(screen.getByRole("button", { name: "Fetch current team" }));
+
+    expect(managerId).toBeDisabled();
+    expect(screen.getByLabelText(/Plan server token/)).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Clear draft" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove Draft 01" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove Draft 01 from draft" })).toBeDisabled();
+
+    await act(async () => {
+      resolveImport?.(managerPreview);
+      await Promise.resolve();
+    });
+    expect(await screen.findByText("15/15 players")).toBeInTheDocument();
+    expect(managerId).toBeEnabled();
+  });
+
+  it("preserves the existing draft when direct manager import fails", async () => {
+    const user = userEvent.setup();
+    const stored = {
+      version: 3,
+      seedSource: "manual",
+      optimizerRunId: plans[0].optimizer_run_id,
+      forecastRunId: plans[0].forecast_run_id,
+      season: plans[0].season,
+      managerCaptureId: null,
+      playerCodes: [1],
+    };
+    window.localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify(stored));
+    vi.mocked(fetchManagerTeam).mockRejectedValue(new Error("manager not found"));
+    render(<UserDraftPage />);
+    await screen.findByText("1/15 players");
+
+    await user.type(screen.getByLabelText("FPL manager ID"), "999999");
+    await user.click(screen.getByRole("button", { name: "Fetch current team" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "manager not found Your existing draft was kept unchanged",
+    );
+    expect(screen.getByText("1/15 players")).toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
+    ).toEqual(stored);
   });
 
   it("fails closed when the platform plan has no exact audit rules snapshot", async () => {

@@ -25,6 +25,10 @@ live_api:
     fixtures: "fixtures/"
     element_summary: "element-summary/{element_id}/"
     event_live: "event/{gw}/live/"
+    entry: "entry/{manager_id}/"
+    entry_event_picks: "entry/{manager_id}/event/{event}/picks/"
+    entry_transfers: "entry/{manager_id}/transfers/"
+    entry_history: "entry/{manager_id}/history/"
   # Be polite: roughly 1 request/second (section 3.1).
   min_request_interval_seconds: 1.0
   timeout_seconds: 30.0

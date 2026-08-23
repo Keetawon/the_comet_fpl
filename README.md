@@ -85,18 +85,27 @@ retains player-gameweek, player-fixture, and team-fixture forecast vintages, wit
 attached separately. The versioned BI semantic/star export, atomic Parquet/static-JSON publish
 boundary, platform/custom-plan separation, lock/exclusion flow, and dashboard are implemented
 development-only. The dashboard exposes six read-only analytic/decision routes plus Plan Builder
-and a browser-only Squad Draft sandbox. Squad Draft remains bound to one formal forecast vintage,
+and a browser-only Squad Draft sandbox. The local, development-only manager path now reconstructs
+a public manager squad into an immutable private capture, applies current bank/purchase/selling
+values and remaining free transfers, and can optimize transfers from the first forecast
+gameweek. Squad Draft remains bound to one exact forecast vintage and recorded rules snapshot,
 enforces roster shape and club caps, reports deadline-price cost and xP, and deliberately does not
-enforce the standard budget; it is not optimizer output or an imported manager squad;
+enforce the standard budget; it can now be seeded manually, from an optimized plan, or from an
+exact manager capture;
 the Players form repair is implemented in code/tests with view-specific starts, xG/90, xA/90,
 bonus, BPS, DC, clean-sheet, on-pitch goals-conceded, saves, and xGC columns. Those defensive
 fields are backward-looking observed form only; future player-level saves/DC/GC/xGC forecasts
 remain unavailable and are never synthesized from club primitives. A failure-atomic local
 development database rebuild and atomic BI/static republish completed on 2026-08-19, so the fields
-are visible locally; migration alone would leave existing rows NULL. The final deadline vintage
-must still repeat rebuild/export/republish through P0. Plan Builder produces fresh-squad custom
-scenarios; manager-team import and selling-value-aware own-team planning are separate P2 work, not
-part of that UI task. Real-deadline prospective validation remains open.
+were visible in that local generation; migration alone would leave existing rows NULL. That dated
+refresh did not itself satisfy or replace the historical final-deadline capture. Plan Builder
+supports both fresh-squad
+custom scenarios and local manager-ID own-team transfer planning. The public endpoint does not
+expose purchase/selling prices, so the manager path currently supports GW1-started entries only,
+reconstructs them from committed GW1 launch prices plus public transfer replay, maps season-scoped
+elements to stable player codes, and fails closed on incomplete provenance or a selectable-player
+registry mismatch. Authenticated My Team access, hosted manager
+accounts, future price changes, and production validation remain open.
 The official 2026/27 payload confirms 17 configured scoring fields, and official published
 rules now confirm the seven thresholds/units that payload omits. Two edge cases remain
 explicitly unexercised, so the ruleset is not described as fully validated. The Phase 1
@@ -359,8 +368,8 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | 1 | Stage A team model + validation harness | harness run; **V1/V2 fitted, gate not cleared**; V3 development invalidated; V4 development-only (not promoted) |
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
 | 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 development-evaluated; exposure-weighted goals V4 (-0.44% vs baseline, ties V3) and assists V2 (+1.85% vs baseline, -0.11% vs the incumbent V1) each run once, development-only, neither promoted; Stage D v3 composer, prospective forecast, and the GW29-38 EV backtest all run and development-only, with the V1 comparator outscoring the V3 primary |
-| 3b | Stage E optimiser + prediction ledger | optimiser, stable input/decision artifacts, no-transfer repair, and append-only player-gameweek/player-fixture/team-fixture ledger with finalized-outcome attachment implemented development-only; horizon availability, future prices/selling values, and manager-team import remain open |
-| 4 | BI semantic export + dashboard | versioned semantic/star export, atomic Parquet and static-JSON publish, platform/custom plan separation, locks/exclusions, six analytic routes plus Plan Builder and browser-only Squad Draft implemented development-only; real-deadline validation and hosted/manager-import operation remain open |
+| 3b | Stage E optimiser + prediction ledger | optimiser, stable input/decision artifacts, no-transfer repair, append-only forecast/outcome ledger, and private public-manager capture plus selling-value/free-transfer-aware transfer planning implemented development-only; horizon availability and future price/selling-value changes remain open |
+| 4 | BI semantic export + dashboard | versioned semantic/star export, atomic Parquet and static-JSON publish, platform/custom plan separation, locks/exclusions, six analytic routes, manager-aware Plan Builder, and Squad Draft with optimized/current-team handoffs implemented development-only; real-deadline validation and authenticated hosted manager operation remain open |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
 
 Phase 3b is an addition to the original phasing, which ended Phase 3 at simulation and had no
@@ -378,8 +387,9 @@ the atomic static publisher derives the dashboard's JSON read models from that e
 and BI tools consume those read-only outputs, never the mutable production DuckDB. The eight
 dashboard routes are Summary, Fixture matrix, Players, Next GW suggestion, Forecast vs actual,
 Optimizer audit, Plan Builder, and Squad Draft. Formal platform default/diagnostic plans remain
-separate from fresh-squad user-custom plans and browser-local manual drafts; manager-id import and
-selling-value-aware own-team planning are not implemented. See `docs/bi-semantic-contract.md`,
+separate from user-custom plans and browser-local drafts. The local manager-ID path keeps its
+immutable capture and manager context private, while the public pack strips user-custom and
+manager data. See `docs/manager-team-suggestions.md`, `docs/bi-semantic-contract.md`,
 `docs/bi-export-contract.md`,
 `docs/dashboard-json-contract.md`, and `dashboard/README.md`.
 

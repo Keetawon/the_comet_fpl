@@ -10,26 +10,206 @@ beyond the loopback interface the server itself listens on.
 from __future__ import annotations
 
 import json
+import math
 import threading
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from fpl.artifacts.prospective_points import (
+    ContractIdentity,
+    ForecastArtifactManifest,
+    ForecastArtifactRow,
+    LiveInputProvenance,
+    ProspectivePointsArtifact,
+    write_artifact_atomic,
+)
+from fpl.ingest.manager_team import (
+    ManagerCaptureCompleteness,
+    ManagerCaptureProvenance,
+    ManagerSquadPlayer,
+    ManagerTeamCapture,
+    ManagerTransferReplayRules,
+    derive_manager_capture_id,
+    write_manager_capture_atomic,
+)
 from fpl.jobs import plan_server
 from fpl.jobs.plan_server import (
     RequestError,
     ServerState,
     _allowed_origin,
+    _load_manager_capture,
+    _manager_capture_path,
+    _manager_team_preview,
     _publish_dashboard_generations,
     _run_optimizer_cli,
+    fetch_and_store_manager_team,
     make_handler,
+    run_manager_plan,
     run_plan,
     summarize_artifact,
+    validate_manager_plan_request,
     validate_request,
 )
+
+HASH = "a" * 64
+CAPTURED_AT = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
+
+
+def _distribution(mean: float) -> tuple[float, ...]:
+    lower = math.floor(mean)
+    fraction = mean - lower
+    if fraction == 0.0:
+        return (*((0.0,) * lower), 1.0)
+    return (*((0.0,) * lower), 1.0 - fraction, fraction)
+
+
+def _manager_players(*, price_delta_code: int | None = None) -> tuple[ManagerSquadPlayer, ...]:
+    positions = ("GK", "GK", *("DEF",) * 5, *("MID",) * 5, *("FWD",) * 3)
+    players: list[ManagerSquadPlayer] = []
+    for offset, position in enumerate(positions, start=1):
+        now_cost = 51 if offset == price_delta_code else 50
+        players.append(
+            ManagerSquadPlayer(
+                element=100 + offset,
+                code=offset,
+                web_name=f"P{offset}",
+                position=position,
+                team_id=(offset - 1) // 3 + 1,
+                now_cost=now_cost,
+                purchase_price=50,
+                selling_price=50,
+            )
+        )
+    return tuple(players)
+
+
+def _manager_capture(
+    *,
+    planning_event: int = 2,
+    bootstrap_sha256: str = HASH,
+    registry_sha256: str = HASH,
+) -> ManagerTeamCapture:
+    players = _manager_players()
+    selling_value = sum(player.selling_price for player in players)
+    pending = ManagerTeamCapture(
+        capture_id="pending",
+        captured_at=CAPTURED_AT,
+        season="2026-27",
+        manager_id=42,
+        manager_name="Fixture XI",
+        player_first_name="Test",
+        player_last_name="Manager",
+        started_event=1,
+        picks_event=planning_event - 1,
+        planning_event=planning_event,
+        squad=players,
+        bank_tenths=25,
+        squad_selling_value_tenths=selling_value,
+        available_budget_tenths=selling_value + 25,
+        free_transfers_available=1,
+        existing_hit_points=4,
+        historical_hit_points=0,
+        post_picks_transfer_count=2,
+        chips=(),
+        transfer_rules=ManagerTransferReplayRules(),
+        completeness=ManagerCaptureCompleteness(
+            latest_free_hit_picks_comparable_to_permanent_squad=True
+        ),
+        provenance=ManagerCaptureProvenance(
+            current_bootstrap_sha256=bootstrap_sha256,
+            selectable_player_registry_sha256=registry_sha256,
+            entry_sha256="b" * 64,
+            latest_picks_sha256="c" * 64,
+            start_picks_sha256="d" * 64,
+            transfers_sha256="e" * 64,
+            history_sha256="f" * 64,
+            deadline_snapshot_capture_id="file-synthetic",
+            deadline_snapshot_captured_at=datetime(2026, 8, 21, 12, 0, tzinfo=UTC),
+            deadline_snapshot_relative_path="snapshots/daily/2026-08-21/synthetic",
+            deadline_snapshot_manifest_sha256="1" * 64,
+            deadline_snapshot_bootstrap_archive_sha256="2" * 64,
+            deadline_snapshot_bootstrap_payload_sha256="3" * 64,
+        ),
+    )
+    payload = pending.model_dump(mode="json", by_alias=True)
+    payload["capture_id"] = derive_manager_capture_id(pending)
+    return ManagerTeamCapture.model_validate(payload)
+
+
+def _write_forecast(
+    path: Path,
+    *,
+    gw_from: int = 2,
+    bootstrap_sha256: str = HASH,
+    registry_sha256: str | None = HASH,
+    price_delta_code: int | None = None,
+) -> ProspectivePointsArtifact:
+    players = _manager_players(price_delta_code=price_delta_code)
+    rows = tuple(
+        ForecastArtifactRow(
+            season="2026-27",
+            gw=gw_from,
+            code=player.code,
+            web_name=player.web_name,
+            position=player.position,
+            team_id=player.team_id,
+            team_code=player.team_id,
+            now_cost=player.now_cost,
+            selected_by_percent=None,
+            availability_status="a",
+            chance_of_playing=None,
+            availability_multiplier=1.0,
+            fixture_ids=(2000 + player.code,),
+            kickoff_times=(datetime(2026, 8, 29, 14, 0, tzinfo=UTC),),
+            expected_points=2.0,
+            availability_adjusted_expected_points=2.0,
+            expected_bonus=0.0,
+            distribution=_distribution(2.0),
+            cold_start_player=False,
+            stage_a_league_average_team=False,
+            attacking_signal_cold_start=False,
+            assist_signal_cold_start=False,
+            transferred_no_rescale=False,
+        )
+        for player in players
+    )
+    artifact = ProspectivePointsArtifact(
+        manifest=ForecastArtifactManifest(
+            as_of=CAPTURED_AT,
+            season="2026-27",
+            gw_from=gw_from,
+            gw_to=gw_from,
+            row_count=len(rows),
+            roster_size=len(rows),
+            fixture_count=len(rows),
+            monte_carlo_draws=100,
+            base_seed=1,
+            fixture_points_support_max=40,
+            freshness_cold_start=True,
+            commit_sha="forecastcommit",
+            database_sha256="9" * 64,
+            contracts={
+                "synthetic": ContractIdentity(name="synthetic", version="1", sha256="8" * 64)
+            },
+            component_modes={"test": "synthetic"},
+            live_inputs=LiveInputProvenance(
+                bootstrap_capture_id="synthetic",
+                bootstrap_known_at=CAPTURED_AT,
+                bootstrap_payload_sha256=bootstrap_sha256,
+                schedule_capture_ids=("synthetic",),
+                selectable_player_registry_sha256=registry_sha256,
+            ),
+        ),
+        rows=rows,
+    )
+    write_artifact_atomic(path, artifact)
+    return artifact
 
 
 def _write_standing_plans(base: Path) -> None:
@@ -70,6 +250,37 @@ class TestValidateRequest:
         for bad in (0, 1, -0.5, "0.5"):
             with pytest.raises(RequestError, match="min_bench_appearance"):
                 validate_request({"locks": [], "min_bench_appearance": bad})
+
+
+class TestValidateManagerPlanRequest:
+    def test_parses_capture_rules_and_free_transfer_override(self) -> None:
+        capture_id = "manager-" + "1" * 64
+        assert validate_manager_plan_request(
+            {
+                "capture_id": capture_id,
+                "locks": [7, 3, 7],
+                "excludes": [11, 9],
+                "min_bench_appearance": 0.25,
+                "free_transfers_override": 0,
+            }
+        ) == (capture_id, [3, 7], [9, 11], 0.25, 0)
+
+    def test_accepts_no_override_and_rejects_invalid_overrides(self) -> None:
+        capture_id = "manager-" + "1" * 64
+        assert validate_manager_plan_request({"capture_id": capture_id})[-1] is None
+        for bad in (True, -1, 6, 1.5, "1"):
+            with pytest.raises(RequestError, match="free_transfers_override"):
+                validate_manager_plan_request(
+                    {"capture_id": capture_id, "free_transfers_override": bad}
+                )
+
+    @pytest.mark.parametrize(
+        "capture_id",
+        ["", "1" * 64, "manager-" + "G" * 64, "../manager-" + "1" * 64],
+    )
+    def test_rejects_noncanonical_capture_ids(self, capture_id: str) -> None:
+        with pytest.raises(RequestError, match="immutable manager capture"):
+            validate_manager_plan_request({"capture_id": capture_id})
 
 
 class TestAllowedOrigin:
@@ -124,6 +335,267 @@ class TestSummarizeArtifact:
         assert summary["optimizer_run_id"] == "r" * 64
         assert summary["gw_expected_points"] == 60.7
         assert summary["captain"] == "Gibbs-White"
+
+    def test_schema_v2_separates_new_hits_from_sunk_hits_and_reports_cash(
+        self, tmp_path: Path
+    ) -> None:
+        capture_id = "manager-" + "1" * 64
+        artifact = {
+            "schema_version": 2,
+            "run_id": "r" * 64,
+            "decision_sha256": "d" * 64,
+            "manager_context": {
+                "capture_id": capture_id,
+                "existing_hit_points": 4,
+                "initial_free_transfers": 0,
+                "bank_tenths": 25,
+            },
+            "plan": {
+                "expected_points_after_hits": 111.5,
+                "hit_points": 8,
+                "weeks": [
+                    {
+                        "gw": 2,
+                        "expected_points": 61.5,
+                        "squad_cost_tenths": 1015,
+                        "captain": {"web_name": "Captain"},
+                        "vice_captain": {"web_name": "Vice"},
+                        "transfers_in": [{"code": 16, "web_name": "New"}],
+                        "transfers_out": [{"code": 1, "web_name": "Old"}],
+                        "free_transfers_before": 0,
+                        "free_transfers_after": 0,
+                        "hit_points": 4,
+                        "bank_before_tenths": 25,
+                        "bank_after_tenths": 20,
+                    },
+                    {
+                        "gw": 3,
+                        "expected_points": 58.0,
+                        "squad_cost_tenths": 1015,
+                        "captain": {"web_name": "Captain"},
+                        "vice_captain": {"web_name": "Vice"},
+                        "transfers_in": [{"code": 17, "web_name": "Second new"}],
+                        "transfers_out": [{"code": 2, "web_name": "Second old"}],
+                        "free_transfers_before": 1,
+                        "free_transfers_after": 0,
+                        "hit_points": 4,
+                        "bank_before_tenths": 20,
+                        "bank_after_tenths": 13,
+                    },
+                ],
+            },
+        }
+        path = tmp_path / "manager-plan.json"
+        path.write_text(json.dumps(artifact), encoding="utf-8")
+
+        summary = summarize_artifact(path)
+
+        assert summary["hit_points"] == 8
+        assert summary["manager_existing_hit_points"] == 4
+        assert summary["manager_capture_id"] == capture_id
+        assert summary["manager_initial_free_transfers"] == 0
+        assert summary["manager_bank_tenths"] == 25
+        assert summary["manager_weeks"][0] == {
+            "gw": 2,
+            "transfers_in": [{"code": 16, "web_name": "New"}],
+            "transfers_out": [{"code": 1, "web_name": "Old"}],
+            "free_transfers_before": 0,
+            "free_transfers_after": 0,
+            "hit_points": 4,
+            "bank_before_tenths": 25,
+            "bank_after_tenths": 20,
+        }
+
+
+class TestManagerTeamPreview:
+    @staticmethod
+    def _state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ServerState:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        _write_forecast(state.forecast_path)
+        return state
+
+    def test_returns_exact_fifteen_player_private_dto(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        state = self._state(tmp_path, monkeypatch)
+        capture = _manager_capture()
+
+        preview = _manager_team_preview(state, capture)
+
+        assert set(preview) == {
+            "capture_id",
+            "captured_at",
+            "manager_id",
+            "entry_name",
+            "picks_event",
+            "planning_gw",
+            "bank_tenths",
+            "squad_selling_value_tenths",
+            "free_transfers_available",
+            "free_transfers_source",
+            "existing_hit_points",
+            "players",
+        }
+        assert preview["capture_id"] == capture.capture_id
+        assert preview["manager_id"] == 42
+        assert preview["entry_name"] == "Fixture XI"
+        assert preview["planning_gw"] == 2
+        assert len(preview["players"]) == 15
+        assert preview["players"][0] == {
+            "element_id": 101,
+            "code": 1,
+            "web_name": "P1",
+            "position": "GK",
+            "team_id": 1,
+            "team_code": 1,
+            "now_cost": 50,
+            "purchase_price": 50,
+            "selling_price": 50,
+        }
+
+    @pytest.mark.parametrize(
+        ("case", "message"),
+        [
+            ("gameweek", "active forecast starts"),
+            ("registry", "different selectable-player registries"),
+            ("price", "disagrees with active forecast metadata"),
+        ],
+    )
+    def test_fails_closed_on_forecast_capture_disagreement(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        case: str,
+        message: str,
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        if case == "gameweek":
+            _write_forecast(state.forecast_path, gw_from=3)
+            capture = _manager_capture()
+        elif case == "registry":
+            _write_forecast(state.forecast_path, registry_sha256="7" * 64)
+            capture = _manager_capture()
+        else:
+            _write_forecast(state.forecast_path, price_delta_code=1)
+            capture = _manager_capture()
+
+        with pytest.raises(RequestError, match=message):
+            _manager_team_preview(state, capture)
+
+    def test_preview_tolerates_volatile_bootstrap_payload_changes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        _write_forecast(state.forecast_path, bootstrap_sha256="7" * 64)
+        preview = _manager_team_preview(state, _manager_capture(bootstrap_sha256="8" * 64))
+        assert len(preview["players"]) == 15
+
+    def test_preview_requires_forecast_registry_binding(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        _write_forecast(state.forecast_path, registry_sha256=None)
+        with pytest.raises(RequestError, match="no selectable-player registry binding"):
+            _manager_team_preview(state, _manager_capture())
+
+    def test_manager_plan_rejects_more_owned_exclusions_than_first_week_depth(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_git_worktree_clean", lambda repo: True)
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        _write_forecast(state.forecast_path)
+        capture = _manager_capture()
+        write_manager_capture_atomic(
+            _manager_capture_path(state, capture.capture_id),
+            capture,
+        )
+        forced = [player.code for player in capture.squad[:3]]
+        with pytest.raises(RequestError, match="force 3 first-week transfers"):
+            run_manager_plan(
+                state,
+                capture.capture_id,
+                [],
+                forced,
+                0.0,
+                None,
+            )
+
+    def test_fetch_validates_previews_and_stores_without_network(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        state = self._state(tmp_path, monkeypatch)
+        capture = _manager_capture()
+        client_instance = object()
+        writes: list[tuple[Path, ManagerTeamCapture]] = []
+
+        class FakeClient:
+            def __enter__(self) -> object:
+                return client_instance
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        def fake_capture(manager_id: int, *, client: object) -> ManagerTeamCapture:
+            assert manager_id == 42
+            assert client is client_instance
+            return capture
+
+        def fake_write(path: Path, value: ManagerTeamCapture) -> str:
+            writes.append((path, value))
+            return "0" * 64
+
+        monkeypatch.setattr(plan_server, "FplApiClient", FakeClient)
+        monkeypatch.setattr(plan_server, "capture_manager_team", fake_capture)
+        monkeypatch.setattr(plan_server, "write_manager_capture_atomic", fake_write)
+
+        preview = fetch_and_store_manager_team(state, 42)
+
+        assert preview["capture_id"] == capture.capture_id
+        assert writes == [
+            (
+                tmp_path / plan_server.MANAGER_CAPTURES_DIRNAME / f"{capture.capture_id}.json",
+                capture,
+            )
+        ]
+
+    def test_capture_reload_rejects_path_traversal_and_invalid_or_corrupt_ids(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        for invalid in (
+            "../manager-" + "1" * 64,
+            "manager-" + "1" * 63,
+            "manager-" + "Z" * 64,
+        ):
+            with pytest.raises(RequestError, match="capture id is invalid"):
+                _manager_capture_path(state, invalid)
+
+        capture = _manager_capture()
+        valid_path = _manager_capture_path(state, capture.capture_id)
+        write_manager_capture_atomic(valid_path, capture)
+        assert _load_manager_capture(state, capture.capture_id) == capture
+
+        missing = "manager-" + "1" * 64
+        with pytest.raises(RequestError, match="capture is unavailable"):
+            _load_manager_capture(state, missing)
+
+        corrupt_path = _manager_capture_path(state, missing)
+        corrupt_path.parent.mkdir(exist_ok=True)
+        corrupt_path.write_text("{}", encoding="utf-8")
+        with pytest.raises(RequestError, match="immutable validation"):
+            _load_manager_capture(state, missing)
 
 
 class TestRunPlanPreChecks:
@@ -297,6 +769,74 @@ class TestRunPlanPreChecks:
         assert seen.count("--exclude") == 2
         assert seen[seen.index("--plan-origin") + 1] == "user_custom"
         assert "9" in seen and "11" in seen
+
+    def test_manager_plan_threads_capture_rules_override_and_shared_publish(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_git_worktree_clean", lambda repo: True)
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        _write_forecast(state.forecast_path)
+        _write_standing_plans(tmp_path)
+        capture = _manager_capture()
+        seen_argv: list[str] = []
+        published: list[tuple[Path, list[Path], dict[str, Any]]] = []
+
+        monkeypatch.setattr(plan_server, "_load_manager_capture", lambda _state, _id: capture)
+
+        def fake_optimizer(argv: list[str]) -> None:
+            seen_argv.extend(argv)
+            Path(argv[argv.index("--output") + 1]).write_text("{}", encoding="utf-8")
+
+        summary = {
+            "optimizer_run_id": "r" * 64,
+            "decision_sha256": "d" * 64,
+            "manager_capture_id": capture.capture_id,
+        }
+        monkeypatch.setattr(plan_server, "_run_optimizer_cli", fake_optimizer)
+        monkeypatch.setattr(plan_server, "summarize_artifact", lambda _path: dict(summary))
+
+        def fake_publish(
+            _state: ServerState,
+            output: Path,
+            standing_paths: list[Path],
+            published_summary: dict[str, Any],
+        ) -> None:
+            published.append((output, standing_paths, published_summary))
+
+        monkeypatch.setattr(plan_server, "_publish_custom_artifact", fake_publish)
+
+        result = run_manager_plan(
+            state,
+            capture.capture_id,
+            [1],
+            [9, 11],
+            0.25,
+            0,
+        )
+
+        assert seen_argv[0] == str(state.forecast_path)
+        assert seen_argv[seen_argv.index("--manager-capture") + 1] == str(
+            _manager_capture_path(state, capture.capture_id)
+        )
+        assert seen_argv[seen_argv.index("--plan-origin") + 1] == "user_custom"
+        assert seen_argv[seen_argv.index("--lock") + 1] == "1"
+        assert seen_argv.count("--exclude") == 2
+        assert seen_argv[seen_argv.index("--min-bench-appearance") + 1] == "0.25"
+        assert seen_argv[seen_argv.index("--free-transfers-override") + 1] == "0"
+        output = Path(seen_argv[seen_argv.index("--output") + 1])
+        assert output.name.startswith("manager-plan-")
+        assert published == [
+            (
+                output,
+                [tmp_path / name for name in plan_server.STANDING_PLANS],
+                result,
+            )
+        ]
+        assert result["manager_entry_name"] == "Fixture XI"
+        assert result["manager_planning_gw"] == 2
+        assert len(result["manager_current_team"]) == 15
 
     def test_publishes_the_exact_output_not_the_newest_sibling(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -689,6 +1229,32 @@ def loopback_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Threadin
             "bench_seen": bench,
         },
     )
+    monkeypatch.setattr(
+        plan_server,
+        "fetch_and_store_manager_team",
+        lambda state, manager_id: {"manager_id_seen": manager_id},
+    )
+    monkeypatch.setattr(
+        plan_server,
+        "_load_manager_capture",
+        lambda state, capture_id: {"capture_id": capture_id},
+    )
+    monkeypatch.setattr(
+        plan_server,
+        "_manager_team_preview",
+        lambda state, capture: {"capture_seen": capture["capture_id"]},
+    )
+    monkeypatch.setattr(
+        plan_server,
+        "run_manager_plan",
+        lambda state, capture_id, locks, excludes, bench, override: {
+            "capture_seen": capture_id,
+            "locks_seen": locks,
+            "excludes_seen": excludes,
+            "bench_seen": bench,
+            "override_seen": override,
+        },
+    )
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(ServerState(tmp_path)))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -751,6 +1317,75 @@ class TestHttpSurface:
         assert body["locks_seen"] == [3, 7]
         assert body["excludes_seen"] == [9, 11]
         assert body["bench_seen"] == 0.25
+
+    def test_manager_routes_validate_and_dispatch(
+        self, loopback_server: ThreadingHTTPServer
+    ) -> None:
+        capture_id = "manager-" + "1" * 64
+
+        status, _, payload = self._request(
+            loopback_server,
+            "/manager-team",
+            method="POST",
+            body=json.dumps({"manager_id": 42}).encode("utf-8"),
+        )
+        assert status == 200
+        assert json.loads(payload)["manager_id_seen"] == 42
+
+        status, _, payload = self._request(
+            loopback_server,
+            "/manager-team/capture",
+            method="POST",
+            body=json.dumps({"capture_id": capture_id}).encode("utf-8"),
+        )
+        assert status == 200
+        assert json.loads(payload)["capture_seen"] == capture_id
+
+        status, _, payload = self._request(
+            loopback_server,
+            "/manager-plan",
+            method="POST",
+            body=json.dumps(
+                {
+                    "capture_id": capture_id,
+                    "locks": [7, 3],
+                    "excludes": [11, 9],
+                    "min_bench_appearance": 0.25,
+                    "free_transfers_override": 0,
+                }
+            ).encode("utf-8"),
+        )
+        body = json.loads(payload)
+        assert status == 200
+        assert body["capture_seen"] == capture_id
+        assert body["locks_seen"] == [3, 7]
+        assert body["excludes_seen"] == [9, 11]
+        assert body["bench_seen"] == 0.25
+        assert body["override_seen"] == 0
+
+    @pytest.mark.parametrize(
+        ("route", "body"),
+        [
+            ("/manager-team", {"manager_id": 42}),
+            ("/manager-team/capture", {"capture_id": "manager-" + "1" * 64}),
+            ("/manager-plan", {"capture_id": "manager-" + "1" * 64}),
+        ],
+    )
+    def test_manager_routes_require_same_machine_authorization(
+        self,
+        loopback_server: ThreadingHTTPServer,
+        route: str,
+        body: dict[str, object],
+    ) -> None:
+        status, _, payload = self._request(
+            loopback_server,
+            route,
+            method="POST",
+            body=json.dumps(body).encode("utf-8"),
+            origin="https://evil.example",
+        )
+        assert status == 403
+        assert "not allowed" in json.loads(payload)["error"]
 
     def test_bad_body_is_a_409_with_a_safe_message(
         self, loopback_server: ThreadingHTTPServer

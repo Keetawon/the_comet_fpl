@@ -4,16 +4,18 @@
 // runs the optimizer or writes a decision artifact. Structural FPL squad rules are enforced while
 // budget is deliberately advisory so managers can explore future value-growth scenarios.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   Check,
   CircleAlert,
+  LoaderCircle,
   Plus,
   RotateCcw,
   Trash2,
+  UserRoundSearch,
 } from "lucide-react";
 
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
@@ -56,8 +58,17 @@ import {
   type UserDraftRules,
 } from "@/lib/userDraft";
 import {
+  fetchManagerTeam,
+  fetchManagerTeamCapture,
+  type ManagerTeamPreview,
+} from "@/lib/planServer";
+import {
+  loadPlanServerToken,
+  rememberPlanServerToken,
+} from "@/lib/planServerToken";
+import {
   clearSquadDraftHandoff,
-  squadDraftHandoffRunId,
+  squadDraftHandoff,
 } from "@/lib/squadDraftHandoff";
 import { cn } from "@/lib/utils";
 
@@ -88,12 +99,32 @@ type PageState =
   | { status: "error"; message: string }
   | ReadyState;
 
-interface StoredDraft {
+type DraftSeedSource = "manual" | "optimized" | "manager_current";
+
+interface StoredDraftV2 {
   version: 2;
   optimizerRunId: string;
   forecastRunId: string;
   season: string;
   playerCodes: number[];
+}
+
+interface StoredDraft {
+  version: 3;
+  seedSource: DraftSeedSource;
+  optimizerRunId: string;
+  forecastRunId: string;
+  season: string;
+  managerCaptureId: string | null;
+  playerCodes: number[];
+}
+
+interface RestoredDraft {
+  players: PlayerRecord[];
+  warning: string | null;
+  seedSource: DraftSeedSource;
+  managerCaptureId: string | null;
+  migrate: boolean;
 }
 
 function formatPrice(tenths: number | null): string {
@@ -202,42 +233,73 @@ function resolveReadyState(
 
 function restoreDraft(
   state: ReadyState,
-): { players: PlayerRecord[]; warning: string | null } {
+): RestoredDraft {
+  const empty = (warning: string | null): RestoredDraft => ({
+    players: [],
+    warning,
+    seedSource: "manual",
+    managerCaptureId: null,
+    migrate: false,
+  });
   let raw: string | null;
   try {
     raw = window.localStorage.getItem(USER_DRAFT_STORAGE_KEY);
   } catch {
-    return {
-      players: [],
-      warning: "Browser storage is unavailable; this draft will last only for this tab.",
-    };
+    return empty("Browser storage is unavailable; this draft will last only for this tab.");
   }
-  if (!raw) return { players: [], warning: null };
+  if (!raw) return empty(null);
 
   let candidate: unknown;
   try {
     candidate = JSON.parse(raw);
   } catch {
-    return { players: [], warning: "The saved Squad Draft was invalid and was not restored." };
+    return empty("The saved Squad Draft was invalid and was not restored.");
   }
   if (!candidate || typeof candidate !== "object") {
-    return { players: [], warning: "The saved Squad Draft was invalid and was not restored." };
+    return empty("The saved Squad Draft was invalid and was not restored.");
   }
-  const stored = candidate as Partial<StoredDraft>;
+  const stored = candidate as Partial<StoredDraft> | Partial<StoredDraftV2>;
   if (
-    stored.version !== 2 ||
+    (stored.version !== 2 && stored.version !== 3) ||
     stored.optimizerRunId !== state.plan.optimizer_run_id ||
     stored.forecastRunId !== state.plan.forecast_run_id ||
     stored.season !== state.plan.season
   ) {
-    return {
-      players: [],
-      warning:
-        "A saved draft belongs to another optimizer run or forecast vintage, so a new draft was started.",
-    };
+    return empty(
+      "A saved draft belongs to another optimizer run or forecast vintage, so a new draft was started.",
+    );
   }
   if (!Array.isArray(stored.playerCodes)) {
-    return { players: [], warning: "The saved Squad Draft was invalid and was not restored." };
+    return empty("The saved Squad Draft was invalid and was not restored.");
+  }
+
+  let seedSource: DraftSeedSource = "manual";
+  let managerCaptureId: string | null = null;
+  let migrate = stored.version === 2;
+  if (stored.version === 3) {
+    if (
+      stored.seedSource !== "manual" &&
+      stored.seedSource !== "optimized" &&
+      stored.seedSource !== "manager_current"
+    ) {
+      return empty("The saved Squad Draft had invalid seed provenance and was not restored.");
+    }
+    seedSource = stored.seedSource;
+    const capture =
+      typeof stored.managerCaptureId === "string"
+        ? stored.managerCaptureId.trim()
+        : "";
+    if (seedSource === "manager_current" && !capture) {
+      return empty(
+        "The saved current-team draft had no manager capture id and was not restored.",
+      );
+    }
+    if (seedSource !== "manager_current" && capture) {
+      return empty(
+        "The saved Squad Draft mixed incompatible seed provenance and was not restored.",
+      );
+    }
+    managerCaptureId = capture || null;
   }
 
   const byCode = new Map(state.players.map((player) => [player.code, player]));
@@ -255,11 +317,23 @@ function restoreDraft(
     }
     restored.push(player);
   }
+  const warnings: string[] = [];
+  if (migrate) {
+    warnings.push(
+      "The legacy saved draft was restored as manual because it did not record its original seed source.",
+    );
+  }
+  if (dropped) {
+    warnings.push(
+      "Some saved players were unavailable or broke the current structural rules and were omitted.",
+    );
+  }
   return {
     players: restored,
-    warning: dropped
-      ? "Some saved players were unavailable or broke the current structural rules and were omitted."
-      : null,
+    warning: warnings.length ? warnings.join(" ") : null,
+    seedSource,
+    managerCaptureId,
+    migrate,
   };
 }
 
@@ -303,12 +377,65 @@ function forwardedDraft(state: ReadyState): PlayerRecord[] {
   return selected;
 }
 
-function storeDraft(state: ReadyState, players: readonly PlayerRecord[]): string | null {
+function managerCurrentDraft(
+  state: ReadyState,
+  preview: ManagerTeamPreview,
+): PlayerRecord[] {
+  if (preview.planning_gw !== state.plan.gw_from) {
+    throw new Error(
+      `Manager capture plans GW${preview.planning_gw}, but the selected forecast starts at GW${state.plan.gw_from}. ` +
+        "Refresh and republish the matching forecast before importing this team.",
+    );
+  }
+  const byCode = new Map(state.players.map((player) => [player.code, player]));
+  const selected: PlayerRecord[] = [];
+  for (const captured of preview.players) {
+    const player = byCode.get(captured.code);
+    if (!player) {
+      throw new Error(
+        `Current-team player ${captured.web_name} (${captured.code}) is missing from forecast ` +
+          `${state.plan.forecast_run_id}.`,
+      );
+    }
+    if (
+      player.position !== captured.position ||
+      player.team_code !== captured.team_code
+    ) {
+      throw new Error(
+        `Current-team player ${captured.web_name} does not match the selected forecast roster.`,
+      );
+    }
+    const guard = userDraftSelectionGuard(selected, player, state.rules);
+    if (!guard.allowed) {
+      throw new Error(
+        `Current team is not structurally legal at ${captured.web_name} ` +
+          `(${guard.reason ?? "unknown rule"}).`,
+      );
+    }
+    selected.push(player);
+  }
+  if (!userDraftStructure(selected, state.rules).isComplete) {
+    throw new Error("Current-team import did not produce a complete structural squad.");
+  }
+  return selected;
+}
+
+function storeDraft(
+  state: ReadyState,
+  players: readonly PlayerRecord[],
+  seedSource: DraftSeedSource,
+  managerCaptureId: string | null,
+): string | null {
+  if (seedSource === "manager_current" && !managerCaptureId?.trim()) {
+    throw new Error("Current-team draft storage requires a manager capture id.");
+  }
   const payload: StoredDraft = {
-    version: 2,
+    version: 3,
+    seedSource,
     optimizerRunId: state.plan.optimizer_run_id,
     forecastRunId: state.plan.forecast_run_id,
     season: state.plan.season,
+    managerCaptureId: seedSource === "manager_current" ? managerCaptureId : null,
     playerCodes: players.map((player) => player.code),
   };
   try {
@@ -425,11 +552,13 @@ function DraftSquadTable({
   selected,
   rules,
   loadedGws,
+  disabled,
   onRemove,
 }: {
   selected: readonly PlayerRecord[];
   rules: UserDraftRules;
   loadedGws: readonly number[];
+  disabled?: boolean;
   onRemove: (code: number) => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("total5");
@@ -610,6 +739,7 @@ function DraftSquadTable({
                         type="button"
                         variant="ghost"
                         size="icon-sm"
+                        disabled={disabled}
                         aria-label={`Remove ${player.web_name}`}
                         title={`Remove ${player.web_name}`}
                         onClick={() => onRemove(player.code)}
@@ -651,8 +781,19 @@ function DraftSquadTable({
 }
 
 export function UserDraftPage() {
+  const hostedStatic = import.meta.env.VITE_HOSTED_STATIC === "true";
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [selected, setSelected] = useState<PlayerRecord[]>([]);
+  const [seedSource, setSeedSource] = useState<DraftSeedSource>("manual");
+  const [managerCaptureId, setManagerCaptureId] = useState<string | null>(null);
+  const [managerPreview, setManagerPreview] = useState<ManagerTeamPreview | null>(null);
+  const [managerId, setManagerId] = useState("");
+  const [managerImporting, setManagerImporting] = useState(false);
+  const [managerImportError, setManagerImportError] = useState<string | null>(null);
+  const [serverToken, setServerToken] = useState(loadPlanServerToken);
+  const [tokenStorageWarning, setTokenStorageWarning] = useState<string | null>(null);
+  const managerImportRequestRef = useRef(0);
+  const handoffServerTokenRef = useRef(serverToken);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -661,9 +802,9 @@ export function UserDraftPage() {
 
   useEffect(() => {
     let cancelled = false;
-    let optimizerRunId: string | null;
+    let handoff: ReturnType<typeof squadDraftHandoff>;
     try {
-      optimizerRunId = squadDraftHandoffRunId(window.location.hash);
+      handoff = squadDraftHandoff(window.location.hash);
     } catch (error: unknown) {
       setState({
         status: "error",
@@ -672,29 +813,73 @@ export function UserDraftPage() {
       return;
     }
     Promise.all([loadPlayers(), loadNextGw(), loadOptimizerAudit()])
-      .then(([playersData, nextGw, audit]) => {
-        if (cancelled) return;
+      .then(async ([playersData, nextGw, audit]) => {
         const ready = resolveReadyState(
           playersData.players,
           nextGw.plans,
           audit,
-          optimizerRunId,
+          handoff?.optimizerRunId ?? null,
         );
-        const restored =
-          optimizerRunId == null
-            ? restoreDraft(ready)
-            : {
-                players: forwardedDraft(ready),
-                warning: null,
-              };
-        const warning =
-          optimizerRunId == null ? restored.warning : storeDraft(ready, restored.players);
+        let restored: RestoredDraft;
+        let preview: ManagerTeamPreview | null = null;
+        if (handoff == null) {
+          restored = restoreDraft(ready);
+        } else if (handoff.source === "optimized") {
+          restored = {
+            players: forwardedDraft(ready),
+            warning: null,
+            seedSource: "optimized",
+            managerCaptureId: null,
+            migrate: false,
+          };
+        } else {
+          if (hostedStatic) {
+            throw new Error(
+              "Captured-manager Squad Draft handoffs require the trusted local Plan Server.",
+            );
+          }
+          preview = await fetchManagerTeamCapture(
+            handoff.managerCaptureId ?? "",
+            handoffServerTokenRef.current,
+          );
+          if (preview.capture_id !== handoff.managerCaptureId) {
+            throw new Error(
+              "Plan server returned a different manager capture than the handoff requested.",
+            );
+          }
+          restored = {
+            players: managerCurrentDraft(ready, preview),
+            warning: null,
+            seedSource: "manager_current",
+            managerCaptureId: preview.capture_id,
+            migrate: false,
+          };
+        }
+        if (cancelled) return;
+        const shouldStore = handoff != null || restored.migrate;
+        const persistedWarning = shouldStore
+          ? storeDraft(
+              ready,
+              restored.players,
+              restored.seedSource,
+              restored.managerCaptureId,
+            )
+          : null;
+        const warning = [restored.warning, persistedWarning].filter(Boolean).join(" ") || null;
         setState(ready);
         setSelected(restored.players);
+        setSeedSource(restored.seedSource);
+        setManagerCaptureId(restored.managerCaptureId);
+        setManagerPreview(preview);
         setStorageWarning(warning);
-        if (optimizerRunId != null) {
+        if (handoff?.source === "optimized") {
           setHandoffNotice(
             `Forwarded ${restored.players.length} optimized players from ${ready.plan.display_label}.`,
+          );
+          clearSquadDraftHandoff();
+        } else if (handoff?.source === "manager_current" && preview) {
+          setHandoffNotice(
+            `Forwarded ${restored.players.length} players from ${preview.entry_name || `manager #${preview.manager_id}`}'s captured current team.`,
           );
           clearSquadDraftHandoff();
         }
@@ -710,11 +895,52 @@ export function UserDraftPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hostedStatic]);
 
-  const persistSelection = (ready: ReadyState, next: PlayerRecord[]) => {
+  const persistSelection = (
+    ready: ReadyState,
+    next: PlayerRecord[],
+    nextSeedSource = seedSource,
+    nextManagerCaptureId = managerCaptureId,
+  ) => {
     setSelected(next);
-    setStorageWarning(storeDraft(ready, next));
+    setSeedSource(nextSeedSource);
+    setManagerCaptureId(nextManagerCaptureId);
+    setStorageWarning(
+      storeDraft(ready, next, nextSeedSource, nextManagerCaptureId),
+    );
+  };
+
+  const importManagerTeam = async (ready: ReadyState) => {
+    if (hostedStatic) {
+      setManagerImportError(
+        "Manager import is available only with the trusted local Plan Server.",
+      );
+      return;
+    }
+    if (!/^\d{1,10}$/.test(managerId.trim()) || Number(managerId.trim()) <= 0) {
+      setManagerImportError("Enter a positive FPL manager ID.");
+      return;
+    }
+    const requestId = ++managerImportRequestRef.current;
+    setManagerImporting(true);
+    setManagerImportError(null);
+    try {
+      const preview = await fetchManagerTeam(managerId.trim(), serverToken);
+      if (requestId !== managerImportRequestRef.current) return;
+      // Resolve and validate the complete replacement before changing UI or browser storage.
+      const imported = managerCurrentDraft(ready, preview);
+      persistSelection(ready, imported, "manager_current", preview.capture_id);
+      setManagerPreview(preview);
+      setHandoffNotice(
+        `Imported ${imported.length} current players for ${preview.entry_name || `manager #${preview.manager_id}`}.`,
+      );
+    } catch (error: unknown) {
+      if (requestId !== managerImportRequestRef.current) return;
+      setManagerImportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (requestId === managerImportRequestRef.current) setManagerImporting(false);
+    }
   };
 
   const teams = useMemo(() => {
@@ -782,6 +1008,8 @@ export function UserDraftPage() {
     safePage * PLAYER_PAGE_SIZE,
     (safePage + 1) * PLAYER_PAGE_SIZE,
   );
+  const managerIdValid =
+    /^\d{1,10}$/.test(managerId.trim()) && Number(managerId.trim()) > 0;
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -821,6 +1049,146 @@ export function UserDraftPage() {
         </p>
       )}
 
+      <section
+        className="rounded-xl border bg-card p-4 shadow-sm"
+        aria-labelledby="manager-draft-import-heading"
+        aria-busy={managerImporting}
+      >
+        <div className="flex items-start gap-2">
+          <UserRoundSearch className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+          <div>
+            <h2 id="manager-draft-import-heading" className="font-semibold">
+              Import your current FPL team
+            </h2>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+              This shortcut fetches your current 15 and replaces this browser draft only after
+              every player maps into the exact forecast and recorded squad rules. It does not
+              optimize transfers or create a suggestion; use Plan Builder for that.
+            </p>
+          </div>
+        </div>
+        {hostedStatic ? (
+          <p className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+            Current-team import is intentionally local-only. Manual Squad Draft remains available
+            here, but manager IDs and private captures require the trusted local Plan Server.
+          </p>
+        ) : (
+        <form
+          className="mt-3 grid items-end gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void importManagerTeam(state);
+          }}
+        >
+          <div className="w-full max-w-xs">
+            <label htmlFor="draft-manager-id" className="text-xs font-medium">
+              FPL manager ID
+            </label>
+            <Input
+              id="draft-manager-id"
+              className="mt-1"
+              inputMode="numeric"
+              autoComplete="off"
+              value={managerId}
+              aria-invalid={managerId.length > 0 && !managerIdValid}
+              aria-describedby="draft-manager-id-hint"
+              disabled={managerImporting}
+              onChange={(event) => {
+                setManagerId(event.target.value);
+                setManagerImportError(null);
+              }}
+              placeholder="e.g. 123456"
+            />
+            <p id="draft-manager-id-hint" className="mt-1 text-[10px] text-muted-foreground">
+              {managerId.trim() && !managerIdValid
+                ? "Use 1-10 digits and a value greater than zero."
+                : "The number in fantasy.premierleague.com/entry/{id}."}
+            </p>
+          </div>
+          <div className="w-full max-w-xs">
+            <label htmlFor="draft-plan-server-token" className="text-xs font-medium">
+              Plan server token{" "}
+              <span className="font-normal text-muted-foreground">(LAN only)</span>
+            </label>
+            <Input
+              id="draft-plan-server-token"
+              type="password"
+              autoComplete="off"
+              className="mt-1 font-mono"
+              value={serverToken}
+              disabled={managerImporting}
+              onChange={(event) => {
+                setServerToken(event.target.value);
+                setTokenStorageWarning(null);
+              }}
+              placeholder="leave blank on this computer"
+            />
+            <button
+              type="button"
+              className="mt-1 text-[10px] font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50"
+              disabled={managerImporting}
+              onClick={() => {
+                setTokenStorageWarning(
+                  rememberPlanServerToken(serverToken)
+                    ? null
+                    : "Token storage is unavailable; this tab will keep using it.",
+                );
+              }}
+            >
+              Remember token on this browser
+            </button>
+          </div>
+          <Button type="submit" disabled={!managerIdValid || managerImporting}>
+            {managerImporting ? (
+              <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <UserRoundSearch className="size-3.5" aria-hidden />
+            )}
+            {managerImporting ? "Fetching current team…" : "Fetch current team"}
+          </Button>
+        </form>
+        )}
+        {tokenStorageWarning && !hostedStatic && (
+          <p role="status" className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+            {tokenStorageWarning}
+          </p>
+        )}
+        {managerImportError && (
+          <p role="alert" className="mt-2 text-xs text-destructive">
+            {managerImportError} Your existing draft was kept unchanged.
+          </p>
+        )}
+        {managerPreview && (
+          <div
+            className="mt-3 grid gap-2 rounded-lg border bg-muted/20 p-3 text-xs sm:grid-cols-2 lg:grid-cols-4"
+            aria-label="Imported manager values"
+          >
+            <p>
+              <span className="block text-muted-foreground">Captured team</span>
+              <strong>{managerPreview.entry_name || `Manager #${managerPreview.manager_id}`}</strong>
+              {" · "}picks GW{managerPreview.picks_event}
+            </p>
+            <p>
+              <span className="block text-muted-foreground">Current selling value</span>
+              <strong>{formatPrice(managerPreview.squad_selling_value_tenths)}</strong>
+            </p>
+            <p>
+              <span className="block text-muted-foreground">Bank</span>
+              <strong>{formatPrice(managerPreview.bank_tenths)}</strong>
+            </p>
+            <p>
+              <span className="block text-muted-foreground">Free transfers for GW{managerPreview.planning_gw}</span>
+              <strong>{managerPreview.free_transfers_available}</strong>
+              {" · "}{managerPreview.free_transfers_source}
+            </p>
+            <p className="sm:col-span-2 lg:col-span-4 text-muted-foreground">
+              Selling value and bank are manager-capture values. Prices and totals in the draft
+              table remain advisory now-costs from forecast {state.plan.forecast_run_id.slice(0, 12)}…
+            </p>
+          </div>
+        )}
+      </section>
+
       <section className="rounded-xl border bg-card p-4 shadow-sm" aria-label="Draft status">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -834,13 +1202,18 @@ export function UserDraftPage() {
               </Badge>
             ))}
             <Badge variant="outline">max {state.rules.maximumPerClub} per club</Badge>
+            <Badge variant="outline">seed: {seedSource.replace("_", " ")}</Badge>
           </div>
           <Button
             type="button"
             size="sm"
             variant="outline"
-            disabled={selected.length === 0}
-            onClick={() => persistSelection(state, [])}
+            disabled={selected.length === 0 || managerImporting}
+            onClick={() => {
+              persistSelection(state, [], "manual", null);
+              setManagerPreview(null);
+              setHandoffNotice(null);
+            }}
           >
             <RotateCcw className="size-3.5" /> Clear draft
           </Button>
@@ -855,7 +1228,7 @@ export function UserDraftPage() {
         >
           {overBudget && <CircleAlert className="mt-0.5 size-4 shrink-0" />}
           <p>
-            Current draft cost <span className="font-semibold text-foreground">{formatPrice(totals.totalCostTenths)}</span>
+            Advisory forecast now-cost <span className="font-semibold text-foreground">{formatPrice(totals.totalCostTenths)}</span>
             {overBudget
               ? ` — ${formatPrice((totals.totalCostTenths ?? 0) - state.rules.budgetTenths)} above the recorded ${formatPrice(state.rules.budgetTenths)} budget. This is allowed here for planning.`
               : ` · recorded budget ${formatPrice(state.rules.budgetTenths)}. Affordability is advisory on this page.`}
@@ -875,6 +1248,7 @@ export function UserDraftPage() {
           selected={selected}
           rules={state.rules}
           loadedGws={state.loadedGws}
+          disabled={managerImporting}
           onRemove={(code) =>
             persistSelection(state, selected.filter((player) => player.code !== code))
           }
@@ -995,7 +1369,7 @@ export function UserDraftPage() {
                     type="button"
                     size="sm"
                     variant={isSelected ? "outline" : "default"}
-                    disabled={!isSelected && !guard.allowed}
+                    disabled={managerImporting || (!isSelected && !guard.allowed)}
                     title={isSelected ? `Remove ${player.web_name} from draft` : reason}
                     aria-label={
                       isSelected

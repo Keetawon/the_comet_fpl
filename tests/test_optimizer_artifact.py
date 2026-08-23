@@ -15,7 +15,7 @@ import os
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -23,13 +23,18 @@ from pydantic import ValidationError
 
 from fpl.artifacts.optimizer_plan import (
     ForecastInputProvenance,
+    ManagerPlanContext,
     OptimizerArtifactError,
     OptimizerArtifactExistsError,
     OptimizerPlanArtifact,
     OptimizerProvenance,
+    OwnedPlayerValueRecord,
     SearchPolicy,
     SolverIdentity,
     SquadRulesProvenance,
+    TransferPlanRecord,
+    build_optimizer_plan_artifact,
+    derive_optimizer_decision_sha256,
     derive_optimizer_run_id,
     optimizer_artifact_bytes,
     read_optimizer_artifact,
@@ -43,6 +48,16 @@ from fpl.artifacts.prospective_points import (
     ProspectivePointsArtifact,
     write_artifact_atomic,
 )
+from fpl.ingest.manager_team import (
+    ManagerCaptureCompleteness,
+    ManagerCaptureProvenance,
+    ManagerSquadPlayer,
+    ManagerTeamCapture,
+    ManagerTransferReplayRules,
+    derive_manager_capture_id,
+    manager_capture_bytes,
+    manager_capture_sha256,
+)
 from fpl.jobs import optimize_squad
 from fpl.jobs.optimize_squad import (
     _initial_squad_record,
@@ -52,6 +67,7 @@ from fpl.jobs.optimize_squad import (
     main,
 )
 from fpl.optimize.rules import load_squad_rules
+from fpl.optimize.squad import OptimizationError
 
 HASH = "a" * 64
 HASH_B = "b" * 64
@@ -338,6 +354,232 @@ def _build(horizon: int = 2, *, optimizer_commit: str = "optcommit") -> Optimize
         risk_lambda=0.0,
         solver_package_version="3.3.2",
         solver_binary_version="2.10.3",
+    )
+
+
+def _manager_build() -> OptimizerPlanArtifact:
+    """Turn the stable v1 fixture into a small imported-team transfer decision."""
+    base = _build()
+    manager_provenance = base.provenance.model_copy(
+        update={
+            "forecast": base.provenance.forecast.model_copy(
+                update={"selectable_player_registry_sha256": HASH}
+            )
+        }
+    )
+    outgoing = base.initial_squad.members[-1]
+    incoming = outgoing.model_copy(
+        update={
+            "code": 999,
+            "web_name": "P999",
+            "team_id": 999,
+            "team_code": 999,
+            "now_cost": outgoing.now_cost + 10,
+        }
+    )
+    plan_payload = base.plan.model_dump(mode="json")
+
+    def replace_ref(ref: dict[str, object]) -> None:
+        if ref["code"] == outgoing.code:
+            ref["code"] = incoming.code
+            ref["web_name"] = incoming.web_name
+
+    for offset, week in enumerate(plan_payload["weeks"]):
+        week["squad_after_transfers"] = [
+            incoming.model_dump(mode="json") if member["code"] == outgoing.code else member
+            for member in week["squad_after_transfers"]
+        ]
+        week["squad_after_transfers"].sort(key=lambda member: member["code"])
+        week["squad_cost_tenths"] += 10
+        for ref in week["starting_xi"]:
+            replace_ref(ref)
+        replace_ref(week["captain"])
+        replace_ref(week["vice_captain"])
+        replace_ref(week["bench_goalkeeper"])
+        for ref in week["bench_order"]:
+            replace_ref(ref)
+        week["bank_before_tenths"] = 10 if offset == 0 else 0
+        week["bank_after_tenths"] = 0
+        if offset == 0:
+            week["transfers_out"] = [{"code": outgoing.code, "web_name": outgoing.web_name}]
+            week["transfers_in"] = [{"code": incoming.code, "web_name": incoming.web_name}]
+            week["free_transfers_before"] = 0
+            week["free_transfers_after"] = 0
+            week["hit_points"] = 4
+        else:
+            week["transfers_out"] = []
+            week["transfers_in"] = []
+            week["free_transfers_before"] = 1
+            week["free_transfers_after"] = 1
+            week["hit_points"] = 0
+    plan_payload["hit_points"] = 4
+    plan_payload["expected_points_after_hits"] -= 4.0
+    plan_payload["objective_value_after_hits"] -= 4.0
+    plan = TransferPlanRecord.model_validate(plan_payload)
+
+    initial = base.initial_squad.model_copy(update={"solver_status": "Imported"})
+    solver = base.solver.model_copy(update={"status": "Imported"})
+    policy = base.search_policy.model_copy(
+        update={
+            "plan_mode": "manager",
+            "initial_free_transfers": 0,
+            "plan_origin": "user_custom",
+            "excluded_codes": (outgoing.code,),
+        }
+    )
+    # An imported team's current market value may exceed its original budget; cash legality is
+    # instead checked from bank plus the outgoing player's selling value.
+    rules = base.rules.model_copy(update={"budget_tenths": base.initial_squad.cost_tenths - 10})
+    manager = ManagerPlanContext(
+        capture_id="manager-" + HASH,
+        capture_sha256=HASH_B,
+        selectable_player_registry_sha256=HASH,
+        captured_at=AS_OF,
+        manager_id=123456,
+        picks_event=1,
+        planning_gw=1,
+        bank_tenths=10,
+        initial_free_transfers=0,
+        free_transfers_source="replayed_public_history",
+        existing_hit_points=4,
+        owned_players=tuple(
+            OwnedPlayerValueRecord(
+                code=member.code,
+                purchase_price_tenths=member.now_cost,
+                selling_price_tenths=member.now_cost,
+            )
+            for member in base.initial_squad.members
+        ),
+    )
+    return build_optimizer_plan_artifact(
+        provenance=manager_provenance,
+        search_policy=policy,
+        solver=solver,
+        rules=rules,
+        initial_squad=initial,
+        plan=plan,
+        assumptions=base.assumptions,
+        manager_context=manager,
+    )
+
+
+def test_schema_v1_identity_and_canonical_bytes_remain_pinned() -> None:
+    artifact = _build()
+    assert artifact.schema_version == 1
+    assert artifact.run_id == "799c094f5bfab76e74d7e86e1d89f636e992a2037d0b99a5d7ef502bd3919876"
+    assert (
+        artifact.decision_sha256
+        == "6b9f33efd034def324f4147968291abde7404e3f76eca571256d0e05556568c5"
+    )
+    import hashlib
+
+    assert (
+        hashlib.sha256(optimizer_artifact_bytes(artifact)).hexdigest()
+        == "1a7655f77f043d3c77455b10211904d535913a88591da83f862e96e6238ba6a6"
+    )
+
+
+def test_manager_v2_validates_first_week_hit_cash_and_over_budget_market_value() -> None:
+    artifact = _manager_build()
+    first, second = artifact.plan.weeks
+    assert artifact.schema_version == 2
+    assert artifact.search_policy.plan_mode == "manager"
+    assert artifact.initial_squad.cost_tenths > artifact.rules.budget_tenths
+    assert len(first.transfers_in) == len(first.transfers_out) == 1
+    assert (first.free_transfers_before, first.free_transfers_after, first.hit_points) == (0, 0, 4)
+    assert (first.bank_before_tenths, first.bank_after_tenths) == (10, 0)
+    assert (second.free_transfers_before, second.free_transfers_after) == (1, 1)
+    assert artifact.manager_context is not None
+    assert artifact.manager_context.existing_hit_points == 4
+    # The already-incurred hit is recorded as sunk; only the newly planned hit enters the total.
+    assert artifact.plan.hit_points == 4
+
+
+def test_manager_v2_canonical_round_trip(tmp_path: Path) -> None:
+    artifact = _manager_build()
+    path = tmp_path / "manager-plan.json"
+    write_optimizer_artifact_atomic(path, artifact)
+    assert read_optimizer_artifact(path) == artifact
+    assert b'"schema_version": 2' in path.read_bytes()
+    assert b'"manager_context"' in path.read_bytes()
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda payload: payload["plan"]["weeks"][0].__setitem__("hit_points", 0),
+            "hit cost",
+        ),
+        (
+            lambda payload: payload["plan"]["weeks"][0].__setitem__("bank_after_tenths", 1),
+            "bank-after",
+        ),
+        (
+            lambda payload: payload["manager_context"]["owned_players"][-1].__setitem__(
+                "selling_price_tenths", 41
+            ),
+            "selling price",
+        ),
+        (
+            lambda payload: payload["search_policy"].__setitem__("initial_free_transfers", 1),
+            "initial free transfers",
+        ),
+    ],
+)
+def test_manager_v2_rejects_financial_or_transfer_tampering(
+    mutate: Callable[[dict[str, object]], None],
+    message: str,
+) -> None:
+    payload = _manager_build().model_dump(mode="json", by_alias=True)
+    mutate(payload)
+    with pytest.raises(ValidationError, match=message):
+        OptimizerPlanArtifact.model_validate(payload)
+
+
+def test_manager_v2_allows_owned_exclude_only_until_first_transfer() -> None:
+    artifact = _manager_build()
+    excluded = artifact.search_policy.excluded_codes[0]
+    assert excluded in {member.code for member in artifact.initial_squad.members}
+    assert all(
+        excluded not in {member.code for member in week.squad_after_transfers}
+        for week in artifact.plan.weeks
+    )
+
+    owned_still_present = artifact.initial_squad.members[0].code
+    bad_owned = artifact.model_dump(mode="json", by_alias=True)
+    bad_owned["search_policy"]["excluded_codes"] = [owned_still_present]
+    with pytest.raises(ValidationError, match="contains an excluded player"):
+        OptimizerPlanArtifact.model_validate(bad_owned)
+
+    incoming = artifact.plan.weeks[0].transfers_in[0].code
+    bad_non_owned = artifact.model_dump(mode="json", by_alias=True)
+    bad_non_owned["search_policy"]["excluded_codes"] = [incoming]
+    with pytest.raises(ValidationError, match="contains an excluded player"):
+        OptimizerPlanArtifact.model_validate(bad_non_owned)
+
+
+def test_manager_context_and_mode_bind_decision_and_run_identity() -> None:
+    artifact = _manager_build()
+    assert artifact.manager_context is not None
+    changed_context = artifact.manager_context.model_copy(update={"manager_id": 654321})
+    changed_decision = derive_optimizer_decision_sha256(
+        artifact.rules,
+        artifact.initial_squad,
+        artifact.plan,
+        artifact.assumptions,
+        manager_context=changed_context,
+    )
+    assert changed_decision != artifact.decision_sha256
+    assert (
+        derive_optimizer_run_id(
+            artifact.provenance,
+            artifact.search_policy,
+            artifact.solver,
+            changed_decision,
+            manager_context=changed_context,
+        )
+        != artifact.run_id
     )
 
 
@@ -683,6 +925,230 @@ def _write_forecast(tmp_path: Path, horizon: int = 2) -> Path:
     return path
 
 
+def _manager_forecast(horizon: int = 2) -> ProspectivePointsArtifact:
+    """A GW2+ forecast whose current 15 can be worth more than a fresh 100.0 budget."""
+    base = _artifact(horizon)
+    rows = tuple(
+        row.model_copy(
+            update={
+                "gw": row.gw + 1,
+                "now_cost": 70,
+                "kickoff_times": tuple(
+                    kickoff + timedelta(days=1) for kickoff in row.kickoff_times
+                ),
+            }
+        )
+        for row in base.rows
+    )
+    return ProspectivePointsArtifact(
+        manifest=base.manifest.model_copy(
+            update={
+                "gw_from": 2,
+                "gw_to": horizon + 1,
+                "live_inputs": base.manifest.live_inputs.model_copy(
+                    update={"selectable_player_registry_sha256": HASH}
+                ),
+            }
+        ),
+        rows=rows,
+    )
+
+
+def _manager_capture(artifact: ProspectivePointsArtifact) -> ManagerTeamCapture:
+    """Build and revalidate a complete canonical capture matching the manager forecast."""
+    first_rows = {
+        row.code: row for row in artifact.rows if row.gw == artifact.manifest.gw_from
+    }
+    # Keep the weak FWD 33 and omit the strong FWD 30. The manager path should recommend the
+    # one affordable same-position replacement immediately in GW2.
+    current_codes = tuple(sorted(code for code in first_rows if code != 30))
+    squad = tuple(
+        ManagerSquadPlayer(
+            element=code,
+            code=code,
+            web_name=first_rows[code].web_name or f"P{code}",
+            position=first_rows[code].position,
+            team_id=first_rows[code].team_id,
+            now_cost=70,
+            purchase_price=50,
+            selling_price=60,
+        )
+        for code in current_codes
+    )
+    provenance = ManagerCaptureProvenance(
+        current_bootstrap_sha256=HASH,
+        selectable_player_registry_sha256=HASH,
+        entry_sha256=HASH_B,
+        latest_picks_sha256=HASH_C,
+        start_picks_sha256=HASH,
+        transfers_sha256=HASH_B,
+        history_sha256=HASH_C,
+        deadline_snapshot_capture_id="synthetic-deadline",
+        deadline_snapshot_captured_at=AS_OF - timedelta(hours=1),
+        deadline_snapshot_relative_path="snapshots/daily/synthetic",
+        deadline_snapshot_manifest_sha256=HASH,
+        deadline_snapshot_bootstrap_archive_sha256=HASH_B,
+        deadline_snapshot_bootstrap_payload_sha256=HASH_C,
+    )
+    pending = ManagerTeamCapture(
+        capture_id="pending",
+        captured_at=AS_OF + timedelta(days=2),
+        season=artifact.manifest.season,
+        manager_id=42,
+        manager_name="Synthetic Manager",
+        player_first_name="Fixture",
+        player_last_name="Owner",
+        started_event=1,
+        picks_event=1,
+        planning_event=2,
+        squad=squad,
+        bank_tenths=10,
+        squad_selling_value_tenths=900,
+        available_budget_tenths=910,
+        free_transfers_available=1,
+        existing_hit_points=4,
+        historical_hit_points=0,
+        post_picks_transfer_count=2,
+        chips=(),
+        transfer_rules=ManagerTransferReplayRules(),
+        completeness=ManagerCaptureCompleteness(
+            latest_free_hit_picks_comparable_to_permanent_squad=True
+        ),
+        provenance=provenance,
+    )
+    payload = pending.model_dump(mode="json", by_alias=True)
+    payload["capture_id"] = derive_manager_capture_id(pending)
+    capture = ManagerTeamCapture.model_validate(payload)
+    # This also re-derives the identity and proves the fixture is serializable at the real boundary.
+    assert manager_capture_bytes(capture)
+    return capture
+
+
+def _write_manager_inputs(tmp_path: Path) -> tuple[Path, Path, ManagerTeamCapture]:
+    artifact = _manager_forecast()
+    forecast = tmp_path / "manager-forecast.jsonl"
+    write_artifact_atomic(forecast, artifact)
+    capture = _manager_capture(artifact)
+    capture_path = tmp_path / "manager-capture.json"
+    capture_path.write_bytes(manager_capture_bytes(capture))
+    return forecast, capture_path, capture
+
+
+def test_manager_producer_imports_current_fifteen_and_plans_first_gw_finances(
+    tmp_path: Path,
+) -> None:
+    forecast = _manager_forecast()
+    capture = _manager_capture(forecast)
+    rules = load_squad_rules()
+
+    initial, index, plan, names = _solve(
+        forecast,
+        rules,
+        0.0,
+        manager_capture=capture,
+        free_transfers_override=0,
+    )
+
+    assert {member.code for member in initial.members} == {
+        player.code for player in capture.squad
+    }
+    assert initial.squad_cost_tenths == 1050 > rules.squad.budget_tenths
+    first, second = plan.weeks
+    assert first.gw == forecast.manifest.gw_from
+    assert (first.transfers_out, first.transfers_in) == ((33,), (30,))
+    assert (first.free_transfers_before, first.free_transfers_after, first.hit_points) == (0, 0, 4)
+    assert (first.bank_before_tenths, first.bank_after_tenths) == (10, 0)
+    assert (
+        second.free_transfers_before,
+        second.free_transfers_after,
+        second.hit_points,
+    ) == (1, 1, 0)
+    assert (second.bank_before_tenths, second.bank_after_tenths) == (0, 0)
+    assert plan.hit_points == 4
+
+    provenance = OptimizerProvenance(
+        optimizer_commit_sha="producer-test",
+        forecast=build_forecast_provenance(forecast, "manager-forecast.jsonl", HASH),
+        squad_rules=SquadRulesProvenance(
+            path="squad_2026_27.yaml",
+            contract_version=rules.contract_version,
+            sha256=HASH_B,
+        ),
+    )
+    context = optimize_squad._manager_plan_context(capture, free_transfers_override=0)
+    artifact = assemble_optimizer_artifact(
+        initial=initial,
+        plan=plan,
+        names=names,
+        index=index,
+        provenance=provenance,
+        rules=rules,
+        risk_lambda=0.0,
+        plan_origin="user_custom",
+        manager_context=context,
+        solver_package_version="3.3.2",
+        solver_binary_version="2.10.3",
+    )
+    assert artifact.schema_version == 2
+    assert artifact.manager_context is not None
+    assert artifact.manager_context.capture_id == capture.capture_id
+    assert artifact.manager_context.capture_sha256 == manager_capture_sha256(capture)
+    assert artifact.manager_context.bank_tenths == 10
+    assert artifact.manager_context.initial_free_transfers == 0
+    assert artifact.manager_context.free_transfers_override == 0
+    assert artifact.manager_context.existing_hit_points == 4
+    first_artifact_week = artifact.plan.weeks[0]
+    assert (
+        first_artifact_week.bank_before_tenths,
+        first_artifact_week.bank_after_tenths,
+    ) == (10, 0)
+
+    output = tmp_path / "assembled-manager-plan.json"
+    write_optimizer_artifact_atomic(output, artifact)
+    assert read_optimizer_artifact(output) == artifact
+
+
+def test_manager_solve_requires_exact_registry_binding_and_bounded_repairs() -> None:
+    forecast = _manager_forecast()
+    capture = _manager_capture(forecast)
+    rules = load_squad_rules()
+
+    mismatched = capture.model_copy(
+        update={
+            "provenance": capture.provenance.model_copy(
+                update={"selectable_player_registry_sha256": HASH_B}
+            )
+        }
+    )
+    with pytest.raises(OptimizationError, match="registries disagree"):
+        _solve(forecast, rules, 0.0, manager_capture=mismatched)
+
+    unbound = ProspectivePointsArtifact(
+        manifest=forecast.manifest.model_copy(
+            update={
+                "live_inputs": forecast.manifest.live_inputs.model_copy(
+                    update={"selectable_player_registry_sha256": None}
+                )
+            }
+        ),
+        rows=forecast.rows,
+        player_fixture_rows=forecast.player_fixture_rows,
+        team_fixture_rows=forecast.team_fixture_rows,
+    )
+    with pytest.raises(OptimizationError, match="registry binding"):
+        _solve(unbound, rules, 0.0, manager_capture=capture)
+
+    forced = tuple(player.code for player in capture.squad[:3])
+    with pytest.raises(OptimizationError, match="force 3 first-week transfers"):
+        _solve(
+            forecast,
+            rules,
+            0.0,
+            excluded_codes=forced,
+            manager_capture=capture,
+        )
+
+
 def _mock_clean_output(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -692,6 +1158,87 @@ def _mock_clean_output(
     monkeypatch.setattr(optimize_squad, "_git_head", lambda _repo: head)
     monkeypatch.setattr(optimize_squad, "_pulp_package_version", lambda: "3.3.2")
     monkeypatch.setattr(optimize_squad, "_cbc_binary_version", lambda: "2.10.3")
+
+
+def test_manager_cli_binds_exact_capture_bytes_and_writes_schema_v2(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forecast, capture_path, capture = _write_manager_inputs(tmp_path)
+    output = tmp_path / "manager-plan.json"
+    _mock_clean_output(monkeypatch)
+
+    assert (
+        main(
+            [
+                str(forecast),
+                "--manager-capture",
+                str(capture_path),
+                "--free-transfers-override",
+                "0",
+                "--plan-origin",
+                "user_custom",
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+
+    artifact = read_optimizer_artifact(output)
+    assert artifact.schema_version == 2
+    assert artifact.manager_context is not None
+    assert artifact.manager_context.capture_id == capture.capture_id
+    assert artifact.manager_context.capture_sha256 == manager_capture_sha256(capture)
+    assert artifact.manager_context.free_transfers_override == 0
+    assert artifact.plan.weeks[0].transfers_out[0].code == 33
+    assert artifact.plan.weeks[0].transfers_in[0].code == 30
+    assert (
+        artifact.plan.weeks[0].bank_before_tenths,
+        artifact.plan.weeks[0].bank_after_tenths,
+        artifact.plan.weeks[0].hit_points,
+    ) == (10, 0, 4)
+    report = json.loads(capsys.readouterr().out)
+    assert report["manager"]["capture_sha256"] == manager_capture_sha256(capture)
+    assert report["manager"]["free_transfers_available"] == 0
+    assert report["manager"]["free_transfers_override"] == 0
+    assert report["manager"]["existing_hit_points"] == 4
+
+
+def test_manager_cli_rejects_capture_byte_mutation_during_solve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forecast, capture_path, _capture = _write_manager_inputs(tmp_path)
+    output = tmp_path / "manager-plan.json"
+    _mock_clean_output(monkeypatch)
+    real_solve = optimize_squad._solve
+
+    def drifting_solve(*args: object, **kwargs: object) -> object:
+        result = real_solve(*args, **kwargs)  # type: ignore[arg-type]
+        capture_path.write_bytes(capture_path.read_bytes() + b"\n")
+        return result
+
+    monkeypatch.setattr(optimize_squad, "_solve", drifting_solve)
+    assert (
+        main(
+            [
+                str(forecast),
+                "--manager-capture",
+                str(capture_path),
+                "--plan-origin",
+                "user_custom",
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+    assert capsys.readouterr().out == ""
+    assert not output.exists()
+    assert list(tmp_path.glob(".manager-plan.json.*.tmp")) == []
 
 
 def test_job_output_refuses_dirty_worktree(
@@ -901,8 +1448,10 @@ def test_cbc_version_retries_and_accepts_only_an_explicit_version_line(
             ),
         )
     )
+    calls: list[dict[str, object]] = []
 
     def run(*_args: object, **_kwargs: object) -> object:
+        calls.append(_kwargs)
         outcome = next(outcomes)
         if isinstance(outcome, Exception):
             raise outcome
@@ -911,6 +1460,7 @@ def test_cbc_version_retries_and_accepts_only_an_explicit_version_line(
     monkeypatch.setattr(pulp, "PULP_CBC_CMD", lambda **_kwargs: Solver())
     monkeypatch.setattr(optimize_squad.subprocess, "run", run)
     assert optimize_squad._cbc_binary_version() == "2.10.3"
+    assert calls and all(call["stdin"] is optimize_squad.subprocess.DEVNULL for call in calls)
 
 
 def test_solver_versions_never_returns_a_partial_identity(

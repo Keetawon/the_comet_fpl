@@ -1,7 +1,7 @@
 # Development roadmap: GW1 decision pack, then BI
 
 Status: active execution plan  
-Last updated: 2026-08-19<br>
+Last updated: 2026-08-23<br>
 Target: 2026/27 GW1  
 Deadline: `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok)  
 First kickoff: `2026-08-21T19:00:00Z`
@@ -9,6 +9,11 @@ First kickoff: `2026-08-21T19:00:00Z`
 This is the canonical near-term delivery order. `AGENTS.md` remains the authority for correctness,
 model history, frozen contracts, and working protocol. If a task does not advance one of the two
 owner goals below, defer it unless it is required to keep the deadline path correct.
+
+**Post-deadline note (2026-08-23).** The GW1 deadline has passed. Dated statements below about
+pending 2026-08-20/21 operations are retained as the delivery record and do not authorize a rerun
+or reinterpretation of frozen artifacts. Current work is the explicitly post-deadline P2
+manager-team workflow recorded below; no model default or frozen evaluation changed.
 
 ## Owner goals
 
@@ -72,10 +77,12 @@ rewriting it before any new deadline artifact is produced.
 
 Open operational gaps:
 
-- the 2026-08-20 fallback and 2026-08-21 final deadline runs and official-FPL submission remain;
+- the outcome/evidence for the dated fallback/final runs and official-FPL submission must be
+  reconciled separately; this P2 update does not backfill them;
 - `chance_of_playing_next_round` is repeated across GW1-5;
-- future prices use deadline `now_cost`; price changes and selling value are not modelled;
-- manager-team import and selling-value accounting remain post-deadline work;
+- manager captures now carry current purchase/selling values and cash, but future prices and
+  future selling-value changes remain frozen at forecast `now_cost`;
+- authenticated My Team access, hosted manager accounts, and capture-retention policy remain open;
 - real forecast-versus-actual monitoring must wait for finalized 2026/27 outcomes.
 
 ## Delivery rules until the GW1 deadline
@@ -771,8 +778,9 @@ from the latest user plan; Optimizer Audit retains all runs with distinct labels
 picker supports up to five green locks and fifteen red exclusions. Exclusions are enforced through
 the initial ILP, every future transfer candidate/squad, artifact validation, run-id provenance,
 plan server, read model, and UI; lock/exclusion overlap and unknown/unselectable codes fail closed.
-The `manager_id` is still saved only for the post-deadline importer and is explicitly not applied
-to a GW1 fresh-squad solve.
+At this dated P1 milestone, `manager_id` was saved only for the post-deadline importer and was
+explicitly not applied to a GW1 fresh-squad solve. The P2 implementation recorded below supersedes
+that UI boundary without changing the historical P1 result.
 
 **P1.7g Plan Builder decision UX (2026-08-19): implemented and focused-tested.** The fresh-squad
 wizard exposes the eligible pool with reusable top and bottom pagination; a bottom-page change
@@ -783,8 +791,9 @@ percentage. A solved custom plan stays separate from the platform recommendation
 exact 15-player sortable analysis table: captain, vice, bench roles, and row colours are fixed to
 GW1 even when sorted; sortable columns expose `Total 3 GWs xP`, `Total 5 GWs xP`, and raw
 `GW1 xP` through `GW5 xP`; expanded rows show each gameweek's forecast and in-plan role/status.
-Missing or malformed exact-run data fails visibly. The remaining gap is still the post-deadline
-manager import and selling-value workflow, not fresh-squad solving.
+Missing or malformed exact-run data fails visibly. At this dated milestone the remaining gap was
+the post-deadline manager import and selling-value workflow; the P2 implementation below now fills
+that local development boundary.
 
 **P1.7h Per-gameweek squad xP and Bench Boost screen (2026-08-19): implemented and
 dashboard-tested.** Next GW and Plan Builder append three selected-plan-only rows to the player
@@ -812,9 +821,10 @@ footer row with selected cost and xP totals. Complete legal 15-player drafts may
 best-legal-XI/bench loaded-horizon screen and individual xP shortlist, but neither is a chip
 recommendation: manager ownership, chip inventory, transfers/hits, autosubs, captain fallback,
 competing windows, later gameweeks, and future measured availability are unavailable. State is
-versioned and browser-local; the route never calls the plan server, emits an optimizer artifact,
-or changes the formal/custom plan read models. This optional P1 surface may not delay the P0 final
-capture, official-FPL entry, or immutable evidence.
+versioned and browser-local; at this dated P1 milestone the route never called the plan server,
+emitted an optimizer artifact, or changed the formal/custom plan read models. P2 now adds a
+bounded direct manager import through the local Plan Server while preserving browser-local draft
+state and leaving formal/custom plan read models unchanged.
 
 ### P1.8 — Complete Players-page form exposure after P0
 
@@ -833,7 +843,8 @@ NULL, view, and position-applicability behavior without client-side recalculatio
 local database rebuild populated the additive columns and the local BI/static generation was
 atomically republished successfully. Migration alone still leaves pre-existing rows NULL. The final
 deadline vintage must repeat rebuild/export/republish through P0; this local development refresh
-does not satisfy or replace that deadline artifact. Manager-team import remains P2.
+does not satisfy or replace that deadline artifact. Manager-team import was assigned to P2 and is
+now recorded in that section as a separate post-deadline implementation.
 
 Build only after the export contract and its tests pass. Minimum pages:
 
@@ -858,27 +869,37 @@ silently turn ownership into selection utility.
 Only after P0 and the BI MVP are secure:
 
 - measure and contract per-GW availability semantics;
-- design price-change and selling-value handling;
+- design future price-change and future selling-value handling;
 - monitor recorded real-deadline forecasts against finalized outcomes;
 - decide whether a newly named positional attacking-allocation candidate is warranted;
 - investigate a price-informed starter prior on a fresh, pre-registered validation window;
 - revisit cards only if a real decision is shown to turn on their measured margin;
-- build the manager-team transfer-suggestion wizard per
-  `docs/manager-team-suggestions.md` (manager_id input, own-squad transfer suggestions with
-  exact free-transfer/-4-hit accounting, up to five locked must-keep players via `--lock`, up to
-  fifteen never-buy players via `--exclude`, the `--min-bench-appearance` bench gate, and
-  selling-value-aware budget checks); the optimizer-side primitives (`--lock`, `--exclude`,
-  `initial_banked_free_transfers`, the bench gate) are
-  already implemented and tested — the remaining work is the manager ingest boundary, value
-  accounting, and their integration inside the existing Plan Builder page. **The interactive
-  solving half shipped early
-  (2026-08-17, extended 2026-08-18 with explicit custom-plan identity and exclusions; owner
-  decision — it is needed for the GW1 decision itself):**
-  `fpl.jobs.plan_server` is a localhost trigger that runs the unchanged, fail-closed
-  optimizer and publish chain for the wizard's rules and republishes the read models; see
-  `dashboard/README.md`. It adds vintages beside the runbook flow and replaces no part of it.
+- **Manager-team transfer workflow (implemented development-only 2026-08-23; acceptance still
+  pending).** The public picks endpoint was live-measured not to contain purchase/selling values.
+  `fpl.ingest.manager_team` therefore supports GW1-started entries only, starts from committed GW1
+  launch prices, maps season-scoped elements to stable codes, replays public
+  permanent transfers and chips, reconciles the latest revealed squad and bank, and derives
+  purchase/selling values plus remaining free transfers. It emits an atomic, immutable private
+  capture bound to payload, snapshot, and full selectable-player registry hashes. Later starters,
+  missing evidence, or a capture/forecast registry mismatch fail closed rather than inventing
+  prices. This is public-entry reconstruction, not authenticated My Team state.
+- The manager optimizer starts from that exact 15, allows moves in the first forecast gameweek,
+  carries cash and per-player sale basis, and charges only new moves beyond the effective
+  remaining FT count at four points each. Already-incurred hits are recorded as sunk. A 0-5 FT
+  override is explicit provenance. Up to five owned locks mean never sell; an owned exclusion is
+  forced out in the first forecast gameweek and a non-owned exclusion is never bought. Future
+  prices remain frozen, and the bounded transfer search makes no global-optimality claim.
+- The local Plan Server accepts an explicit `--forecast` and adds `/manager-team`,
+  `/manager-team/capture`, and `/manager-plan` beside the existing `/plan`. Plan Builder shows
+  HOLD/OUT/IN, FT, cash, sunk/new hits, and offers both the optimized and captured-current-team
+  Squad Draft handoffs. Squad Draft also has a direct manager-ID capture shortcut that preserves
+  the old draft on failure. Manager captures/context stay out of shared read models; the public
+  pack removes user-custom plans and rejects manager IDs, current squads, bank, and selling values.
+  Hosted authentication, ownership verification, accounts/entitlements, and a selections log
+  remain unimplemented. See `docs/manager-team-suggestions.md` and `dashboard/README.md`.
 
-These are not GW1 blockers and must not be rushed into the current forecast.
+These were not GW1 blockers. The post-deadline implementation remains separate and changes no
+frozen forecast or evaluation.
 
 ## Required gate and handoff
 

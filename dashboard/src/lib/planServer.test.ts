@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  fetchManagerTeam,
+  fetchManagerTeamCapture,
   fetchPlanStatus,
+  parseManagerTeamPreview,
+  solveManagerPlan,
   solvePlan,
   type PlanServerStatus,
 } from "./planServer";
@@ -25,6 +29,35 @@ const status: PlanServerStatus = {
     cbc_binary_version: "2.10.3",
     solver_ready: true,
   },
+};
+
+const managerPlayers = Array.from({ length: 15 }, (_, index) => ({
+  element_id: index + 1,
+  code: 1000 + index,
+  web_name: `Player ${index + 1}`,
+  position:
+    index < 2 ? "GK" : index < 7 ? "DEF" : index < 12 ? "MID" : "FWD",
+  team_id: index + 1,
+  team_code: 200 + index,
+  now_cost: 60,
+  purchase_price: 50,
+  selling_price: 50,
+}));
+
+const managerPreview = {
+  ok: true,
+  capture_id: "capture-1",
+  captured_at: "2026-08-23T10:00:00Z",
+  manager_id: 123456,
+  entry_name: "Test XI",
+  picks_event: 1,
+  planning_gw: 2,
+  bank_tenths: 5,
+  squad_selling_value_tenths: 750,
+  free_transfers_available: 1,
+  free_transfers_source: "derived",
+  existing_hit_points: 0,
+  players: managerPlayers,
 };
 
 function response(payload: unknown): Response {
@@ -125,6 +158,117 @@ describe("plan server token transport", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(received).not.toBeNull();
     expect(received?.runtime?.solver_ready).toBe(false);
+  });
+});
+
+describe("manager-team client contract", () => {
+  it("strictly parses one exact 15-player capture", () => {
+    expect(parseManagerTeamPreview(managerPreview)).toMatchObject({
+      capture_id: "capture-1",
+      manager_id: 123456,
+      players: expect.arrayContaining([
+        expect.objectContaining({ code: 1000, position: "GK", selling_price: 50 }),
+      ]),
+    });
+  });
+
+  it("rejects duplicate players and inconsistent selling-value provenance", () => {
+    expect(() =>
+      parseManagerTeamPreview({
+        ...managerPreview,
+        players: managerPlayers.map((player, index) =>
+          index === 1 ? { ...player, code: managerPlayers[0].code } : player,
+        ),
+      }),
+    ).toThrow(/duplicate player codes/i);
+    expect(() =>
+      parseManagerTeamPreview({
+        ...managerPreview,
+        squad_selling_value_tenths: 751,
+      }),
+    ).toThrow(/selling value does not match/i);
+  });
+
+  it("posts manager ids and exact capture ids with the shared auth token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response(managerPreview));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchManagerTeam(" 123456 ", "lan-secret");
+    await fetchManagerTeamCapture(" capture-1 ", "lan-secret");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "http://localhost:8765/manager-team",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-FPL-Plan-Token": "lan-secret",
+        },
+        body: JSON.stringify({ manager_id: 123456 }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://localhost:8765/manager-team/capture",
+      expect.objectContaining({
+        body: JSON.stringify({ capture_id: "capture-1" }),
+      }),
+    );
+  });
+
+  it("surfaces a manager endpoint's safe error message", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ...response({ ok: false, error: "manager not found" }),
+      ok: false,
+      status: 404,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchManagerTeam(123456)).rejects.toThrow("manager not found");
+  });
+
+  it("posts manager solve rules using the backend field names", async () => {
+    const result = {
+      ok: true,
+      optimizer_run_id: "manager-run",
+      decision_sha256: "abc",
+      gw: 2,
+      gw_expected_points: 60,
+      horizon_expected_points: 300,
+      hit_points: 4,
+      squad_cost_tenths: 1000,
+      captain: "Alpha",
+      vice_captain: "Beta",
+      manager_capture_id: "capture-1",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(response(result));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await solveManagerPlan(
+      {
+        captureId: "capture-1",
+        locks: [1],
+        excludes: [2],
+        minBenchAppearance: 0.25,
+        freeTransfersOverride: null,
+      },
+      undefined,
+      "lan-secret",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8765/manager-plan",
+      expect.objectContaining({
+        body: JSON.stringify({
+          capture_id: "capture-1",
+          locks: [1],
+          excludes: [2],
+          min_bench_appearance: 0.25,
+          free_transfers_override: null,
+        }),
+      }),
+    );
   });
 });
 

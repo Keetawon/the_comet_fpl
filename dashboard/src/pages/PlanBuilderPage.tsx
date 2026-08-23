@@ -42,9 +42,14 @@ import type { NextGwPlan, PlayerRecord } from "@/data/types";
 import { resolvedPlanKind } from "@/lib/nextGw";
 import { clearPlanRequest, writePlanRequest } from "@/lib/planRequest";
 import {
+  fetchManagerTeam,
+  fetchManagerTeamCapture,
   fetchPlanStatus,
   PLAN_SERVER_START_COMMAND,
+  solveManagerPlan,
   solvePlan,
+  type ManagerTeamPreview,
+  type PlanSummary,
 } from "@/lib/planServer";
 import {
   loadPlanServerToken,
@@ -68,6 +73,7 @@ type PageState =
 // Wizard screens: 0 Start, 1 manager import, 2 set rules, 3 review & run, 4 result.
 type Step = 0 | 1 | 2 | 3 | 4;
 type SelectionMode = "lock" | "exclude";
+type BuildMode = "scratch" | "manager";
 
 /** The solve card's view of the local plan server (src/fpl/jobs/plan_server.py). */
 type SolverStatus =
@@ -84,6 +90,8 @@ type SolverStatus =
 const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 const MAX_LOCKS = 5;
 const MAX_EXCLUSIONS = 15;
+// Current bounded manager search can make at most two first-deadline transfers.
+const MANAGER_FIRST_WEEK_TRANSFER_DEPTH = 2;
 const PLAYER_PAGE_SIZE = 50;
 const DEFAULT_SQUAD_QUOTA: Record<string, number> = { GK: 2, DEF: 5, MID: 5, FWD: 3 };
 const THRESHOLDS = [
@@ -99,6 +107,9 @@ const STEPS = ["Start", "Set your rules", "Review & run", "Your plan"] as const;
 // ponytail: a fixed local path the owner's machine guarantees, not a config surface.
 const DEV_FORECAST_PATH = "D:\\tmp\\gw1\\dev-latest\\gw1_5_default.jsonl";
 const DEV_PLAN_OUTPUT_DIR = "D:\\tmp\\gw1\\dev-latest";
+const SOLVED_MANAGER_RESULT_STORAGE_KEY = "fpl-solved-manager-result-v1";
+const LEGACY_MANAGER_CAPTURE_STORAGE_KEY = "fpl-solved-manager-capture";
+const LEGACY_MANAGER_SUMMARY_STORAGE_KEY = "fpl-solved-manager-summary";
 
 function newManualPlanOutput(): string {
   const token =
@@ -326,25 +337,282 @@ function rememberSolvedPlan(runId: string): boolean {
   }
 }
 
-function planBuilderRunHash(runId: string, serverToken: string): string {
+interface StoredManagerResult {
+  version: 1;
+  optimizerRunId: string;
+  managerCaptureId: string;
+  summary: PlanSummary | null;
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function requiredString(value: Record<string, unknown>, key: string): string | null {
+  const item = value[key];
+  return typeof item === "string" && item.trim() ? item : null;
+}
+
+function requiredInteger(
+  value: Record<string, unknown>,
+  key: string,
+  minimum = 0,
+): number | null {
+  const item = value[key];
+  return Number.isSafeInteger(item) && Number(item) >= minimum ? Number(item) : null;
+}
+
+function requiredNumber(value: Record<string, unknown>, key: string): number | null {
+  const item = value[key];
+  return typeof item === "number" && Number.isFinite(item) ? item : null;
+}
+
+function parseManagerPlayerRef(value: unknown): { code: number; web_name: string | null } | null {
+  const player = objectValue(value);
+  if (!player) return null;
+  const code = requiredInteger(player, "code", 1);
+  const webName = player.web_name;
+  if (code == null || (webName !== null && typeof webName !== "string")) return null;
+  return { code, web_name: webName };
+}
+
+function parseManagerWeek(value: unknown): NonNullable<PlanSummary["manager_weeks"]>[number] | null {
+  const week = objectValue(value);
+  if (!week || !Array.isArray(week.transfers_in) || !Array.isArray(week.transfers_out)) {
+    return null;
+  }
+  const transfersIn = week.transfers_in.map(parseManagerPlayerRef);
+  const transfersOut = week.transfers_out.map(parseManagerPlayerRef);
+  const gw = requiredInteger(week, "gw", 1);
+  const freeBefore = requiredInteger(week, "free_transfers_before");
+  const freeAfter = requiredInteger(week, "free_transfers_after");
+  const hitPoints = requiredInteger(week, "hit_points");
+  const bankBefore = requiredInteger(week, "bank_before_tenths");
+  const bankAfter = requiredInteger(week, "bank_after_tenths");
+  if (
+    transfersIn.some((player) => player == null) ||
+    transfersOut.some((player) => player == null) ||
+    gw == null ||
+    freeBefore == null ||
+    freeAfter == null ||
+    hitPoints == null ||
+    bankBefore == null ||
+    bankAfter == null
+  ) {
+    return null;
+  }
+  return {
+    gw,
+    transfers_in: transfersIn as { code: number; web_name: string | null }[],
+    transfers_out: transfersOut as { code: number; web_name: string | null }[],
+    free_transfers_before: freeBefore,
+    free_transfers_after: freeAfter,
+    hit_points: hitPoints,
+    bank_before_tenths: bankBefore,
+    bank_after_tenths: bankAfter,
+  };
+}
+
+function parseStoredManagerSummary(value: unknown): PlanSummary | null {
+  const summary = objectValue(value);
+  if (!summary || !Array.isArray(summary.manager_weeks)) return null;
+  const optimizerRunId = requiredString(summary, "optimizer_run_id");
+  const decisionSha = requiredString(summary, "decision_sha256");
+  const managerCaptureId = requiredString(summary, "manager_capture_id");
+  const captain = requiredString(summary, "captain");
+  const viceCaptain = requiredString(summary, "vice_captain");
+  const gw = requiredInteger(summary, "gw", 1);
+  const gwExpectedPoints = requiredNumber(summary, "gw_expected_points");
+  const horizonExpectedPoints = requiredNumber(summary, "horizon_expected_points");
+  const hitPoints = requiredInteger(summary, "hit_points");
+  const squadCost = requiredInteger(summary, "squad_cost_tenths");
+  const planningGw = requiredInteger(summary, "manager_planning_gw", 1);
+  const existingHits = requiredInteger(summary, "manager_existing_hit_points");
+  const initialFreeTransfers = requiredInteger(summary, "manager_initial_free_transfers");
+  const bank = requiredInteger(summary, "manager_bank_tenths");
+  const sellingValue = requiredInteger(summary, "manager_squad_selling_value_tenths");
+  const weeks = summary.manager_weeks.map(parseManagerWeek);
+  if (
+    !optimizerRunId ||
+    !decisionSha ||
+    !managerCaptureId ||
+    !captain ||
+    !viceCaptain ||
+    gw == null ||
+    gwExpectedPoints == null ||
+    horizonExpectedPoints == null ||
+    hitPoints == null ||
+    squadCost == null ||
+    planningGw == null ||
+    existingHits == null ||
+    initialFreeTransfers == null ||
+    bank == null ||
+    sellingValue == null ||
+    weeks.length === 0 ||
+    weeks.some((week) => week == null)
+  ) {
+    return null;
+  }
+  const entryName =
+    typeof summary.manager_entry_name === "string"
+      ? summary.manager_entry_name
+      : undefined;
+  return {
+    optimizer_run_id: optimizerRunId,
+    decision_sha256: decisionSha,
+    gw,
+    gw_expected_points: gwExpectedPoints,
+    horizon_expected_points: horizonExpectedPoints,
+    hit_points: hitPoints,
+    squad_cost_tenths: squadCost,
+    captain,
+    vice_captain: viceCaptain,
+    manager_capture_id: managerCaptureId,
+    manager_entry_name: entryName,
+    manager_planning_gw: planningGw,
+    manager_existing_hit_points: existingHits,
+    manager_initial_free_transfers: initialFreeTransfers,
+    manager_bank_tenths: bank,
+    manager_squad_selling_value_tenths: sellingValue,
+    manager_weeks: weeks as NonNullable<PlanSummary["manager_weeks"]>,
+  };
+}
+
+function managerCaptureFromHash(runId: string): string | null {
+  const query = window.location.hash.split("?", 2)[1];
+  if (!query) return null;
+  const params = new URLSearchParams(query);
+  const runs = params.getAll("run");
+  const captures = params.getAll("manager_capture_id");
+  if (
+    runs.length !== 1 ||
+    runs[0].trim() !== runId ||
+    captures.length !== 1 ||
+    !captures[0].trim()
+  ) {
+    return null;
+  }
+  return captures[0].trim();
+}
+
+function storedManagerResult(runId: string | null): StoredManagerResult | null {
+  if (!runId) return null;
+  let stored: StoredManagerResult | null = null;
+  try {
+    const raw = window.localStorage.getItem(SOLVED_MANAGER_RESULT_STORAGE_KEY);
+    if (raw) {
+      const value = objectValue(JSON.parse(raw));
+      const optimizerRunId = value && requiredString(value, "optimizerRunId");
+      const managerCaptureId = value && requiredString(value, "managerCaptureId");
+      if (value?.version === 1 && optimizerRunId && managerCaptureId) {
+        const parsedSummary =
+          value.summary == null ? null : parseStoredManagerSummary(value.summary);
+        stored = {
+          version: 1,
+          optimizerRunId,
+          managerCaptureId,
+          summary:
+            parsedSummary?.optimizer_run_id === optimizerRunId &&
+            parsedSummary.manager_capture_id === managerCaptureId
+              ? parsedSummary
+              : null,
+        };
+      }
+    }
+  } catch {
+    stored = null;
+  }
+  const hashCapture = managerCaptureFromHash(runId);
+  if (hashCapture) {
+    return stored?.optimizerRunId === runId && stored.managerCaptureId === hashCapture
+      ? stored
+      : {
+          version: 1,
+          optimizerRunId: runId,
+          managerCaptureId: hashCapture,
+          summary: null,
+        };
+  }
+  return stored?.optimizerRunId === runId ? stored : null;
+}
+
+function rememberManagerResult(result: StoredManagerResult | null): boolean {
+  try {
+    if (result) {
+      window.localStorage.setItem(
+        SOLVED_MANAGER_RESULT_STORAGE_KEY,
+        JSON.stringify(result),
+      );
+    } else {
+      window.localStorage.removeItem(SOLVED_MANAGER_RESULT_STORAGE_KEY);
+    }
+    window.localStorage.removeItem(LEGACY_MANAGER_CAPTURE_STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_MANAGER_SUMMARY_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function initialPlanBuilderResult(): {
+  runId: string | null;
+  manager: StoredManagerResult | null;
+} {
+  const runId = storedSolvedPlanId();
+  return { runId, manager: storedManagerResult(runId) };
+}
+
+function planBuilderRunHash(
+  runId: string,
+  serverToken: string,
+  managerCaptureId?: string | null,
+): string {
   const params = new URLSearchParams({ run: runId });
   const cleanToken = serverToken.trim();
   if (cleanToken) params.set("server_token", cleanToken);
+  if (managerCaptureId) params.set("manager_capture_id", managerCaptureId);
   return "plan-builder?" + params.toString();
 }
 
 export function PlanBuilderPage() {
   const hostedStatic = import.meta.env.VITE_HOSTED_STATIC === "true";
+  const [initialStoredResult] = useState(initialPlanBuilderResult);
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [rules, setRules] = useState<Rules | null>(null);
-  const [resultPlanId, setResultPlanId] = useState<string | null>(storedSolvedPlanId);
-  const [step, setStep] = useState<Step>(() => (storedSolvedPlanId() ? 4 : 0));
+  const [resultPlanId, setResultPlanId] = useState<string | null>(
+    initialStoredResult.runId,
+  );
+  const [step, setStep] = useState<Step>(() => (initialStoredResult.runId ? 4 : 0));
   const [manualOutputPath] = useState(newManualPlanOutput);
   const [manualRunId, setManualRunId] = useState("");
+  const [manualOpenError, setManualOpenError] = useState<string | null>(null);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const [serverToken, setServerToken] = useState(loadPlanServerToken);
   const [tokenStorageWarning, setTokenStorageWarning] = useState<string | null>(null);
-  const [managerId, setManagerId] = useState("");
+  const [managerId, setManagerId] = useState(() => {
+    try {
+      return window.localStorage.getItem("fpl-manager-id") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [buildMode, setBuildMode] = useState<BuildMode>(
+    initialStoredResult.manager ? "manager" : "scratch",
+  );
+  const [managerTeam, setManagerTeam] = useState<ManagerTeamPreview | null>(null);
+  const [managerLoad, setManagerLoad] = useState<
+    "idle" | "loading" | "loaded" | "error"
+  >("idle");
+  const [managerLoadError, setManagerLoadError] = useState<string | null>(null);
+  const [freeTransfersOverride, setFreeTransfersOverride] = useState<number | null>(null);
+  const [managerSummary, setManagerSummary] = useState<PlanSummary | null>(
+    initialStoredResult.manager?.summary ?? null,
+  );
+  const [resultManagerCaptureId, setResultManagerCaptureId] = useState<string | null>(
+    initialStoredResult.manager?.managerCaptureId ?? null,
+  );
   const [locks, setLocks] = useState<PlayerRecord[]>([]);
   const [excludes, setExcludes] = useState<PlayerRecord[]>([]);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("lock");
@@ -390,11 +658,21 @@ export function PlanBuilderPage() {
   const openExactPublishedRun = (rawRunId: string) => {
     const runId = rawRunId.trim();
     if (!runId) return;
+    if (buildMode === "manager") {
+      setManualOpenError(
+        "A manually published manager run cannot be safely bound to this capture in the browser. Use Solve now so the local Plan Server verifies and returns the exact run/capture pair.",
+      );
+      return;
+    }
+    setManualOpenError(null);
     setResultPlanId(runId);
+    setManagerSummary(null);
+    setResultManagerCaptureId(null);
     setStep(4);
-    const remembered = rememberSolvedPlan(runId);
+    const rememberedPlan = rememberSolvedPlan(runId);
+    const rememberedManager = rememberManagerResult(null);
     setStorageWarning(
-      remembered
+      rememberedPlan && rememberedManager
         ? null
         : "Browser storage is unavailable. The exact run id is preserved in this page URL.",
     );
@@ -402,40 +680,143 @@ export function PlanBuilderPage() {
     reloadPublishedReadModels();
   };
 
+  const importManagerTeam = () => {
+    if (hostedStatic || !managerValid) return;
+    setManagerLoad("loading");
+    setManagerLoadError(null);
+    void fetchManagerTeam(managerId.trim(), serverToken)
+      .then((preview) => {
+        setBuildMode("manager");
+        setManagerTeam(preview);
+        setFreeTransfersOverride(null);
+        setLocks([]);
+        setExcludes([]);
+        setManagerLoad("loaded");
+        try {
+          localStorage.setItem("fpl-manager-id", String(preview.manager_id));
+        } catch {
+          // The exact capture remains in component state when browser storage is unavailable.
+        }
+      })
+      .catch((error: unknown) => {
+        setManagerTeam(null);
+        setManagerLoad("error");
+        setManagerLoadError(error instanceof Error ? error.message : String(error));
+      });
+  };
+
+  useEffect(() => {
+    if (
+      hostedStatic ||
+      step !== 2 ||
+      buildMode !== "manager" ||
+      managerTeam != null ||
+      !resultManagerCaptureId
+    ) {
+      return;
+    }
+    let cancelled = false;
+    setManagerLoad("loading");
+    setManagerLoadError(null);
+    void fetchManagerTeamCapture(resultManagerCaptureId, serverToken)
+      .then((preview) => {
+        if (cancelled) return;
+        if (preview.capture_id !== resultManagerCaptureId) {
+          throw new Error(
+            "Plan server returned a different manager capture than the saved result.",
+          );
+        }
+        setManagerTeam(preview);
+        setManagerId(String(preview.manager_id));
+        setFreeTransfersOverride(null);
+        setManagerLoad("loaded");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setManagerLoad("error");
+        setManagerLoadError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    buildMode,
+    hostedStatic,
+    managerTeam,
+    resultManagerCaptureId,
+    serverToken,
+    step,
+  ]);
+
   const solveNow = () => {
     if (hostedStatic) {
       setSolver({ status: "hosted-static" });
       return;
     }
     setSolver({ status: "solving", stage: null });
-    void solvePlan(
-      {
-        locks: locks.map((p) => p.code),
-        excludes: excludes.map((p) => p.code),
-        minBenchAppearance: thresholdFlag ? Number(thresholdFlag) : null,
-      },
-      (stage) =>
-        setSolver((current) =>
-          current.status === "solving"
-            ? { ...current, stage: stage ?? current.stage }
-            : current,
-        ),
-      serverToken,
-    )
+    const request = {
+      locks: locks.map((p) => p.code),
+      excludes: excludes.map((p) => p.code),
+      minBenchAppearance: thresholdFlag ? Number(thresholdFlag) : null,
+    };
+    const onStage = (stage: string | null) =>
+      setSolver((current) =>
+        current.status === "solving"
+          ? { ...current, stage: stage ?? current.stage }
+          : current,
+      );
+    const solve =
+      buildMode === "manager" && managerTeam
+        ? solveManagerPlan(
+            {
+              ...request,
+              captureId: managerTeam.capture_id,
+              freeTransfersOverride,
+            },
+            onStage,
+            serverToken,
+          )
+        : solvePlan(request, onStage, serverToken);
+    void solve
       .then((summary) => {
         // The plan server republished the read models. Keep the user inside Plan Builder and
         // reload so the module-level JSON cache refetches the exact returned run id. The URL
         // is the durable fallback when localStorage is denied (private/security modes).
+        if (
+          buildMode === "manager" &&
+          (!managerTeam || summary.manager_capture_id !== managerTeam.capture_id)
+        ) {
+          throw new Error(
+            "Plan server returned a manager result that does not match the imported capture.",
+          );
+        }
         setResultPlanId(summary.optimizer_run_id);
+        const captureId = buildMode === "manager" ? managerTeam?.capture_id ?? null : null;
+        setManagerSummary(buildMode === "manager" ? summary : null);
+        setResultManagerCaptureId(captureId);
         setStep(4);
         clearPlanRequest();
-        const remembered = rememberSolvedPlan(summary.optimizer_run_id);
+        const rememberedPlan = rememberSolvedPlan(summary.optimizer_run_id);
+        const rememberedManager = rememberManagerResult(
+          captureId
+            ? {
+                version: 1,
+                optimizerRunId: summary.optimizer_run_id,
+                managerCaptureId: captureId,
+                summary,
+              }
+            : null,
+        );
         setStorageWarning(
-          remembered
+          rememberedPlan && rememberedManager
             ? null
             : "Browser storage is unavailable. The exact run id is preserved in this page URL.",
         );
-        window.location.hash = planBuilderRunHash(summary.optimizer_run_id, serverToken);
+        window.location.hash = planBuilderRunHash(
+          summary.optimizer_run_id,
+          serverToken,
+          captureId,
+        );
         reloadPublishedReadModels();
       })
       .catch((error: unknown) => {
@@ -497,6 +878,14 @@ export function PlanBuilderPage() {
   const budget = rules?.budgetTenths ?? 1000;
   const quota = rules?.squadQuota ?? DEFAULT_SQUAD_QUOTA;
   const maxPerClub = rules?.maxPerClub ?? 3;
+  const managerOwnedCodes = useMemo(
+    () => new Set(managerTeam?.players.map((player) => player.code) ?? []),
+    [managerTeam],
+  );
+  const managerOwnedExcludedCount = useMemo(
+    () => excludes.filter((player) => managerOwnedCodes.has(player.code)).length,
+    [excludes, managerOwnedCodes],
+  );
 
   const totals = useMemo(() => {
     if (state.status !== "ready") return null;
@@ -543,6 +932,9 @@ export function PlanBuilderPage() {
   const lockGuard = (player: PlayerRecord): string | null => {
     if (locks.some((p) => p.code === player.code)) return null;
     if (excludes.some((p) => p.code === player.code)) return "remove exclusion first";
+    if (buildMode === "manager" && !managerOwnedCodes.has(player.code)) {
+      return "not in imported squad";
+    }
     if (locks.length >= MAX_LOCKS) return "max " + MAX_LOCKS + " locks";
     if ((totals?.lockedByPos[player.position] ?? 0) >= (quota[player.position] ?? 0)) {
       return player.position + " quota full";
@@ -557,6 +949,13 @@ export function PlanBuilderPage() {
     if (excludes.some((p) => p.code === player.code)) return null;
     if (locks.some((p) => p.code === player.code)) return "remove lock first";
     if (excludes.length >= MAX_EXCLUSIONS) return "max " + MAX_EXCLUSIONS + " exclusions";
+    if (
+      buildMode === "manager" &&
+      managerOwnedCodes.has(player.code) &&
+      managerOwnedExcludedCount >= MANAGER_FIRST_WEEK_TRANSFER_DEPTH
+    ) {
+      return "first-week transfer depth (" + MANAGER_FIRST_WEEK_TRANSFER_DEPTH + ")";
+    }
     return null;
   };
 
@@ -662,6 +1061,18 @@ export function PlanBuilderPage() {
     DEV_FORECAST_PATH,
     "--risk-lambda 0",
     "--plan-origin user_custom",
+    ...(buildMode === "manager" && managerTeam
+      ? [
+          "--manager-capture " +
+            DEV_PLAN_OUTPUT_DIR +
+            "\\manager-captures\\" +
+            managerTeam.capture_id +
+            ".json",
+        ]
+      : []),
+    ...(buildMode === "manager" && freeTransfersOverride != null
+      ? ["--free-transfers-override " + freeTransfersOverride]
+      : []),
     ...locks.map((p) => `--lock ${p.code}`),
     ...excludes.map((p) => `--exclude ${p.code}`),
     ...(thresholdFlag ? [`--min-bench-appearance ${thresholdFlag}`] : []),
@@ -697,7 +1108,8 @@ export function PlanBuilderPage() {
       : null;
 
   const managerTouched = managerId.trim() !== "";
-  const managerValid = /^\d{1,10}$/.test(managerId.trim());
+  const managerValid =
+    /^\d{1,10}$/.test(managerId.trim()) && Number(managerId.trim()) > 0;
 
   if (state.status === "loading") {
     return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
@@ -728,7 +1140,7 @@ export function PlanBuilderPage() {
         <h1 className="text-lg font-semibold">Plan builder</h1>
         <p className="text-xs text-muted-foreground">
           vintage {state.runId?.slice(0, 12)}… · rules from the recorded optimizer artifact ·
-          wizard v2 (fresh squad); manager import lands after GW1
+          manager-owned transfers and fresh-squad planning
         </p>
       </div>
       <StepBar current={step === 0 || step === 1 ? 1 : step} />
@@ -737,7 +1149,11 @@ export function PlanBuilderPage() {
         <section className="mx-auto grid w-full max-w-3xl gap-4 pt-2 md:grid-cols-2" aria-label="Start">
           <button
             type="button"
-            onClick={() => setStep(1)}
+            onClick={() => {
+              setBuildMode("manager");
+              setManualOpenError(null);
+              setStep(1);
+            }}
             className="group relative overflow-hidden rounded-xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-400 to-indigo-500" />
@@ -746,7 +1162,7 @@ export function PlanBuilderPage() {
             </span>
             <p className="mt-3 font-semibold">Import my team</p>
             <Badge variant="outline" className="mt-1.5 border-amber-300 bg-amber-50 text-[10px] text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-              Lands after the GW1 deadline
+              Ready on local development
             </Badge>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               Enter your FPL manager id and get transfer suggestions for <em>your</em> squad —
@@ -758,7 +1174,14 @@ export function PlanBuilderPage() {
           </button>
           <button
             type="button"
-            onClick={() => setStep(2)}
+            onClick={() => {
+              setBuildMode("scratch");
+              setManagerTeam(null);
+              setManagerSummary(null);
+              setResultManagerCaptureId(null);
+              setManualOpenError(null);
+              setStep(2);
+            }}
             className="group relative overflow-hidden rounded-xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
@@ -785,8 +1208,8 @@ export function PlanBuilderPage() {
           <div className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">Import my team</h2>
-              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                Lands after the GW1 deadline (2026-08-21)
+              <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-[10px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                Public API · private local capture
               </Badge>
             </div>
             <label htmlFor="manager-id" className="mt-4 block text-sm font-medium">
@@ -800,9 +1223,12 @@ export function PlanBuilderPage() {
               aria-describedby="manager-id-hint"
               className="mt-1 max-w-xs font-mono"
               value={managerId}
+              disabled={managerLoad === "loading"}
               onChange={(e) => {
                 setManagerId(e.target.value);
-                // remembered locally so the import screen greets a returning user once it ships
+                setManagerTeam(null);
+                setManagerLoad("idle");
+                setManagerLoadError(null);
                 if (/^\d{1,10}$/.test(e.target.value.trim())) {
                   try { localStorage.setItem("fpl-manager-id", e.target.value.trim()); } catch { /* private mode */ }
                 }
@@ -814,18 +1240,87 @@ export function PlanBuilderPage() {
                 : "The number in fantasy.premierleague.com/entry/{id}."}
             </p>
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-              {managerTouched && managerValid
-                ? `Manager #${managerId.trim()} saved for the future importer. It is not used in this GW1 solve.`
-                : "Your id is remembered on this device; nothing is sent anywhere (this dashboard is static)."}
+              Manager ID uses FPL's public endpoints. The local service reconstructs purchase and
+              selling values from a committed deadline snapshot plus public transfer history and
+              fails closed if it cannot reconcile all 15.
             </p>
+            {!hostedStatic && (
+              <div className="mt-3 rounded-lg border bg-muted/30 p-2.5">
+                <label htmlFor="manager-plan-server-token" className="text-xs font-medium">
+                  Plan server token <span className="font-normal text-muted-foreground">(LAN only)</span>
+                </label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Input
+                    id="manager-plan-server-token"
+                    type="password"
+                    autoComplete="off"
+                    className="h-8 min-w-48 flex-1 font-mono text-xs"
+                    placeholder="leave blank on this computer"
+                    value={serverToken}
+                    disabled={managerLoad === "loading"}
+                    onChange={(event) => setServerToken(event.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    onClick={importManagerTeam}
+                    disabled={!managerValid || managerLoad === "loading"}
+                  >
+                    {managerLoad === "loading" ? (
+                      <LoaderCircle className="size-4 animate-spin" />
+                    ) : (
+                      <Download className="size-4" />
+                    )}
+                    {managerLoad === "loading" ? "Fetching…" : "Get your team"}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {hostedStatic && (
+              <p className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+                Manager import is intentionally local-only. Open this commit with the local plan
+                server; the hosted dashboard never receives manager identifiers or squads.
+              </p>
+            )}
+            {managerLoadError && (
+              <p role="alert" className="mt-3 text-xs leading-relaxed text-destructive">
+                {managerLoadError}
+              </p>
+            )}
+            {managerTeam && (
+              <div className="mt-4 rounded-xl border border-emerald-300/70 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/20">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="font-medium">
+                    {managerTeam.entry_name || `Manager #${managerTeam.manager_id}`}
+                  </p>
+                  <span className="text-[10px] text-muted-foreground">
+                    captured {new Date(managerTeam.captured_at).toLocaleString()}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Public squad after GW{managerTeam.picks_event} · planning GW
+                  {managerTeam.planning_gw} · 15 players reconciled
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                  <div><span className="block text-muted-foreground">Bank</span><strong>{price(managerTeam.bank_tenths)}</strong></div>
+                  <div><span className="block text-muted-foreground">Selling value</span><strong>{price(managerTeam.squad_selling_value_tenths)}</strong></div>
+                  <div><span className="block text-muted-foreground">Remaining FT</span><strong>{managerTeam.free_transfers_available}</strong></div>
+                  <div><span className="block text-muted-foreground">Already-paid hits</span><strong>-{managerTeam.existing_hit_points}</strong></div>
+                </div>
+                <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+                  This is reconstructed public state, not authenticated FPL “my-team” data.
+                  Confirm the remaining free-transfer count before solving; any override is
+                  recorded in the optimizer artifact.
+                </p>
+              </div>
+            )}
           </div>
           <div className="rounded-xl border bg-muted/40 p-4">
-            <p className="text-xs font-medium text-muted-foreground">What the importer will do once it lands</p>
+            <p className="text-xs font-medium text-muted-foreground">What this workflow guarantees</p>
             <ul className="mt-2 space-y-2 text-sm">
               {[
-                { icon: Download, text: "Read your 15 with real selling prices and bank — the dashboard never fetches; a local job captures and publishes." },
-                { icon: ArrowLeftRight, text: "Derive your banked free transfers so hits are charged honestly (-4 each beyond the free grant)." },
-                { icon: Lock, text: "Suggest transfers for YOUR squad — locks become never-sell, the rotation threshold still applies." },
+                { icon: Download, text: "Capture your reconstructed 15, bank, purchase bases, and selling values immutably on this machine." },
+                { icon: ArrowLeftRight, text: "Start transfers in the first forecast gameweek and charge -4 for each move beyond the effective free transfers." },
+                { icon: Lock, text: "Locks mean never sell; excluding an owned player means force that player out at the first actionable deadline." },
               ].map(({ icon: Icon, text }) => (
                 <li key={text} className="flex items-start gap-2">
                   <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -835,11 +1330,17 @@ export function PlanBuilderPage() {
             </ul>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setStep(2)}>
-              Continue to player rules <ArrowRight className="size-4" />
+            <Button
+              disabled={!managerTeam}
+              onClick={() => {
+                setBuildMode("manager");
+                setStep(2);
+              }}
+            >
+              Choose locked and excluded players <ArrowRight className="size-4" />
             </Button>
             <span className="text-[10px] text-muted-foreground">
-              Builds a fresh squad now; your saved manager id is not applied.
+              The optimizer will start from this exact capture, not a fresh squad.
             </span>
             <Button variant="ghost" onClick={() => setStep(0)}>Back</Button>
           </div>
@@ -1024,7 +1525,11 @@ export function PlanBuilderPage() {
               <p className="text-sm">
                 Locks:{" "}
                 <span className="font-medium tabular-nums">
-                  {locks.length ? `${locks.length} of ${MAX_LOCKS}` : "none — the optimizer picks all 15"}
+                  {locks.length
+                    ? `${locks.length} of ${MAX_LOCKS}`
+                    : buildMode === "manager"
+                      ? "none — every imported player may be sold"
+                      : "none — the optimizer picks all 15"}
                 </span>
               </p>
               <p className="mt-1 text-sm">
@@ -1033,6 +1538,20 @@ export function PlanBuilderPage() {
                   {excludes.length ? excludes.length + " of " + MAX_EXCLUSIONS : "none"}
                 </span>
               </p>
+              {buildMode === "manager" && (
+                <p
+                  className={cn(
+                    "mt-1 text-[10px]",
+                    managerOwnedExcludedCount > MANAGER_FIRST_WEEK_TRANSFER_DEPTH
+                      ? "font-medium text-destructive"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  Owned players forced OUT: {managerOwnedExcludedCount}/
+                  {MANAGER_FIRST_WEEK_TRANSFER_DEPTH} current first-week search depth. Non-owned
+                  exclusions remain avoid-only and can use the rest of the {MAX_EXCLUSIONS} slots.
+                </p>
+              )}
               <div className="mt-3 flex items-center gap-2 text-sm">
                 Rotation threshold
                 <ToggleGroup
@@ -1054,6 +1573,7 @@ export function PlanBuilderPage() {
                 Outfield bench players must be at least this likely to appear; bench goalkeeper
                 exempt.
               </p>
+              {buildMode === "scratch" ? (
               <div className="mt-3">
                 <div
                   role="img"
@@ -1100,11 +1620,77 @@ export function PlanBuilderPage() {
                     : `headroom ${price(totals.leftover)}${totals.lockedCost / budget > 0.9 ? " (warning: >90% committed)" : ""}`}
                 </div>
               </div>
+              ) : managerTeam ? (
+                <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/50 p-3 dark:border-sky-900 dark:bg-sky-950/20">
+                  <p className="text-xs font-medium">Imported manager transfer state</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                    <span>Cash bank <strong className="block">{price(managerTeam.bank_tenths)}</strong></span>
+                    <span>Selling value <strong className="block">{price(managerTeam.squad_selling_value_tenths)}</strong></span>
+                  </div>
+                  <label htmlFor="free-transfers-override" className="mt-3 block text-xs font-medium">
+                    Remaining free transfers
+                  </label>
+                  <select
+                    id="free-transfers-override"
+                    className="mt-1 h-8 w-full rounded-md border bg-background px-2 text-xs"
+                    value={freeTransfersOverride == null ? "capture" : String(freeTransfersOverride)}
+                    onChange={(event) =>
+                      setFreeTransfersOverride(
+                        event.target.value === "capture" ? null : Number(event.target.value),
+                      )
+                    }
+                  >
+                    <option value="capture">
+                      Use reconstructed value ({managerTeam.free_transfers_available})
+                    </option>
+                    {[0, 1, 2, 3, 4, 5].map((value) => (
+                      <option key={value} value={value}>Override: {value}</option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+                    Already-paid hits: -{managerTeam.existing_hit_points} (sunk; never charged
+                    twice). New suggestions beyond the effective free transfers cost -4 each.
+                  </p>
+                </div>
+              ) : buildMode === "manager" ? (
+                <div
+                  role={managerLoad === "error" ? "alert" : "status"}
+                  className={cn(
+                    "mt-3 rounded-lg border p-3 text-xs",
+                    managerLoad === "error"
+                      ? "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+                      : "border-sky-200 bg-sky-50/50 text-sky-800 dark:border-sky-900 dark:bg-sky-950/20 dark:text-sky-200",
+                  )}
+                >
+                  {managerLoad === "loading"
+                    ? "Reloading the exact saved manager capture..."
+                    : managerLoadError ??
+                      "The exact manager capture must be loaded before this plan can be edited."}
+                  {managerLoad === "error" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() => setStep(1)}
+                    >
+                      Return to manager import
+                    </Button>
+                  )}
+                </div>
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={() => setStep(3)}
-                disabled={totals.leftover < 0 || !totals.completionPossible}
+                disabled={
+                  (buildMode === "scratch" &&
+                    (totals.leftover < 0 || !totals.completionPossible)) ||
+                  (buildMode === "manager" &&
+                    (managerTeam == null ||
+                      managerOwnedExcludedCount >
+                        MANAGER_FIRST_WEEK_TRANSFER_DEPTH))
+                }
               >
                 Next: Review & run <ArrowRight className="size-4" />
               </Button>
@@ -1125,7 +1711,9 @@ export function PlanBuilderPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium text-muted-foreground">Review your rules</p>
               <span className="text-xs tabular-nums text-muted-foreground">
-                threshold {thresholdLabel} · budget {price(budget)}
+                {buildMode === "manager" && managerTeam
+                  ? `GW${managerTeam.planning_gw} · bank ${price(managerTeam.bank_tenths)} · FT ${freeTransfersOverride ?? managerTeam.free_transfers_available}`
+                  : `threshold ${thresholdLabel} · budget ${price(budget)}`}
               </span>
             </div>
             {locks.length ? (
@@ -1151,7 +1739,11 @@ export function PlanBuilderPage() {
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground">No locks — the optimizer picks all 15.</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {buildMode === "manager"
+                  ? "No locks — every imported player may be sold."
+                  : "No locks — the optimizer picks all 15."}
+              </p>
             )}
             {excludes.length ? (
               <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Excluded players">
@@ -1180,6 +1772,7 @@ export function PlanBuilderPage() {
             ) : (
               <p className="mt-1 text-sm text-muted-foreground">No excluded players.</p>
             )}
+            {buildMode === "scratch" ? (
             <div
               className={cn(
                 "mt-3 text-sm tabular-nums",
@@ -1190,9 +1783,24 @@ export function PlanBuilderPage() {
                 ? `over budget by ${price(-totals.leftover)} — go back and unlock a player`
                 : `headroom ${price(totals.leftover)} after the cheapest position fill`}
             </div>
+            ) : managerTeam ? (
+              <div className="mt-3 rounded-lg border bg-muted/30 p-3 text-xs">
+                <p>
+                  Imported public squad: <strong>{managerTeam.entry_name || `#${managerTeam.manager_id}`}</strong>
+                  {" "}· selling value {price(managerTeam.squad_selling_value_tenths)}
+                  {" "}· cash {price(managerTeam.bank_tenths)}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  Effective remaining FT: {freeTransfersOverride ?? managerTeam.free_transfers_available}
+                  {freeTransfersOverride == null ? " (reconstructed)" : " (user override)"}
+                  {" "}· already-paid hits -{managerTeam.existing_hit_points}
+                </p>
+              </div>
+            ) : null}
             <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-              Frozen prices at the deadline; availability is a reported overlay for the next
-              gameweek only. Development-only output.
+              {buildMode === "manager"
+                ? "Captured purchase/selling values govern the first move; future prices remain frozen. Existing hits are sunk and new excess transfers cost -4. Development-only output."
+                : "Frozen prices at the deadline; availability is a reported overlay for the next gameweek only. Development-only output."}
             </p>
           </div>
 
@@ -1272,9 +1880,10 @@ export function PlanBuilderPage() {
             </div>
             <p className="mt-2 text-sm leading-relaxed">
               Runs the <span className="font-medium">real optimizer</span> on this machine with
-              your locks, exclusions, and threshold, then republishes the read models — about a
-              minute or two. Your exact squad remains here; it never replaces the platform
-              suggestion.
+              {buildMode === "manager"
+                ? " your imported squad, selling values, confirmed free transfers, locks, exclusions, and threshold. It returns who to sell and buy, including new -4 hits."
+                : " your locks, exclusions, and threshold, then republishes the read models."}
+              {" "}Your exact scenario remains here; it never replaces the platform suggestion.
             </p>
             <div className="mt-3 rounded-lg border bg-muted/30 p-2.5">
               <label htmlFor="plan-server-token" className="text-xs font-medium">
@@ -1325,8 +1934,9 @@ export function PlanBuilderPage() {
                 onClick={solveNow}
                 disabled={
                   solver.status !== "online" ||
-                  totals.leftover < 0 ||
-                  !totals.completionPossible
+                  (buildMode === "scratch" &&
+                    (totals.leftover < 0 || !totals.completionPossible)) ||
+                  (buildMode === "manager" && managerTeam == null)
                 }
               >
                 <Sparkles className="size-4" />
@@ -1416,33 +2026,51 @@ export function PlanBuilderPage() {
               className="mx-3 mb-3 rounded-lg border bg-muted/30 p-3"
               aria-label="Open manually published plan"
             >
-              <label htmlFor="manual-run-id" className="text-xs font-medium">
-                Published optimizer run id
-              </label>
-              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
-                Copy <span className="font-mono">optimizer_run_id</span> from the generated plan
-                after publishing. Opening it records only that exact id; a missing or non-custom
-                run fails visibly and never falls back to a platform squad.
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Input
-                  id="manual-run-id"
-                  aria-label="Published optimizer run id"
-                  className="h-8 min-w-56 flex-1 font-mono text-xs"
-                  placeholder="paste optimizer_run_id"
-                  value={manualRunId}
-                  disabled={isSolving}
-                  onChange={(event) => setManualRunId(event.target.value)}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={isSolving || !manualRunId.trim()}
-                  onClick={() => openExactPublishedRun(manualRunId)}
-                >
-                  Open exact custom plan
-                </Button>
-              </div>
+              {buildMode === "manager" ? (
+                <p role="alert" className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                  Manual manager-result opening is unavailable: the browser cannot prove that a
+                  pasted run id was produced from this exact private capture. Use Solve now so the
+                  Plan Server verifies the run/capture pair and enables both Squad Draft handoffs.
+                </p>
+              ) : (
+                <>
+                  <label htmlFor="manual-run-id" className="text-xs font-medium">
+                    Published optimizer run id
+                  </label>
+                  <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                    Copy <span className="font-mono">optimizer_run_id</span> from the generated plan
+                    after publishing. Opening it records only that exact id; a missing or non-custom
+                    run fails visibly and never falls back to a platform squad.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Input
+                      id="manual-run-id"
+                      aria-label="Published optimizer run id"
+                      className="h-8 min-w-56 flex-1 font-mono text-xs"
+                      placeholder="paste optimizer_run_id"
+                      value={manualRunId}
+                      disabled={isSolving}
+                      onChange={(event) => {
+                        setManualRunId(event.target.value);
+                        setManualOpenError(null);
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isSolving || !manualRunId.trim()}
+                      onClick={() => openExactPublishedRun(manualRunId)}
+                    >
+                      Open exact custom plan
+                    </Button>
+                  </div>
+                  {manualOpenError && (
+                    <p role="alert" className="mt-2 text-xs text-destructive">
+                      {manualOpenError}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2 px-3 pb-3">
               <Button
@@ -1552,6 +2180,71 @@ export function PlanBuilderPage() {
                 </div>
               )}
 
+              {managerSummary?.optimizer_run_id === resultPlan.optimizer_run_id &&
+                managerSummary.manager_weeks && (
+                  <section className="rounded-xl border border-sky-200 bg-sky-50/40 p-4 dark:border-sky-900 dark:bg-sky-950/20" aria-label="Manager transfer recommendations">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <div>
+                        <h3 className="font-semibold">Your transfer suggestion</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {managerSummary.manager_entry_name || "Imported manager"} · captured
+                          state, not a fresh 100.0 squad
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5 text-xs">
+                        <Badge variant="outline">
+                          sunk hits -{managerSummary.manager_existing_hit_points ?? 0}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            (managerSummary.hit_points ?? 0) > 0 &&
+                              "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300",
+                          )}
+                        >
+                          new hits -{managerSummary.hit_points}
+                        </Badge>
+                      </div>
+                    </div>
+                    <ol className="mt-3 space-y-2">
+                      {managerSummary.manager_weeks.map((week) => (
+                        <li key={week.gw} className="rounded-lg border bg-background/80 p-3 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <strong>GW{week.gw}</strong>
+                            <span className="text-muted-foreground">
+                              FT {week.free_transfers_before} → {week.free_transfers_after} ·
+                              bank {price(week.bank_before_tenths)} → {price(week.bank_after_tenths)}
+                              {week.hit_points > 0 ? ` · hit -${week.hit_points}` : ""}
+                            </span>
+                          </div>
+                          {week.transfers_in.length === 0 ? (
+                            <p className="mt-1 font-medium text-emerald-700 dark:text-emerald-300">
+                              HOLD — bank the free transfer
+                            </p>
+                          ) : (
+                            <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                              <p>
+                                <span className="font-medium text-red-700 dark:text-red-300">OUT</span>
+                                {" "}
+                                {week.transfers_out.map((player) => player.web_name ?? player.code).join(", ")}
+                              </p>
+                              <p>
+                                <span className="font-medium text-emerald-700 dark:text-emerald-300">IN</span>
+                                {" "}
+                                {week.transfers_in.map((player) => player.web_name ?? player.code).join(", ")}
+                              </p>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+                      Already-paid hits are shown for context and are never deducted twice. Future
+                      prices are frozen at this capture/forecast vintage.
+                    </p>
+                  </section>
+                )}
+
               <PlanSquadTable plan={resultPlan} />
               <TransferPath weeks={resultPlan.weeks} />
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1564,10 +2257,33 @@ export function PlanBuilderPage() {
                     Edit and solve again
                   </Button>
                   <Button asChild>
-                    <a href={squadDraftHandoffHref(resultPlan.optimizer_run_id)}>
-                      Forward team to Squad Draft
+                    <a
+                      href={
+                        resultManagerCaptureId
+                          ? squadDraftHandoffHref(resultPlan.optimizer_run_id, {
+                              source: "optimized",
+                            })
+                          : squadDraftHandoffHref(resultPlan.optimizer_run_id)
+                      }
+                    >
+                      {resultManagerCaptureId
+                        ? "Forward suggested team to Squad Draft"
+                        : "Forward team to Squad Draft"}
                     </a>
                   </Button>
+                  {resultManagerCaptureId && (
+                    <Button asChild variant="outline">
+                      <a
+                        href={squadDraftHandoffHref(resultPlan.optimizer_run_id, {
+                          source: "manager_current",
+                          managerCaptureId: resultManagerCaptureId,
+                          serverToken,
+                        })}
+                      >
+                        Use captured current team in Squad Draft
+                      </a>
+                    </Button>
+                  )}
                   <Button asChild variant="outline">
                     <a href="#next-gw">View platform suggestion</a>
                   </Button>

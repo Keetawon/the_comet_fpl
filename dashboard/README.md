@@ -98,9 +98,16 @@ dependency) that runs the *same* jobs the runbook does — never a reimplementat
 repository root:
 
 ```powershell
-.\.venv\Scripts\python.exe -m fpl.jobs.plan_server            # 127.0.0.1:8765
-.\.venv\Scripts\python.exe -m fpl.jobs.plan_server --host 0.0.0.0   # reachable from the LAN preview
+.\.venv\Scripts\python.exe -m fpl.jobs.plan_server `
+    --base <dev-latest-directory> `
+    --forecast <current-prospective-points.jsonl>              # 127.0.0.1:8765
+.\.venv\Scripts\python.exe -m fpl.jobs.plan_server --host 0.0.0.0 `
+    --base <dev-latest-directory> --forecast <current-prospective-points.jsonl>
 ```
+
+`--forecast` binds both scratch and manager solves to one explicit prospective artifact. If it
+is omitted, the legacy `<base>/gw1_5_default.jsonl` convention remains; post-deadline operation
+should pass the current artifact explicitly.
 
 Loopback use is deliberately zero-friction. A LAN-bound server prints a fresh per-launch access
 token; paste it into Plan Builder on the phone. The browser sends it only in the
@@ -109,8 +116,8 @@ origin hosted by this machine is accepted.
 
 `POST /plan {"locks": [code...], "excludes": [code...],
 "min_bench_appearance": 0.25|null}` runs
-`fpl.jobs.optimize_squad` on the dev-latest default forecast with your rules, writes a unique
-timestamped immutable artifact under `dev-latest\my-rules\`, then republishes the BI export and
+`fpl.jobs.optimize_squad` on the selected forecast with your rules, writes a unique
+timestamped immutable artifact under `<base>\my-rules\`, then republishes the BI export and
 read models carrying the required standing default/diagnostic plans plus that exact interactive
 plan. The server refuses to solve if either standing artifact is absent and verifies all three
 plan kinds in the browser-facing read model before reporting success. The
@@ -119,6 +126,32 @@ fifteen, and their sets must not overlap. This keeps interactive plans distingui
 platform suggestions downstream. `GET /status` reports busy/stage/worktree state. The browser
 never computes anything — it
 asks this process to run the fail-closed jobs and then refetches the published JSON.
+
+The development-only own-team surface adds three local POST endpoints:
+
+- `/manager-team {"manager_id": 123}` fetches the public entry/picks/transfers/history payloads,
+  reconstructs purchase and selling values from the committed start-deadline bootstrap plus
+  transfer replay, maps season-scoped elements to stable player codes, and atomically creates
+  `<base>/manager-captures/<capture_id>.json`;
+- `/manager-team/capture {"capture_id": "manager-..."}` reloads that exact immutable capture;
+- `/manager-plan` consumes the capture id, locks, exclusions, threshold, and optional
+  `free_transfers_override` (0-5), then runs the same optimizer/publish chain from the imported
+  squad.
+
+The manager capture and active forecast must agree on season, first gameweek, and a canonical
+full selectable-player registry hash covering season element, stable code, club, position, and
+price. Volatile bootstrap statistics are deliberately excluded. Public reconstruction currently
+fails closed for entries that started after GW1 because their acquisition prices are unavailable.
+The first forecast gameweek may contain transfers.
+Captured bank and per-player selling values govern affordability; already-incurred hits are sunk,
+while newly recommended transfers beyond the effective remaining free transfers cost four points
+each. A lock is an owned never-sell player. An owned exclusion is forced out in the first
+forecast gameweek; a non-owned exclusion is never bought. Future prices remain frozen.
+
+These endpoints use public FPL data and do not authenticate ownership of a manager ID. Captures
+and manager artifact context are private local inputs and are not added to the shared dashboard
+read models. See `../docs/manager-team-suggestions.md` for the reconstruction and provenance
+contract.
 
 Solver readiness in `/status` includes the separately observed PuLP package and CBC binary
 versions, the discovery-attempt count, and a component-specific failure reason. A failed startup
@@ -169,9 +202,12 @@ the last good generation.
 
 The supported zero-cost hosted shape is GitHub Pages plus an immutable, sanitized dashboard-data
 ZIP pinned in `public-data-release.json`. The hosted build is read-only: analytical pages and
-Squad Draft work in the browser, while Plan Builder never probes a visitor's local optimizer and
-directs exact solves back to a trusted machine. The public-data packager removes user-custom plans
-and rejects workstation paths or secret-like values before rebuilding and validating the manifest.
+manual Squad Draft work in the browser, while Plan Builder never probes a visitor's local
+optimizer and directs exact solves back to a trusted machine. Manager fetch/solve and direct
+manager-to-Draft import likewise require the trusted local Plan Server; the hosted site has no
+manager account, capture store, or authenticated My Team integration. The public-data packager
+removes user-custom plans and rejects manager IDs, bank/selling values, current-squad payloads,
+workstation paths, or secret-like values before rebuilding and validating the manifest.
 
 See [Public dashboard deployment](../docs/dashboard-deployment.md) for the one-time Pages setting,
 release/pin workflow, privacy boundary, refresh, and rollback procedure.
@@ -252,39 +288,53 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   comparison rows are sorted, filtered, paginated, or expanded to the whole player pool.
   The highest complete bench-xP gameweek inside the loaded horizon is marked. **Forward team to
   Squad Draft** seeds the exact selected optimizer run's first-week 15 in the browser sandbox.
-- **Plan builder** (implemented, wizard v2, fresh-squad path only): the interactive side of
-  the manager-wizard design (`docs/manager-team-suggestions.md`). The manager-id field currently
-  performs a format check and a best-effort `localStorage` write only; it does not call FPL,
-  restore, import, or apply a manager squad, so continuing still starts a fresh-squad solve.
+- **Plan builder** (implemented development-only, fresh-squad and manager paths): the interactive
+  side of the manager workflow (`../docs/manager-team-suggestions.md`). **Get your team** sends a
+  manager ID to the local Plan Server, previews the reconstructed 15 with bank, selling value,
+  remaining free transfers, and sunk hits, and then optimizes from that immutable capture.
+  Authenticated My Team access is not implemented.
   The picker exposes the full eligible priced population with shared search/filters, 50 rows per
   page, and pagination at both the top and bottom. Users can select up to five green locks and
-  fifteen red exclusions; the sets are disjoint and position, club-cap, population, and live
-  cheapest-completion budget guards run before submission. **Solve now** checks the forecast,
+  fifteen red exclusions; the sets are disjoint. Fresh-squad position, club-cap, population, and
+  cheapest-completion budget guards remain. On the manager path locks are owned never-sell
+  players, owned exclusions are forced out in the first forecast gameweek, and non-owned
+  exclusions are never bought. The user can retain the reconstructed remaining FT count or record
+  a 0-5 override. **Solve now** checks the forecast,
   clean worktree, Python environment, PuLP, and CBC through the local plan server, then shows
   honest stage-based preparation/optimization/publication feedback rather than a fabricated
   percentage. The exact `user_custom` run stays on Plan Builder and fails visibly if the published
   read model does not contain it; it never replaces or redirects to the formal Next GW suggestion.
-  Its result is a sortable 15-player table whose GW1 XI/captain/vice/ordered-bench roles remain
-  fixed while sorting. It exposes `Total 3 GWs xP`, `Total 5 GWs xP`, raw GW1-GW5 xP columns, and
+  Its result is a sortable 15-player table whose first-gameweek
+  XI/captain/vice/ordered-bench roles remain
+  fixed while sorting. It exposes `Total 3 GWs xP`, `Total 5 GWs xP`, raw loaded-gameweek xP
+  columns, and
   an expanded per-gameweek membership/role view. Its footer is bound to the exact custom plan and
   shows the same planned XI, bench, and 15-player raw xP sums, calculated from each week's
-  post-transfer roles rather than the fixed GW1 display membership. Once that exact result is
-  published, its forward button seeds the result's first-week squad into Squad Draft.
-- **Squad draft** (implemented, browser-only manual sandbox): without a handoff it binds to exactly
+  post-transfer roles rather than the fixed first-week display membership. A manager result also
+  shows HOLD or OUT/IN per gameweek, FT/cash before and after, new hits, and the separately reported
+  sunk hits. Once published, it offers both **Forward suggested team to Squad Draft** and **Use
+  captured current team in Squad Draft**.
+- **Squad draft** (implemented development-only browser sandbox with a local import shortcut):
+  without a handoff it binds to exactly
   one formal platform-default forecast vintage. An explicit `optimizer_run_id` handoff from Next GW
   or Plan Builder instead resolves that exact plan, matching audit/rules snapshot, and forecast
   vintage, then replaces the browser draft with its first-week optimized 15. The handoff fails
   closed on a missing/ambiguous run, mismatched audit, missing player, or structurally invalid
-  squad. The user can then select zero to 15 players manually. It enforces duplicate, position,
+  squad. A manager-current handoff reloads the exact private capture instead. The page's direct
+  **Fetch current team** shortcut creates a new manager capture and atomically replaces the draft
+  only after all 15 players map into the exact selected forecast/rules context; failure preserves
+  the old draft. The user can then select zero to 15 players manually. It enforces duplicate, position,
   squad-size, and three-per-club
   limits but deliberately does not enforce the standard £100m budget; an over-budget draft is
   labelled as such rather than blocked. The sortable/fullscreen selected-player table shows
-  deadline-vintage cost, raw GW1-GW5 xP, strict Total 3/5-GW xP, and a final footer row whose cost
+  deadline-vintage cost, raw loaded-gameweek xP, strict Total 3/5-GW xP, and a final footer row
+  whose cost
   and xP totals remain invariant under sorting. Draft state is isolated in versioned
   run-qualified browser storage and never calls the optimizer or replaces a platform/custom
   plan. Its best-legal-XI/bench and highest-player screens are loaded-horizon planning context,
-  not chip recommendations: manager ownership, chip inventory, autosubs, captain fallback,
-  competing chip windows, and the rest of the season are unavailable.
+  not chip recommendations: direct import provides only the captured current 15 and values;
+  chip optimization, autosubs, captain fallback, competing chip windows, authenticated account
+  state, and the rest of the season remain unavailable.
 - **Forecast vs actual** (implemented, P1.7e): each recorded vintage scored against its own
   season's finalised outcomes (points under 2026/27 rules, read-time join at
   `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a

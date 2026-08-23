@@ -66,11 +66,12 @@ class LiveInputProvenance(_Frozen):
     bootstrap_known_at: datetime
     bootstrap_payload_sha256: str
     schedule_capture_ids: tuple[str, ...]
+    selectable_player_registry_sha256: str | None = None
 
-    @field_validator("bootstrap_payload_sha256")
+    @field_validator("bootstrap_payload_sha256", "selectable_player_registry_sha256")
     @classmethod
-    def _valid_sha256(cls, value: str) -> str:
-        return _validate_sha256(value)
+    def _valid_sha256(cls, value: str | None) -> str | None:
+        return None if value is None else _validate_sha256(value)
 
     @field_validator("schedule_capture_ids")
     @classmethod
@@ -432,8 +433,15 @@ def build_artifact_rows(
 
 
 def _json_line(model: BaseModel) -> str:
+    payload = model.model_dump(mode="json", by_alias=True)
+    if (
+        isinstance(model, ForecastArtifactManifest)
+        and model.live_inputs.selectable_player_registry_sha256 is None
+    ):
+        # Preserve canonical bytes for artifacts written before the additive registry binding.
+        payload["live_inputs"].pop("selectable_player_registry_sha256", None)
     return json.dumps(
-        model.model_dump(mode="json", by_alias=True),
+        payload,
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,

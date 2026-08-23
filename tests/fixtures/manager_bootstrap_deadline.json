@@ -1,0 +1,32 @@
+{
+  "events": [
+    {"id": 1, "name": "Gameweek 1", "deadline_time": "2026-08-21T17:30:00Z", "finished": false, "is_current": true},
+    {"id": 2, "name": "Gameweek 2", "deadline_time": "2026-08-28T17:30:00Z", "finished": false, "is_next": true}
+  ],
+  "teams": [
+    {"id": 1, "code": 101, "name": "One", "short_name": "ONE"},
+    {"id": 2, "code": 102, "name": "Two", "short_name": "TWO"},
+    {"id": 3, "code": 103, "name": "Three", "short_name": "THR"},
+    {"id": 4, "code": 104, "name": "Four", "short_name": "FOR"},
+    {"id": 5, "code": 105, "name": "Five", "short_name": "FIV"}
+  ],
+  "elements": [
+    {"id": 1, "code": 1001, "web_name": "P01", "element_type": 1, "team": 1, "now_cost": 45},
+    {"id": 2, "code": 1002, "web_name": "P02", "element_type": 1, "team": 2, "now_cost": 45},
+    {"id": 3, "code": 1003, "web_name": "P03", "element_type": 2, "team": 3, "now_cost": 45},
+    {"id": 4, "code": 1004, "web_name": "P04", "element_type": 2, "team": 4, "now_cost": 45},
+    {"id": 5, "code": 1005, "web_name": "P05", "element_type": 2, "team": 5, "now_cost": 45},
+    {"id": 6, "code": 1006, "web_name": "P06", "element_type": 2, "team": 1, "now_cost": 45},
+    {"id": 7, "code": 1007, "web_name": "P07", "element_type": 2, "team": 2, "now_cost": 45},
+    {"id": 8, "code": 1008, "web_name": "P08", "element_type": 3, "team": 3, "now_cost": 60},
+    {"id": 9, "code": 1009, "web_name": "P09", "element_type": 3, "team": 4, "now_cost": 60},
+    {"id": 10, "code": 1010, "web_name": "P10", "element_type": 3, "team": 5, "now_cost": 60},
+    {"id": 11, "code": 1011, "web_name": "P11", "element_type": 3, "team": 1, "now_cost": 60},
+    {"id": 12, "code": 1012, "web_name": "P12", "element_type": 3, "team": 2, "now_cost": 60},
+    {"id": 13, "code": 1013, "web_name": "P13", "element_type": 4, "team": 3, "now_cost": 70},
+    {"id": 14, "code": 1014, "web_name": "P14", "element_type": 4, "team": 4, "now_cost": 70},
+    {"id": 15, "code": 1015, "web_name": "P15", "element_type": 4, "team": 5, "now_cost": 45},
+    {"id": 16, "code": 1016, "web_name": "P16", "element_type": 4, "team": 5, "now_cost": 50},
+    {"id": 17, "code": 1017, "web_name": "P17", "element_type": 4, "team": 4, "now_cost": 72}
+  ]
+}

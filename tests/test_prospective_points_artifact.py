@@ -21,6 +21,7 @@ from fpl.artifacts.prospective_points import (
     artifact_bytes,
     build_artifact_rows,
     read_artifact,
+    read_artifact_bytes,
     write_artifact_atomic,
 )
 
@@ -173,6 +174,13 @@ def test_canonical_bytes_do_not_depend_on_input_order() -> None:
     )
     second = ProspectivePointsArtifact(manifest=_manifest(len(rows)), rows=rows)
     assert artifact_bytes(first) == artifact_bytes(second)
+
+
+def test_absent_registry_binding_preserves_legacy_canonical_bytes() -> None:
+    payload = artifact_bytes(_artifact())
+    manifest = json.loads(payload.splitlines()[0])
+    assert "selectable_player_registry_sha256" not in manifest["live_inputs"]
+    assert artifact_bytes(read_artifact_bytes(payload)) == payload
 
 
 def test_manifest_requires_complete_hashes_and_reconciled_row_count() -> None:

@@ -16,8 +16,9 @@ Three properties make a recorded plan auditable and safe:
 
 * **Stable run identity.** ``decision_sha256`` binds the complete legal decision and assumptions;
   ``run_id`` binds that digest to the forecast/rules hashes, optimiser commit, complete search
-  policy, and complete solver identity. Only relocatable paths and wall-clock time are excluded.
-  Both hashes are re-derived on read.
+  policy, and complete solver identity. Only relocatable paths and optimizer publication time are
+  excluded; an input manager capture's knowledge timestamp remains identity-binding. Both hashes
+  are re-derived on read.
 * **Immutability.** :func:`write_optimizer_artifact_atomic` refuses to overwrite an existing
   destination and promotes a flushed sibling temporary file with an atomic create-if-absent hard
   link. Concurrent writers therefore have exactly one winner and cannot clobber it.
@@ -42,7 +43,8 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 OPTIMIZER_ARTIFACT_SCHEMA = "fpl.optimizer-plan"
-OPTIMIZER_ARTIFACT_SCHEMA_VERSION = 1
+OPTIMIZER_ARTIFACT_SCHEMA_VERSION: Literal[2] = 2
+_LEGACY_OPTIMIZER_ARTIFACT_SCHEMA_VERSION: Literal[1] = 1
 OPTIMIZER_ARTIFACT_STATUS = "development_only_not_a_validated_production_recommendation"
 
 PositionName = Literal["GK", "DEF", "MID", "FWD"]
@@ -78,11 +80,12 @@ class ForecastInputProvenance(_Frozen):
     gw_from: int = Field(ge=1)
     gw_to: int = Field(ge=1)
     commit_sha: str
+    selectable_player_registry_sha256: str | None = None
 
-    @field_validator("sha256")
+    @field_validator("sha256", "selectable_player_registry_sha256")
     @classmethod
-    def _valid_sha256(cls, value: str) -> str:
-        return _validate_sha256(value)
+    def _valid_sha256(cls, value: str | None) -> str | None:
+        return None if value is None else _validate_sha256(value)
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -179,6 +182,10 @@ class SearchPolicy(_Frozen):
     min_bench_appearance: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
     locked_codes: tuple[int, ...] = ()
     excluded_codes: tuple[int, ...] = ()
+    # These two fields are additive schema-v2 policy. Their defaults deliberately describe the
+    # pre-v2 scratch-squad planner, and are omitted from schema-v1 canonical bytes and identity.
+    plan_mode: Literal["scratch", "manager"] = "scratch"
+    initial_free_transfers: int = Field(default=0, ge=0)
     # None exists only for schema-v1 artifacts written before origin provenance was added.
     # Every current producer passes an explicit value; retaining None on read lets downstream
     # compatibility logic distinguish a constrained legacy user plan from a platform plan.
@@ -206,6 +213,80 @@ class SearchPolicy(_Frozen):
             raise ValueError("players cannot be both locked and excluded")
         if not self.search_method.strip() or not self.optimality_scope.strip():
             raise ValueError("search_method and optimality_scope are required")
+        if self.initial_free_transfers > self.free_transfer_bank_cap:
+            raise ValueError("initial_free_transfers exceeds the free-transfer bank cap")
+        if self.plan_mode == "scratch" and self.initial_free_transfers != 0:
+            raise ValueError("scratch plans cannot start with free transfers")
+        return self
+
+
+class OwnedPlayerValueRecord(_Frozen):
+    """Deadline-frozen acquisition and sale values for one imported manager player."""
+
+    code: int = Field(gt=0)
+    purchase_price_tenths: int = Field(gt=0)
+    selling_price_tenths: int = Field(gt=0)
+
+
+class ManagerPlanContext(_Frozen):
+    """Private, immutable manager-team capture bound to a schema-v2 plan.
+
+    The public FPL API exposes the last-deadline squad and transfer history, not authenticated live
+    team state. The source field makes that limitation explicit. existing_hit_points records costs
+    already incurred before this solve; they are sunk and therefore never deducted from the plan's
+    prospective objective a second time.
+    """
+
+    capture_id: str
+    capture_sha256: str
+    selectable_player_registry_sha256: str
+    captured_at: datetime
+    manager_id: int = Field(gt=0)
+    source: Literal["public_last_deadline_squad"] = "public_last_deadline_squad"
+    picks_event: int = Field(ge=1)
+    planning_gw: int = Field(ge=1)
+    bank_tenths: int = Field(ge=0)
+    initial_free_transfers: int = Field(ge=0)
+    free_transfers_source: str
+    free_transfers_override: int | None = Field(default=None, ge=0)
+    existing_hit_points: int = Field(ge=0)
+    owned_players: tuple[OwnedPlayerValueRecord, ...]
+
+    @field_validator("capture_sha256", "selectable_player_registry_sha256")
+    @classmethod
+    def _valid_capture_hash(cls, value: str) -> str:
+        return _validate_sha256(value)
+
+    @field_validator("capture_id")
+    @classmethod
+    def _valid_capture_id(cls, value: str) -> str:
+        digest = value.removeprefix("manager-")
+        _validate_sha256(digest)
+        return value
+
+    @field_validator("owned_players")
+    @classmethod
+    def _ordered_owned_players(
+        cls, value: tuple[OwnedPlayerValueRecord, ...]
+    ) -> tuple[OwnedPlayerValueRecord, ...]:
+        codes = tuple(player.code for player in value)
+        if codes != tuple(sorted(codes)) or len(set(codes)) != len(codes):
+            raise ValueError("manager owned-player values must be unique and ordered by code")
+        return value
+
+    @model_validator(mode="after")
+    def _coherent(self) -> Self:
+        if self.captured_at.tzinfo is None or self.captured_at.utcoffset() is None:
+            raise ValueError("manager capture timestamp must be timezone-aware")
+        if self.picks_event > self.planning_gw:
+            raise ValueError("manager picks_event cannot be after planning_gw")
+        if not self.free_transfers_source.strip():
+            raise ValueError("free_transfers_source is required")
+        if (
+            self.free_transfers_override is not None
+            and self.free_transfers_override != self.initial_free_transfers
+        ):
+            raise ValueError("free-transfer override must equal the recorded initial state")
         return self
 
 
@@ -286,6 +367,8 @@ class TransferWeekRecord(_Frozen):
     free_transfers_before: int = Field(ge=0)
     free_transfers_after: int = Field(ge=0)
     hit_points: int = Field(ge=0)
+    bank_before_tenths: int | None = Field(default=None, ge=0)
+    bank_after_tenths: int | None = Field(default=None, ge=0)
     squad_cost_tenths: int = Field(ge=0)
     squad_after_transfers: tuple[SquadMemberRecord, ...]
     starting_xi: tuple[PlayerRef, ...]
@@ -366,6 +449,7 @@ def _member_map(
     cost_tenths: int,
     rules: SquadRulesSnapshot,
     context: str,
+    enforce_budget: bool = True,
 ) -> dict[int, SquadMemberRecord]:
     if len(members) != rules.squad_size:
         raise ValueError(f"{context} must contain exactly {rules.squad_size} players")
@@ -375,7 +459,7 @@ def _member_map(
     actual_cost = sum(member.now_cost for member in members)
     if cost_tenths != actual_cost:
         raise ValueError(f"{context} cost does not equal its member prices")
-    if actual_cost > rules.budget_tenths:
+    if enforce_budget and actual_cost > rules.budget_tenths:
         raise ValueError(f"{context} exceeds the configured budget")
     expected_positions = {rule.position: rule.squad for rule in rules.positions}
     actual_positions = Counter(member.position for member in members)
@@ -443,7 +527,7 @@ class OptimizerPlanArtifact(_Frozen):
     artifact_schema: Literal["fpl.optimizer-plan"] = Field(
         default="fpl.optimizer-plan", alias="schema"
     )
-    schema_version: Literal[1] = 1
+    schema_version: Literal[1, 2] = 1
     status: Literal["development_only_not_a_validated_production_recommendation"] = (
         "development_only_not_a_validated_production_recommendation"
     )
@@ -456,6 +540,7 @@ class OptimizerPlanArtifact(_Frozen):
     initial_squad: InitialSquadRecord
     plan: TransferPlanRecord
     assumptions: tuple[str, ...]
+    manager_context: ManagerPlanContext | None = None
 
     @field_validator("run_id", "decision_sha256")
     @classmethod
@@ -464,6 +549,25 @@ class OptimizerPlanArtifact(_Frozen):
 
     @model_validator(mode="after")
     def _internally_consistent(self) -> Self:
+        manager_mode = self.schema_version == 2
+        if manager_mode:
+            if self.manager_context is None:
+                raise ValueError("schema-v2 manager plans require manager_context")
+            if self.search_policy.plan_mode != "manager":
+                raise ValueError("schema-v2 manager plans require plan_mode=manager")
+            if (
+                self.search_policy.initial_free_transfers
+                != self.manager_context.initial_free_transfers
+            ):
+                raise ValueError("manager initial free transfers disagree with search policy")
+        elif self.manager_context is not None:
+            raise ValueError("schema-v1 artifacts cannot carry manager_context")
+        elif (
+            self.search_policy.plan_mode != "scratch"
+            or self.search_policy.initial_free_transfers != 0
+        ):
+            raise ValueError("schema-v1 artifacts require the scratch planning policy")
+
         if self.provenance.forecast.season != self.rules.season:
             raise ValueError("forecast and squad-rule seasons disagree")
         if self.provenance.squad_rules.contract_version != self.rules.contract_version:
@@ -478,11 +582,58 @@ class OptimizerPlanArtifact(_Frozen):
             cost_tenths=self.initial_squad.cost_tenths,
             rules=self.rules,
             context="initial squad",
+            enforce_budget=not manager_mode,
         )
         if not set(self.search_policy.locked_codes).issubset(previous):
             raise ValueError("initial squad omits a locked player")
-        if set(self.search_policy.excluded_codes).intersection(previous):
+        if not manager_mode and set(self.search_policy.excluded_codes).intersection(previous):
             raise ValueError("initial squad contains an excluded player")
+        if manager_mode:
+            assert self.manager_context is not None
+            forecast_registry_sha = self.provenance.forecast.selectable_player_registry_sha256
+            if forecast_registry_sha is None:
+                raise ValueError(
+                    "manager plans require a forecast selectable-player registry binding"
+                )
+            if (
+                forecast_registry_sha
+                != self.manager_context.selectable_player_registry_sha256
+            ):
+                raise ValueError(
+                    "manager capture and forecast selectable-player registries disagree"
+                )
+            if self.manager_context.planning_gw != self.provenance.forecast.gw_from:
+                raise ValueError("manager planning_gw must equal the first forecast gameweek")
+            if (
+                self.manager_context.initial_free_transfers
+                > self.search_policy.free_transfer_bank_cap
+            ):
+                raise ValueError("manager initial free transfers exceed the configured bank cap")
+            hit_cost = self.search_policy.hit_cost_points
+            invalid_existing_hits = (
+                self.manager_context.existing_hit_points != 0
+                if hit_cost == 0
+                else self.manager_context.existing_hit_points % hit_cost != 0
+            )
+            if invalid_existing_hits:
+                raise ValueError(
+                    "manager existing hit points disagree with the configured hit cost"
+                )
+            owned = {record.code: record for record in self.manager_context.owned_players}
+            if set(owned) != set(previous):
+                raise ValueError("manager owned-player values must exactly cover the initial squad")
+            for code, record in owned.items():
+                now_cost = previous[code].now_cost
+                expected_selling = (
+                    now_cost
+                    if now_cost <= record.purchase_price_tenths
+                    else record.purchase_price_tenths
+                    + (now_cost - record.purchase_price_tenths) // 2
+                )
+                if record.selling_price_tenths != expected_selling:
+                    raise ValueError(
+                        "manager selling price is inconsistent with purchase and current price"
+                    )
         expected_gws = tuple(
             range(self.provenance.forecast.gw_from, self.provenance.forecast.gw_to + 1)
         )
@@ -493,12 +644,22 @@ class OptimizerPlanArtifact(_Frozen):
             raise ValueError("candidate pool cannot be smaller than the squad")
 
         previous_free_after = 0
+        previous_bank: int | None = None
+        sale_values: dict[int, int] = {}
+        if manager_mode:
+            assert self.manager_context is not None
+            previous_bank = self.manager_context.bank_tenths
+            sale_values = {
+                record.code: record.selling_price_tenths
+                for record in self.manager_context.owned_players
+            }
         for offset, week in enumerate(self.plan.weeks):
             current = _member_map(
                 week.squad_after_transfers,
                 cost_tenths=week.squad_cost_tenths,
                 rules=self.rules,
                 context=f"GW{week.gw} squad",
+                enforce_budget=not manager_mode,
             )
             incoming = _check_refs(week.transfers_in, current, context=f"GW{week.gw} transfers in")
             outgoing = _check_refs(
@@ -521,14 +682,18 @@ class OptimizerPlanArtifact(_Frozen):
             if transfer_count > self.search_policy.maximum_transfers_per_gameweek:
                 raise ValueError(f"GW{week.gw} exceeds the official transfer maximum")
 
-            if offset == 0:
+            if offset == 0 and not manager_mode:
                 if transfer_count or week.free_transfers_before or week.free_transfers_after:
                     raise ValueError("the initial gameweek must not contain transfers")
                 expected_hit = 0
             else:
-                expected_before = min(
-                    self.search_policy.free_transfer_bank_cap,
-                    previous_free_after + self.search_policy.free_transfer_per_gameweek,
+                expected_before = (
+                    self.search_policy.initial_free_transfers
+                    if offset == 0
+                    else min(
+                        self.search_policy.free_transfer_bank_cap,
+                        previous_free_after + self.search_policy.free_transfer_per_gameweek,
+                    )
                 )
                 if week.free_transfers_before != expected_before:
                     raise ValueError(f"GW{week.gw} free-transfer state is inconsistent")
@@ -540,6 +705,27 @@ class OptimizerPlanArtifact(_Frozen):
                 )
             if week.hit_points != expected_hit:
                 raise ValueError(f"GW{week.gw} hit cost is inconsistent")
+
+            if manager_mode:
+                if week.bank_before_tenths is None or week.bank_after_tenths is None:
+                    raise ValueError(f"GW{week.gw} manager plan requires bank accounting")
+                if week.bank_before_tenths != previous_bank:
+                    raise ValueError(f"GW{week.gw} bank-before state is inconsistent")
+                proceeds = sum(sale_values[code] for code in outgoing)
+                purchases = sum(current[code].now_cost for code in incoming)
+                expected_bank_after = week.bank_before_tenths + proceeds - purchases
+                if expected_bank_after < 0:
+                    raise ValueError(f"GW{week.gw} transfer spend exceeds available cash")
+                if week.bank_after_tenths != expected_bank_after:
+                    raise ValueError(f"GW{week.gw} bank-after state is inconsistent")
+                for code in outgoing:
+                    del sale_values[code]
+                for code in incoming:
+                    # Future prices are frozen: an acquired player's later sale basis is now_cost.
+                    sale_values[code] = current[code].now_cost
+                previous_bank = week.bank_after_tenths
+            elif week.bank_before_tenths is not None or week.bank_after_tenths is not None:
+                raise ValueError("schema-v1 artifacts cannot carry weekly bank accounting")
             _validate_week_lineup(week, current, self.rules)
             previous = current
             previous_free_after = week.free_transfers_after
@@ -560,12 +746,20 @@ class OptimizerPlanArtifact(_Frozen):
             raise ValueError("aggregate plan points do not reconcile to the weekly records")
 
         decision_sha256 = derive_optimizer_decision_sha256(
-            self.rules, self.initial_squad, self.plan, self.assumptions
+            self.rules,
+            self.initial_squad,
+            self.plan,
+            self.assumptions,
+            manager_context=self.manager_context,
         )
         if self.decision_sha256 != decision_sha256:
             raise ValueError("decision_sha256 does not match the recorded decision")
         expected = derive_optimizer_run_id(
-            self.provenance, self.search_policy, self.solver, self.decision_sha256
+            self.provenance,
+            self.search_policy,
+            self.solver,
+            self.decision_sha256,
+            manager_context=self.manager_context,
         )
         if self.run_id != expected:
             raise ValueError(
@@ -580,15 +774,21 @@ def derive_optimizer_run_id(
     search_policy: SearchPolicy,
     solver: SolverIdentity,
     decision_sha256: str,
+    *,
+    manager_context: ManagerPlanContext | None = None,
 ) -> str:
     """A deterministic, stable id for an optimizer run.
 
     The identity covers the content-hashed inputs, optimiser commit, complete search policy,
     complete solver identity, and the separately validated decision digest. It reads no relocatable
-    file path or wall-clock time.
+    file path or optimizer publication time.
     """
-    identity = {
-        "schema_version": OPTIMIZER_ARTIFACT_SCHEMA_VERSION,
+    identity: dict[str, object] = {
+        "schema_version": (
+            OPTIMIZER_ARTIFACT_SCHEMA_VERSION
+            if manager_context is not None
+            else _LEGACY_OPTIMIZER_ARTIFACT_SCHEMA_VERSION
+        ),
         "forecast_sha256": provenance.forecast.sha256,
         "forecast_schema": provenance.forecast.forecast_schema,
         "forecast_schema_version": provenance.forecast.forecast_schema_version,
@@ -627,6 +827,13 @@ def derive_optimizer_run_id(
         identity["excluded_codes"] = list(search_policy.excluded_codes)
     if search_policy.plan_origin == "user_custom":
         identity["plan_origin"] = search_policy.plan_origin
+    if manager_context is not None:
+        identity["forecast_selectable_player_registry_sha256"] = (
+            provenance.forecast.selectable_player_registry_sha256
+        )
+        identity["plan_mode"] = search_policy.plan_mode
+        identity["initial_free_transfers"] = search_policy.initial_free_transfers
+        identity["manager_context"] = manager_context.model_dump(mode="json")
     blob = json.dumps(identity, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
@@ -636,14 +843,28 @@ def derive_optimizer_decision_sha256(
     initial_squad: InitialSquadRecord,
     plan: TransferPlanRecord,
     assumptions: tuple[str, ...],
+    *,
+    manager_context: ManagerPlanContext | None = None,
 ) -> str:
     """Hash the complete self-contained decision and its legality/assumption context."""
+    plan_payload = plan.model_dump(mode="json")
+    if manager_context is None:
+        # Preserve schema-v1 decision hashes exactly: additive v2 None fields did not exist.
+        for week in plan_payload["weeks"]:
+            week.pop("bank_before_tenths", None)
+            week.pop("bank_after_tenths", None)
     decision = {
         "rules": rules.model_dump(mode="json"),
         "initial_squad": initial_squad.model_dump(mode="json"),
-        "plan": plan.model_dump(mode="json"),
+        "plan": plan_payload,
         "assumptions": list(assumptions),
     }
+    if manager_context is not None:
+        decision["manager"] = {
+            "plan_mode": "manager",
+            "initial_free_transfers": manager_context.initial_free_transfers,
+            "context": manager_context.model_dump(mode="json"),
+        }
     blob = json.dumps(decision, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
@@ -657,11 +878,30 @@ def build_optimizer_plan_artifact(
     initial_squad: InitialSquadRecord,
     plan: TransferPlanRecord,
     assumptions: tuple[str, ...],
+    manager_context: ManagerPlanContext | None = None,
 ) -> OptimizerPlanArtifact:
     """Assemble a validated artifact, deriving and embedding its ``run_id``."""
-    decision_sha256 = derive_optimizer_decision_sha256(rules, initial_squad, plan, assumptions)
-    run_id = derive_optimizer_run_id(provenance, search_policy, solver, decision_sha256)
+    decision_sha256 = derive_optimizer_decision_sha256(
+        rules,
+        initial_squad,
+        plan,
+        assumptions,
+        manager_context=manager_context,
+    )
+    run_id = derive_optimizer_run_id(
+        provenance,
+        search_policy,
+        solver,
+        decision_sha256,
+        manager_context=manager_context,
+    )
+    schema_version: Literal[1, 2] = (
+        OPTIMIZER_ARTIFACT_SCHEMA_VERSION
+        if manager_context is not None
+        else _LEGACY_OPTIMIZER_ARTIFACT_SCHEMA_VERSION
+    )
     return OptimizerPlanArtifact(
+        schema_version=schema_version,
         run_id=run_id,
         decision_sha256=decision_sha256,
         provenance=provenance,
@@ -671,6 +911,7 @@ def build_optimizer_plan_artifact(
         initial_squad=initial_squad,
         plan=plan,
         assumptions=assumptions,
+        manager_context=manager_context,
     )
 
 
@@ -681,6 +922,18 @@ def optimizer_artifact_bytes(artifact: OptimizerPlanArtifact) -> bytes:
     content and provenance serialise to identical bytes regardless of field construction order.
     """
     payload = artifact.model_dump(mode="json", by_alias=True)
+    if artifact.schema_version == _LEGACY_OPTIMIZER_ARTIFACT_SCHEMA_VERSION:
+        # The v2 fields are accepted with scratch defaults when old JSON is parsed, but canonical
+        # v1 output remains byte-for-byte identical to the pre-v2 serializer.
+        payload.pop("manager_context", None)
+        payload["provenance"]["forecast"].pop(
+            "selectable_player_registry_sha256", None
+        )
+        payload["search_policy"].pop("plan_mode", None)
+        payload["search_policy"].pop("initial_free_transfers", None)
+        for week in payload["plan"]["weeks"]:
+            week.pop("bank_before_tenths", None)
+            week.pop("bank_after_tenths", None)
     text = json.dumps(payload, sort_keys=True, indent=2, allow_nan=False)
     return (text + "\n").encode("utf-8")
 

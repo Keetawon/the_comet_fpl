@@ -1,322 +1,204 @@
-# Manager-team transfer suggestions — design record
+# Manager-team transfer suggestions -- as-built record
 
-Status: **wizard v2 shipped on the dashboard (Plan builder page) 2026-08-18** — the
-fresh-squad path now keeps user-specific results on this page, supports up to five green locks
-and fifteen red exclusions through the real optimizer, and keeps the formal platform suggestion
-separate on Next GW. The manager-id import, own-squad value/state boundary, selections-log
-backend, and hosted mode remain design-only P2 work after the 2026/27 GW1 deadline (see
-`DEV-ROADMAP.md`). Nothing here changes a model, a frozen evaluation, or the GW1 decision path.
-The owner confirmed the wizard is END-USER-FACING frontend, not an owner tool: its language,
-guards, and error messages are written for users.
+Status: **implemented development-only for local use on 2026-08-23**. Plan Builder can now
+capture a public FPL manager's current permanent squad, optimize from that squad, show the
+recommended OUT/IN path and transfer costs, and forward either the suggested squad or the
+captured current squad to Squad Draft. Squad Draft also has a direct manager-ID import shortcut.
+The original build-from-scratch path remains available and separate.
 
-## Current shipped boundary (as of 2026-08-19)
+This is not an authenticated FPL "My Team" integration, a hosted account service, or a
+production-validated recommendation. It changes no forecast model, prospective default, or
+frozen historical evaluation.
 
-- **Fresh squad only.** Build from scratch is live. The manager-id field performs a format check
-  and a best-effort browser `localStorage` write only. It makes no FPL request, verifies no entry,
-  is not restored on load, and neither imports nor applies a manager squad. **Continue without
-  import** and continuing after an id both use the same fresh-squad path.
-- **Fixed loaded horizon.** The solve uses the gameweek range in the loaded default forecast
-  artifact (currently GW1-5); there is no shipped 1/3/5 horizon selector.
-- **Rules picker.** The complete eligible priced population is available through shared search and
-  filters, 50 rows per page, with pagination above and below the list. Users may choose at most five
-  green locks and fifteen red exclusions. The sets must be disjoint, and position, club-cap,
-  remaining-population, and cheapest-legal-completion budget guards run before submission. The
-  rotation threshold is applied by the real optimizer.
-- **Truthful solve state.** Plan Builder checks the forecast, clean worktree, Python environment,
-  PuLP, and CBC through the local plan server. During a run it reports the real preparation,
-  optimization, and publication stages without inventing a completion percentage.
-- **Exact custom result.** Publication must contain the requested immutable `user_custom` run id or
-  the page fails visibly. The result remains on Plan Builder and never replaces the formal platform
-  plan on Next GW. Its sortable 15-player table keeps the solved GW1 XI, captain, vice-captain, and
-  ordered bench fixed while sorting; it shows `Total 3 GWs xP`, `Total 5 GWs xP`, raw GW1-GW5 xP,
-  and an expanded per-gameweek squad/role view.
+## User workflow
 
-## Target P2 boundary (not shipped)
+### Plan Builder
 
-The target own-team path will add a bounded network capture that verifies the manager entry,
-previews the manager, imports the current 15, and records bank, banked free transfers, purchase and
-selling prices, and capture provenance. The optimizer will then start from that imported squad.
-The public current-event picks endpoint may have no saved picks before the first deadline, so its
-live shape and pre-GW1 failure behavior must be measured and fixture-tested rather than assumed.
-Restoration of the saved manager id, the selections log, hosted authentication, and any paid tier
-also remain P2. None of those behaviors should be inferred from the current format-only field.
+1. Choose **Get your team** and enter a positive FPL manager ID, or continue with the existing
+   **Build from scratch** path.
+2. The local Plan Server fetches the manager's public FPL state, reconstructs the permanent 15,
+   writes one immutable private capture, and returns a bounded preview: entry name, picks event,
+   planning gameweek, bank, selling value, remaining free transfers, already-incurred hits, and
+   the mapped players.
+3. Choose up to five locked players and up to fifteen excluded players, plus the existing
+   outfield-bench appearance threshold. On the manager path:
 
-## 1. Target wizard flow (owner sketch 2026-08-17, refined)
+   - a lock must be in the imported squad and means **never sell**;
+   - an owned exclusion means **force out in the first forecast gameweek**;
+   - a non-owned exclusion means **never buy**;
+   - lock/exclusion overlap fails before solving.
+4. Use the reconstructed remaining free-transfer count or choose an explicit 0-5 override. An
+   override is retained in optimizer provenance; it does not mutate the manager capture.
+5. Run the real optimizer. The result shows HOLD or OUT/IN by gameweek, free transfers before and
+   after, cash before and after, and new hit points. Hits already paid before capture are shown as
+   sunk context and are never charged twice.
+6. After a successful manager solve, choose either:
+   - **Forward suggested team to Squad Draft** -- seeds the optimized first-forecast-GW 15; or
+   - **Use captured current team in Squad Draft** -- reloads the exact private capture and seeds
+     the pre-suggestion 15.
 
-The screen-level target below preserves the shipped fresh-squad subset and specifies the remaining
-own-team additions; unqualified manager-import behavior in this section is a P2 target.
+The result remains a `user_custom` plan on Plan Builder and never replaces the formal platform
+suggestion on Next GW.
 
-The owner's sketch: *have own team? (manager_id → read team) or not → pick up to 5 locked
-players and exclude up to 15 avoided players (shared search + filters; warn when the money left
-or remaining population cannot complete a legal squad; rotation threshold here too) → confirm
-(own team shown / suggestion shown + locks + exclusions + threshold) →
-next → optimize under the conditions → summary.* The refinement below keeps that shape and
-fixes the three things the optimizer's actual contract forces: (a) locks mean "must include"
-on the fresh path but "never sell" on the own-team path; (b) the budget pre-flight only
-exists on the fresh path (an owned squad's affordability is the solver's job); (c) the
-"confirm a suggestion" step cannot precede the run — the pre-run screen confirms the RULES,
-not a team, and the suggested team appears only in the summary.
+### Squad Draft shortcut
 
-### Screen 1 — Start
+Squad Draft has its own **Fetch current team** action. It captures a manager by ID and atomically
+replaces the browser draft only after all 15 stable player codes map into Squad Draft's exact
+forecast vintage and recorded squad rules. A failed fetch, stale capture, missing player, or
+structurally invalid squad leaves the existing draft unchanged. This shortcut does not optimize
+transfers; Plan Builder owns that workflow.
 
-- Choice: **Import my team** (enter `manager_id`) or **Build from scratch**.
-- **Target P2:** import validates against FPL and previews the entry (team name, overall rank,
-  current GW) so a
-  typo is caught before anything else; error states: not found, no picks saved yet (offer
-  the fresh path), a pick that does not map into the forecast roster (block with names).
-- **Target P2:** horizon selector (GW1-5 default; 1/3/5 bounded by the loaded vintage). The vintage is the
-  default architecture and is displayed, never chosen — cross-model EV comparison is
-  forbidden by P0.3 and the UI must not invite it.
+Squad Draft still displays forecast `now_cost` and treats the standard budget as advisory. The
+manager preview's selling value and cash are capture facts, not a new Squad Draft budget rule.
 
-### Screen 2 — Set your rules
+## Public-manager reconstruction boundary
 
-- **Own team:** the imported 15 renders read-only with the role-coloured pivot rows
-  (availability, xP, flags), plus the derived banked free transfers and bank — the "-4 per
-  transfer beyond the free grant" rule is stated here, next to the number of free transfers
-  the user actually has.
-- **Lock picker (both paths, max 5):** the full eligible priced population with a lock toggle,
-  shared search/filters, 50 rows per page, and top/bottom pagination. Guards computed
-  client-side so the solver never has to fail closed on something the UI knew: per-position
-  quota (locking a 4th FWD is impossible), club cap (no 4 locks from one club), and on the
-  fresh path the **budget pre-flight**: warn when committed cost passes ~90% of budget, and
-  block with numbers when `sum(lock now_cost) + cheapest legal completion of the remaining
-  quotas > budget` (a sum-of-k-cheapest-per-position lower bound; club-cap infeasibility is
-  rare and falls back to the solver's named error). The own-team path shows no budget check
-  on locks — the user already owns them.
-- **Exclude picker (both paths, max 15):** the same search and filters in a separate mode.
-  Locked selections are green and excluded selections red. The sets are disjoint and the UI
-  requires removing one rule before applying the other. Exclusions are omitted from the fresh
-  squad's cheapest-completion preflight and mean never-select initially / never-buy later.
-- **Rotation threshold** (both paths): plain-language selector (Off / 25% / 50%) with the
-  semantics inline — outfield bench players must be AT LEAST this likely to appear, bench
-  goalkeeper exempt, measure is a conservative lower bound. The picker shows each player's
-  appearance lower bound so users see who clears the gate before choosing.
+The public picks response does **not** contain purchase or selling prices. The implementation does
+not invent them. A capture fetches and validates the current-season public endpoints for:
 
-### Screen 3 — Review the rules (pre-run confirmation)
+- current bootstrap-static data;
+- the manager entry;
+- the latest revealed picks and the manager's start-event picks;
+- transfer history; and
+- entry history, including chips and per-event transfer costs.
 
-A policy card, not a team: green locks and red exclusions with photos and prices, threshold,
-horizon, and per path either the budget headroom (fresh) or squad value + bank + banked free
-transfers + the -4
-rule (own team). Frozen-price and availability-overlay caveats are printed here once, so
-the summary can stay clean. The primary button runs the optimization.
+It then reconstructs ownership and values as follows:
 
-### Screen 4 — Calculate
+1. Require `started_event == 1`. A later starter's acquisition prices can change before that
+   event's deadline, and the public API does not expose the evidence needed to reconstruct them.
+2. Select the latest committed daily bootstrap snapshot captured at or before the GW1 deadline.
+   Its fixed launch prices establish the starting squad's purchase prices.
+3. Map season-scoped FPL `element` IDs to stable player `code` values. Bare element IDs are never
+   joined across seasons.
+4. Replay permanent public transfers, using the recorded `element_out_cost` and
+   `element_in_cost`. A Free Hit event's temporary squad is not applied to permanent ownership.
+5. Reconcile the replayed permanent squad to the latest revealed picks when those picks are
+   comparable, then apply confirmed transfers already made for the next planning event.
+6. Reconcile cash from the latest picks bank plus those post-picks transfer prices.
+7. Compute current selling price in integer tenths:
 
-The browser does not reimplement the solver (PuLP/CBC lives in Python). The local plan server
-invokes the real optimizer with `--lock`, `--exclude`, and `--min-bench-appearance`, republishes
-the read models, and returns the immutable optimizer run id; the exact command remains visible as
-an offline fallback. On completion Plan Builder stays on its own result screen and renders only
-that exact run id. If it is absent after republishing, the page fails visibly instead of showing
-the platform squad or another custom run.
+   ```text
+   current <= purchase: selling = current
+   current >  purchase: selling = purchase + floor((current - purchase) / 2)
+   ```
 
-Localhost requests need no credential. For the optional phone/LAN preview, the server prints a
-fresh per-launch token which Plan Builder sends only as `X-FPL-Plan-Token`; all non-loopback
-requests require it. The publish also fails closed unless both formal standing artifacts and the
-exact custom run appear in `next_gw.json`.
+Every required endpoint is fetched before publication. Missing deadline snapshots, malformed
+payloads, unmapped players, missing prices, replay mismatches, illegal squad shape, or an active
+Wildcard/Free Hit for the planning event fail closed. The currently supported scope is a
+current-season entry that started in GW1, whose next planning event immediately follows its latest
+revealed picks, and whose GW1 deadline has a committed repository snapshot. Later-starting entries
+fail closed instead of receiving invented purchase prices. This public reconstruction may lag
+authenticated account state; authenticated My Team access is not implemented.
 
-The shipped fresh path also exposes the readiness checks before submission and the real
-prepare/optimize/publish stage while the solve is running. A stage is not converted into a fake
-percentage or ETA.
+## Free transfers and hits
 
-### Screen 5 — Summary
+The capture replays the public event history under the recorded 2026/27 rules: one grant per
+event, banked up to five. Wildcard and Free Hit preserve the bank that existed before the chip but
+consume that event's new grant. Reported transfer costs are reconciled to `-4` for each transfer
+beyond the available grant; disagreement fails closed.
 
-- Fresh path: a sortable 15-player table with cost and horizon EV. Solved GW1
-  XI/captain/vice/ordered-bench roles remain fixed while sorting; `Total 3 GWs xP`, `Total 5 GWs
-  xP`, raw GW1-GW5 xP, and the expanded per-gameweek membership/role view expose the horizon
-  detail. The transfer path, locks, exclusions, availability flags, and development-only caveats
-  remain visible.
-- Own-team path: **HOLD is presented as a positive recommendation when it is optimal**
-  (it frequently is — banked free transfers are often worth more than a forced move);
-  otherwise per-GW in/out with a "free" or "-4 hit" badge, EV before/after hits, the new
-  XIs, and an explicit "locked players: untouched" line.
-- Optional but recommended: a **cost-of-locks comparison** — the same model re-run without
-  the user's locks beside the locked run, same scale, so the UI can say "keeping your five
-  costs about N xP over the horizon". This is a same-model comparison (legitimate, unlike
-  cross-model EV) and is the wizard's most persuasive screen.
+For the next planning deadline, confirmed transfers already present in the public log are applied
+to the squad, bank, and remaining free-transfer count. Any hit caused by those moves is recorded as
+`existing_hit_points`: it is already incurred and therefore does not reduce the prospective
+optimizer objective again. Only newly suggested moves beyond the effective remaining free
+transfers cost four points each. The first forecast gameweek is actionable; unlike the legacy
+fresh-squad plan, it may contain transfers.
 
-### Wizard control → optimizer flag map
+The UI permits a 0-5 remaining-FT override because public state and a user's current account view
+can differ. The optimizer artifact records both the capture source and override value.
 
-| Wizard control | Fresh path | Own-team path |
-| --- | --- | --- |
-| Import my team | — | manager squad = initial state (no initial-squad ILP) |
-| Banked free transfers (derived) | — (fresh season: 0) | `initial_banked_free_transfers=B` |
-| Lock player (≤5) | `--lock CODE` (must-include) | `--lock CODE` (never-sell) |
-| Exclude player (≤15) | `--exclude CODE` (never-select) | `--exclude CODE` (never-buy) |
-| Rotation threshold | `--min-bench-appearance P` | `--min-bench-appearance P` |
-| Horizon | artifact GW range | artifact GW range |
+## Selling-value-aware optimization
 
-## 1a. Prior flow summary (superseded by the screen spec above)
-
-A manager who already owns a team wants transfer suggestions for THEIR squad, not a fresh
-15. The wizard flow:
-
-1. **Identify** — the user supplies their FPL `manager_id` (the number in
-   `fantasy.premierleague.com/entry/{manager_id}`).
-2. **Import** — the system fetches the manager's current 15, their bank/squad value, and
-   their transfer history, and maps every pick onto the stable player `code` used by the
-   forecast artifacts.
-3. **Constrain** — the user may **lock up to 5 players** they refuse to sell, set the
-   **bench-appearance threshold** (already shipped: `--min-bench-appearance`), and the
-   system derives their **banked free transfers** so hits are charged honestly: every
-   transfer beyond the free grant costs the configured **-4 hit**.
-4. **Suggest** — the optimizer runs the already-implemented exact fixed-squad lineup and the
-   bounded transfer planner *from the manager's own squad as the initial state*, and emits
-   per-gameweek: who to transfer out/in, whether each move is free or a -4 hit, the new
-   XI/captain/vice/bench, and expected points before and after hits.
-5. **Review** — the dashboard shows the current squad beside the suggested path with the
-   EV delta, hits, and every caveat (frozen prices, GW1-only availability overlay,
-   development-only status).
-
-## 2. Why this is mostly already built
-
-The hard parts exist and are tested:
-
-| Wizard need | Already implemented |
-| --- | --- |
-| Exact lineup for a squad I do not choose | `exact_lineup` (Stage E fixed-squad solve) |
-| "Who should I transfer?" | `plan_transfers` bounded DP over successor squads |
-| -4 per transfer beyond the free grant | `hit_cost_points` + free-transfer banking, exact |
-| "I have 2 banked free transfers" | `plan_transfers(initial_banked_free_transfers=B)` |
-| "Keep my 5 favourite players" | `locked_codes` / `--lock` (never transferred out) |
-| "Bench must be playable" | `--min-bench-appearance` gate, held across transfers |
-| Auditable, immutable suggestions | the optimizer artifact contract |
-
-What is genuinely new for P2 is the manager data boundary (fetch + mapping + value accounting)
-and the own-team UI/state. The fresh-squad UI is already shipped. Nothing about the forecast,
-composer, or the frozen evaluation history changes.
-
-## 3. Data boundary (the only new network surface)
-
-Public FPL endpoints (subject to shape verification against a live capture before any code
-is written — never promote an inferred shape to a confirmed fact):
-
-- `GET /api/entry/{manager_id}/` — manager identity, current event, points. Used for
-  validation ("is this a real manager?") and the wizard greeting.
-- `GET /api/entry/{manager_id}/event/{event}/picks` — the 15 picks for an event. Each pick
-  carries the season-scoped `element` id, the captaincy multiplier, and — critically —
-  `purchase_price`/`selling_price`, which give the manager's REAL squad value and bank
-  (the roadmap's "selling value not modelled" gap is only about *future* price moves; the
-  current value is knowable). Before a first save for the current event, fall back to the
-  latest completed event's picks as the current-squad proxy, labelled as such.
-- `GET /api/entry/{manager_id}/transfers/` (+ `/history` for chips) — transfer history per
-  event, used to DERIVE the banked free-transfer state (see §5).
-
-Repository rules that bind this work:
-
-- New network behaviour needs retries, bounded timeouts, shape validation, and offline tests
-  with vendored fixtures (`AGENTS.md` working protocol). The `ingest` package owns this;
-  nothing leaks into features/optimize.
-- Event time and knowledge time differ: every manager capture is versioned with
-  `captured_at`, hashed, and recorded in the emitted artifact's provenance. A suggestion is
-  reproducible only against its captured inputs, exactly like the forecast artifacts.
-- `element` (element_id) is season-scoped: picks map to the stable `code` through THIS
-  season's bootstrap, which the daily snapshots already carry. Never join a bare
-  `element_id` across seasons.
-- The dashboard never gains a network client. The static app reads only published JSON read
-  models (see §7).
-
-## 4. Selling value and the budget check
-
-`validate_squad` today checks `sum(now_cost) <= budget` — correct for a fresh squad at a
-deadline, WRONG for a manager whose players have appreciated. The manager path must use:
+The manager path does not reject an appreciated owned squad merely because its market price
+exceeds the fresh GBP 100.0 budget. Its state carries cash and a sale basis for every owned player:
 
 ```text
-affordability: sum(selling_price of retained players) + sum(now_cost of incoming players)
-               <= squad value (selling prices) + bank
+cash after = cash before
+             + sum(captured selling values of outgoing players)
+             - sum(frozen now_cost of incoming players)
 ```
 
-with both `squad value` and `bank` read from the picks payload. Future price moves remain
-unmodelled: every later-gameweek affordability statement stays a frozen-price scenario, as
-the runbook already labels them.
+Negative cash is illegal. A player bought inside the scenario receives that frozen `now_cost` as
+both purchase and later sale basis. The state key includes squad, cash, free transfers, and sale
+basis, so financially different paths are not merged.
 
-## 5. Deriving banked free transfers (needs measurement, not assumption)
+Lineup selection is exact for each visited squad. The multi-gameweek transfer search remains the
+existing deterministic bounded search; it makes no global-optimality claim. All future prices are
+frozen at the forecast artifact's known `now_cost`: future rises, falls, and sale-value changes are
+not forecast. The usual later-gameweek availability-overlay caveat also remains.
 
-FPL grants one free transfer per gameweek (two for the first deadline of a restart season),
-banks unused transfers up to the configured cap, and playing most chips (wildcard, free
-hit) consumes/reset that state. The banked count for the NEXT deadline must be derived from
-`/transfers` history by replaying: entitlement(event) -> carried(event+1), event by event,
-with chip weeks identified from `/history`. **The exact chip semantics (does a wildcard week
-bank or forfeit?) is a verification item against the official rules and a live manager's
-known state before shipping** — record the answer in this file when measured. The derived
-value feeds `plan_transfers(initial_banked_free_transfers=B)` and is displayed in the UI as
-"you have N free transfers; this plan uses X free and Y hits (-4Y)".
+## Immutable private capture and optimizer artifact
 
-## 6. Locks, threshold, and infeasibility UX
+`fpl.ingest.manager_team` emits schema `fpl.manager-team-capture` version 2 with status
+`development_only_public_manager_import`. The content-derived `manager-<sha256>` capture ID binds
+the normalized squad, manager/event state, values, free-transfer replay, chip history, capture
+time, source payload hashes, committed deadline-snapshot hashes, and the current full selectable-
+player registry hash. The Plan Server stores it
+under `<base>/manager-captures/<capture_id>.json` with atomic create/no-clobber behavior.
 
-Locks (`--lock`, max 5), exclusions (`--exclude`, max 15), and the bench gate compose; the wizard
-must reject lock/exclude overlap before solving and translate solver
-failures into wizard language:
+A manager solve emits optimizer artifact schema version 2. Its private `manager_context` binds the
+capture ID and SHA-256, capture time, manager ID, picks/planning events, bank, effective initial
+free transfers and any override, sunk hits, and every owned player's purchase/selling values.
+Artifact validation independently replays squad legality, first-week transfers, free-transfer
+banking, hit costs, and cash transitions. Existing schema-version-1 scratch-plan identities remain
+unchanged.
 
-- locked player below the appearance threshold -> explain that the explicit must-keep rule exempts
-  him from the bench threshold;
-- locked set breaks position/club/budget legality -> name the conflicting locks;
-- excluded or locked code is unknown/unpriced -> name it; excluded players never enter any future
-  transfer squad;
-- threshold no legal squad meets -> suggest lowering it.
+Manager captures and manager artifact context are local private inputs. They are not added to the
+shared player or optimizer dashboard read models.
 
-The manager's own CURRENT squad is never "illegal" (the game enforces legality), but a
-threshold applied to it can be unsatisfiable — the wizard must show which bench players
-fail the gate BEFORE suggesting transfers, so the user understands why the planner holds or
-hits.
+## Local Plan Server
 
-## 7. Presentation boundary and the future hosted product
-
-The dashboard is a static consumer and stays one. The local flow is:
+Run the server against the exact prospective-points artifact whose first gameweek is the manager's
+next planning event:
 
 ```powershell
-# thin job, wraps ingest + mapping + the existing optimizer
-fpl.jobs.suggest_manager_transfers --manager-id 123456 `
-    --lock 425746 --lock 152982 `
-    --min-bench-appearance 0.25 `
-    --output <manager-suggestion-artifact.json>     # immutable, provenance-bearing
-# then a read-model emitter derives manager_plan.json for the dashboard "My team" page
+.\.venv\Scripts\python.exe -m fpl.jobs.plan_server `
+    --base <dev-latest-directory> `
+    --forecast <prospective-points.jsonl>
 ```
 
-The manager id and the wizard inputs are chosen at job time, not in the browser; the
-dashboard page renders the published suggestion file.
+Omitting `--forecast` retains the legacy `<base>/gw1_5_default.jsonl` convention; post-deadline
+work should pass the current artifact explicitly. The capture and forecast must agree on season,
+first gameweek, and a canonical registry hash over every selectable player's season element,
+stable code, position, club, and price. Volatile points, ownership, and event fields in the full
+bootstrap payload do not invalidate that decision registry. The durable optimizer rechecks the
+same binding; the HTTP preview is not the sole provenance guard.
 
-**Future SaaS mode (login, one manager id per user, paid extra ids).** When this becomes a
-hosted product, the boundary is already drawn for it: authentication, the one-manager-per-
-account entitlement, and payments live in a NEW thin service layer around the domain
-functions — never inside `src/fpl/optimize` or the artifact contracts. The service owns the
-user-to-manager_id mapping; the suggestion artifact carries `manager_id`, the capture
-hashes, and the policy (locks, threshold, banked transfers) so an audit can always answer
-"whose team, whose data, which policy produced this". Nothing about the domain changes when
-the paywall arrives; a free tier is simply "one manager_id per account".
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /status` | solver, forecast, worktree, and current-stage readiness |
+| `POST /plan` | existing build-from-scratch custom solve |
+| `POST /manager-team` with `{"manager_id": 123}` | fetch, reconstruct, store, and preview a new capture |
+| `POST /manager-team/capture` with `{"capture_id": "manager-..."}` | reload exactly one immutable capture |
+| `POST /manager-plan` | solve locks, exclusions, threshold, and optional FT override from a capture |
 
-## 7a. Selections-log backend (owner direction 2026-08-17, design only)
+Loopback use needs no token. Non-loopback/LAN requests require the per-launch
+`X-FPL-Plan-Token` and existing same-machine origin check. A durable solve still requires a clean
+Git worktree, verified PuLP/CBC identity, the exact forecast, and the standing platform artifacts
+needed for the shared publish boundary.
 
-When the hosted mode arrives, a thin persistence service sits beside the wizard and records
-every user configuration as an append-only log row:
+## Hosted/public privacy boundary
 
-```text
-(user/account id, manager_id when imported, vintage run_id, locked codes, excluded codes,
-rotation threshold, created_at)  ->  later joined to the produced plan's run_id
-```
+The supported hosted dashboard is static and read-only. It has no FPL credential, manager account,
+manager capture store, or optimizer service. The public-data packager removes `user_custom` plans
+and rejects manager IDs, bank/selling values, current-squad payloads, workstation paths, and other
+private fields. Neither manager capture nor manager suggestion data is shipped in the public pack.
 
-Purposes: audit and correction of what a user actually selected (the owner's "correct the
-users select logs"), analytics on which locks/thresholds users choose, and the entitlement
-checks behind one-manager-per-account with paid extra seats. The log lives in the service
-layer -- the optimizer and artifact contracts stay pure, and a log row never mutates a
-recorded plan; corrections append a new row with a reason, mirroring the ledger's
-append-only discipline.
+The local manager-ID workflow uses FPL's public endpoints and does not authenticate ownership of
+that ID. Login, authenticated My Team state, one-manager-per-account entitlements, payments, and an
+append-only hosted selections log remain unimplemented service-layer work.
 
-## 8. Suggestion artifact (sketch)
+## Known limitations and follow-up
 
-Reuse the optimizer artifact contract, adding manager provenance: manager_id, entry/picks
-and transfers capture ids + SHA-256 + captured_at, derived banked transfers with the
-derivation's version, the used bootstrap capture (for element->code), plus the existing
-forecast/rules/solver/policy blocks. Development-only status and the frozen-price caveat
-remain mandatory fields. Immutability and no-clobber behavior are inherited unchanged.
-
-## 9. Open items (each needs a measured answer before implementation)
-
-1. Verify the live shape of `/entry/{id}/event/{n}/picks` (selling prices, bank) and
-   `/entry/{id}/transfers` against a real manager; vendor fixtures for offline tests.
-2. Measure the chip/free-transfer banking rules from the official rules page and one live
-   manager with a known state.
-3. Decide the candidate-pool policy for a manager search (the pool bound currently ranks by
-   horizon utility; managers may want "only players I can afford now").
-4. Post-deadline sequencing: this is P2 work and must not displace the remaining GW1 decision-pack
-   operations. The BI/dashboard MVP is already implemented development-only; this import is not
-   required to complete it.
+- Development-only: no claim is made here that a live end-to-end manager solve or hosted workflow
+  has passed a production acceptance gate.
+- Only GW1-started entries in the bounded next-event public reconstruction scope above are
+  supported; later-start, historical, and cross-season reconstruction require authenticated or
+  otherwise exact acquisition-price evidence.
+- An active planning Wildcard or Free Hit is rejected rather than modeled.
+- Public endpoints can lag what a signed-in manager sees; the recorded remaining-FT override is
+  the explicit correction path.
+- Future prices and future selling values remain frozen scenarios.
+- Chip optimization, autosubs, captain fallback, and authenticated account state remain absent.
+- Capture retention/deletion policy, hosted authentication, entitlements, and selections-log
+  persistence remain future service concerns.
