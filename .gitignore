@@ -39,6 +39,9 @@ Thumbs.db
 .vscode/
 *.swp
 
+# Machine-local assistant settings
+/.claude/settings.local.json
+
 # NOT ignored: snapshots/
 # R5 snapshots are the one thing in this repo that cannot be regenerated -- the FPL API
 # destroys per-gameweek data at season rollover. They are committed by
