@@ -142,6 +142,7 @@ from fpl.models.points_composition import (
     conditional_rate,
     representative_minutes,
 )
+from fpl.models.price_starter_prior import apply_price_starter_prior
 from fpl.storage.db import connect, default_db_path
 from fpl.types import Position
 from fpl.validate.freshness import FreshnessError, require_prospective_freshness
@@ -1615,6 +1616,14 @@ def predict_prospective_points(
                 was_home=was_home,
             )
             minutes_dist = minutes_model.predict(minutes_target)
+            if cold_start:
+                # No eligible history at all: the minutes model can only return its constant
+                # position prior, so every newcomer at a club reads the same. Launch price is
+                # the one deadline-known field that separates them (see
+                # `fpl.models.price_starter_prior`). Players WITH history are untouched.
+                minutes_dist = apply_price_starter_prior(
+                    minutes_dist, price=metadata.now_cost, position=position
+                )
             if appearance == "seasonal":
                 # Recent appearance is the equal-weighted trailing-5 (no recency weight); the fitted
                 # model is the fallback only when there are too few trailing rows to average.
