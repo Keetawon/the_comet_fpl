@@ -13,6 +13,8 @@ from itertools import pairwise
 import pytest
 
 from fpl.models.price_starter_prior import (
+    BEHIND_INCUMBENT_CAP,
+    INCUMBENT_APPEARANCE_THRESHOLD,
     PRICE_PRIOR_CAP,
     PRICE_PRIOR_COEFFICIENTS,
     PRICE_PRIOR_PIVOT,
@@ -128,3 +130,55 @@ def test_constants_are_pinned() -> None:
         assert math.isfinite(intercept) and math.isfinite(slope)
         # The unpenalised GK fit reached 3.87 and behaved as a step function.
         assert 0.0 < slope < 1.5
+
+
+def test_incumbent_cap_only_ever_lowers() -> None:
+    """The cap is a ceiling, never a floor: a newcomer already rated below it is untouched."""
+    for position in FITTED:
+        for price in range(35, 151, 5):
+            plain = price_starter_probability(price, position)
+            capped = price_starter_probability(price, position, behind_established_incumbent=True)
+            assert plain is not None and capped is not None
+            assert capped <= plain + 1e-12
+            assert capped <= BEHIND_INCUMBENT_CAP + 1e-12
+            if plain <= BEHIND_INCUMBENT_CAP:
+                assert capped == pytest.approx(plain)
+
+
+def test_incumbent_cap_fixes_the_case_that_motivated_it() -> None:
+    """A 5.0m newcomer keeper behind a dearer established incumbent was reading 0.85."""
+    uncapped = price_starter_probability(50, Position.GK)
+    capped = price_starter_probability(50, Position.GK, behind_established_incumbent=True)
+    assert uncapped is not None and capped is not None
+    assert uncapped > 0.80
+    assert capped == pytest.approx(BEHIND_INCUMBENT_CAP)
+
+
+def test_incumbent_cap_is_off_by_default() -> None:
+    """Nothing changes for a caller that does not pass the flag."""
+    for position in FITTED:
+        for price in (40, 50, 65):
+            assert price_starter_probability(price, position) == price_starter_probability(
+                price, position, behind_established_incumbent=False
+            )
+
+
+def test_reshape_passes_the_incumbent_flag_through() -> None:
+    minutes = (0.5, 0.1, 0.1, 0.3)
+    reshaped = apply_price_starter_prior(
+        minutes, price=60, position=Position.DEF, behind_established_incumbent=True
+    )
+    assert sum(reshaped) == pytest.approx(1.0)
+    assert 1.0 - reshaped[0] == pytest.approx(BEHIND_INCUMBENT_CAP)
+    # conditional minute shape still preserved
+    before = [minutes[i] / sum(minutes[1:]) for i in (1, 2, 3)]
+    after = [reshaped[i] / sum(reshaped[1:]) for i in (1, 2, 3)]
+    assert after == pytest.approx(before)
+
+
+def test_incumbent_constants_are_pinned() -> None:
+    """0.284 is measured (201 historical rows, and 0.283 on the 2025-26 subset), not tuned."""
+    assert BEHIND_INCUMBENT_CAP == 0.284
+    assert INCUMBENT_APPEARANCE_THRESHOLD == 0.70
+    low, high = PRICE_PRIOR_CAP
+    assert low < BEHIND_INCUMBENT_CAP < high

@@ -78,6 +78,40 @@ carries least information exactly where the position is most crowded. Dropping d
 seeing that number would be selecting a rule on its own test set, so all four positions ship on
 the same rule and the weakness is recorded here instead.
 
+The one thing an absolute price cannot see
+-----------------------------------------
+
+Price is read on its own scale, so it does not know who else is already at the club. Measured
+on the same 473 newcomers, splitting those whose club fields an established same-position
+incumbent (prior-season appearance >= 0.70) by whether the newcomer is priced above or below
+him:
+
+=========================  ====  =============  ==========
+newcomer versus incumbent  n     appearance     prior says
+=========================  ====  =============  ==========
+priced above him           25    0.863          0.699
+priced the same            75    0.508          0.513
+priced below him           201   **0.284**      0.382
+=========================  ====  =============  ==========
+
+The middle row is almost exact and the outer two are compressed toward it. The bottom row is
+the damaging one, and it is not a rounding error: a newcomer behind a dearer established
+incumbent appears **0.284** of the time historically and **0.283** on the 2025-26 rows alone --
+two windows agreeing to a thousandth -- while the price curve alone hands out up to the 0.85
+cap. The live consequence was a 5.0m goalkeeper with no Premier League history and 0.0%
+ownership outscoring his own club's 5.5m incumbent, which changed the optimizer's squad.
+
+:data:`BEHIND_INCUMBENT_CAP` therefore caps, and only caps, a cold start in exactly that
+position. It never raises anyone, and it is a measured ceiling rather than a fitted parameter,
+so it introduces no new degrees of freedom and consumes no validation window.
+
+Ownership would resolve the same case more finely -- an expensive newcomer nobody selects is a
+different animal from an expensive newcomer everybody selects, and the gap between those two
+groups measures +0.322 historically and +0.530 on live 2026/27 GW1. It is deliberately NOT
+built here: three candidate encodings were tried against the live window, which spends it, and
+goalkeepers cannot express it at all on 39 training rows where price already separates almost
+perfectly. The confirmation window for that work is 2026/27 GW2 onward, untouched.
+
 Scope
 -----
 
@@ -93,6 +127,8 @@ import math
 from fpl.types import Position
 
 __all__ = [
+    "BEHIND_INCUMBENT_CAP",
+    "INCUMBENT_APPEARANCE_THRESHOLD",
     "PRICE_PRIOR_CAP",
     "PRICE_PRIOR_COEFFICIENTS",
     "PRICE_PRIOR_PIVOT",
@@ -126,6 +162,21 @@ newcomer carries strictly less evidence than a proven ever-present. 0.04 is the 
 out-of-the-side rate of 0.039.
 """
 
+BEHIND_INCUMBENT_CAP = 0.284
+"""Ceiling for a cold start priced below an established same-position team-mate.
+
+The measured appearance rate of exactly that group: 0.284 over 201 historical newcomers and
+0.283 over the 98 of them in 2025-26. It is a cap, never a floor, so a newcomer the price curve
+already rates below it keeps his own lower value.
+"""
+
+INCUMBENT_APPEARANCE_THRESHOLD = 0.70
+"""Prior-season appearance rate at which a team-mate counts as an established incumbent.
+
+The threshold the group above was measured under. Below it the "incumbent" is not established
+enough for his price to say anything about who starts.
+"""
+
 PRICE_PRIOR_COEFFICIENTS: dict[Position, tuple[float, float]] = {
     Position.GK: (1.36703, 0.99990),
     Position.DEF: (0.61236, 0.19870),
@@ -143,8 +194,18 @@ def _sigmoid(value: float) -> float:
     return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, value))))
 
 
-def price_starter_probability(price: int | None, position: Position) -> float | None:
+def price_starter_probability(
+    price: int | None,
+    position: Position,
+    *,
+    behind_established_incumbent: bool = False,
+) -> float | None:
     """Appearance probability for a no-history player at ``price`` (FPL tenths of a million).
+
+    ``behind_established_incumbent`` marks a cold start whose club fields a same-position
+    team-mate with eligible history, a prior-season appearance rate of at least
+    :data:`INCUMBENT_APPEARANCE_THRESHOLD`, and a strictly higher price. Such a player is capped
+    at :data:`BEHIND_INCUMBENT_CAP`; the cap only ever lowers the answer.
 
     Returns ``None`` when the price is missing or not positive, which is the caller's signal to
     keep the existing constant position prior rather than invent one.
@@ -157,6 +218,8 @@ def price_starter_probability(price: int | None, position: Position) -> float | 
     intercept, slope = coefficients
     probability = _sigmoid(intercept + slope * (float(price) - PRICE_PRIOR_PIVOT))
     low, high = PRICE_PRIOR_CAP
+    if behind_established_incumbent:
+        high = min(high, BEHIND_INCUMBENT_CAP)
     return max(low, min(high, probability))
 
 
@@ -165,6 +228,7 @@ def apply_price_starter_prior(
     *,
     price: int | None,
     position: Position,
+    behind_established_incumbent: bool = False,
 ) -> tuple[float, float, float, float]:
     """Reshape a four-bin minutes distribution to the price-implied appearance probability.
 
@@ -176,7 +240,9 @@ def apply_price_starter_prior(
     Availability is not applied here. It stays the separate reported overlay and is never folded
     into a stored distribution.
     """
-    probability = price_starter_probability(price, position)
+    probability = price_starter_probability(
+        price, position, behind_established_incumbent=behind_established_incumbent
+    )
     if probability is None:
         return minutes
     _, bin1, bin2, bin3 = minutes

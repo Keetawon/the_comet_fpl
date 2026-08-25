@@ -142,7 +142,10 @@ from fpl.models.points_composition import (
     conditional_rate,
     representative_minutes,
 )
-from fpl.models.price_starter_prior import apply_price_starter_prior
+from fpl.models.price_starter_prior import (
+    INCUMBENT_APPEARANCE_THRESHOLD,
+    apply_price_starter_prior,
+)
 from fpl.storage.db import connect, default_db_path
 from fpl.types import Position
 from fpl.validate.freshness import FreshnessError, require_prospective_freshness
@@ -1539,6 +1542,26 @@ def predict_prospective_points(
         cold_start: bool
         transferred: bool
 
+    # Dearest ESTABLISHED same-position team-mate per (team, position). A cold start priced
+    # below one of these is capped by the price prior: measured, such a newcomer appears 0.284
+    # of the time while the price curve alone would hand him up to 0.85.
+    established_price: dict[tuple[int, str], int] = {}
+    for entry_index in range(len(reg_codes)):
+        mate_code = int(reg_codes[entry_index])
+        if mate_code not in codes_with_history:
+            continue
+        mate_rate, mate_rows = prior_appearance.get(mate_code, (None, 0))
+        if mate_rate is None or mate_rate < INCUMBENT_APPEARANCE_THRESHOLD:
+            continue
+        if mate_rows < _MIN_PRIOR_SEASON_ROWS:
+            continue
+        mate_meta = live_metadata.get(mate_code)
+        if mate_meta is None or mate_meta.now_cost is None:
+            continue
+        mate_key = (int(reg_teams[entry_index]), str(reg_positions[entry_index]))
+        if mate_meta.now_cost > established_price.get(mate_key, 0):
+            established_price[mate_key] = mate_meta.now_cost
+
     by_fixture: dict[int, list[_Pending]] = defaultdict(list)
     player_metadata: list[ProspectivePlayerMetadata] = []
     for index in range(len(reg_codes)):
@@ -1621,8 +1644,16 @@ def predict_prospective_points(
                 # position prior, so every newcomer at a club reads the same. Launch price is
                 # the one deadline-known field that separates them (see
                 # `fpl.models.price_starter_prior`). Players WITH history are untouched.
+                dearest_established = established_price.get((team_id, position.value))
                 minutes_dist = apply_price_starter_prior(
-                    minutes_dist, price=metadata.now_cost, position=position
+                    minutes_dist,
+                    price=metadata.now_cost,
+                    position=position,
+                    behind_established_incumbent=(
+                        dearest_established is not None
+                        and metadata.now_cost is not None
+                        and dearest_established > metadata.now_cost
+                    ),
                 )
             if appearance == "seasonal":
                 # Recent appearance is the equal-weighted trailing-5 (no recency weight); the fitted
