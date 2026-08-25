@@ -116,6 +116,9 @@ transformation. The artifact carries an explicit `as_of`, so nothing here is inf
   NULL/unfinalized/duplicate source rows, treats exact re-runs as no-ops, appends new fixture keys,
   and rejects changed values for an attached key. Two fixtures for one player in a double gameweek
   remain two rows because the grain includes `fixture`.
-- **Read/BI layer.** The decision-layer reads (upcoming EV and risk, actual-versus-predicted,
-  calibration by position and horizon) and the atomic star-schema export described in `AGENTS.md`
-  priority 9 consume this ledger but are separate, later work.
+- **Read/BI layer — implemented development-only.** The atomic star-schema export consumes the
+  ledger without querying around it. Dashboard schema v4 then derives exact cumulative player
+  endpoints from the published player-gameweek PMFs: xP plus inclusive `P(<=2)` and
+  `P(>=2/4/6/10/15)`. Cross-gameweek probabilities are convolved in the Python emitter under an
+  explicit independence assumption; the browser selects published scalars and never computes a
+  probability from the ledger primitives.

@@ -18,7 +18,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Atomically publish versioned per-page dashboard read models (fixture_matrix, "
-            "players, summary, next_gw, forecast_vs_actual, optimizer_audit) from a "
+            "players, player_horizons, summary, next_gw, forecast_vs_actual, optimizer_audit) "
+            "from a "
             "published BI Parquet export."
         )
     )
@@ -43,8 +44,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(
-        f"published {result.fixture_matrix_rows} team, {result.players_rows} player and "
-        f"{result.next_gw_plans} plan read-model rows to {result.output_dir}; "
+        f"published {result.fixture_matrix_rows} team, {result.players_rows} player, "
+        f"{result.player_horizon_rows} player-horizon and {result.next_gw_plans} plan "
+        f"read-model rows to {result.output_dir}; "
         f"content_sha256={result.content_sha256}"
     )
     return 0

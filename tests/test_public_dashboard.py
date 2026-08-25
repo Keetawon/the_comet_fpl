@@ -23,6 +23,8 @@ from fpl.publish.dashboard_json import (
     NEXT_GW_SCHEMA,
     OPTIMIZER_AUDIT_FILENAME,
     OPTIMIZER_AUDIT_SCHEMA,
+    PLAYER_HORIZONS_FILENAME,
+    PLAYER_HORIZONS_SCHEMA,
     PLAYERS_FILENAME,
     PLAYERS_SCHEMA,
     SUMMARY_FILENAME,
@@ -45,6 +47,7 @@ _FILENAMES = (
     FORECAST_VS_ACTUAL_FILENAME,
     NEXT_GW_FILENAME,
     OPTIMIZER_AUDIT_FILENAME,
+    PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     SUMMARY_FILENAME,
 )
@@ -151,7 +154,45 @@ def _documents() -> dict[str, dict[str, Any]]:
         PLAYERS_FILENAME: {
             "schema": PLAYERS_SCHEMA,
             "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
-            "players": [{"code": 1, "web_name": "Preserved Player"}],
+            "players": [
+                {
+                    "run_id": "forecast-primary",
+                    "season": "2026-27",
+                    "code": 1,
+                    "web_name": "Preserved Player",
+                }
+            ],
+        },
+        PLAYER_HORIZONS_FILENAME: {
+            "schema": PLAYER_HORIZONS_SCHEMA,
+            "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+            "semantics": {
+                "grain": ["run_id", "season", "code", "gw_to"],
+                "cumulative_from": "dim_forecast_run.gw_from",
+                "distribution_combination": "independent-gameweek-convolution-v1",
+                "availability": "raw-model-distribution-unadjusted",
+                "value_decimal_places": 6,
+                "probability_boundary_policy": "preserve-exact-zero-one-v1",
+                "thresholds": {"p_le": [2], "p_ge": [2, 4, 6, 10, 15]},
+            },
+            "horizon_fields": [
+                "gw_to",
+                "xp",
+                "p_le_2",
+                "p_ge_2",
+                "p_ge_4",
+                "p_ge_6",
+                "p_ge_10",
+                "p_ge_15",
+            ],
+            "players": [
+                {
+                    "run_id": "forecast-primary",
+                    "season": "2026-27",
+                    "code": 1,
+                    "horizons": [[gw, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0] for gw in range(1, 6)],
+                }
+            ],
         },
         NEXT_GW_FILENAME: {
             "schema": NEXT_GW_SCHEMA,
@@ -208,8 +249,17 @@ def _write_generation(directory: Path, documents: dict[str, dict[str, Any]]) -> 
             "export_created_at": "2026-08-21T11:59:00+00:00",
             "database_sha256": _sha("3"),
         },
-        "runs": [],
-        "run_ids": [],
+        "runs": [
+            {
+                "run_id": "forecast-primary",
+                "as_of": "2026-08-21T17:30:00+00:00",
+                "season": "2026-27",
+                "gw_from": 1,
+                "gw_to": 5,
+                "horizon_gameweeks": 5,
+            }
+        ],
+        "run_ids": ["forecast-primary"],
         "ease_index_formula_version": "fixture-ease-v1",
         "files": files,
     }
@@ -257,6 +307,11 @@ def test_packages_only_formal_plans_and_reseals_a_deterministic_root_zip(tmp_pat
         assert plan["search_policy"]["plan_origin"] == "platform"
     assert public_documents[FIXTURE_MATRIX_FILENAME] == _documents()[FIXTURE_MATRIX_FILENAME]
     assert public_documents[PLAYERS_FILENAME] == _documents()[PLAYERS_FILENAME]
+    assert public_documents[PLAYER_HORIZONS_FILENAME] == _documents()[PLAYER_HORIZONS_FILENAME]
+    horizon_payload = (first.output_dir / PLAYER_HORIZONS_FILENAME).read_bytes()
+    assert horizon_payload.endswith(b"\n")
+    assert horizon_payload.count(b"\n") == 1
+    assert horizon_payload == _canonical_json_bytes(_documents()[PLAYER_HORIZONS_FILENAME])
 
     joined_payload = b"".join(path.read_bytes() for path in first.output_dir.iterdir())
     assert b"user_custom" not in joined_payload

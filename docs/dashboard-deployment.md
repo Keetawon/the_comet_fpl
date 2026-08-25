@@ -42,7 +42,7 @@ uv run python -m fpl.jobs.package_public_dashboard `
 
 The command prints a single JSON record containing the asset name, asset SHA-256, byte size, and
 sanitized manifest content SHA-256. Inspect its output directory if desired; it must contain
-exactly the six page JSON files plus `manifest.json`.
+exactly the seven read-model JSON files plus `manifest.json`.
 
 Create a new release and tag for that exact generation. Never replace an existing tag or asset:
 
@@ -75,6 +75,8 @@ Commit that pin with the dashboard code. A push to `main` now downloads only the
 asset, verifies its pinned SHA-256 and exact ZIP members, validates the read-model manifest, runs
 the dashboard tests and lint, builds with the Pages base path and hosted-mode guard, revalidates
 the copied build data, and deploys the artifact. `workflow_dispatch` provides an explicit retry.
+Dashboard tests, lint, and a normal build run even while the pin is `unpublished`; only the
+asset-dependent hosted build and deploy are skipped.
 
 ## Refresh and rollback
 

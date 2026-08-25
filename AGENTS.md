@@ -225,9 +225,13 @@ and support up to five locked players and fifteen excluded players end-to-end; e
 absent from the initial squad and every future transfer squad, and lock/exclusion overlap fails
 closed. They do **not** import or optimize the owner's existing FPL squad: manager-id ingestion,
 verification, selling-value accounting, and own-team transfer suggestions remain post-deadline
-work. Dashboard read-model schema
-version 3 explicitly separates formal platform default/diagnostic plans from user-custom plans, so
-hash ordering or browser-local state cannot replace the formal Next-GW recommendation. Two
+work. Dashboard read-model schema version 3 introduced the explicit separation of formal platform
+default/diagnostic plans from user-custom plans, so hash ordering or browser-local state cannot
+replace the formal Next-GW recommendation. Schema version 4 is current: it adds one cumulative
+player endpoint per `(run_id, season, code, gw_to)` with summed xP, inclusive `P(points <= 2)`, and
+inclusive `P(points >= 2/4/6/10/15)`, computed by independent gameweek convolution in the Python
+static emitter. The browser selects those published scalars only for all fixtures from the run's
+fixed start; it never sums probabilities or derives a CCDF/model quantity. Two
 forecast/transfer scenario gaps remain:
 `chance_of_playing_next_round` is repeated across the whole horizon, and future transfers use the
 deadline's static prices with no price-change or selling-value model. The append-only prediction
@@ -900,7 +904,15 @@ displace the active delivery order.
    selections ignore affordability while retaining roster shape and club caps. Neither route is a
    manager-team import. Retain both player-fixture and player-gameweek predictions for every pre-deadline run,
    never overwrite a vintage, and join actual outcomes only after finalisation.
-   The decision layer should support: upcoming 1/3/5-GW player EV and risk; fixture difficulty split
+   The decision layer supports exact cumulative player endpoints from the run's fixed start: xP,
+   inclusive `P(points <= 2)`, and inclusive `P(points >= 2/4/6/10/15)`. Expected points may be
+   summed; probabilities must be convolved in the Python emitter under the versioned independent-
+   gameweek assumption and are raw/unadjusted for the next-round availability overlay. A shifted
+   start or venue filter suppresses the probability display rather than conditioning it. The bulk
+   wire payload uses a versioned positional field dictionary and six-decimal emitter quantization
+   only after full-precision validation; exact zero/one probability boundaries stay exact. It never
+   carries raw PMFs; any future CCDF uses a small precomputed lazy shard. The decision
+   layer also supports: fixture difficulty split
    into overall, attack, and defence; actual-versus-predicted player and team performance; player
    form (minutes, starts, xG, xA, goals, assists, bonus/BPS, DC, points); calibration by position and
    horizon; and optimiser-plan audits. Preserve the primitive measures and publish any composite

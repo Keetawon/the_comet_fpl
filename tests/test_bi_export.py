@@ -565,6 +565,12 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     assert actual.column("expected_goals").to_pylist() == [None]
     assert actual.column("total_points_as_recorded").to_pylist() == [6]
     assert actual.column("points_under_rules_2026_27").to_pylist() == [7]
+    player_gameweeks = pq.read_table(output / "fact_forecast_player_gameweek.parquet").to_pylist()
+    artifact_pmfs = {(row.gw, row.code): list(row.distribution) for row in artifact.rows}
+    for row in player_gameweeks:
+        assert json.loads(row["distribution"]) == pytest.approx(
+            artifact_pmfs[(row["gw"], row["code"])]
+        )
     player_form = pq.read_table(output / "fact_player_form.parquet")
     assert player_form.column("clean_sheets").to_pylist() == [1]
     assert player_form.column("goals_conceded").to_pylist() == [0]

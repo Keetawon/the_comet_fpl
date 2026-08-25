@@ -1,10 +1,9 @@
 # The publish contract
 
-**Status: agreed application-export design, not yet implemented.** The development-only Stage E
-optimiser and its stable prospective-points input artifact are implemented. Phase 3b still needs the
-append-only prediction ledger, BI semantic/star-schema export, and this static application export;
-Phase 4 builds the first dashboard consumer. Recorded now so upstream work targets a fixed boundary
-rather than being retrofitted.
+**Status: historical design, superseded where noted by
+`docs/dashboard-json-contract.md` version 4.** The ledger, BI export, static application export,
+and dashboard are now implemented development-only. This file retains the original product shape;
+the implemented, versioned boundary is authoritative when the two differ.
 
 ## Why this exists
 
@@ -29,6 +28,11 @@ difficulty, and pivot-ready dimensions. Do not silently overload this applicatio
 
 ## Layout
 
+> **Historical, non-normative layout.** The per-player histogram files and shapes below were an
+> early design and must not be implemented. The authoritative schema-v4 layout is
+> `docs/dashboard-json-contract.md`: seven read-model JSON files plus a manifest, with compact
+> cumulative scalars in `player_horizons.json` and no raw PMF in the bulk payload.
+
 ```
 public/data/
   manifest.json            provenance, target gameweek, model version   (every view)
@@ -50,12 +54,12 @@ Rough sizes at ~700 players: `players.json` ≈ 400 KB, each detail file ≈ 4 K
 1. **`code` is the identity.** Never `element`, which is reassigned every season (gotcha 1).
    `element_id` is carried alongside solely for deep-linking to fantasy.premierleague.com,
    and is never used as a join key.
-2. **Every number is pre-computed.** The frontend formats and sorts; it never derives a
-   statistic. Any quantity a view needs is a field here.
-3. **Distributions ship as histograms, not just moments.** `P(≥6)`, `P(≥10)` and `Var` are
-   all derivable from the histogram, so shipping the bins means a new threshold is a
-   frontend change rather than a re-export. This is the difference between "can we show
-   `P(≥15)` for triple-captain week?" being an afternoon or a pipeline change.
+2. **Model quantities are pre-computed.** The frontend may filter, sort, sum already-published
+   xP, and calculate presentation geometry. It may not derive a model quantity from primitives.
+3. **Probability arithmetic stays upstream.** The bulk player payload publishes cumulative xP,
+   `P(<=2)`, and `P(>=t)` for `t in {2,4,6,10,15}` at every forecast endpoint. It does not ship
+   raw PMFs. Any future CCDF detail ships precomputed points in a lazy player shard; the browser
+   may draw those points but never constructs them from a PMF or adds marginal probabilities.
 4. **`schema_version` is in the manifest** and every consumer asserts on it, so a shape
    change fails loudly instead of rendering wrong numbers.
 5. **Nulls are nulls.** An unmodelled or unmeasured quantity is `null`, never `0` — the same
@@ -100,6 +104,9 @@ The provenance record. Also the data source for the transparency view's caveats.
 them is the point: the transparency view should state what the model does not know.
 
 ## players.json
+
+> **Historical example only.** Its embedded per-gameweek probability fields and histogram/detail
+> design are superseded by backend-convolved cumulative endpoints in `player_horizons.json`.
 
 Drives the player table and the captaincy view. One row per player.
 
@@ -167,9 +174,9 @@ fixtures are.
 
 `p_returns`, `p_haul` and `variance` **must not be summed** -- `P(haul in 4 GWs)` is not the
 sum of four per-gameweek probabilities, and adding them overstates the result every time. The
-simulator holds the joint distribution, so it precomputes those aggregates for N = 1..6 in
-`horizons` at no extra cost. A client wanting a horizon the export does not carry must ask
-for it to be added rather than deriving it.
+implemented v4 emitter convolves the stored player-gameweek marginals from the run's `gw_from`
+through every `gw_to`, under the explicitly versioned independent-gameweek assumption. A client
+wanting a horizon the export does not carry must ask for it to be added rather than deriving it.
 
 ## players/{code}.json
 

@@ -826,6 +826,26 @@ emitted an optimizer artifact, or changed the formal/custom plan read models. P2
 bounded direct manager import through the local Plan Server while preserving browser-local draft
 state and leaving formal/custom plan read models unchanged.
 
+**P1.7j Cumulative player-outcome read model (2026-08-25): implemented and offline-tested.**
+Dashboard schema version 4 adds `player_horizons.json`, with one endpoint per player for every
+`gw_to` in the forecast run. Python convolves the published player-gameweek PMFs and emits
+cumulative xP, inclusive `P(points <= 2)`, and inclusive `P(points >= 2/4/6/10/15)`. The emitter
+reconciles PMF mass and means, the full roster/gameweek population, player identities, and exact
+run endpoints at full precision before publishing compact positional rows quantized to six
+decimal places; exact zero/one probability boundaries remain exact. The browser may decode,
+select, filter, sort, and sum published
+xP; it never sums probabilities, reads a PMF, derives a CCDF, or manufactures a model quantity
+from display primitives. The values are raw model distributions, unadjusted for the reported
+availability overlay, and cross-gameweek composition is explicitly versioned as independent
+marginal convolution. Raw PMFs remain absent from the bulk payload; any future CCDF drill-down
+must receive precomputed points through a separately versioned lazy shard. The Players table now
+loads the strict v4 file and exposes all six inclusive probability columns for an exact cumulative
+endpoint. A shifted start or Home/Away filter suppresses them with an explanation; such filters
+may still sum xP but cannot condition a marginal probability. The measured 599-player/five-endpoint
+design budget was about 305 KB raw and 76 KB gzipped **per vintage**; the current compact
+609-player development vintage measures 259,421 / 75,155 bytes. An all-vintage file scales with
+the number of recorded runs.
+
 ### P1.8 — Complete Players-page form exposure after P0
 
 **Status (2026-08-19): implementation, focused tests, and local development publication

@@ -1,5 +1,6 @@
 {
-  "json_schema_version": 3,
+  "schema": "fpl.dashboard-optimizer-audit",
+  "json_schema_version": 4,
   "plans": [
     {
       "optimizer_run_id": "opt-default",

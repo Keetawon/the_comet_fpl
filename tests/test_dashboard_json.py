@@ -27,8 +27,11 @@ import fpl.storage.db
 from fpl.publish.dashboard_json import (
     DASHBOARD_JSON_SCHEMA_VERSION,
     FIXTURE_MATRIX_FILENAME,
+    PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     DashboardJsonError,
+    _validate_player_horizon_document,
+    _validate_player_horizon_generation,
     build_dashboard_read_models,
     export_dashboard_json,
     render_read_model_files,
@@ -264,7 +267,11 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "chance_of_playing": None,
                 "availability_multiplier": 1.0,
                 "expected_points": 5.5 if gw == 1 else 4.5,
-                "distribution": "[0.1, 0.2, 0.3, 0.25, 0.15]",
+                "distribution": (
+                    "[0.3, 0, 0, 0, 0, 0, 0, 0.1, 0.6]"
+                    if gw == 1
+                    else "[0.3, 0, 0, 0, 0, 0, 0.4, 0.3]"
+                ),
                 "cold_start_player": False,
                 "stage_a_league_average_team": False,
                 "attacking_signal_cold_start": False,
@@ -288,7 +295,11 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "chance_of_playing": 75,
                 "availability_multiplier": 0.75,
                 "expected_points": 2.0 if gw == 1 else 3.0,
-                "distribution": "[0.4, 0.35, 0.25]",
+                "distribution": (
+                    "[0.75, 0, 0, 0, 0, 0, 0, 0, 0.25]"
+                    if gw == 1
+                    else "[0.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25]"
+                ),
                 "cold_start_player": False,
                 "stage_a_league_average_team": True,
                 "attacking_signal_cold_start": False,
@@ -330,6 +341,8 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 "season": SEASON,
                 "gw_from": 1,
                 "gw_to": 2,
+                "row_count": 4,
+                "roster_size": 2,
                 "status": "recorded",
                 "component_modes": (
                     '{"appearance_mode": "seasonal", "assists_mode": "coupled", '
@@ -623,6 +636,10 @@ def _player(models: Any, code: int) -> dict[str, Any]:
     return next(p for p in models.players if p["code"] == code)
 
 
+def _player_horizons(models: Any, code: int) -> dict[str, Any]:
+    return next(p for p in models.player_horizons if p["code"] == code)
+
+
 # --------------------------------------------------------------------------------------
 # Read-model content
 # --------------------------------------------------------------------------------------
@@ -655,6 +672,288 @@ def test_grain_identity_and_season_safe_label_resolution(tmp_path: Path) -> None
             "opponent_team_id",
             "element_id",
         }
+
+
+def test_player_horizons_are_convolved_upstream_with_inclusive_thresholds(
+    tmp_path: Path,
+) -> None:
+    models = build_dashboard_read_models(_build_source_export(tmp_path))
+
+    assert _player_horizons(models, 1) == {
+        "run_id": RUN_ID,
+        "season": SEASON,
+        "code": 1,
+        "horizons": [
+            {
+                "gw_to": 1,
+                "xp": 5.5,
+                "p_le_2": 0.3,
+                "p_ge_2": 0.7,
+                "p_ge_4": 0.7,
+                "p_ge_6": 0.7,
+                "p_ge_10": 0.0,
+                "p_ge_15": 0.0,
+            },
+            {
+                "gw_to": 2,
+                "xp": 10.0,
+                "p_le_2": 0.09,
+                "p_ge_2": 0.91,
+                "p_ge_4": 0.91,
+                "p_ge_6": 0.91,
+                "p_ge_10": 0.49,
+                "p_ge_15": 0.18,
+            },
+        ],
+    }
+    rendered = render_read_model_files(models)
+    document = json.loads(rendered[PLAYER_HORIZONS_FILENAME].decode("utf-8"))
+    assert document["semantics"] == {
+        "grain": ["run_id", "season", "code", "gw_to"],
+        "cumulative_from": "dim_forecast_run.gw_from",
+        "distribution_combination": "independent-gameweek-convolution-v1",
+        "availability": "raw-model-distribution-unadjusted",
+        "value_decimal_places": 6,
+        "probability_boundary_policy": "preserve-exact-zero-one-v1",
+        "thresholds": {"p_le": [2], "p_ge": [2, 4, 6, 10, 15]},
+    }
+    assert document["horizon_fields"] == [
+        "gw_to",
+        "xp",
+        "p_le_2",
+        "p_ge_2",
+        "p_ge_4",
+        "p_ge_6",
+        "p_ge_10",
+        "p_ge_15",
+    ]
+    assert document["players"][0]["horizons"][0] == [1, 5.5, 0.3, 0.7, 0.7, 0.7, 0.0, 0.0]
+    for filename, payload in rendered.items():
+        assert "distribution" not in _all_keys(json.loads(payload)), filename
+    assert sum(len(player["horizons"]) for player in document["players"]) == 4
+
+
+def test_player_horizon_wire_quantization_is_compact_and_preserves_probability_boundaries(
+    tmp_path: Path,
+) -> None:
+    models = build_dashboard_read_models(_build_source_export(tmp_path))
+    first = models.player_horizons[0]["horizons"][0]
+    second = models.player_horizons[0]["horizons"][1]
+    first["xp"] = 5.50000049
+    first["p_ge_10"] = 0.00000004
+    first["p_ge_15"] = 0.00000004
+    second["p_ge_2"] = 0.9999996
+
+    document = json.loads(render_read_model_files(models)[PLAYER_HORIZONS_FILENAME])
+    first_row, second_row = document["players"][0]["horizons"]
+    fields = document["horizon_fields"]
+    assert first_row[fields.index("xp")] == 5.5
+    assert second_row[fields.index("p_ge_2")] == 0.999999
+    assert first_row[fields.index("p_ge_10")] == 0.000001
+    assert first_row[fields.index("p_ge_15")] == 0.000001
+    _validate_player_horizon_document(document)
+
+
+def test_score_two_belongs_to_both_inclusive_probability_events(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_forecast_player_gameweek"]
+    rows = [
+        {**row, "expected_points": 2.0, "distribution": "[0, 0, 1]"}
+        if row["code"] == 2 and row["gw"] == 1
+        else row
+        for row in rows
+    ]
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows)
+    score_two = _player_horizons(build_dashboard_read_models(export_dir), 2)["horizons"][0]
+    assert score_two["p_le_2"] == 1.0
+    assert score_two["p_ge_2"] == 1.0
+
+
+def test_horizon_probability_is_not_the_sum_of_gameweek_probabilities(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_forecast_player_gameweek"]
+    bernoulli = "[0.5, 0, 0, 0, 0, 0, 0.5]"
+    rows = [
+        {**row, "expected_points": 3.0, "distribution": bernoulli} if row["code"] == 1 else row
+        for row in rows
+    ]
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows)
+
+    horizons = _player_horizons(build_dashboard_read_models(export_dir), 1)["horizons"]
+    assert horizons[0]["p_ge_6"] == 0.5
+    assert horizons[1]["p_ge_6"] == 0.75
+    assert horizons[1]["p_ge_6"] != horizons[0]["p_ge_6"] * 2
+    assert horizons[1]["xp"] == 6.0  # xP remains the exact sum: 3.0 + 3.0
+
+
+def test_blank_gameweek_leaves_the_cumulative_distribution_unchanged(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_forecast_player_gameweek"]
+    rows = [
+        {**row, "expected_points": 0.0, "distribution": "[1]"}
+        if row["code"] == 1 and row["gw"] == 2
+        else row
+        for row in rows
+    ]
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows)
+
+    first, second = _player_horizons(build_dashboard_read_models(export_dir), 1)["horizons"]
+    assert second == {**first, "gw_to": 2}
+
+
+def test_accepted_pmf_mass_roundoff_cannot_shrink_a_cumulative_tail(
+    tmp_path: Path,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_forecast_player_gameweek"]
+    rows = [
+        {**row, "expected_points": 2.0, "distribution": "[0, 0, 1]"}
+        if row["code"] == 1 and row["gw"] == 1
+        else {**row, "expected_points": 0.0, "distribution": "[0.9999999995]"}
+        if row["code"] == 1 and row["gw"] == 2
+        else row
+        for row in rows
+    ]
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows)
+
+    first, second = _player_horizons(build_dashboard_read_models(export_dir), 1)["horizons"]
+    assert first["xp"] == second["xp"] == 2.0
+    assert first["p_ge_2"] == second["p_ge_2"] == 1.0
+
+
+def test_float_roundoff_cannot_make_valid_cumulative_tails_fail_validation(
+    tmp_path: Path,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_forecast_player_gameweek"]
+    rows = [
+        {
+            **row,
+            "expected_points": 15.0,
+            "distribution": json.dumps([0.0] * 15 + [1.0]),
+        }
+        if row["code"] == 1 and row["gw"] == 1
+        else {
+            **row,
+            "expected_points": 0.8250543658672808,
+            "distribution": "[0.17494563413271938, 0.8250543658672808]",
+        }
+        if row["code"] == 1 and row["gw"] == 2
+        else row
+        for row in rows
+    ]
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows)
+
+    document = json.loads(
+        render_read_model_files(build_dashboard_read_models(export_dir))[PLAYER_HORIZONS_FILENAME]
+    )
+    _validate_player_horizon_document(document)
+    first, second = next(row for row in document["players"] if row["code"] == 1)["horizons"]
+    p_ge_15_index = document["horizon_fields"].index("p_ge_15")
+    assert first[p_ge_15_index] == 1.0
+    assert second[p_ge_15_index] == 0.999999
+
+
+@pytest.mark.parametrize(
+    ("distribution", "expected_points", "message"),
+    [
+        ("[]", 0.0, "non-empty"),
+        ("[0.4, 0.4]", 0.4, "sums to"),
+        ("[1.1, -0.1]", -0.1, "non-negative"),
+        ("[NaN]", 0.0, "finite"),
+        ("[1]", 1.0, "does not match"),
+    ],
+)
+def test_player_horizons_fail_closed_on_malformed_or_inconsistent_pmf(
+    tmp_path: Path, distribution: str, expected_points: float, message: str
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_forecast_player_gameweek"]
+    rows[0] = {
+        **rows[0],
+        "distribution": distribution,
+        "expected_points": expected_points,
+    }
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows)
+    with pytest.raises(DashboardJsonError, match=message):
+        build_dashboard_read_models(export_dir)
+
+
+def test_player_horizons_require_every_declared_player_gameweek(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_forecast_player_gameweek"]
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows[:-1])
+    with pytest.raises(DashboardJsonError, match="declares 4 rows/2 players"):
+        build_dashboard_read_models(export_dir)
+
+
+def test_player_horizons_reject_an_empty_declared_roster(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["dim_forecast_run"]
+    rows[0] = {**rows[0], "row_count": 0, "roster_size": 0}
+    _rewrite_table(export_dir, "dim_forecast_run", rows)
+    with pytest.raises(DashboardJsonError, match="positive integer"):
+        build_dashboard_read_models(export_dir)
+
+
+def test_player_horizon_generation_reconciles_players_and_exact_endpoints(
+    tmp_path: Path,
+) -> None:
+    models = build_dashboard_read_models(_build_source_export(tmp_path))
+    rendered = render_read_model_files(models)
+    documents = {
+        PLAYERS_FILENAME: json.loads(rendered[PLAYERS_FILENAME]),
+        PLAYER_HORIZONS_FILENAME: json.loads(rendered[PLAYER_HORIZONS_FILENAME]),
+    }
+    manifest = {"runs": list(models.runs)}
+
+    missing_endpoint = json.loads(json.dumps(documents))
+    missing_endpoint[PLAYER_HORIZONS_FILENAME]["players"][0]["horizons"].pop()
+    _validate_player_horizon_document(missing_endpoint[PLAYER_HORIZONS_FILENAME])
+    with pytest.raises(DashboardJsonError, match="has endpoints"):
+        _validate_player_horizon_generation(missing_endpoint, manifest)
+
+    missing_player = json.loads(json.dumps(documents))
+    missing_player[PLAYER_HORIZONS_FILENAME]["players"].pop()
+    _validate_player_horizon_document(missing_player[PLAYER_HORIZONS_FILENAME])
+    with pytest.raises(DashboardJsonError, match="does not reconcile"):
+        _validate_player_horizon_generation(missing_player, manifest)
+
+    extra_run = json.loads(json.dumps(manifest))
+    extra_run["runs"].append(
+        {
+            **extra_run["runs"][0],
+            "run_id": "run-with-no-player-population",
+        }
+    )
+    with pytest.raises(DashboardJsonError, match="cover every manifest run"):
+        _validate_player_horizon_generation(documents, extra_run)
+
+    impossible_overlap = json.loads(json.dumps(documents[PLAYER_HORIZONS_FILENAME]))
+    p_le_2_index = impossible_overlap["horizon_fields"].index("p_le_2")
+    impossible_overlap["players"][0]["horizons"][0][p_le_2_index] = 0.2
+    with pytest.raises(DashboardJsonError, match="inclusive score-2 overlap"):
+        _validate_player_horizon_document(impossible_overlap)
+
+    excess_precision = json.loads(json.dumps(documents[PLAYER_HORIZONS_FILENAME]))
+    excess_precision["players"][0]["horizons"][0][1] += 0.0000001
+    with pytest.raises(DashboardJsonError, match="not ordered cumulative values"):
+        _validate_player_horizon_document(excess_precision)
+
+    wrong_fields = json.loads(json.dumps(documents[PLAYER_HORIZONS_FILENAME]))
+    wrong_fields["horizon_fields"][1:3] = reversed(wrong_fields["horizon_fields"][1:3])
+    with pytest.raises(DashboardJsonError, match="positional horizon field contract"):
+        _validate_player_horizon_document(wrong_fields)
+
+    short_row = json.loads(json.dumps(documents[PLAYER_HORIZONS_FILENAME]))
+    short_row["players"][0]["horizons"][0].pop()
+    with pytest.raises(DashboardJsonError, match="malformed row"):
+        _validate_player_horizon_document(short_row)
+
+    malformed_run = json.loads(json.dumps(manifest))
+    malformed_run["runs"][0]["run_id"] = []
+    with pytest.raises(DashboardJsonError, match="invalid run horizon"):
+        _validate_player_horizon_generation(documents, malformed_run)
 
 
 def test_unmeasured_values_stay_json_null_never_zero(tmp_path: Path) -> None:
@@ -1052,6 +1351,7 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
     assert first == second
     assert set(first) == {
         FIXTURE_MATRIX_FILENAME,
+        PLAYER_HORIZONS_FILENAME,
         PLAYERS_FILENAME,
         "next_gw.json",
         "summary.json",
@@ -1220,7 +1520,11 @@ def test_publication_is_reproducible_and_validates(tmp_path: Path) -> None:
     )
 
     assert first.content_sha256 == second.content_sha256
-    for filename in (FIXTURE_MATRIX_FILENAME, PLAYERS_FILENAME):
+    for filename in (
+        FIXTURE_MATRIX_FILENAME,
+        PLAYERS_FILENAME,
+        PLAYER_HORIZONS_FILENAME,
+    ):
         assert (first.output_dir / filename).read_bytes() == (
             second.output_dir / filename
         ).read_bytes()
@@ -1238,6 +1542,9 @@ def test_publication_is_reproducible_and_validates(tmp_path: Path) -> None:
     assert manifest["ease_index_formula_version"] == "fixture-ease-v1"
     assert manifest["files"][FIXTURE_MATRIX_FILENAME]["row_count"] == first.fixture_matrix_rows
     assert manifest["files"][PLAYERS_FILENAME]["row_count"] == first.players_rows
+    assert (
+        manifest["files"][PLAYER_HORIZONS_FILENAME]["row_count"] == first.player_horizon_rows == 4
+    )
     assert first.output_dir.is_symlink()
 
 

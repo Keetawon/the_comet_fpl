@@ -1,6 +1,6 @@
 """Per-page dashboard read models over the published BI Parquet export.
 
-This is the dashboard data boundary: it pre-shapes the joins all six read-model pages
+This is the dashboard data boundary: it pre-shapes the joins all dashboard pages
 need (fixture matrix, players, summary, next gameweek, forecast versus actual, optimizer
 audit) into application JSON, so the static browser app only renders and ships no
 client-side query engine.  It reads ONLY the
@@ -17,11 +17,13 @@ machinery surfaces its own :class:`fpl.publish.export.BiExportError` subclasses.
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Final
 
@@ -53,9 +55,13 @@ DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
 # record shapes are unchanged.
 # v3: optimizer plans carry an explicit platform/default/diagnostic/user classification,
 # a display label, and the compact owner policy needed by the plan-builder result view.
-DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 3
+# v4: each player carries cumulative-horizon xP and threshold probabilities derived here
+# from the published player-gameweek PMFs.  The browser selects these values; it never
+# sums probabilities or reconstructs them from per-gameweek primitives.
+DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 4
 FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
+PLAYER_HORIZONS_SCHEMA: Final[str] = "fpl.dashboard-player-horizons"
 SUMMARY_SCHEMA: Final[str] = "fpl.dashboard-summary"
 NEXT_GW_SCHEMA: Final[str] = "fpl.dashboard-next-gw"
 FORECAST_VS_ACTUAL_SCHEMA: Final[str] = "fpl.dashboard-forecast-vs-actual"
@@ -63,6 +69,7 @@ OPTIMIZER_AUDIT_SCHEMA: Final[str] = "fpl.dashboard-optimizer-audit"
 MANIFEST_FILENAME: Final[str] = "manifest.json"
 FIXTURE_MATRIX_FILENAME: Final[str] = "fixture_matrix.json"
 PLAYERS_FILENAME: Final[str] = "players.json"
+PLAYER_HORIZONS_FILENAME: Final[str] = "player_horizons.json"
 SUMMARY_FILENAME: Final[str] = "summary.json"
 NEXT_GW_FILENAME: Final[str] = "next_gw.json"
 FORECAST_VS_ACTUAL_FILENAME: Final[str] = "forecast_vs_actual.json"
@@ -86,11 +93,27 @@ _READ_TABLES: Final[tuple[str, ...]] = (
     "dim_optimizer_run",
 )
 _WINDOW_LABELS: Final[tuple[str, ...]] = ("last_3", "last_5", "last_10", "season_to_date")
+_HORIZON_THRESHOLDS: Final[tuple[int, ...]] = (2, 4, 6, 10, 15)
+_HORIZON_FIELDS: Final[tuple[str, ...]] = (
+    "gw_to",
+    "xp",
+    "p_le_2",
+    "p_ge_2",
+    "p_ge_4",
+    "p_ge_6",
+    "p_ge_10",
+    "p_ge_15",
+)
+_HORIZON_VALUE_DECIMAL_PLACES: Final[int] = 6
+_PMF_ABSOLUTE_TOLERANCE: Final[float] = 1e-9
+_EXPECTED_POINTS_ABSOLUTE_TOLERANCE: Final[float] = 1e-10
+_HORIZON_WIRE_ABSOLUTE_TOLERANCE: Final[float] = 10**-_HORIZON_VALUE_DECIMAL_PLACES
 # Which top-level array of each file the manifest row_count counts.  summary.json is a
 # single object, so its row count is 1.
 _FILE_LIST_KEY: Final[dict[str, str | None]] = {
     FIXTURE_MATRIX_FILENAME: "teams",
     PLAYERS_FILENAME: "players",
+    PLAYER_HORIZONS_FILENAME: "players",
     NEXT_GW_FILENAME: "plans",
     SUMMARY_FILENAME: None,
     FORECAST_VS_ACTUAL_FILENAME: "runs",
@@ -99,6 +122,7 @@ _FILE_LIST_KEY: Final[dict[str, str | None]] = {
 _FILE_SCHEMA: Final[dict[str, str]] = {
     FIXTURE_MATRIX_FILENAME: FIXTURE_MATRIX_SCHEMA,
     PLAYERS_FILENAME: PLAYERS_SCHEMA,
+    PLAYER_HORIZONS_FILENAME: PLAYER_HORIZONS_SCHEMA,
     NEXT_GW_FILENAME: NEXT_GW_SCHEMA,
     SUMMARY_FILENAME: SUMMARY_SCHEMA,
     FORECAST_VS_ACTUAL_FILENAME: FORECAST_VS_ACTUAL_SCHEMA,
@@ -125,12 +149,13 @@ class DashboardJsonError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class DashboardReadModels:
-    """The derived, publishable content of all six page read models."""
+    """The derived, publishable content of every dashboard read model."""
 
     runs: tuple[dict[str, Any], ...]
     teams: tuple[dict[str, Any], ...]
     schedule: dict[str, Any]
     players: tuple[dict[str, Any], ...]
+    player_horizons: tuple[dict[str, Any], ...]
     summary: dict[str, Any]
     next_gw: dict[str, Any]
     forecast_vs_actual: dict[str, Any]
@@ -148,6 +173,7 @@ class DashboardJsonResult:
     run_ids: tuple[str, ...]
     fixture_matrix_rows: int
     players_rows: int
+    player_horizon_rows: int
     next_gw_plans: int
 
 
@@ -555,6 +581,208 @@ def _avg_minutes_last_5(form: dict[str, Any] | None) -> float | None:
     if not isinstance(minutes, (int, float)) or not isinstance(rostered, int) or not rostered:
         return None  # zero denominator is unmeasured here, never 0.0
     return float(minutes) / rostered
+
+
+def _validated_horizon_pmf(raw: object, subject: str) -> tuple[float, ...]:
+    """Parse one published player-gameweek PMF without weakening its artifact contract."""
+    if not isinstance(raw, str):
+        raise DashboardJsonError(f"{subject} distribution must be a JSON string")
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise DashboardJsonError(f"{subject} distribution is not JSON: {exc}") from exc
+    if not isinstance(parsed, list) or not parsed:
+        raise DashboardJsonError(f"{subject} distribution must be a non-empty JSON array")
+    if not all(
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value >= 0.0
+        for value in parsed
+    ):
+        raise DashboardJsonError(
+            f"{subject} distribution masses must be finite, non-negative numbers"
+        )
+    probabilities = tuple(float(value) for value in parsed)
+    total = math.fsum(probabilities)
+    if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=_PMF_ABSOLUTE_TOLERANCE):
+        raise DashboardJsonError(f"{subject} distribution sums to {total!r}, expected 1")
+    return probabilities
+
+
+def _convolve_pmfs(left: tuple[float, ...], right: tuple[float, ...]) -> tuple[float, ...]:
+    """Discrete convolution over the complete integer support, with no truncation."""
+    products: list[list[float]] = [[] for _ in range(len(left) + len(right) - 1)]
+    for left_index, left_mass in enumerate(left):
+        for right_index, right_mass in enumerate(right):
+            products[left_index + right_index].append(left_mass * right_mass)
+    return tuple(math.fsum(cell) for cell in products)
+
+
+def _bounded_probability(value: float, subject: str) -> float:
+    if value < -_PMF_ABSOLUTE_TOLERANCE or value > 1.0 + _PMF_ABSOLUTE_TOLERANCE:
+        raise DashboardJsonError(f"{subject} probability {value!r} falls outside [0, 1]")
+    # Floating convolution can miss a boundary by a few ulps. Clamp only inside the same
+    # tolerance used to validate the source PMFs.
+    return min(1.0, max(0.0, value))
+
+
+def _build_player_horizons(
+    player_gameweek: pl.DataFrame, runs: pl.DataFrame
+) -> tuple[dict[str, Any], ...]:
+    """Convolve each player's gameweek PMFs from ``gw_from`` through every ``gw_to``.
+
+    Expected points are included beside the threshold probabilities for one coherent
+    distribution summary.  The weekly published means are independently reconciled with
+    their PMFs, and missing weeks fail closed rather than producing a partial horizon.
+    """
+    bounded = player_gameweek.join(_horizon_projection(runs), on="run_id", how="left")
+    _require_within_run(bounded, "player-gameweek")
+
+    actual_by_run = {
+        str(row["run_id"]): (int(row["rows"]), int(row["players"]))
+        for row in bounded.group_by("run_id")
+        .agg(pl.len().alias("rows"), pl.col("code").n_unique().alias("players"))
+        .iter_rows(named=True)
+    }
+    for run in runs.iter_rows(named=True):
+        run_id = str(run["run_id"])
+        gw_from, gw_to = run["gw_from"], run["gw_to"]
+        row_count, roster_size = run.get("row_count"), run.get("roster_size")
+        if (
+            not isinstance(gw_from, int)
+            or not isinstance(gw_to, int)
+            or not isinstance(row_count, int)
+            or not isinstance(roster_size, int)
+            or roster_size <= 0
+            or row_count <= 0
+        ):
+            raise DashboardJsonError(
+                f"dim_forecast_run {run_id} is missing its positive integer "
+                "horizon/population contract"
+            )
+        expected_rows = roster_size * (gw_to - gw_from + 1)
+        if row_count != expected_rows:
+            raise DashboardJsonError(
+                f"dim_forecast_run {run_id} row_count {row_count} does not equal "
+                f"roster_size*horizon {expected_rows}"
+            )
+        actual_rows, actual_players = actual_by_run.get(run_id, (0, 0))
+        if actual_rows != row_count or actual_players != roster_size:
+            raise DashboardJsonError(
+                f"dim_forecast_run {run_id} declares {row_count} rows/{roster_size} players "
+                f"but the published player-gameweek table has {actual_rows}/{actual_players}"
+            )
+
+    duplicate = (
+        bounded.group_by(["run_id", "season", "code", "gw"]).len().filter(pl.col("len") != 1)
+    )
+    if duplicate.height:
+        raise DashboardJsonError(
+            "player-gameweek forecast rows are not unique at (run_id, season, code, gw)"
+        )
+
+    grouped: dict[tuple[str, str, int], list[dict[str, Any]]] = {}
+    for row in bounded.sort(["run_id", "season", "code", "gw"]).iter_rows(named=True):
+        key = (str(row["run_id"]), str(row["season"]), int(row["code"]))
+        grouped.setdefault(key, []).append(row)
+
+    result: list[dict[str, Any]] = []
+    for key, rows in grouped.items():
+        run_id, season, code = key
+        gw_from = rows[0]["gw_from"]
+        gw_to = rows[0]["gw_to"]
+        if not isinstance(gw_from, int) or not isinstance(gw_to, int):
+            raise DashboardJsonError(f"player {code} references an invalid run horizon")
+        actual_gws = [int(row["gw"]) for row in rows]
+        expected_gws = list(range(gw_from, gw_to + 1))
+        if actual_gws != expected_gws:
+            raise DashboardJsonError(
+                f"player {code} in {run_id}/{season} has gameweeks {actual_gws}, expected "
+                f"the complete horizon {expected_gws}"
+            )
+
+        cumulative: tuple[float, ...] = (1.0,)
+        published_xp: list[float] = []
+        normalised_xp: list[float] = []
+        horizons: list[dict[str, float | int]] = []
+        for row in rows:
+            gw = int(row["gw"])
+            subject = f"player {code} in {run_id}/{season} GW{gw}"
+            raw_expected = row["expected_points"]
+            if (
+                not isinstance(raw_expected, (int, float))
+                or isinstance(raw_expected, bool)
+                or not math.isfinite(raw_expected)
+            ):
+                raise DashboardJsonError(f"{subject} expected_points must be finite")
+            weekly_raw = _validated_horizon_pmf(row["distribution"], subject)
+            weekly_xp = math.fsum(index * mass for index, mass in enumerate(weekly_raw))
+            if not math.isclose(
+                float(raw_expected),
+                weekly_xp,
+                rel_tol=0.0,
+                abs_tol=_EXPECTED_POINTS_ABSOLUTE_TOLERANCE,
+            ):
+                raise DashboardJsonError(
+                    f"{subject} expected_points {raw_expected!r} does not match its "
+                    f"distribution mean {weekly_xp!r}"
+                )
+
+            # Upstream permits at most 1e-9 serialisation drift in total mass. Preserve the
+            # stored xP above, but remove that accepted drift before repeated convolution so
+            # a valid near-unit PMF cannot make cumulative tails shrink or exceed one.
+            weekly_mass = math.fsum(weekly_raw)
+            weekly = tuple(mass / weekly_mass for mass in weekly_raw)
+            normalised_xp.append(math.fsum(index * mass for index, mass in enumerate(weekly)))
+            cumulative = _convolve_pmfs(cumulative, weekly)
+            cumulative_mass = math.fsum(cumulative)
+            if not math.isclose(
+                cumulative_mass,
+                1.0,
+                rel_tol=0.0,
+                abs_tol=_PMF_ABSOLUTE_TOLERANCE,
+            ):
+                raise DashboardJsonError(
+                    f"{subject} cumulative distribution sums to {cumulative_mass!r}, expected 1"
+                )
+            published_xp.append(float(raw_expected))
+            cumulative_xp = math.fsum(index * mass for index, mass in enumerate(cumulative))
+            summed_xp = math.fsum(published_xp)
+            summed_normalised_xp = math.fsum(normalised_xp)
+            if not math.isclose(
+                cumulative_xp,
+                summed_normalised_xp,
+                rel_tol=0.0,
+                abs_tol=_EXPECTED_POINTS_ABSOLUTE_TOLERANCE,
+            ):
+                raise DashboardJsonError(
+                    f"{subject} cumulative distribution mean {cumulative_xp!r} does not "
+                    f"match its normalised gameweek means {summed_normalised_xp!r}"
+                )
+
+            horizon: dict[str, float | int] = {
+                "gw_to": gw,
+                "xp": summed_xp,
+                "p_le_2": _bounded_probability(
+                    math.fsum(cumulative[:3]), f"{subject} P(points <= 2)"
+                ),
+            }
+            for threshold in _HORIZON_THRESHOLDS:
+                horizon[f"p_ge_{threshold}"] = _bounded_probability(
+                    math.fsum(cumulative[threshold:]),
+                    f"{subject} P(points >= {threshold})",
+                )
+            horizons.append(horizon)
+        result.append(
+            {
+                "run_id": run_id,
+                "season": season,
+                "code": code,
+                "horizons": horizons,
+            }
+        )
+    return tuple(result)
 
 
 def _build_players(
@@ -1522,6 +1750,17 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_forecast_run"],
         frames["fact_player_form"],
     )
+    player_horizons = _build_player_horizons(
+        frames["fact_forecast_player_gameweek"], frames["dim_forecast_run"]
+    )
+    player_keys = {(row["run_id"], row["season"], int(row["code"])) for row in players}
+    horizon_keys = {(row["run_id"], row["season"], int(row["code"])) for row in player_horizons}
+    if player_keys != horizon_keys:
+        raise DashboardJsonError(
+            "player horizon summaries do not reconcile with player identities: "
+            f"missing={sorted(player_keys - horizon_keys)[:3]}, "
+            f"orphan={sorted(horizon_keys - player_keys)[:3]}"
+        )
     next_gw = _build_next_gw(
         frames["fact_optimizer_plan"],
         frames["dim_optimizer_run"],
@@ -1554,6 +1793,7 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         teams=teams,
         schedule=schedule,
         players=players,
+        player_horizons=player_horizons,
         summary=summary,
         next_gw=next_gw,
         forecast_vs_actual=forecast_vs_actual,
@@ -1563,9 +1803,55 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
 
 
 def build_dashboard_read_models(export_dir: Path) -> DashboardReadModels:
-    """Derive both read models from a published Parquet export without touching DuckDB."""
+    """Derive all read models from a published Parquet export without touching DuckDB."""
     source = Path(export_dir)
     return _build(source, _read_source_manifest(source))
+
+
+def _player_horizon_semantics() -> dict[str, Any]:
+    return {
+        "grain": ["run_id", "season", "code", "gw_to"],
+        "cumulative_from": "dim_forecast_run.gw_from",
+        "distribution_combination": "independent-gameweek-convolution-v1",
+        "availability": "raw-model-distribution-unadjusted",
+        "value_decimal_places": _HORIZON_VALUE_DECIMAL_PLACES,
+        "probability_boundary_policy": "preserve-exact-zero-one-v1",
+        "thresholds": {
+            "p_le": [2],
+            "p_ge": list(_HORIZON_THRESHOLDS),
+        },
+    }
+
+
+def _player_horizon_wire_players(models: DashboardReadModels) -> list[dict[str, Any]]:
+    """Compact named internal values into versioned positional rows for transport."""
+    quantum = 10**-_HORIZON_VALUE_DECIMAL_PLACES
+    players: list[dict[str, Any]] = []
+    for player in models.player_horizons:
+        rows: list[list[int | float]] = []
+        for horizon in player["horizons"]:
+            values: list[int | float] = [int(horizon["gw_to"])]
+            for field in _HORIZON_FIELDS[1:]:
+                raw_value = float(horizon[field])
+                rounded = round(raw_value, _HORIZON_VALUE_DECIMAL_PLACES)
+                if field.startswith("p_"):
+                    # Quantisation must not relabel possible/impossible or certain/uncertain.
+                    # Reserve exact 0 and 1 for source values at those exact boundaries.
+                    if raw_value > 0.0 and rounded == 0.0:
+                        rounded = quantum
+                    elif raw_value < 1.0 and rounded == 1.0:
+                        rounded = 1.0 - quantum
+                values.append(0.0 if rounded == 0.0 else rounded)
+            rows.append(values)
+        players.append(
+            {
+                "run_id": player["run_id"],
+                "season": player["season"],
+                "code": player["code"],
+                "horizons": rows,
+            }
+        )
+    return players
 
 
 def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
@@ -1587,6 +1873,15 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
                 "players": list(models.players),
             },
             indent=2,
+        ),
+        PLAYER_HORIZONS_FILENAME: _canonical_json_bytes(
+            {
+                "schema": PLAYER_HORIZONS_SCHEMA,
+                "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+                "semantics": _player_horizon_semantics(),
+                "horizon_fields": list(_HORIZON_FIELDS),
+                "players": _player_horizon_wire_players(models),
+            }
         ),
         NEXT_GW_FILENAME: _canonical_json_bytes(
             {
@@ -1623,8 +1918,199 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
     }
 
 
+def _validate_player_horizon_document(document: Mapping[str, Any]) -> None:
+    if set(document) != {
+        "schema",
+        "json_schema_version",
+        "semantics",
+        "horizon_fields",
+        "players",
+    }:
+        raise DashboardJsonError("player_horizons.json has a malformed schema envelope")
+    if document.get("semantics") != _player_horizon_semantics():
+        raise DashboardJsonError("player_horizons.json lost its versioned probability semantics")
+    if document.get("horizon_fields") != list(_HORIZON_FIELDS):
+        raise DashboardJsonError("player_horizons.json lost its positional horizon field contract")
+    players = document.get("players")
+    if not isinstance(players, list):
+        raise DashboardJsonError("player_horizons.json players must be an array")
+    player_keys: set[tuple[str, str, int]] = set()
+    expected_player_keys = {"run_id", "season", "code", "horizons"}
+    probability_keys = _HORIZON_FIELDS[2:]
+    for player in players:
+        if not isinstance(player, dict) or set(player) != expected_player_keys:
+            raise DashboardJsonError("player_horizons.json has a malformed player record")
+        run_id, season, code = player["run_id"], player["season"], player["code"]
+        if (
+            not isinstance(run_id, str)
+            or not run_id
+            or not isinstance(season, str)
+            or not season
+            or not isinstance(code, int)
+            or isinstance(code, bool)
+            or code <= 0
+        ):
+            raise DashboardJsonError("player_horizons.json has an invalid player identity")
+        player_key = (run_id, season, code)
+        if player_key in player_keys:
+            raise DashboardJsonError(f"player_horizons.json repeats player identity {player_key}")
+        player_keys.add(player_key)
+        horizons = player["horizons"]
+        if not isinstance(horizons, list) or not horizons:
+            raise DashboardJsonError(f"player_horizons.json {player_key} has no horizons")
+        previous_gw = 0
+        previous_xp = -math.inf
+        previous_le_2 = math.inf
+        previous_ge = dict.fromkeys(probability_keys[1:], -math.inf)
+        for raw_horizon in horizons:
+            if not isinstance(raw_horizon, list) or len(raw_horizon) != len(_HORIZON_FIELDS):
+                raise DashboardJsonError(f"player_horizons.json {player_key} has a malformed row")
+            horizon = dict(zip(_HORIZON_FIELDS, raw_horizon, strict=True))
+            gw_to, xp = horizon["gw_to"], horizon["xp"]
+            if (
+                not isinstance(gw_to, int)
+                or isinstance(gw_to, bool)
+                or gw_to <= previous_gw
+                or not isinstance(xp, (int, float))
+                or isinstance(xp, bool)
+                or not math.isfinite(xp)
+                or xp < 0.0
+                or xp < previous_xp - _HORIZON_WIRE_ABSOLUTE_TOLERANCE
+                or float(xp) != round(float(xp), _HORIZON_VALUE_DECIMAL_PLACES)
+            ):
+                raise DashboardJsonError(
+                    f"player_horizons.json {player_key} horizons are not ordered cumulative values"
+                )
+            for key in probability_keys:
+                value = horizon[key]
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(value)
+                    or not 0.0 <= value <= 1.0
+                    or float(value) != round(float(value), _HORIZON_VALUE_DECIMAL_PLACES)
+                ):
+                    raise DashboardJsonError(
+                        f"player_horizons.json {player_key} {key} is not a probability"
+                    )
+            if horizon["p_le_2"] > previous_le_2 + _HORIZON_WIRE_ABSOLUTE_TOLERANCE or any(
+                horizon[key] < previous_ge[key] - _HORIZON_WIRE_ABSOLUTE_TOLERANCE
+                for key in probability_keys[1:]
+            ):
+                raise DashboardJsonError(
+                    f"player_horizons.json {player_key} probabilities are not cumulative"
+                )
+            if any(
+                horizon[left] < horizon[right] - _HORIZON_WIRE_ABSOLUTE_TOLERANCE
+                for left, right in pairwise(probability_keys[1:])
+            ):
+                raise DashboardJsonError(
+                    f"player_horizons.json {player_key} threshold tails are not ordered"
+                )
+            if horizon["p_le_2"] + horizon["p_ge_2"] < 1.0 - _HORIZON_WIRE_ABSOLUTE_TOLERANCE:
+                raise DashboardJsonError(
+                    f"player_horizons.json {player_key} violates inclusive score-2 overlap"
+                )
+            previous_gw = gw_to
+            previous_xp = float(xp)
+            previous_le_2 = float(horizon["p_le_2"])
+            previous_ge = {key: float(horizon[key]) for key in probability_keys[1:]}
+
+
+def _validate_player_horizon_generation(
+    documents: Mapping[str, Mapping[str, Any]], manifest: Mapping[str, Any]
+) -> None:
+    """Reconcile the additive horizon file with its generation, not just itself."""
+    player_rows = documents[PLAYERS_FILENAME].get("players")
+    horizon_rows = documents[PLAYER_HORIZONS_FILENAME].get("players")
+    runs = manifest.get("runs")
+    if not isinstance(player_rows, list) or not isinstance(horizon_rows, list):
+        raise DashboardJsonError("player read models lost their top-level player arrays")
+    if not isinstance(runs, list):
+        raise DashboardJsonError("read-model manifest runs must be an array")
+
+    run_horizons: dict[tuple[str, str], tuple[int, int]] = {}
+    for run in runs:
+        if not isinstance(run, dict):
+            raise DashboardJsonError("read-model manifest has a malformed run record")
+        run_id, season = run.get("run_id"), run.get("season")
+        gw_from, gw_to = run.get("gw_from"), run.get("gw_to")
+        horizon_gameweeks = run.get("horizon_gameweeks")
+        if (
+            not isinstance(run_id, str)
+            or not run_id
+            or not isinstance(season, str)
+            or not season
+            or not isinstance(gw_from, int)
+            or isinstance(gw_from, bool)
+            or not isinstance(gw_to, int)
+            or isinstance(gw_to, bool)
+            or gw_from <= 0
+            or gw_from > gw_to
+            or not isinstance(horizon_gameweeks, int)
+            or isinstance(horizon_gameweeks, bool)
+            or horizon_gameweeks != gw_to - gw_from + 1
+        ):
+            raise DashboardJsonError("read-model manifest has an invalid run horizon")
+        run_key = (run_id, season)
+        if run_key in run_horizons:
+            raise DashboardJsonError("read-model manifest repeats a run horizon")
+        run_horizons[run_key] = (gw_from, gw_to)
+
+    player_keys: set[tuple[str, str, int]] = set()
+    for player in player_rows:
+        if not isinstance(player, dict):
+            raise DashboardJsonError("players.json has a malformed player record")
+        run_id, season, code = player.get("run_id"), player.get("season"), player.get("code")
+        if (
+            not isinstance(run_id, str)
+            or not isinstance(season, str)
+            or not isinstance(code, int)
+            or isinstance(code, bool)
+        ):
+            raise DashboardJsonError("players.json has an invalid player identity")
+        player_key = (run_id, season, code)
+        if player_key in player_keys:
+            raise DashboardJsonError(f"players.json repeats player identity {player_key}")
+        player_keys.add(player_key)
+
+    horizon_keys: set[tuple[str, str, int]] = set()
+    for player in horizon_rows:
+        # The file-local validator has already established the exact record shape.
+        horizon_key = (player["run_id"], player["season"], player["code"])
+        horizon_keys.add(horizon_key)
+        run_horizon = run_horizons.get((horizon_key[0], horizon_key[1]))
+        if run_horizon is None:
+            raise DashboardJsonError(
+                f"player_horizons.json {horizon_key} references a run absent from the manifest"
+            )
+        expected_gws = list(range(run_horizon[0], run_horizon[1] + 1))
+        actual_gws = [row[0] for row in player["horizons"]]
+        if actual_gws != expected_gws:
+            raise DashboardJsonError(
+                f"player_horizons.json {horizon_key} has endpoints {actual_gws}, expected "
+                f"{expected_gws}"
+            )
+    if player_keys != horizon_keys:
+        raise DashboardJsonError(
+            "player_horizons.json does not reconcile with players.json: "
+            f"missing={sorted(player_keys - horizon_keys)[:3]}, "
+            f"orphan={sorted(horizon_keys - player_keys)[:3]}"
+        )
+    player_runs = {(run_id, season) for run_id, season, _code in player_keys}
+    if set(run_horizons) != player_runs:
+        raise DashboardJsonError(
+            "player_horizons.json does not cover every manifest run: "
+            f"missing={sorted(set(run_horizons) - player_runs)[:3]}, "
+            f"orphan={sorted(player_runs - set(run_horizons))[:3]}"
+        )
+
+
 def _file_row_count(document: Mapping[str, Any], filename: str) -> int:
     """Rows the manifest counts for one file: its top-level array, or 1 for an object."""
+    if filename == PLAYER_HORIZONS_FILENAME:
+        players = document["players"]
+        return sum(len(player["horizons"]) for player in players)
     list_key = _FILE_LIST_KEY[filename]
     if list_key is None:
         return 1
@@ -1648,6 +2134,7 @@ def _validate_directory(
             f"read-model directory must contain exactly {sorted(expected_names)}; found "
             f"{sorted(actual)}"
         )
+    documents: dict[str, Mapping[str, Any]] = {}
     for filename, entry in sorted(expected_files.items()):
         payload = (directory / filename).read_bytes()
         if _sha256_bytes(payload) != entry["sha256"]:
@@ -1658,8 +2145,11 @@ def _validate_directory(
             or document.get("json_schema_version") != DASHBOARD_JSON_SCHEMA_VERSION
         ):
             raise DashboardJsonError(f"{filename} lost its schema envelope")
+        if filename == PLAYER_HORIZONS_FILENAME:
+            _validate_player_horizon_document(document)
         if _file_row_count(document, filename) != entry["row_count"]:
             raise DashboardJsonError(f"{filename} row count does not match the manifest")
+        documents[filename] = document
     manifest = _strict_json_loads((directory / MANIFEST_FILENAME).read_text(encoding="utf-8"))
     if set(manifest) != _MANIFEST_KEYS:
         raise DashboardJsonError("read-model manifest fields drifted")
@@ -1677,6 +2167,7 @@ def _validate_directory(
         raise DashboardJsonError("read-model manifest run_ids disagree with its runs records")
     if run_ids != sorted(run_ids):
         raise DashboardJsonError("read-model manifest run ids are not deterministically ordered")
+    _validate_player_horizon_generation(documents, manifest)
     return manifest
 
 
@@ -1728,6 +2219,9 @@ def export_dashboard_json(
             row_counts = {
                 FIXTURE_MATRIX_FILENAME: len(models.teams),
                 PLAYERS_FILENAME: len(models.players),
+                PLAYER_HORIZONS_FILENAME: sum(
+                    len(player["horizons"]) for player in models.player_horizons
+                ),
                 NEXT_GW_FILENAME: len(models.next_gw["plans"]),
                 SUMMARY_FILENAME: 1,
                 FORECAST_VS_ACTUAL_FILENAME: len(models.forecast_vs_actual["runs"]),
@@ -1777,6 +2271,7 @@ def export_dashboard_json(
         run_ids=tuple(str(record["run_id"]) for record in models.runs),
         fixture_matrix_rows=len(models.teams),
         players_rows=len(models.players),
+        player_horizon_rows=sum(len(player["horizons"]) for player in models.player_horizons),
         next_gw_plans=len(models.next_gw["plans"]),
     )
 
@@ -1793,6 +2288,8 @@ __all__ = [
     "NEXT_GW_SCHEMA",
     "PLAYERS_FILENAME",
     "PLAYERS_SCHEMA",
+    "PLAYER_HORIZONS_FILENAME",
+    "PLAYER_HORIZONS_SCHEMA",
     "SUMMARY_FILENAME",
     "SUMMARY_SCHEMA",
     "DashboardJsonError",

@@ -1,4 +1,6 @@
 {
+  "schema": "fpl.dashboard-fixture-matrix",
+  "json_schema_version": 4,
   "teams": [
     {
       "run_id": "sample-run-0001",

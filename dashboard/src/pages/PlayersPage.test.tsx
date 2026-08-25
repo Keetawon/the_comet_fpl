@@ -5,21 +5,59 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw, loadPlayers } from "@/data/load";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { loadFixtureMatrix, loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
 import playersSample from "@/data/samplePlayers.json";
 import teamsSample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
-import type { NextGwPlan, PlayerFormWindow, PlayerRecord, TeamRecord } from "@/data/types";
+import horizonsSample from "@/data/samplePlayerHorizons.json";
+import type {
+  NextGwPlan,
+  PlayerFormWindow,
+  PlayerHorizonsData,
+  PlayerRecord,
+  TeamRecord,
+} from "@/data/types";
+import { PLAYER_HORIZON_FIELDS } from "@/data/types";
 import { PlayersPage } from "./PlayersPage";
 
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
+const horizonsData: PlayerHorizonsData = {
+  ...(horizonsSample as unknown as Omit<
+    PlayerHorizonsData,
+    "horizon_fields" | "players"
+  >),
+  horizon_fields: PLAYER_HORIZON_FIELDS,
+  players: horizonsSample.players.map((player) => ({
+    ...player,
+    horizons: player.horizons.map(
+      ([gw_to, xp, p_le_2, p_ge_2, p_ge_4, p_ge_6, p_ge_10, p_ge_15]) => ({
+        gw_to,
+        xp,
+        p_le_2,
+        p_ge_2,
+        p_ge_4,
+        p_ge_6,
+        p_ge_10,
+        p_ge_15,
+      }),
+    ),
+  })),
+};
 
 vi.mock("@/data/load", () => ({
   loadPlayers: vi.fn(),
+  loadPlayerHorizons: vi.fn(),
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
 }));
+
+beforeAll(() => {
+  HTMLElement.prototype.hasPointerCapture = () => false;
+  HTMLElement.prototype.setPointerCapture = () => undefined;
+  HTMLElement.prototype.releasePointerCapture = () => undefined;
+  HTMLElement.prototype.scrollIntoView = () => undefined;
+});
 
 const teamsForRunA: TeamRecord[] = teamsSample.teams.map((t) => ({ ...t, run_id: "run-a" }));
 
@@ -48,6 +86,9 @@ function playerWithLastFive(
 
 beforeEach(() => {
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersSample.players, manifest: null });
+  vi.mocked(loadPlayerHorizons).mockResolvedValue(
+    horizonsData,
+  );
   vi.mocked(loadFixtureMatrix).mockResolvedValue({
     teams: teamsForRunA,
     schedule: {
@@ -73,7 +114,13 @@ describe("PlayersPage", () => {
     expect(screen.getByText("Beta")).toBeInTheDocument();
     // the form window is a named column set anchored to the season it measured
     expect(screen.getByText("Last 5 App")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /xP GW1-3/ })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /xP GW1-5/ })).toBeInTheDocument();
+    for (const name of ["P(≤2)", "P(≥2)", "P(≥4)", "P(≥6)", "P(≥10)", "P(≥15)"]) {
+      expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByText(/backend-convolved independent-gameweek model values/)).toBeInTheDocument();
+    const alpha = screen.getByText("Alpha").closest("tr")!;
+    expect(within(alpha).getByTitle("P(≥6), raw model probability")).toHaveTextContent("99%");
     // availability is labelled as the official overlay, never as "starts"
     expect(screen.getAllByText(/doubtful/).length).toBeGreaterThan(0);
     expect(
@@ -188,18 +235,63 @@ describe("PlayersPage", () => {
     expect(secondDirection.slice(0, 2)).toEqual(firstDirection.slice(0, 2).reverse());
   });
 
-  it("shows each player once even when the export carries several vintages", async () => {
+  it("derives fallback bounds from horizons and never substitutes another vintage", async () => {
+    const user = userEvent.setup();
     const duplicated = [
       ...playersSample.players,
-      ...playersSample.players.map((p) => ({ ...p, run_id: "run-b" })),
+      ...playersSample.players.map((p, index) => ({
+        ...p,
+        run_id: "run-b",
+        // An empty fixture list must not contaminate the whole run with a synthetic GW0.
+        fixtures:
+          index === 0
+            ? []
+            : p.fixtures.map((fixture) => ({ ...fixture, gw: fixture.gw + 1 })),
+      })),
     ];
+    const runBHorizons = horizonsData.players.map((player) => ({
+      ...player,
+      run_id: "run-b",
+      horizons: player.horizons.slice(0, 3).map((horizon, index) => ({
+        ...horizon,
+        gw_to: index + 2,
+        ...(player.code === 1 && index === 2 ? { p_ge_6: 0.93 } : {}),
+      })),
+    }));
     vi.mocked(loadPlayers).mockResolvedValueOnce({ players: duplicated, manifest: null });
+    vi.mocked(loadPlayerHorizons).mockResolvedValueOnce({
+      ...horizonsData,
+      players: [
+        ...horizonsData.players,
+        ...runBHorizons,
+      ],
+    });
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(screen.getAllByText("Alpha").length).toBe(1);
     expect(screen.getAllByText("Beta").length).toBe(1);
     // the vintage selector appears and names the default architecture
-    expect(screen.getByRole("combobox", { name: "Forecast vintage" })).toBeInTheDocument();
+    const vintage = screen.getByRole("combobox", { name: "Forecast vintage" });
+    await user.click(vintage);
+    await user.click(screen.getByRole("option", { name: /run-b/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "From gameweek" })).toHaveTextContent("GW2"),
+    );
+    expect(screen.getByRole("combobox", { name: "To gameweek" })).toHaveTextContent("GW4");
+    const alpha = screen.getByText("Alpha").closest("tr")!;
+    expect(within(alpha).getByTitle("P(≥6), raw model probability")).toHaveTextContent("93%");
+  });
+
+  it("selects the exact cumulative endpoint instead of adding marginal probabilities", async () => {
+    const user = userEvent.setup();
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    const alpha = () => screen.getByText("Alpha").closest("tr")!;
+    expect(within(alpha()).getByTitle("P(≥6), raw model probability")).toHaveTextContent("99%");
+
+    await user.click(screen.getByRole("combobox", { name: "To gameweek" }));
+    await user.click(screen.getByRole("option", { name: "GW1" }));
+    expect(within(alpha()).getByTitle("P(≥6), raw model probability")).toHaveTextContent("50%");
   });
 
   it("expands a row to the per-fixture primitives behind the colour", async () => {
@@ -236,7 +328,7 @@ describe("PlayersPage", () => {
     const user = userEvent.setup();
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
-    const header = screen.getByRole("columnheader", { name: /xP GW1-3/ });
+    const header = screen.getByRole("columnheader", { name: /xP GW1-5/ });
     // the page opens sorted by xP descending; clicking flips it to ascending
     expect(header).toHaveAttribute("aria-sort", "descending");
     await user.click(within(header).getByRole("button"));
@@ -248,7 +340,7 @@ describe("PlayersPage", () => {
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     const goals = screen.getByRole("columnheader", { name: "G" });
-    const rangeXp = screen.getByRole("columnheader", { name: /xP GW1-3/ });
+    const rangeXp = screen.getByRole("columnheader", { name: /xP GW1-5/ });
     await user.click(within(goals).getByRole("button"));
     expect(goals).not.toHaveAttribute("aria-sort", "none");
     expect(rangeXp).toHaveAttribute("aria-sort", "none");
@@ -278,6 +370,8 @@ describe("PlayersPage", () => {
 
     await user.click(within(view).getByRole("radio", { name: "Defense" }));
     await user.click(within(venue).getByRole("radio", { name: "Away" }));
+    expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Cumulative probabilities are hidden/)).toBeInTheDocument();
     await user.click(within(availability).getByRole("radio", { name: "Flagged" }));
     await user.type(minPrice, "99");
     expect(await screen.findByText("No players match the current filters.")).toBeInTheDocument();
@@ -289,6 +383,7 @@ describe("PlayersPage", () => {
     expect(screen.getByText("Beta")).toBeInTheDocument();
     expect(within(view).getByRole("radio", { name: "Overall" })).toBeChecked();
     expect(within(venue).getByRole("radio", { name: "All" })).toBeChecked();
+    expect(screen.getByRole("columnheader", { name: "P(≥6)" })).toBeInTheDocument();
     expect(within(availability).getByRole("radio", { name: "All" })).toBeChecked();
     expect(minPrice).toHaveValue(null);
     expect(clear).toHaveFocus();

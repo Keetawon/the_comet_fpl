@@ -5,7 +5,7 @@ browser-specific ``user_custom`` optimizer plans and an absolute local path to t
 rules file.  Those values must never leak into the static public deployment.  This module
 is a narrow transport boundary: it validates the source generation, removes only custom
 plans, normalizes the one provenance path, reseals the dashboard manifest, validates the
-result, and emits a deterministic ZIP containing the seven read-model files at its root.
+result, and emits a deterministic ZIP containing the eight read-model files at its root.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from fpl.publish.dashboard_json import (
     MANIFEST_FILENAME,
     NEXT_GW_FILENAME,
     OPTIMIZER_AUDIT_FILENAME,
+    PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     SUMMARY_FILENAME,
     DashboardJsonError,
@@ -49,6 +50,7 @@ _READ_MODEL_FILENAMES: Final[tuple[str, ...]] = tuple(
     sorted(
         (
             FIXTURE_MATRIX_FILENAME,
+            PLAYER_HORIZONS_FILENAME,
             PLAYERS_FILENAME,
             SUMMARY_FILENAME,
             NEXT_GW_FILENAME,
@@ -122,6 +124,9 @@ _FORMAL_FORBIDDEN_POLICY_FIELDS: Final[frozenset[str]] = frozenset(
 _DOCUMENT_TOP_LEVEL_KEYS: Final[dict[str, frozenset[str]]] = {
     FIXTURE_MATRIX_FILENAME: frozenset({"schema", "json_schema_version", "teams", "schedule"}),
     PLAYERS_FILENAME: frozenset({"schema", "json_schema_version", "players"}),
+    PLAYER_HORIZONS_FILENAME: frozenset(
+        {"schema", "json_schema_version", "semantics", "horizon_fields", "players"}
+    ),
     NEXT_GW_FILENAME: frozenset({"schema", "json_schema_version", "plans"}),
     SUMMARY_FILENAME: frozenset(
         {
@@ -435,7 +440,13 @@ def _render_sanitized_generation(
     files: dict[str, dict[str, Any]] = {}
     for filename in _READ_MODEL_FILENAMES:
         document = documents[filename]
-        payload = _canonical_json_bytes(document, indent=2)
+        # Keep the high-cardinality positional horizon transport compact after the
+        # public-safety pass. Re-expanding it here would more than double the served
+        # payload and undo the schema-v4 wire-format budget.
+        payload = _canonical_json_bytes(
+            document,
+            indent=None if filename == PLAYER_HORIZONS_FILENAME else 2,
+        )
         (staging / filename).write_bytes(payload)
         files[filename] = {
             "row_count": _file_row_count(document, filename),
@@ -475,7 +486,7 @@ def _validate_archive(directory: Path, archive_path: Path) -> None:
         with zipfile.ZipFile(archive_path, mode="r") as archive:
             if tuple(archive.namelist()) != _ARCHIVE_FILENAMES:
                 raise PublicDashboardPackageError(
-                    "public dashboard archive must contain exactly the seven read-model "
+                    "public dashboard archive must contain exactly the eight read-model "
                     "files at its root in deterministic order"
                 )
             for filename in _ARCHIVE_FILENAMES:

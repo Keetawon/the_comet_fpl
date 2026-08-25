@@ -372,7 +372,8 @@ if ($LASTEXITCODE -ne 0) { throw "dashboard read models failed" }
 
 `export_dashboard_json` reads only the published Parquet export (never the production
 DuckDB), verifies its manifest and file hashes, and atomically publishes
-`fixture_matrix.json` + `players.json` with a provenance-bearing manifest
+the seven dashboard JSON read models, including `fixture_matrix.json`, `players.json`, and
+the backend-convolved `player_horizons.json`, with a provenance-bearing manifest
 (`docs/dashboard-json-contract.md`). It changes no model, ledger row, or artifact.
 
 ## Deadline-day timing

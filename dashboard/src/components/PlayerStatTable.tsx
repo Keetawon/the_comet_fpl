@@ -37,13 +37,15 @@ import { NULL_BUCKET_CLASS } from "@/lib/difficulty";
 import type { ColorSource, ViewMode } from "@/lib/difficulty";
 import { playerChipBucket, playerChipMetric } from "@/lib/playerChips";
 import { availabilityLabel } from "@/lib/availability";
-import type { PlayerFixture, PlayerFormWindow, PlayerRecord } from "@/data/types";
+import type { PlayerFixture, PlayerFormWindow, PlayerHorizon, PlayerRecord } from "@/data/types";
 
 export interface PlayerStatRow {
   player: PlayerRecord;
   /** Venue/GW-filtered fixtures, sorted by (gw, kickoff). */
   filtered: PlayerFixture[];
   totalXp: number | null;
+  /** Exact backend-published cumulative endpoint; absent under incompatible fixture filters. */
+  horizon?: PlayerHorizon | null;
   form: PlayerFormWindow | null;
 }
 

@@ -91,9 +91,36 @@ jobs:
           echo "asset_size_bytes=${asset_size_bytes}" >> "${GITHUB_OUTPUT}"
           echo "manifest_content_sha256=${manifest_content_sha256}" >> "${GITHUB_OUTPUT}"
 
+  dashboard-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dashboard dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Test dashboard
+        working-directory: dashboard
+        run: npm test -- --run
+
+      - name: Lint dashboard
+        working-directory: dashboard
+        run: npm run lint
+
+      - name: Build dashboard
+        working-directory: dashboard
+        run: npm run build
+
   build:
     if: needs.release-pin.outputs.enabled == 'true'
-    needs: release-pin
+    needs: [release-pin, dashboard-quality]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -132,6 +159,7 @@ jobs:
               "manifest.json",
               "next_gw.json",
               "optimizer_audit.json",
+              "player_horizons.json",
               "players.json",
               "summary.json",
           }
@@ -189,14 +217,6 @@ jobs:
       - name: Install dashboard dependencies
         working-directory: dashboard
         run: npm ci
-
-      - name: Test dashboard
-        working-directory: dashboard
-        run: npm test -- --run
-
-      - name: Lint dashboard
-        working-directory: dashboard
-        run: npm run lint
 
       - name: Build hosted dashboard
         working-directory: dashboard

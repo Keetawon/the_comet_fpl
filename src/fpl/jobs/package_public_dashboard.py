@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
         "--archive",
         type=Path,
         required=True,
-        help="New deterministic .zip asset; its seven files are stored at archive root.",
+        help="New deterministic .zip asset; its eight files are stored at archive root.",
     )
     args = parser.parse_args(argv)
 

@@ -1,6 +1,6 @@
-# Dashboard read-model JSON contract, version 3
+# Dashboard read-model JSON contract, version 4
 
-Status: implemented by DEV-ROADMAP P1.7a (backend publish layer) and extended by P1.7d/P1.7e
+Status: implemented by DEV-ROADMAP P1.7a (backend publish layer) and extended by P1.7d/P1.7e/P1.7j
 with the summary, next-gameweek, forecast-vs-actual, and optimizer-audit read models. This
 document is the authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The
 static app renders these files and nothing else. Version 2 adds `summary.json`,
@@ -9,6 +9,12 @@ set; the version-1 record shapes are unchanged.
 
 Version 3 adds explicit optimizer-plan classification and owner-policy fields. It does not
 infer plan ownership from run-id, hash, input, or row order.
+
+Version 4 adds `player_horizons.json`: cumulative player xP and inclusive points-threshold
+probabilities for every endpoint in a forecast run. The static emitter computes these values by
+convolving the already-published player-gameweek distributions. The browser selects an exact
+endpoint and may filter/sort player records; it never conditions a distribution, sums
+probabilities, parses a PMF, or derives a tail.
 
 ## Boundary and provenance chain
 
@@ -35,10 +41,12 @@ rejects a concurrent writer; an unmanaged target directory is never replaced; an
 removes the staging tree and leaves the previous endpoint byte-identical.
 
 `generated_at` is the only field excluded from the read-model manifest's `content_sha256`, so
-identical inputs produce byte-identical `fixture_matrix.json` / `players.json` and an identical
-content hash.
+identical inputs produce byte-identical read-model JSON (including `player_horizons.json`) and an
+identical content hash.
 
 ## Layout
+
+Version 4 adds `player_horizons.json` beside the six page-oriented JSON files shown below.
 
 ```text
 data/
@@ -47,6 +55,7 @@ data/
     ├── manifest.json
     ├── fixture_matrix.json
     ├── players.json
+    ├── player_horizons.json
     ├── next_gw.json
     ├── summary.json
     ├── forecast_vs_actual.json
@@ -230,6 +239,88 @@ BI/static publication completed successfully on 2026-08-19, and that local gener
 the populated values. The final deadline vintage must still repeat rebuild/export/republish through
 P0; the refreshed development generation does not replace the deadline artifact.
 
+## player_horizons.json — cumulative outcomes per player
+
+Each player object contains one cumulative entry for every `gw_to` from its forecast run's
+`gw_from` through `gw_to`. Its logical grain is `(run_id, season, code, gw_to)`, and the manifest
+`row_count` counts those nested horizon entries rather than only the outer player objects.
+
+The emitter starts with a point mass at zero and convolves the complete, already-DGW-convolved
+player-gameweek distributions in ascending gameweek order. It validates the calculation at full
+precision, then quantizes the seven published model values to six decimal places. xP has maximum
+absolute serialization error `0.0000005`; a probability has error below `0.000001` because exact
+zero and one are reserved for source probabilities at those exact boundaries. Each endpoint
+carries:
+
+- `xp`;
+- `p_le_2`, meaning inclusive `P(total points <= 2)`;
+- `p_ge_2`, `p_ge_4`, `p_ge_6`, `p_ge_10`, and `p_ge_15`, each inclusive.
+
+Score 2 therefore belongs to both `p_le_2` and `p_ge_2`; the fields are not complements. A blank
+gameweek's `[1.0]` point mass leaves the cumulative distribution unchanged. Missing player-week
+rows, a duplicate week, malformed/non-finite/negative/non-normalised mass, or disagreement between
+the PMF mean and stored xP fails publication. The source run's `row_count` and `roster_size` are
+also reconciled so an entirely omitted player or run cannot disappear silently.
+
+```json
+{
+  "schema": "fpl.dashboard-player-horizons",
+  "json_schema_version": 4,
+  "semantics": {
+    "grain": ["run_id", "season", "code", "gw_to"],
+    "cumulative_from": "dim_forecast_run.gw_from",
+    "distribution_combination": "independent-gameweek-convolution-v1",
+    "availability": "raw-model-distribution-unadjusted",
+    "value_decimal_places": 6,
+    "probability_boundary_policy": "preserve-exact-zero-one-v1",
+    "thresholds": {"p_le": [2], "p_ge": [2, 4, 6, 10, 15]}
+  },
+  "horizon_fields": [
+    "gw_to", "xp", "p_le_2", "p_ge_2", "p_ge_4", "p_ge_6", "p_ge_10", "p_ge_15"
+  ],
+  "players": [{
+    "run_id": "f9bbd862…", "season": "2026-27", "code": 118748,
+    "horizons": [[1, 6.41, 0.200, 0.852, 0.681, 0.512, 0.371, 0.126]]
+  }]
+}
+```
+
+`horizon_fields` is a fixed positional dictionary for the compact wire rows. The frontend checks
+that exact order and maps each row to named values; that decoding is serialization work, not model
+arithmetic. Unknown fields, the wrong order, excess precision, or a row of the wrong length fails
+closed.
+
+The semantics are deliberately explicit. The stored PMFs are raw model distributions: the
+first-gameweek reported availability overlay is not mixed into xP or any probability and is never
+repeated over later weeks. Only marginal player-gameweek PMFs are stored, so the cumulative
+operation is versioned as an independent-across-gameweek convolution rather than claimed to be a
+joint forecast.
+
+Every endpoint always covers **all fixtures** from the run's fixed `gw_from` through its `gw_to`.
+It cannot answer a shifted-start or Home/Away-only question. The Players page therefore shows the
+probability columns only when venue is All and the selected range starts at the run's `gw_from`;
+otherwise it suppresses them and explains why. Arbitrary fixture filtering may still sum published
+xP, but it never subtracts, rescales, or relabels a cumulative probability.
+
+Expected points are summable; probabilities are not. A measured three-gameweek example gives
+`P(total >= 6) = 0.9033` after convolution, while adding its three per-gameweek values gives
+`1.0585` (invalid and above one). The same player's xP sums exactly to `13.3475`. Consequently:
+
+- JavaScript may sum already-published xP, perform set operations, sort/filter rows, and compute
+  presentation geometry such as hulls or quadrant boundaries;
+- JavaScript may not add probability fields, convolve PMFs, derive a CCDF, or manufacture a model
+  quantity from reporting primitives.
+
+The design budget measured for 599 players over five endpoints was about 305 KB JSON / 76 KB
+gzipped per vintage. The compact implementation's current 609-player/five-endpoint development
+vintage measures 259,421 / 75,155 bytes; these are empirical sizes, not schema invariants. The
+current file contains every published vintage, so its total size scales with the number of
+recorded runs; the per-vintage comparison is the relevant raw-PMF comparison. Raw PMFs are absent
+from this bulk payload. A future CCDF drill-down must publish precomputed CCDF points in
+deterministic, lazy-loaded player shards (and cap the UI to a small comparison set); React may draw
+those points but may not turn a PMF into a CCDF. That shard/shortlist policy is not introduced by
+version 4.
+
 ## next_gw.json — one object per optimizer plan (P1.7d)
 
 The population is every plan in the source export's `fact_optimizer_plan` (the export is
@@ -331,7 +422,7 @@ and the audit page reads both files.
 ```json
 {
   "schema": "fpl.dashboard-read-models",
-  "json_schema_version": 3,
+  "json_schema_version": 4,
   "generated_at": "2026-08-15T00:00:00+00:00",
   "source": {
     "export_schema": "fpl.bi-semantic-export",
@@ -349,7 +440,8 @@ and the audit page reads both files.
   "ease_index_formula_version": "fixture-ease-v1",
   "files": {
     "fixture_matrix.json": {"row_count": 20, "sha256": "…"},
-    "players.json": {"row_count": 581, "sha256": "…"},
+    "players.json": {"row_count": 599, "sha256": "…"},
+    "player_horizons.json": {"row_count": 2995, "sha256": "…"},
     "next_gw.json": {"row_count": 2, "sha256": "…"},
     "summary.json": {"row_count": 1, "sha256": "…"},
     "forecast_vs_actual.json": {"row_count": 0, "sha256": "…"},
@@ -360,8 +452,9 @@ and the audit page reads both files.
 ```
 
 `row_count` is the number of objects in the file's top-level array (`plans` for
-next_gw.json and optimizer_audit.json, `runs` for forecast_vs_actual.json); summary.json is
-a single object, so its row count is 1. `runs` is sorted by `run_id` and validated against
+next_gw.json and optimizer_audit.json, `runs` for forecast_vs_actual.json), except that
+`player_horizons.json` counts its nested cumulative endpoint rows. `summary.json` is a single
+object, so its row count is 1. `runs` is sorted by `run_id` and validated against
 both the source manifest's `exported_run_ids` and the `dim_forecast_run` rows read from the
 export. Every fixture row must fall inside its run's `gw_from..gw_to` horizon and season;
 anything outside fails closed. A source export that mixes ease formula versions also fails
@@ -372,4 +465,7 @@ closed.
 The P1.7b-P1.7e static app, any notebook, and any external tool read only these files
 (or the Parquet export). Nothing downstream of the BI boundary queries DuckDB. All six
 roadmap pages now have read models; later pages are additive files under this same manifest
-and schema version bump policy.
+and schema version bump policy. Version-4 consumers load cumulative outcomes through the strict
+`player_horizons.json` boundary and look up an exact `(run_id, season, code, gw_to)` endpoint;
+they never interpolate or substitute another vintage. The Players route renders these scalars
+only under the fixed-start/all-fixtures scope described above.

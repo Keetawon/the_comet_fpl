@@ -1,5 +1,5 @@
 // Read-model shapes as emitted by fpl.publish.dashboard_json (schema
-// fpl.dashboard-read-models v1; see docs/dashboard-json-contract.md).
+// fpl.dashboard-read-models v4; see docs/dashboard-json-contract.md).
 // Nullable fields are `| null`: NULL means unmeasured/unavailable and must
 // never be rendered as 0, "", or a fabricated colour.
 
@@ -164,6 +164,85 @@ export interface PlayerRecord {
   form: PlayerForm | null;
   avg_minutes_last_5: number | null;
   fixtures: PlayerFixture[];
+}
+
+/** One exact endpoint lookup with six-decimal published scalars, for all fixtures. */
+export interface PlayerHorizon {
+  gw_to: number;
+  xp: number;
+  p_le_2: number;
+  p_ge_2: number;
+  p_ge_4: number;
+  p_ge_6: number;
+  p_ge_10: number;
+  p_ge_15: number;
+}
+
+/** Canonical positional order in the compact schema-v4 wire payload. */
+export const PLAYER_HORIZON_FIELDS = [
+  "gw_to",
+  "xp",
+  "p_le_2",
+  "p_ge_2",
+  "p_ge_4",
+  "p_ge_6",
+  "p_ge_10",
+  "p_ge_15",
+] as const;
+
+export type PlayerHorizonWire = [
+  gw_to: number,
+  xp: number,
+  p_le_2: number,
+  p_ge_2: number,
+  p_ge_4: number,
+  p_ge_6: number,
+  p_ge_10: number,
+  p_ge_15: number,
+];
+
+export interface PlayerHorizonsRecord {
+  run_id: string;
+  season: string;
+  code: number;
+  horizons: PlayerHorizon[];
+}
+
+export interface PlayerHorizonsWireRecord {
+  run_id: string;
+  season: string;
+  code: number;
+  horizons: PlayerHorizonWire[];
+}
+
+export interface PlayerHorizonSemantics {
+  grain: ["run_id", "season", "code", "gw_to"];
+  cumulative_from: "dim_forecast_run.gw_from";
+  distribution_combination: "independent-gameweek-convolution-v1";
+  availability: "raw-model-distribution-unadjusted";
+  thresholds: {
+    p_le: [2];
+    p_ge: [2, 4, 6, 10, 15];
+  };
+  value_decimal_places: 6;
+  probability_boundary_policy: "preserve-exact-zero-one-v1";
+}
+
+export interface PlayerHorizonsData {
+  schema: "fpl.dashboard-player-horizons";
+  json_schema_version: 4;
+  semantics: PlayerHorizonSemantics;
+  horizon_fields: typeof PLAYER_HORIZON_FIELDS;
+  players: PlayerHorizonsRecord[];
+}
+
+/** Serialized payload shape before the loader decodes positional horizon values. */
+export interface PlayerHorizonsWireData {
+  schema: "fpl.dashboard-player-horizons";
+  json_schema_version: 4;
+  semantics: PlayerHorizonSemantics;
+  horizon_fields: typeof PLAYER_HORIZON_FIELDS;
+  players: PlayerHorizonsWireRecord[];
 }
 
 export interface ForecastRun {

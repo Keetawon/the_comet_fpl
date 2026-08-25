@@ -89,7 +89,13 @@ except OSError:
 `manifest.json` is optional for the app (every record repeats its `run_id`/`as_of`); copy
 it when available. `players.json` is by far the largest file and is shared by the Summary,
 Players, and Next-GW pages; it is fetched and parsed once per browser session (a
-module-level cache in `src/data/load.ts`).
+module-level cache in `src/data/load.ts`). Schema v4 also publishes compact
+`player_horizons.json`: cumulative xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)` for every
+player and exact forecast endpoint. Python computes those probabilities by convolving the
+published gameweek PMFs at full precision, then emits a compact positional row whose named values
+are quantized to six decimals. Exact zero/one probability boundaries are preserved. The browser
+data layer validates the field dictionary, decodes the row, and selects an exact
+`(run_id, season, code, gw_to)` endpoint; it never sums probabilities or parses a PMF.
 
 ## Solve from the dashboard (local plan server)
 
@@ -269,6 +275,12 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   republish completed on 2026-08-19, so P1.8 values are visible in the local static UI. An existing
   database's additive columns remain NULL until rebuilt, and the final deadline vintage must repeat
   rebuild/export/republish through P0.
+  Schema v4 adds the strict `player_horizons.json` outcome columns: cumulative xP, `P(≤2)`, and
+  `P(≥2/4/6/10/15)` at the selected exact endpoint. They always cover every fixture from the
+  forecast run's start, assume independent gameweeks, and remain raw/unadjusted for the reported
+  next-round availability overlay. Published scalars are six-decimal emitter values, not
+  browser-derived values. The page hides them for a shifted start or Home/Away filter; those
+  controls cannot subtract or condition a published probability.
 - **Summary** (implemented, P1.7d): the landing page — next gameweek kickoff (deadlines are
   not sourced, so none is shown), one optimizer squad summary card per plan (GW1 squad xP,
   cost, hits, captain/vice, XI and bench lines), an availability watch (the official
@@ -372,3 +384,7 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
 - Squad Draft totals use only the selected browser draft and one exact formal forecast vintage.
   A true blank gameweek contributes zero, while missing or non-finite forecast values make the
   dependent total unmeasured; partial sums are never shown as complete totals.
+- Expected points may be summed from complete published values. Probabilities may never be added,
+  subtracted, complemented, or reconstructed from PMFs in JavaScript. Filtering/sorting player
+  records and drawing presentation geometry are allowed. Any future CCDF drill-down must load a
+  small backend-precomputed shard; the bulk payload contains no PMF.
