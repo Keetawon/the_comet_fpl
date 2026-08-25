@@ -367,5 +367,103 @@
    "not_verifiable_here": "Manchester City play in GW1 fixture 8, which had not kicked off when the last committed snapshot was captured, so Rulli's actual GW1 outcome cannot be checked from committed data.",
    "candidate_fix_not_implemented": "Ownership (selected_by_percent) is loaded and unused, and would rank two keepers at one club. That is a modelling change needing its own validation window, so it is recorded here rather than patched in."
   }
+ },
+ "f_club_relative_cap": {
+  "question": "Can the absolute price prior's blind spot to a club's existing starter be closed without fitting anything new?",
+  "verdict": "YES for the decision failure, at a small distributional cost. SHIPPED as BEHIND_INCUMBENT_CAP.",
+  "measured_group": {
+   "definition": "newcomer whose club fields a same-position team-mate with eligible history and a prior-season appearance rate of at least 0.70",
+   "priced_above_incumbent": {
+    "n": 25,
+    "appearance": 0.863,
+    "prior_predicted": 0.699
+   },
+   "priced_same": {
+    "n": 75,
+    "appearance": 0.508,
+    "prior_predicted": 0.513
+   },
+   "priced_below_incumbent": {
+    "n": 201,
+    "appearance": 0.284,
+    "prior_predicted": 0.382
+   },
+   "replication": "0.284 over the 201 historical rows and 0.283 over the 98 of them in 2025-26.",
+   "reading": "The middle row is nearly exact and the outer two are compressed toward it. The cap addresses only the bottom row."
+  },
+  "design": "A ceiling at the measured 0.284, never a floor. It adds no fitted parameter and consumes no validation window. The job resolves the dearest established same-position team-mate in a pre-pass over the deadline registry.",
+  "effect_on_gw1": {
+   "inversions_cheaper_cold_start_outranking_dearer_teammate": {
+    "before_any_prior": 47,
+    "after_price_prior": 47,
+    "after_cap": 29,
+    "newly_created_by_the_price_prior": 9,
+    "of_those_still_present_after_the_cap": 1
+   },
+   "cold_starts_affected": {
+    "of": 120,
+    "lowered": 84
+   },
+   "motivating_case": "Rulli, 5.0m goalkeeper, 0.0% owned, no PL history: 1.380 before any prior, 4.825 under the price prior, 1.587 with the cap -- now below his club's incumbent Donnarumma at 3.822.",
+   "accuracy_359_rows_six_fixtures": {
+    "no_prior": {
+     "ev_over_actual": 0.964,
+     "mae": 1.772,
+     "mean_log_score": 1.7767,
+     "crps": 1.1796
+    },
+    "price_prior": {
+     "ev_over_actual": 0.969,
+     "mae": 1.7294,
+     "mean_log_score": 1.7318,
+     "crps": 1.144
+    },
+    "price_plus_cap": {
+     "ev_over_actual": 0.952,
+     "mae": 1.7236,
+     "mean_log_score": 1.7451,
+     "crps": 1.1536
+    }
+   },
+   "cold_start_subset_90_rows": {
+    "mae_no_prior": 1.9703,
+    "mae_price": 1.8096,
+    "mae_cap": 1.7764,
+    "ev_no_prior": 104.01,
+    "ev_price": 109.48,
+    "ev_cap": 96.84,
+    "actual": 151
+   },
+   "honest_trade": "The cap wins MAE overall and on the cold-start subset, and loses slightly on mean log score and CRPS. Capping at a group MEAN truncates the upper half of that group, which also deepens the existing under-prediction of cold starts. Both variants beat no prior on every metric. On 359 rows over six fixtures none of these differences is individually significant -- the actual total alone carries an 8.9% standard error -- so this is a decision-safety choice, not a measured accuracy win."
+  },
+  "ownership_deliberately_deferred": {
+   "evidence_it_would_work": {
+    "expensive_and_widely_selected_vs_expensive_and_ignored": {
+     "historical": {
+      "n_high": 89,
+      "appearance_high": 0.76,
+      "n_low": 101,
+      "appearance_low": 0.438,
+      "difference": 0.322,
+      "t": 5.93
+     },
+     "live_2026_27_gw1": {
+      "n_high": 13,
+      "appearance_high": 0.846,
+      "n_low": 19,
+      "appearance_low": 0.316,
+      "difference": 0.53,
+      "t": 3.63
+     },
+     "note": "Prices are near-identical between the two high-price groups (5.75m against 5.22m), so this is not a price effect. Ownership at both price levels also separates (cheap: 0.354 against 0.138)."
+    }
+   },
+   "why_not_built": [
+    "Three ownership encodings were tried against the live 2026/27 GW1 window, which spends it: log-odds floored at 0.001% (+18.0%, t=-4.97, but a cliff at the 0.0/0.1% rounding boundary), floored at 0.05% (+14.9%, t=-3.85, but the goalkeeper correction disappears), and a within-position percentile (+10.8%, t=-4.77, stable surface). Those figures are optimistically biased by that iteration.",
+    "Goalkeepers cannot express the effect at all: 39 training rows where price already separates almost perfectly leave the ownership term inert in every encoding, so the very case that motivated the work is the one it cannot fix.",
+    "An additive three-feature model (price + relative price + ownership) reached only t=-1.59 on the strict 2025-26 holdout and regressed in three of four positions."
+   ],
+   "confirmation_window": "2026/27 GW2 onward, untouched by any fit or holdout in this record."
+  }
  }
 }

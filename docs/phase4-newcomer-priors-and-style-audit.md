@@ -187,3 +187,75 @@ kicked off when the last committed snapshot was captured.
 Ownership (`selected_by_percent`) is loaded and unused, and would rank two keepers at one club.
 That is a modelling change needing its own validation window, so it is recorded here rather than
 patched in on the strength of one squad diff.
+
+## 6. Closing the club-relative blind spot without fitting anything
+
+An absolute price is read on its own scale, so it cannot see who is already at the club.
+Splitting the same 473 newcomers by whether their club fields an established same-position
+incumbent (prior-season appearance ≥ 0.70), and whether the newcomer is priced above or below
+him:
+
+| newcomer vs incumbent | n | appears | prior said |
+|---|---|---|---|
+| priced above him | 25 | 0.863 | 0.699 |
+| priced the same | 75 | 0.508 | 0.513 |
+| **priced below him** | 201 | **0.284** | 0.382 |
+
+The middle row is nearly exact and the outer two are compressed toward it. The bottom row is
+the damaging one, and it is not noise: **0.284** over 201 historical rows and **0.283** over the
+98 of them in 2025-26, two windows agreeing to a thousandth.
+
+`BEHIND_INCUMBENT_CAP` caps exactly that group at the rate it was measured at. It only ever
+lowers a value, adds no fitted parameter, and consumes no validation window.
+
+### What it did
+
+The motivating case is resolved: Rulli (5.0m goalkeeper, 0.0% owned, no PL history) read 1.380
+before any prior, **4.825** under the price prior, and **1.587** with the cap — now below his own
+club's incumbent Donnarumma at 3.822. Club-internal inversions fall from 47 to 29, and of the
+**9 newly created by the price prior only 1 survives**. 84 of 120 cold starts are lowered.
+
+| | EV/actual | MAE | log score | CRPS |
+|---|---|---|---|---|
+| no prior | 0.964 | 1.7720 | 1.7767 | 1.1796 |
+| price prior | 0.969 | 1.7294 | **1.7318** | **1.1440** |
+| price + cap | 0.952 | **1.7236** | 1.7451 | 1.1536 |
+
+**This is a trade, not a clean win.** The cap wins MAE overall and on the 90-row cold-start
+subset (1.8096 → 1.7764), and loses slightly on mean log score and CRPS. Capping at a group
+*mean* truncates the upper half of that group, which also deepens the existing under-prediction
+of cold starts (EV 109.48 → 96.84 against an actual 151). Both variants beat no prior on every
+metric. On 359 rows over six fixtures none of these differences is individually significant —
+the actual total alone carries an 8.9% standard error — so this is a **decision-safety choice,
+not a measured accuracy win**: what it removes is a squad selection driven by a 0%-owned
+newcomer, which matters more here than a third decimal of log score.
+
+## 7. Ownership: measured, deliberately not built
+
+The sharper fix is ownership, and the evidence for the mechanism is strong. Splitting expensive
+newcomers by whether the crowd picks them:
+
+| | historical | live 2026/27 GW1 |
+|---|---|---|
+| expensive, widely selected | 0.760 (n=89) | 0.846 (n=13) |
+| expensive, ignored | 0.438 (n=101) | 0.316 (n=19) |
+| difference | **+0.322** (t=5.93) | **+0.530** (t=3.63) |
+
+Prices are near-identical between the two high-price groups (5.75m against 5.22m), so this is
+not price in disguise, and ownership separates at the cheap end too (0.354 against 0.138).
+
+It is not built, for three reasons:
+
+1. **The live window has been spent.** Three encodings were tried against 2026/27 GW1 —
+   log-odds floored at 0.001% (+18.0%, t = −4.97, but a cliff at the 0.0/0.1% rounding
+   boundary), floored at 0.05% (+14.9%, t = −3.85, but the goalkeeper correction vanishes), and
+   a within-position percentile (+10.8%, t = −4.77, stable). Iterating like that biases all
+   three figures upward.
+2. **Goalkeepers cannot express it.** On 39 training rows where price already separates almost
+   perfectly, the ownership term is inert in every encoding — so the case that motivated the
+   work is the one it cannot fix.
+3. **The additive three-feature form failed the strict test**: t = −1.59 on the 2025-26 holdout,
+   regressing in three of four positions.
+
+The confirmation window is **2026/27 GW2 onward**, untouched by any fit or holdout here. Fit
+once on history, score once there, and do not iterate on the encoding again.
