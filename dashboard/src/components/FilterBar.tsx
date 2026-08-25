@@ -25,6 +25,8 @@ interface FilterBarProps {
   minGw: number;
   maxGw: number;
   showGameweekRange?: boolean;
+  /** Clarifies whether this range addresses forecast fixtures or another GW grain. */
+  gameweekLabel?: string;
 }
 
 const gwOptions = (from: number, to: number) =>
@@ -36,6 +38,7 @@ export function FilterBar({
   minGw,
   maxGw,
   showGameweekRange = true,
+  gameweekLabel = "Gameweeks",
 }: FilterBarProps) {
   const gwFromOptions = gwOptions(minGw, filters.gwTo);
   const gwToOptions = gwOptions(filters.gwFrom, maxGw);
@@ -68,7 +71,7 @@ export function FilterBar({
         <ToggleGroupItem value="away">Away</ToggleGroupItem>
       </ToggleGroup>
       {showGameweekRange && <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span>Gameweeks</span>
+        <span>{gameweekLabel}</span>
         <Select
           value={String(filters.gwFrom)}
           onValueChange={(value) =>

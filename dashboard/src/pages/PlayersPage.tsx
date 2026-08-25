@@ -298,6 +298,7 @@ export function PlayersPage() {
                 onChange={setFilters}
                 minGw={selectedRun?.gw_from ?? state.gwFrom}
                 maxGw={selectedRun?.gw_to ?? state.gwTo}
+                gameweekLabel="Forecast GWs"
               />
               <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
                 <RotateCcw className="size-3.5" aria-hidden />
@@ -306,6 +307,10 @@ export function PlayersPage() {
             </div>
           )}
           <PlayerFiltersBar filters={playerFilters} onChange={setPlayerFilters} teams={teams} />
+          <p className="text-xs text-muted-foreground">
+            Forecast GWs filter upcoming fixtures and xP only. Past form is observed through{" "}
+            {formAnchor} and is controlled separately by Past form window.
+          </p>
         </div>
       </FilterPanel>
 

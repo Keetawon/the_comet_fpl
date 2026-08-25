@@ -114,6 +114,11 @@ describe("PlayersPage", () => {
     expect(screen.getByText("Beta")).toBeInTheDocument();
     // the form window is a named column set anchored to the season it measured
     expect(screen.getByText("Last 5 App")).toBeInTheDocument();
+    expect(screen.getByText("Forecast GWs")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Past form window" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Forecast GWs filter upcoming fixtures and xP only/),
+    ).toHaveTextContent("Past form is observed through 2025-26 GW38");
     expect(screen.getByRole("columnheader", { name: /xP GW1-5/ })).toBeInTheDocument();
     for (const name of ["P(≤2)", "P(≥2)", "P(≥4)", "P(≥6)", "P(≥10)", "P(≥15)"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();

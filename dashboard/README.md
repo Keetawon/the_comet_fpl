@@ -281,6 +281,9 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   next-round availability overlay. Published scalars are six-decimal emitter values, not
   browser-derived values. The page hides them for a shifted start or Home/Away filter; those
   controls cannot subtract or condition a published probability.
+  The two time axes stay separate: **Forecast GWs** filters upcoming fixtures and xP, while
+  **Past form window** selects one backend-published observed Last 3/5/10/Season aggregate at
+  the displayed form anchor. A forecast range never silently reinterprets historical form.
 - **Summary** (implemented, P1.7d): the landing page — next gameweek kickoff (deadlines are
   not sourced, so none is shown), one optimizer squad summary card per plan (GW1 squad xP,
   cost, hits, captain/vice, XI and bench lines), an availability watch (the official

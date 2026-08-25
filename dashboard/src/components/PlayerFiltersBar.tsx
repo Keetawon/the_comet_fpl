@@ -166,12 +166,12 @@ export function PlayerFiltersBar({
       </ToggleGroup>
       {showFormWindow && (
         <div className="flex items-center gap-2">
-          <span>Form window</span>
+          <span>Past form window</span>
           <Select
             value={filters.formWindow}
             onValueChange={(value) => set({ formWindow: value as WindowLabel })}
           >
-            <SelectTrigger size="sm" className="w-28" aria-label="Form window">
+            <SelectTrigger size="sm" className="w-28" aria-label="Past form window">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
