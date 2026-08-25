@@ -872,7 +872,10 @@ Only after P0 and the BI MVP are secure:
 - design future price-change and future selling-value handling;
 - monitor recorded real-deadline forecasts against finalized outcomes;
 - decide whether a newly named positional attacking-allocation candidate is warranted;
-- investigate a price-informed starter prior on a fresh, pre-registered validation window;
+- the price-informed starter prior is **built** for cold starts (held-out MAE 0.3835 ->
+  0.3086, t = -5.57) together with a club-relative cap; the open half is the ownership
+  term, which must be fitted on history and scored once on 2026/27 GW2 onward -- the live
+  GW1 window was spent comparing encodings and can no longer validate it;
 - revisit cards only if a real decision is shown to turn on their measured margin;
 - **Manager-team transfer workflow (implemented development-only 2026-08-23; acceptance still
   pending).** The public picks endpoint was live-measured not to contain purchase/selling values.

@@ -696,6 +696,49 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   populations, whose teams concede 1.49 against 1.336 per match, and the composer already handles
   that through each fixture's own rate. Thinning remains right on the conceded *mean* (0.417
   against 0.412).
+- **A newcomer's launch price predicts whether he plays; two-season-old statistics do not.**
+  Measured over 473 players with no archive row in either of the two preceding seasons
+  (2023-24..2025-26), the correlation between launch price and the appearance rate of a player's
+  first five gameweeks is GK **0.619**, MID 0.508, FWD 0.473, DEF 0.250, and the pooled ladder is
+  monotone: 4.0-4.5m appears 0.180, 4.5-5.0m 0.301, 5.0-5.5m 0.488, 5.5-6.0m 0.654, 6.0-6.5m
+  0.787. All 35 newcomer goalkeepers priced at or below 4.0m appeared **0.000** of the time. A
+  season t-2 term, by contrast, adds nothing to appearance once t-1 is known -- the partial
+  correlation is DEF -0.020, MID +0.083, FWD -0.083, and only GK +0.268 -- so a
+  `0.2*t-2 + 0.3*t-1 + 0.5*last-5` blend loses to the shipped `0.7*prior + 0.3*recent` in every
+  position group. It *does* help per-90 RATES (xG/90 partial +0.411 for midfielders), which is
+  the split the minutes/rate separation already asks for. See
+  `docs/phase4-newcomer-priors-and-style-audit.md`.
+- **Price is absolute and cannot see the incumbent, and that gap is worth a cap.** Among newcomers
+  whose club fields an established same-position player (prior-season appearance >= 0.70), those
+  priced BELOW him appear **0.284** of the time (n=201) against 0.508 when priced level (n=75) and
+  0.863 when priced above him (n=25). The 0.284 reproduces at 0.283 on the 2025-26 rows alone.
+  `models/price_starter_prior.BEHIND_INCUMBENT_CAP` caps exactly that group; it never raises
+  anyone.
+- **Opponent playing style adds nothing beyond opponent strength, and the audit is closed.** Under
+  a deliberately generous setup -- style indices built from the FULL season and scored in-sample --
+  every team-grain correlation with the strength model's residual sits inside |t| < 0.85 over 3,040
+  team-match rows, including both style-by-style interactions. Absorbing opponents concede 1.808
+  goals against 1.154 for controlling ones and the strength model absorbs the whole of it
+  (residuals -0.025 against +0.011). At player grain the split-half reliability of "this player
+  suits that style" is 0.016 (DEF), 0.053 (MID) and 0.198 (FWD) within position, against a 0.44
+  benchmark for card-proneness. Do not ingest an external style feed on this evidence; if it is
+  ever re-opened, run the same kill-test on the new feed BEFORE wiring anything into a model.
+- **Standard deviation grows as the square root of expected points, so a Sharpe ratio is just
+  `sqrt(EV)` and ranks nothing new.** Measured on the composer's own GW1 distributions,
+  `sd / sqrt(EV)` is flat at 1.86, 1.72, 1.70 and 1.74 for EV of 1, 2, 3 and 4. Spearman between a
+  Sharpe rank and an EV rank is **0.919**, and points-per-million reaches **0.981**. An EV-versus-sd
+  scatter collapses onto a parabola. Risk has to be measured on an axis that is not collinear with
+  the mean -- `P(haul)` against `P(blank)`, or ownership-relative active return -- or it is
+  measuring the mean twice.
+- **Expected points are summable across gameweeks; probabilities are not.** A gameweek row is the
+  convolution over that gameweek's fixtures, so summing `expected_points` over a horizon is exact
+  and handles double and blank gameweeks with no special case. Summing a probability does not:
+  measured on one player over GW1-3, `P(>= 6 points)` is **0.9033** convolved correctly and
+  **1.0585** if the per-gameweek values are added -- 17% high, and above 1.0, which is impossible.
+  Any multi-gameweek probability must be precomputed from the convolved distribution, never
+  derived by a consumer from per-gameweek values. Cost is not a reason to avoid it: convolving all
+  599 players over five cumulative horizons takes **0.16 s** in pure Python, and the resulting
+  payload is 305 KB of JSON (about 76 KB gzipped) against 819 KB for the raw distributions.
 
 ## Priorities for upcoming work
 
@@ -873,8 +916,10 @@ displace the active delivery order.
    1.0-1.6 goals against an actual zero. A defender's goal scores 6 against a forward's 4, so this
    mis-ranks positions and inflates the total at once, and it connects to the measured constant
    that the defender attacking signal is xA, not xG. See `docs/phase4-composer-positional-bias.md`.
-   Also still open and
-   measured-but-not-yet-built: a price-informed starter prior in the appearance layer. The Stage E squad
+   The price-informed
+   starter prior in the appearance layer is now **built** (`models/price_starter_prior.py`,
+   cold starts only, held-out MAE 0.3835 -> 0.3086, t = -5.57); what remains open there is the
+   ownership term, whose confirmation window is 2026/27 GW2 onward. The Stage E squad
    optimiser and its stable prospective-points input artifact are now implemented
    **development-only**. The fixed-squad ILP is exact; the multi-GW transfer search is bounded and
    makes no global-optimality claim. The confirmed no-transfer pruning defect is fixed: the current

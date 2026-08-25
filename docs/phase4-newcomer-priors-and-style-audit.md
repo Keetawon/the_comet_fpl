@@ -159,10 +159,13 @@ pre-change run came from checking out the parent commit.
 
 Accuracy on the 359 rows of the six completed fixtures improves on every metric:
 
-| | MAE | log score | CRPS | EV/actual |
+| | EV/actual | MAE | log score | CRPS |
 |---|---|---|---|---|
-| before | 1.772 | 1.777 | 1.180 | 0.964 |
-| after | **1.729** | **1.732** | **1.144** | **0.969** |
+| before | 0.964 | 1.7720 | 1.7767 | 1.1796 |
+| after | **0.969** | **1.7294** | **1.7318** | **1.1440** |
+
+(Same rows, same column order and same precision as the table in section 6, which adds the cap
+on top of this "after".)
 
 On the 73 zero-history rows MAE falls 1.894 → 1.815 (−4.2%). Ranking is stable where it should
 be: Spearman 0.9444 overall, top-10 9/10, top-20 18/20, top-50 47/50. Players with eligible
@@ -259,3 +262,33 @@ It is not built, for three reasons:
 
 The confirmation window is **2026/27 GW2 onward**, untouched by any fit or holdout here. Fit
 once on history, score once there, and do not iterate on the encoding again.
+
+## 8. Consuming a distribution downstream: two facts worth having before anyone builds
+
+These came out of designing a player-selection view and are recorded because they constrain any
+consumer of the forecast artifact, not just that view.
+
+**Expected points are summable across gameweeks. Probabilities are not.** A gameweek row is
+already the convolution over that gameweek's fixtures — a double gameweek convolves both, a blank
+is the exact point mass `(1.0,)` — so summing `expected_points` over any horizon is exact and
+needs no special case. Summing a probability is not. Measured on one player over GW1-3:
+
+| | value |
+|---|---|
+| `P(>= 6 points)`, convolved correctly | **0.9033** |
+| the same by adding the three per-gameweek values | **1.0585** |
+| `xP`, summed directly | 13.3475 (correct) |
+
+The naive figure is 17% high **and above 1.0**, which a probability cannot be. The existing
+`player_xp` per-gameweek map (P1.7d) lets a consumer sum for a 1/3/5-gameweek selector; that
+pattern does not extend to any probability, which must be precomputed from the convolved
+distribution per horizon.
+
+**There is no performance problem here, so do not design around one.** Convolving all 599 players
+over five cumulative horizons takes **0.16 s** in pure Python; `numpy` is not a dependency of this
+project and adding one for this would not be justified. The effective support is smaller than it
+looks — 171 slots at a five-gameweek horizon, but 99.999% of the mass sits below 86 — so the work
+could be halved by truncating, and it is not worth doing at 0.16 s. A precomputed payload of 599
+players × 5 horizons × 7 values is 305 KB of JSON, about 76 KB gzipped, against 819 KB for
+shipping the raw distributions. The real cost in this pipeline is the Monte-Carlo forecast itself
+(~2 minutes for a GW1-5 vintage), which runs once per vintage.

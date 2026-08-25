@@ -303,17 +303,18 @@
   "accuracy_on_the_six_completed_fixtures": {
    "rows": 359,
    "before": {
+    "ev_over_actual": 0.964,
     "mae": 1.772,
-    "mean_log_score": 1.777,
-    "crps": 1.18,
-    "ev_over_actual": 0.964
+    "mean_log_score": 1.7767,
+    "crps": 1.1796
    },
    "after": {
-    "mae": 1.729,
-    "mean_log_score": 1.732,
-    "crps": 1.144,
-    "ev_over_actual": 0.969
-   }
+    "ev_over_actual": 0.969,
+    "mae": 1.7294,
+    "mean_log_score": 1.7318,
+    "crps": 1.144
+   },
+   "note": "Same rows and same precision as f_club_relative_cap. 'after' here is the price prior alone; the club-relative cap on top of it is recorded in that later section."
   },
   "zero_history_subset": {
    "rows": 73,

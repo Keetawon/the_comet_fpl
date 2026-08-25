@@ -6,6 +6,14 @@ gate, and is not grounds to change any component default. Record:
 
 Produced at HEAD `7a3f5da94e02d508dc757c1cea193bd9974c2fa0` on a clean worktree.
 
+**Superseded for the accuracy numbers, not for the verdict (2026-08-25).** Every figure below
+describes the composer as it stood at that commit. The appearance layer has since gained a
+price-informed prior for cold starts and a club-relative cap, which move these same 359 rows to
+MAE 1.7236, mean log score 1.7451 and CRPS 1.1536. The comparison that this document exists to
+make -- fourteen component architectures scored against each other -- is unaffected, because all
+fourteen were produced by the same code on the same day. Do not quote the accuracy numbers here as
+current; see `docs/phase4-newcomer-priors-and-style-audit.md` section 6 for the later ones.
+
 ## What was measured
 
 Every component-mode combination the prospective job exposes was forecast at the real GW1
