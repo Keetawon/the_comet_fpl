@@ -549,9 +549,7 @@ def _manager_plan_context(
     return ManagerPlanContext(
         capture_id=capture.capture_id,
         capture_sha256=manager_capture_sha256(capture),
-        selectable_player_registry_sha256=(
-            capture.provenance.selectable_player_registry_sha256
-        ),
+        selectable_player_registry_sha256=(capture.provenance.selectable_player_registry_sha256),
         captured_at=capture.captured_at,
         manager_id=capture.manager_id,
         picks_event=capture.picks_event,
@@ -586,9 +584,7 @@ def build_forecast_provenance(
         gw_from=manifest.gw_from,
         gw_to=manifest.gw_to,
         commit_sha=manifest.commit_sha,
-        selectable_player_registry_sha256=(
-            manifest.live_inputs.selectable_player_registry_sha256
-        ),
+        selectable_player_registry_sha256=(manifest.live_inputs.selectable_player_registry_sha256),
     )
 
 
@@ -882,9 +878,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
         try:
-            snapshot = _capture_input_snapshot(
-                args.artifact, rules_path, args.manager_capture
-            )
+            snapshot = _capture_input_snapshot(args.artifact, rules_path, args.manager_capture)
         except (OSError, RuntimeError, ValueError) as exc:
             logger.error("%s", exc)
             return 1

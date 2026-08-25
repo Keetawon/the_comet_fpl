@@ -1,0 +1,470 @@
+{
+ "record_type": "development_measurement",
+ "title": "Newcomer priors, multi-season blending, and an opponent-style audit",
+ "status": "DEVELOPMENT-ONLY. Re-runs no frozen evaluation and judges no promotion gate. One measurement (the price prior) was shipped; the other three are negative results recorded so they are not re-opened without new evidence.",
+ "created_at": "2026-08-25T07:55:38.853809Z",
+ "git_commit_sha": "1b7d194ed8e7c59bb42bd52c9fafe68cfebfc5c6",
+ "worktree_clean": true,
+ "database_sha256": "73e62580e79a6438b0ff9fac57c05adb9ef02cff095822ec13b08708f491c676",
+ "population_note": "A newcomer is a player with no archive row in either of the two seasons preceding the one being predicted. Targets are the appearance rate over a season's first five observed gameweeks. Identity is `code`; club is resolved from fact rows via team_code.",
+ "a_multi_season_blend": {
+  "question": "Does a season t-2 term (owner proposal 0.2*t-2 + 0.3*t-1 + 0.5*last-5) help?",
+  "verdict": "NO for appearance, YES for per-90 rates. The proposed weights lose to the shipped 0/0.7/0.3 in every position group.",
+  "appearance_partial_correlation_of_t2_given_t1": {
+   "GK": {
+    "n": 114,
+    "partial": 0.268
+   },
+   "DEF": {
+    "n": 369,
+    "partial": -0.02
+   },
+   "MID": {
+    "n": 486,
+    "partial": 0.083
+   },
+   "FWD": {
+    "n": 103,
+    "partial": -0.083
+   }
+  },
+  "out_of_sample_mae_rotating_triples": {
+   "current_0_0.7_0.3": 0.2503,
+   "blend_0.1_0.5_0.4": 0.2519,
+   "proposed_0.2_0.3_0.5": 0.256,
+   "t1_only": 0.2591,
+   "last5_only": 0.2628,
+   "ols_fitted_out_of_sample": 0.278
+  },
+  "fitted_weights_average": {
+   "t2": 0.092,
+   "t1": 0.42,
+   "last5": 0.255,
+   "intercept": 0.095
+  },
+  "note_on_the_bigger_error": "The 0.5 on the last-five window is a larger error than the 0.2 on t-2. Fitted last-five weights run 0.148-0.432 and the repository already measures 0.7 long / 0.3 recent as optimal at a season boundary.",
+  "note_on_fitting": "A fitted four-parameter OLS is the WORST of the six in every position group, so these weights should not be fitted; a principled fixed prior generalises better.",
+  "per_90_rates_single_triple_2023_24_to_2025_26": {
+   "caveat": "xG/xA are complete only from 2023-24, so exactly one (t-2, t-1, t) triple exists and the MAE figures are in-sample. Indicative, not conclusive.",
+   "xg90_partial_t2_given_t1": {
+    "DEF": 0.268,
+    "MID": 0.411,
+    "FWD": 0.085
+   },
+   "xa90_partial_t2_given_t1": {
+    "DEF": 0.233,
+    "MID": 0.205,
+    "FWD": 0.017
+   },
+   "xg90_mae": {
+    "t1_only": 0.0492,
+    "blend_0.2_t2": 0.0468
+   },
+   "xa90_mae": {
+    "t1_only": 0.0342,
+    "blend_0.2_t2": 0.0336
+   },
+   "pooled_trap": "The pooled ALL row reads 0.864 for xg90 and must be ignored: it reproduces the documented 0.871 pooled-across-position artefact."
+  },
+  "injury_return_cohort": {
+   "definition": "appearance >= 0.70 in t-2 and <= 0.30 in t-1",
+   "n": 32,
+   "share_of_population": 0.03,
+   "per_season": 10.7,
+   "same_club": 26,
+   "actual_early_appearance_mean": 0.273,
+   "actual_median": 0.2,
+   "actual_sd": 0.317,
+   "outcome_split": {
+    "barely_played_lt_0.1": 15,
+    "some_0.1_to_0.5": 9,
+    "regular_0.5_to_0.8": 5,
+    "nailed_ge_0.8": 3
+   },
+   "current_model_bias": {
+    "value": -0.149,
+    "se": 0.05,
+    "t": -2.98,
+    "reading": "The current model DOES under-rate this cohort, significantly."
+   },
+   "cohort_mae": {
+    "last5_only": 0.2172,
+    "current_0_0.7_0.3": 0.2306,
+    "proposed_0.2_0.3_0.5": 0.2412,
+    "heavier_t2_0.35_0.45_0.20": 0.2718
+   },
+   "reading": "More weight on t-2 is worse even on the cohort it targets. The cohort is a mixture -- 47% barely play again, 9% become nailed -- and two-season-old statistics cannot say which branch a given player is on. That information is current availability, which belongs in the overlay."
+  }
+ },
+ "b_club_positional_median": {
+  "question": "For a newcomer, is his club's positional median a better base than a league prior?",
+  "verdict": "NO. The club dimension adds nothing; the apparent gain is a level correction.",
+  "newcomers": 473,
+  "with_a_club_median": 254,
+  "coverage": 0.54,
+  "mae_leave_one_season_out": {
+   "league_mean_all_players": {
+    "ALL": 0.3877,
+    "GK": 0.3161,
+    "DEF": 0.3918,
+    "MID": 0.4067,
+    "FWD": 0.3905
+   },
+   "newcomer_base_by_position": {
+    "ALL": 0.3823,
+    "GK": 0.2675,
+    "DEF": 0.3978,
+    "MID": 0.4046,
+    "FWD": 0.3898
+   },
+   "club_positional_median": {
+    "ALL": 0.3808,
+    "GK": 0.248,
+    "DEF": 0.3968,
+    "MID": 0.4074,
+    "FWD": 0.391
+   }
+  },
+  "paired_club_median_minus_newcomer_base": {
+   "value": -0.0029,
+   "se": 0.0108,
+   "t": -0.27,
+   "n": 254,
+   "reading": "Not significant. Whatever the club median gains, a position-level newcomer base rate gains too."
+  }
+ },
+ "c_price_prior": {
+  "question": "Does launch price separate newcomers the model currently cannot tell apart?",
+  "verdict": "YES, strongly. SHIPPED -- see src/fpl/models/price_starter_prior.py.",
+  "degeneracy_measured_on_the_live_gw1_run": {
+   "roster": 599,
+   "cold_start": 120,
+   "zero_archive_row": 100,
+   "example": "Twelve zero-history midfielders at one club span 1.349-1.508 expected points with prices 4.5m and 5.0m interleaved through the ordering -- Monte-Carlo noise from each player's own draw stream, not information.",
+   "does_ev_vary_by_opponent": "Yes. Zero-history defenders span 0.822-1.868 across clubs, because Stage A is opponent-aware. Only the WITHIN club-and-position ordering is noise."
+  },
+  "correlation_price_to_appearance": {
+   "GK": 0.619,
+   "MID": 0.508,
+   "FWD": 0.473,
+   "DEF": 0.25,
+   "ALL": 0.408
+  },
+  "appearance_by_price_band": {
+   "4.0-4.5": {
+    "n": 115,
+    "rate": 0.18
+   },
+   "4.5-5.0": {
+    "n": 168,
+    "rate": 0.301
+   },
+   "5.0-5.5": {
+    "n": 99,
+    "rate": 0.488
+   },
+   "5.5-6.0": {
+    "n": 52,
+    "rate": 0.654
+   },
+   "6.0-6.5": {
+    "n": 16,
+    "rate": 0.787
+   }
+  },
+  "goalkeeper_separation": {
+   "at_or_below_4.0m": {
+    "n": 35,
+    "appearance_rate": 0.0
+   },
+   "above_4.0m": {
+    "n": 27,
+    "appearance_rate": 0.393
+   },
+   "constant_being_replaced": 0.2496
+  },
+  "held_out_2025_26": {
+   "n": 181,
+   "mae_constant": 0.3835,
+   "mae_price": 0.3086,
+   "relative": -0.195,
+   "paired_difference": -0.0749,
+   "se": 0.0134,
+   "t": -5.57,
+   "by_position": {
+    "GK": {
+     "n": 23,
+     "before": 0.2932,
+     "after": 0.1699,
+     "relative": -0.421
+    },
+    "DEF": {
+     "n": 60,
+     "before": 0.3763,
+     "after": 0.3755,
+     "relative": -0.002
+    },
+    "MID": {
+     "n": 70,
+     "before": 0.4105,
+     "after": 0.2956,
+     "relative": -0.28
+    },
+    "FWD": {
+     "n": 28,
+     "before": 0.4056,
+     "after": 0.312,
+     "relative": -0.231
+    }
+   }
+  },
+  "known_weakness": "Defenders gain nothing (-0.2%) and their signed bias worsens from +0.075 to +0.130. They ship on the same rule anyway; dropping them after seeing that number would select a rule on its own test set."
+ },
+ "d_opponent_style_audit": {
+  "question": "Does opponent playing style add anything beyond opponent strength, at team or player grain?",
+  "verdict": "NO at both grains. Do not ingest an external style feed on this evidence.",
+  "method_note": "Deliberately generous: style indices were built from the FULL season (hindsight) and scored in-sample. A signal that cannot survive here cannot survive point-in-time.",
+  "style_proxies": [
+   "control = negated z-score of xGC allowed per match",
+   "directness = z(team threat) - z(team creativity)"
+  ],
+  "team_grain": {
+   "rows": 3040,
+   "residual_vs_opponent_control": {
+    "r": 0.0132,
+    "t": 0.73
+   },
+   "residual_vs_opponent_directness": {
+    "r": 0.0043,
+    "t": 0.24
+   },
+   "residual_vs_own_control": {
+    "r": -0.0148,
+    "t": -0.82
+   },
+   "residual_vs_style_interaction": {
+    "r": 0.0124,
+    "t": 0.68
+   },
+   "residual_vs_directness_x_control": {
+    "r": -0.0113,
+    "t": -0.63
+   },
+   "tercile_table": [
+    {
+     "opponent": "lets you shoot (absorbing)",
+     "n": 1013,
+     "actual_goals": 1.808,
+     "residual": -0.0252
+    },
+    {
+     "opponent": "middle",
+     "n": 1013,
+     "actual_goals": 1.469,
+     "residual": 0.0039
+    },
+    {
+     "opponent": "controls the game",
+     "n": 1014,
+     "actual_goals": 1.154,
+     "residual": 0.0111
+    }
+   ],
+   "reading": "The raw spread is huge (1.808 against 1.154) and the strength model absorbs all of it. Style and strength are collinear -- good teams control, weak teams absorb."
+  },
+  "player_grain_split_half": {
+   "measure": "a player's xG+xA per 90 against absorbing opponents minus against controlling opponents, computed on his odd matches versus his even matches",
+   "DEF": {
+    "n": 377,
+    "r": 0.0164
+   },
+   "MID": {
+    "n": 457,
+    "r": 0.0528
+   },
+   "FWD": {
+    "n": 95,
+    "r": 0.1984
+   },
+   "pooled_all": {
+    "n": 1013,
+    "r": 0.1337,
+    "warning": "IGNORE. Pooling positions reproduces the documented pooled-across-position artefact; only the within-position rows are meaningful."
+   },
+   "benchmarks": {
+    "card_proneness_split_half": 0.44,
+    "defender_xa_cross_season": 0.784
+   }
+  },
+  "data_availability": "mart_fact_team_match carries goals, team_xg, team_xgc, team_bps and fdr only. Possession, passes and shot counts are absent from the FPL archive. FBref via the existing operator-pull recipe (docs/phase3-stage-c-fbref-recipe.md) is the established route if this is ever re-opened, and its column mapping is unverified until the 2025-26 overlap gate passes."
+ },
+ "e_price_prior_impact_on_gw1": {
+  "note": "Both forecasts generated at as_of 2026-08-21T17:30:00Z on the same database; the pre-change run was produced by checking out the parent commit.",
+  "accuracy_on_the_six_completed_fixtures": {
+   "rows": 359,
+   "before": {
+    "ev_over_actual": 0.964,
+    "mae": 1.772,
+    "mean_log_score": 1.7767,
+    "crps": 1.1796
+   },
+   "after": {
+    "ev_over_actual": 0.969,
+    "mae": 1.7294,
+    "mean_log_score": 1.7318,
+    "crps": 1.144
+   },
+   "note": "Same rows and same precision as f_club_relative_cap. 'after' here is the price prior alone; the club-relative cap on top of it is recorded in that later section."
+  },
+  "zero_history_subset": {
+   "rows": 73,
+   "mae_before": 1.894,
+   "mae_after": 1.815,
+   "relative": -0.042,
+   "ev_before": 93.0,
+   "ev_after": 86.94,
+   "actual": 115
+  },
+  "ranking_stability": {
+   "spearman_before_vs_after": 0.9444,
+   "top_10_overlap": "9/10",
+   "top_20_overlap": "18/20",
+   "top_50_overlap": "47/50"
+  },
+  "spillover_to_players_with_history": {
+   "changed": 379,
+   "of": 479,
+   "median": 0.0085,
+   "max": 0.2685,
+   "cause": "attacking shares are normalised across a club's squad and bonus is simulated jointly per fixture (one winner), so an opponent's cold start moves you too"
+  },
+  "decision_change": {
+   "squad_members_changed": 2,
+   "out": [
+    "Donnarumma (5.5m GK, 8.6% owned)",
+    "Thiaw (5.0m DEF)"
+   ],
+   "in": [
+    "Rulli (5.0m GK, 0.0% owned, no PL history)",
+    "Pedro Porro (5.5m DEF)"
+   ],
+   "gw1_expected_points": {
+    "before": 64.827,
+    "after": 64.979
+   },
+   "horizon_expected_points": {
+    "before": 322.95,
+    "after": 321.092
+   }
+  },
+  "identified_risk": {
+   "name": "the prior is absolute, not club-relative",
+   "detail": "A mid-priced newcomer behind a dearer incumbent at the same club is over-rated. Rulli at 5.0m reaches the 0.85 cap and outscores Man City's 5.5m Donnarumma (4.83 against 3.82) despite 0.0% ownership, and that inversion drove the squad change above.",
+   "systematic_count": {
+    "cheaper_cold_start_outranking_a_dearer_teammate": 47,
+    "already_true_before_the_change": 38,
+    "newly_created_by_the_price_prior": 9
+   },
+   "not_verifiable_here": "Manchester City play in GW1 fixture 8, which had not kicked off when the last committed snapshot was captured, so Rulli's actual GW1 outcome cannot be checked from committed data.",
+   "candidate_fix_not_implemented": "Ownership (selected_by_percent) is loaded and unused, and would rank two keepers at one club. That is a modelling change needing its own validation window, so it is recorded here rather than patched in."
+  }
+ },
+ "f_club_relative_cap": {
+  "question": "Can the absolute price prior's blind spot to a club's existing starter be closed without fitting anything new?",
+  "verdict": "YES for the decision failure, at a small distributional cost. SHIPPED as BEHIND_INCUMBENT_CAP.",
+  "measured_group": {
+   "definition": "newcomer whose club fields a same-position team-mate with eligible history and a prior-season appearance rate of at least 0.70",
+   "priced_above_incumbent": {
+    "n": 25,
+    "appearance": 0.863,
+    "prior_predicted": 0.699
+   },
+   "priced_same": {
+    "n": 75,
+    "appearance": 0.508,
+    "prior_predicted": 0.513
+   },
+   "priced_below_incumbent": {
+    "n": 201,
+    "appearance": 0.284,
+    "prior_predicted": 0.382
+   },
+   "replication": "0.284 over the 201 historical rows and 0.283 over the 98 of them in 2025-26.",
+   "reading": "The middle row is nearly exact and the outer two are compressed toward it. The cap addresses only the bottom row."
+  },
+  "design": "A ceiling at the measured 0.284, never a floor. It adds no fitted parameter and consumes no validation window. The job resolves the dearest established same-position team-mate in a pre-pass over the deadline registry.",
+  "effect_on_gw1": {
+   "inversions_cheaper_cold_start_outranking_dearer_teammate": {
+    "before_any_prior": 47,
+    "after_price_prior": 47,
+    "after_cap": 29,
+    "newly_created_by_the_price_prior": 9,
+    "of_those_still_present_after_the_cap": 1
+   },
+   "cold_starts_affected": {
+    "of": 120,
+    "lowered": 84
+   },
+   "motivating_case": "Rulli, 5.0m goalkeeper, 0.0% owned, no PL history: 1.380 before any prior, 4.825 under the price prior, 1.587 with the cap -- now below his club's incumbent Donnarumma at 3.822.",
+   "accuracy_359_rows_six_fixtures": {
+    "no_prior": {
+     "ev_over_actual": 0.964,
+     "mae": 1.772,
+     "mean_log_score": 1.7767,
+     "crps": 1.1796
+    },
+    "price_prior": {
+     "ev_over_actual": 0.969,
+     "mae": 1.7294,
+     "mean_log_score": 1.7318,
+     "crps": 1.144
+    },
+    "price_plus_cap": {
+     "ev_over_actual": 0.952,
+     "mae": 1.7236,
+     "mean_log_score": 1.7451,
+     "crps": 1.1536
+    }
+   },
+   "cold_start_subset_90_rows": {
+    "mae_no_prior": 1.9703,
+    "mae_price": 1.8096,
+    "mae_cap": 1.7764,
+    "ev_no_prior": 104.01,
+    "ev_price": 109.48,
+    "ev_cap": 96.84,
+    "actual": 151
+   },
+   "honest_trade": "The cap wins MAE overall and on the cold-start subset, and loses slightly on mean log score and CRPS. Capping at a group MEAN truncates the upper half of that group, which also deepens the existing under-prediction of cold starts. Both variants beat no prior on every metric. On 359 rows over six fixtures none of these differences is individually significant -- the actual total alone carries an 8.9% standard error -- so this is a decision-safety choice, not a measured accuracy win."
+  },
+  "ownership_deliberately_deferred": {
+   "evidence_it_would_work": {
+    "expensive_and_widely_selected_vs_expensive_and_ignored": {
+     "historical": {
+      "n_high": 89,
+      "appearance_high": 0.76,
+      "n_low": 101,
+      "appearance_low": 0.438,
+      "difference": 0.322,
+      "t": 5.93
+     },
+     "live_2026_27_gw1": {
+      "n_high": 13,
+      "appearance_high": 0.846,
+      "n_low": 19,
+      "appearance_low": 0.316,
+      "difference": 0.53,
+      "t": 3.63
+     },
+     "note": "Prices are near-identical between the two high-price groups (5.75m against 5.22m), so this is not a price effect. Ownership at both price levels also separates (cheap: 0.354 against 0.138)."
+    }
+   },
+   "why_not_built": [
+    "Three ownership encodings were tried against the live 2026/27 GW1 window, which spends it: log-odds floored at 0.001% (+18.0%, t=-4.97, but a cliff at the 0.0/0.1% rounding boundary), floored at 0.05% (+14.9%, t=-3.85, but the goalkeeper correction disappears), and a within-position percentile (+10.8%, t=-4.77, stable surface). Those figures are optimistically biased by that iteration.",
+    "Goalkeepers cannot express the effect at all: 39 training rows where price already separates almost perfectly leave the ownership term inert in every encoding, so the very case that motivated the work is the one it cannot fix.",
+    "An additive three-feature model (price + relative price + ownership) reached only t=-1.59 on the strict 2025-26 holdout and regressed in three of four positions."
+   ],
+   "confirmation_window": "2026/27 GW2 onward, untouched by any fit or holdout in this record."
+  }
+ }
+}

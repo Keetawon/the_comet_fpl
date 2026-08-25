@@ -114,7 +114,9 @@ class _ManagerPath:
     objective_value: float
 
     @property
-    def ranking_key(self) -> tuple[
+    def ranking_key(
+        self,
+    ) -> tuple[
         float,
         int,
         int,
@@ -466,9 +468,7 @@ def _plan_manager_transfers(
     initial_sale_prices = tuple(
         sorted((code, player.selling_price_tenths) for code, player in owned_by_code.items())
     )
-    states: dict[
-        tuple[tuple[int, ...], int, int, tuple[tuple[int, int], ...]], _ManagerPath
-    ] = {
+    states: dict[tuple[tuple[int, ...], int, int, tuple[tuple[int, int], ...]], _ManagerPath] = {
         (
             initial_squad,
             financials.free_transfers_available,

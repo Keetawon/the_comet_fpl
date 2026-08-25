@@ -595,10 +595,7 @@ class OptimizerPlanArtifact(_Frozen):
                 raise ValueError(
                     "manager plans require a forecast selectable-player registry binding"
                 )
-            if (
-                forecast_registry_sha
-                != self.manager_context.selectable_player_registry_sha256
-            ):
+            if forecast_registry_sha != self.manager_context.selectable_player_registry_sha256:
                 raise ValueError(
                     "manager capture and forecast selectable-player registries disagree"
                 )
@@ -926,9 +923,7 @@ def optimizer_artifact_bytes(artifact: OptimizerPlanArtifact) -> bytes:
         # The v2 fields are accepted with scratch defaults when old JSON is parsed, but canonical
         # v1 output remains byte-for-byte identical to the pre-v2 serializer.
         payload.pop("manager_context", None)
-        payload["provenance"]["forecast"].pop(
-            "selectable_player_registry_sha256", None
-        )
+        payload["provenance"]["forecast"].pop("selectable_player_registry_sha256", None)
         payload["search_policy"].pop("plan_mode", None)
         payload["search_policy"].pop("initial_free_transfers", None)
         for week in payload["plan"]["weeks"]:
