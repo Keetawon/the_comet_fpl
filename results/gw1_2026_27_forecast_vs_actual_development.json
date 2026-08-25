@@ -1,0 +1,850 @@
+{
+ "record_type": "development_measurement",
+ "status": "DEVELOPMENT-ONLY. Not a promotion gate, not a re-run of any frozen evaluation, and not grounds to change any component default.",
+ "title": "2026/27 GW1 prospective full-points forecast versus recorded outcome",
+ "created_at": "2026-08-25T03:21:43.187996Z",
+ "git_commit_sha": "7a3f5da94e02d508dc757c1cea193bd9974c2fa0",
+ "worktree_clean": true,
+ "database_sha256": "73e62580e79a6438b0ff9fac57c05adb9ef02cff095822ec13b08708f491c676",
+ "forecast": {
+  "as_of": "2026-08-21T17:30:00Z",
+  "season": "2026-27",
+  "gw": 1,
+  "monte_carlo_draws": 2000,
+  "bootstrap_known_at": "2026-08-21T06:41:56Z",
+  "bootstrap_payload_sha256": "7db0a660b7c0a71c0bb71cbfc8feb2db780439a7d5190a6843224a9cad60b7e1",
+  "point_in_time_note": "bootstrap_known_at precedes as_of; the post-deadline 08-22 and 08-23 captures are loaded in the database but excluded by the as_of filter."
+ },
+ "outcome_source": {
+  "snapshot": "snapshots/daily/2026-08-23/2026-08-23T063715Z",
+  "captured_at": "2026-08-23T06:37:15Z",
+  "sha256": {
+   "bootstrap-static.json.gz": "949d5a15be91616259c8ba5f8b21e0417cb6e7698281814e83d664b14a6d1a5e",
+   "event-live-1.json.gz": "a863c29b8a65ded9297f2c9e2191e629347c926b3dba0689862343a110b2018b",
+   "fixtures.json.gz": "c06424755b50210747c88b6adc45a15cf97736348f5d31d26546eb66cabbb570"
+  },
+  "completed_fixtures": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ],
+  "incomplete_fixtures": [
+   7,
+   8,
+   9,
+   10
+  ],
+  "clubs_covered": 12,
+  "coverage_caveat": "Only 6 of the 10 GW1 fixtures had been played when the last committed snapshot was captured (2026-08-23T06:37:15Z). Fixtures 7-10 are absent. No snapshot covering them is committed and the live API is unreachable from this environment.",
+  "finalisation_caveat": "The 6 covered fixtures are finished_provisional with bonus applied; none carries finished = TRUE, so the repository's outcome-attachment contract would still reject them. This measurement therefore does not write to the prediction ledger."
+ },
+ "population": {
+  "rows": 359,
+  "grain": "player_gameweek",
+  "definition": "Every deadline-roster player whose GW1 fixture is one of the 6 completed fixtures, including players who did not appear (actual 0).",
+  "unmatched_codes": 0
+ },
+ "ruleset_replay_validation": {
+  "rows_checked": 364,
+  "recorded_total": 599,
+  "replayed_total": 599,
+  "mismatches": 0,
+  "note": "config/scoring_2026_27.yaml reproduces the recorded FPL points of every covered GW1 player-fixture row exactly. First live confirmation of the 2026/27 ruleset."
+ },
+ "unmodelled_components": {
+  "components": [
+   "penalties_saved",
+   "penalties_missed",
+   "own_goals",
+   "cards"
+  ],
+  "actual_points": -16,
+  "note": "Held at zero by composer design; removing them from the actual raises the target from 599 to 615 and lowers every EV/actual ratio."
+ },
+ "stage_a_team_grain": {
+  "predicted_goals_per_fixture": 2.785,
+  "actual_goals_per_fixture": 2.333,
+  "goals_ratio": 1.194,
+  "predicted_clean_sheets": 3.16,
+  "actual_clean_sheets": 5,
+  "clean_sheet_ratio": 0.632,
+  "fixtures": 6,
+  "note": "Reproduces live the documented one-for-one trade between the league scoring level and clean-sheet accuracy. Six fixtures decide nothing."
+ },
+ "significance": {
+  "actual_total": 599,
+  "actual_total_standard_error": 53.4,
+  "paired_t_log_seasonal_minus_model": 1.31,
+  "paired_t_crps_seasonal_minus_model": -0.0,
+  "paired_t_log_default_minus_v1v1": -1.51,
+  "paired_t_crps_default_minus_v1v1": 0.47,
+  "top_20_lift_bootstrap_95ci": [
+   -0.156,
+   1.207
+  ],
+  "conclusion": "No pairwise difference between the 14 models is statistically significant on this sample. The ranking metrics are noise-dominated at n = 20."
+ },
+ "artifacts_generated": 24,
+ "distinct_models": 14,
+ "models": [
+  {
+   "component_modes": {
+    "attacking": "v3",
+    "assists": "coupled",
+    "appearance": "model",
+    "share_signal_variants": "threat"
+   },
+   "artifact_sha256": "00e8e673996bc9514d73f901d36549bd3820a004eef236f5f6f8a2ade7fb99b4",
+   "expected_points_sum": 548.9575,
+   "ev_over_actual_recorded": 0.916456594323873,
+   "ev_over_actual_modelled_components_only": 0.8926138211382113,
+   "mae": 1.7386922005571033,
+   "mean_log_score": 1.6453558166167412,
+   "crps": 1.1758451692200558,
+   "pit_80_coverage": 0.7465181058495822,
+   "spearman": 0.4164028141212538,
+   "ndcg_at_20": 0.14596976615574475,
+   "top_20_capture": 0.14084507042253522,
+   "top_20_overlap": 0.0,
+   "top_20_mean_actual": 1.5,
+   "top_20_lift_over_field": -0.10100166944908173,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.4662887323943665,
+     "act": 2.943661971830986
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.051388888888889,
+     "act": 2.388888888888889
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.3420625,
+     "act": 1.4027777777777777
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.6563611111111112,
+     "act": 1.2083333333333333
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.15645138888888888,
+     "act": 0.4166666666666667
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v3",
+    "assists": "coupled",
+    "appearance": "model",
+    "share_signal_variants": "auto/xg"
+   },
+   "artifact_sha256": "46caa931bc5f748e6ecb37c9e3ea745970d0338bb5f8efce5e8081ca9bef201f",
+   "expected_points_sum": 547.36,
+   "ev_over_actual_recorded": 0.9137896494156929,
+   "ev_over_actual_modelled_components_only": 0.8900162601626016,
+   "mae": 1.7374791086350976,
+   "mean_log_score": 1.6554931811910039,
+   "crps": 1.179651082172702,
+   "pit_80_coverage": 0.754874651810585,
+   "spearman": 0.4166889698635254,
+   "ndcg_at_20": 0.2062090264669434,
+   "top_20_capture": 0.2347417840375587,
+   "top_20_overlap": 0.1,
+   "top_20_mean_actual": 2.5,
+   "top_20_lift_over_field": 0.498330550918197,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.4775422535211264,
+     "act": 2.8450704225352115
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.0362430555555555,
+     "act": 2.5694444444444446
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.3319999999999999,
+     "act": 1.3472222222222223
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.6544166666666666,
+     "act": 1.1805555555555556
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.15031944444444445,
+     "act": 0.4166666666666667
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v1",
+    "assists": "coupled",
+    "appearance": "model",
+    "share_signal_variants": "threat"
+   },
+   "artifact_sha256": "013898da4bfa651c77ca3f49864a1c163bc0dcab5dd635d763e0fd7ac324daa0",
+   "expected_points_sum": 509.368,
+   "ev_over_actual_recorded": 0.850363939899833,
+   "ev_over_actual_modelled_components_only": 0.8282406504065041,
+   "mae": 1.6819108635097495,
+   "mean_log_score": 1.7009082024676452,
+   "crps": 1.1714387924791088,
+   "pit_80_coverage": 0.7325905292479109,
+   "spearman": 0.418835171202937,
+   "ndcg_at_20": 0.2164187043869897,
+   "top_20_capture": 0.2535211267605634,
+   "top_20_overlap": 0.1,
+   "top_20_mean_actual": 2.7,
+   "top_20_lift_over_field": 0.618196994991653,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.217711267605634,
+     "act": 2.816901408450704
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 1.9434444444444443,
+     "act": 2.1666666666666665
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.2048680555555555,
+     "act": 1.8333333333333333
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.6104861111111111,
+     "act": 1.125
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.14273611111111112,
+     "act": 0.4166666666666667
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v1",
+    "assists": "coupled",
+    "appearance": "model",
+    "share_signal_variants": "auto/xg"
+   },
+   "artifact_sha256": "fc0d3e9b012b8eff61dafb1989a41e30a0312870d023e44360e37136ecc19fa3",
+   "expected_points_sum": 509.38,
+   "ev_over_actual_recorded": 0.8503839732888147,
+   "ev_over_actual_modelled_components_only": 0.828260162601626,
+   "mae": 1.6784568245125349,
+   "mean_log_score": 1.7054504142940674,
+   "crps": 1.1727997158774373,
+   "pit_80_coverage": 0.7353760445682451,
+   "spearman": 0.42005348130824266,
+   "ndcg_at_20": 0.19731726500302377,
+   "top_20_capture": 0.215962441314554,
+   "top_20_overlap": 0.05,
+   "top_20_mean_actual": 2.3,
+   "top_20_lift_over_field": 0.3784641068447412,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.2238591549295776,
+     "act": 2.7464788732394365
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 1.9383819444444446,
+     "act": 2.263888888888889
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.203486111111111,
+     "act": 1.8194444444444444
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.6125555555555555,
+     "act": 1.1111111111111112
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.1412152777777778,
+     "act": 0.4166666666666667
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v3",
+    "assists": "v1",
+    "appearance": "model",
+    "share_signal_variants": "threat"
+   },
+   "artifact_sha256": "710c48f2c0508055ce5c55fb4811e41884702b28d831918208fc964f1948e5f6",
+   "expected_points_sum": 523.146,
+   "ev_over_actual_recorded": 0.8733656093489148,
+   "ev_over_actual_modelled_components_only": 0.8506439024390243,
+   "mae": 1.7109916434540389,
+   "mean_log_score": 1.713445874178443,
+   "crps": 1.1789457813370474,
+   "pit_80_coverage": 0.7381615598885793,
+   "spearman": 0.4114701395571703,
+   "ndcg_at_20": 0.1865596315311623,
+   "top_20_capture": 0.17370892018779344,
+   "top_20_overlap": 0.0,
+   "top_20_mean_actual": 1.85,
+   "top_20_lift_over_field": 0.10876460767946594,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.284880281690141,
+     "act": 2.943661971830986
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 1.9636180555555558,
+     "act": 1.9722222222222223
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.2722569444444445,
+     "act": 1.8611111111111112
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.6379722222222222,
+     "act": 1.0833333333333333
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.1528125,
+     "act": 0.5
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v3",
+    "assists": "v1",
+    "appearance": "model",
+    "share_signal_variants": "auto/xg"
+   },
+   "artifact_sha256": "852f33eb750b029a8bcde6902ef3cba74bb6e0957dabab5b369d9937229f9384",
+   "expected_points_sum": 521.5355,
+   "ev_over_actual_recorded": 0.870676961602671,
+   "ev_over_actual_modelled_components_only": 0.8480252032520325,
+   "mae": 1.7145612813370474,
+   "mean_log_score": 1.721310781996173,
+   "crps": 1.1828063614206128,
+   "pit_80_coverage": 0.7409470752089137,
+   "spearman": 0.4090086324156779,
+   "ndcg_at_20": 0.18695119842116176,
+   "top_20_capture": 0.19248826291079812,
+   "top_20_overlap": 0.05,
+   "top_20_mean_actual": 2.05,
+   "top_20_lift_over_field": 0.22863105175292153,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.2980774647887325,
+     "act": 2.9014084507042255
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 1.9471736111111113,
+     "act": 2.138888888888889
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.260715277777778,
+     "act": 1.7361111111111112
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.6355833333333334,
+     "act": 1.1666666666666667
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.14780555555555555,
+     "act": 0.4166666666666667
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v3",
+    "assists": "coupled",
+    "appearance": "seasonal",
+    "share_signal_variants": "threat"
+   },
+   "artifact_sha256": "784c3b40f4fd7de06638b5e7af5eb894791815012d7f8e72fcb3d43eb2fc1be7",
+   "expected_points_sum": 578.725,
+   "ev_over_actual_recorded": 0.9661519198664441,
+   "ev_over_actual_modelled_components_only": 0.9410162601626016,
+   "mae": 1.7735738161559889,
+   "mean_log_score": 1.7733673648031654,
+   "crps": 1.176218123955432,
+   "pit_80_coverage": 0.7465181058495822,
+   "spearman": 0.4020298812196601,
+   "ndcg_at_20": 0.2247591991619591,
+   "top_20_capture": 0.24882629107981222,
+   "top_20_overlap": 0.05,
+   "top_20_mean_actual": 2.65,
+   "top_20_lift_over_field": 0.5882303839732888,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.5412253521126758,
+     "act": 2.9859154929577465
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.173090277777778,
+     "act": 2.013888888888889
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.4084375,
+     "act": 1.8333333333333333
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.8448402777777777,
+     "act": 0.8333333333333334
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.11943750000000002,
+     "act": 0.6944444444444444
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v3",
+    "assists": "coupled",
+    "appearance": "seasonal",
+    "share_signal_variants": "auto/xg"
+   },
+   "artifact_sha256": "0dcfb52a49ebe61fdae4a561eb58076894d4c2b7a731bd023c7ddbaf6359db72",
+   "expected_points_sum": 577.1865,
+   "ev_over_actual_recorded": 0.9635834724540902,
+   "ev_over_actual_modelled_components_only": 0.9385146341463415,
+   "mae": 1.7720403899721449,
+   "mean_log_score": 1.7766622110675896,
+   "crps": 1.1796148614206128,
+   "pit_80_coverage": 0.7465181058495822,
+   "spearman": 0.40352528170207236,
+   "ndcg_at_20": 0.2184068789156228,
+   "top_20_capture": 0.23943661971830985,
+   "top_20_overlap": 0.05,
+   "top_20_mean_actual": 2.55,
+   "top_20_lift_over_field": 0.5282971619365608,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.560112676056338,
+     "act": 2.915492957746479
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.156027777777778,
+     "act": 1.9722222222222223
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.3977638888888888,
+     "act": 1.9722222222222223
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.8356736111111112,
+     "act": 0.8194444444444444
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.11634722222222223,
+     "act": 0.6805555555555556
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v1",
+    "assists": "v1",
+    "appearance": "model",
+    "share_signal_variants": "auto/threat/xg"
+   },
+   "artifact_sha256": "05bca11e195f7bee1529921b3cfbc1c37b8540a062aa80cd8b4b7900733ef5df",
+   "expected_points_sum": 483.564,
+   "ev_over_actual_recorded": 0.8072854757929884,
+   "ev_over_actual_modelled_components_only": 0.7862829268292684,
+   "mae": 1.655757660167131,
+   "mean_log_score": 1.7777102730095948,
+   "crps": 1.1783877729805012,
+   "pit_80_coverage": 0.7270194986072424,
+   "spearman": 0.4108465681277646,
+   "ndcg_at_20": 0.19228676148888482,
+   "top_20_capture": 0.20187793427230047,
+   "top_20_overlap": 0.05,
+   "top_20_mean_actual": 2.15,
+   "top_20_lift_over_field": 0.28856427378964944,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.0491901408450706,
+     "act": 2.76056338028169
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 1.8469930555555554,
+     "act": 2.3055555555555554
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.1373194444444445,
+     "act": 1.75
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.5870347222222222,
+     "act": 1.0277777777777777
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.13797916666666665,
+     "act": 0.5138888888888888
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v1",
+    "assists": "coupled",
+    "appearance": "seasonal",
+    "share_signal_variants": "threat"
+   },
+   "artifact_sha256": "d89885bf4526c2635a645d66226114f2666e61f6976d88fe559004bebc805e35",
+   "expected_points_sum": 542.815,
+   "ev_over_actual_recorded": 0.9062020033388982,
+   "ev_over_actual_modelled_components_only": 0.8826260162601627,
+   "mae": 1.7171810584958216,
+   "mean_log_score": 1.8332877205886682,
+   "crps": 1.1700583077994429,
+   "pit_80_coverage": 0.7325905292479109,
+   "spearman": 0.414979404022487,
+   "ndcg_at_20": 0.21352346936021485,
+   "top_20_capture": 0.22535211267605634,
+   "top_20_overlap": 0.0,
+   "top_20_mean_actual": 2.4,
+   "top_20_lift_over_field": 0.4383973288814691,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.3409225352112677,
+     "act": 3.084507042253521
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.0772222222222223,
+     "act": 1.7777777777777777
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.2711805555555555,
+     "act": 1.8888888888888888
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.7855486111111111,
+     "act": 0.9166666666666666
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.110625,
+     "act": 0.6944444444444444
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v1",
+    "assists": "coupled",
+    "appearance": "seasonal",
+    "share_signal_variants": "auto/xg"
+   },
+   "artifact_sha256": "71937e2d27ffaa11625ea36cb729f51e03cef81538641f80f015ada58e5d5f3d",
+   "expected_points_sum": 542.7825,
+   "ev_over_actual_recorded": 0.9061477462437396,
+   "ev_over_actual_modelled_components_only": 0.8825731707317074,
+   "mae": 1.713926183844011,
+   "mean_log_score": 1.838172137942339,
+   "crps": 1.171583737465181,
+   "pit_80_coverage": 0.7381615598885793,
+   "spearman": 0.41374107634090257,
+   "ndcg_at_20": 0.2523594685718693,
+   "top_20_capture": 0.2863849765258216,
+   "top_20_overlap": 0.1,
+   "top_20_mean_actual": 3.05,
+   "top_20_lift_over_field": 0.8279632721202004,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.3535,
+     "act": 2.788732394366197
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.068763888888889,
+     "act": 2.0972222222222223
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.2710486111111112,
+     "act": 1.9027777777777777
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.7832430555555556,
+     "act": 0.875
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.10866666666666666,
+     "act": 0.6944444444444444
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v3",
+    "assists": "v1",
+    "appearance": "seasonal",
+    "share_signal_variants": "threat"
+   },
+   "artifact_sha256": "4cacba7bacba289f760c5d61b757b6f4e69d6c6e1eaf2fc16f26931e387467e7",
+   "expected_points_sum": 554.7860000000001,
+   "ev_over_actual_recorded": 0.926186978297162,
+   "ev_over_actual_modelled_components_only": 0.9020910569105692,
+   "mae": 1.7447325905292481,
+   "mean_log_score": 1.8394377854174697,
+   "crps": 1.178100639275766,
+   "pit_80_coverage": 0.7381615598885793,
+   "spearman": 0.39908969698760244,
+   "ndcg_at_20": 0.22076095138025673,
+   "top_20_capture": 0.2300469483568075,
+   "top_20_overlap": 0.05,
+   "top_20_mean_actual": 2.45,
+   "top_20_lift_over_field": 0.46836393989983316,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.379218309859155,
+     "act": 2.6901408450704225
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.0926041666666664,
+     "act": 2.0416666666666665
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.341548611111111,
+     "act": 2.111111111111111
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.8223819444444445,
+     "act": 0.8333333333333334
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.11654166666666667,
+     "act": 0.6805555555555556
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v3",
+    "assists": "v1",
+    "appearance": "seasonal",
+    "share_signal_variants": "auto/xg"
+   },
+   "artifact_sha256": "611a6e8c5f739cc22e6aacc517d8a4a26cfb0a82bcdc4c2e71712de3d4402e67",
+   "expected_points_sum": 553.271,
+   "ev_over_actual_recorded": 0.9236577629382303,
+   "ev_over_actual_modelled_components_only": 0.8996276422764227,
+   "mae": 1.7472980501392756,
+   "mean_log_score": 1.8450428387998934,
+   "crps": 1.181225786908078,
+   "pit_80_coverage": 0.7353760445682451,
+   "spearman": 0.40210196713080637,
+   "ndcg_at_20": 0.2064795576495225,
+   "top_20_capture": 0.2112676056338028,
+   "top_20_overlap": 0.0,
+   "top_20_mean_actual": 2.25,
+   "top_20_lift_over_field": 0.34849749582637735,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.3933732394366194,
+     "act": 2.788732394366197
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.077326388888889,
+     "act": 2.0416666666666665
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.3321597222222221,
+     "act": 2.0277777777777777
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.8139791666666667,
+     "act": 0.8194444444444444
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.11461111111111112,
+     "act": 0.6805555555555556
+    }
+   ]
+  },
+  {
+   "component_modes": {
+    "attacking": "v1",
+    "assists": "v1",
+    "appearance": "seasonal",
+    "share_signal_variants": "auto/threat/xg"
+   },
+   "artifact_sha256": "f96974ea02088f2c51f5e05b6f10aebaff4165130152f282e2449b4a3b434058",
+   "expected_points_sum": 518.861,
+   "ev_over_actual_recorded": 0.8662120200333889,
+   "ev_over_actual_modelled_components_only": 0.8436764227642276,
+   "mae": 1.6877771587743733,
+   "mean_log_score": 1.9019337644446552,
+   "crps": 1.1749862325905291,
+   "pit_80_coverage": 0.724233983286908,
+   "spearman": 0.41074251903434794,
+   "ndcg_at_20": 0.2622788607096186,
+   "top_20_capture": 0.24882629107981222,
+   "top_20_overlap": 0.0,
+   "top_20_mean_actual": 2.65,
+   "top_20_lift_over_field": 0.5882303839732888,
+   "quintile_calibration": [
+    {
+     "bucket": 1,
+     "n": 71,
+     "pred": 3.1825211267605633,
+     "act": 2.7464788732394365
+    },
+    {
+     "bucket": 2,
+     "n": 72,
+     "pred": 2.0020972222222224,
+     "act": 2.0416666666666665
+    },
+    {
+     "bucket": 3,
+     "n": 72,
+     "pred": 1.2011527777777777,
+     "act": 1.9027777777777777
+    },
+    {
+     "bucket": 4,
+     "n": 72,
+     "pred": 0.7577291666666667,
+     "act": 0.9722222222222222
+    },
+    {
+     "bucket": 5,
+     "n": 72,
+     "pred": 0.10710416666666667,
+     "act": 0.6944444444444444
+    }
+   ]
+  }
+ ]
+}
