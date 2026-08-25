@@ -349,7 +349,7 @@ describe("PlanBuilderPage", () => {
     await user.click(await screen.findByText("Import my team"));
 
     const continueButton = screen.getByRole("button", {
-      name: /Choose locked and excluded players/,
+      name: /Set squad rules/,
     });
     expect(continueButton).toBeDisabled();
     const input = await screen.findByLabelText("FPL manager id");
@@ -374,11 +374,16 @@ describe("PlanBuilderPage", () => {
     expect(continueButton).toBeEnabled();
 
     await user.click(continueButton);
-    expect(screen.getByLabelText("Search player")).toBeInTheDocument();
+    expect(screen.getByText("Your imported squad")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("list", { name: "Imported squad player rules" })).getAllByRole(
+        "listitem",
+      ),
+    ).toHaveLength(15);
     expect(window.localStorage.getItem("fpl-manager-id")).toBe("1234567");
   });
 
-  it("solves the imported squad with owned-only locks, any-player exclusions, hits, and both draft handoffs", async () => {
+  it("solves the imported squad with keep, sell, avoid-buy, hits, and both draft handoffs", async () => {
     const user = userEvent.setup();
     vi.mocked(loadNextGw).mockResolvedValue({
       plans: [plans[0], managerPlan, plans[1]],
@@ -401,7 +406,7 @@ describe("PlanBuilderPage", () => {
     await user.click(screen.getByRole("button", { name: "Get your team" }));
     await user.click(
       await screen.findByRole("button", {
-        name: /Choose locked and excluded players/,
+        name: /Set squad rules/,
       }),
     );
 
@@ -409,24 +414,21 @@ describe("PlanBuilderPage", () => {
     expect(screen.queryByRole("img", { name: /^Budget meter/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/cheapest position fill/)).not.toBeInTheDocument();
 
-    const search = screen.getByRole("textbox", { name: "Search player" });
-    await user.type(search, "Keeper Two");
-    let keeperTwo = screen.getByRole("button", { name: /Keeper Two/ });
-    expect(keeperTwo).toBeDisabled();
-    expect(keeperTwo).toHaveTextContent("not in imported squad");
+    const importedSquad = screen.getByRole("list", { name: "Imported squad player rules" });
+    expect(within(importedSquad).getAllByRole("listitem")).toHaveLength(15);
+    await user.click(screen.getByRole("radio", { name: "Keep Alpha" }));
+    expect(screen.getByRole("radio", { name: "Keep Alpha" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
 
-    await user.clear(search);
-    await user.type(search, "Alpha");
-    await user.click(screen.getByRole("button", { name: /Alpha/ }));
-    expect(screen.getByText("locked")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("radio", { name: "Exclude" }));
-    await user.clear(search);
+    await user.click(screen.getByText(/Optional: avoid buying other players/));
+    const search = screen.getByRole("textbox", { name: "Search avoid-buy player" });
     await user.type(search, "Keeper Two");
-    keeperTwo = screen.getByRole("button", { name: /Keeper Two/ });
+    const keeperTwo = screen.getByRole("button", { name: /Keeper Two/ });
     expect(keeperTwo).toBeEnabled();
     await user.click(keeperTwo);
-    expect(keeperTwo).toHaveTextContent("excluded");
+    expect(keeperTwo).toHaveTextContent("avoid");
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Remaining free transfers" }),
@@ -547,25 +549,19 @@ describe("PlanBuilderPage", () => {
     await user.click(screen.getByRole("button", { name: "Get your team" }));
     await user.click(
       await screen.findByRole("button", {
-        name: /Choose locked and excluded players/,
+        name: /Set squad rules/,
       }),
     );
-    await user.click(screen.getByRole("radio", { name: "Exclude" }));
-    const search = screen.getByRole("textbox", { name: "Search player" });
-    for (const name of ["Alpha", "Beta"]) {
-      await user.clear(search);
-      await user.type(search, name);
-      await user.click(screen.getByRole("button", { name: new RegExp(name) }));
-    }
+    await user.click(screen.getByRole("radio", { name: "Sell Alpha" }));
+    await user.click(screen.getByRole("radio", { name: "Sell Beta" }));
 
-    expect(screen.getByText(/Owned players forced OUT:/)).toHaveTextContent("2/2");
-    await user.clear(search);
-    await user.type(search, "Keeper Three");
-    const thirdOwned = screen.getByRole("button", { name: /Keeper Three/ });
+    expect(screen.getByText(/Required sales:/)).toHaveTextContent("2 of 2");
+    const thirdOwned = screen.getByRole("radio", { name: "Sell Keeper Three" });
     expect(thirdOwned).toBeDisabled();
-    expect(thirdOwned).toHaveTextContent("first-week transfer depth (2)");
+    expect(thirdOwned).toHaveAttribute("title", "first-week transfer depth (2)");
 
-    await user.clear(search);
+    await user.click(screen.getByText(/Optional: avoid buying other players/));
+    const search = screen.getByRole("textbox", { name: "Search avoid-buy player" });
     await user.type(search, "Keeper Two");
     expect(screen.getByRole("button", { name: /Keeper Two/ })).toBeEnabled();
 

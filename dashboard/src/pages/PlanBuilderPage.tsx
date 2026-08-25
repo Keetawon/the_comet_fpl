@@ -1,7 +1,8 @@
 // Plan builder (the wizard, v2). A screen-per-step wizard per the design record
-// (docs/manager-team-suggestions.md): Start (import vs scratch) -> Set your rules (lock picker
-// with search/filters, per-position and club-cap guards, live budget pre-flight, rotation
-// threshold) -> Review & run. The browser cannot solve (the optimizer is PuLP/CBC in Python),
+// (docs/manager-team-suggestions.md): Start (import vs scratch) -> Set your rules (the imported
+// 15 first, then an optional market-wide avoid list; scratch mode keeps the full lock/exclude
+// picker with its quota, club-cap, and budget guards) -> Review & run. The browser cannot solve
+// (the optimizer is PuLP/CBC in Python),
 // so the final screen is the command bridge: the wizard emits the exact command to run and the
 // result stays in this user-specific page once recorded. The formal platform recommendation
 // remains separate on Next GW. The manager_id import
@@ -73,6 +74,7 @@ type PageState =
 // Wizard screens: 0 Start, 1 manager import, 2 set rules, 3 review & run, 4 result.
 type Step = 0 | 1 | 2 | 3 | 4;
 type SelectionMode = "lock" | "exclude";
+type ManagerPlayerRule = "flexible" | SelectionMode;
 type BuildMode = "scratch" | "manager";
 
 /** The solve card's view of the local plan server (src/fpl/jobs/plan_server.py). */
@@ -886,6 +888,40 @@ export function PlanBuilderPage() {
     () => excludes.filter((player) => managerOwnedCodes.has(player.code)).length,
     [excludes, managerOwnedCodes],
   );
+  const playerByCode = useMemo(
+    () =>
+      new Map(
+        state.status === "ready"
+          ? state.players.map((player) => [player.code, player] as const)
+          : [],
+      ),
+    [state],
+  );
+  const managerSquadPlayers = useMemo(() => {
+    if (!managerTeam) return [];
+    return managerTeam.players
+      .map((imported) => {
+        const player = playerByCode.get(imported.code);
+        if (!player) return null;
+        return {
+          imported,
+          player,
+          xp: player.fixtures.reduce(
+            (sum, fixture) => sum + (fixture.expected_points ?? 0),
+            0,
+          ),
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item != null)
+      .sort(
+        (a, b) =>
+          POSITIONS.indexOf(a.player.position as (typeof POSITIONS)[number]) -
+            POSITIONS.indexOf(b.player.position as (typeof POSITIONS)[number]) ||
+          a.player.web_name.localeCompare(b.player.web_name),
+      );
+  }, [managerTeam, playerByCode]);
+  const managerUnmappedPlayerCount =
+    (managerTeam?.players.length ?? 0) - managerSquadPlayers.length;
 
   const totals = useMemo(() => {
     if (state.status !== "ready") return null;
@@ -959,12 +995,15 @@ export function PlanBuilderPage() {
     return null;
   };
 
-  const selectionGuard = (player: PlayerRecord) =>
-    selectionMode === "lock" ? lockGuard(player) : excludeGuard(player);
+  const selectionGuard = (player: PlayerRecord, mode: SelectionMode = selectionMode) =>
+    mode === "lock" ? lockGuard(player) : excludeGuard(player);
 
-  const toggleSelection = (player: PlayerRecord) => {
-    if (selectionGuard(player)) return;
-    if (selectionMode === "lock") {
+  const toggleSelection = (
+    player: PlayerRecord,
+    mode: SelectionMode = selectionMode,
+  ) => {
+    if (selectionGuard(player, mode)) return;
+    if (mode === "lock") {
       setLocks((current) =>
         current.some((p) => p.code === player.code)
           ? current.filter((p) => p.code !== player.code)
@@ -979,11 +1018,48 @@ export function PlanBuilderPage() {
     }
   };
 
+  const managerRule = (player: PlayerRecord): ManagerPlayerRule => {
+    if (locks.some((candidate) => candidate.code === player.code)) return "lock";
+    if (excludes.some((candidate) => candidate.code === player.code)) return "exclude";
+    return "flexible";
+  };
+
+  const managerRuleGuard = (
+    player: PlayerRecord,
+    rule: ManagerPlayerRule,
+  ): string | null => {
+    const current = managerRule(player);
+    if (rule === current || rule === "flexible") return null;
+    if (rule === "lock" && locks.length >= MAX_LOCKS) {
+      return "maximum keep rules reached";
+    }
+    if (
+      rule === "exclude" &&
+      managerOwnedExcludedCount >= MANAGER_FIRST_WEEK_TRANSFER_DEPTH
+    ) {
+      return `first-week transfer depth (${MANAGER_FIRST_WEEK_TRANSFER_DEPTH})`;
+    }
+    return null;
+  };
+
+  const setManagerRule = (player: PlayerRecord, rule: ManagerPlayerRule) => {
+    if (managerRuleGuard(player, rule)) return;
+    setLocks((current) => {
+      const withoutPlayer = current.filter((candidate) => candidate.code !== player.code);
+      return rule === "lock" ? [...withoutPlayer, player] : withoutPlayer;
+    });
+    setExcludes((current) => {
+      const withoutPlayer = current.filter((candidate) => candidate.code !== player.code);
+      return rule === "exclude" ? [...withoutPlayer, player] : withoutPlayer;
+    });
+  };
+
   const candidates = useMemo(() => {
     if (state.status !== "ready") return [];
     const term = search.trim().toLowerCase();
     return state.players
       .filter((p) => matchesPlayerFilters(p, filters) && p.now_cost != null)
+      .filter((p) => buildMode !== "manager" || !managerOwnedCodes.has(p.code))
       .filter((p) => !term || (p.web_name ?? "").toLowerCase().includes(term))
       .map((p) => ({
         player: p,
@@ -995,7 +1071,7 @@ export function PlanBuilderPage() {
           (a.player.now_cost ?? 0) - (b.player.now_cost ?? 0) ||
           a.player.code - b.player.code,
       );
-  }, [state, search, filters]);
+  }, [state, search, filters, buildMode, managerOwnedCodes]);
 
   const candidatePageCount = Math.max(1, Math.ceil(candidates.length / PLAYER_PAGE_SIZE));
   const visibleCandidates = useMemo(
@@ -1133,6 +1209,129 @@ export function PlanBuilderPage() {
       </div>
     );
   }
+
+  const candidatePicker = (mode: SelectionMode) => (
+    <>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <Input
+          placeholder={buildMode === "manager" ? "Search players to avoid..." : "Search player..."}
+          aria-label={buildMode === "manager" ? "Search avoid-buy player" : "Search player"}
+          className="h-8 w-52"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setCandidatePage(0);
+          }}
+        />
+        <span className="text-xs text-muted-foreground">
+          {candidates.length === 0
+            ? "No eligible priced players match"
+            : "Players " +
+              (candidatePage * PLAYER_PAGE_SIZE + 1) +
+              "โ€“" +
+              Math.min((candidatePage + 1) * PLAYER_PAGE_SIZE, candidates.length) +
+              " of " +
+              candidates.length +
+              " by forecast-horizon xP"}
+        </span>
+      </div>
+      <div className="mb-2 rounded-md border bg-background/60 px-2 py-1.5">
+        <PlayerFiltersBar
+          filters={filters}
+          onChange={(nextFilters) => {
+            setFilters(nextFilters);
+            setCandidatePage(0);
+          }}
+          teams={teams}
+          showFormWindow={false}
+        />
+      </div>
+      <PlayerPickerPager
+        page={candidatePage}
+        pageCount={candidatePageCount}
+        total={candidates.length}
+        placement="top"
+        onPageChange={changeCandidatePage}
+      />
+      <ul
+        ref={candidateListRef}
+        tabIndex={-1}
+        aria-label={
+          buildMode === "manager"
+            ? `Avoid-buy candidates page ${candidatePage + 1}`
+            : `Player candidates page ${candidatePage + 1}`
+        }
+        className="grid scroll-mt-14 gap-1.5 md:grid-cols-1 lg:grid-cols-2"
+      >
+        {visibleCandidates.map(({ player, xp }) => {
+          const locked = locks.some((candidate) => candidate.code === player.code);
+          const excluded = excludes.some((candidate) => candidate.code === player.code);
+          const blocked = selectionGuard(player, mode);
+          const selected = mode === "lock" ? locked : excluded;
+          return (
+            <li key={player.code}>
+              <button
+                type="button"
+                onClick={() => toggleSelection(player, mode)}
+                disabled={!!blocked && !selected}
+                aria-pressed={selected}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg border bg-card px-2 py-1.5 text-left text-xs transition-all",
+                  locked
+                    ? "border-emerald-400/80 bg-emerald-50 ring-1 ring-emerald-400/60 dark:bg-emerald-950/40"
+                    : excluded
+                      ? "border-red-400/80 bg-red-50 ring-1 ring-red-400/60 dark:bg-red-950/40"
+                      : "hover:-translate-y-px hover:border-primary/40 hover:shadow-sm",
+                  blocked &&
+                    !selected &&
+                    "cursor-not-allowed opacity-50 hover:translate-y-0 hover:border-border hover:shadow-none",
+                )}
+              >
+                <PlayerPhoto code={player.code} name={player.web_name} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {player.web_name}
+                    {locked && (
+                      <Badge className="ml-1 bg-emerald-600 px-1 text-[9px]">locked</Badge>
+                    )}
+                    {excluded && (
+                      <Badge variant="destructive" className="ml-1 px-1 text-[9px]">
+                        {buildMode === "manager" ? "avoid" : "excluded"}
+                      </Badge>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <TeamBadge teamCode={player.team_code} shortName={player.team_short_name} />
+                    {player.position} ยท {price(player.now_cost)} ยท{" "}
+                    {(player.selected_by_percent ?? 0).toFixed(1)}% ยท{" "}
+                    {availabilityLabel(player.availability_status)}
+                  </span>
+                </span>
+                <span className="text-right">
+                  <span className="block tabular-nums font-medium">{xp.toFixed(1)}</span>
+                  <span className="block text-[9px] text-muted-foreground">horizon xP</span>
+                </span>
+                {locked ? (
+                  <Lock className="size-3.5 shrink-0 text-emerald-600" />
+                ) : excluded ? (
+                  <Ban className="size-3.5 shrink-0 text-red-600" />
+                ) : blocked ? (
+                  <span className="text-[9px] text-muted-foreground">{blocked}</span>
+                ) : null}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <PlayerPickerPager
+        page={candidatePage}
+        pageCount={candidatePageCount}
+        total={candidates.length}
+        placement="bottom"
+        onPageChange={changeCandidatePage}
+      />
+    </>
+  );
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -1337,7 +1536,7 @@ export function PlanBuilderPage() {
                 setStep(2);
               }}
             >
-              Choose locked and excluded players <ArrowRight className="size-4" />
+              Set squad rules <ArrowRight className="size-4" />
             </Button>
             <span className="text-[10px] text-muted-foreground">
               The optimizer will start from this exact capture, not a fresh squad.
@@ -1349,7 +1548,154 @@ export function PlanBuilderPage() {
 
       {step === 2 && totals && (
         <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
-          <section aria-label="Player rules picker" className="rounded-lg border bg-muted/40 p-3">
+          <section
+            aria-label={buildMode === "manager" ? "Imported squad rules" : "Player rules picker"}
+            className="rounded-lg border bg-muted/40 p-3"
+          >
+            {buildMode === "manager" ? (
+              <>
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">Your imported squad</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Start with your 15. Leave a player flexible, keep them, or require a
+                      first-week sale.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-400 bg-emerald-50 tabular-nums text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    >
+                      <Lock className="size-3" /> Keep {locks.length}/{MAX_LOCKS}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="border-red-400 bg-red-50 tabular-nums text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                    >
+                      <Ban className="size-3" /> Sell {managerOwnedExcludedCount}/
+                      {MANAGER_FIRST_WEEK_TRANSFER_DEPTH}
+                    </Badge>
+                    {(locks.length > 0 || managerOwnedExcludedCount > 0) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[11px]"
+                        onClick={() => {
+                          setLocks([]);
+                          setExcludes((current) =>
+                            current.filter((player) => !managerOwnedCodes.has(player.code)),
+                          );
+                        }}
+                      >
+                        Reset squad rules
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {managerUnmappedPlayerCount > 0 && (
+                  <p
+                    role="alert"
+                    className="mb-3 rounded-md border border-red-300 bg-red-50 p-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+                  >
+                    {managerUnmappedPlayerCount} imported player
+                    {managerUnmappedPlayerCount === 1 ? " is" : "s are"} absent from the selected
+                    dashboard forecast. Refresh the read models before setting transfer rules.
+                  </p>
+                )}
+                <ul
+                  aria-label="Imported squad player rules"
+                  className="grid gap-2 lg:grid-cols-2"
+                >
+                  {managerSquadPlayers.map(({ imported, player, xp }) => {
+                    const rule = managerRule(player);
+                    const lockBlocked = managerRuleGuard(player, "lock");
+                    const sellBlocked = managerRuleGuard(player, "exclude");
+                    return (
+                      <li
+                        key={player.code}
+                        className={cn(
+                          "rounded-lg border bg-card p-2 text-xs transition-colors",
+                          rule === "lock" &&
+                            "border-emerald-400/80 bg-emerald-50 dark:bg-emerald-950/40",
+                          rule === "exclude" &&
+                            "border-red-400/80 bg-red-50 dark:bg-red-950/40",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <PlayerPhoto code={player.code} name={player.web_name} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium">{player.web_name}</span>
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <TeamBadge
+                                teamCode={player.team_code}
+                                shortName={player.team_short_name}
+                              />
+                              {player.position} ยท sell {price(imported.selling_price)} ยท current{" "}
+                              {price(imported.now_cost)}
+                            </span>
+                          </span>
+                          <span className="text-right">
+                            <span className="block tabular-nums font-medium">{xp.toFixed(1)}</span>
+                            <span className="block text-[9px] text-muted-foreground">
+                              horizon xP
+                            </span>
+                          </span>
+                        </div>
+                        <ToggleGroup
+                          type="single"
+                          value={rule}
+                          onValueChange={(value) =>
+                            value && setManagerRule(player, value as ManagerPlayerRule)
+                          }
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Rule for ${player.web_name}`}
+                          className="mt-2 grid grid-cols-3"
+                        >
+                          <ToggleGroupItem
+                            value="flexible"
+                            aria-label={`Flexible ${player.web_name}`}
+                          >
+                            Flexible
+                          </ToggleGroupItem>
+                          <ToggleGroupItem
+                            value="lock"
+                            aria-label={`Keep ${player.web_name}`}
+                            title={lockBlocked ?? undefined}
+                            disabled={!!lockBlocked && rule !== "lock"}
+                          >
+                            <Lock className="size-3" /> Keep
+                          </ToggleGroupItem>
+                          <ToggleGroupItem
+                            value="exclude"
+                            aria-label={`Sell ${player.web_name}`}
+                            title={sellBlocked ?? undefined}
+                            disabled={!!sellBlocked && rule !== "exclude"}
+                          >
+                            <Ban className="size-3" /> Sell
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <details className="mt-4 rounded-lg border bg-background/70 p-3">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Optional: avoid buying other players
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {excludes.length - managerOwnedExcludedCount} selected
+                    </span>
+                  </summary>
+                  <p className="mb-3 mt-2 text-xs text-muted-foreground">
+                    Search the transfer market only if there are non-owned players the optimizer
+                    must never buy. Your imported 15 are managed above.
+                  </p>
+                  {candidatePicker("exclude")}
+                </details>
+              </>
+            ) : (
+              <>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 Player picker — the same search and filters apply to both rules
@@ -1517,19 +1863,47 @@ export function PlanBuilderPage() {
               placement="bottom"
               onPageChange={changeCandidatePage}
             />
+              </>
+            )}
           </section>
 
           <section aria-label="Your rules" className="flex flex-col gap-3">
             <div className="rounded-xl border bg-card p-3 shadow-sm">
               <p className="mb-2 text-xs font-medium text-muted-foreground">Your rules</p>
+              {buildMode === "manager" && (
+                <>
+                  <p className="text-sm">
+                    Kept:{" "}
+                    <span className="font-medium tabular-nums">
+                      {locks.length} of {MAX_LOCKS}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-sm">
+                    Required sales:{" "}
+                    <span className="font-medium tabular-nums">
+                      {managerOwnedExcludedCount} of {MANAGER_FIRST_WEEK_TRANSFER_DEPTH}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-sm">
+                    Avoid buying:{" "}
+                    <span className="font-medium tabular-nums">
+                      {excludes.length - managerOwnedExcludedCount} selected
+                    </span>
+                  </p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Flexible players may be kept or sold. Required sales happen at the first
+                    actionable deadline; avoid-buy rules apply only to players outside your squad.
+                  </p>
+                </>
+              )}
+              {buildMode === "scratch" && (
+                <>
               <p className="text-sm">
                 Locks:{" "}
                 <span className="font-medium tabular-nums">
                   {locks.length
                     ? `${locks.length} of ${MAX_LOCKS}`
-                    : buildMode === "manager"
-                      ? "none — every imported player may be sold"
-                      : "none — the optimizer picks all 15"}
+                    : "none — the optimizer picks all 15"}
                 </span>
               </p>
               <p className="mt-1 text-sm">
@@ -1538,19 +1912,7 @@ export function PlanBuilderPage() {
                   {excludes.length ? excludes.length + " of " + MAX_EXCLUSIONS : "none"}
                 </span>
               </p>
-              {buildMode === "manager" && (
-                <p
-                  className={cn(
-                    "mt-1 text-[10px]",
-                    managerOwnedExcludedCount > MANAGER_FIRST_WEEK_TRANSFER_DEPTH
-                      ? "font-medium text-destructive"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  Owned players forced OUT: {managerOwnedExcludedCount}/
-                  {MANAGER_FIRST_WEEK_TRANSFER_DEPTH} current first-week search depth. Non-owned
-                  exclusions remain avoid-only and can use the rest of the {MAX_EXCLUSIONS} slots.
-                </p>
+                </>
               )}
               <div className="mt-3 flex items-center gap-2 text-sm">
                 Rotation threshold
@@ -1689,7 +2051,8 @@ export function PlanBuilderPage() {
                   (buildMode === "manager" &&
                     (managerTeam == null ||
                       managerOwnedExcludedCount >
-                        MANAGER_FIRST_WEEK_TRANSFER_DEPTH))
+                        MANAGER_FIRST_WEEK_TRANSFER_DEPTH ||
+                      managerUnmappedPlayerCount > 0))
                 }
               >
                 Next: Review & run <ArrowRight className="size-4" />
@@ -1716,6 +2079,9 @@ export function PlanBuilderPage() {
                   : `threshold ${thresholdLabel} · budget ${price(budget)}`}
               </span>
             </div>
+            <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {buildMode === "manager" ? "Keep rules" : "Locked players"}
+            </p>
             {locks.length ? (
               <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Locked players">
                 {locks.map((p) => (
@@ -1741,10 +2107,13 @@ export function PlanBuilderPage() {
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
                 {buildMode === "manager"
-                  ? "No locks — every imported player may be sold."
+                  ? "No keep rules — every imported player remains flexible."
                   : "No locks — the optimizer picks all 15."}
               </p>
             )}
+            <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {buildMode === "manager" ? "Sales and avoid-buy rules" : "Excluded players"}
+            </p>
             {excludes.length ? (
               <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Excluded players">
                 {excludes.map((p) => (
@@ -1755,6 +2124,11 @@ export function PlanBuilderPage() {
                     <PlayerPhoto code={p.code} name={p.web_name} size="sm" />
                     <span className="font-medium">{p.web_name}</span>
                     <span className="text-muted-foreground">{price(p.now_cost)}</span>
+                    {buildMode === "manager" && (
+                      <Badge variant="outline" className="h-4 px-1 text-[9px]">
+                        {managerOwnedCodes.has(p.code) ? "sell" : "avoid"}
+                      </Badge>
+                    )}
                     <button
                       type="button"
                       aria-label={`Remove exclusion ${p.web_name}`}
@@ -1770,7 +2144,11 @@ export function PlanBuilderPage() {
                 ))}
               </ul>
             ) : (
-              <p className="mt-1 text-sm text-muted-foreground">No excluded players.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {buildMode === "manager"
+                  ? "No required sales or avoid-buy rules."
+                  : "No excluded players."}
+              </p>
             )}
             {buildMode === "scratch" ? (
             <div
