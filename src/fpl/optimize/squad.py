@@ -339,9 +339,7 @@ def solution_for_existing_squad(
         raise OptimizationError("players cannot be both locked and excluded")
     missing_locks = sorted(set(locked) - set(selected))
     if missing_locks:
-        raise OptimizationError(
-            f"locked codes are not in the existing squad: {missing_locks}"
-        )
+        raise OptimizationError(f"locked codes are not in the existing squad: {missing_locks}")
     validate_squad(index, rules, selected, enforce_budget=False)
     # These are an auditable view of the imported starting state, not the manager plan itself.
     # Do not apply the bench gate here: the manager planner may repair a below-threshold bench (or

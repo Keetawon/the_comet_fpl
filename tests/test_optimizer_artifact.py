@@ -956,9 +956,7 @@ def _manager_forecast(horizon: int = 2) -> ProspectivePointsArtifact:
 
 def _manager_capture(artifact: ProspectivePointsArtifact) -> ManagerTeamCapture:
     """Build and revalidate a complete canonical capture matching the manager forecast."""
-    first_rows = {
-        row.code: row for row in artifact.rows if row.gw == artifact.manifest.gw_from
-    }
+    first_rows = {row.code: row for row in artifact.rows if row.gw == artifact.manifest.gw_from}
     # Keep the weak FWD 33 and omit the strong FWD 30. The manager path should recommend the
     # one affordable same-position replacement immediately in GW2.
     current_codes = tuple(sorted(code for code in first_rows if code != 30))
@@ -1049,9 +1047,7 @@ def test_manager_producer_imports_current_fifteen_and_plans_first_gw_finances(
         free_transfers_override=0,
     )
 
-    assert {member.code for member in initial.members} == {
-        player.code for player in capture.squad
-    }
+    assert {member.code for member in initial.members} == {player.code for player in capture.squad}
     assert initial.squad_cost_tenths == 1050 > rules.squad.budget_tenths
     first, second = plan.weeks
     assert first.gw == forecast.manifest.gw_from

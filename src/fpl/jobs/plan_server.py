@@ -191,9 +191,7 @@ def _manager_team_preview(
             f"manager capture plans GW{capture.planning_event}, but the active forecast starts "
             f"at GW{forecast.manifest.gw_from}; regenerate the forecast"
         )
-    forecast_registry_sha = (
-        forecast.manifest.live_inputs.selectable_player_registry_sha256
-    )
+    forecast_registry_sha = forecast.manifest.live_inputs.selectable_player_registry_sha256
     if forecast_registry_sha is None:
         raise RequestError(
             "the active forecast has no selectable-player registry binding; regenerate the "
@@ -810,9 +808,7 @@ def run_manager_plan(
         summary = summarize_artifact(output)
         summary["manager_entry_name"] = capture.manager_name
         summary["manager_planning_gw"] = capture.planning_event
-        summary["manager_squad_selling_value_tenths"] = (
-            capture.squad_selling_value_tenths
-        )
+        summary["manager_squad_selling_value_tenths"] = capture.squad_selling_value_tenths
         summary["manager_current_team"] = preview["players"]
         _publish_custom_artifact(state, output, standing_paths, summary)
         with state.status_lock:
@@ -943,12 +939,10 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                     capture_id = body.get("capture_id")
                     if not isinstance(capture_id, str):
                         raise RequestError("capture_id must be a string")
-                    result = _manager_team_preview(
-                        state, _load_manager_capture(state, capture_id)
-                    )
+                    result = _manager_team_preview(state, _load_manager_capture(state, capture_id))
                 else:
-                    capture_id, locks, excludes, bench, override = (
-                        validate_manager_plan_request(body)
+                    capture_id, locks, excludes, bench, override = validate_manager_plan_request(
+                        body
                     )
                     result = run_manager_plan(
                         state,
@@ -994,10 +988,7 @@ def serve(
     print(
         f"LAN access token ({ACCESS_TOKEN_HEADER}; loopback does not need it): {state.access_token}"
     )
-    print(
-        "POST /plan | /manager-team | /manager-team/capture | /manager-plan "
-        "and GET /status"
-    )
+    print("POST /plan | /manager-team | /manager-team/capture | /manager-plan and GET /status")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

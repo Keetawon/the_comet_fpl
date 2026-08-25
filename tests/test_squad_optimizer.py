@@ -573,9 +573,7 @@ def _manager_financials(
             OwnedPlayerFinancials(
                 code=code,
                 purchase_price_tenths=index.first_by_code[code].now_cost or 0,
-                selling_price_tenths=overrides.get(
-                    code, index.first_by_code[code].now_cost or 0
-                ),
+                selling_price_tenths=overrides.get(code, index.first_by_code[code].now_cost or 0),
             )
             for code in codes
         ),
@@ -584,9 +582,7 @@ def _manager_financials(
 
 def test_imported_existing_squad_can_exceed_fresh_market_budget() -> None:
     players = tuple(
-        replace(player, cost=70)
-        for player in _base_players()
-        if player.code in set(_INITIAL_SQUAD)
+        replace(player, cost=70) for player in _base_players() if player.code in set(_INITIAL_SQUAD)
     )
     artifact = _artifact(players)
     rules = load_squad_rules()
@@ -597,11 +593,7 @@ def test_imported_existing_squad_can_exceed_fresh_market_budget() -> None:
 
 def test_manager_plan_can_transfer_in_first_forecast_gw_and_charges_new_hit() -> None:
     players = (
-        *(
-            player
-            for player in _base_players(horizon=2)
-            if player.code in set(_INITIAL_SQUAD)
-        ),
+        *(player for player in _base_players(horizon=2) if player.code in set(_INITIAL_SQUAD)),
         _Player(code=35, position="FWD", points=(20.0, 20.0)),
     )
     artifact = _artifact(players)
@@ -697,11 +689,7 @@ def test_manager_affordability_filters_before_transition_pruning() -> None:
 
 def test_manager_remaining_free_transfers_are_not_regranted_in_first_week() -> None:
     players = (
-        *(
-            player
-            for player in _base_players(horizon=2)
-            if player.code in set(_INITIAL_SQUAD)
-        ),
+        *(player for player in _base_players(horizon=2) if player.code in set(_INITIAL_SQUAD)),
         _Player(code=35, position="FWD", points=(20.0, 20.0)),
     )
     artifact = _artifact(players)
