@@ -1,7 +1,7 @@
 # The publish contract
 
 **Status: historical design, superseded where noted by
-`docs/dashboard-json-contract.md` version 4.** The ledger, BI export, static application export,
+`docs/dashboard-json-contract.md` version 6.** The ledger, BI export, static application export,
 and dashboard are now implemented development-only. This file retains the original product shape;
 the implemented, versioned boundary is authoritative when the two differ.
 
@@ -29,8 +29,8 @@ difficulty, and pivot-ready dimensions. Do not silently overload this applicatio
 ## Layout
 
 > **Historical, non-normative layout.** The per-player histogram files and shapes below were an
-> early design and must not be implemented. The authoritative schema-v4 layout is
-> `docs/dashboard-json-contract.md`: seven read-model JSON files plus a manifest, with compact
+> early design and must not be implemented. The authoritative schema-v6 layout is
+> `docs/dashboard-json-contract.md`: eight read-model JSON files plus a manifest, with compact
 > cumulative scalars in `player_horizons.json` and no raw PMF in the bulk payload.
 
 ```

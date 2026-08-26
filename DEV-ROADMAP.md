@@ -942,8 +942,19 @@ outcome facts.
   analytics axis.
 - Provide accessible, keyboard-operable SVG plus an exact table/list. Null axis values are omitted
   with counts, never coerced to zero. Pareto geometry is display logic, not optimization.
+- Let users tighten the horizontal chart viewport and focus on the efficient/Pareto set when
+  outliers compress a dense cluster. Classification still uses the full filtered eligible set;
+  viewport controls never change exact tables or insight facts. Player probability bounds use
+  displayed percent units. Invalid ranges fail open to the full chart.
 - Call outputs player value/risk and club-environment shortlists. Never claim an optimal squad,
   guaranteed return, calibrated current-season goal level, or the best asset inside a club.
+- Do not add an EV-versus-standard-deviation or Sharpe view: those axes are empirically collinear
+  here. A true constrained portfolio frontier needs joint correlations/samples and squad rules at
+  the Python publish/optimizer boundary; the current browser frontier is direct-value Pareto
+  geometry over individual players or club environments.
+- Label player/team past-vs-future form as latest-at-export reporting context, not state frozen at
+  the selected forecast vintage. Show the row's observed `(season, as_at_gw)` anchor because an
+  older forecast may be displayed beside later form; this comparison remains explanatory only.
 
 Acceptance: pure direction-aware Pareto and aggregation tests cover ties, nulls, vintage isolation,
 exact fixed-start horizon endpoints, double and blank gameweeks, venue filtering, expected-count

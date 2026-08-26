@@ -474,6 +474,16 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
 - Deep-analytics charts may compute direction-labelled Pareto and quadrant display geometry from
   direct published axes. They are not optimizers. Team expected clean sheets is explicitly a sum of
   per-fixture probabilities (an expected count), never labelled as a probability.
+- The analytics pages label that nondominated set as an efficient frontier and provide chart-only
+  horizontal min/max and frontier-focus controls for crowded plots. Frontier membership is still
+  classified on every filtered eligible row; the exact table and insight facts do not change, and
+  the page reports hidden points. Probability-axis inputs use displayed percent units. This is not
+  a Markowitz mean-variance/Sharpe frontier: a portfolio view would require backend-published joint
+  samples or covariances plus squad constraints.
+- Past-vs-future form is latest at static export, not frozen at a selected forecast vintage. Those
+  views show the per-row season/gameweek form anchor and warn that form can post-date an older run;
+  it remains context only and is never treated as future utility or a model input. Form
+  availability still gates which context points are axis-complete.
 - Every route's implemented deterministic insight panel derives from visible published facts. Any
   optional remote explanation is explicit opt-in, cites allowlisted fact ids, never receives
   private manager/custom-plan state, and never supplies canonical numbers.

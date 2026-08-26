@@ -116,8 +116,11 @@ legacy schema-1 vintage with no fixture transport contributes zero team objects.
   across seasons (`team_code` is cross-season-safe). At a GW1 deadline this is the prior
   season's closing gameweek; a promoted club falls back to its last completed PL season; a
   club with no observed form has `form: null`. The anchor `season` and `as_at_gw` are carried
-  so the UI can label how old the form is. All four windows (`last_3`, `last_5`, `last_10`,
-  `season_to_date`) carry every measure including per-match rates, NULLs preserved.
+  so the UI can label how old the form is. The emitter attaches that same latest-at-export
+  snapshot to every forecast-run record; it is not reconstructed as of each run's `as_of` and
+  may therefore post-date an older selected vintage. It is reporting context only. All four
+  windows (`last_3`, `last_5`, `last_10`, `season_to_date`) carry every measure including
+  per-match rates, NULLs preserved.
 - `fixtures` is every team-fixture row of that vintage, ordered by `gw`, then kickoff, then
   fixture id — both legs of a double gameweek are separate entries. `kickoff_time` may be
   `null` for an unscheduled fixture and orders last, never first.
@@ -208,7 +211,10 @@ The population is every player with rows in `fact_forecast_player_gameweek` for 
   `clean_sheets`, on-pitch `goals_conceded`, `saves`, and `expected_goals_conceded` fields in
   addition to the existing availability, attack, bonus/BPS, DC, and points measures. The first
   three are `null` when the player did not appear; xGC is `null` when no appeared row measured it
-  and otherwise sums the measured appeared rows, including a partially measured window.
+  and otherwise sums the measured appeared rows, including a partially measured window. As with
+  team form, this is the latest snapshot at static export attached across forecast runs, not a
+  point-in-time snapshot at the selected run's `as_of`; the per-row `season` and `as_at_gw`
+  anchors must remain visible wherever an older forecast is compared with form.
 - `actuals` is the current forecast record's **same-season** observed fixture history through
   officially complete gameweeks. Each item contains `gw`, `fixture`, `kickoff_time`, `minutes`,
   `starts`, `goals_scored`, `assists`, `clean_sheets`, `goals_conceded`, `saves`, `bonus`, `bps`,

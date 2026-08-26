@@ -66,7 +66,7 @@ describe("PlayerAnalyticsPage", () => {
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     expect(screen.getByText(/exact fixed-start GW1-5 endpoint/)).toBeInTheDocument();
 
-    const table = screen.getByRole("table", { name: /Player analytics exact values · Value frontier/ });
+    const table = screen.getByRole("table", { name: /Player analytics exact eligible values · Value frontier/ });
     const alpha = within(table).getByText("Alpha").closest("tr")!;
     expect(within(alpha).getByText("£12.8m")).toBeInTheDocument();
     expect(within(alpha).getByText("27.000000")).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe("PlayerAnalyticsPage", () => {
     );
     expect(alphaPoint).toHaveAttribute("tabindex", "0");
     expect(screen.getByLabelText("Player position colour legend")).toHaveTextContent(
-      "outlined = Pareto frontier",
+      "outlined = efficient frontier (Pareto)",
     );
   });
 
@@ -87,8 +87,20 @@ describe("PlayerAnalyticsPage", () => {
     await screen.findByRole("heading", { name: "Player analytics" });
 
     await user.click(screen.getByRole("radio", { name: "Upside / downside" }));
+    const horizontalMin = screen.getByRole("spinbutton", {
+      name: /Minimum horizontal chart value · P\(total/,
+    });
+    expect(horizontalMin.parentElement).toHaveTextContent(
+      "Horizontal range (P(total ≤ 2), %)",
+    );
+    expect(horizontalMin).toHaveAttribute("max", "100");
+    await user.type(horizontalMin, "5");
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(1);
+    expect(screen.getByLabelText(/Beta; GK · BET/)).toBeInTheDocument();
+    await user.clear(horizontalMin);
+
     let table = screen.getByRole("table", {
-      name: /Player analytics exact values · Upside \/ downside/,
+      name: /Player analytics exact eligible values · Upside \/ downside/,
     });
     let alpha = within(table).getByText("Alpha").closest("tr")!;
     expect(within(alpha).getByText("0.50% (0.005000)")).toBeInTheDocument();
@@ -97,7 +109,7 @@ describe("PlayerAnalyticsPage", () => {
     await user.click(screen.getByRole("combobox", { name: "Haul threshold" }));
     await user.click(screen.getByRole("option", { name: "≥ 15" }));
     table = screen.getByRole("table", {
-      name: /Player analytics exact values · Upside \/ downside/,
+      name: /Player analytics exact eligible values · Upside \/ downside/,
     });
     alpha = within(table).getByText("Alpha").closest("tr")!;
     expect(within(alpha).getByText("86.00% (0.860000)")).toBeInTheDocument();
@@ -107,6 +119,46 @@ describe("PlayerAnalyticsPage", () => {
     alpha = within(table).getByText("Alpha").closest("tr")!;
     expect(within(alpha).getByText("25.00% (0.250000)")).toBeInTheDocument();
     expect(within(alpha).getByText("10.00% (0.100000)")).toBeInTheDocument();
+  });
+
+  it("focuses the horizontal chart domain without changing exact rows or frontier geometry", async () => {
+    const user = userEvent.setup();
+    render(<PlayerAnalyticsPage />);
+    await screen.findByRole("heading", { name: "Player analytics" });
+
+    const minimum = screen.getByRole("spinbutton", {
+      name: /Minimum horizontal chart value · Deadline price/,
+    });
+    const maximum = screen.getByRole("spinbutton", {
+      name: /Maximum horizontal chart value · Deadline price/,
+    });
+    expect(screen.getByText(/Horizontal range \(Deadline price/)).toBeInTheDocument();
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(2);
+    const insightBeforeFocus = screen.getByTestId("insight-summary-panel").textContent;
+
+    await user.type(minimum, "10");
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(1);
+    expect(screen.getByText(/1 currently shown in the chart/)).toBeInTheDocument();
+    const exactTable = screen.getByRole("table", { name: /exact eligible values · Value frontier/ });
+    expect(within(exactTable).getByText("Alpha")).toBeInTheDocument();
+    expect(within(exactTable).getByText("Beta")).toBeInTheDocument();
+
+    await user.type(maximum, "5");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Min must not exceed max. Horizontal bounds are ignored.",
+    );
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Clear player analytics filters" }));
+    expect(minimum).toHaveValue(null);
+    expect(maximum).toHaveValue(null);
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(2);
+
+    await user.click(within(screen.getByRole("radiogroup", { name: "Chart point scope" })).getByRole("radio", { name: "Efficient frontier only" }));
+    expect(screen.getAllByTestId("analytics-point").every((point) => point.dataset.frontier === "true"))
+      .toBe(true);
+    expect(within(exactTable).getByText("Beta")).toBeInTheDocument();
+    expect(screen.getByTestId("insight-summary-panel").textContent).toBe(insightBeforeFocus);
   });
 
   it("counts unmeasured ownership as omitted in differential mode instead of zero", async () => {
@@ -128,13 +180,22 @@ describe("PlayerAnalyticsPage", () => {
     await screen.findByRole("heading", { name: "Player analytics" });
 
     await user.click(screen.getByRole("radio", { name: "Past vs future" }));
+    const horizontalMin = screen.getByRole("spinbutton", {
+      name: /Minimum horizontal chart value · Observed points/,
+    });
+    await user.type(horizontalMin, "10");
+    await user.click(screen.getByRole("combobox", { name: "Past form window" }));
+    await user.click(screen.getByRole("option", { name: "Last 3" }));
+    await waitFor(() => expect(horizontalMin).toHaveValue(null));
     expect(screen.getAllByText(/context only/).length).toBeGreaterThan(0);
-    expect(screen.queryByText("outlined = Pareto frontier")).not.toBeInTheDocument();
+    expect(screen.queryByText("outlined = efficient frontier (Pareto)")).not.toBeInTheDocument();
     const table = screen.getByRole("table", { name: /Past vs future/ });
     const alpha = within(table).getByText("Alpha").closest("tr")!;
-    expect(within(alpha).getByText("31")).toBeInTheDocument();
+    expect(within(alpha).getByText("16")).toBeInTheDocument();
+    expect(within(alpha).getByText("2025-26 GW38")).toBeInTheDocument();
     expect(within(alpha).getByText("Context only")).toBeInTheDocument();
-    expect(screen.getByText(/comparison is explanatory, not causal/)).toBeInTheDocument();
+    expect(screen.getAllByText(/latest static-export anchor/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/may post-date the selected forecast vintage/i).length).toBeGreaterThan(0);
   });
 
   it("reuses player filters and explains a fully empty filtered scope", async () => {

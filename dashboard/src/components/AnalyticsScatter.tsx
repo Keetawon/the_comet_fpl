@@ -12,6 +12,11 @@ export interface AnalyticsScatterAxis {
   direction: AnalyticsScatterDirection;
   /** Display formatter only; it must not transform the plotted model value. */
   format?: (value: number) => string;
+  /** Optional physical bounds used only to clamp padded chart ticks. */
+  bounds?: {
+    min?: number;
+    max?: number;
+  };
 }
 
 /**
@@ -64,15 +69,34 @@ function finite(value: number | null | undefined): value is number {
   return value != null && Number.isFinite(value);
 }
 
-function domain(values: readonly number[]): Domain {
+function domain(
+  values: readonly number[],
+  bounds: AnalyticsScatterAxis["bounds"],
+): Domain {
   const min = Math.min(...values);
   const max = Math.max(...values);
+  let padded: Domain;
   if (min !== max) {
     const padding = (max - min) * 0.06;
-    return { min: min - padding, max: max + padding };
+    padded = { min: min - padding, max: max + padding };
+  } else {
+    const padding = Math.max(Math.abs(min) * 0.06, 1);
+    padded = { min: min - padding, max: max + padding };
   }
-  const padding = Math.max(Math.abs(min) * 0.06, 1);
-  return { min: min - padding, max: max + padding };
+  const clamped = {
+    min: bounds?.min == null ? padded.min : Math.max(bounds.min, padded.min),
+    max: bounds?.max == null ? padded.max : Math.min(bounds.max, padded.max),
+  };
+  if (clamped.min < clamped.max) return clamped;
+
+  // A single point exactly on a physical bound still needs a non-zero plotting span.
+  if (bounds?.min != null && min === bounds.min) {
+    return { min: bounds.min, max: bounds.max ?? bounds.min + 1 };
+  }
+  if (bounds?.max != null && max === bounds.max) {
+    return { min: bounds.min ?? bounds.max - 1, max: bounds.max };
+  }
+  return padded;
 }
 
 function ticks({ min, max }: Domain): number[] {
@@ -143,12 +167,18 @@ export function AnalyticsScatter({
   );
 
   const xDomain = useMemo(
-    () => domain([...eligible.map(({ x }) => x), ...(finite(medianX) ? [medianX] : [])]),
-    [eligible, medianX],
+    () => domain(
+      [...eligible.map(({ x }) => x), ...(finite(medianX) ? [medianX] : [])],
+      xAxis.bounds,
+    ),
+    [eligible, medianX, xAxis.bounds],
   );
   const yDomain = useMemo(
-    () => domain([...eligible.map(({ y }) => y), ...(finite(medianY) ? [medianY] : [])]),
-    [eligible, medianY],
+    () => domain(
+      [...eligible.map(({ y }) => y), ...(finite(medianY) ? [medianY] : [])],
+      yAxis.bounds,
+    ),
+    [eligible, medianY, yAxis.bounds],
   );
 
   if (!eligible.length) {

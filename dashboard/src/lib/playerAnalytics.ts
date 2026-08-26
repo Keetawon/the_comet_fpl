@@ -210,7 +210,7 @@ function factsFor(
       id: `highest-y.${bestY.code}`,
       // The vertical axis is a future forecast in every view, including past-vs-future.
       kind: "forecast",
-      statement: `${bestY.webName} has the highest plotted ${result.yAxis.label}: ${factValue(config, "y", bestY.y)}.`,
+      statement: `${bestY.webName} has the highest axis-complete ${result.yAxis.label} in the full filtered population: ${factValue(config, "y", bestY.y)}.`,
       sources: ["players.json", "player_horizons.json"],
     });
   }
@@ -220,7 +220,7 @@ function factsFor(
       facts.push({
         id: "frontier.members",
         kind: "forecast",
-        statement: `Pareto frontier (${frontier.length}${plotted.filter((row) => row.isFrontier).length > frontier.length ? "+" : ""} shown): ${frontier.map((row) => row.webName).join(", ")}.`,
+        statement: `Efficient frontier / Pareto set in the full filtered population (${frontier.length}${plotted.filter((row) => row.isFrontier).length > frontier.length ? "+" : ""} named): ${frontier.map((row) => row.webName).join(", ")}.`,
         sources: ["players.json", "player_horizons.json"],
       });
     }
@@ -228,7 +228,7 @@ function factsFor(
   facts.push({
     id: "coverage.omitted",
     kind: "coverage",
-    statement: `${plotted.length} of ${eligibleCount} filtered players are plotted; ${omittedCount} are omitted because at least one selected axis value is unmeasured.`,
+    statement: `${plotted.length} of ${eligibleCount} filtered players are axis-complete before chart focus; ${omittedCount} are omitted because at least one selected axis value is unmeasured.`,
     sources: ["players.json", "player_horizons.json"],
   });
   return facts;

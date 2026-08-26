@@ -109,6 +109,32 @@ describe("AnalyticsScatter", () => {
     expect(screen.getAllByTestId("analytics-point")[0]).toHaveAttribute("cx");
   });
 
+  it("clamps padded ticks to declared physical metric bounds", () => {
+    render(
+      <AnalyticsScatter
+        {...props}
+        points={[{ id: "certain", label: "Certain", x: 0, y: 1 }]}
+        xAxis={{
+          label: "P(blank)",
+          direction: "minimize",
+          bounds: { min: 0, max: 1 },
+          format: (value) => `${Math.round(value * 100)}%`,
+        }}
+        yAxis={{
+          label: "P(haul)",
+          direction: "maximize",
+          bounds: { min: 0, max: 1 },
+          format: (value) => `${Math.round(value * 100)}%`,
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText("0%").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("100%").length).toBeGreaterThan(0);
+    expect(screen.queryByText("-100%")).not.toBeInTheDocument();
+    expect(screen.queryByText("200%")).not.toBeInTheDocument();
+  });
+
   it("renders an explicit empty state and ignores non-finite coordinates", () => {
     render(
       <AnalyticsScatter

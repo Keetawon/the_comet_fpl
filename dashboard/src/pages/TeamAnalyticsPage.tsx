@@ -60,6 +60,8 @@ type PageState =
       defaultRunId: string;
     };
 
+type ChartExtent = "all" | "frontier";
+
 const FORM_LABELS: Record<WindowLabel, string> = {
   last_3: "Last 3",
   last_5: "Last 5",
@@ -106,9 +108,18 @@ function chartTitle(view: TeamAnalyticsView, pastMetric: TeamPastMetric): string
 
 function chartDescription(view: TeamAnalyticsView): string {
   if (view === "past-future") {
-    return "Context-only comparison of a directly published observed form rate with future modelled lambdas; no frontier or buy/avoid claim.";
+    return "Context-only comparison of a directly published latest-at-export observed form rate with future modelled lambdas. It is not vintage-aligned; no frontier or buy/avoid claim is made.";
   }
-  return "Pareto frontier means nondominated club environments in this selected scope, not an optimal FPL squad.";
+  if (view === "environment") {
+    return "The efficient frontier is the Pareto-nondominated geometry of selected-scope sums of published λ against (lower is better) and λ for (higher is better). It is not an optimal FPL squad.";
+  }
+  return "The efficient frontier is the Pareto-nondominated geometry of selected-scope sums of published clean-sheet probabilities and λ for (both higher is better). It is not an optimal FPL squad.";
+}
+
+function numericBound(value: string): number | null {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function TeamAnalyticsPage() {
@@ -118,6 +129,9 @@ export function TeamAnalyticsPage() {
   const [gwTo, setGwTo] = useState(1);
   const [venue, setVenue] = useState<TeamAnalyticsVenue>("all");
   const [view, setView] = useState<TeamAnalyticsView>("environment");
+  const [chartExtent, setChartExtent] = useState<ChartExtent>("all");
+  const [xMinimum, setXMinimum] = useState("");
+  const [xMaximum, setXMaximum] = useState("");
   const [formWindow, setFormWindow] = useState<WindowLabel>("last_5");
   const [pastMetric, setPastMetric] = useState<TeamPastMetric>("xg-for");
 
@@ -236,6 +250,36 @@ export function TeamAnalyticsPage() {
       })),
     [plot.plotted],
   );
+  const xMinimumValue = numericBound(xMinimum);
+  const xMaximumValue = numericBound(xMaximum);
+  const xRangeActive = xMinimumValue != null || xMaximumValue != null;
+  const xRangeValid =
+    xMinimumValue == null || xMaximumValue == null || xMinimumValue <= xMaximumValue;
+  const xFocusedScatterPoints = useMemo(
+    () =>
+      !xRangeActive || !xRangeValid
+        ? scatterPoints
+        : scatterPoints.filter(
+            (point) =>
+              (xMinimumValue == null || point.x >= xMinimumValue) &&
+              (xMaximumValue == null || point.x <= xMaximumValue),
+          ),
+    [scatterPoints, xMaximumValue, xMinimumValue, xRangeActive, xRangeValid],
+  );
+  const frontierOnly = chartExtent === "frontier" && plot.axes.showFrontier;
+  const visibleScatterPoints = useMemo(
+    () =>
+      frontierOnly
+        ? xFocusedScatterPoints.filter((point) => point.isFrontier === true)
+        : xFocusedScatterPoints,
+    [frontierOnly, xFocusedScatterPoints],
+  );
+  const xHiddenPoints = scatterPoints.length - xFocusedScatterPoints.length;
+  const chartIsFiltered = frontierOnly || xHiddenPoints > 0;
+  const resetChartXFocus = () => {
+    setXMinimum("");
+    setXMaximum("");
+  };
 
   if (state.status === "loading") {
     return (
@@ -267,7 +311,7 @@ export function TeamAnalyticsPage() {
 
   const options = vintageOptions(state.runs, state.plans);
   const selectedVintageLabel = `${selectedRun.run_id} · ${selectedRun.season}`;
-  const horizonLabel = `GW${gwFrom}-${gwTo} · ${venue} venue · ${analytics.fixtureRows} modelled team-fixture rows`;
+  const horizonLabel = `GW${gwFrom}-${gwTo} · ${venue} venue · ${analytics.fixtureRows} modelled team-fixture rows · axes fit ${frontierOnly ? "efficient frontier" : xHiddenPoints ? "horizontal focus" : "all plotted clubs"}`;
   const insightFacts = [
     insightFact(
       "coverage.fixture_rows",
@@ -278,14 +322,14 @@ export function TeamAnalyticsPage() {
     insightFact(
       "coverage.fallback_rows",
       "coverage",
-      `${facts.fallbackRows} visible modelled rows use the published Stage A league-average fallback.`,
+      `${facts.fallbackRows} selected-scope modelled rows use the published Stage A league-average fallback.`,
       ["fixture_matrix.json"],
     ),
     ...(facts.frontier.length ? [
       insightFact(
         "frontier.clubs",
         "frontier",
-        `${facts.frontier.length} clubs are on the visible Pareto frontier; ${facts.frontier.slice(0, 5).map((team) => team.teamName).join(", ")}${facts.frontier.length > 5 ? ", and others" : ""}.`,
+        `${facts.frontier.length} clubs are on the efficient frontier / Pareto set in the full selected axis-complete population; ${facts.frontier.slice(0, 5).map((team) => team.teamName).join(", ")}${facts.frontier.length > 5 ? ", and others" : ""}.`,
         ["fixture_matrix.json"],
       ),
     ] : []),
@@ -293,7 +337,7 @@ export function TeamAnalyticsPage() {
       insightFact(
         "rank.highest_attack_total",
         "rank",
-        `${facts.highestAttack.teamName} has the highest visible summed expected goals for at ${fmt(facts.highestAttack.value)}.`,
+        `${facts.highestAttack.teamName} has the highest selected-scope summed expected goals for at ${fmt(facts.highestAttack.value)}.`,
         ["fixture_matrix.json"],
       ),
     ] : []),
@@ -301,7 +345,7 @@ export function TeamAnalyticsPage() {
       insightFact(
         "rank.lowest_defence_total",
         "rank",
-        `${facts.lowestConceding.teamName} has the lowest visible summed expected goals against at ${fmt(facts.lowestConceding.value)}.`,
+        `${facts.lowestConceding.teamName} has the lowest selected-scope summed expected goals against at ${fmt(facts.lowestConceding.value)}.`,
         ["fixture_matrix.json"],
       ),
     ] : []),
@@ -317,8 +361,9 @@ export function TeamAnalyticsPage() {
   const insightCaveats = [
     "Stage A lambdas are relative fixture signals, not calibrated current-season scoring levels.",
     "Expected clean sheets is a summed expected count, not a probability of at least one clean sheet.",
+    "The efficient frontier is direct-value Pareto geometry, not a Markowitz EV-versus-standard-deviation frontier; no team PMF or standard deviation is regenerated in the browser.",
     view === "past-future"
-      ? "Past form is observed and future lambdas are forecasts; this view is explanatory, not causal."
+      ? "Observed form is the latest snapshot at static export and may post-date the selected forecast vintage. It is reporting context only, not a vintage-aligned input or causal comparison."
       : "Pareto-frontier membership compares only the displayed axes and does not establish optimality.",
   ];
 
@@ -329,7 +374,9 @@ export function TeamAnalyticsPage() {
           <h1 className="text-lg font-semibold">Team analytics</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Compare risk-aware club environments from one recorded forecast vintage. These are
-            exposure shortlists, not optimal teams or guarantees.
+            exposure shortlists, not optimal teams or guarantees. Risk here means only the
+            published attack, defence, and clean-sheet primitives shown on the axes; the browser
+            does not regenerate a team PMF.
           </p>
         </div>
         <VintageSelect
@@ -341,6 +388,7 @@ export function TeamAnalyticsPage() {
             setRunId(nextRunId);
             setGwFrom(next.gw_from);
             setGwTo(next.gw_to);
+            resetChartXFocus();
           }}
         />
       </div>
@@ -350,7 +398,11 @@ export function TeamAnalyticsPage() {
           <ToggleGroup
             type="single"
             value={view}
-            onValueChange={(value) => value && setView(value as TeamAnalyticsView)}
+            onValueChange={(value) => {
+              if (!value) return;
+              setView(value as TeamAnalyticsView);
+              resetChartXFocus();
+            }}
             variant="outline"
             aria-label="Team analytics view"
           >
@@ -361,7 +413,11 @@ export function TeamAnalyticsPage() {
           <ToggleGroup
             type="single"
             value={venue}
-            onValueChange={(value) => value && setVenue(value as TeamAnalyticsVenue)}
+            onValueChange={(value) => {
+              if (!value) return;
+              setVenue(value as TeamAnalyticsVenue);
+              resetChartXFocus();
+            }}
             variant="outline"
             aria-label="Venue filter"
           >
@@ -373,7 +429,10 @@ export function TeamAnalyticsPage() {
             <span>Modelled GWs</span>
             <Select
               value={String(gwFrom)}
-              onValueChange={(value) => setGwFrom(Math.min(Number(value), gwTo))}
+              onValueChange={(value) => {
+                setGwFrom(Math.min(Number(value), gwTo));
+                resetChartXFocus();
+              }}
             >
               <SelectTrigger size="sm" className="w-18" aria-label="From modelled gameweek">
                 <SelectValue />
@@ -387,7 +446,13 @@ export function TeamAnalyticsPage() {
               </SelectContent>
             </Select>
             <span>to</span>
-            <Select value={String(gwTo)} onValueChange={(value) => setGwTo(Number(value))}>
+            <Select
+              value={String(gwTo)}
+              onValueChange={(value) => {
+                setGwTo(Number(value));
+                resetChartXFocus();
+              }}
+            >
               <SelectTrigger size="sm" className="w-18" aria-label="To modelled gameweek">
                 <SelectValue />
               </SelectTrigger>
@@ -404,7 +469,10 @@ export function TeamAnalyticsPage() {
             <>
               <Select
                 value={formWindow}
-                onValueChange={(value) => setFormWindow(value as WindowLabel)}
+                onValueChange={(value) => {
+                  setFormWindow(value as WindowLabel);
+                  resetChartXFocus();
+                }}
               >
                 <SelectTrigger size="sm" className="w-36" aria-label="Past form window">
                   <SelectValue />
@@ -419,7 +487,10 @@ export function TeamAnalyticsPage() {
               </Select>
               <Select
                 value={pastMetric}
-                onValueChange={(value) => setPastMetric(value as TeamPastMetric)}
+                onValueChange={(value) => {
+                  setPastMetric(value as TeamPastMetric);
+                  resetChartXFocus();
+                }}
               >
                 <SelectTrigger size="sm" className="w-48" aria-label="Past metric">
                   <SelectValue />
@@ -434,63 +505,167 @@ export function TeamAnalyticsPage() {
               </Select>
             </>
           )}
+          {plot.axes.showFrontier && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Chart extent</span>
+              <Select
+                value={chartExtent}
+                onValueChange={(value) => setChartExtent(value as ChartExtent)}
+              >
+                <SelectTrigger size="sm" className="w-48" aria-label="Chart extent">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All plotted clubs</SelectItem>
+                  <SelectItem value="frontier">Efficient frontier only</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs">Axes fit the selected points</span>
+            </div>
+          )}
+          <fieldset className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <legend className="sr-only">Horizontal chart focus</legend>
+            <span>Horizontal focus</span>
+            <label className="flex items-center gap-1">
+              <span className="text-xs">Min</span>
+              <input
+                type="number"
+                step="any"
+                value={xMinimum}
+                onChange={(event) => setXMinimum(event.target.value)}
+                aria-label={`X minimum · ${plot.axes.xLabel}`}
+                aria-invalid={!xRangeValid}
+                className="h-8 w-24 rounded-md border bg-background px-2 tabular-nums text-foreground"
+              />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs">Max</span>
+              <input
+                type="number"
+                step="any"
+                value={xMaximum}
+                onChange={(event) => setXMaximum(event.target.value)}
+                aria-label={`X maximum · ${plot.axes.xLabel}`}
+                aria-invalid={!xRangeValid}
+                className="h-8 w-24 rounded-md border bg-background px-2 tabular-nums text-foreground"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={resetChartXFocus}
+              disabled={!xRangeActive}
+              className="h-8 rounded-md border bg-background px-3 text-xs text-foreground disabled:opacity-40"
+            >
+              Reset X
+            </button>
+            <span className="max-w-md text-xs">
+              Bounds use {plot.axes.xLabel}. They filter chart points only; frontier membership
+              and the exact table stay based on the full selected axis-complete club population.
+            </span>
+          </fieldset>
+          {!xRangeValid && (
+            <p role="alert" className="text-xs text-destructive">
+              X minimum must not exceed X maximum. The chart remains unfiltered.
+            </p>
+          )}
+          {view === "past-future" && (
+            <p className="text-xs text-muted-foreground">
+              Observed form is latest at static export, not frozen at the selected forecast
+              vintage, and may post-date an older run. Each exact row shows its own form anchor.
+            </p>
+          )}
         </div>
       </FilterPanel>
 
-      <AnalyticsScatter
-        title={chartTitle(view, pastMetric)}
-        description={chartDescription(view)}
-        points={scatterPoints}
-        xAxis={{
-          label: plot.axes.xLabel,
-          direction: plot.axes.xDirection,
-          format: (value) => value.toFixed(2),
-        }}
-        yAxis={{
-          label: plot.axes.yLabel,
-          direction: plot.axes.yDirection,
-          format: (value) => value.toFixed(2),
-        }}
-        vintageLabel={selectedVintageLabel}
-        horizonLabel={horizonLabel}
-        medianX={plot.medianX}
-        medianY={plot.medianY}
-        emptyMessage="No clubs have complete axis values in this modelled scope. Nulls and blank weeks are omitted, never read as zero."
-      />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.7fr)]">
+        <div className="space-y-2">
+          <AnalyticsScatter
+            title={chartTitle(view, pastMetric)}
+            description={chartDescription(view)}
+            points={visibleScatterPoints}
+            xAxis={{
+              label: plot.axes.xLabel,
+              direction: plot.axes.xDirection,
+              format: (value) => value.toFixed(2),
+              bounds: { min: 0 },
+            }}
+            yAxis={{
+              label: plot.axes.yLabel,
+              direction: plot.axes.yDirection,
+              format: (value) => value.toFixed(2),
+              bounds: { min: 0 },
+            }}
+            vintageLabel={selectedVintageLabel}
+            horizonLabel={horizonLabel}
+            medianX={chartIsFiltered ? null : plot.medianX}
+            medianY={chartIsFiltered ? null : plot.medianY}
+            emptyMessage={
+              frontierOnly && xRangeActive && xRangeValid
+                ? "No efficient-frontier club falls inside the selected horizontal focus. Reset X, widen the bounds, or show all clubs; the exact table remains unchanged."
+                : xHiddenPoints
+                ? "No eligible clubs fall inside the selected horizontal focus. Reset X or widen the bounds; the exact table remains unchanged."
+                : "No clubs have complete axis values in this modelled scope. Nulls and blank weeks are omitted, never read as zero."
+            }
+          />
 
-      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground" aria-label="Chart legend">
-        <span><span className="mr-1 inline-block size-2.5 rounded-full bg-blue-600" />No Stage A fallback row</span>
-        <span><span className="mr-1 inline-block size-2.5 rounded-full bg-orange-500" />Contains Stage A fallback row</span>
-        {plot.axes.showFrontier && <span>Heavy outline = Pareto-nondominated environment</span>}
-        <span>Bubble size = modelled fixture count</span>
-        <span>{plot.omitted.length} team(s) not plotted because an axis is null</span>
+          <div
+            className="flex flex-wrap gap-4 text-xs text-muted-foreground"
+            aria-label="Chart legend"
+          >
+            <span>
+              <span className="mr-1 inline-block size-2.5 rounded-full bg-blue-600" />
+              No Stage A fallback row
+            </span>
+            <span>
+              <span className="mr-1 inline-block size-2.5 rounded-full bg-orange-500" />
+              Contains Stage A fallback row
+            </span>
+            {plot.axes.showFrontier && (
+              <span>
+                Heavy outline = efficient frontier (Pareto-nondominated direct values)
+              </span>
+            )}
+            <span>Bubble size = modelled fixture count</span>
+            <span>{plot.omitted.length} team(s) not plotted because an axis is null</span>
+            {plot.axes.showFrontier && (
+              <span>
+                Chart shows {visibleScatterPoints.length} of {scatterPoints.length} eligible club(s);
+                the exact table retains every club.
+              </span>
+            )}
+            <span>
+              Horizontal focus hides {xHiddenPoints} eligible club(s); full-population frontier
+              membership is unchanged.
+            </span>
+          </div>
+        </div>
+
+        <InsightSummaryPanel
+          items={insightFacts}
+          caveats={insightCaveats}
+          remote={{
+            page: "team_analytics",
+            provenance: publishedInsightProvenance(state.manifest, selectedRun),
+            scope: compactInsightScope({
+              gw_from: gwFrom,
+              gw_to: gwTo,
+              view,
+              venue,
+              form_window: formWindowScope(formWindow),
+              past_metric: teamPastMetricScope(view, pastMetric),
+            }),
+            localScopeKey: JSON.stringify({
+              runId: selectedRun.run_id,
+              gwFrom,
+              gwTo,
+              venue,
+              view,
+              formWindow,
+              pastMetric,
+            }),
+          }}
+        />
       </div>
-
-      <InsightSummaryPanel
-        items={insightFacts}
-        caveats={insightCaveats}
-        remote={{
-          page: "team_analytics",
-          provenance: publishedInsightProvenance(state.manifest, selectedRun),
-          scope: compactInsightScope({
-            gw_from: gwFrom,
-            gw_to: gwTo,
-            view,
-            venue,
-            form_window: formWindowScope(formWindow),
-            past_metric: teamPastMetricScope(view, pastMetric),
-          }),
-          localScopeKey: JSON.stringify({
-            runId: selectedRun.run_id,
-            gwFrom,
-            gwTo,
-            venue,
-            view,
-            formWindow,
-            pastMetric,
-          }),
-        }}
-      />
 
       <section className="space-y-2" aria-labelledby="team-analytics-exact-values">
         <h2 id="team-analytics-exact-values" className="text-sm font-semibold">
@@ -505,6 +680,7 @@ export function TeamAnalyticsPage() {
               <TableHead>λ against total / fixture</TableHead>
               <TableHead>Expected CS count / fixture</TableHead>
               {view === "past-future" && <TableHead>{PAST_METRIC_LABELS[pastMetric]}</TableHead>}
+              {view === "past-future" && <TableHead>Observed form anchor</TableHead>}
               <TableHead>Fallbacks</TableHead>
               <TableHead>Chart status</TableHead>
             </TableRow>
@@ -517,31 +693,40 @@ export function TeamAnalyticsPage() {
                   <span className="text-xs text-muted-foreground">{row.shortName}</span>
                 </TableCell>
                 <TableCell className="tabular-nums">{row.fixtureCount}</TableCell>
-                <TableCell className="tabular-nums">{fmt(row.lambdaForTotal)} / {fmt(row.lambdaForPerFixture)}</TableCell>
-                <TableCell className="tabular-nums">{fmt(row.lambdaAgainstTotal)} / {fmt(row.lambdaAgainstPerFixture)}</TableCell>
-                <TableCell className="tabular-nums" title="Sum of per-fixture clean-sheet probabilities; expected count, not a probability">
+                <TableCell className="tabular-nums">
+                  {fmt(row.lambdaForTotal)} / {fmt(row.lambdaForPerFixture)}
+                </TableCell>
+                <TableCell className="tabular-nums">
+                  {fmt(row.lambdaAgainstTotal)} / {fmt(row.lambdaAgainstPerFixture)}
+                </TableCell>
+                <TableCell
+                  className="tabular-nums"
+                  title="Sum of per-fixture clean-sheet probabilities; expected count, not a probability"
+                >
                   {fmt(row.expectedCleanSheets)} / {fmt(row.expectedCleanSheetsPerFixture)}
                 </TableCell>
                 {view === "past-future" && (
-                  <TableCell className="tabular-nums">
-                    {fmt(
-                      pastMetric === "xg-for"
-                        ? row.past.xgForPerMatch
-                        : pastMetric === "goals-for"
-                          ? row.past.goalsForPerMatch
-                          : pastMetric === "xgc"
-                            ? row.past.xgcPerMatch
-                            : row.past.goalsAgainstPerMatch,
-                    )}{" "}
-                    <span className="text-xs text-muted-foreground">{row.formLabel ?? "unavailable"}</span>
-                  </TableCell>
+                  <>
+                    <TableCell className="tabular-nums">
+                      {fmt(
+                        pastMetric === "xg-for"
+                          ? row.past.xgForPerMatch
+                          : pastMetric === "goals-for"
+                            ? row.past.goalsForPerMatch
+                            : pastMetric === "xgc"
+                              ? row.past.xgcPerMatch
+                              : row.past.goalsAgainstPerMatch,
+                      )}
+                    </TableCell>
+                    <TableCell>{row.formLabel ?? "unavailable"}</TableCell>
+                  </>
                 )}
                 <TableCell className="tabular-nums">{row.fallbackFixtureCount}</TableCell>
                 <TableCell>
                   {!plottedCodes.has(row.teamCode)
                     ? "Not plotted — missing axis"
                     : frontierCodes.has(row.teamCode)
-                      ? "Pareto frontier"
+                      ? "Efficient frontier (Pareto)"
                       : view === "past-future"
                         ? "Context point"
                         : "Dominated environment"}

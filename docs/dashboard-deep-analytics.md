@@ -1,8 +1,9 @@
 # Deep analytics dashboard contract
 
 Status: contract frozen and first implementation completed development-only on 2026-08-26. The
-dashboard read-model schema version 4 is sufficient for this implementation; this document does
-not change a model, forecast vintage, optimizer objective, or published probability.
+cumulative inputs introduced in dashboard read-model schema version 4 and retained in current
+schema version 6 are sufficient for this implementation; this document does not change a model,
+forecast vintage, optimizer objective, or published probability.
 
 ## Decision question
 
@@ -21,6 +22,31 @@ The browser reads only the atomic static JSON export. It may filter, sum already
 values, rank records, and compute Pareto/frontier or quadrant display geometry. It may not create a
 probability, convolve a PMF, fit a trend, turn a per-90 rate into a forecast, or query DuckDB.
 
+### What "efficient frontier" means here
+
+The UI may call the direction-aware Pareto set an **efficient frontier** because it answers the
+same exploration question as an asset screen: which individual choices are not worse on both of
+the displayed return/risk axes? It is not a Markowitz mean-variance portfolio frontier, a convex
+hull, or evidence that intermediate combinations are attainable. The browser never estimates a
+covariance matrix or reruns the composer.
+
+Expected points versus standard deviation and a Sharpe-like ratio are deliberately excluded. On
+the published composer distributions, standard deviation is approximately proportional to the
+square root of EV, so those views mostly rank the mean twice. The player risk/reward view instead
+uses the exact published cumulative `P(total <= 2)` and `P(total >= threshold)` endpoints. The
+team views use direct published attack/defence lambdas and expected clean-sheet count; they do not
+claim to be a portfolio-return distribution. A future constrained portfolio frontier would need
+joint, provenance-bearing samples or covariances plus FPL squad rules and must be computed and
+published in Python, not inferred by the browser from marginal PMFs.
+
+Chart focus is presentation state only. A user may set horizontal minimum/maximum bounds or show
+only the already-classified frontier to inspect a crowded cluster. Pareto membership is always
+computed first over the complete filtered eligible population; chart focus never reclassifies a
+point, changes the exact table, or changes deterministic/AI insight facts. The page reports how
+many eligible points are hidden. Invalid bounds fail open to the full chart. Probability-axis
+controls are displayed as percentages and converted only for the viewport predicate; this does
+not create or transform a model probability.
+
 ## Player analytics
 
 The page binds to exactly one `(run_id, season)` and one exact cumulative endpoint `gw_to`, starting
@@ -37,7 +63,7 @@ Four views are allowed:
 | Differential | deadline ownership percent | cumulative xP | left and up |
 | Past vs future | one directly published observed form rate/value | cumulative xP | explanatory only |
 
-The value and differential fronts are Pareto-nondominated sets, not convex hulls and not optimal
+The value, upside/downside, and differential fronts are Pareto-nondominated sets, not convex hulls and not optimal
 squads. A player is dominated only when another eligible player is no worse on both axes and
 strictly better on at least one. Exact ties use stable player `code` ordering for display without
 claiming that either player dominates the other.
@@ -52,6 +78,14 @@ The accessible table beside the chart is authoritative for exact values. SVG poi
 keyboard-focusable and expose player, axes, frontier state, vintage, and horizon to assistive
 technology. The page must state that price and ownership are deadline-vintage overlays and the
 probability distribution is raw and does not apply the reported availability multiplier.
+
+Observed form is reporting context with a different time anchor: `players.json` attaches the
+latest form snapshot available at static export to every forecast-run record. It is not a frozen
+copy of form as known at the selected run's `as_of`, so it can post-date an older selected vintage.
+Past-vs-future must label this limitation and expose each player's own `(season, as_at_gw)` anchor
+in the exact table. It remains explanatory only and is never treated as future utility or a model
+input; form availability still determines which context points are axis-complete and therefore the
+view's coverage and descriptive fact population.
 
 ## Team analytics
 
@@ -81,6 +115,11 @@ orientation. Labels use "club environment" or "exposure shortlist", never "optim
 price, minutes, set pieces, transfer costs, or the three-player club cap; users must carry a club
 signal into Players or Plan Builder for asset-level decisions.
 
+Team form follows the same latest-at-export rule and is not aligned to the selected forecast
+vintage. Past-vs-future therefore labels the limitation and displays each club's own
+`(season, as_at_gw)` anchor in the exact table. A later form anchor beside an older forecast is
+explicit reporting context, not point-in-time model evidence or a causal comparison.
+
 ## Shared insight facts
 
 Each page emits a small deterministic fact packet for the shared insight panel. Eligible facts are
@@ -98,5 +137,8 @@ The optional language renderer is governed by `docs/dashboard-ai-summaries.md`.
   expected-clean-sheet labelling, and fallback accounting.
 - Both pages provide chart and table equivalents, loading/error/empty states, keyboard access,
   axis labels, legends, source vintage, and caveats.
+- Horizontal chart bounds and frontier-only focus are user-adjustable presentation controls. Tests
+  prove they leave the authoritative table, full-population Pareto membership, and insight scope
+  unchanged, handle invalid bounds safely, and use percent units for probability axes.
 - Route and sidebar tests expose Player analytics and Team analytics without changing formal
   optimizer or manager-team state.

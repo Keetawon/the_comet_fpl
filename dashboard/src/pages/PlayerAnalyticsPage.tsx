@@ -14,6 +14,7 @@ import {
 } from "@/components/PlayerFiltersBar";
 import { VintageSelect } from "@/components/VintageSelect";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -88,12 +89,12 @@ const POSITION_COLOURS: Record<string, string> = {
 };
 
 const VIEW_DESCRIPTION: Record<PlayerAnalyticsView, string> = {
-  value: "Cheaper and higher-xP players form the nondominated exploration frontier.",
+  value: "Asset-style efficient frontier: cheaper and higher-xP players form the Pareto-nondominated set.",
   upside_downside:
-    "Lower published blank probability and higher published haul probability are preferred.",
-  differential: "Lower deadline ownership and higher cumulative xP form the exploration frontier.",
+    "Risk/reward efficient frontier: lower published blank probability and higher published haul probability are preferred.",
+  differential: "Differential efficient frontier: lower deadline ownership and higher cumulative xP form the Pareto-nondominated set.",
   past_future:
-    "Observed past form is shown beside future cumulative xP for context only; no frontier is claimed.",
+    "Latest-at-export observed form is shown beside future cumulative xP for context only; it is not aligned to the selected forecast vintage and no frontier is claimed.",
 };
 
 function deriveRuns(
@@ -131,9 +132,30 @@ function axisTick(view: PlayerAnalyticsView, axis: "x" | "y", value: number): st
   return value.toFixed(2);
 }
 
-function firstFormAnchor(players: readonly PlayerRecord[]): string | null {
-  const form = players.find((player) => player.form != null)?.form;
-  return form ? `${form.season} GW${form.as_at_gw}` : null;
+function playerFormAnchor(player: PlayerRecord): string | null {
+  return player.form ? `${player.form.season} GW${player.form.as_at_gw}` : null;
+}
+
+function formAnchorSummary(players: readonly PlayerRecord[]): string {
+  const anchors = [
+    ...new Set(
+      players
+        .map(playerFormAnchor)
+        .filter((anchor): anchor is string => anchor != null),
+    ),
+  ].sort();
+  const unavailableCount =
+    players.length - players.filter((player) => player.form != null).length;
+  if (!anchors.length) {
+    return "Latest-at-export observed form is unavailable for this filtered population.";
+  }
+  const measured = anchors.length === 1
+    ? anchors[0]
+    : `${anchors.length} different anchors; see the exact table`;
+  const unavailable = unavailableCount
+    ? ` ${unavailableCount} filtered player${unavailableCount === 1 ? " has" : "s have"} no form anchor.`
+    : "";
+  return `Observed form uses the latest static-export anchor (${measured}), not the selected forecast vintage.${unavailable}`;
 }
 
 export function PlayerAnalyticsPage() {
@@ -144,6 +166,9 @@ export function PlayerAnalyticsPage() {
   const [haulThreshold, setHaulThreshold] = useState<HaulThreshold>(10);
   const [pastMetric, setPastMetric] = useState<PastMetric>("points");
   const [filters, setFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
+  const [chartXMin, setChartXMin] = useState("");
+  const [chartXMax, setChartXMax] = useState("");
+  const [chartPointScope, setChartPointScope] = useState<"all" | "frontier">("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -224,6 +249,10 @@ export function PlayerAnalyticsPage() {
     () => exactRunPlayers.filter((player) => matchesPlayerFilters(player, filters)),
     [exactRunPlayers, filters],
   );
+  const formAnchorByCode = useMemo(
+    () => new Map(filteredPlayers.map((player) => [player.code, playerFormAnchor(player)])),
+    [filteredPlayers],
+  );
 
   const horizonIndex = useMemo(
     () => indexPlayerHorizons(state.status === "ready" ? state.horizons : []),
@@ -269,6 +298,51 @@ export function PlayerAnalyticsPage() {
     [analytics],
   );
 
+  const effectiveChartXMin = useMemo(() => {
+    if (chartXMin.trim() === "") return null;
+    const value = Number(chartXMin);
+    if (!Number.isFinite(value)) return null;
+    return view === "upside_downside" ? value / 100 : value;
+  }, [chartXMin, view]);
+
+  const effectiveChartXMax = useMemo(() => {
+    if (chartXMax.trim() === "") return null;
+    const value = Number(chartXMax);
+    if (!Number.isFinite(value)) return null;
+    return view === "upside_downside" ? value / 100 : value;
+  }, [chartXMax, view]);
+  const invalidChartXRange =
+    effectiveChartXMin != null &&
+    effectiveChartXMax != null &&
+    effectiveChartXMin > effectiveChartXMax;
+  const invalidProbabilityBound =
+    view === "upside_downside" &&
+    [effectiveChartXMin, effectiveChartXMax].some(
+      (value) => value != null && (value < 0 || value > 1),
+    );
+  const invalidChartXBounds = invalidChartXRange || invalidProbabilityBound;
+
+  const xFocusedScatterPoints = useMemo(
+    () =>
+      invalidChartXBounds
+        ? scatterPoints
+        : scatterPoints.filter(
+            (point) =>
+              (effectiveChartXMin == null || point.x >= effectiveChartXMin) &&
+              (effectiveChartXMax == null || point.x <= effectiveChartXMax),
+          ),
+    [scatterPoints, effectiveChartXMin, effectiveChartXMax, invalidChartXBounds],
+  );
+
+  const visibleScatterPoints = useMemo(
+    () =>
+      xFocusedScatterPoints.filter(
+        (point) =>
+          (view === "past_future" || chartPointScope === "all" || point.isFrontier === true),
+      ),
+    [xFocusedScatterPoints, view, chartPointScope],
+  );
+
   if (state.status === "loading") {
     return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
   }
@@ -293,7 +367,10 @@ export function PlayerAnalyticsPage() {
 
   const horizonLabel = `GW${selectedRun.gw_from}-${effectiveGwTo} (fixed start)`;
   const vintageLabel = `${selectedRun.run_id} · ${selectedRun.season}`;
-  const formAnchor = firstFormAnchor(exactRunPlayers);
+  const horizontalInputAxisLabel = `${analytics?.xAxis.label ?? "X"}${
+    view === "upside_downside" ? " (percent)" : ""
+  }`;
+  const formAnchorNote = formAnchorSummary(filteredPlayers);
   const insightFacts = analytics?.facts.map((fact) =>
     insightFact(
       fact.id,
@@ -312,7 +389,7 @@ export function PlayerAnalyticsPage() {
     "Price and ownership are deadline-vintage overlays.",
     "Cumulative probabilities are raw published values from the run's fixed start.",
     view === "past_future"
-      ? "Past form is observed and cumulative xP is a future forecast; the comparison is explanatory, not causal."
+      ? "Observed form is the latest snapshot at static export and may post-date the selected forecast vintage. It is reporting context only, not a vintage-aligned input or causal comparison."
       : "Pareto-frontier membership is an exploration aid and does not establish optimality.",
   ];
 
@@ -320,6 +397,24 @@ export function PlayerAnalyticsPage() {
     setRunId(nextRunId);
     const nextRun = state.runs.find((run) => run.run_id === nextRunId);
     setGwTo(nextRun?.gw_to ?? null);
+    setChartXMin("");
+    setChartXMax("");
+    setChartPointScope("all");
+  };
+
+  const resetFilters = () => {
+    setFilters(INITIAL_PLAYER_FILTERS);
+    setChartXMin("");
+    setChartXMax("");
+    setChartPointScope("all");
+  };
+
+  const changeFilters = (nextFilters: PlayerFilters) => {
+    if (nextFilters.formWindow !== filters.formWindow) {
+      setChartXMin("");
+      setChartXMax("");
+    }
+    setFilters(nextFilters);
   };
 
   return (
@@ -346,7 +441,12 @@ export function PlayerAnalyticsPage() {
               type="single"
               value={view}
               onValueChange={(value) => {
-                if (value) setView(value as PlayerAnalyticsView);
+                if (value) {
+                  setView(value as PlayerAnalyticsView);
+                  setChartXMin("");
+                  setChartXMax("");
+                  setChartPointScope("all");
+                }
               }}
               variant="outline"
               aria-label="Analytics view"
@@ -360,11 +460,15 @@ export function PlayerAnalyticsPage() {
               )}
             </ToggleGroup>
 
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span>Cumulative horizon</span>
               <Select
                 value={String(effectiveGwTo)}
-                onValueChange={(value) => setGwTo(Number(value))}
+                onValueChange={(value) => {
+                  setGwTo(Number(value));
+                  setChartXMin("");
+                  setChartXMax("");
+                }}
               >
                 <SelectTrigger size="sm" className="w-28" aria-label="Cumulative horizon endpoint">
                   <SelectValue />
@@ -403,7 +507,14 @@ export function PlayerAnalyticsPage() {
             {view === "past_future" && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Past metric</span>
-                <Select value={pastMetric} onValueChange={(value) => setPastMetric(value as PastMetric)}>
+                <Select
+                  value={pastMetric}
+                  onValueChange={(value) => {
+                    setPastMetric(value as PastMetric);
+                    setChartXMin("");
+                    setChartXMax("");
+                  }}
+                >
                   <SelectTrigger size="sm" className="w-64" aria-label="Past form metric">
                     <SelectValue />
                   </SelectTrigger>
@@ -417,27 +528,86 @@ export function PlayerAnalyticsPage() {
                 </Select>
               </div>
             )}
+
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span>
+                Horizontal range ({analytics?.xAxis.label ?? "X"}
+                {view === "upside_downside" ? ", %" : ""})
+              </span>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={view === "upside_downside" ? 0 : undefined}
+                max={view === "upside_downside" ? 100 : undefined}
+                step={view === "upside_downside" ? 0.1 : "any"}
+                placeholder="min"
+                aria-label={`Minimum horizontal chart value · ${horizontalInputAxisLabel}`}
+                aria-invalid={invalidChartXBounds}
+                className="h-8 w-20"
+                value={chartXMin}
+                onChange={(event) => setChartXMin(event.target.value)}
+              />
+              <span>to</span>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={view === "upside_downside" ? 0 : undefined}
+                max={view === "upside_downside" ? 100 : undefined}
+                step={view === "upside_downside" ? 0.1 : "any"}
+                placeholder="max"
+                aria-label={`Maximum horizontal chart value · ${horizontalInputAxisLabel}`}
+                aria-invalid={invalidChartXBounds}
+                className="h-8 w-20"
+                value={chartXMax}
+                onChange={(event) => setChartXMax(event.target.value)}
+              />
+              {invalidChartXBounds && (
+                <span role="alert" className="text-xs text-destructive">
+                  {invalidProbabilityBound
+                    ? "Probability bounds must be between 0% and 100%. Horizontal bounds are ignored."
+                    : "Min must not exceed max. Horizontal bounds are ignored."}
+                </span>
+              )}
+            </div>
+
+            {view !== "past_future" && (
+              <ToggleGroup
+                type="single"
+                value={chartPointScope}
+                onValueChange={(value) => {
+                  if (value) setChartPointScope(value as "all" | "frontier");
+                }}
+                variant="outline"
+                aria-label="Chart point scope"
+              >
+                <ToggleGroupItem value="all">All players</ToggleGroupItem>
+                <ToggleGroupItem value="frontier">Efficient frontier only</ToggleGroupItem>
+              </ToggleGroup>
+            )}
           </div>
 
-          <PlayerFiltersBar filters={filters} onChange={setFilters} teams={teams} />
+          <PlayerFiltersBar filters={filters} onChange={changeFilters} teams={teams} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
-              The horizon always starts at the vintage's fixed GW{selectedRun.gw_from}.{" "}
-              {formAnchor
-                ? `Past form is observed through ${formAnchor}.`
-                : "Past form is unmeasured for this filtered vintage."}
+              The horizon always starts at the vintage's fixed GW{selectedRun.gw_from}.
+              {view === "past_future" ? ` ${formAnchorNote}` : ""}
             </p>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setFilters(INITIAL_PLAYER_FILTERS)}
+              onClick={resetFilters}
               aria-label="Clear player analytics filters"
             >
               <RotateCcw className="size-3.5" aria-hidden />
               Clear filters
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Horizontal min/max and efficient-frontier focus only tighten the visible plot domain.
+            Enter values in the active X-axis units shown above. The exact-values table, frontier
+            membership, filters, and insight summary still use every eligible published point.
+          </p>
         </div>
       </FilterPanel>
 
@@ -447,26 +617,38 @@ export function PlayerAnalyticsPage() {
             <AnalyticsScatter
               title={PLAYER_ANALYTICS_VIEW_LABEL[view]}
               description={VIEW_DESCRIPTION[view]}
-              points={scatterPoints}
+              points={visibleScatterPoints}
               xAxis={{
                 label: analytics.xAxis.label,
                 direction: analytics.xAxis.direction,
                 format: (value) => axisTick(view, "x", value),
+                bounds:
+                  view === "upside_downside"
+                    ? { min: 0, max: 1 }
+                    : view === "differential"
+                      ? { min: 0, max: 100 }
+                      : view === "value"
+                        ? { min: 0 }
+                        : pastMetric === "points"
+                          ? undefined
+                          : { min: 0 },
               }}
               yAxis={{
                 label: analytics.yAxis.label,
                 direction: analytics.yAxis.direction,
                 format: (value) => axisTick(view, "y", value),
+                bounds: view === "upside_downside" ? { min: 0, max: 1 } : { min: 0 },
               }}
               vintageLabel={vintageLabel}
               horizonLabel={horizonLabel}
               emptyMessage={
                 analytics.eligibleCount === 0
                   ? "No players match the current filters."
+                  : scatterPoints.length > 0 && visibleScatterPoints.length === 0
+                    ? "No plotted player reaches the current chart focus."
                   : "Every filtered player is missing at least one selected axis value."
               }
             />
-
             <InsightSummaryPanel
               items={insightFacts}
               caveats={insightCaveats}
@@ -506,7 +688,8 @@ export function PlayerAnalyticsPage() {
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p>
               {analytics.plotted.length} plotted · {analytics.omittedCount} not plotted of{" "}
-              {analytics.eligibleCount} filtered players. Null axis values are omitted, never zero.
+              {analytics.eligibleCount} filtered players. {visibleScatterPoints.length} currently
+              shown in the chart; null axis values are omitted, never zero.
             </p>
             <div className="flex flex-wrap items-center gap-3" aria-label="Player position colour legend">
               {Object.entries(POSITION_COLOURS).map(([position, colour]) => (
@@ -519,15 +702,17 @@ export function PlayerAnalyticsPage() {
                   {position}
                 </span>
               ))}
-              {view !== "past_future" && <span>outlined = Pareto frontier</span>}
+              {view !== "past_future" && <span>outlined = efficient frontier (Pareto)</span>}
             </div>
           </div>
 
           <section className="rounded-lg border bg-card p-3" aria-labelledby="player-values-title">
             <h2 id="player-values-title" className="mb-2 text-sm font-semibold">
-              Exact plotted values
+              Exact eligible values
             </h2>
-            <Table aria-label={`Player analytics exact values · ${PLAYER_ANALYTICS_VIEW_LABEL[view]}`}>
+            <Table
+              aria-label={`Player analytics exact eligible values · ${PLAYER_ANALYTICS_VIEW_LABEL[view]}`}
+            >
               <TableHeader>
                 <TableRow>
                   <TableHead>Player</TableHead>
@@ -535,6 +720,7 @@ export function PlayerAnalyticsPage() {
                   <TableHead>Position</TableHead>
                   <TableHead>{analytics.xAxis.label}</TableHead>
                   <TableHead>{analytics.yAxis.label}</TableHead>
+                  {view === "past_future" && <TableHead>Observed form anchor</TableHead>}
                   <TableHead>Frontier</TableHead>
                 </TableRow>
               </TableHeader>
@@ -550,6 +736,9 @@ export function PlayerAnalyticsPage() {
                     <TableCell className="tabular-nums">
                       {formatPlayerAnalyticsValue(analytics.config, "y", row.y)}
                     </TableCell>
+                    {view === "past_future" && (
+                      <TableCell>{formAnchorByCode.get(row.code) ?? "unavailable"}</TableCell>
+                    )}
                     <TableCell>
                       {view === "past_future" ? "Context only" : row.isFrontier ? "Yes" : "No"}
                     </TableCell>
@@ -557,7 +746,10 @@ export function PlayerAnalyticsPage() {
                 ))}
                 {!analytics.plotted.length && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={view === "past_future" ? 7 : 6}
+                      className="text-center text-muted-foreground"
+                    >
                       {analytics.eligibleCount === 0
                         ? "No players match the current filters."
                         : "No players have both selected axis values."}

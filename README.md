@@ -8,7 +8,7 @@ different answers:
 |---|---|
 | Who do I transfer in? | `E[points]` over the next N gameweeks |
 | Who do I captain? | `P(total points >= 10)` through an exact cumulative gameweek endpoint |
-| Is this differential worth it? | `Var(points)` and effective ownership |
+| Is this differential worth it? | exact cumulative downside/upside probabilities and deadline ownership |
 
 A single `xP` answers only the first.
 

@@ -1022,6 +1022,15 @@ active delivery order.
    development-only. Preserve the primitive measures and publish any composite
    difficulty score only with a versioned formula and direction. Export a pivot-friendly star schema
    atomically; BI consumers never query the mutable production DuckDB.
+   Analytics may call the nondominated set an efficient frontier and let a user tighten the chart's
+   horizontal viewport or display only those members, but classification stays over the complete
+   filtered eligible set and the exact table/insight packet stays unchanged. This is direct-value
+   Pareto geometry, not a Markowitz mean-variance or Sharpe portfolio frontier; any constrained
+   portfolio analysis needs backend-published joint dependence plus the FPL squad rules.
+   Past-vs-future observed form is the latest snapshot at static export and may post-date an older
+   selected forecast. Label it as non-vintage-aligned reporting context and show each row's
+   `(season, as_at_gw)` anchor; never describe it as state known at the forecast `as_of` or use it
+   as point-in-time model evidence.
 
 ## Sub-agent coordination and handoff
 
