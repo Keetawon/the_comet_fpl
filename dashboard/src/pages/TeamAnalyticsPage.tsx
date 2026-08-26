@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnalyticsScatter, type AnalyticsScatterPoint } from "@/components/AnalyticsScatter";
 import { FilterPanel } from "@/components/FilterPanel";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import { VintageSelect } from "@/components/VintageSelect";
 import {
   Select,
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { loadFixtureMatrix, loadNextGw } from "@/data/load";
-import type { NextGwPlan, TeamRecord, WindowLabel } from "@/data/types";
+import type { DashboardManifest, NextGwPlan, TeamRecord, WindowLabel } from "@/data/types";
 import { WINDOW_LABELS } from "@/data/types";
 import {
   TEAM_ANALYTICS_CAVEATS,
@@ -31,12 +32,20 @@ import {
   type TeamPastMetric,
 } from "@/lib/teamAnalytics";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
+import {
+  compactInsightScope,
+  formWindowScope,
+  insightFact,
+  publishedInsightProvenance,
+  teamPastMetricScope,
+} from "@/lib/insights";
 
 interface AnalyticsRun {
   run_id: string;
   season: string;
   gw_from: number;
   gw_to: number;
+  as_of?: string;
 }
 
 type PageState =
@@ -47,6 +56,7 @@ type PageState =
       teams: TeamRecord[];
       plans: NextGwPlan[];
       runs: AnalyticsRun[];
+      manifest: DashboardManifest | null;
       defaultRunId: string;
     };
 
@@ -79,6 +89,7 @@ function derivedRuns(teams: readonly TeamRecord[]): AnalyticsRun[] {
       season: team.season,
       gw_from: current ? Math.min(current.gw_from, from) : from,
       gw_to: current ? Math.max(current.gw_to, to) : to,
+      as_of: current?.as_of ?? team.as_of,
     });
   }
   return [...runs.values()].sort((left, right) => left.run_id.localeCompare(right.run_id));
@@ -121,6 +132,7 @@ export function TeamAnalyticsPage() {
               season: run.season,
               gw_from: run.gw_from,
               gw_to: run.gw_to,
+              as_of: run.as_of,
             }))
           : derivedRuns(fixtureData.teams);
         const defaultRun = defaultVintageRunId(
@@ -134,6 +146,7 @@ export function TeamAnalyticsPage() {
           teams: fixtureData.teams,
           plans: nextGw.plans,
           runs,
+          manifest: fixtureData.manifest,
           defaultRunId: selected?.run_id ?? "",
         });
         setRunId(selected?.run_id ?? null);
@@ -255,9 +268,59 @@ export function TeamAnalyticsPage() {
   const options = vintageOptions(state.runs, state.plans);
   const selectedVintageLabel = `${selectedRun.run_id} · ${selectedRun.season}`;
   const horizonLabel = `GW${gwFrom}-${gwTo} · ${venue} venue · ${analytics.fixtureRows} modelled team-fixture rows`;
-  const frontierLabel = facts.frontier.length
-    ? facts.frontier.map((team) => team.teamName).join(", ")
-    : "None (this view is explanatory or has no complete axes)";
+  const insightFacts = [
+    insightFact(
+      "coverage.fixture_rows",
+      "coverage",
+      `Scope: GW${gwFrom}-${gwTo}, ${venue} venue, ${facts.fixtureRows} modelled fixture rows; ${facts.omittedTeams} club${facts.omittedTeams === 1 ? " is" : "s are"} omitted from the plot.`,
+      ["fixture_matrix.json"],
+    ),
+    insightFact(
+      "coverage.fallback_rows",
+      "coverage",
+      `${facts.fallbackRows} visible modelled rows use the published Stage A league-average fallback.`,
+      ["fixture_matrix.json"],
+    ),
+    ...(facts.frontier.length ? [
+      insightFact(
+        "frontier.clubs",
+        "frontier",
+        `${facts.frontier.length} clubs are on the visible Pareto frontier; ${facts.frontier.slice(0, 5).map((team) => team.teamName).join(", ")}${facts.frontier.length > 5 ? ", and others" : ""}.`,
+        ["fixture_matrix.json"],
+      ),
+    ] : []),
+    ...(facts.highestAttack ? [
+      insightFact(
+        "rank.highest_attack_total",
+        "rank",
+        `${facts.highestAttack.teamName} has the highest visible summed expected goals for at ${fmt(facts.highestAttack.value)}.`,
+        ["fixture_matrix.json"],
+      ),
+    ] : []),
+    ...(facts.lowestConceding ? [
+      insightFact(
+        "rank.lowest_defence_total",
+        "rank",
+        `${facts.lowestConceding.teamName} has the lowest visible summed expected goals against at ${fmt(facts.lowestConceding.value)}.`,
+        ["fixture_matrix.json"],
+      ),
+    ] : []),
+    ...(facts.highestExpectedCleanSheets ? [
+      insightFact(
+        "rank.highest_expected_clean_sheets",
+        "rank",
+        `Highest expected CS count: ${facts.highestExpectedCleanSheets.teamName} (${fmt(facts.highestExpectedCleanSheets.value)}).`,
+        ["fixture_matrix.json"],
+      ),
+    ] : []),
+  ];
+  const insightCaveats = [
+    "Stage A lambdas are relative fixture signals, not calibrated current-season scoring levels.",
+    "Expected clean sheets is a summed expected count, not a probability of at least one clean sheet.",
+    view === "past-future"
+      ? "Past form is observed and future lambdas are forecasts; this view is explanatory, not causal."
+      : "Pareto-frontier membership compares only the displayed axes and does not establish optimality.",
+  ];
 
   return (
     <div className="flex flex-col gap-4 p-6">
@@ -403,23 +466,31 @@ export function TeamAnalyticsPage() {
         <span>{plot.omitted.length} team(s) not plotted because an axis is null</span>
       </div>
 
-      <section className="rounded-lg border p-4" aria-labelledby="team-insight-facts">
-        <h2 id="team-insight-facts" className="text-sm font-semibold">
-          Deterministic insight facts
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Direct sums, ranks, and display geometry only; no model quantity or probability is
-          reconstructed here.
-        </p>
-        <ul className="mt-3 grid gap-2 text-sm md:grid-cols-2">
-          <li>Scope: GW{facts.scope.gwFrom}-{facts.scope.gwTo}, {facts.scope.venue} venue, {facts.fixtureRows} modelled fixture rows.</li>
-          <li>Exposure frontier: {frontierLabel}.</li>
-          <li>Highest summed λ for: {facts.highestAttack ? `${facts.highestAttack.teamName} (${fmt(facts.highestAttack.value)})` : "—"}.</li>
-          <li>Lowest summed λ against: {facts.lowestConceding ? `${facts.lowestConceding.teamName} (${fmt(facts.lowestConceding.value)})` : "—"}.</li>
-          <li>Highest expected CS count: {facts.highestExpectedCleanSheets ? `${facts.highestExpectedCleanSheets.teamName} (${fmt(facts.highestExpectedCleanSheets.value)})` : "—"}.</li>
-          <li>{facts.fallbackRows} Stage A fallback row(s); {facts.omittedTeams} team(s) omitted from the chart.</li>
-        </ul>
-      </section>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "team_analytics",
+          provenance: publishedInsightProvenance(state.manifest, selectedRun),
+          scope: compactInsightScope({
+            gw_from: gwFrom,
+            gw_to: gwTo,
+            view,
+            venue,
+            form_window: formWindowScope(formWindow),
+            past_metric: teamPastMetricScope(view, pastMetric),
+          }),
+          localScopeKey: JSON.stringify({
+            runId: selectedRun.run_id,
+            gwFrom,
+            gwTo,
+            venue,
+            view,
+            formWindow,
+            pastMetric,
+          }),
+        }}
+      />
 
       <section className="space-y-2" aria-labelledby="team-analytics-exact-values">
         <h2 id="team-analytics-exact-values" className="text-sm font-semibold">

@@ -13,10 +13,14 @@ optimizer, and local plan server are never deployed.
 - Squad Draft remains browser-local. A friend's selections stay in that browser's local storage.
 - Plan Builder can review rules, but the hosted build does not probe or expose the Python/PuLP
   service. Exact solves remain a trusted-machine workflow.
-- P2.4 will add a network-free deterministic insight summary to every route. It is active work, not
-  part of the completed P2.3 deployment contract. The hosted build never contains a Z.AI or other
-  provider credential and never calls a provider directly. Optional AI prose requires a separately
-  deployed authenticated/rate-limited proxy; until then the action stays unavailable.
+- Every route includes its implemented network-free deterministic insight summary. The seven public
+  renderer-eligible routes are Summary, Fixture matrix, Players, Player analytics, Team analytics,
+  Player prediction vs actual, and Team prediction vs actual. Next GW suggestion, Optimizer audit,
+  Plan Builder, and Squad Draft remain local deterministic-only surfaces.
+- The hosted build never contains a Z.AI or other provider credential and makes zero insight-status
+  or provider-summary calls. Optional AI-selected explanation is explicit opt-in through the protected local Plan
+  Server only; it stays unavailable in the static hosted build. No key belongs in `VITE_*`, static
+  JSON, a URL, browser storage, logs, cache records, Git, or the release ZIP.
 
 GitHub Pages is public. Anyone with the URL can download every JSON file in the deployed site.
 The public package therefore removes every `user_custom` plan, converts workstation-specific

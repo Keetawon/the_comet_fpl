@@ -155,13 +155,14 @@ jobs:
 
           expected = {
               "fixture_matrix.json",
-              "forecast_vs_actual.json",
               "manifest.json",
               "next_gw.json",
               "optimizer_audit.json",
+              "player_forecast_vs_actual.json",
               "player_horizons.json",
               "players.json",
               "summary.json",
+              "team_forecast_vs_actual.json",
           }
           with zipfile.ZipFile(sys.argv[1]) as release:
               names = {entry.filename for entry in release.infolist() if not entry.is_dir()}

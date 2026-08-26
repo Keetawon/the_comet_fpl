@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import { ThemeToggle, initTheme } from "@/components/ThemeToggle";
 import { NextGwPage } from "@/pages/NextGwPage";
 import { OptimizerAuditPage } from "@/pages/OptimizerAuditPage";
@@ -32,6 +33,11 @@ const PAGES: Record<string, React.ComponentType> = {
   // Temporary stable alias for bookmarks from schema v4.
   "forecast-vs-actual": PlayerForecastVsActualPage,
   optimizer: OptimizerAuditPage,
+};
+
+const LOCAL_ONLY_INSIGHTS: Record<string, string> = {
+  "plan-builder": "This interactive decision workspace remains deterministic and local to the browser.",
+  "squad-draft": "This browser-only draft workspace remains deterministic and local to the browser.",
 };
 
 function routeFromHash(): string {
@@ -66,6 +72,14 @@ export default function App() {
         </header>
         <main className="min-h-0 flex-1 overflow-auto">
           <Page />
+          {LOCAL_ONLY_INSIGHTS[route] && (
+            <div className="px-4 pb-6 lg:px-6">
+              <InsightSummaryPanel
+                items={[{ id: "local-only", statement: LOCAL_ONLY_INSIGHTS[route] }]}
+                localOnlyReason="AI explanation is disabled on decision and private routes; no page state is sent."
+              />
+            </div>
+          )}
         </main>
       </div>
     </div>

@@ -38,6 +38,15 @@ from fpl.ingest.manager_team import (
     derive_manager_capture_id,
     write_manager_capture_atomic,
 )
+from fpl.insights.contracts import (
+    INSIGHT_REQUEST_SCHEMA,
+    INSIGHT_SCHEMA_VERSION,
+    PROMPT_VERSION,
+    InsightSummaryRequest,
+    ProviderSummaryPayload,
+    ResolvedInsightEvidence,
+)
+from fpl.insights.service import InsightService
 from fpl.jobs import plan_server
 from fpl.jobs.plan_server import (
     RequestError,
@@ -59,6 +68,65 @@ from fpl.jobs.plan_server import (
 
 HASH = "a" * 64
 CAPTURED_AT = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
+
+
+def _insight_request_bytes(**overrides: object) -> bytes:
+    payload: dict[str, object] = {
+        "schema": INSIGHT_REQUEST_SCHEMA,
+        "schema_version": INSIGHT_SCHEMA_VERSION,
+        "page": "summary",
+        "manifest_sha256": HASH,
+        "run_id": "forecast-vintage-1",
+        "season": "2026-27",
+        "as_of": "2026-08-26T08:00:00Z",
+        "scope": {"gw_from": 2, "gw_to": 5},
+    }
+    payload.update(overrides)
+    return json.dumps(payload).encode("utf-8")
+
+
+class _HttpInsightProvider:
+    provider_id = "fake"
+    model = "fake-model-v1"
+
+    def generate(
+        self,
+        evidence: ResolvedInsightEvidence,
+        *,
+        deadline_monotonic: float,
+    ) -> ProviderSummaryPayload:
+        del evidence, deadline_monotonic
+        return ProviderSummaryPayload.model_validate(
+            {
+                "headline": "coverage",
+                "items": [
+                    {
+                        "relation": "highlight",
+                        "fact_ids": ["summary.coverage"],
+                    }
+                ],
+            }
+        )
+
+
+def _fake_insight_evidence(
+    directory: Path, request: InsightSummaryRequest
+) -> ResolvedInsightEvidence:
+    del directory
+    return ResolvedInsightEvidence.model_validate(
+        {
+            "request": request,
+            "facts": [
+                {
+                    "id": "summary.coverage",
+                    "kind": "coverage",
+                    "statement": "The displayed export reports complete horizon coverage.",
+                    "source_read_models": ["summary.json"],
+                }
+            ],
+            "caveats": [],
+        }
+    )
 
 
 def _distribution(mean: float) -> tuple[float, ...]:
@@ -1255,7 +1323,11 @@ def loopback_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Threadin
             "override_seen": override,
         },
     )
-    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(ServerState(tmp_path)))
+    insight_service = InsightService(provider=None, cache_dir=tmp_path / "insight-cache")
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        make_handler(ServerState(tmp_path, insight_service=insight_service)),
+    )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield server
@@ -1301,6 +1373,97 @@ class TestHttpSurface:
         assert body["runtime"]["solver_ready"] is True
         assert body["runtime"]["solver_discovery_attempts"] >= 1
         assert body["runtime"]["solver_discovery_error"] is None
+
+    def test_insight_status_is_exact_and_disabled_by_default(
+        self, loopback_server: ThreadingHTTPServer
+    ) -> None:
+        status, _, payload = self._request(loopback_server, "/insights/status")
+        assert status == 200
+        assert json.loads(payload) == {
+            "enabled": False,
+            "provider": None,
+            "model": None,
+            "prompt_version": PROMPT_VERSION,
+        }
+
+    def test_disabled_and_invalid_insight_requests_return_stable_safe_errors(
+        self, loopback_server: ThreadingHTTPServer
+    ) -> None:
+        status, _, payload = self._request(
+            loopback_server,
+            "/insights/summary",
+            method="POST",
+            body=_insight_request_bytes(),
+        )
+        assert status == 503
+        assert json.loads(payload) == {
+            "schema": "fpl.insight-summary-error",
+            "schema_version": 1,
+            "code": "insights_disabled",
+            "message": "AI insight rendering is not configured on this server.",
+        }
+
+        status, _, payload = self._request(
+            loopback_server,
+            "/insights/summary",
+            method="POST",
+            body=_insight_request_bytes(prompt="arbitrary prompt"),
+        )
+        assert status == 422
+        assert json.loads(payload)["code"] == "invalid_request"
+
+    def test_insight_request_is_origin_protected(
+        self, loopback_server: ThreadingHTTPServer
+    ) -> None:
+        status, _, payload = self._request(
+            loopback_server,
+            "/insights/summary",
+            method="POST",
+            body=_insight_request_bytes(),
+            origin="https://evil.example",
+        )
+        assert status == 403
+        assert "not allowed" in json.loads(payload)["error"]
+
+    def test_insight_generation_does_not_take_or_wait_for_optimizer_lock(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_git_worktree_clean", lambda repo: True)
+        insight_service = InsightService(
+            provider=_HttpInsightProvider(),
+            cache_dir=tmp_path / "insight-cache",
+            evidence_resolver=_fake_insight_evidence,
+        )
+        state = ServerState(tmp_path, insight_service=insight_service)
+        assert state.run_lock.acquire(blocking=False)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(state))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            status, _, payload = self._request(
+                server,
+                "/insights/summary",
+                method="POST",
+                body=_insight_request_bytes(),
+            )
+            body = json.loads(payload)
+            assert status == 200
+            assert body["schema"] == "fpl.insight-summary-response"
+            assert body["source"] == "provider"
+            assert body["provider"] == "fake"
+            assert body["model"] == "fake-model-v1"
+            assert body["prompt_version"] == PROMPT_VERSION
+            assert body["items"] == [
+                {
+                    "text": "The displayed export reports complete horizon coverage.",
+                    "citations": ["summary.coverage"],
+                }
+            ]
+            assert "insights" not in body
+            assert state.run_lock.locked()
+        finally:
+            state.run_lock.release()
+            server.shutdown()
+            server.server_close()
 
     def test_plan_posts_through_to_the_pipeline(self, loopback_server: ThreadingHTTPServer) -> None:
         status, _, payload = self._request(

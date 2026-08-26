@@ -38,10 +38,12 @@ import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FixtureChip } from "@/components/FixtureTicker";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import { TeamBadge } from "@/components/Avatars";
 import { VintageSelect } from "@/components/VintageSelect";
 import { loadFixtureMatrix, loadNextGw } from "@/data/load";
 import type {
+  DashboardManifest,
   FixtureScheduleOverlay,
   NextGwPlan,
   ScheduleFixture,
@@ -69,6 +71,12 @@ import {
   type OpponentStrength,
 } from "@/lib/opponentStrength";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
+import {
+  compactInsightScope,
+  formWindowScope,
+  insightFact,
+  publishedInsightProvenance,
+} from "@/lib/insights";
 
 type PageState =
   | { status: "loading" }
@@ -78,6 +86,7 @@ type PageState =
       teams: TeamRecord[];
       schedule: FixtureScheduleOverlay;
       plans: NextGwPlan[];
+      manifest: DashboardManifest | null;
       runs: { run_id: string; season: string; gw_from: number; gw_to: number }[];
       easeVersion: string;
       gwFrom: number;
@@ -313,6 +322,7 @@ export function FixtureMatrixPage() {
           teams: fixtureData.teams,
           schedule: fixtureData.schedule,
           plans: nextGw.plans,
+          manifest: fixtureData.manifest,
           runs,
           easeVersion: fixtureData.easeIndexFormulaVersion,
           gwFrom,
@@ -570,6 +580,51 @@ export function FixtureMatrixPage() {
 
   const activeRunId = runId ?? state.defaultRunId;
   const activeRun = runTeams[0];
+  const modelledFacts = rows.flatMap((row) =>
+    row.filtered.map((fixture) => ({
+      team: row.team,
+      fixture,
+      value: filters ? viewMetric(fixture, filters.view) : null,
+    })),
+  );
+  const rankedFixtures = modelledFacts
+    .filter((row): row is typeof row & { value: number } => row.value != null)
+    .sort(
+      (left, right) =>
+        right.value - left.value ||
+        left.team.team_code - right.team.team_code ||
+        left.fixture.fixture - right.fixture.fixture,
+    );
+  const bestFixture = rankedFixtures[0];
+  const scheduleOnlyRows = rows.reduce((total, row) => total + row.scheduleOnly.length, 0);
+  const fallbackRows = modelledFacts.filter((row) => row.fixture.stage_a_league_average_team).length;
+  const insightFacts = [
+    insightFact(
+      "coverage.fixture_rows",
+      "coverage",
+      `${modelledFacts.length} modelled team-fixture rows and ${scheduleOnlyRows} schedule-only rows are visible in this scope.`,
+      ["fixture_matrix.json"],
+    ),
+    insightFact(
+      "coverage.fallback_rows",
+      "coverage",
+      `${fallbackRows} visible modelled rows use the published Stage A league-average fallback.`,
+      ["fixture_matrix.json"],
+    ),
+    ...(bestFixture ? [
+      insightFact(
+        "rank.highest_fixture_metric",
+        "rank",
+        `${bestFixture.team.team_name} against ${bestFixture.fixture.opponent_short_name} in GW${bestFixture.fixture.gw} has the highest visible ${filters?.view === "defense" ? "clean-sheet probability" : `${filters?.view ?? "overall"} ease index`} at ${bestFixture.value.toFixed(3)}.`,
+        ["fixture_matrix.json"],
+      ),
+    ] : []),
+  ];
+  const insightCaveats = [
+    "Ranks use directly published fixture values; schedule-only rows do not enter modelled ranks.",
+    "The current schedule overlay may be newer than the selected forecast vintage.",
+    "Null fixture values are omitted and are never interpreted as zero.",
+  ];
 
   return (
     <div className="flex flex-col gap-3 p-4 lg:p-6">
@@ -654,6 +709,36 @@ export function FixtureMatrixPage() {
           from the selected forecast vintage and may include later schedule amendments.
         </p>
       </div>
+
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "fixture_matrix",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...(state.runs.find((run) => run.run_id === activeRunId) ?? {
+              run_id: activeRunId,
+              season: activeRun?.season ?? "",
+            }),
+            as_of: activeRun?.as_of,
+          }),
+          scope: compactInsightScope({
+            gw_from: filters?.gwFrom,
+            gw_to: filters?.gwTo,
+            view: filters?.view === "defense" ? "defence" : filters?.view,
+            venue: filters?.venue,
+            form_window: formWindowScope(formWindow),
+          }),
+          localScopeKey: JSON.stringify({
+            runId: activeRunId,
+            filters,
+            horizon,
+            formWindow,
+            colorSource,
+            sorting,
+          }),
+        }}
+      />
 
       <DecisionTableFullscreen label="Fixture matrix table">
         {({ isFullscreen }) => (

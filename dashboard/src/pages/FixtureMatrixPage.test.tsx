@@ -88,6 +88,7 @@ describe("FixtureMatrixPage", () => {
   it("renders one row per club with per-GW chips, blank slots, and all colour sources", async () => {
     render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Enter Fixture matrix table fullscreen" }),
     ).toBeInTheDocument();

@@ -50,8 +50,9 @@ describe("TeamAnalyticsPage", () => {
     expect(screen.getByRole("table", { name: "Exact team analytics values" })).toBeInTheDocument();
     expect(screen.getByText("Expected CS count / fixture")).toBeInTheDocument();
     expect(screen.getByText(/expected count, not P\(at least one clean sheet\)/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Deterministic insight facts" })).toBeInTheDocument();
-    expect(screen.getByText(/Stage A fallback row\(s\)/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
+    expect(screen.getByText(/visible modelled rows use the published Stage A/i)).toBeInTheDocument();
     expect(screen.getByText(/Both DGW legs count separately/)).toBeInTheDocument();
   });
 

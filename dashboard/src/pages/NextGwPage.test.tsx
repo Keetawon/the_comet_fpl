@@ -125,6 +125,7 @@ describe("SummaryPage", () => {
     await waitFor(() => expect(screen.getByText(/2026-27 · GW1-3/)).toBeInTheDocument());
     expect(screen.getByText(/first kickoff 2026-08-22 11:30 UTC/)).toBeInTheDocument();
     expect(screen.getByText(/Deadlines are not sourced/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     // one platform card per formal plan, labelled by product role, never comparing EV
     expect(screen.getByText("Platform recommendation — default")).toBeInTheDocument();
     expect(screen.getByText("Platform diagnostic sensitivity")).toBeInTheDocument();
@@ -180,6 +181,8 @@ describe("NextGwPage", () => {
       expect(screen.getByText(/Platform Next GW suggestion — GW1/)).toBeInTheDocument(),
     );
     expect(screen.getByText(/Formation/).textContent).toContain("captain Alpha");
+    expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", {
         name: "Enter Next GW suggestion players table fullscreen",

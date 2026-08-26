@@ -14,7 +14,8 @@ HTTPX, YAML configuration, pytest, Ruff, and strict mypy.
 
 The 2026/27 GW1 deadline has passed. `DEV-ROADMAP.md` remains the canonical execution order and the
 dated P0 record remains immutable; do not infer that the owner completed the official-FPL submission
-steps unless their evidence is present. Current post-deadline dashboard work is ordered as follows:
+steps unless their evidence is present. The post-deadline dashboard program was implemented
+development-only in this order:
 
 1. freeze the instruction, roadmap, semantic, read-model, monitoring, and AI-summary contracts;
 2. add player and team deep-analytics pages over already-published forecast values;
@@ -22,6 +23,17 @@ steps unless their evidence is present. Current post-deadline dashboard work is 
    append-only outcomes and exact stored distributions;
 4. add deterministic insight summaries to every route and an optional, evidence-bound language
    renderer for public analytical pages.
+
+All eleven routes now have an immediate deterministic summary. Only Summary, Fixture matrix,
+Players, Player analytics, Team analytics, Player prediction vs actual, and Team prediction vs
+actual may invoke the optional renderer, and only after explicit user action. Next GW suggestion,
+Optimizer audit, Plan Builder, and Squad Draft remain local deterministic-only. Hosted static
+builds never call an insight provider. Provider keys are server-process secrets and must never enter
+`VITE_*`, static JSON, URLs, browser storage, logs, cache records, or Git. The browser sends only
+typed public selectors; Python verifies the static generation, constructs the facts, and renders
+canonical text from provider-selected fact ids. Failure always leaves deterministic facts usable.
+The implemented Z.AI adapter targets the general Open Platform API; never assume a GLM
+Coding Plan quota licenses general dashboard traffic without a separate provider agreement.
 
 The new pages do not authorize model research, retuning, or reinterpretation of frozen evaluations.
 Deep analytics ranks future published player/club environments; forecast monitoring diagnoses past
@@ -404,8 +416,9 @@ outcome attachment, BI semantic v3 export, atomic schema-v5 static publish bound
 dashboard are all
 implemented development-only. The dashboard reads only versioned static JSON derived from the
 published Parquet export; it never queries the mutable production DuckDB. Deep analytics and exact
-player/team monitoring are implemented; deterministic and optional evidence-bound insight summaries
-are the active next addition in `DEV-ROADMAP.md`.
+player/team monitoring and deterministic/optional evidence-bound insight summaries are implemented
+development-only. P2.5 in `DEV-ROADMAP.md` owns any later post-deadline work; this implementation
+does not authorize a model-default change or reinterpretation of a frozen evaluation.
 
 ## Non-negotiable correctness rules
 
@@ -525,12 +538,14 @@ DuckDB.
     condition probabilities, recreate a distribution from a mean, or multiply an observed per-90
     display rate by forecast minutes. Exact multi-fixture/horizon probabilities and scoring metrics
     are computed in the Python publish layer from stored distributions.
-12. A language model may explain only a bounded, provenance-keyed allowlist of already-published
-    facts. It performs no arithmetic, probability work, causal inference, model verdict, or
-    decision provenance. Deterministic summaries remain available on every route. Provider keys
-    stay in a trusted server process; never put them in Vite/static assets, URLs, browser storage,
-    logs, or Git, and never send manager, squad, bank, selling-value, capture, or custom-plan data
-    to a third party.
+12. A browser may send only exact typed public selectors to a language-rendering boundary. The
+    trusted server verifies the selected static generation and constructs a bounded,
+    provenance-keyed allowlist of already-published facts. A provider may select/group fact ids; it
+    never authors canonical numbers or prose and performs no arithmetic, probability work, causal
+    inference, model verdict, or decision provenance. Deterministic summaries remain available on
+    every route. Provider keys stay in a trusted server process; never put them in Vite/static
+    assets, URLs, browser storage, logs, or Git, and never send manager, squad, bank, selling-value,
+    capture, or custom-plan data to a third party.
 
 Run the smallest relevant tests while iterating, then use the full local gate before handoff:
 
@@ -774,12 +789,13 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
 
 ## Priorities for upcoming work
 
-The deadline record is closed to reinterpretation. Execute the current post-deadline dashboard
-sequence in `DEV-ROADMAP.md`: contracts first, then player/team deep analytics, then exact
-player/team forecast monitoring, then the optional evidence-bound language renderer and full
-republish/visual gate. Do not start a new model candidate or tune a known bias as part of this UI
-work. The numbered items below remain binding model-history and research guardrails; they are not
-permission to displace the active delivery order.
+The deadline record is closed to reinterpretation. The post-deadline dashboard sequence in
+`DEV-ROADMAP.md` has completed through the optional evidence-bound language renderer: contracts,
+player/team deep analytics, exact player/team forecast monitoring, and deterministic/optional
+summaries landed in that order. The remaining delivery gate is a fresh outcome attachment, full
+schema-v5 republish, and visual verification. Do not start a new model candidate or tune a known
+bias as part of this UI work. The numbered items below remain binding model-history and research
+guardrails; they are not permission to displace the active delivery order.
 
 1. Keep `trailing_goals_attack_defence` as the Stage A model. Do not promote any failed
    candidate (V1, V2) and do not reinterpret one after seeing its outer result. Candidate V3
@@ -974,10 +990,11 @@ permission to displace the active delivery order.
    leg are final, so a partial double gameweek produces zero scored player observations. Team attack
    CRPS uses the team's exact stored goals-for PMF; defence CRPS uses the opponent's exact stored PMF,
    never a distribution reconstructed from lambda. The current nine read-only analytic/decision
-   routes are separate from
-   Plan Builder, whose custom runs build a fresh squad, and Squad Draft, whose browser-local manual
-   selections ignore affordability while retaining roster shape and club caps. Neither route is a
-   manager-team import. Retain both player-fixture and player-gameweek predictions for every pre-deadline run,
+   routes are separate from Plan Builder and Squad Draft. Plan Builder supports both fresh custom
+   squads and a private, immutable manager-team capture path for transfer planning. Squad Draft
+   supports manual selection plus an explicitly imported private manager capture, ignores the
+   standard budget while retaining roster shape and club caps, and never relabels that capture as
+   optimizer output. Retain both player-fixture and player-gameweek predictions for every pre-deadline run,
    never overwrite a vintage, and join actual outcomes only after finalisation.
    The decision layer supports exact cumulative player endpoints from the run's fixed start: xP,
    inclusive `P(points <= 2)`, and inclusive `P(points >= 2/4/6/10/15)`. Expected points may be
@@ -990,8 +1007,9 @@ permission to displace the active delivery order.
    supports fixture difficulty split into overall, attack, and defence; player form (minutes,
    starts, xG, xA, goals, assists, bonus/BPS, DC, points); direct-value player/team Pareto
    analytics; separately published player/team prediction-versus-actual observations and
-   calibration; and optimiser-plan audits. Deterministic and optional AI page summaries are the
-   active next step, not an implemented capability. Preserve the primitive measures and publish any composite
+   calibration; and optimiser-plan audits. Deterministic summaries on all eleven routes and the
+   optional evidence-bound renderer on the seven public analytical routes are implemented
+   development-only. Preserve the primitive measures and publish any composite
    difficulty score only with a versioned formula and direction. Export a pivot-friendly star schema
    atomically; BI consumers never query the mutable production DuckDB.
 

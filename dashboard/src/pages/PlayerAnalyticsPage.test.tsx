@@ -62,7 +62,8 @@ describe("PlayerAnalyticsPage", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "Player analytics" })).toBeInTheDocument());
     expect(screen.getByText(/fixed start GW1/)).toBeInTheDocument();
     expect(screen.getByText(/2 plotted · 0 not plotted of 2 filtered players/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Deterministic insight" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     expect(screen.getByText(/exact fixed-start GW1-5 endpoint/)).toBeInTheDocument();
 
     const table = screen.getByRole("table", { name: /Player analytics exact values · Value frontier/ });

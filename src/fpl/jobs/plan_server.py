@@ -55,6 +55,16 @@ from fpl.ingest.manager_team import (
     read_manager_capture,
     write_manager_capture_atomic,
 )
+from fpl.insights.contracts import (
+    INSIGHT_ERROR_SCHEMA,
+    INSIGHT_SCHEMA_VERSION,
+    MAX_INSIGHT_BODY_BYTES,
+    InsightErrorCode,
+    InsightErrorResponse,
+    parse_insight_request_bytes,
+)
+from fpl.insights.providers import InsightGenerationError, safe_error_message
+from fpl.insights.service import INSIGHT_CACHE_DIRNAME, InsightService, build_insight_service
 from fpl.jobs.optimize_squad import (
     MAX_EXCLUDED_PLAYERS,
     MAX_LOCKED_PLAYERS,
@@ -74,6 +84,7 @@ DEFAULT_PORT = 8765
 # ponytail: the dev-data convention directory from dashboard/README.md, overridable --host
 # aside, not a config surface. All interactive artifacts live beside the standing pair.
 DEFAULT_BASE = Path(r"D:\tmp\gw1\dev-latest")
+DEFAULT_DASHBOARD_DATA = repo_root() / "dashboard" / "public" / "data"
 DB_PATH = Path("data/fpl.duckdb")
 FORECAST_NAME = "gw1_5_default.jsonl"
 STANDING_PLANS = ("plan_default.json", "plan_diagnostic.json")
@@ -338,10 +349,18 @@ class ServerState:
         *,
         access_token: str | None = None,
         forecast_path: Path | None = None,
+        dashboard_data_dir: Path | None = None,
+        insight_service: InsightService | None = None,
     ) -> None:
         self.base_dir = base_dir
         self.forecast_path = forecast_path or base_dir / FORECAST_NAME
+        self.dashboard_data_dir = Path(dashboard_data_dir or DEFAULT_DASHBOARD_DATA)
         self.access_token = access_token or secrets.token_urlsafe(24)
+        self.insight_service = (
+            insight_service
+            if insight_service is not None
+            else build_insight_service(base_dir / INSIGHT_CACHE_DIRNAME)
+        )
         self.run_lock = threading.Lock()
         self.capture_lock = threading.Lock()
         self.status_lock = threading.Lock()
@@ -895,13 +914,20 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
 
         def do_GET(self) -> None:
-            if urlparse(self.path).path != "/status":
+            route = urlparse(self.path).path
+            if route not in {"/status", "/insights/status"}:
                 self._respond(404, {"error": "unknown endpoint"})
                 return
             if not self._authorized():
                 self._respond(403, {"error": "origin or plan-server token not allowed"})
                 return
-            self._respond(200, state.snapshot())
+            if route == "/insights/status":
+                self._respond(
+                    200,
+                    state.insight_service.status().model_dump(mode="json", by_alias=True),
+                )
+            else:
+                self._respond(200, state.snapshot())
 
         def do_POST(self) -> None:
             route = urlparse(self.path).path
@@ -910,11 +936,53 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                 "/manager-team",
                 "/manager-team/capture",
                 "/manager-plan",
+                "/insights/summary",
             }:
                 self._respond(404, {"error": "unknown endpoint"})
                 return
             if not self._authorized():
                 self._respond(403, {"error": "origin or plan-server token not allowed"})
+                return
+            if route == "/insights/summary":
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    if length <= 0 or length > MAX_INSIGHT_BODY_BYTES:
+                        raise ValueError("missing or oversized insight request body")
+                    previous_timeout = self.connection.gettimeout()
+                    try:
+                        self.connection.settimeout(5.0)
+                        payload = self.rfile.read(length)
+                    finally:
+                        self.connection.settimeout(previous_timeout)
+                    if len(payload) != length:
+                        raise ValueError("short insight request body")
+                    request = parse_insight_request_bytes(payload)
+                    insight_response = state.insight_service.generate(
+                        request, dashboard_data_dir=state.dashboard_data_dir
+                    )
+                    self._respond(
+                        200,
+                        insight_response.model_dump(mode="json", by_alias=True),
+                    )
+                except (TimeoutError, ValueError):
+                    self._respond_insight_error(InsightErrorCode.INVALID_REQUEST, 422)
+                except InsightGenerationError as exc:
+                    status_by_code = {
+                        InsightErrorCode.INVALID_REQUEST: 422,
+                        InsightErrorCode.INSIGHTS_DISABLED: 503,
+                        InsightErrorCode.RATE_LIMITED: 429,
+                        InsightErrorCode.PROVIDER_TIMEOUT: 504,
+                        InsightErrorCode.PROVIDER_AUTH: 502,
+                        InsightErrorCode.PROVIDER_UNAVAILABLE: 502,
+                        InsightErrorCode.PROVIDER_RESPONSE_TOO_LARGE: 502,
+                        InsightErrorCode.MALFORMED_PROVIDER_RESPONSE: 502,
+                    }
+                    self._respond_insight_error(exc.code, status_by_code[exc.code])
+                except Exception:
+                    # The service normally translates provider failures.  Keep the final boundary
+                    # body-free and exception-free too: provider exceptions can contain upstream
+                    # payload material and therefore must not be logged or echoed.
+                    self._respond_insight_error(InsightErrorCode.PROVIDER_UNAVAILABLE, 502)
                 return
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -963,6 +1031,17 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                 state.fail(message)
                 self._respond(500, {"ok": False, "error": message})
 
+        def _respond_insight_error(self, code: InsightErrorCode, status: int) -> None:
+            payload = InsightErrorResponse.model_validate(
+                {
+                    "schema": INSIGHT_ERROR_SCHEMA,
+                    "schema_version": INSIGHT_SCHEMA_VERSION,
+                    "code": code.value,
+                    "message": safe_error_message(code),
+                }
+            )
+            self._respond(status, payload.model_dump(mode="json", by_alias=True))
+
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
             logger.info("%s %s", self.address_string(), format % args)
 
@@ -975,9 +1054,14 @@ def serve(
     base_dir: Path,
     *,
     forecast_path: Path | None = None,
+    dashboard_data_dir: Path = DEFAULT_DASHBOARD_DATA,
 ) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    state = ServerState(base_dir, forecast_path=forecast_path)
+    state = ServerState(
+        base_dir,
+        forecast_path=forecast_path,
+        dashboard_data_dir=dashboard_data_dir,
+    )
     server = ThreadingHTTPServer((host, port), make_handler(state))
     bound_host = str(server.server_address[0])
     bound_port = server.server_address[1]
@@ -988,7 +1072,10 @@ def serve(
     print(
         f"LAN access token ({ACCESS_TOKEN_HEADER}; loopback does not need it): {state.access_token}"
     )
-    print("POST /plan | /manager-team | /manager-team/capture | /manager-plan and GET /status")
+    print(
+        "POST /plan | /manager-team | /manager-team/capture | /manager-plan | "
+        "/insights/summary and GET /status | /insights/status"
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -1008,8 +1095,20 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="prospective-points artifact to solve (default: BASE/gw1_5_default.jsonl)",
     )
+    parser.add_argument(
+        "--dashboard-data",
+        type=Path,
+        default=DEFAULT_DASHBOARD_DATA,
+        help="exact published dashboard data directory used to resolve insight evidence",
+    )
     args = parser.parse_args(argv)
-    serve(args.host, args.port, args.base, forecast_path=args.forecast)
+    serve(
+        args.host,
+        args.port,
+        args.base,
+        forecast_path=args.forecast,
+        dashboard_data_dir=args.dashboard_data,
+    )
     return 0
 
 

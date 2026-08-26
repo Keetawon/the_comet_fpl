@@ -13,9 +13,10 @@ owner goals below, defer it unless it is required to keep the deadline path corr
 **Post-deadline note (2026-08-26).** The GW1 deadline has passed. Dated statements below about
 pending 2026-08-20/21 operations are retained as the delivery record and do not authorize a rerun
 or reinterpretation of frozen artifacts. The local manager-team workflow is now implemented
-development-only. Current work is the ordered P2 dashboard program: contracts first, then player
-and team deep analytics, then exact player/team prediction monitoring, then evidence-bound insight
-summaries. No model default or frozen evaluation changes.
+development-only. The ordered P2 dashboard program is now implemented development-only: contracts
+first, then player and team deep analytics, then exact player/team prediction monitoring, then
+evidence-bound insight summaries. No model default or frozen evaluation changed. P2.5 owns any
+later post-deadline work.
 
 ## Owner goals
 
@@ -34,8 +35,8 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   and Plan Builder paths are implemented and rehearsed, and the immutable 2026-08-17 evening pack
   remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
-- **Goal 2's MVP, deep analytics, and exact parallel monitoring are implemented development-only;
-  deterministic/optional AI summaries are active next.** Semantic contract version 3, dashboard
+- **Goal 2's MVP, deep analytics, exact parallel monitoring, and evidence-bound summaries are
+  implemented development-only.** Semantic contract version 3, dashboard
   schema version 5, immutable player/team outcomes, the atomic static-JSON boundary, nine read-only
   analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
   development-only. P1.8's full Players-page
@@ -43,9 +44,9 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   defensive fields are implemented in code and focused tests; the failure-atomic local database
   rebuild and atomic BI/static republish completed on 2026-08-19, so they are visible locally.
   The final deadline vintage still requires the same controlled refresh inside Goal 1. The local
-  manager-team path is implemented development-only. P2.2 player/team deep analytics and P2.3's
-  corrected append-only outcome boundary with parallel comparison pages are complete; P2.4 insight
-  summaries remain the ordered active next addition below.
+  manager-team path is implemented development-only. P2.2 player/team deep analytics, P2.3's
+  corrected append-only outcome boundary with parallel comparison pages, and P2.4's deterministic
+  summaries plus optional evidence-bound renderer are complete development-only.
 
 ## Current baseline
 
@@ -56,9 +57,10 @@ series; later handoff records the new commits and full gate rather than rewritin
 - The latest committed live snapshot was captured at `2026-08-18T06:39:18Z` and contains 590
   elements, 20 teams, 38 events, and 380 fixtures. Its first kickoff is
   `2026-08-21T19:00:00Z`; its deadline is `2026-08-21T17:30:00Z`.
-- The current local DuckDB, formal development forecasts, optimizer plans, and published dashboard
-  read models still derive from the `2026-08-17T06:50:35Z` snapshot with 587 players and 2,935
-  player-gameweek rows. They are a development vintage, not an 08-18 refresh or the final team.
+- At the start of this dated audit, the local DuckDB, formal development forecasts, optimizer
+  plans, and published dashboard read models derived from the `2026-08-17T06:50:35Z` snapshot with
+  587 players and 2,935 player-gameweek rows. That sentence is a historical baseline, not a claim
+  about the post-P2.4 republished generation.
 - The prospective pipeline emits a canonical, provenance-bearing player-gameweek JSONL artifact.
 - The append-only DuckDB prediction ledger is implemented in `src/fpl/storage/ledger.py`, with the
   thin `fpl.jobs.record_forecast` entry point. It records player-gameweek and player-fixture
@@ -907,7 +909,8 @@ advancing; none of these tasks changes a prospective model default or frozen eva
 
 ### P2.1 - Freeze the dashboard analytics, monitoring, and insight contracts
 
-**Status (2026-08-26): contract freeze complete; P2.2 and P2.3 are implemented, P2.4 remains.** The
+**Status (2026-08-26): contract freeze complete; P2.2, P2.3, and P2.4 are implemented
+development-only.** The
 detailed boundaries are frozen in:
 
 - `docs/dashboard-deep-analytics.md`;
@@ -977,28 +980,35 @@ product/metric failure.
 
 ### P2.4 - Deterministic and optional AI insight summaries
 
-**Status (2026-08-26): active next; not yet implemented.** Every route gets a
-network-free deterministic insight panel. Public analytical routes additionally offer an explicit
-"Explain with AI" action when the trusted local insight service is enabled. Private/decision routes
-remain deterministic-only.
+**Status (2026-08-26): implemented development-only.** Every route has a network-free deterministic
+insight panel. Summary, Fixture matrix, Players, Player analytics, Team analytics, Player prediction
+vs actual, and Team prediction vs actual additionally offer an explicit **Explain with AI** action
+when the trusted local insight service is enabled. Next GW suggestion, Optimizer audit, Plan
+Builder, and Squad Draft remain deterministic-only.
 
-- Implement a provider-neutral Python service and optional Z.AI GLM adapter through the existing
+- The provider-neutral Python service and optional Z.AI GLM adapter use the existing
   protected local server boundary. The browser never holds the API key and hosted static builds make
-  no provider call.
-- Use Z.AI's general Open Platform API, not its coding-tools endpoint. Coding Plan quota is not
-  assumed to license general application calls; configure a general API key/balance under the
-  current provider terms.
-- Send at most a small allowlisted, provenance-keyed set of facts for the visible scope. No PMFs,
+  no provider call. Server-only configuration is `FPL_INSIGHTS_PROVIDER=zai_glm`,
+  `FPL_INSIGHTS_API_KEY`, `FPL_INSIGHTS_MODEL`, and optional credential-free HTTPS
+  `FPL_INSIGHTS_BASE_URL`.
+- The adapter uses Z.AI's general Open Platform API, not its coding-tools endpoint. Coding Plan
+  quota is not assumed to license general application calls; configure a general API key/balance
+  under the current provider terms.
+- Requests send only exact typed page/vintage/filter selectors. The server verifies the selected
+  schema-v5 manifest and file hashes, reconstructs the allowlisted facts from that static
+  generation, and refuses mismatched provenance before provider/cache work. No PMFs, caller prose,
   arbitrary prompts, manager/custom-plan identifiers, squads, bank, selling values, capture data,
-  credentials, or full page payloads.
-- Require structured validated output with citations to submitted fact ids, bounded timeouts/body,
-  narrow retries, rate limiting, single-flight, safe errors, and an ignored provenance-aware cache.
-  AI prose never supplies canonical numbers, arithmetic, a probability, a model verdict, or decision
+  credentials, or full page payloads cross the boundary.
+- Structured provider output contains fact-id selections/relation enums rather than prose. Python
+  renders canonical cited statements. Bounded timeouts/body, narrow retries, rate limiting, true
+  single-flight, safe errors, and an ignored provenance-aware cache remain mandatory.
+  AI-selected output never supplies canonical numbers, arithmetic, a probability, a model verdict, or decision
   provenance.
 
-Acceptance: the security, privacy, provider, cache, server, frontend, stale-response, and per-route
-tests in `docs/dashboard-ai-summaries.md` pass. Provider failure always leaves the deterministic
-summary usable.
+Acceptance: implemented security, privacy, provider, cache, server, frontend, stale-response, and
+per-route tests cover the cases in `docs/dashboard-ai-summaries.md`. Hosted mode makes no insight
+network request, provider use requires explicit opt-in, and every disabled, timeout, rate-limit,
+malformed, or upstream failure leaves the deterministic summary usable.
 
 ### P2.5 - Other post-deadline work
 

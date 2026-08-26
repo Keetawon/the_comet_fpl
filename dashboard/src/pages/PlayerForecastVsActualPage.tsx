@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import {
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import type {
   PlayerForecastObservation,
   PlayerForecastVsActualData,
 } from "@/data/types";
+import { compactInsightScope, insightFact, publishedInsightProvenance } from "@/lib/insights";
 import { AccuracyScatter, AccuracyScoreKpis } from "./ForecastAccuracyParts";
 
 type PageState =
@@ -167,6 +169,45 @@ export function PlayerForecastVsActualPage() {
     ...row,
     label: `${row.team_name} (${row.team_short_name})`,
   }));
+  const insightFacts = [
+    insightFact(
+      "coverage.visible_rows",
+      "coverage",
+      `${observations.length} scored player-gameweek row${observations.length === 1 ? " is" : "s are"} visible for ${scopeLabel}.`,
+      ["player_forecast_vs_actual.json"],
+    ),
+    ...(scoreBlock?.bias == null ? [] : [
+      insightFact(
+        "score.bias",
+        "published_scalar",
+        `Published bias is ${signed(scoreBlock.bias)} points; positive means actual points exceeded forecast xP.`,
+        ["player_forecast_vs_actual.json"],
+      ),
+    ]),
+    ...(topUnder ? [
+      insightFact(
+        "rank.largest_positive_residual",
+        "rank",
+        `Largest under-prediction: ${topUnder.web_name} GW${topUnder.gw} (${signed(topUnder.residual)}).`,
+        ["player_forecast_vs_actual.json"],
+      ),
+    ] : []),
+    ...(topOver ? [
+      insightFact(
+        "rank.smallest_residual",
+        "rank",
+        `${topOver.web_name} in GW${topOver.gw} has the smallest visible residual at ${signed(topOver.residual)} points.`,
+        ["player_forecast_vs_actual.json"],
+      ),
+    ] : []),
+  ];
+  const insightCaveats = [
+    "Only authoritatively finalized observations are scored.",
+    "Residual equals actual points minus forecast xP.",
+    "Probabilities and CRPS are published values; the browser does not reconstruct them.",
+  ];
+  const firstCompletedGw = completedGws[0] ?? run.gw_from;
+  const lastCompletedGw = completedGws.at(-1) ?? run.gw_to;
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -245,15 +286,20 @@ export function PlayerForecastVsActualPage() {
         emptyMessage="No fully finalized player-gameweek observations exist in this scope."
       />
 
-      <section className="rounded-lg border p-4" aria-labelledby="player-insights-heading">
-        <h2 id="player-insights-heading" className="text-sm font-semibold">Deterministic insight facts</h2>
-        <ul className="mt-2 grid gap-2 text-sm md:grid-cols-2">
-          <li>Scope: {scopeLabel}, {observations.length} exact scored observation(s).</li>
-          <li>Published bias: {signed(scoreBlock?.bias)} (actual − forecast).</li>
-          <li>Largest under-prediction: {topUnder ? `${topUnder.web_name} GW${topUnder.gw} (${signed(topUnder.residual)})` : "—"}.</li>
-          <li>Largest over-prediction: {topOver ? `${topOver.web_name} GW${topOver.gw} (${signed(topOver.residual)})` : "—"}.</li>
-        </ul>
-      </section>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "player_forecast_vs_actual",
+          provenance: publishedInsightProvenance(state.data.manifest, run),
+          scope: compactInsightScope({
+            gw_from: gwFilter === "all" ? firstCompletedGw : Number(gwFilter),
+            gw_to: gwFilter === "all" ? lastCompletedGw : Number(gwFilter),
+            view: "overall",
+          }),
+          localScopeKey: JSON.stringify({ runId: run.run_id, gwFilter }),
+        }}
+      />
 
       <section className="space-y-2" aria-labelledby="player-observations-heading">
         <h2 id="player-observations-heading" className="text-sm font-semibold">Exact player observations</h2>

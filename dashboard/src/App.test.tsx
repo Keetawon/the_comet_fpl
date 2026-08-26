@@ -71,4 +71,20 @@ describe("App deep-analytics routes", () => {
     expect(screen.getByRole("heading", { name: "Player prediction accuracy route" })).toBeInTheDocument();
     expect(screen.getByText("active:forecast-vs-actual")).toBeInTheDocument();
   });
+
+  it("keeps browser decision workspaces deterministic-only", () => {
+    window.location.hash = "#plan-builder";
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
+    expect(screen.getByText(/decision workspace remains deterministic and local/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
+
+    act(() => {
+      window.location.hash = "#squad-draft";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(screen.getByText(/draft workspace remains deterministic and local/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
+  });
 });

@@ -1,14 +1,14 @@
 # Evidence-bound dashboard insight summaries
 
-Status: pre-implementation contract, frozen 2026-08-26. The language model is an optional renderer,
-not an analytical authority or autonomous agent.
+Status: implemented development-only from the frozen 2026-08-26 contract. The language model is
+an optional renderer, not an analytical authority or autonomous agent.
 
 ## Product rule
 
 Every dashboard route gets an immediate deterministic insight panel. Public analytical routes may
 also show an explicit **Explain with AI** action when a trusted local provider is configured.
 Nothing calls a remote model automatically on page load or filter changes. Changing vintage or
-scope immediately rebuilds the deterministic facts and marks prior AI prose stale.
+scope immediately rebuilds the deterministic facts and marks prior AI-selected output stale.
 
 Remote v1 scope is limited to Summary, Fixture matrix, Players, Player analytics, Team analytics,
 Player prediction vs actual, and Team prediction vs actual. Next-GW plans, Optimizer audit, Plan
@@ -16,9 +16,10 @@ Builder, Squad Draft, manager imports, squads, bank, purchase/selling values, ca
 and custom-plan state remain deterministic-only. They still have a summary panel; their data is
 never sent to a third-party model.
 
-AI output is labelled "AI-generated - verify cited metrics". It may prioritize and explain facts;
-it may not calculate a metric, probability, trend, causal claim, recommendation, or model verdict.
-Canonical numbers remain rendered from the local fact packet, not copied back from model prose.
+AI output is labelled "AI-selected - verify cited metrics". The provider may select and group
+server-authored fact ids, but it never authors dashboard prose. Python renders the selected
+canonical statements with their citations, so the optional step cannot introduce a new metric,
+probability, causal claim, recommendation, or model verdict.
 
 ## Z.AI use
 
@@ -31,36 +32,68 @@ Open Platform API key/balance and confirm the current account terms.
 
 The API key exists only in the trusted Python process environment. It is never put in Vite source,
 `VITE_*`, static JSON, a URL, browser storage, logs, cache records, or Git. The hosted dashboard is
-static and therefore keeps deterministic summaries until a separately authenticated, rate-limited
-server proxy is deployed. Direct browser-to-provider calls are forbidden.
+static, keeps deterministic summaries, makes no insight network call, and does not offer the
+optional action. Local optional AI-selected output goes through the protected Plan Server. Direct
+browser-to-provider calls are forbidden.
 
-The adapter is provider-neutral. Suggested environment variables are
-`FPL_INSIGHTS_PROVIDER=zai_glm`, `FPL_INSIGHTS_API_KEY`, `FPL_INSIGHTS_MODEL`, and an optional
-server-owned HTTPS base URL. The request cannot choose a key, provider, model, base URL, system
-prompt, or free-form user prompt.
+The adapter is provider-neutral. Its implemented server environment is
+`FPL_INSIGHTS_PROVIDER=zai_glm`, `FPL_INSIGHTS_API_KEY`, `FPL_INSIGHTS_MODEL`, and optional
+`FPL_INSIGHTS_BASE_URL` (defaulting to the general Open Platform URL above). A custom base URL must
+be credential-free HTTPS. The request cannot choose a key, provider, model, base URL, system
+prompt, or free-form user prompt. Missing, incomplete, or invalid configuration leaves the optional
+renderer disabled while every deterministic panel continues to work.
+
+For local PowerShell use, configure only the trusted server process, then start the normal Plan
+Server. Replace the placeholder in the private shell or source the value from a local secret
+manager; do not put this block with a real key in a script, `.env` file, terminal transcript, or
+commit:
+
+```powershell
+$env:FPL_INSIGHTS_PROVIDER = "zai_glm"
+$env:FPL_INSIGHTS_API_KEY = "<general-Open-Platform-API-key>"
+$env:FPL_INSIGHTS_MODEL = "glm-4.7"
+# Optional; omit to use https://api.z.ai/api/paas/v4/
+$env:FPL_INSIGHTS_BASE_URL = "https://api.z.ai/api/paas/v4/"
+
+.\.venv\Scripts\python.exe -m fpl.jobs.plan_server `
+    --base <dev-latest-directory> `
+    --forecast <current-prospective-points.jsonl> `
+    --dashboard-data dashboard\public\data
+```
+
+Clear the process values after the server stops if the shell will be reused:
+
+```powershell
+Remove-Item Env:FPL_INSIGHTS_API_KEY, Env:FPL_INSIGHTS_PROVIDER, `
+    Env:FPL_INSIGHTS_MODEL, Env:FPL_INSIGHTS_BASE_URL -ErrorAction SilentlyContinue
+```
 
 ## Browser-to-server contract
 
-`POST /insights/summary` accepts an exact-key, Pydantic-validated
-`fpl.insight-summary-request` version 1:
+The existing same-origin/approved-LAN-token Plan Server boundary protects both insight endpoints;
+they are not provider-facing public APIs. `POST /insights/summary` accepts an exact-key,
+Pydantic-validated
+`fpl.insight-summary-request` version 1. The browser sends selectors only:
 
 - a public-page enum;
 - manifest content hash, run id, season, and `as_of`;
-- a bounded typed display scope;
-- at most 24 unique facts with safe stable ids, kind, a statement of at most 240 characters, and
-  source read-model names;
-- at most eight explicit caveats;
+- a bounded, exact typed display scope containing only that page's public filters;
 - at most 16 KiB total body.
 
-There is no arbitrary chat field. Facts are limited to already-published scalars, allowed sums,
-ranks/frontiers, null/coverage counts, and caveats. Requests containing manager/private identifiers,
-financial state, squads, filesystem paths, authorization material, or control characters fail
-closed.
+There is no fact, caveat, chat, or arbitrary-text field. Extra keys fail closed. The server resolves
+the selector against the explicitly configured dashboard-data directory, verifies the schema-v5
+manifest content hash, every file hash, run/season/`as_of`, and a stable manifest before and after
+the read, then constructs the bounded fact/caveat packet itself. A caller therefore cannot smuggle
+manager/private state, financial state, credentials, paths, instructions, or invented values to the
+provider. `--dashboard-data` defaults to `dashboard/public/data`; the server never discovers a
+generation by glob.
 
 The success response identifies schema/version, source (`provider` or `cache`), provider, model,
-prompt version, cache key, and generation time. It contains a short headline and at most four
-plain-text insight items. Every item cites one or more allowlisted input fact ids; unknown or missing
-citations fail validation. React renders text, never provider HTML or executable Markdown.
+prompt version, cache key, and generation time. It contains a server-rendered headline and at most
+four plain-text insight items. The provider response is only a bounded headline category plus
+fact-id selections/relation enums. Unknown, duplicate, incomplete, non-`stop`, or malformed
+selections fail validation; Python renders the verified source statements and exact citations.
+React renders text, never provider HTML or executable Markdown.
 
 `GET /insights/status` may expose only enabled state, provider, model, and prompt version. It never
 returns credentials or a server base URL. Disabled, timed-out, rate-limited, malformed, or failed
@@ -70,15 +103,18 @@ provider calls return a stable safe error code and the UI keeps the deterministi
 
 - Use the general chat-completions API with structured JSON output where the configured model
   supports it. HTTPX and Pydantic are already project dependencies; no provider SDK is required.
-- The fixed system prompt treats facts as untrusted data, uses cited facts only, performs no new
-  arithmetic, distinguishes past form/future forecast/finalized actual, and repeats
-  development-only caveats.
-- Use bounded connect/write/read/pool timeouts, a hard overall deadline, one retry only for transport
-  failures or 429/502/503/504, a capped response body, no redirects, a small rate limit, and
-  single-flight by cache key. Never retry authentication or malformed output.
-- Cache key is SHA-256 over the canonical request plus provider identity, model, and prompt version.
+- The fixed system prompt asks only for fact-id selection/grouping. GLM thinking is disabled for
+  this renderer. The provider does not return prose, arithmetic, or a model verdict.
+- Use bounded connect/write/read/pool timeouts, an overall time budget with postflight rejection and
+  bounded waiter time, one retry only for transport failures or 429/502/503/504, a capped response
+  body, no redirects, a small rate limit, and single-flight by cache key. Never retry authentication
+  or malformed output.
+- Cache key is SHA-256 over the canonical server-resolved evidence plus provider identity, model,
+  and prompt version.
   Cache only validated response/provenance under the ignored plan-server base; never cache keys,
-  raw provider bodies, request facts, or failures.
+  raw provider bodies, resolved evidence, selector requests, or failures. Cache hits revalidate
+  citations, and one in-memory flight shares both success and failure with concurrent waiters even
+  if the disk cache is unavailable.
 - Do not log request bodies or upstream bodies. The insight service must not acquire the optimizer
   run lock and must work independently of solver readiness.
 
@@ -89,10 +125,12 @@ builder returns concise source-linked facts and caveats from its visible scope. 
 vintage, horizon, probability, form/forecast, and outcome-finality semantics. Empty pages explain
 why there is no evidence instead of producing generic prose.
 
-## Acceptance
+## Implemented acceptance
 
-- Contract tests reject extra keys, invalid pages, duplicate/unknown fact ids, oversized payloads,
-  private content, arbitrary prompts, and invalid citations.
+- Contract tests reject extra keys (including facts, caveats, private text, and arbitrary prompts),
+  invalid pages/scopes, duplicate JSON keys, coercive numeric selectors, and oversized payloads.
+- Evidence tests reject mismatched/tampered manifests, files, runs, seasons, timestamps, and scopes
+  before any provider/cache call, and cover all seven server-side page builders.
 - Provider tests use an injected fake transport and cover auth secrecy, retry policy, timeouts,
   response limits, malformed JSON, caching, concurrency, rate limiting, and safe errors.
 - Server tests cover same-origin/approved-LAN-token protection and prove insight work does not take
@@ -100,5 +138,7 @@ why there is no evidence instead of producing generic prose.
 - Frontend tests prove hosted mode makes no provider request, explicit opt-in is required, filter
   changes invalidate stale prose, failure preserves deterministic facts, and returned markup is
   inert text.
-- Every route has a deterministic panel; only the allowlisted public analytical routes can invoke
-  the remote renderer.
+- Every one of the eleven routes has a deterministic panel. Only Summary, Fixture matrix, Players,
+  Player analytics, Team analytics, Player prediction vs actual, and Team prediction vs actual can
+  invoke the remote renderer. Next GW suggestion, Optimizer audit, Plan Builder, and Squad Draft are
+  local deterministic-only routes.

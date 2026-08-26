@@ -20,6 +20,7 @@ describe("TeamForecastVsActualPage", () => {
     render(<TeamForecastVsActualPage />);
 
     expect(await screen.findByRole("heading", { name: "Team prediction vs actual" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     expect(screen.getByText(/4 of 6 forecast team-fixture sides scored/)).toBeInTheDocument();
     expect(screen.getByText(/two immutable reciprocal outcome sides agree/)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Attack predicted vs actual/ })).toBeInTheDocument();

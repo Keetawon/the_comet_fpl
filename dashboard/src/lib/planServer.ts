@@ -12,6 +12,122 @@ export function planServerUrl(): string {
   return `http://${window.location.hostname}:${PLAN_SERVER_PORT}`;
 }
 
+export type InsightPage =
+  | "summary"
+  | "fixture_matrix"
+  | "players"
+  | "player_analytics"
+  | "team_analytics"
+  | "player_forecast_vs_actual"
+  | "team_forecast_vs_actual";
+
+export interface InsightDisplayScope {
+  gw_from?: number;
+  gw_to?: number;
+  position?: "all" | "GK" | "DEF" | "MID" | "FWD";
+  team_code?: number;
+  view?:
+    | "overall"
+    | "attack"
+    | "defence"
+    | "clean_sheet"
+    | "value"
+    | "upside_downside"
+    | "differential"
+    | "past_future"
+    | "environment"
+    | "attack-floor"
+    | "past-future";
+  venue?: "all" | "home" | "away";
+  form_window?: 3 | 5 | 10 | "season_to_date";
+  threshold?: 2 | 4 | 6 | 10 | 15;
+  min_price_tenths?: number;
+  max_price_tenths?: number;
+  min_avg_minutes_l5?: number;
+  availability?: "all" | "available" | "flagged";
+  past_metric?:
+    | "points"
+    | "xg_per_90"
+    | "xa_per_90"
+    | "xg-for"
+    | "goals-for"
+    | "xgc"
+    | "goals-against";
+}
+
+export interface InsightSummaryRequest {
+  schema: "fpl.insight-summary-request";
+  schema_version: 1;
+  page: InsightPage;
+  manifest_sha256: string;
+  run_id: string;
+  season: string;
+  as_of: string;
+  scope: InsightDisplayScope;
+}
+
+export interface InsightSummaryItem {
+  text: string;
+  citations: string[];
+}
+
+export interface InsightSummaryResponse {
+  schema: "fpl.insight-summary-response";
+  schema_version: 1;
+  source: "provider" | "cache";
+  provider: string;
+  model: string;
+  prompt_version: "evidence-renderer-v1";
+  cache_key: string;
+  generated_at: string;
+  headline: string;
+  items: InsightSummaryItem[];
+}
+
+export interface InsightStatus {
+  enabled: boolean;
+  provider: string | null;
+  model: string | null;
+  prompt_version: "evidence-renderer-v1";
+}
+
+const INSIGHT_SCOPE_KEYS = [
+  "gw_from",
+  "gw_to",
+  "position",
+  "team_code",
+  "view",
+  "venue",
+  "form_window",
+  "threshold",
+  "min_price_tenths",
+  "max_price_tenths",
+  "min_avg_minutes_l5",
+  "availability",
+  "past_metric",
+] as const satisfies readonly (keyof InsightDisplayScope)[];
+
+/** Strip any runtime-added data so browser-authored prose can never cross this boundary. */
+export function selectorOnlyInsightRequest(
+  request: InsightSummaryRequest,
+): InsightSummaryRequest {
+  const scope = Object.fromEntries(
+    INSIGHT_SCOPE_KEYS.flatMap((key) =>
+      request.scope[key] === undefined ? [] : [[key, request.scope[key]]],
+    ),
+  ) as InsightDisplayScope;
+  return {
+    schema: "fpl.insight-summary-request",
+    schema_version: 1,
+    page: request.page,
+    manifest_sha256: request.manifest_sha256,
+    run_id: request.run_id,
+    season: request.season,
+    as_of: request.as_of,
+    scope,
+  };
+}
+
 export interface PlanServerStatus {
   busy: boolean;
   stage: string | null;
@@ -137,6 +253,164 @@ function integerField(
     throw new Error(`manager-team response has an invalid ${key}.`);
   }
   return Number(item);
+}
+
+function exactRecord(
+  payload: unknown,
+  keys: readonly string[],
+  label: string,
+): Record<string, unknown> {
+  const value = record(payload, label);
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  if (
+    actual.length !== expected.length ||
+    actual.some((key, index) => key !== expected[index])
+  ) {
+    throw new Error(`${label} has unexpected keys.`);
+  }
+  return value;
+}
+
+function insightString(
+  value: Record<string, unknown>,
+  key: string,
+  maximum: number,
+): string {
+  const item = value[key];
+  if (typeof item !== "string" || item.length < 1 || item.length > maximum) {
+    throw new Error(`insight response has an invalid ${key}.`);
+  }
+  return item;
+}
+
+function timezoneDate(value: string, key: string): string {
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) {
+    throw new Error(`insight response has an invalid ${key}.`);
+  }
+  return value;
+}
+
+/** Strictly validate the public status response; credentials and base URLs are never accepted. */
+export function parseInsightStatus(payload: unknown): InsightStatus {
+  const value = exactRecord(
+    payload,
+    ["enabled", "provider", "model", "prompt_version"],
+    "insight status",
+  );
+  if (
+    typeof value.enabled !== "boolean" ||
+    value.prompt_version !== "evidence-renderer-v1" ||
+    (value.provider !== null && typeof value.provider !== "string") ||
+    (value.model !== null && typeof value.model !== "string") ||
+    value.enabled !== (value.provider !== null && value.model !== null)
+  ) {
+    throw new Error("insight status is malformed.");
+  }
+  return value as unknown as InsightStatus;
+}
+
+/** Strictly validate the server-authored response and safe fact-id citation shape. */
+export function parseInsightSummaryResponse(payload: unknown): InsightSummaryResponse {
+  const value = exactRecord(
+    payload,
+    [
+      "schema",
+      "schema_version",
+      "source",
+      "provider",
+      "model",
+      "prompt_version",
+      "cache_key",
+      "generated_at",
+      "headline",
+      "items",
+    ],
+    "insight response",
+  );
+  if (
+    value.schema !== "fpl.insight-summary-response" ||
+    value.schema_version !== 1 ||
+    (value.source !== "provider" && value.source !== "cache") ||
+    value.prompt_version !== "evidence-renderer-v1"
+  ) {
+    throw new Error("insight response has an unsupported contract.");
+  }
+  insightString(value, "provider", 48);
+  insightString(value, "model", 96);
+  const cacheKey = insightString(value, "cache_key", 64);
+  if (!/^[0-9a-f]{64}$/.test(cacheKey)) {
+    throw new Error("insight response has an invalid cache_key.");
+  }
+  timezoneDate(insightString(value, "generated_at", 64), "generated_at");
+  insightString(value, "headline", 160);
+  if (!Array.isArray(value.items) || value.items.length < 1 || value.items.length > 4) {
+    throw new Error("insight response has invalid items.");
+  }
+  const items = value.items.map((rawItem, index): InsightSummaryItem => {
+    const item = exactRecord(rawItem, ["text", "citations"], `insight item ${index + 1}`);
+    const text = insightString(item, "text", 360);
+    if (
+      !Array.isArray(item.citations) ||
+      item.citations.length < 1 ||
+      item.citations.length > 6 ||
+      item.citations.some(
+        (citation) =>
+          typeof citation !== "string" || !/^[a-z][a-z0-9_.-]{0,63}$/.test(citation),
+      ) ||
+      new Set(item.citations).size !== item.citations.length
+    ) {
+      throw new Error(`insight item ${index + 1} has invalid citations.`);
+    }
+    return { text, citations: item.citations as string[] };
+  });
+  return { ...(value as unknown as InsightSummaryResponse), items };
+}
+
+async function insightJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw new Error(`insight server returned ${response.status} without valid JSON.`);
+  }
+}
+
+/** This call is intentionally made only after the user presses Explain with AI. */
+export async function fetchInsightStatus(
+  token?: string | null,
+  signal?: AbortSignal,
+): Promise<InsightStatus> {
+  const response = await fetch(`${planServerUrl()}/insights/status`, {
+    headers: tokenHeaders(token),
+    signal: signal ?? AbortSignal.timeout(4000),
+  });
+  const payload = await insightJson(response);
+  if (!response.ok) throw new Error(`insight server status failed (${response.status}).`);
+  return parseInsightStatus(payload);
+}
+
+/** Send only the exact evidence packet; provider identity and credentials stay server-owned. */
+export async function fetchInsightSummary(
+  request: InsightSummaryRequest,
+  token?: string | null,
+  signal?: AbortSignal,
+): Promise<InsightSummaryResponse> {
+  const response = await fetch(`${planServerUrl()}/insights/summary`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...tokenHeaders(token) },
+    body: JSON.stringify(selectorOnlyInsightRequest(request)),
+    signal: signal ?? AbortSignal.timeout(30_000),
+  });
+  const payload = await insightJson(response);
+  if (!response.ok) {
+    const error = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+    throw new Error(
+      typeof error.message === "string" && error.message.trim()
+        ? error.message
+        : `insight server returned ${response.status}.`,
+    );
+  }
+  return parseInsightSummaryResponse(payload);
 }
 
 /** Validate the network boundary instead of trusting a TypeScript assertion over JSON. */

@@ -20,6 +20,7 @@ describe("PlayerForecastVsActualPage", () => {
     render(<PlayerForecastVsActualPage />);
 
     expect(await screen.findByRole("heading", { name: "Player prediction vs actual" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     expect(screen.getByText(/4 of 6 forecast player-gameweeks scored/)).toBeInTheDocument();
     expect(screen.getByText(/partial double gameweek scores nothing/i)).toBeInTheDocument();
     expect(screen.getByText("Bias (actual − forecast)")).toBeInTheDocument();

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { AnalyticsScatter, type AnalyticsScatterPoint } from "@/components/AnalyticsScatter";
 import { FilterPanel } from "@/components/FilterPanel";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import {
   INITIAL_PLAYER_FILTERS,
   matchesPlayerFilters,
@@ -31,10 +32,22 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
 import type {
+  DashboardManifest,
   NextGwPlan,
   PlayerHorizonsRecord,
   PlayerRecord,
 } from "@/data/types";
+import {
+  compactInsightScope,
+  formWindowScope,
+  insightFact,
+  maxPriceTenthsScope,
+  minAverageMinutesScope,
+  minPriceTenthsScope,
+  playerPastMetricScope,
+  playerPositionScope,
+  publishedInsightProvenance,
+} from "@/lib/insights";
 import {
   buildPlayerAnalytics,
   formatPlayerAnalyticsValue,
@@ -63,6 +76,7 @@ type PageState =
       horizons: PlayerHorizonsRecord[];
       plans: NextGwPlan[];
       runs: AnalyticsRun[];
+      manifest: DashboardManifest | null;
       defaultRunId: string;
     };
 
@@ -146,6 +160,7 @@ export function PlayerAnalyticsPage() {
           horizons: horizonData.players,
           plans: nextGw.plans,
           runs,
+          manifest: playerData.manifest,
           defaultRunId: defaultRun ?? "",
         });
         setRunId(defaultRun);
@@ -279,6 +294,27 @@ export function PlayerAnalyticsPage() {
   const horizonLabel = `GW${selectedRun.gw_from}-${effectiveGwTo} (fixed start)`;
   const vintageLabel = `${selectedRun.run_id} · ${selectedRun.season}`;
   const formAnchor = firstFormAnchor(exactRunPlayers);
+  const insightFacts = analytics?.facts.map((fact) =>
+    insightFact(
+      fact.id,
+      fact.id.startsWith("frontier")
+        ? "frontier"
+        : fact.id.startsWith("highest")
+          ? "rank"
+          : fact.id.startsWith("coverage") || fact.id === "scope"
+            ? "coverage"
+            : "comparison",
+      fact.statement,
+      fact.sources,
+    ),
+  ) ?? [];
+  const insightCaveats = [
+    "Price and ownership are deadline-vintage overlays.",
+    "Cumulative probabilities are raw published values from the run's fixed start.",
+    view === "past_future"
+      ? "Past form is observed and cumulative xP is a future forecast; the comparison is explanatory, not causal."
+      : "Pareto-frontier membership is an exploration aid and does not establish optimality.",
+  ];
 
   const changeRun = (nextRunId: string) => {
     setRunId(nextRunId);
@@ -431,24 +467,40 @@ export function PlayerAnalyticsPage() {
               }
             />
 
-            <section className="rounded-lg border bg-card p-4" aria-labelledby="player-insight-title">
-              <h2 id="player-insight-title" className="text-sm font-semibold">
-                Deterministic insight
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Evidence-bound facts from the visible scope; no remote AI call.
-              </p>
-              <ul className="mt-3 space-y-2 text-sm">
-                {analytics.facts.map((fact) => (
-                  <li key={fact.id}>{fact.statement}</li>
-                ))}
-              </ul>
-              <div className="mt-4 border-t pt-3 text-xs text-muted-foreground">
-                {analytics.caveats.map((caveat) => (
-                  <p key={caveat} className="mt-1">{caveat}</p>
-                ))}
-              </div>
-            </section>
+            <InsightSummaryPanel
+              items={insightFacts}
+              caveats={insightCaveats}
+              remote={{
+                page: "player_analytics",
+                provenance: publishedInsightProvenance(state.manifest, {
+                  ...selectedRun,
+                  as_of: selectedRun.as_of ?? exactRunPlayers[0]?.as_of,
+                }),
+                scope: compactInsightScope({
+                  gw_from: selectedRun.gw_from,
+                  gw_to: effectiveGwTo,
+                  position: playerPositionScope(filters.position),
+                  team_code: filters.teamCode === "all" ? undefined : Number(filters.teamCode),
+                  view,
+                  form_window: formWindowScope(filters.formWindow),
+                  threshold: view === "upside_downside" ? haulThreshold : undefined,
+                  min_price_tenths: minPriceTenthsScope(filters.minPrice),
+                  max_price_tenths: maxPriceTenthsScope(filters.maxPrice),
+                  min_avg_minutes_l5: minAverageMinutesScope(filters.minMinutes),
+                  availability: filters.availability,
+                  past_metric: playerPastMetricScope(view, pastMetric),
+                }),
+                localScopeKey: JSON.stringify({
+                  runId: selectedRun.run_id,
+                  gwTo: effectiveGwTo,
+                  view,
+                  haulThreshold,
+                  pastMetric,
+                  filters,
+                }),
+              }}
+            />
+
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">

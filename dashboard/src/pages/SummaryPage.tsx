@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import { Separator } from "@/components/ui/separator";
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { FixtureTicker } from "@/components/FixtureTicker";
@@ -19,6 +20,7 @@ import {
   loadSummary,
 } from "@/data/load";
 import type {
+  DashboardManifest,
   NextGwPlan,
   PlayerRecord,
   SummaryData,
@@ -33,6 +35,7 @@ import {
   resolvedPlanKind,
 } from "@/lib/nextGw";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
+import { compactInsightScope, publishedInsightProvenance } from "@/lib/insights";
 
 type PageState =
   | { status: "loading" }
@@ -43,6 +46,7 @@ type PageState =
       players: PlayerRecord[];
       teams: TeamRecord[];
       plans: NextGwPlan[];
+      manifest: DashboardManifest | null;
       runs: { run_id: string; season: string; gw_from: number; gw_to: number }[];
       defaultRunId: string;
     };
@@ -151,6 +155,7 @@ export function SummaryPage() {
           players: playersData.players,
           teams: teamsData.teams,
           plans: nextGw.plans,
+          manifest: playersData.manifest ?? teamsData.manifest,
           runs,
           defaultRunId: defaultRun ?? runs[0]?.run_id ?? "",
         });
@@ -239,6 +244,23 @@ export function SummaryPage() {
   const savedCustomId = savedCustomPlanId();
   const customPlan =
     customPlans.find((plan) => plan.optimizer_run_id === savedCustomId) ?? customPlans[0] ?? null;
+  const visibleTopNext = view.topNext[0];
+  const visibleTopHorizon = view.topHorizon[0];
+  const localInsightItems = [
+    {
+      id: "coverage.visible_scope",
+      statement: `${view.players.length} players and ${view.teams.length} clubs are visible for GW${view.gwFrom} through GW${view.gwTo}.`,
+    },
+    ...(visibleTopNext?.next == null ? [] : [{
+      id: "rank.visible_next_xp",
+      statement: `${visibleTopNext.player.web_name} has the highest visible GW${view.gwFrom} xP at ${visibleTopNext.next.toFixed(3)}.`,
+    }]),
+    ...(visibleTopHorizon?.horizon == null ? [] : [{
+      id: "rank.visible_horizon_xp",
+      statement: `${visibleTopHorizon.player.web_name} has the highest visible GW${view.gwFrom}-${view.gwTo} xP total at ${visibleTopHorizon.horizon.toFixed(3)}.`,
+    }]),
+  ];
+  const summaryMatchesVisible = summary.latest_run?.run_id === view.run.run_id;
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -253,6 +275,26 @@ export function SummaryPage() {
         </div>
         <VintageSelect options={vintageOptions(state.runs, state.plans)} value={runId ?? state.defaultRunId} onChange={setRunId} />
       </div>
+
+      <InsightSummaryPanel
+        items={localInsightItems}
+        caveats={[
+          "xP totals sum already-published values; probabilities are never combined in the browser.",
+          "Summary ranks describe one immutable forecast vintage.",
+        ]}
+        remote={{
+          page: "summary",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...view.run,
+            as_of: view.players[0]?.as_of,
+          }),
+          scope: compactInsightScope({ gw_from: view.gwFrom, gw_to: view.gwTo }),
+          localScopeKey: view.run.run_id,
+          unavailableReason: summaryMatchesVisible
+            ? undefined
+            : "AI explanation is unavailable because the visible vintage differs from summary.json.",
+        }}
+      />
 
       <div className="grid gap-3 lg:grid-cols-3">
         <Card title="Next gameweek">

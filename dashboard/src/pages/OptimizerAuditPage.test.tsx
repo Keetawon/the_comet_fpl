@@ -18,6 +18,8 @@ describe("OptimizerAuditPage", () => {
     await waitFor(() =>
       expect(screen.getByText(/Optimizer audit/)).toBeInTheDocument(),
     );
+    expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
     // development-only banner is always visible
     expect(screen.getByText(/development-only/)).toBeInTheDocument();
     // solver identity and status

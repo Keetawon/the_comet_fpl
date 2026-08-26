@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import {
   Table,
   TableBody,
@@ -16,6 +17,7 @@ import type {
   TeamForecastObservation,
   TeamForecastVsActualData,
 } from "@/data/types";
+import { compactInsightScope, insightFact, publishedInsightProvenance } from "@/lib/insights";
 import { AccuracyKpis, AccuracyScatter, AccuracyScoreKpis, type AccuracyKpi } from "./ForecastAccuracyParts";
 
 type TeamAccuracyView = "attack" | "defence" | "clean_sheet";
@@ -203,6 +205,49 @@ export function TeamForecastVsActualPage() {
   const sliceTeam: TeamSlice[] = run.by_team.map((row) => ({ ...row, label: `${row.team_name} (${row.team_short_name})` }));
   const sliceVenue: TeamSlice[] = run.by_venue.map((row) => ({ ...row, label: row.venue === "home" ? "Home" : "Away" }));
   const sliceFallback: TeamSlice[] = run.by_fallback.map((row) => ({ ...row, label: row.stage_a_league_average_team ? "Stage A fallback" : "No fallback" }));
+  const insightFacts = [
+    insightFact(
+      "coverage.visible_sides",
+      "coverage",
+      `${observations.length} finalized team-fixture side${observations.length === 1 ? " is" : "s are"} visible for ${scopeLabel}.`,
+      ["team_forecast_vs_actual.json"],
+    ),
+    ...(selectedScore == null ? [] : [
+      insightFact(
+        view === "clean_sheet" ? "score.clean_sheet_brier" : `score.${view}_bias`,
+        "published_scalar",
+        view === "clean_sheet"
+          ? `Published clean-sheet Brier score is ${fmt((selectedScore as CleanSheetScoreBlock).brier)}.`
+          : `Published ${view} bias is ${signed((selectedScore as ForecastAccuracyScoreBlock).bias)}; residual is actual minus forecast.`,
+        ["team_forecast_vs_actual.json"],
+      ),
+    ]),
+    ...(highInsight ? [
+      insightFact(
+        "rank.largest_selected_error",
+        "rank",
+        `${highInsight.team_name} in GW${highInsight.gw} has the largest visible ${view === "clean_sheet" ? "clean-sheet Brier score" : `${view} residual`} at ${view === "clean_sheet" ? fmt(insightValue(highInsight)) : signed(insightValue(highInsight))}.`,
+        ["team_forecast_vs_actual.json"],
+      ),
+    ] : []),
+    ...(lowInsight ? [
+      insightFact(
+        "rank.smallest_selected_error",
+        "rank",
+        `${lowInsight.team_name} in GW${lowInsight.gw} has the smallest visible ${view === "clean_sheet" ? "clean-sheet Brier score" : `${view} residual`} at ${view === "clean_sheet" ? fmt(insightValue(lowInsight)) : signed(insightValue(lowInsight))}.`,
+        ["team_forecast_vs_actual.json"],
+      ),
+    ] : []),
+  ];
+  const insightCaveats = [
+    "Only finalized reciprocal fixture sides are scored.",
+    view === "defence"
+      ? "A positive defence residual means more goals were conceded than forecast and is worse."
+      : "Residual equals actual goals minus the published forecast.",
+    "CRPS, Brier scores, and calibration are published values; the browser does not reconstruct them.",
+  ];
+  const firstCompletedGw = completedGws[0] ?? run.gw_from;
+  const lastCompletedGw = completedGws.at(-1) ?? run.gw_to;
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -250,12 +295,20 @@ export function TeamForecastVsActualPage() {
         emptyMessage="No finalized team-fixture observations exist in this scope."
       />
 
-      <section className="rounded-lg border p-4" aria-labelledby="team-insights-heading"><h2 id="team-insights-heading" className="text-sm font-semibold">Deterministic insight facts</h2><ul className="mt-2 grid gap-2 text-sm md:grid-cols-2">
-        <li>Scope: {scopeLabel}, {observations.length} exact team-fixture side(s).</li>
-        <li>{view === "clean_sheet" ? `Published Brier: ${fmt((selectedScore as CleanSheetScoreBlock | undefined)?.brier)}` : `Published bias: ${signed((selectedScore as ForecastAccuracyScoreBlock | undefined)?.bias)} (actual − forecast)`}.</li>
-        <li>{view === "clean_sheet" ? "Largest published clean-sheet Brier" : `Largest ${view === "defence" ? "worse-than-forecast defence residual" : "positive residual"}`}: {highInsight ? `${highInsight.team_name} GW${highInsight.gw} (${view === "clean_sheet" ? fmt(insightValue(highInsight)) : signed(insightValue(highInsight))})` : "—"}.</li>
-        <li>{view === "clean_sheet" ? "Smallest published clean-sheet Brier" : `Smallest ${view === "defence" ? "defence residual (fewer conceded)" : "residual"}`}: {lowInsight ? `${lowInsight.team_name} GW${lowInsight.gw} (${view === "clean_sheet" ? fmt(insightValue(lowInsight)) : signed(insightValue(lowInsight))})` : "—"}.</li>
-      </ul></section>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "team_forecast_vs_actual",
+          provenance: publishedInsightProvenance(state.data.manifest, run),
+          scope: compactInsightScope({
+            gw_from: gwFilter === "all" ? firstCompletedGw : Number(gwFilter),
+            gw_to: gwFilter === "all" ? lastCompletedGw : Number(gwFilter),
+            view,
+          }),
+          localScopeKey: JSON.stringify({ runId: run.run_id, gwFilter, view }),
+        }}
+      />
 
       <section className="space-y-2" aria-labelledby="club-residuals-heading"><h2 id="club-residuals-heading" className="text-sm font-semibold">Cumulative club residuals in selected scope</h2><p className="text-xs text-muted-foreground">Expected clean sheets is the sum of published per-fixture probabilities, an expected count—not P(at least one clean sheet).</p><div className="overflow-x-auto rounded-md border"><Table aria-label="Cumulative club prediction residuals"><TableHeader><TableRow><TableHead>Club</TableHead><TableHead>Rows</TableHead><TableHead>Attack forecast / actual / residual</TableHead><TableHead>Defence forecast / actual / residual</TableHead><TableHead>Expected / actual clean sheets</TableHead></TableRow></TableHeader><TableBody>{clubs.map((club) => <TableRow key={club.teamId}><TableCell>{club.teamName} ({club.shortName})</TableCell><TableCell>{club.rows}</TableCell><TableCell className="tabular-nums">{fmt(club.attackForecast)} / {fmt(club.attackActual, 0)} / {signed(club.attackResidual)}</TableCell><TableCell className="tabular-nums">{fmt(club.defenceForecast)} / {fmt(club.defenceActual, 0)} / {signed(club.defenceResidual)} <span className="text-xs text-muted-foreground">(positive worse)</span></TableCell><TableCell className="tabular-nums">{fmt(club.expectedCleanSheets)} / {club.actualCleanSheets}</TableCell></TableRow>)}</TableBody></Table></div></section>
 

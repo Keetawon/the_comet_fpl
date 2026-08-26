@@ -291,6 +291,7 @@ describe("PlayersPage", () => {
     const user = userEvent.setup();
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     const alpha = () => screen.getByText("Alpha").closest("tr")!;
     expect(within(alpha()).getByTitle("P(≥6), raw model probability")).toHaveTextContent("99%");
 

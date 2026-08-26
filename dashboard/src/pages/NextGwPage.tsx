@@ -21,6 +21,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FilterPanel } from "@/components/FilterPanel";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import {
   FORM_WINDOW_LABEL,
   INITIAL_PLAYER_FILTERS,
@@ -359,6 +360,16 @@ export function NextGwPage() {
   const options = [1, 3, 5].filter((n) => n <= horizon);
   const weeks = options.includes(horizonWeeks) ? horizonWeeks : options[0];
   const planTotals = planXpSummaryRows(plan, weeks);
+  const captain = week.players.find((player) => player.code === week.captain_code);
+  const viceCaptain = week.players.find((player) => player.code === week.vice_captain_code);
+  const firstWeekXp = week.players.reduce(
+    (total, player) => total + (player.expected_points ?? 0),
+    0,
+  );
+  const horizonTransfers = plan.weeks.reduce(
+    (total, planWeek) => total + planWeek.players.filter((player) => player.transferred_in).length,
+    0,
+  );
 
   const planColumns: LegacyColumnDef<PlayerStatRow>[] = [
     {
@@ -484,6 +495,32 @@ export function NextGwPage() {
           </Button>
         </div>
       </div>
+
+      <InsightSummaryPanel
+        items={[
+          {
+            id: "scope.plan",
+            statement: `${state.plans.length} formal platform output${state.plans.length === 1 ? " is" : "s are"} published; this view shows ${planDisplayLabel(plan)} for GW${plan.gw_from}-${plan.gw_to}.`,
+          },
+          {
+            id: "sum.first_week_xp",
+            statement: `The published GW${week.gw} player xP values sum to ${firstWeekXp.toFixed(3)} before captain multiplication and hit costs.`,
+          },
+          {
+            id: "roles.captain",
+            statement: `Captain is ${captain?.web_name ?? week.captain_code}; vice-captain is ${viceCaptain?.web_name ?? week.vice_captain_code}.`,
+          },
+          {
+            id: "coverage.horizon_changes",
+            statement: `${horizonTransfers} incoming change${horizonTransfers === 1 ? " is" : "s are"} published across the ${plan.weeks.length}-gameweek horizon; GW${week.gw} hit cost is ${week.hit_points} points.`,
+          },
+        ]}
+        caveats={[
+          "This panel is deterministic-only because the route contains decision material.",
+          "No values from this page are sent to an AI provider.",
+        ]}
+        localOnlyReason="AI explanation is disabled on decision routes; no page state is sent."
+      />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>

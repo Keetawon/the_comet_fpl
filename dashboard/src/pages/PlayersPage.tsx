@@ -11,6 +11,7 @@ import { RotateCcw } from "lucide-react";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
+import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import {
   FORM_WINDOW_LABEL,
   INITIAL_PLAYER_FILTERS,
@@ -22,11 +23,21 @@ import { PlayerStatTable, type PlayerStatRow } from "@/components/PlayerStatTabl
 import { VintageSelect } from "@/components/VintageSelect";
 import { Button } from "@/components/ui/button";
 import { loadFixtureMatrix, loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
-import type { NextGwPlan, PlayerHorizonsRecord, PlayerRecord, TeamRecord } from "@/data/types";
+import type { DashboardManifest, NextGwPlan, PlayerHorizonsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
+import {
+  compactInsightScope,
+  formWindowScope,
+  insightFact,
+  maxPriceTenthsScope,
+  minAverageMinutesScope,
+  minPriceTenthsScope,
+  playerPositionScope,
+  publishedInsightProvenance,
+} from "@/lib/insights";
 
 type PageState =
   | { status: "loading" }
@@ -37,6 +48,7 @@ type PageState =
       playerHorizons: PlayerHorizonsRecord[];
       teams: TeamRecord[];
       plans: NextGwPlan[];
+      manifest: DashboardManifest | null;
       manifestRuns: { run_id: string; season: string; gw_from: number; gw_to: number }[];
       easeVersion: string;
       gwFrom: number;
@@ -92,6 +104,7 @@ export function PlayersPage() {
           playerHorizons: horizonsData.players,
           teams: teamsData.teams,
           plans: nextGw.plans,
+          manifest: playersData.manifest,
           manifestRuns: runs,
           easeVersion:
             playersData.manifest?.ease_index_formula_version ?? teamsData.easeIndexFormulaVersion,
@@ -271,6 +284,40 @@ export function PlayersPage() {
     });
     setPlayerFilters({ ...INITIAL_PLAYER_FILTERS });
   };
+  const rankedRows = [...rows]
+    .filter((row): row is PlayerStatRow & { totalXp: number } => row.totalXp != null)
+    .sort((left, right) => right.totalXp - left.totalXp || left.player.code - right.player.code);
+  const topXp = rankedRows[0];
+  const flaggedCount = rows.filter(
+    (row) => row.player.availability_status != null && row.player.availability_status !== "a",
+  ).length;
+  const insightFacts = [
+    insightFact(
+      "coverage.filtered_players",
+      "coverage",
+      `${rows.length} players match the visible filters; ${rows.length - rankedRows.length} have no xP value in this scope.`,
+      ["players.json", "player_horizons.json"],
+    ),
+    ...(topXp ? [
+      insightFact(
+        "rank.highest_xp",
+        "rank",
+        `${topXp.player.web_name} has the highest visible xP total at ${topXp.totalXp.toFixed(3)} from GW${filters?.gwFrom ?? selectedRun?.gw_from} through GW${filters?.gwTo ?? selectedRun?.gw_to}.`,
+        ["players.json", "player_horizons.json"],
+      ),
+    ] : []),
+    insightFact(
+      "coverage.flagged_overlay",
+      "coverage",
+      `${flaggedCount} visible players carry a non-available next-round status overlay.`,
+      ["players.json"],
+    ),
+  ];
+  const insightCaveats = [
+    "xP totals sum already-published player-fixture values or select an exact cumulative endpoint.",
+    "Outcome probabilities are shown only for the run's fixed start and all venues.",
+    "The availability status is a next-round overlay and is not applied to raw xP.",
+  ];
 
   return (
     <div className="flex flex-col gap-3 p-4 lg:p-6">
@@ -341,6 +388,37 @@ export function PlayersPage() {
           </p>
         ) : null}
       </div>
+
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "players",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...selectedRun!,
+            as_of: activeRun?.as_of,
+          }),
+          scope: compactInsightScope({
+            gw_from: filters?.gwFrom,
+            gw_to: filters?.gwTo,
+            position: playerPositionScope(playerFilters.position),
+            team_code: playerFilters.teamCode === "all" ? undefined : Number(playerFilters.teamCode),
+            view: filters?.view === "defense" ? "defence" : filters?.view,
+            venue: filters?.venue,
+            form_window: formWindowScope(playerFilters.formWindow),
+            min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
+            max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
+            min_avg_minutes_l5: minAverageMinutesScope(playerFilters.minMinutes),
+            availability: playerFilters.availability,
+          }),
+          localScopeKey: JSON.stringify({
+            runId: activeRunId,
+            filters,
+            playerFilters,
+            colorSource,
+          }),
+        }}
+      />
 
       {filters && (
         <PlayerStatTable

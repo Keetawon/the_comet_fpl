@@ -12,17 +12,23 @@ Schema v5 is the current development-only application contract. The ordered prog
    values, following `../docs/dashboard-deep-analytics.md`;
 2. **Implemented development-only:** schema-v5 parallel player/team prediction-versus-actual pages
    with complete-gameweek finality, following `../docs/prediction-vs-actual-dashboard.md`;
-3. **Active next, not yet implemented:** a deterministic insight panel on every route and an
-   optional trusted-server language renderer
+3. **Implemented development-only:** a deterministic insight panel on every route and an optional,
+   evidence-bound trusted-server language renderer
    on public analytical routes, following `../docs/dashboard-ai-summaries.md`.
 
 The implemented deep-analytics routes are `#player-analytics` and `#team-analytics`; both are
 linked directly in the sidebar and retain an exact-table equivalent for every chart.
 
-The static hosted build never receives a model-provider key and never calls Z.AI directly. P2.4
-will keep deterministic summaries available without a provider and require a separately
-authenticated proxy for optional hosted prose. Local provider configuration belongs to the Python
-server environment, never `VITE_*` or browser storage.
+All eleven routes render their deterministic summary without a network dependency. The seven
+public renderer-eligible routes are Summary, Fixture matrix, Players, Player analytics, Team
+analytics, Player prediction vs actual, and Team prediction vs actual. Next GW suggestion,
+Optimizer audit, Plan Builder, and Squad Draft remain deterministic-only because they contain
+decision or private local state.
+
+The static hosted build never receives a model-provider key and never calls Z.AI or any other
+provider. Deterministic summaries remain available there and the optional action is unavailable.
+Local provider configuration belongs to the trusted Python server environment, never `VITE_*`,
+static JSON, a URL, browser storage, logs, cache records, or Git.
 
 ## Generate the data
 
@@ -106,11 +112,12 @@ except OSError:
 '@ | .\.venv\Scripts\python.exe -
 ```
 
-`manifest.json` is optional for the app (every record repeats its `run_id`/`as_of`); copy
-it when available. `players.json` is by far the largest file and is shared by the Summary,
+`manifest.json` is optional only for deterministic/base page loading because every record repeats
+its `run_id`/`as_of`; it is required for optional AI eligibility and the server's exact generation
+verification, so deployment packages always include it. `players.json` is by far the largest file and is shared by the Summary,
 Players, and Next-GW pages; it is fetched and parsed once per browser session (a
-module-level cache in `src/data/load.ts`). Schema v4 also publishes compact
-`player_horizons.json`: cumulative xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)` for every
+module-level cache in `src/data/load.ts`). Introduced in schema v4 and retained in schema v5,
+`player_horizons.json` carries cumulative xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)` for every
 player and exact forecast endpoint. Python computes those probabilities by convolving the
 published gameweek PMFs at full precision, then emits a compact positional row whose named values
 are quantized to six decimals. Exact zero/one probability boundaries are preserved. The browser
@@ -119,8 +126,8 @@ data layer validates the field dictionary, decodes the row, and selects an exact
 
 ## Solve from the dashboard (local plan server)
 
-The wizard's **Solve now** button targets a tiny local HTTP service (stdlib only, no new
-dependency) that runs the *same* jobs the runbook does — never a reimplementation. From the
+The wizard's **Solve now** button targets a tiny local HTTP service that runs the *same* jobs the
+runbook does — never a reimplementation. From the
 repository root:
 
 ```powershell
@@ -134,6 +141,44 @@ repository root:
 `--forecast` binds both scratch and manager solves to one explicit prospective artifact. If it
 is omitted, the legacy `<base>/gw1_5_default.jsonl` convention remains; post-deadline operation
 should pass the current artifact explicitly.
+
+### Optional evidence-bound Z.AI summaries
+
+Provider rendering is disabled by default. To enable the implemented Z.AI adapter for the seven
+public analytical routes, configure the general Open Platform API in the trusted PowerShell process
+before starting the same Plan Server. Replace the placeholder in a private shell or source it from
+a local secret manager; never commit a real key or put it in a `VITE_*` variable:
+
+```powershell
+$env:FPL_INSIGHTS_PROVIDER = "zai_glm"
+$env:FPL_INSIGHTS_API_KEY = "<general-Open-Platform-API-key>"
+$env:FPL_INSIGHTS_MODEL = "glm-4.7"
+# Optional; omit to use the implemented default.
+$env:FPL_INSIGHTS_BASE_URL = "https://api.z.ai/api/paas/v4/"
+
+.\.venv\Scripts\python.exe -m fpl.jobs.plan_server `
+    --base <dev-latest-directory> `
+    --forecast <current-prospective-points.jsonl> `
+    --dashboard-data dashboard\public\data
+```
+
+`GET /insights/status` and `POST /insights/summary` use the same same-origin/approved-LAN-token
+boundary as the other local endpoints. After **Explain with AI** is clicked, the browser submits
+only an exact page/vintage/filter selector. The server revalidates the explicitly selected
+schema-v5 dashboard generation (`--dashboard-data`, default `dashboard/public/data`) and constructs
+the fact packet itself. The provider cannot receive caller prose, a free-form prompt, PMF,
+manager/capture identifier, squad, bank, purchase/selling value, credential, or custom plan state.
+The provider returns fact-id selections rather than prose; Python renders canonical cited text and
+React never renders provider HTML or executable Markdown. Timeouts, disabled configuration, rate
+limits, bad selections, malformed output, or provider failures leave the deterministic panel
+intact.
+
+Only a validated response and safe provenance are cached under the ignored Plan Server base. Keys,
+selector requests, resolved facts, raw provider bodies, and failures are neither cached nor logged.
+The cache key binds the canonical server-resolved evidence, provider, model, and prompt version.
+Z.AI Coding Plan quota is licensed for
+supported coding tools and must not be assumed to cover general application traffic; use a general
+Open Platform API key/balance under the current provider terms.
 
 Loopback use is deliberately zero-friction. A LAN-bound server prints a fresh per-launch access
 token; paste it into Plan Builder on the phone. The browser sends it only in the
@@ -424,6 +469,6 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
 - Deep-analytics charts may compute direction-labelled Pareto and quadrant display geometry from
   direct published axes. They are not optimizers. Team expected clean sheets is explicitly a sum of
   per-fixture probabilities (an expected count), never labelled as a probability.
-- P2.4 will derive every route's deterministic insight panel from visible published facts. Any
-  optional remote explanation must be explicit opt-in, cite allowlisted fact ids, never receive
-  private manager/custom-plan state, and never supply canonical numbers.
+- Every route's implemented deterministic insight panel derives from visible published facts. Any
+  optional remote explanation is explicit opt-in, cites allowlisted fact ids, never receives
+  private manager/custom-plan state, and never supplies canonical numbers.
