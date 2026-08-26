@@ -46,6 +46,21 @@ describe("PlayerForecastVsActualPage", () => {
     expect(screen.getByText(/full run/)).toBeInTheDocument();
   });
 
+  it("defaults to the newest scored vintage when a newer run has no actuals", async () => {
+    const mixed = clone(payload);
+    const pending = clone(mixed.runs[0]);
+    pending.run_id = "newer-pending-player-run";
+    pending.created_at = "2026-08-25T16:05:00Z";
+    pending.coverage.scored_rows = 0;
+    mixed.runs.push(pending);
+    vi.mocked(loadPlayerForecastVsActual).mockResolvedValue(mixed);
+
+    render(<PlayerForecastVsActualPage />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Player forecast vintage")).toHaveValue("player-run-001"),
+    );
+  });
+
   it("shows explicit no-outcome coverage without zero-filling", async () => {
     const empty = clone(payload);
     empty.has_outcomes = false;

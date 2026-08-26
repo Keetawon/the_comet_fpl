@@ -38,6 +38,10 @@ function newestRun(runs: readonly PlayerForecastAccuracyRun[]) {
   )[0];
 }
 
+function defaultRun(runs: readonly PlayerForecastAccuracyRun[]) {
+  return newestRun(runs.filter((run) => run.coverage.scored_rows > 0)) ?? newestRun(runs);
+}
+
 function observationOrder(left: PlayerForecastObservation, right: PlayerForecastObservation) {
   return left.gw - right.gw || left.web_name.localeCompare(right.web_name) || left.code - right.code;
 }
@@ -95,7 +99,7 @@ export function PlayerForecastVsActualPage() {
       .then((data) => {
         if (cancelled) return;
         setState({ status: "ready", data });
-        setRunId(newestRun(data.runs)?.run_id ?? "");
+        setRunId(defaultRun(data.runs)?.run_id ?? "");
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -112,7 +116,7 @@ export function PlayerForecastVsActualPage() {
 
   const run =
     state.status === "ready"
-      ? state.data.runs.find((candidate) => candidate.run_id === runId) ?? newestRun(state.data.runs)
+      ? state.data.runs.find((candidate) => candidate.run_id === runId) ?? defaultRun(state.data.runs)
       : undefined;
   const completedGws = useMemo(
     () => (run ? [...run.by_gw].sort((a, b) => a.gw - b.gw).map(({ gw }) => gw) : []),

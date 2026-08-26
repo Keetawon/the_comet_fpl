@@ -422,14 +422,16 @@ comparison page and is not a twelfth navigation item.
   partial double gameweek contributes no scored observation. It reads
   `player_forecast_vs_actual.json`, reports coverage/finality, xP versus replayed points, signed
   residual (`actual - forecast`), MAE/RMSE/CRPS, slices, calibration, and exact tables. The legacy
-  `#forecast-vs-actual` hash aliases this page.
+  `#forecast-vs-actual` hash aliases this page. It defaults to the newest vintage with scored rows;
+  newer pending vintages remain selectable.
 - **Team prediction vs actual** (implemented development-only, P2.3): reads
   `team_forecast_vs_actual.json` at directed team-fixture grain. Attack CRPS scores the named
   club's exact stored goals PMF; defence CRPS scores the opponent's exact PMF; neither PMF is
   recreated from a lambda or sent to the browser. Clean-sheet Brier uses the published probability.
   Positive attack residual means more goals scored than forecast; positive defence residual means
   more conceded than forecast and is worse. Coverage/finality and exact table equivalents remain
-  visible when no prospective outcomes are attached.
+  visible when no prospective outcomes are attached. It uses the same newest-scored-vintage
+  default while retaining every published vintage in the selector.
 - **Optimizer audit** (implemented, P1.7e): the provenance behind each optimizer decision
   from `optimizer_audit.json` — Git heads and the clean-worktree guarantee, forecast and
   squad-rule inputs, solver identity/options/seed/status, the bounded-search policy with its

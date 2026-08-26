@@ -1228,7 +1228,7 @@ export function PlanBuilderPage() {
             ? "No eligible priced players match"
             : "Players " +
               (candidatePage * PLAYER_PAGE_SIZE + 1) +
-              "โ€“" +
+              "–" +
               Math.min((candidatePage + 1) * PLAYER_PAGE_SIZE, candidates.length) +
               " of " +
               candidates.length +
@@ -1302,8 +1302,8 @@ export function PlanBuilderPage() {
                   </span>
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <TeamBadge teamCode={player.team_code} shortName={player.team_short_name} />
-                    {player.position} ยท {price(player.now_cost)} ยท{" "}
-                    {(player.selected_by_percent ?? 0).toFixed(1)}% ยท{" "}
+                    {player.position} · {price(player.now_cost)} ·{" "}
+                    {(player.selected_by_percent ?? 0).toFixed(1)}% ·{" "}
                     {availabilityLabel(player.availability_status)}
                   </span>
                 </span>
@@ -1631,7 +1631,7 @@ export function PlanBuilderPage() {
                                 teamCode={player.team_code}
                                 shortName={player.team_short_name}
                               />
-                              {player.position} ยท sell {price(imported.selling_price)} ยท current{" "}
+                              {player.position} · sell {price(imported.selling_price)} · current{" "}
                               {price(imported.now_cost)}
                             </span>
                           </span>

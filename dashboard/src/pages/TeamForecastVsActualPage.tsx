@@ -41,6 +41,10 @@ function newestRun(runs: readonly TeamForecastAccuracyRun[]) {
   )[0];
 }
 
+function defaultRun(runs: readonly TeamForecastAccuracyRun[]) {
+  return newestRun(runs.filter((run) => run.coverage.scored_rows > 0)) ?? newestRun(runs);
+}
+
 function observationOrder(left: TeamForecastObservation, right: TeamForecastObservation) {
   return left.gw - right.gw || left.fixture - right.fixture || left.team_id - right.team_id;
 }
@@ -146,7 +150,7 @@ export function TeamForecastVsActualPage() {
       .then((data) => {
         if (cancelled) return;
         setState({ status: "ready", data });
-        setRunId(newestRun(data.runs)?.run_id ?? "");
+        setRunId(defaultRun(data.runs)?.run_id ?? "");
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -157,7 +161,7 @@ export function TeamForecastVsActualPage() {
   }, []);
 
   const run = state.status === "ready"
-    ? state.data.runs.find((candidate) => candidate.run_id === runId) ?? newestRun(state.data.runs)
+    ? state.data.runs.find((candidate) => candidate.run_id === runId) ?? defaultRun(state.data.runs)
     : undefined;
   const completedGws = useMemo(
     () => (run ? [...run.by_gw].sort((a, b) => a.gw - b.gw).map(({ gw }) => gw) : []),

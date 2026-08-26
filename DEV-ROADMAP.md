@@ -1010,6 +1010,17 @@ per-route tests cover the cases in `docs/dashboard-ai-summaries.md`. Hosted mode
 network request, provider use requires explicit opt-in, and every disabled, timeout, rate-limit,
 malformed, or upstream failure leaves the deterministic summary usable.
 
+Local acceptance refresh (2026-08-26): a fresh official capture reported all ten GW1 fixtures
+final with scores. Outcome attachment appended 610 player-fixture facts and 20 reciprocal team
+sides. The semantic-v3 generation hash is
+`22c2c25745c6140a6b87d5fac412f56794b72e53365bb068c92c9110b2a57362`; the validated schema-v5
+dashboard generation hash is
+`258f0e1f77b536949f82fb4e0f79694f4a52b4a36902f1ed6692ff9832f03cf3`. GW1-capable vintages
+publish 584 scored player-gameweeks with three explicitly missing immutable outcomes and 20/20
+scored reciprocal team sides. Newer GW2-start vintages correctly have no GW1 observations, so both
+monitoring pages default to the newest vintage with scored rows while leaving every vintage
+selectable. The obsolete `forecast_vs_actual.json` is absent from the replaced generation.
+
 ### P2.5 - Other post-deadline work
 
 Only after the ordered dashboard program above, unless an operational blocker requires otherwise:

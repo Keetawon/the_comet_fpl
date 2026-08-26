@@ -64,6 +64,21 @@ describe("TeamForecastVsActualPage", () => {
     expect(screen.getAllByText("+0.700").length).toBeGreaterThan(0);
   });
 
+  it("defaults to the newest scored vintage when a newer run has no actuals", async () => {
+    const mixed = clone(payload);
+    const pending = clone(mixed.runs[0]);
+    pending.run_id = "newer-pending-team-run";
+    pending.created_at = "2026-08-25T16:05:00Z";
+    pending.coverage.scored_rows = 0;
+    mixed.runs.push(pending);
+    vi.mocked(loadTeamForecastVsActual).mockResolvedValue(mixed);
+
+    render(<TeamForecastVsActualPage />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Team forecast vintage")).toHaveValue("team-run-001"),
+    );
+  });
+
   it("shows pending empty state and loader errors explicitly", async () => {
     const empty = clone(payload);
     empty.has_outcomes = false;
