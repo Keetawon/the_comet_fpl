@@ -34,16 +34,18 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   and Plan Builder paths are implemented and rehearsed, and the immutable 2026-08-17 evening pack
   remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
-- **Goal 2's MVP is implemented; its post-deadline analytics extension is active.** The versioned semantic export, player-fixture forecast
-  transport, outcome attachment, atomic static-JSON boundary, six analytic pages, Plan Builder,
-  and the browser-only Squad Draft sandbox are shipped development-only. P1.8's full Players-page
+- **Goal 2's MVP, deep analytics, and exact parallel monitoring are implemented development-only;
+  deterministic/optional AI summaries are active next.** Semantic contract version 3, dashboard
+  schema version 5, immutable player/team outcomes, the atomic static-JSON boundary, nine read-only
+  analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
+  development-only. P1.8's full Players-page
   form matrix and additive observed
   defensive fields are implemented in code and focused tests; the failure-atomic local database
   rebuild and atomic BI/static republish completed on 2026-08-19, so they are visible locally.
   The final deadline vintage still requires the same controlled refresh inside Goal 1. The local
-  manager-team path is implemented development-only. Player/team deep analytics, a corrected
-  append-only outcome boundary with parallel comparison pages, and insight summaries are the
-  ordered P2 additions below.
+  manager-team path is implemented development-only. P2.2 player/team deep analytics and P2.3's
+  corrected append-only outcome boundary with parallel comparison pages are complete; P2.4 insight
+  summaries remain the ordered active next addition below.
 
 ## Current baseline
 
@@ -64,21 +66,21 @@ series; later handoff records the new commits and full gate rather than rewritin
 - Stage E selects a legal 15-player squad and exact weekly lineup/captain, then performs a bounded
   multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed, and immutable
   platform/default, diagnostic, and custom-plan identities are separated fail-closed.
-- The BI semantic/star export, fixture difficulty and player/team form facts, atomic static JSON,
-  six analytic dashboard pages, Plan Builder, and Squad Draft are implemented development-only.
-  The browser reads only published JSON and never DuckDB. Dashboard schema version 4 is current;
-  deep analytics can use its published values, while exact team monitoring requires the frozen
-  semantic-v3/read-model-v5 additions below.
+- The BI semantic-v3/star export, fixture difficulty and player/team form facts, atomic schema-v5
+  static JSON, nine read-only analytic/decision pages, Plan Builder, and Squad Draft are implemented
+  development-only. The browser reads only published JSON and never DuckDB. Player/Team analytics
+  and separate Player/Team prediction-monitoring pages are current; the old
+  `#forecast-vs-actual` route is only a player-page alias.
 - The localhost plan service was live and ready at audit time (PuLP 3.3.2, CBC 2.10.3, clean and
   idle), and the dashboard preview served the latest frontend. These are transient service checks,
   not substitutes for the final immutable artifacts.
-- The last recorded dashboard gate was green (80 tests, production build, and lint with 12
-  pre-existing warnings).
-  Today's full Python run reached 1,623 passed, 4 skipped, and 13 failures; every failure is the
-  same known Windows `WinError 1314` directory-symlink privilege case in the BI-export publish
-  tests. No model or optimizer regression was observed. This is still not an unqualified green
-  formal gate: use a symlink-capable/elevated environment or an explicitly approved and documented
-  run before declaring the formal gate green.
+- Focused P2.3 ledger/outcome, semantic/export validation, dashboard-emitter/public-package, strict
+  frontend loader/page/route tests, dashboard production build, and lint passed. The broader Python
+  gate on this Windows host still reaches only the atomic publish boundary in the directory-symlink
+  cases: `WinError 1314` means the shell lacks symlink privilege, not that a semantic/read-model
+  assertion failed. This is still not an unqualified green formal gate; use Developer Mode, an
+  elevated/symlink-capable environment, or an explicitly approved documented run before declaring
+  it green.
 - The local database is rebuildable. Daily snapshots are the irreplaceable source and must remain
   committed.
 
@@ -90,8 +92,6 @@ Open operational gaps:
 - manager captures now carry current purchase/selling values and cash, but future prices and
   future selling-value changes remain frozen at forecast `now_cost`;
 - authenticated My Team access, hosted manager accounts, and capture-retention policy remain open;
-- the current player comparison does not prove complete-gameweek finality and can score a partial
-  double gameweek; it must be replaced by the P2 monitoring contract before use;
 - real prospective forecast monitoring remains empty until immutable finalized 2026/27 outcomes
   are attached.
 
@@ -416,7 +416,7 @@ artifacts can be traced by immutable IDs and SHA-256 values.
 
 ## P1: BI semantic export and decision dashboard
 
-**Bird's-eye status (2026-08-19): substantially implemented development-only.** The semantic
+**Historical bird's-eye status (2026-08-19): substantially implemented development-only.** The semantic
 contract/export, fixture-grain forecast transport, outcome attachment, atomic static publish
 boundary, fixture difficulty and player/team form views, all six analytic pages, Plan Builder, and
 the browser-only Squad Draft sandbox are present. The browser reads only static JSON and never the
@@ -427,6 +427,9 @@ refreshed successfully and atomically on 2026-08-19. The final deadline vintage 
 rebuilt, exported, and republished through the P0 sequence; the local refresh does not replace that
 artifact. Forecast-versus-actual becomes informative only after outcomes finalize. Manager import
 remains separate P2 work.
+
+This dated P1 snapshot predates the P2.2/P2.3 additions. The current status and route counts are
+recorded in the Goal 2 and P2 sections above and below.
 
 ### P1.1 — Freeze semantic contract v1
 
@@ -749,7 +752,7 @@ tests (player chip semantics: xP headline vs colour metric, FDR source, NULL→n
 xP; page smoke incl. expandable primitives and overlay labelling). Dev read models were
 regenerated from the recorded vintage so the new fields carry real data.
 
-**P1.7e Forecast-vs-actual + Optimizer-audit pages (2026-08-16): implemented.** Two read
+**Historical P1.7e Forecast-vs-actual + Optimizer-audit milestone (2026-08-16): implemented.** Two read
 models ship. `forecast_vs_actual.json` scores each recorded vintage against its own season's
 finalised outcomes (points under 2026/27 rules) via a read-time join at `(season, gw, code)`:
 rows, mean EV/actual, bias, MAE, and CRPS (double-sum discrete CRPS from the stored
@@ -774,6 +777,9 @@ data: the dev ledger carries a diagnostic vintage (run `407668b6…`) beside the
 (`86a072ad…`), and two dev-only optimizer plans (default `7ce5b0c8…`, diagnostic
 `90683dfc…`, both `risk_lambda=0`, clean worktree) feed the export, so the Next-GW diff and
 the audit page render real plans.
+
+P2.3 supersedes only this milestone's single monitoring file and route: dashboard schema v5 uses
+separate `player_forecast_vs_actual.json` and `team_forecast_vs_actual.json` read models and pages.
 
 **P1.7f Platform/custom plan separation + exclusions (2026-08-18): implemented,
 offline-tested.** Dashboard read-model schema version 3 gives every optimizer decision an
@@ -901,8 +907,8 @@ advancing; none of these tasks changes a prospective model default or frozen eva
 
 ### P2.1 - Freeze the dashboard analytics, monitoring, and insight contracts
 
-**Status (2026-08-26): documentation authored; implementation follows in P2.2-P2.4.** Update this
-roadmap and `AGENTS.md`, then freeze the detailed boundaries in:
+**Status (2026-08-26): contract freeze complete; P2.2 and P2.3 are implemented, P2.4 remains.** The
+detailed boundaries are frozen in:
 
 - `docs/dashboard-deep-analytics.md`;
 - `docs/prediction-vs-actual-dashboard.md`;
@@ -919,8 +925,9 @@ operation, and test; implementation cannot silently weaken these requirements.
 ### P2.2 - Player and team deep analytics
 
 **Status (2026-08-26): implemented development-only; focused and full dashboard tests pass.**
-Player analytics and Team analytics now use only dashboard schema version 4 values. They do not
-wait for or reach around the P2.3 outcome work.
+Player analytics and Team analytics use only the cumulative/forecast values introduced in dashboard
+schema version 4 and retained unchanged in current schema version 5. They do not reach around P2.3's
+outcome facts.
 
 - Player views: price-versus-cumulative-xP Pareto frontier; published inclusive haul-versus-downside
   frontier; ownership-versus-xP differential view; and explicitly labelled observed-form versus
@@ -941,8 +948,9 @@ labelling, fallback accounting, loading/error/empty states, and accessible table
 
 ### P2.3 - Exact parallel player/team prediction monitoring
 
-**Status: active after P2.2.** Replace the current ambiguous player-only aggregate with explicit
-player and team read models and pages. This is a correctness repair, not merely a visual extension.
+**Status (2026-08-26): implemented development-only; focused backend/frontend tests pass.** The
+ambiguous player-only aggregate has been replaced by explicit player and team read models and pages.
+This is a correctness repair, not merely a visual extension.
 
 1. Persist official home/away scores in live fixture versions. Add an append-only
    `ledger_outcome_team_fixture` with two reciprocal rows per finalized fixture; exact reattachment
@@ -962,11 +970,14 @@ player and team read models and pages. This is a correctness repair, not merely 
 
 Acceptance: the hand-computed and failure cases in
 `docs/prediction-vs-actual-dashboard.md` pass through ledger attachment, Parquet round-trip, static
-publication, public-package sanitization, strict frontend loading, and both pages.
+publication, public-package sanitization, strict frontend loading, and both pages. On this Windows
+host, tests that exercise the final generation-symlink swap require Developer Mode or an elevated
+shell; `WinError 1314` at that last OS call is recorded as environment-specific rather than a
+product/metric failure.
 
 ### P2.4 - Deterministic and optional AI insight summaries
 
-**Status: planned after the analytical pages expose stable fact builders.** Every route gets a
+**Status (2026-08-26): active next; not yet implemented.** Every route gets a
 network-free deterministic insight panel. Public analytical routes additionally offer an explicit
 "Explain with AI" action when the trusted local insight service is enabled. Private/decision routes
 remain deterministic-only.

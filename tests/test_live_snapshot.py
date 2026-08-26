@@ -57,6 +57,8 @@ def _fixtures(*, kickoff: str = "2026-08-22T14:00:00Z") -> list[dict[str, object
             "kickoff_time": kickoff,
             "team_h": 1,
             "team_a": 2,
+            "team_h_score": 3,
+            "team_a_score": 1,
             "team_h_difficulty": 2,
             "team_a_difficulty": 4,
             "pulse_id": 7001,
@@ -124,6 +126,12 @@ def test_capture_manifest_and_live_loader_are_atomic() -> None:
         assert result.loaded.fixture_versions == 1
         assert result.loaded.player_fixture_versions == 1
         assert con.execute("SELECT count(*) FROM stg_live_team_version").fetchone() == (2,)
+        assert con.execute(
+            """
+            SELECT team_h_score, team_a_score
+            FROM stg_live_fixture_version WHERE fixture = 501
+            """
+        ).fetchone() == (3, 1)
         team_row = con.execute(
             """
             SELECT team_id, team_name, short_name

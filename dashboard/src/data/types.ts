@@ -1,5 +1,5 @@
 // Read-model shapes as emitted by fpl.publish.dashboard_json (schema
-// fpl.dashboard-read-models v4; see docs/dashboard-json-contract.md).
+// fpl.dashboard-read-models v5; see docs/dashboard-json-contract.md).
 // Nullable fields are `| null`: NULL means unmeasured/unavailable and must
 // never be rendered as 0, "", or a fabricated colour.
 
@@ -178,7 +178,7 @@ export interface PlayerHorizon {
   p_ge_15: number;
 }
 
-/** Canonical positional order in the compact schema-v4 wire payload. */
+/** Canonical positional order in the compact schema-v5 wire payload. */
 export const PLAYER_HORIZON_FIELDS = [
   "gw_to",
   "xp",
@@ -230,7 +230,7 @@ export interface PlayerHorizonSemantics {
 
 export interface PlayerHorizonsData {
   schema: "fpl.dashboard-player-horizons";
-  json_schema_version: 4;
+  json_schema_version: 5;
   semantics: PlayerHorizonSemantics;
   horizon_fields: typeof PLAYER_HORIZON_FIELDS;
   players: PlayerHorizonsRecord[];
@@ -239,7 +239,7 @@ export interface PlayerHorizonsData {
 /** Serialized payload shape before the loader decodes positional horizon values. */
 export interface PlayerHorizonsWireData {
   schema: "fpl.dashboard-player-horizons";
-  json_schema_version: 4;
+  json_schema_version: 5;
   semantics: PlayerHorizonSemantics;
   horizon_fields: typeof PLAYER_HORIZON_FIELDS;
   players: PlayerHorizonsWireRecord[];
@@ -381,46 +381,215 @@ export interface SummaryData {
   ease_index_formula_version: string | null;
 }
 
-// ---- forecast_vs_actual.json (P1.7e): vintages scored against finalised outcomes ----
+// ---- schema-v5 prediction monitoring: immutable forecasts joined to final outcomes ----
 
-export interface ScoreBlock {
+export interface ForecastAccuracySemantics {
+  [key: string]: unknown;
+}
+
+export interface ForecastAccuracyScoreBlock {
   rows: number;
-  mean_ev: number | null;
-  mean_actual: number | null;
+  distribution_rows: number;
+  forecast_total: number | null;
+  actual_total: number | null;
+  forecast_mean: number | null;
+  actual_mean: number | null;
+  /** Actual minus forecast. Positive means the model under-predicted this measure. */
   bias: number | null;
   mae: number | null;
+  rmse: number | null;
   crps: number | null;
 }
 
-export interface FvaPosition extends ScoreBlock {
+export interface CleanSheetScoreBlock {
+  rows: number;
+  predicted_mean: number | null;
+  observed_rate: number | null;
+  brier: number | null;
+}
+
+export interface ForecastAccuracyRunProvenance {
+  run_id: string;
+  as_of: string | null;
+  created_at: string | null;
+  season: string;
+  gw_from: number;
+  gw_to: number;
+  status: string | null;
+  component_modes: ComponentModes | null;
+}
+
+export interface PlayerForecastCoverage {
+  forecast_rows: number;
+  pending_rows: number;
+  final_eligible_rows: number;
+  missing_outcome_rows: number;
+  legacy_unavailable_rows: number;
+  scored_rows: number;
+  distribution_scored_rows: number;
+}
+
+export interface PlayerAccuracyByPosition extends ForecastAccuracyScoreBlock {
   position: string;
 }
 
-export interface FvaGw extends ScoreBlock {
+export interface PlayerAccuracyByGameweek extends ForecastAccuracyScoreBlock {
   gw: number;
 }
 
-export interface FvaCalibration {
+export interface PlayerAccuracyByTeam extends ForecastAccuracyScoreBlock {
+  team_id: number;
+  team_code: number | null;
+  team_name: string;
+  team_short_name: string;
+}
+
+export type PlayerCalibrationEvent = "points_le" | "points_ge";
+
+export interface PlayerForecastCalibration {
+  event: PlayerCalibrationEvent;
+  threshold: 2 | 6 | 10;
   bucket: string;
-  threshold_points: number;
   rows: number;
   predicted_mean: number;
   observed_rate: number;
 }
 
-export interface FvaRun extends ScoreBlock {
-  run_id: string;
-  season: string;
-  gw_from: number;
-  gw_to: number;
-  by_position: FvaPosition[];
-  by_gw: FvaGw[];
-  calibration: FvaCalibration[];
+export interface PlayerForecastObservation {
+  gw: number;
+  code: number;
+  web_name: string;
+  position: string;
+  team_id: number;
+  team_code: number | null;
+  team_name: string;
+  team_short_name: string;
+  forecast_xp: number;
+  actual_points: number;
+  /** Actual points minus forecast xP. */
+  residual: number;
+  absolute_error: number;
+  crps: number | null;
+  p_le_2: number | null;
+  p_ge_2: number | null;
+  p_ge_6: number | null;
+  p_ge_10: number | null;
 }
 
-export interface ForecastVsActualData {
+export interface PlayerForecastAccuracyRun extends ForecastAccuracyRunProvenance {
+  coverage: PlayerForecastCoverage;
+  overall: ForecastAccuracyScoreBlock;
+  by_position: PlayerAccuracyByPosition[];
+  by_gw: PlayerAccuracyByGameweek[];
+  by_team: PlayerAccuracyByTeam[];
+  calibration: PlayerForecastCalibration[];
+  observations: PlayerForecastObservation[];
+}
+
+export interface PlayerForecastVsActualData {
+  schema: "fpl.dashboard-player-forecast-vs-actual";
+  json_schema_version: 5;
+  semantics: ForecastAccuracySemantics;
   has_outcomes: boolean;
-  runs: FvaRun[];
+  runs: PlayerForecastAccuracyRun[];
+  /** Optional publication metadata loaded beside the exact JSON envelope. */
+  manifest: DashboardManifest | null;
+}
+
+export interface TeamForecastCoverage {
+  forecast_rows: number;
+  pending_rows: number;
+  missing_outcome_rows: number;
+  invalid_fixture_rows: number;
+  scored_rows: number;
+  attack_distribution_scored_rows: number;
+  defence_distribution_scored_rows: number;
+  clean_sheet_scored_rows: number;
+}
+
+export interface TeamAccuracyScoreSet {
+  attack: ForecastAccuracyScoreBlock;
+  defence: ForecastAccuracyScoreBlock;
+  clean_sheet: CleanSheetScoreBlock;
+}
+
+export interface TeamAccuracyByGameweek extends TeamAccuracyScoreSet {
+  gw: number;
+}
+
+export interface TeamAccuracyByTeam extends TeamAccuracyScoreSet {
+  team_id: number;
+  team_code: number | null;
+  team_name: string;
+  team_short_name: string;
+}
+
+export interface TeamAccuracyByVenue extends TeamAccuracyScoreSet {
+  venue: "home" | "away";
+}
+
+export interface TeamAccuracyByFallback extends TeamAccuracyScoreSet {
+  stage_a_league_average_team: boolean;
+}
+
+export type TeamCalibrationEvent = "goals_ge" | "clean_sheet";
+
+export interface TeamForecastCalibration {
+  event: TeamCalibrationEvent;
+  threshold: 1 | 2 | 3 | null;
+  bucket: string;
+  rows: number;
+  predicted_mean: number;
+  observed_rate: number;
+}
+
+export interface TeamForecastObservation {
+  fixture: number;
+  gw: number;
+  kickoff_time: string | null;
+  team_id: number;
+  team_code: number | null;
+  team_name: string;
+  team_short_name: string;
+  opponent_team_id: number;
+  opponent_team_code: number | null;
+  opponent_team_name: string;
+  opponent_team_short_name: string;
+  was_home: boolean;
+  lambda_for: number;
+  actual_goals_for: number;
+  /** Actual goals scored minus lambda_for. Positive means more goals than forecast. */
+  attack_residual: number;
+  lambda_against: number;
+  actual_goals_against: number;
+  /** Actual goals conceded minus lambda_against. Positive is worse for the defending club. */
+  defence_residual: number;
+  probability_clean_sheet: number;
+  actual_clean_sheet: boolean;
+  attack_crps: number | null;
+  defence_crps: number | null;
+  clean_sheet_brier: number;
+  stage_a_league_average_team: boolean;
+}
+
+export interface TeamForecastAccuracyRun extends ForecastAccuracyRunProvenance, TeamAccuracyScoreSet {
+  coverage: TeamForecastCoverage;
+  by_gw: TeamAccuracyByGameweek[];
+  by_team: TeamAccuracyByTeam[];
+  by_venue: TeamAccuracyByVenue[];
+  by_fallback: TeamAccuracyByFallback[];
+  calibration: TeamForecastCalibration[];
+  observations: TeamForecastObservation[];
+}
+
+export interface TeamForecastVsActualData {
+  schema: "fpl.dashboard-team-forecast-vs-actual";
+  json_schema_version: 5;
+  semantics: ForecastAccuracySemantics;
+  has_outcomes: boolean;
+  runs: TeamForecastAccuracyRun[];
+  /** Optional publication metadata loaded beside the exact JSON envelope. */
+  manifest: DashboardManifest | null;
 }
 
 // ---- optimizer_audit.json (P1.7e): provenance behind each optimizer decision ----

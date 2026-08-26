@@ -6,21 +6,23 @@ it never queries DuckDB and never reads Parquet in the browser.
 
 ## 2026-08-26 dashboard program
 
-The schema-v4 application remains the working baseline. The ordered additive work is:
+Schema v5 is the current development-only application contract. The ordered program is:
 
 1. **Implemented development-only:** Player analytics and Team analytics over existing published
    values, following `../docs/dashboard-deep-analytics.md`;
-2. schema-v5 parallel player/team prediction-versus-actual pages with complete-gameweek finality,
-   following `../docs/prediction-vs-actual-dashboard.md`;
-3. a deterministic insight panel on every route and an optional trusted-server language renderer
+2. **Implemented development-only:** schema-v5 parallel player/team prediction-versus-actual pages
+   with complete-gameweek finality, following `../docs/prediction-vs-actual-dashboard.md`;
+3. **Active next, not yet implemented:** a deterministic insight panel on every route and an
+   optional trusted-server language renderer
    on public analytical routes, following `../docs/dashboard-ai-summaries.md`.
 
 The implemented deep-analytics routes are `#player-analytics` and `#team-analytics`; both are
 linked directly in the sidebar and retain an exact-table equivalent for every chart.
 
-The static hosted build never receives a model-provider key and never calls Z.AI directly. Until a
-separately authenticated proxy is deployed it uses deterministic summaries only. Local provider
-configuration belongs to the Python server environment, never `VITE_*` or browser storage.
+The static hosted build never receives a model-provider key and never calls Z.AI directly. P2.4
+will keep deterministic summaries available without a provider and require a separately
+authenticated proxy for optional hosted prose. Local provider configuration belongs to the Python
+server environment, never `VITE_*` or browser storage.
 
 ## Generate the data
 
@@ -248,9 +250,11 @@ release/pin workflow, privacy boundary, refresh, and rollback procedure.
 
 ## Pages
 
-The app has eight routes: the six analytical/read-model pages below (Summary, Fixture
-matrix, Players, Next GW suggestion, Forecast vs actual, and Optimizer audit), the
-interactive Plan builder, and the browser-only Squad draft sandbox.
+The app has eleven sidebar routes: nine analytical/read-model pages (Summary, Fixture matrix, Team
+analytics, Players, Player analytics, Next GW suggestion, Player prediction vs actual, Team
+prediction vs actual, and Optimizer audit), the interactive Plan builder, and the browser-only
+Squad draft sandbox. The legacy `#forecast-vs-actual` hash remains only as an alias to the player
+comparison page and is not a twelfth navigation item.
 
 - **Fixture matrix** (implemented, P1.7b): the fixture pivot — one row per club of the
   selected vintage, **one column per gameweek** (two chips in a double gameweek), with
@@ -368,14 +372,19 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   not chip recommendations: direct import provides only the captured current 15 and values;
   chip optimization, autosubs, captain fallback, competing chip windows, authenticated account
   state, and the rest of the season remain unavailable.
-- **Forecast vs actual** (legacy aggregate, P1.7e): each recorded vintage scored against its own
-  season's finalised outcomes (points under 2026/27 rules, read-time join at
-  `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a
-  P(≥2 points) calibration table. With no finalised outcomes (the 2026-27 GW1 state) the
-  page shows the framework and says why; unfinalised rows are excluded, never read as zero. This
-  schema-v4 page does not yet prove whole-gameweek finality for a partial double gameweek and must
-  not be treated as the P2.3 monitoring result. Its version-5 successor splits Player prediction vs
-  actual and Team prediction vs actual and consumes append-only finalized outcomes.
+- **Player prediction vs actual** (implemented development-only, P2.3): scores one recorded
+  player-gameweek only after the official gameweek and every forecast fixture leg are final. A
+  partial double gameweek contributes no scored observation. It reads
+  `player_forecast_vs_actual.json`, reports coverage/finality, xP versus replayed points, signed
+  residual (`actual - forecast`), MAE/RMSE/CRPS, slices, calibration, and exact tables. The legacy
+  `#forecast-vs-actual` hash aliases this page.
+- **Team prediction vs actual** (implemented development-only, P2.3): reads
+  `team_forecast_vs_actual.json` at directed team-fixture grain. Attack CRPS scores the named
+  club's exact stored goals PMF; defence CRPS scores the opponent's exact PMF; neither PMF is
+  recreated from a lambda or sent to the browser. Clean-sheet Brier uses the published probability.
+  Positive attack residual means more goals scored than forecast; positive defence residual means
+  more conceded than forecast and is worse. Coverage/finality and exact table equivalents remain
+  visible when no prospective outcomes are attached.
 - **Optimizer audit** (implemented, P1.7e): the provenance behind each optimizer decision
   from `optimizer_audit.json` — Git heads and the clean-worktree guarantee, forecast and
   squad-rule inputs, solver identity/options/seed/status, the bounded-search policy with its
@@ -415,6 +424,6 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
 - Deep-analytics charts may compute direction-labelled Pareto and quadrant display geometry from
   direct published axes. They are not optimizers. Team expected clean sheets is explicitly a sum of
   per-fixture probabilities (an expected count), never labelled as a probability.
-- Every route's deterministic insight panel is derived from its visible published facts. Optional
-  remote explanation is explicit opt-in, cites allowlisted fact ids, and never receives private
-  manager/custom-plan state or supplies canonical numbers.
+- P2.4 will derive every route's deterministic insight panel from visible published facts. Any
+  optional remote explanation must be explicit opt-in, cite allowlisted fact ids, never receive
+  private manager/custom-plan state, and never supply canonical numbers.

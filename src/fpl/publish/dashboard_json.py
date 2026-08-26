@@ -31,6 +31,7 @@ import polars as pl
 
 # The atomic-publish machinery (lock, generation swap, no-clobber, fsync) and the strict
 # JSON helpers are shared with the Parquet exporter; import rather than fork a second copy.
+from fpl.publish.contract import SEMANTIC_CONTRACT_VERSION
 from fpl.publish.export import (
     BI_EXPORT_SCHEMA,
     BI_EXPORT_SCHEMA_VERSION,
@@ -58,13 +59,19 @@ DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
 # v4: each player carries cumulative-horizon xP and threshold probabilities derived here
 # from the published player-gameweek PMFs.  The browser selects these values; it never
 # sums probabilities or reconstructs them from per-gameweek primitives.
-DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 4
+# v5: retrospective monitoring is split into player and team files.  Both consume only
+# immutable outcome-ledger facts, enforce complete-gameweek/two-sided finality here, and
+# publish scalar observations and scores rather than PMFs to the browser.
+DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 5
 FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
 PLAYER_HORIZONS_SCHEMA: Final[str] = "fpl.dashboard-player-horizons"
 SUMMARY_SCHEMA: Final[str] = "fpl.dashboard-summary"
 NEXT_GW_SCHEMA: Final[str] = "fpl.dashboard-next-gw"
-FORECAST_VS_ACTUAL_SCHEMA: Final[str] = "fpl.dashboard-forecast-vs-actual"
+PLAYER_FORECAST_VS_ACTUAL_SCHEMA: Final[str] = (
+    "fpl.dashboard-player-forecast-vs-actual"
+)
+TEAM_FORECAST_VS_ACTUAL_SCHEMA: Final[str] = "fpl.dashboard-team-forecast-vs-actual"
 OPTIMIZER_AUDIT_SCHEMA: Final[str] = "fpl.dashboard-optimizer-audit"
 MANIFEST_FILENAME: Final[str] = "manifest.json"
 FIXTURE_MATRIX_FILENAME: Final[str] = "fixture_matrix.json"
@@ -72,7 +79,8 @@ PLAYERS_FILENAME: Final[str] = "players.json"
 PLAYER_HORIZONS_FILENAME: Final[str] = "player_horizons.json"
 SUMMARY_FILENAME: Final[str] = "summary.json"
 NEXT_GW_FILENAME: Final[str] = "next_gw.json"
-FORECAST_VS_ACTUAL_FILENAME: Final[str] = "forecast_vs_actual.json"
+PLAYER_FORECAST_VS_ACTUAL_FILENAME: Final[str] = "player_forecast_vs_actual.json"
+TEAM_FORECAST_VS_ACTUAL_FILENAME: Final[str] = "team_forecast_vs_actual.json"
 OPTIMIZER_AUDIT_FILENAME: Final[str] = "optimizer_audit.json"
 
 # Exactly the tables the read models read.  The source export is contract-complete, so a
@@ -89,7 +97,8 @@ _READ_TABLES: Final[tuple[str, ...]] = (
     "fact_player_form",
     "fact_forecast_player_fixture",
     "fact_optimizer_plan",
-    "fact_player_fixture_actual",
+    "fact_finalized_player_fixture_outcome",
+    "fact_finalized_team_fixture_outcome",
     "dim_optimizer_run",
 )
 _WINDOW_LABELS: Final[tuple[str, ...]] = ("last_3", "last_5", "last_10", "season_to_date")
@@ -116,7 +125,8 @@ _FILE_LIST_KEY: Final[dict[str, str | None]] = {
     PLAYER_HORIZONS_FILENAME: "players",
     NEXT_GW_FILENAME: "plans",
     SUMMARY_FILENAME: None,
-    FORECAST_VS_ACTUAL_FILENAME: "runs",
+    PLAYER_FORECAST_VS_ACTUAL_FILENAME: "runs",
+    TEAM_FORECAST_VS_ACTUAL_FILENAME: "runs",
     OPTIMIZER_AUDIT_FILENAME: "plans",
 }
 _FILE_SCHEMA: Final[dict[str, str]] = {
@@ -125,7 +135,8 @@ _FILE_SCHEMA: Final[dict[str, str]] = {
     PLAYER_HORIZONS_FILENAME: PLAYER_HORIZONS_SCHEMA,
     NEXT_GW_FILENAME: NEXT_GW_SCHEMA,
     SUMMARY_FILENAME: SUMMARY_SCHEMA,
-    FORECAST_VS_ACTUAL_FILENAME: FORECAST_VS_ACTUAL_SCHEMA,
+    PLAYER_FORECAST_VS_ACTUAL_FILENAME: PLAYER_FORECAST_VS_ACTUAL_SCHEMA,
+    TEAM_FORECAST_VS_ACTUAL_FILENAME: TEAM_FORECAST_VS_ACTUAL_SCHEMA,
     OPTIMIZER_AUDIT_FILENAME: OPTIMIZER_AUDIT_SCHEMA,
 }
 _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
@@ -158,7 +169,8 @@ class DashboardReadModels:
     player_horizons: tuple[dict[str, Any], ...]
     summary: dict[str, Any]
     next_gw: dict[str, Any]
-    forecast_vs_actual: dict[str, Any]
+    player_forecast_vs_actual: dict[str, Any]
+    team_forecast_vs_actual: dict[str, Any]
     optimizer_audit: dict[str, Any]
     ease_index_formula_version: str | None
 
@@ -202,6 +214,10 @@ def _read_source_manifest(export_dir: Path) -> dict[str, Any]:
     ):
         raise DashboardJsonError(
             f"{path} is not a {BI_EXPORT_SCHEMA} version {BI_EXPORT_SCHEMA_VERSION} export"
+        )
+    if manifest.get("semantic_contract_version") != SEMANTIC_CONTRACT_VERSION:
+        raise DashboardJsonError(
+            f"{path} semantic contract version is not {SEMANTIC_CONTRACT_VERSION}"
         )
     tables = manifest.get("tables")
     if not isinstance(tables, dict):
@@ -1376,7 +1392,12 @@ def _discrete_crps(probabilities: list[float], actual: float) -> float | None:
     the caller reports such a row as unmeasured rather than inventing a score.
     """
     support = list(range(len(probabilities)))
-    if any((not (p >= 0.0)) or p > 1.0 for p in probabilities):
+    if (
+        not probabilities
+        or not math.isfinite(actual)
+        or any(not math.isfinite(p) or p < 0.0 or p > 1.0 for p in probabilities)
+        or not math.isclose(sum(probabilities), 1.0, abs_tol=_PMF_ABSOLUTE_TOLERANCE)
+    ):
         return None
     first = sum(p * abs(x - actual) for x, p in zip(support, probabilities, strict=True))
     second = 0.0
@@ -1393,9 +1414,6 @@ _CALIBRATION_BUCKETS: Final[tuple[tuple[str, float, float], ...]] = (
     ("0.5-0.7", 0.5, 0.7),
     ("0.7-1.0", 0.7, 1.01),
 )
-_CALIBRATION_THRESHOLD: Final[int] = 2
-
-
 def _parse_distribution(raw: object) -> list[float] | None:
     if raw is None:
         return None
@@ -1414,132 +1432,687 @@ def _parse_distribution(raw: object) -> list[float] | None:
     return [float(value) for value in parsed]
 
 
-def _score_block(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """Mean EV / actual / bias / MAE / CRPS over scored rows; None when nothing scored."""
+def _valid_distribution(probabilities: list[float] | None) -> list[float] | None:
+    if (
+        probabilities is None
+        or not probabilities
+        or any(not math.isfinite(value) or value < 0.0 or value > 1.0 for value in probabilities)
+        or not math.isclose(sum(probabilities), 1.0, abs_tol=_PMF_ABSOLUTE_TOLERANCE)
+    ):
+        return None
+    return probabilities
+
+
+def _event_probability(
+    probabilities: list[float] | None, *, relation: str, threshold: int
+) -> float | None:
+    valid = _valid_distribution(probabilities)
+    if valid is None:
+        return None
+    if relation == "le":
+        return sum(valid[: threshold + 1])
+    if relation == "ge":
+        return sum(valid[threshold:])
+    raise ValueError(f"unknown event relation {relation!r}")
+
+
+def _score_block(
+    rows: list[dict[str, Any]],
+    *,
+    forecast_field: str,
+    actual_field: str,
+    crps_field: str,
+) -> dict[str, Any]:
+    """Exact scalar and proper-score summary over already eligible observations."""
     if not rows:
         return {
             "rows": 0,
-            "mean_ev": None,
-            "mean_actual": None,
+            "distribution_rows": 0,
+            "forecast_total": None,
+            "actual_total": None,
+            "forecast_mean": None,
+            "actual_mean": None,
             "bias": None,
             "mae": None,
+            "rmse": None,
             "crps": None,
         }
     count = len(rows)
-    mean_ev = sum(row["ev"] for row in rows) / count
-    mean_actual = sum(row["actual"] for row in rows) / count
-    mae = sum(abs(row["actual"] - row["ev"]) for row in rows) / count
-    crps_values = [row["crps"] for row in rows if row["crps"] is not None]
+    forecast_total = sum(float(row[forecast_field]) for row in rows)
+    actual_total = sum(float(row[actual_field]) for row in rows)
+    residuals = [float(row[actual_field]) - float(row[forecast_field]) for row in rows]
+    crps_values = [float(row[crps_field]) for row in rows if row[crps_field] is not None]
     return {
         "rows": count,
-        "mean_ev": mean_ev,
-        "mean_actual": mean_actual,
-        "bias": mean_actual - mean_ev,
-        "mae": mae,
+        "distribution_rows": len(crps_values),
+        "forecast_total": forecast_total,
+        "actual_total": actual_total,
+        "forecast_mean": forecast_total / count,
+        "actual_mean": actual_total / count,
+        "bias": sum(residuals) / count,
+        "mae": sum(abs(value) for value in residuals) / count,
+        "rmse": math.sqrt(sum(value * value for value in residuals) / count),
         "crps": sum(crps_values) / len(crps_values) if crps_values else None,
     }
 
 
-def _build_forecast_vs_actual(
-    player_gameweek: pl.DataFrame,
-    player_fixture_actual: pl.DataFrame,
-    runs: pl.DataFrame,
-) -> dict[str, Any]:
-    """forecast_vs_actual.json: each vintage scored against its own season's finalised
-    outcomes, at player-gameweek grain, under the ``points_under_rules_2026_27`` measure.
-
-    The join is read-time only: forecast rows keep their ``run_id``, outcome rows keep
-    none, and they meet on ``(season, gw, code)``. With no finalised outcomes inside any
-    vintage's horizon (the 2026-27 GW1 state), ``has_outcomes`` is false and every block
-    is empty -- the UI shows the framework and says why, never zero-filled numbers.
-    """
-    horizon = {row["run_id"]: row for row in _horizon_projection(runs).iter_rows(named=True)}
-    # Finalised points per (season, gw, code): unmeasured (NULL) points stay out, never 0.
-    actual_points: dict[tuple[str, int, int], float] = {}
-    if player_fixture_actual.height:
-        measured = player_fixture_actual.filter(pl.col("points_under_rules_2026_27").is_not_null())
-        grouped = measured.group_by(["season", "gw", "code"]).agg(
-            pl.col("points_under_rules_2026_27").sum().alias("actual")
-        )
-        for row in grouped.iter_rows(named=True):
-            actual_points[(row["season"], int(row["gw"]), int(row["code"]))] = float(row["actual"])
-
-    scored_by_run: dict[str, list[dict[str, Any]]] = {}
-    for row in player_gameweek.iter_rows(named=True):
-        run = horizon.get(row["run_id"])
-        if run is None:
-            raise DashboardJsonError(
-                f"forecast row references run {row['run_id']} absent from dim_forecast_run"
-            )
-        actual = actual_points.get((row["season"], int(row["gw"]), int(row["code"])))
-        if actual is None or row["expected_points"] is None:
-            continue  # no finalised outcome (yet) for this player-gameweek: unscored, not zero
-        distribution = _parse_distribution(row.get("distribution"))
-        probabilities_ge_threshold = None
-        crps = None
-        if distribution is not None:
-            total = sum(distribution)
-            if total > 0.0:
-                probabilities_ge_threshold = sum(distribution[_CALIBRATION_THRESHOLD:]) / total
-            crps = _discrete_crps(distribution, actual)
-        scored_by_run.setdefault(row["run_id"], []).append(
-            {
-                "gw": int(row["gw"]),
-                "code": int(row["code"]),
-                "position": row["position"],
-                "ev": float(row["expected_points"]),
-                "actual": actual,
-                "p_ge_threshold": probabilities_ge_threshold,
-                "crps": crps,
-            }
-        )
-
-    run_records: list[dict[str, Any]] = []
-    for run_id in sorted(scored_by_run):
-        rows = scored_by_run[run_id]
-        run = horizon[run_id]
-        by_position = []
-        for position in sorted({row["position"] for row in rows}):
-            block = _score_block([row for row in rows if row["position"] == position])
-            by_position.append({"position": position, **block})
-        by_gw = []
-        for gw in sorted({row["gw"] for row in rows}):
-            block = _score_block([row for row in rows if row["gw"] == gw])
-            by_gw.append({"gw": gw, **block})
-        calibration = []
+def _calibration_records(
+    rows: list[dict[str, Any]],
+    specifications: tuple[tuple[str, int | None, str, Callable[[dict[str, Any]], bool]], ...],
+) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for event, threshold, probability_field, observed in specifications:
         for label, low, high in _CALIBRATION_BUCKETS:
             bucket = [
                 row
                 for row in rows
-                if row["p_ge_threshold"] is not None and low <= row["p_ge_threshold"] < high
+                if row.get(probability_field) is not None
+                and low <= float(row[probability_field]) < high
             ]
             if not bucket:
                 continue
-            calibration.append(
+            records.append(
                 {
+                    "event": event,
+                    "threshold": threshold,
                     "bucket": label,
-                    "threshold_points": _CALIBRATION_THRESHOLD,
                     "rows": len(bucket),
-                    "predicted_mean": sum(row["p_ge_threshold"] for row in bucket) / len(bucket),
-                    "observed_rate": sum(
-                        1.0 for row in bucket if row["actual"] >= _CALIBRATION_THRESHOLD
-                    )
+                    "predicted_mean": sum(float(row[probability_field]) for row in bucket)
                     / len(bucket),
+                    "observed_rate": sum(1.0 for row in bucket if observed(row)) / len(bucket),
                 }
             )
+    return records
+
+
+def _run_base(run: Mapping[str, Any]) -> dict[str, Any]:
+    raw_modes = run.get("component_modes")
+    try:
+        modes = json.loads(raw_modes) if isinstance(raw_modes, str) else raw_modes
+    except json.JSONDecodeError as exc:
+        raise DashboardJsonError(f"run {run.get('run_id')} component_modes is not JSON") from exc
+    if not isinstance(modes, dict):
+        raise DashboardJsonError(f"run {run.get('run_id')} component_modes must be an object")
+    return {
+        "run_id": run["run_id"],
+        "as_of": _iso_or_none(run["as_of"]),
+        "created_at": _iso_or_none(run["created_at"]),
+        "season": run["season"],
+        "gw_from": int(run["gw_from"]),
+        "gw_to": int(run["gw_to"]),
+        "status": run["status"],
+        "component_modes": modes,
+    }
+
+
+def _unique_rows(
+    frame: pl.DataFrame, columns: tuple[str, ...], *, subject: str
+) -> list[dict[str, Any]]:
+    rows = list(frame.iter_rows(named=True))
+    seen: set[tuple[Any, ...]] = set()
+    for row in rows:
+        key = tuple(row[column] for column in columns)
+        if key in seen:
+            raise DashboardJsonError(f"{subject} repeats grain {key}")
+        seen.add(key)
+    return rows
+
+
+def _player_split_blocks(
+    rows: list[dict[str, Any]],
+    *,
+    key: str,
+    identity: Callable[[dict[str, Any]], dict[str, Any]],
+) -> list[dict[str, Any]]:
+    values = sorted({row[key] for row in rows}, key=lambda value: (value is None, str(value)))
+    return [
+        {
+            **identity(next(row for row in rows if row[key] == value)),
+            **_score_block(
+                [row for row in rows if row[key] == value],
+                forecast_field="forecast_xp",
+                actual_field="actual_points",
+                crps_field="crps",
+            ),
+        }
+        for value in values
+    ]
+
+
+def _build_player_forecast_vs_actual(
+    player_gameweek: pl.DataFrame,
+    player_fixture: pl.DataFrame,
+    finalized_player_outcome: pl.DataFrame,
+    gameweeks: pl.DataFrame,
+    player_season: pl.DataFrame,
+    team_season: pl.DataFrame,
+    runs: pl.DataFrame,
+) -> dict[str, Any]:
+    """Build complete-finality player-gameweek monitoring from immutable ledger facts."""
+    run_rows = _unique_rows(runs, ("run_id",), subject="dim_forecast_run")
+    run_by_id = {row["run_id"]: row for row in run_rows}
+    names = {
+        (row["season"], int(row["code"])): row
+        for row in _unique_rows(
+            player_season, ("season", "code"), subject="dim_player_season"
+        )
+    }
+    teams = {
+        (row["season"], int(row["team_id"])): row
+        for row in _unique_rows(team_season, ("season", "team_id"), subject="dim_team_season")
+    }
+    finished = {
+        (row["season"], int(row["gw"])): row["finished"] is True
+        for row in _unique_rows(gameweeks, ("season", "gw"), subject="dim_gameweek")
+    }
+    outcomes = {
+        (row["season"], int(row["fixture"]), int(row["code"])): row
+        for row in _unique_rows(
+            finalized_player_outcome,
+            ("season", "fixture", "code"),
+            subject="fact_finalized_player_fixture_outcome",
+        )
+    }
+    legs: dict[tuple[str, str, int, int], list[dict[str, Any]]] = {}
+    for row in _unique_rows(
+        player_fixture,
+        ("run_id", "season", "fixture", "code"),
+        subject="fact_forecast_player_fixture",
+    ):
+        key = (row["run_id"], row["season"], int(row["gw"]), int(row["code"]))
+        legs.setdefault(key, []).append(row)
+
+    rows_by_run: dict[str, list[dict[str, Any]]] = {run_id: [] for run_id in run_by_id}
+    coverage_by_run: dict[str, dict[str, int]] = {
+        run_id: {
+            "forecast_rows": 0,
+            "pending_rows": 0,
+            "final_eligible_rows": 0,
+            "missing_outcome_rows": 0,
+            "legacy_unavailable_rows": 0,
+            "scored_rows": 0,
+            "distribution_scored_rows": 0,
+        }
+        for run_id in run_by_id
+    }
+    for row in _unique_rows(
+        player_gameweek,
+        ("run_id", "season", "gw", "code"),
+        subject="fact_forecast_player_gameweek",
+    ):
+        run = run_by_id.get(row["run_id"])
+        if run is None:
+            raise DashboardJsonError(
+                f"forecast row references run {row['run_id']} absent from dim_forecast_run"
+            )
+        if row["season"] != run["season"]:
+            raise DashboardJsonError(f"run {row['run_id']} mixes forecast seasons")
+        coverage = coverage_by_run[row["run_id"]]
+        coverage["forecast_rows"] += 1
+        gw = int(row["gw"])
+        code = int(row["code"])
+        if not finished.get((row["season"], gw), False):
+            coverage["pending_rows"] += 1
+            continue
+        coverage["final_eligible_rows"] += 1
+        forecast_legs = legs.get((row["run_id"], row["season"], gw, code), [])
+        if not forecast_legs:
+            coverage["legacy_unavailable_rows"] += 1
+            coverage["missing_outcome_rows"] += 1
+            continue
+        actual_values: list[int] = []
+        missing = False
+        for leg in forecast_legs:
+            outcome = outcomes.get((row["season"], int(leg["fixture"]), code))
+            if outcome is None or outcome["points_under_rules_2026_27"] is None:
+                missing = True
+                break
+            if int(outcome["gw"]) != gw:
+                raise DashboardJsonError("player outcome gameweek disagrees with forecast fixture")
+            actual_values.append(int(outcome["points_under_rules_2026_27"]))
+        if missing:
+            coverage["missing_outcome_rows"] += 1
+            continue
+        actual = float(sum(actual_values))
+        forecast = float(row["expected_points"])
+        distribution = _parse_distribution(row.get("distribution"))
+        # The composer PMF support is 0..N and folds negative composed totals to zero.
+        # Preserve the scalar replayed outcome, but score its distribution at that same support.
+        crps_actual = max(actual, 0.0)
+        crps = _discrete_crps(distribution, crps_actual) if distribution is not None else None
+        identity = names.get((row["season"], code))
+        if identity is None:
+            raise DashboardJsonError(f"player {(row['season'], code)} has no dimension row")
+        team = teams.get((row["season"], int(row["team_id"])))
+        if team is None:
+            raise DashboardJsonError(
+                f"player forecast team {(row['season'], row['team_id'])} has no dimension row"
+            )
+        observation = {
+            "gw": gw,
+            "code": code,
+            "web_name": identity["web_name"],
+            "position": row["position"],
+            "team_id": int(row["team_id"]),
+            "team_code": int(team["team_code"]) if team["team_code"] is not None else None,
+            "team_name": team["team_name"],
+            "team_short_name": team["short_name"],
+            "forecast_xp": forecast,
+            "actual_points": actual,
+            "residual": actual - forecast,
+            "absolute_error": abs(actual - forecast),
+            "crps": crps,
+            "p_le_2": _event_probability(distribution, relation="le", threshold=2),
+            "p_ge_2": _event_probability(distribution, relation="ge", threshold=2),
+            "p_ge_6": _event_probability(distribution, relation="ge", threshold=6),
+            "p_ge_10": _event_probability(distribution, relation="ge", threshold=10),
+        }
+        rows_by_run[row["run_id"]].append(observation)
+        coverage["scored_rows"] += 1
+        if crps is not None:
+            coverage["distribution_scored_rows"] += 1
+
+    run_records: list[dict[str, Any]] = []
+    for run_id in sorted(run_by_id):
+        observations = sorted(rows_by_run[run_id], key=lambda row: (row["gw"], row["code"]))
         run_records.append(
             {
-                "run_id": run_id,
-                "season": run["run_season"],
-                "gw_from": run["gw_from"],
-                "gw_to": run["gw_to"],
-                **_score_block(rows),
-                "by_position": by_position,
-                "by_gw": by_gw,
-                "calibration": calibration,
+                **_run_base(run_by_id[run_id]),
+                "coverage": coverage_by_run[run_id],
+                "overall": _score_block(
+                    observations,
+                    forecast_field="forecast_xp",
+                    actual_field="actual_points",
+                    crps_field="crps",
+                ),
+                "by_position": _player_split_blocks(
+                    observations,
+                    key="position",
+                    identity=lambda row: {"position": row["position"]},
+                ),
+                "by_gw": _player_split_blocks(
+                    observations, key="gw", identity=lambda row: {"gw": row["gw"]}
+                ),
+                "by_team": _player_split_blocks(
+                    observations,
+                    key="team_id",
+                    identity=lambda row: {
+                        "team_id": row["team_id"],
+                        "team_code": row["team_code"],
+                        "team_name": row["team_name"],
+                        "team_short_name": row["team_short_name"],
+                    },
+                ),
+                "calibration": _calibration_records(
+                    observations,
+                    (
+                        ("points_le", 2, "p_le_2", lambda row: row["actual_points"] <= 2),
+                        ("points_ge", 2, "p_ge_2", lambda row: row["actual_points"] >= 2),
+                        ("points_ge", 6, "p_ge_6", lambda row: row["actual_points"] >= 6),
+                        ("points_ge", 10, "p_ge_10", lambda row: row["actual_points"] >= 10),
+                    ),
+                ),
+                "observations": observations,
             }
         )
-    return {"has_outcomes": bool(run_records), "runs": run_records}
+    return {
+        "semantics": {
+            "grain": ["run_id", "season", "gw", "code"],
+            "actual": "sum of immutable fixture outcomes under 2026/27 rules",
+            "residual": "actual_points - forecast_xp",
+            "finality": "official gameweek final and every forecast fixture leg attached",
+            "pmf_source": "exact stored player-gameweek PMF; absent from browser payload",
+            "crps_observation": "replayed points clamped to the model PMF's non-negative support",
+            "coverage_pending_rows": "official gameweek is not yet final",
+            "coverage_final_eligible_rows": (
+                "official gameweek is final before outcome coverage"
+            ),
+            "coverage_missing_outcome_rows": (
+                "final row lacks transport or any immutable fixture leg"
+            ),
+            "coverage_legacy_unavailable_rows": (
+                "final row has no fixture-grain forecast transport"
+            ),
+        },
+        "has_outcomes": any(record["coverage"]["scored_rows"] for record in run_records),
+        "runs": run_records,
+    }
+
+
+def _clean_sheet_block(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    measured = [row for row in rows if row["clean_sheet_brier"] is not None]
+    if not measured:
+        return {
+            "rows": 0,
+            "predicted_mean": None,
+            "observed_rate": None,
+            "brier": None,
+        }
+    return {
+        "rows": len(measured),
+        "predicted_mean": sum(float(row["probability_clean_sheet"]) for row in measured)
+        / len(measured),
+        "observed_rate": sum(1.0 for row in measured if row["actual_clean_sheet"])
+        / len(measured),
+        "brier": sum(float(row["clean_sheet_brier"]) for row in measured) / len(measured),
+    }
+
+
+def _team_score_bundle(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "attack": _score_block(
+            rows,
+            forecast_field="lambda_for",
+            actual_field="actual_goals_for",
+            crps_field="attack_crps",
+        ),
+        "defence": _score_block(
+            rows,
+            forecast_field="lambda_against",
+            actual_field="actual_goals_against",
+            crps_field="defence_crps",
+        ),
+        "clean_sheet": _clean_sheet_block(rows),
+    }
+
+
+def _team_splits(
+    rows: list[dict[str, Any]],
+    *,
+    key: str,
+    identity: Callable[[dict[str, Any]], dict[str, Any]],
+) -> list[dict[str, Any]]:
+    values = sorted({row[key] for row in rows}, key=lambda value: (value is None, str(value)))
+    return [
+        {
+            **identity(next(row for row in rows if row[key] == value)),
+            **_team_score_bundle([row for row in rows if row[key] == value]),
+        }
+        for value in values
+    ]
+
+
+def _build_team_forecast_vs_actual(
+    team_fixture: pl.DataFrame,
+    finalized_team_outcome: pl.DataFrame,
+    fixtures: pl.DataFrame,
+    team_season: pl.DataFrame,
+    runs: pl.DataFrame,
+) -> dict[str, Any]:
+    """Build reciprocal team-fixture monitoring using exact goals-for PMFs."""
+    run_rows = _unique_rows(runs, ("run_id",), subject="dim_forecast_run")
+    run_by_id = {row["run_id"]: row for row in run_rows}
+    teams = {
+        (row["season"], int(row["team_id"])): row
+        for row in _unique_rows(team_season, ("season", "team_id"), subject="dim_team_season")
+    }
+    fixture_rows = _unique_rows(fixtures, ("season", "fixture"), subject="dim_fixture")
+    fixture_by_id = {
+        (row["season"], int(row["fixture"])): row for row in fixture_rows
+    }
+    outcomes = {
+        (row["season"], int(row["fixture"]), int(row["team_id"])): row
+        for row in _unique_rows(
+            finalized_team_outcome,
+            ("season", "fixture", "team_id"),
+            subject="fact_finalized_team_fixture_outcome",
+        )
+    }
+    grouped: dict[tuple[str, str, int], list[dict[str, Any]]] = {}
+    for row in _unique_rows(
+        team_fixture,
+        ("run_id", "season", "fixture", "team_id"),
+        subject="fact_forecast_team_fixture",
+    ):
+        if row["run_id"] not in run_by_id:
+            raise DashboardJsonError(f"team forecast references unknown run {row['run_id']}")
+        grouped.setdefault((row["run_id"], row["season"], int(row["fixture"])), []).append(row)
+
+    rows_by_run: dict[str, list[dict[str, Any]]] = {run_id: [] for run_id in run_by_id}
+    coverage_by_run: dict[str, dict[str, int]] = {
+        run_id: {
+            "forecast_rows": 0,
+            "pending_rows": 0,
+            "missing_outcome_rows": 0,
+            "invalid_fixture_rows": 0,
+            "scored_rows": 0,
+            "attack_distribution_scored_rows": 0,
+            "defence_distribution_scored_rows": 0,
+            "clean_sheet_scored_rows": 0,
+        }
+        for run_id in run_by_id
+    }
+    for (run_id, season, fixture), sides in sorted(grouped.items()):
+        coverage = coverage_by_run[run_id]
+        coverage["forecast_rows"] += len(sides)
+        if len(sides) != 2:
+            raise DashboardJsonError(
+                f"team forecast fixture {(run_id, season, fixture)} has {len(sides)} sides"
+            )
+        sides.sort(key=lambda row: int(row["team_id"]))
+        left, right = sides
+        if (
+            int(left["opponent_team_id"]) != int(right["team_id"])
+            or int(right["opponent_team_id"]) != int(left["team_id"])
+            or left["was_home"] is right["was_home"]
+            or int(left["gw"]) != int(right["gw"])
+        ):
+            raise DashboardJsonError(
+                f"team forecast fixture {(run_id, season, fixture)} is not reciprocal"
+            )
+        fixture_record = fixture_by_id.get((season, fixture))
+        if fixture_record is None:
+            raise DashboardJsonError(f"team forecast fixture {(season, fixture)} has no dimension")
+        if fixture_record["finished"] is not True:
+            coverage["pending_rows"] += 2
+            continue
+        outcome_sides = [
+            outcomes.get((season, fixture, int(left["team_id"]))),
+            outcomes.get((season, fixture, int(right["team_id"]))),
+        ]
+        if any(outcome is None for outcome in outcome_sides):
+            coverage["missing_outcome_rows"] += 2
+            continue
+        left_outcome, right_outcome = outcome_sides
+        if left_outcome is None or right_outcome is None:  # narrowed above; keeps typing explicit
+            raise DashboardJsonError("team outcome coverage changed during immutable read")
+        if (
+            int(left_outcome["opponent_team_id"]) != int(right_outcome["team_id"])
+            or int(right_outcome["opponent_team_id"]) != int(left_outcome["team_id"])
+            or left_outcome["was_home"] is right_outcome["was_home"]
+            or bool(left_outcome["was_home"]) != bool(left["was_home"])
+            or bool(right_outcome["was_home"]) != bool(right["was_home"])
+            or int(left_outcome["goals_for"]) != int(right_outcome["goals_against"])
+            or int(right_outcome["goals_for"]) != int(left_outcome["goals_against"])
+            or int(left_outcome["gw"]) != int(left["gw"])
+            or int(right_outcome["gw"]) != int(right["gw"])
+            or left_outcome["kickoff_time"] != fixture_record["kickoff_time"]
+            or right_outcome["kickoff_time"] != fixture_record["kickoff_time"]
+        ):
+            raise DashboardJsonError(
+                f"team outcome fixture {(season, fixture)} is not reciprocal with its forecast"
+            )
+        by_team_id = {int(side["team_id"]): side for side in sides}
+        outcome_by_team_id = {
+            int(left_outcome["team_id"]): left_outcome,
+            int(right_outcome["team_id"]): right_outcome,
+        }
+        for side in sides:
+            team_id = int(side["team_id"])
+            opponent_id = int(side["opponent_team_id"])
+            outcome = outcome_by_team_id[team_id]
+            opponent = by_team_id[opponent_id]
+            team = teams.get((season, team_id))
+            opponent_team = teams.get((season, opponent_id))
+            if team is None or opponent_team is None:
+                raise DashboardJsonError(f"team fixture {(season, fixture)} lacks a team dimension")
+            if (
+                side["team_code"] is not None
+                and int(side["team_code"]) != int(team["team_code"])
+            ) or (
+                outcome["team_code"] is not None
+                and int(outcome["team_code"]) != int(team["team_code"])
+            ):
+                raise DashboardJsonError(
+                    f"team fixture {(season, fixture, team_id)} disagrees on team_code"
+                )
+            own_distribution = _parse_distribution(side.get("goals_for_distribution"))
+            opponent_distribution = _parse_distribution(opponent.get("goals_for_distribution"))
+            goals_for = int(outcome["goals_for"])
+            goals_against = int(outcome["goals_against"])
+            lambda_for = float(side["lambda_for"])
+            lambda_against = float(side["lambda_against"])
+            probability_clean_sheet = float(side["probability_clean_sheet"])
+            if (
+                not math.isfinite(lambda_for)
+                or lambda_for < 0.0
+                or not math.isfinite(lambda_against)
+                or lambda_against < 0.0
+                or not math.isfinite(probability_clean_sheet)
+                or not 0.0 <= probability_clean_sheet <= 1.0
+                or goals_for < 0
+                or goals_against < 0
+            ):
+                raise DashboardJsonError(
+                    f"team forecast fixture {(run_id, season, fixture)} is invalid"
+                )
+            actual_clean_sheet = goals_against == 0
+            observation = {
+                "fixture": fixture,
+                "gw": int(side["gw"]),
+                "kickoff_time": _iso_or_none(outcome["kickoff_time"]),
+                "team_id": team_id,
+                "team_code": int(team["team_code"]) if team["team_code"] is not None else None,
+                "team_name": team["team_name"],
+                "team_short_name": team["short_name"],
+                "opponent_team_id": opponent_id,
+                "opponent_team_code": (
+                    int(opponent_team["team_code"])
+                    if opponent_team["team_code"] is not None
+                    else None
+                ),
+                "opponent_team_name": opponent_team["team_name"],
+                "opponent_team_short_name": opponent_team["short_name"],
+                "was_home": bool(side["was_home"]),
+                "lambda_for": lambda_for,
+                "actual_goals_for": goals_for,
+                "attack_residual": goals_for - lambda_for,
+                "lambda_against": lambda_against,
+                "actual_goals_against": goals_against,
+                "defence_residual": goals_against - lambda_against,
+                "probability_clean_sheet": probability_clean_sheet,
+                "actual_clean_sheet": actual_clean_sheet,
+                "attack_crps": (
+                    _discrete_crps(own_distribution, goals_for)
+                    if own_distribution is not None
+                    else None
+                ),
+                "defence_crps": (
+                    _discrete_crps(opponent_distribution, goals_against)
+                    if opponent_distribution is not None
+                    else None
+                ),
+                "clean_sheet_brier": (probability_clean_sheet - float(actual_clean_sheet)) ** 2,
+                "stage_a_league_average_team": bool(side["stage_a_league_average_team"]),
+                "p_goals_ge_1": _event_probability(
+                    own_distribution, relation="ge", threshold=1
+                ),
+                "p_goals_ge_2": _event_probability(
+                    own_distribution, relation="ge", threshold=2
+                ),
+                "p_goals_ge_3": _event_probability(
+                    own_distribution, relation="ge", threshold=3
+                ),
+            }
+            rows_by_run[run_id].append(observation)
+            coverage["scored_rows"] += 1
+            coverage["attack_distribution_scored_rows"] += int(
+                observation["attack_crps"] is not None
+            )
+            coverage["defence_distribution_scored_rows"] += int(
+                observation["defence_crps"] is not None
+            )
+            coverage["clean_sheet_scored_rows"] += 1
+
+    run_records: list[dict[str, Any]] = []
+    for run_id in sorted(run_by_id):
+        observations = sorted(
+            rows_by_run[run_id], key=lambda row: (row["gw"], row["fixture"], row["team_id"])
+        )
+        # Calibration-only exact PMF tails are not part of the browser observation contract.
+        calibration = _calibration_records(
+            observations,
+            (
+                ("goals_ge", 1, "p_goals_ge_1", lambda row: row["actual_goals_for"] >= 1),
+                ("goals_ge", 2, "p_goals_ge_2", lambda row: row["actual_goals_for"] >= 2),
+                ("goals_ge", 3, "p_goals_ge_3", lambda row: row["actual_goals_for"] >= 3),
+                (
+                    "clean_sheet",
+                    None,
+                    "probability_clean_sheet",
+                    lambda row: bool(row["actual_clean_sheet"]),
+                ),
+            ),
+        )
+        public_observations = [
+            {key: value for key, value in row.items() if not key.startswith("p_goals_ge_")}
+            for row in observations
+        ]
+        run_records.append(
+            {
+                **_run_base(run_by_id[run_id]),
+                "coverage": coverage_by_run[run_id],
+                **_team_score_bundle(observations),
+                "by_gw": _team_splits(
+                    observations, key="gw", identity=lambda row: {"gw": row["gw"]}
+                ),
+                "by_team": _team_splits(
+                    observations,
+                    key="team_id",
+                    identity=lambda row: {
+                        "team_id": row["team_id"],
+                        "team_code": row["team_code"],
+                        "team_name": row["team_name"],
+                        "team_short_name": row["team_short_name"],
+                    },
+                ),
+                "by_venue": _team_splits(
+                    observations,
+                    key="was_home",
+                    identity=lambda row: {"venue": "home" if row["was_home"] else "away"},
+                ),
+                "by_fallback": _team_splits(
+                    observations,
+                    key="stage_a_league_average_team",
+                    identity=lambda row: {
+                        "stage_a_league_average_team": row["stage_a_league_average_team"]
+                    },
+                ),
+                "calibration": calibration,
+                "observations": public_observations,
+            }
+        )
+    return {
+        "semantics": {
+            "grain": ["run_id", "season", "fixture", "team_code"],
+            "attack_residual": "actual_goals_for - lambda_for; positive means more scored",
+            "defence_residual": (
+                "actual_goals_against - lambda_against; positive means more conceded and worse"
+            ),
+            "attack_crps": "team exact stored goals-for PMF",
+            "defence_crps": "opponent exact stored goals-for PMF",
+            "finality": "two reciprocal immutable outcome rows on an official final fixture",
+            "coverage_pending_rows": "official fixture is not yet final",
+            "coverage_missing_outcome_rows": (
+                "final fixture lacks either reciprocal immutable outcome"
+            ),
+            "coverage_invalid_fixture_rows": (
+                "reserved for explicit unavailable coverage; malformed reciprocal rows fail closed"
+            ),
+        },
+        "has_outcomes": any(record["coverage"]["scored_rows"] for record in run_records),
+        "runs": run_records,
+    }
 
 
 def _parse_json_column(raw: object, subject: str) -> Any:
@@ -1780,9 +2353,20 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_optimizer_run"],
         ease_version,
     )
-    forecast_vs_actual = _build_forecast_vs_actual(
+    player_forecast_vs_actual = _build_player_forecast_vs_actual(
         frames["fact_forecast_player_gameweek"],
-        frames["fact_player_fixture_actual"],
+        frames["fact_forecast_player_fixture"],
+        frames["fact_finalized_player_fixture_outcome"],
+        frames["dim_gameweek"],
+        frames["dim_player_season"],
+        frames["dim_team_season"],
+        frames["dim_forecast_run"],
+    )
+    team_forecast_vs_actual = _build_team_forecast_vs_actual(
+        frames["fact_forecast_team_fixture"],
+        frames["fact_finalized_team_fixture_outcome"],
+        frames["dim_fixture"],
+        frames["dim_team_season"],
         frames["dim_forecast_run"],
     )
     optimizer_audit = _build_optimizer_audit(
@@ -1796,7 +2380,8 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         player_horizons=player_horizons,
         summary=summary,
         next_gw=next_gw,
-        forecast_vs_actual=forecast_vs_actual,
+        player_forecast_vs_actual=player_forecast_vs_actual,
+        team_forecast_vs_actual=team_forecast_vs_actual,
         optimizer_audit=optimizer_audit,
         ease_index_formula_version=ease_version,
     )
@@ -1899,11 +2484,19 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
             },
             indent=2,
         ),
-        FORECAST_VS_ACTUAL_FILENAME: _canonical_json_bytes(
+        PLAYER_FORECAST_VS_ACTUAL_FILENAME: _canonical_json_bytes(
             {
-                "schema": FORECAST_VS_ACTUAL_SCHEMA,
+                "schema": PLAYER_FORECAST_VS_ACTUAL_SCHEMA,
                 "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
-                **models.forecast_vs_actual,
+                **models.player_forecast_vs_actual,
+            },
+            indent=2,
+        ),
+        TEAM_FORECAST_VS_ACTUAL_FILENAME: _canonical_json_bytes(
+            {
+                "schema": TEAM_FORECAST_VS_ACTUAL_SCHEMA,
+                "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+                **models.team_forecast_vs_actual,
             },
             indent=2,
         ),
@@ -2224,7 +2817,10 @@ def export_dashboard_json(
                 ),
                 NEXT_GW_FILENAME: len(models.next_gw["plans"]),
                 SUMMARY_FILENAME: 1,
-                FORECAST_VS_ACTUAL_FILENAME: len(models.forecast_vs_actual["runs"]),
+                PLAYER_FORECAST_VS_ACTUAL_FILENAME: len(
+                    models.player_forecast_vs_actual["runs"]
+                ),
+                TEAM_FORECAST_VS_ACTUAL_FILENAME: len(models.team_forecast_vs_actual["runs"]),
                 OPTIMIZER_AUDIT_FILENAME: len(models.optimizer_audit["plans"]),
             }
             for filename, payload in payloads.items():
@@ -2281,17 +2877,19 @@ __all__ = [
     "DASHBOARD_JSON_SCHEMA_VERSION",
     "FIXTURE_MATRIX_FILENAME",
     "FIXTURE_MATRIX_SCHEMA",
-    "FORECAST_VS_ACTUAL_FILENAME",
-    "FORECAST_VS_ACTUAL_SCHEMA",
     "MANIFEST_FILENAME",
     "NEXT_GW_FILENAME",
     "NEXT_GW_SCHEMA",
     "PLAYERS_FILENAME",
     "PLAYERS_SCHEMA",
+    "PLAYER_FORECAST_VS_ACTUAL_FILENAME",
+    "PLAYER_FORECAST_VS_ACTUAL_SCHEMA",
     "PLAYER_HORIZONS_FILENAME",
     "PLAYER_HORIZONS_SCHEMA",
     "SUMMARY_FILENAME",
     "SUMMARY_SCHEMA",
+    "TEAM_FORECAST_VS_ACTUAL_FILENAME",
+    "TEAM_FORECAST_VS_ACTUAL_SCHEMA",
     "DashboardJsonError",
     "DashboardJsonResult",
     "DashboardReadModels",

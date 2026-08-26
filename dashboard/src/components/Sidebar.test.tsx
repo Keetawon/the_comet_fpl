@@ -14,4 +14,17 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Player analytics" }));
     expect(onNavigate).toHaveBeenCalledWith("player-analytics");
   });
+
+  it("exposes separate player and team prediction-accuracy routes", () => {
+    const onNavigate = vi.fn();
+    render(<Sidebar active="player-forecast-vs-actual" onNavigate={onNavigate} />);
+
+    expect(screen.getByRole("button", { name: "Player prediction vs actual" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Team prediction vs actual" }));
+    expect(onNavigate).toHaveBeenCalledWith("team-forecast-vs-actual");
+    expect(screen.queryByRole("button", { name: "Forecast vs actual" })).not.toBeInTheDocument();
+  });
 });

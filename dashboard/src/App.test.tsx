@@ -14,13 +14,18 @@ vi.mock("@/pages/PlayersPage", () => ({ PlayersPage: () => null }));
 vi.mock("@/pages/NextGwPage", () => ({ NextGwPage: () => null }));
 vi.mock("@/pages/PlanBuilderPage", () => ({ PlanBuilderPage: () => null }));
 vi.mock("@/pages/UserDraftPage", () => ({ UserDraftPage: () => null }));
-vi.mock("@/pages/ForecastVsActualPage", () => ({ ForecastVsActualPage: () => null }));
 vi.mock("@/pages/OptimizerAuditPage", () => ({ OptimizerAuditPage: () => null }));
 vi.mock("@/pages/PlayerAnalyticsPage", () => ({
   PlayerAnalyticsPage: () => <h1>Player analytics route</h1>,
 }));
 vi.mock("@/pages/TeamAnalyticsPage", () => ({
   TeamAnalyticsPage: () => <h1>Team analytics route</h1>,
+}));
+vi.mock("@/pages/PlayerForecastVsActualPage", () => ({
+  PlayerForecastVsActualPage: () => <h1>Player prediction accuracy route</h1>,
+}));
+vi.mock("@/pages/TeamForecastVsActualPage", () => ({
+  TeamForecastVsActualPage: () => <h1>Team prediction accuracy route</h1>,
 }));
 
 import App from "./App";
@@ -44,5 +49,26 @@ describe("App deep-analytics routes", () => {
 
     expect(screen.getByRole("heading", { name: "Team analytics route" })).toBeInTheDocument();
     expect(screen.getByText("active:team-analytics")).toBeInTheDocument();
+  });
+
+  it("renders separate prediction-accuracy routes and keeps the historical player alias", () => {
+    window.location.hash = "#player-forecast-vs-actual";
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "Player prediction accuracy route" })).toBeInTheDocument();
+    expect(screen.getByText("active:player-forecast-vs-actual")).toBeInTheDocument();
+
+    act(() => {
+      window.location.hash = "#team-forecast-vs-actual";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(screen.getByRole("heading", { name: "Team prediction accuracy route" })).toBeInTheDocument();
+    expect(screen.getByText("active:team-forecast-vs-actual")).toBeInTheDocument();
+
+    act(() => {
+      window.location.hash = "#forecast-vs-actual";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(screen.getByRole("heading", { name: "Player prediction accuracy route" })).toBeInTheDocument();
+    expect(screen.getByText("active:forecast-vs-actual")).toBeInTheDocument();
   });
 });

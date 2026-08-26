@@ -34,7 +34,7 @@ import pyarrow as pa  # type: ignore[import-untyped]
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 from fpl.artifacts.optimizer_plan import OptimizerPlanArtifact, read_optimizer_artifact
-from fpl.publish.contract import SEMANTIC_CONTRACT_V2, Column, Table
+from fpl.publish.contract import SEMANTIC_CONTRACT_V3, Column, Table
 from fpl.storage.db import connect, table_columns, table_exists
 
 BI_EXPORT_SCHEMA: Final[str] = "fpl.bi-semantic-export"
@@ -43,18 +43,50 @@ MANIFEST_FILENAME: Final[str] = "manifest.json"
 EASE_INDEX_FORMULA_VERSION: Final[str] = "fixture-ease-v1"
 _MIN_EASE_INDEX_ROWS: Final[int] = 2
 
-_LEDGER_TABLES: Final[tuple[str, ...]] = (
+# Historical v1/v2 declarations predate complete measurement coverage and some non-grain columns
+# (notably fact_player_fixture_actual.starts) legitimately contain NULL. Tightening every old
+# declaration retroactively would make historical exports unusable and misrepresent missing data.
+# Version 3 therefore enforces physical non-nullability only for its newly guaranteed fields; grain
+# columns remain enforced for every contract table below.
+_V3_GUARANTEED_NONNULL_COLUMNS: Final[dict[str, frozenset[str]]] = {
+    "fact_forecast_team_fixture": frozenset({"goals_for_distribution"}),
+    "fact_finalized_player_fixture_outcome": frozenset(
+        {"season", "fixture", "code", "gw", "attached_at"}
+    ),
+    "fact_finalized_team_fixture_outcome": frozenset(
+        {
+            "season",
+            "fixture",
+            "team_id",
+            "opponent_team_id",
+            "gw",
+            "kickoff_time",
+            "was_home",
+            "goals_for",
+            "goals_against",
+            "attached_at",
+        }
+    ),
+}
+
+_FORECAST_LEDGER_TABLES: Final[tuple[str, ...]] = (
     "ledger_forecast_run",
     "ledger_prediction_player_gameweek",
     "ledger_prediction_player_fixture",
     "ledger_prediction_team_fixture",
 )
-_FORECAST_TABLE_NAMES: Final[frozenset[str]] = frozenset(
+_OUTCOME_LEDGER_TABLES: Final[tuple[str, ...]] = (
+    "ledger_outcome_player_fixture",
+    "ledger_outcome_team_fixture",
+)
+_LEDGER_PUBLISHED_TABLE_NAMES: Final[frozenset[str]] = frozenset(
     {
         "dim_forecast_run",
         "fact_forecast_player_gameweek",
         "fact_forecast_player_fixture",
         "fact_forecast_team_fixture",
+        "fact_finalized_player_fixture_outcome",
+        "fact_finalized_team_fixture_outcome",
     }
 )
 _SQL_TYPES: Final[dict[str, str]] = {
@@ -301,6 +333,27 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "goals_for_distribution",
         "stage_a_league_average_team",
     ),
+    "ledger_outcome_player_fixture": (
+        "season",
+        "code",
+        "fixture",
+        "attached_at",
+        "total_points_as_recorded",
+        "points_under_rules_2026_27",
+    ),
+    "ledger_outcome_team_fixture": (
+        "season",
+        "fixture",
+        "team_id",
+        "team_code",
+        "opponent_team_id",
+        "gw",
+        "kickoff_time",
+        "was_home",
+        "goals_for",
+        "goals_against",
+        "attached_at",
+    ),
 }
 
 
@@ -497,12 +550,12 @@ def _require_source_columns(
 
 
 def _ledger_is_present(con: duckdb.DuckDBPyConnection) -> bool:
-    present = {table for table in _LEDGER_TABLES if table_exists(con, table)}
+    present = {table for table in _FORECAST_LEDGER_TABLES if table_exists(con, table)}
     if not present:
         # `build_db` intentionally does not create ledger tables before the first recorded
         # forecast.  That pristine state is a complete zero-vintage export, not source drift.
         return False
-    missing = sorted(set(_LEDGER_TABLES) - present)
+    missing = sorted(set(_FORECAST_LEDGER_TABLES) - present)
     if missing:
         raise BiExportSourceError(
             "ledger schema is partial: present tables cannot be combined with missing table(s) "
@@ -514,7 +567,12 @@ def _ledger_is_present(con: duckdb.DuckDBPyConnection) -> bool:
 def _validate_source_schema(con: duckdb.DuckDBPyConnection) -> bool:
     ledger_present = _ledger_is_present(con)
     for source_table, columns in _SOURCE_COLUMNS.items():
-        if source_table.startswith("ledger_") and not ledger_present:
+        if source_table in _FORECAST_LEDGER_TABLES and not ledger_present:
+            continue
+        # Outcome ledgers are additive, append-only stores. A pre-v3 database can legitimately
+        # lack one, which is equivalent to a valid empty outcome fact; when present its complete
+        # physical shape is still checked strictly.
+        if source_table in _OUTCOME_LEDGER_TABLES and not table_exists(con, source_table):
             continue
         _require_source_columns(con, source_table, columns)
     if ledger_present:
@@ -579,7 +637,12 @@ _OFFICIAL_FDR: Final[str] = f"""
 """
 
 
-def _source_queries(ledger_present: bool) -> dict[str, str]:
+def _source_queries(
+    ledger_present: bool,
+    *,
+    player_outcomes_present: bool,
+    team_outcomes_present: bool,
+) -> dict[str, str]:
     queries: dict[str, str] = {
         "dim_player": f"""
             WITH unified AS (
@@ -755,8 +818,8 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
         """,
     }
     if not ledger_present:
-        for table_name in _FORECAST_TABLE_NAMES:
-            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V2.table(table_name))
+        for table_name in _LEDGER_PUBLISHED_TABLE_NAMES:
+            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V3.table(table_name))
         return queries
 
     queries.update(
@@ -812,6 +875,8 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
                                PARTITION BY prediction.run_id, prediction.season
                            ) AS raw_league_average_team_lambda,
                            prediction.probability_clean_sheet,
+                           CAST(to_json(prediction.goals_for_distribution) AS VARCHAR)
+                               AS goals_for_distribution,
                            prediction.stage_a_league_average_team
                     FROM ledger_prediction_team_fixture AS prediction
                     LEFT JOIN ledger_forecast_run AS run ON run.run_id = prediction.run_id
@@ -848,7 +913,8 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
                             )
                        END AS overall_ease_index,
                        '{EASE_INDEX_FORMULA_VERSION}' AS ease_index_formula_version,
-                       directed.probability_clean_sheet, fdr.fdr AS official_fdr,
+                       directed.probability_clean_sheet, directed.goals_for_distribution,
+                       fdr.fdr AS official_fdr,
                        directed.stage_a_league_average_team
                 FROM directed
                 LEFT JOIN ({_OFFICIAL_FDR}) AS fdr
@@ -856,8 +922,38 @@ def _source_queries(ledger_present: bool) -> dict[str, str]:
                  AND fdr.fixture = directed.fixture
                  AND fdr.team_id = directed.team_id
             """,
+            "fact_finalized_player_fixture_outcome": f"""
+                WITH schedule AS (
+                    SELECT season, fixture, gw
+                    FROM stg_fixture
+                    UNION ALL
+                    SELECT season, fixture, gw
+                    FROM ({_LIVE_FIXTURE_LATEST})
+                    WHERE season NOT IN (SELECT DISTINCT season FROM stg_fixture)
+                )
+                SELECT outcome.season, outcome.fixture, outcome.code, schedule.gw,
+                       outcome.attached_at, outcome.total_points_as_recorded,
+                       outcome.points_under_rules_2026_27
+                FROM ledger_outcome_player_fixture AS outcome
+                LEFT JOIN schedule
+                  ON schedule.season = outcome.season
+                 AND schedule.fixture = outcome.fixture
+            """,
+            "fact_finalized_team_fixture_outcome": """
+                SELECT season, fixture, team_id, team_code, opponent_team_id, gw,
+                       kickoff_time, was_home, goals_for, goals_against, attached_at
+                FROM ledger_outcome_team_fixture
+            """,
         }
     )
+    if not player_outcomes_present:
+        queries["fact_finalized_player_fixture_outcome"] = _empty_source_sql(
+            SEMANTIC_CONTRACT_V3.table("fact_finalized_player_fixture_outcome")
+        )
+    if not team_outcomes_present:
+        queries["fact_finalized_team_fixture_outcome"] = _empty_source_sql(
+            SEMANTIC_CONTRACT_V3.table("fact_finalized_team_fixture_outcome")
+        )
     return queries
 
 
@@ -907,6 +1003,13 @@ def _validate_table_frame(
                     raise BiExportValidationError(
                         f"{table.name}.{column.name}: non-finite float cannot cross the BI boundary"
                     )
+        if (
+            column.name in _V3_GUARANTEED_NONNULL_COLUMNS.get(table.name, frozenset())
+            and frame.column(column.name).null_count
+        ):
+            raise BiExportValidationError(
+                f"{table.name}.{column.name}: guaranteed v3 field contains NULL"
+            )
 
     if expected_null_counts is not None:
         actual_null_counts = _null_counts(frame)
@@ -931,11 +1034,11 @@ def _validate_table_frame(
 def _validate_referential_integrity(tables: Mapping[str, pa.Table]) -> None:
     con = duckdb.connect(":memory:")
     try:
-        for table in SEMANTIC_CONTRACT_V2.tables:
+        for table in SEMANTIC_CONTRACT_V3.tables:
             con.register(table.name, tables[table.name])
-        for child in SEMANTIC_CONTRACT_V2.tables:
+        for child in SEMANTIC_CONTRACT_V3.tables:
             for join in child.joins:
-                parent = SEMANTIC_CONTRACT_V2.table(join.to_table)
+                parent = SEMANTIC_CONTRACT_V3.table(join.to_table)
                 on = " AND ".join(
                     f"child.{_quote_identifier(local)} = parent.{_quote_identifier(remote)}"
                     for local, remote in join.on
@@ -1279,7 +1382,7 @@ def _manifest(
     payload: dict[str, Any] = {
         "schema": BI_EXPORT_SCHEMA,
         "schema_version": BI_EXPORT_SCHEMA_VERSION,
-        "semantic_contract_version": SEMANTIC_CONTRACT_V2.version,
+        "semantic_contract_version": SEMANTIC_CONTRACT_V3.version,
         "created_at": _isoformat(created_at),
         "database_sha256": database_sha256,
         "exported_run_ids": list(exported_run_ids),
@@ -1353,8 +1456,8 @@ def _assert_manifest_shape(manifest: Mapping[str, Any]) -> None:
         or manifest["schema_version"] != BI_EXPORT_SCHEMA_VERSION
     ):
         raise BiExportValidationError("manifest export schema/version does not match this exporter")
-    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V2.version:
-        raise BiExportValidationError("manifest semantic contract version does not match v2")
+    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V3.version:
+        raise BiExportValidationError("manifest semantic contract version does not match v3")
     _manifest_timestamp(manifest["created_at"], "created_at")
     if not _is_sha256(manifest["database_sha256"]):
         raise BiExportValidationError("manifest database_sha256 must be a SHA-256 string")
@@ -1418,14 +1521,14 @@ def _validate_export_directory(
     table_metadata = manifest["tables"]
     if not isinstance(table_metadata, dict):
         raise BiExportValidationError("manifest tables must be an object")
-    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V2.tables}
+    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V3.tables}
     if set(table_metadata) != expected_table_names:
         raise BiExportValidationError(
             "manifest does not enumerate exactly the semantic contract tables"
         )
     expected_files = {MANIFEST_FILENAME}
     frames: dict[str, pa.Table] = {}
-    for table in SEMANTIC_CONTRACT_V2.tables:
+    for table in SEMANTIC_CONTRACT_V3.tables:
         entry = table_metadata[table.name]
         if not isinstance(entry, dict) or set(entry) != {"file", "row_count", "sha256"}:
             raise BiExportValidationError(f"manifest entry for {table.name} is malformed")
@@ -1632,7 +1735,11 @@ def export_bi(
                 optimizer_artifacts = _load_optimizer_artifacts(con, optimizer_plan_paths)
                 optimizer_records = _optimizer_plan_records(optimizer_artifacts)
                 optimizer_runs = _optimizer_run_records(optimizer_artifacts)
-                queries = _source_queries(ledger_present)
+                queries = _source_queries(
+                    ledger_present,
+                    player_outcomes_present=table_exists(con, "ledger_outcome_player_fixture"),
+                    team_outcomes_present=table_exists(con, "ledger_outcome_team_fixture"),
+                )
 
                 injected: Mapping[str, tuple[dict[str, object], ...]] = {
                     "fact_optimizer_plan": optimizer_records,
@@ -1640,7 +1747,7 @@ def export_bi(
                 }
                 table_exports: dict[str, TableExport] = {}
                 expected_null_counts: dict[str, dict[str, int]] = {}
-                for table in SEMANTIC_CONTRACT_V2.tables:
+                for table in SEMANTIC_CONTRACT_V3.tables:
                     if table.name in injected:
                         rows = injected[table.name]
                         frame = (

@@ -1,7 +1,7 @@
 # Player and team prediction-versus-actual dashboard contract
 
-Status: pre-implementation contract, frozen 2026-08-26. This is the planned correctness repair and
-schema-version-5 successor to the current player-only aggregate page.
+Status: **implemented development-only, 2026-08-26**. This schema-version-5 correctness repair
+replaces the former player-only aggregate with parallel player and team monitoring.
 
 ## Purpose and boundary
 
@@ -31,7 +31,7 @@ home/away, opponent, score, gameweek, and kickoff; null or changed finalized sco
 
 ## Ledger and BI amendment
 
-The implementation adds an append-only `ledger_outcome_team_fixture` at
+The implementation includes an append-only `ledger_outcome_team_fixture` at
 `(season, fixture, team_id)` beside `ledger_outcome_player_fixture`. Exact repeats are idempotent;
 changed repeats are rejected. The outcome attachment job validates and appends both player and team
 outcomes without mutating predictions. Current live fixture capture must persist official home and
@@ -49,9 +49,9 @@ stored goals-for PMF for the same recorded fixture. It is never recreated from `
 
 ## Dashboard read models, version 5
 
-The ambiguous `forecast_vs_actual.json` is replaced by two explicit files. The old route may remain
-as a temporary navigation alias to the player page; old schema-v4 files are not silently accepted
-as version 5.
+The ambiguous `forecast_vs_actual.json` is replaced by two explicit files. The old
+`#forecast-vs-actual` route remains as a temporary navigation alias to the player page; old
+schema-v4 files are not silently accepted as version 5.
 
 ### `player_forecast_vs_actual.json`
 
@@ -93,10 +93,12 @@ coverage/finality notice. Positive attack residual means more goals than forecas
 defence residual means more goals conceded than forecast and is therefore worse. Labels state the
 direction instead of relying on colour alone.
 
-Both pages provide an accessible table equivalent and a deterministic insight packet. The optional
-AI renderer may explain only those published facts under `docs/dashboard-ai-summaries.md`.
+Both pages provide an accessible table equivalent. P2.4 will derive a deterministic insight packet;
+its optional AI renderer may explain only those published facts under
+`docs/dashboard-ai-summaries.md`. That summary layer is active next and is not part of this P2.3
+implementation.
 
-## Acceptance
+## Acceptance and implementation evidence
 
 - A partial double gameweek scores zero player-gameweek observations; a fully final double
   gameweek aggregates both legs exactly once.
@@ -109,3 +111,14 @@ AI renderer may explain only those published facts under `docs/dashboard-ai-summ
 - Legacy runs without fixture transport produce explicit unavailable coverage.
 - Both files are validated, hashed, counted, atomically published, and public-package allowlisted.
 - UI tests cover populated, empty, pending, missing-coverage, null, and malformed-schema states.
+
+Focused P2.3 tests pass across live score capture, reciprocal/idempotent/conflict-safe outcome
+attachment, semantic-v3 declaration and Parquet projection, exact PMF round-trip, complete-GW/DGW
+finality, hand-computed player/team scores, public-package allowlisting, strict frontend loading,
+route aliases, and both page states. The dashboard production build and lint also pass.
+
+Tests that execute the final generation-symlink swap require directory-symlink privilege. A plain
+Windows shell without Developer Mode/elevation reaches the validated publish boundary and then
+raises `WinError 1314`; that is an environment-specific OS permission limitation, not a metric,
+finality, or product-validation failure. It does mean the formal atomic-publish gate is not called
+unqualified green on that host until rerun in a symlink-capable environment.

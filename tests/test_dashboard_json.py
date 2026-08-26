@@ -27,9 +27,12 @@ import fpl.storage.db
 from fpl.publish.dashboard_json import (
     DASHBOARD_JSON_SCHEMA_VERSION,
     FIXTURE_MATRIX_FILENAME,
+    PLAYER_FORECAST_VS_ACTUAL_FILENAME,
     PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
+    TEAM_FORECAST_VS_ACTUAL_FILENAME,
     DashboardJsonError,
+    _discrete_crps,
     _validate_player_horizon_document,
     _validate_player_horizon_generation,
     build_dashboard_read_models,
@@ -112,6 +115,9 @@ def _team_fixture_row(
         "overall_ease_index": overall,
         "ease_index_formula_version": "fixture-ease-v1",
         "probability_clean_sheet": 0.4,
+        "goals_for_distribution": (
+            "[0.2, 0.5, 0.3]" if lambda_for >= 1.0 else "[0.6, 0.3, 0.1]"
+        ),
         "official_fdr": fdr,
         "stage_a_league_average_team": False,
     }
@@ -415,14 +421,15 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 min_bench_appearance=0.25,
             ),
         ],
-        # Finalised outcomes at player-fixture grain. Code 2's fixture 101 is unfinalised
-        # (NULL points) and must stay out of every gameweek sum, never read as 0.
-        "fact_player_fixture_actual": [
+        # Immutable player-ledger outcomes. Missing rows remain missing, never zero.
+        "fact_finalized_player_fixture_outcome": [
             {
                 "season": SEASON,
                 "fixture": fixture,
                 "code": code,
                 "gw": gw,
+                "attached_at": CREATED_AT,
+                "total_points_as_recorded": points,
                 "points_under_rules_2026_27": points,
             }
             for fixture, gw, code, points in (
@@ -430,8 +437,29 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 (101, 2, 1, 4),
                 (102, 2, 1, 2),
                 (100, 1, 2, 1),
-                (101, 2, 2, None),  # unknown until finalised
-                (102, 2, 2, 2),
+            )
+        ],
+        "fact_finalized_team_fixture_outcome": [
+            {
+                "season": SEASON,
+                "fixture": fixture,
+                "team_id": team_id,
+                "team_code": 100 + team_id,
+                "opponent_team_id": opponent_id,
+                "gw": gw,
+                "kickoff_time": KICKOFFS[fixture],
+                "was_home": was_home,
+                "goals_for": goals_for,
+                "goals_against": goals_against,
+                "attached_at": CREATED_AT,
+            }
+            for fixture, gw, team_id, opponent_id, was_home, goals_for, goals_against in (
+                (100, 1, 1, 2, True, 2, 1),
+                (100, 1, 2, 1, False, 1, 2),
+                (101, 2, 1, 3, True, 0, 2),
+                (101, 2, 3, 1, False, 2, 0),
+                (102, 2, 2, 1, True, 1, 1),
+                (102, 2, 1, 2, False, 1, 1),
             )
         ],
         "dim_gameweek": [
@@ -569,7 +597,7 @@ def _write_manifest(export_dir: Path, tables: dict[str, dict[str, Any]]) -> None
     manifest: dict[str, Any] = {
         "schema": "fpl.bi-semantic-export",
         "schema_version": 1,
-        "semantic_contract_version": 2,
+        "semantic_contract_version": 3,
         "created_at": CREATED_AT.isoformat(),
         "database_sha256": DATABASE_SHA,
         "exported_run_ids": [RUN_ID],
@@ -1137,46 +1165,149 @@ def test_source_integrity_chain_fails_closed(tmp_path: Path) -> None:
         build_dashboard_read_models(export_dir)
 
 
-def test_forecast_vs_actual_scores_finalised_gameweeks_only(tmp_path: Path) -> None:
-    models = build_dashboard_read_models(_build_source_export(tmp_path))
-    result = models.forecast_vs_actual
+def _mark_final(export_dir: Path, *, gameweeks: tuple[int, ...] = (1, 2)) -> None:
+    fixture_rows = [
+        {**row, "finished": row["gw"] in gameweeks}
+        for row in _source_tables()["dim_fixture"]
+    ]
+    gameweek_rows = [
+        {**row, "finished": row["gw"] in gameweeks}
+        for row in _source_tables()["dim_gameweek"]
+    ]
+    _rewrite_table(export_dir, "dim_fixture", fixture_rows)
+    _rewrite_table(export_dir, "dim_gameweek", gameweek_rows)
+
+
+def test_player_forecast_vs_actual_scores_only_complete_final_gameweeks(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir)
+    result = build_dashboard_read_models(export_dir).player_forecast_vs_actual
     assert result["has_outcomes"] is True
     (run,) = result["runs"]
     assert run["run_id"] == RUN_ID
-    # four scored player-gameweeks; the unfinalised fixture row never enters a sum
-    assert run["rows"] == 4
-    assert run["mean_ev"] == pytest.approx(3.75)
-    assert run["mean_actual"] == pytest.approx(3.75)
-    assert run["bias"] == pytest.approx(0.0)
-    assert run["mae"] == pytest.approx(1.0)
-    assert run["crps"] is not None and run["crps"] > 0.0
+    assert run["coverage"] == {
+        "forecast_rows": 4,
+        "pending_rows": 0,
+        "final_eligible_rows": 4,
+        "missing_outcome_rows": 1,
+        "legacy_unavailable_rows": 1,
+        "scored_rows": 3,
+        "distribution_scored_rows": 3,
+    }
+    assert run["overall"]["forecast_total"] == pytest.approx(12.0)
+    assert run["overall"]["actual_total"] == pytest.approx(13.0)
+    assert run["overall"]["bias"] == pytest.approx(1.0 / 3.0)
+    assert run["overall"]["mae"] == pytest.approx(1.0)
+    assert run["overall"]["rmse"] == pytest.approx((3.5 / 3.0) ** 0.5)
+    assert run["overall"]["crps"] is not None and run["overall"]["crps"] > 0.0
 
     positions = {block["position"]: block for block in run["by_position"]}
     assert positions["GK"]["rows"] == 2
-    assert positions["GK"]["bias"] == pytest.approx(1.0)  # 5.0 EV against 6.0 actual
+    assert positions["GK"]["bias"] == pytest.approx(1.0)
     assert positions["MID"]["bias"] == pytest.approx(-1.0)
     gws = {block["gw"]: block for block in run["by_gw"]}
     assert gws[1]["bias"] == pytest.approx(-0.25)
-    assert gws[2]["bias"] == pytest.approx(0.25)
+    assert gws[2]["bias"] == pytest.approx(1.5)
 
-    buckets = {block["bucket"]: block for block in run["calibration"]}
-    # code 1 predicts P(>=2) = 0.70 in both gameweeks and delivered both times
+    buckets = {
+        block["bucket"]: block
+        for block in run["calibration"]
+        if block["event"] == "points_ge" and block["threshold"] == 2
+    }
     assert buckets["0.7-1.0"]["predicted_mean"] == pytest.approx(0.7)
     assert buckets["0.7-1.0"]["observed_rate"] == pytest.approx(1.0)
-    # code 2 predicts P(>=2) = 0.25 and delivered once of twice
     assert buckets["0.1-0.3"]["predicted_mean"] == pytest.approx(0.25)
-    assert buckets["0.1-0.3"]["observed_rate"] == pytest.approx(0.5)
+    assert buckets["0.1-0.3"]["observed_rate"] == pytest.approx(0.0)
 
 
-def test_forecast_vs_actual_without_outcomes_is_an_explicit_empty_state(tmp_path: Path) -> None:
+def test_partial_double_gameweek_scores_no_partial_player_observation(tmp_path: Path) -> None:
     export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir)
     rows = [
-        {**row, "points_under_rules_2026_27": None}
-        for row in _source_tables()["fact_player_fixture_actual"]
+        row
+        for row in _source_tables()["fact_finalized_player_fixture_outcome"]
+        if not (row["fixture"] == 102 and row["code"] == 1)
     ]
-    _rewrite_table(export_dir, "fact_player_fixture_actual", rows)
-    result = build_dashboard_read_models(export_dir).forecast_vs_actual
-    assert result == {"has_outcomes": False, "runs": []}
+    _rewrite_table(export_dir, "fact_finalized_player_fixture_outcome", rows)
+    run = build_dashboard_read_models(export_dir).player_forecast_vs_actual["runs"][0]
+    assert run["coverage"]["scored_rows"] == 2
+    assert run["coverage"]["missing_outcome_rows"] == 2
+    assert {(row["gw"], row["code"]) for row in run["observations"]} == {(1, 1), (1, 2)}
+
+
+def test_player_forecast_vs_actual_without_outcomes_is_an_explicit_empty_state(
+    tmp_path: Path,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir)
+    rows = [
+        {
+            **row,
+            "total_points_as_recorded": None,
+            "points_under_rules_2026_27": None,
+        }
+        for row in _source_tables()["fact_finalized_player_fixture_outcome"]
+    ]
+    _rewrite_table(export_dir, "fact_finalized_player_fixture_outcome", rows)
+    result = build_dashboard_read_models(export_dir).player_forecast_vs_actual
+    assert result["has_outcomes"] is False
+    assert result["runs"][0]["coverage"]["scored_rows"] == 0
+    assert result["runs"][0]["overall"]["rows"] == 0
+
+
+def test_team_forecast_vs_actual_uses_opponent_pmf_for_defence_crps(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir)
+    result = build_dashboard_read_models(export_dir).team_forecast_vs_actual
+    assert result["has_outcomes"] is True
+    (run,) = result["runs"]
+    assert run["coverage"]["scored_rows"] == 6
+    alpha_fixture_101 = next(
+        row
+        for row in run["observations"]
+        if row["fixture"] == 101 and row["team_id"] == 1
+    )
+    # Alpha's defensive score uses Gamma's exact goals-for PMF [0.6, 0.3, 0.1],
+    # never Alpha's own PMF [0.2, 0.5, 0.3] or a Poisson reconstructed from lambda.
+    assert alpha_fixture_101["defence_crps"] == pytest.approx(
+        _discrete_crps([0.6, 0.3, 0.1], 2.0)
+    )
+    assert alpha_fixture_101["defence_crps"] != pytest.approx(
+        _discrete_crps([0.2, 0.5, 0.3], 2.0)
+    )
+    assert alpha_fixture_101["defence_residual"] == pytest.approx(2.0)
+    assert run["clean_sheet"]["rows"] == 6
+
+
+def test_team_forecast_vs_actual_waits_for_both_immutable_outcome_sides(
+    tmp_path: Path,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir)
+    rows = [
+        row
+        for row in _source_tables()["fact_finalized_team_fixture_outcome"]
+        if not (row["fixture"] == 101 and row["team_id"] == 3)
+    ]
+    _rewrite_table(export_dir, "fact_finalized_team_fixture_outcome", rows)
+    run = build_dashboard_read_models(export_dir).team_forecast_vs_actual["runs"][0]
+    assert run["coverage"]["missing_outcome_rows"] == 2
+    assert run["coverage"]["scored_rows"] == 4
+    assert all(row["fixture"] != 101 for row in run["observations"])
+
+
+def test_team_forecast_vs_actual_rejects_nonreciprocal_final_score(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir)
+    rows = [
+        {**row, "goals_against": 9}
+        if row["fixture"] == 100 and row["team_id"] == 2
+        else row
+        for row in _source_tables()["fact_finalized_team_fixture_outcome"]
+    ]
+    _rewrite_table(export_dir, "fact_finalized_team_fixture_outcome", rows)
+    with pytest.raises(DashboardJsonError, match="not reciprocal"):
+        build_dashboard_read_models(export_dir)
 
 
 def test_discrete_crps_matches_hand_computed_cases() -> None:
@@ -1355,7 +1486,8 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
         PLAYERS_FILENAME,
         "next_gw.json",
         "summary.json",
-        "forecast_vs_actual.json",
+        PLAYER_FORECAST_VS_ACTUAL_FILENAME,
+        TEAM_FORECAST_VS_ACTUAL_FILENAME,
         "optimizer_audit.json",
     }
 
@@ -1375,8 +1507,8 @@ def test_complete_source_populates_every_page_read_model(tmp_path: Path) -> None
     assert models.summary["latest_run"] is not None, "summary has no latest run"
     assert models.next_gw["plans"], "next_gw has no plans"
     assert models.optimizer_audit["plans"], "optimizer_audit has no plans"
-    assert models.forecast_vs_actual["runs"], "forecast_vs_actual scored nothing"
-    assert models.forecast_vs_actual["has_outcomes"] is True
+    assert models.player_forecast_vs_actual["runs"], "player monitoring has no run coverage"
+    assert models.team_forecast_vs_actual["runs"], "team monitoring has no run coverage"
 
 
 def test_next_gw_plans_join_ev_context_and_modes(tmp_path: Path) -> None:
@@ -1652,6 +1784,7 @@ def test_stale_fixture_kickoff_orders_after_current_gw(tmp_path: Path) -> None:
     export_dir = _build_source_export(tmp_path)
     rows = _source_tables()["fact_forecast_team_fixture"]
     rows.append(_team_fixture_row(103, 1, 3, 1, True, 1.0, 1.0, 100.0, 100.0, 100.0, 2))
+    rows.append(_team_fixture_row(103, 3, 1, 1, False, 1.0, 1.0, 100.0, 100.0, 100.0, 4))
     fixture_rows = _source_tables()["dim_fixture"]
     fixture_rows.append(
         {

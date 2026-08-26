@@ -1,14 +1,14 @@
-# BI semantic contract, version 2
+# BI semantic contract, version 3
 
-Status: **frozen** (DEV-ROADMAP P1.1). Development-only data, like everything upstream of it.
+Status: **implemented and frozen development-only** (P1.1 plus the P2.3 monitoring amendment).
 
-Version 2 is an additive schedule-context revision: it adds nullable directed official FDR for
-both sides of `dim_fixture`. Version 1 remains historical; no forecast fact or ease formula changed.
+Version 1 remains historical. Version 2 was the additive schedule-context revision that added
+nullable directed official FDR for both sides of `dim_fixture` without changing a forecast fact or
+ease formula. Both executable historical declarations remain importable.
 
-## Frozen successor: version 3 monitoring amendment (2026-08-26)
+## Version 3 monitoring amendment (2026-08-26)
 
-Version 2 remains the executable/current contract until the P2.3 implementation and tests land.
-Version 3 is frozen in advance by `docs/prediction-vs-actual-dashboard.md` and will add exactly:
+Version 3 is executable/current and adds exactly:
 
 - `goals_for_distribution` to `fact_forecast_team_fixture`, transported unchanged from
   `ledger_prediction_team_fixture` rather than regenerated from `lambda_for`;
@@ -17,10 +17,10 @@ Version 3 is frozen in advance by `docs/prediction-vs-actual-dashboard.md` and w
 - `fact_finalized_team_fixture_outcome` at `(season, fixture, team_id)`, sourced only from the new
   append-only `ledger_outcome_team_fixture`.
 
-The current mart-sourced `fact_player_fixture_actual` remains an observed-history/form fact during
-migration but is not the version-3 monitoring boundary. Both outcome facts carry no `run_id` and
-join to a recorded prediction only downstream. The executable contract, exporter, prose status,
-schema tests, row accounting, and null/finality semantics change together when version 3 lands.
+The mart-sourced `fact_player_fixture_actual` remains an observed-history/form fact but is not the
+version-3 monitoring boundary. Both finalized outcome facts carry no `run_id` and join to a
+recorded prediction only downstream. Empty outcome facts are valid before any immutable finalized
+outcome is attached.
 
 This is the authoritative description of what the BI export publishes. Its executable counterpart is
 `src/fpl/publish/contract.py`, which declares the same schema as typed data and validates it; the two
@@ -148,7 +148,8 @@ bounded-search `search_policy`, the verified `rules_snapshot` (the constraints),
 `assumptions` list. Joins many-to-one to `dim_forecast_run` on `forecast_run_id`: one vintage
 can back several plans (default and diagnostic architectures), never the reverse. Sourced and
 declared in the same change, so it was never in `NOT_YET_SOURCED`; that addition did not itself
-change the then-current v1 contract. The current v2 revision is limited to schedule FDR.
+change the then-current v1 contract. Historical v2 was limited to schedule FDR; v3 adds only the
+monitoring fields/facts listed above.
 
 ## Facts
 
@@ -182,8 +183,10 @@ mapping is part of the transport contract.
 
 **Sourced by P1.2** from `ledger_prediction_team_fixture`. Two rows per fixture, one per club.
 These are the fixture-difficulty **primitives**: `lambda_for`, `lambda_against`,
-`probability_clean_sheet`, plus the official FDR as a separate measure. P1.5 publishes the raw
-lambdas beside four nullable derived values and a non-null formula identity:
+`probability_clean_sheet`, the exact JSON `goals_for_distribution`, plus the official FDR as a
+separate measure. The PMF is transported unchanged from `ledger_prediction_team_fixture`; never
+recreate it from `lambda_for`. P1.5 publishes the raw lambdas beside four nullable derived values
+and a non-null formula identity:
 
 ```text
 league_average_team_lambda = mean(lambda_for) over (run_id, season)
@@ -230,6 +233,26 @@ absence rather than its value.
 club's conceded goals than his share of the minutes implies (measured exposure 0.344 / 0.813 / 0.999
 by minutes bin against 0.254 / 0.837 / 1.000 by minutes), so never derive on-pitch exposure from
 minutes.
+
+### `fact_finalized_player_fixture_outcome` — grain `(season, fixture, code)`
+
+The immutable monitoring target sourced from `ledger_outcome_player_fixture`, carrying the
+schedule-resolved `gw`, `attached_at`, and the separately named nullable
+`total_points_as_recorded` / `points_under_rules_2026_27`. The mutable actual mart is not used for
+monitoring. The fact carries no `run_id`; the static emitter joins it to each recorded vintage only
+at read time and scores a player-gameweek only after complete official-gameweek finality and every
+forecast fixture leg. One completed leg of a double gameweek is never compared with the full
+convolved forecast.
+
+### `fact_finalized_team_fixture_outcome` — grain `(season, fixture, team_id)`
+
+The immutable directed club-side target sourced only from `ledger_outcome_team_fixture`. It carries
+`team_code`, opponent, gameweek, kickoff, venue, official goals for/against, and `attached_at`.
+Every finalized fixture contributes two reciprocal rows. Official fixture scores are retained
+directly rather than reconstructed from player events, so own goals remain correct. The fact has no
+`run_id`. Team attack distributional scoring uses the named club's exact stored PMF; defence uses
+the opponent's exact stored PMF for that fixture, never a distribution inferred from
+`lambda_against`.
 
 ### `fact_player_form` — grain `(season, gw, code, window)`
 
@@ -338,8 +361,9 @@ the work. Three were added, each forced by a documented invariant rather than by
 
 ## Source completeness
 
-Every current v2 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
+Every current v3 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
 P1.6 supplies `fact_player_form`, and P1.6b adds `fact_team_form` (declared and sourced in the same
 change, so it is never in `NOT_YET_SOURCED`). Consequently `contract.NOT_YET_SOURCED` is empty; P1.4
-can require the complete v2 contract rather than silently emitting an apparently complete partial
-export.
+can require the complete v3 contract rather than silently emitting an apparently complete partial
+export. A pre-v3 database that has not yet created one additive outcome ledger emits that outcome
+fact empty; if the table exists, its full physical shape is validated strictly.

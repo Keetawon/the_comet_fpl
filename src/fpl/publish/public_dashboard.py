@@ -5,7 +5,8 @@ browser-specific ``user_custom`` optimizer plans and an absolute local path to t
 rules file.  Those values must never leak into the static public deployment.  This module
 is a narrow transport boundary: it validates the source generation, removes only custom
 plans, normalizes the one provenance path, reseals the dashboard manifest, validates the
-result, and emits a deterministic ZIP containing the eight read-model files at its root.
+result, and emits a deterministic ZIP containing the complete read-model generation at
+its root.
 """
 
 from __future__ import annotations
@@ -22,13 +23,14 @@ from typing import Any, Final
 
 from fpl.publish.dashboard_json import (
     FIXTURE_MATRIX_FILENAME,
-    FORECAST_VS_ACTUAL_FILENAME,
     MANIFEST_FILENAME,
     NEXT_GW_FILENAME,
     OPTIMIZER_AUDIT_FILENAME,
+    PLAYER_FORECAST_VS_ACTUAL_FILENAME,
     PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     SUMMARY_FILENAME,
+    TEAM_FORECAST_VS_ACTUAL_FILENAME,
     DashboardJsonError,
     _file_row_count,
     _manifest_content_sha256,
@@ -54,7 +56,8 @@ _READ_MODEL_FILENAMES: Final[tuple[str, ...]] = tuple(
             PLAYERS_FILENAME,
             SUMMARY_FILENAME,
             NEXT_GW_FILENAME,
-            FORECAST_VS_ACTUAL_FILENAME,
+            PLAYER_FORECAST_VS_ACTUAL_FILENAME,
+            TEAM_FORECAST_VS_ACTUAL_FILENAME,
             OPTIMIZER_AUDIT_FILENAME,
         )
     )
@@ -144,8 +147,11 @@ _DOCUMENT_TOP_LEVEL_KEYS: Final[dict[str, frozenset[str]]] = {
             "ease_index_formula_version",
         }
     ),
-    FORECAST_VS_ACTUAL_FILENAME: frozenset(
-        {"schema", "json_schema_version", "runs", "has_outcomes"}
+    PLAYER_FORECAST_VS_ACTUAL_FILENAME: frozenset(
+        {"schema", "json_schema_version", "semantics", "runs", "has_outcomes"}
+    ),
+    TEAM_FORECAST_VS_ACTUAL_FILENAME: frozenset(
+        {"schema", "json_schema_version", "semantics", "runs", "has_outcomes"}
     ),
     OPTIMIZER_AUDIT_FILENAME: frozenset({"schema", "json_schema_version", "plans"}),
 }

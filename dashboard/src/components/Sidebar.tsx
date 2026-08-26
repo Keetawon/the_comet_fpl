@@ -31,7 +31,8 @@ const PAGES: readonly PageDef[] = [
   { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList },
   { id: "plan-builder", label: "Plan builder", icon: Wand2 },
   { id: "squad-draft", label: "Squad draft", icon: ListPlus },
-  { id: "forecast-vs-actual", label: "Forecast vs actual", icon: LineChart },
+  { id: "player-forecast-vs-actual", label: "Player prediction vs actual", icon: LineChart },
+  { id: "team-forecast-vs-actual", label: "Team prediction vs actual", icon: LineChart },
   { id: "optimizer", label: "Optimizer audit", icon: Scale },
 ];
 

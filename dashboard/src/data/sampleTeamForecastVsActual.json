@@ -1,0 +1,66 @@
+{
+  "schema": "fpl.dashboard-team-forecast-vs-actual",
+  "json_schema_version": 5,
+  "semantics": {
+    "observation_grain": ["run_id", "season", "fixture", "team_code"],
+    "residual": "actual-minus-forecast",
+    "defence_residual_direction": "positive-is-worse",
+    "pmf_transport": "excluded"
+  },
+  "has_outcomes": true,
+  "runs": [
+    {
+      "run_id": "team-run-001",
+      "as_of": "2026-08-21T16:00:00Z",
+      "created_at": "2026-08-21T16:05:00Z",
+      "season": "2026-27",
+      "gw_from": 1,
+      "gw_to": 2,
+      "status": "recorded",
+      "component_modes": {"attacking_mode": "v3"},
+      "coverage": {
+        "forecast_rows": 6,
+        "pending_rows": 2,
+        "missing_outcome_rows": 0,
+        "invalid_fixture_rows": 0,
+        "scored_rows": 4,
+        "attack_distribution_scored_rows": 4,
+        "defence_distribution_scored_rows": 4,
+        "clean_sheet_scored_rows": 4
+      },
+      "attack": {"rows": 4, "distribution_rows": 4, "forecast_total": 5.2, "actual_total": 6.0, "forecast_mean": 1.3, "actual_mean": 1.5, "bias": 0.2, "mae": 0.7, "rmse": 0.905539, "crps": 0.55},
+      "defence": {"rows": 4, "distribution_rows": 4, "forecast_total": 5.2, "actual_total": 6.0, "forecast_mean": 1.3, "actual_mean": 1.5, "bias": 0.2, "mae": 0.7, "rmse": 0.905539, "crps": 0.575},
+      "clean_sheet": {"rows": 4, "predicted_mean": 0.29, "observed_rate": 0.25, "brier": 0.12015},
+      "by_gw": [
+        {"gw": 1, "attack": {"rows": 2, "distribution_rows": 2, "forecast_total": 2.6, "actual_total": 2.0, "forecast_mean": 1.3, "actual_mean": 1.0, "bias": -0.3, "mae": 0.5, "rmse": 0.583095, "crps": 0.5}, "defence": {"rows": 2, "distribution_rows": 2, "forecast_total": 2.6, "actual_total": 2.0, "forecast_mean": 1.3, "actual_mean": 1.0, "bias": -0.3, "mae": 0.5, "rmse": 0.583095, "crps": 0.5}, "clean_sheet": {"rows": 2, "predicted_mean": 0.305, "observed_rate": 0.5, "brier": 0.16405}},
+        {"gw": 2, "attack": {"rows": 2, "distribution_rows": 2, "forecast_total": 2.6, "actual_total": 4.0, "forecast_mean": 1.3, "actual_mean": 2.0, "bias": 0.7, "mae": 0.9, "rmse": 1.140175, "crps": 0.6}, "defence": {"rows": 2, "distribution_rows": 2, "forecast_total": 2.6, "actual_total": 4.0, "forecast_mean": 1.3, "actual_mean": 2.0, "bias": 0.7, "mae": 0.9, "rmse": 1.140175, "crps": 0.65}, "clean_sheet": {"rows": 2, "predicted_mean": 0.275, "observed_rate": 0.0, "brier": 0.07625}}
+      ],
+      "by_team": [
+        {"team_id": 1, "team_code": 101, "team_name": "Alpha FC", "team_short_name": "AAA", "attack": {"rows": 1, "distribution_rows": 1, "forecast_total": 1.8, "actual_total": 2.0, "forecast_mean": 1.8, "actual_mean": 2.0, "bias": 0.2, "mae": 0.2, "rmse": 0.2, "crps": 0.6}, "defence": {"rows": 1, "distribution_rows": 1, "forecast_total": 0.8, "actual_total": 0.0, "forecast_mean": 0.8, "actual_mean": 0.0, "bias": -0.8, "mae": 0.8, "rmse": 0.8, "crps": 0.4}, "clean_sheet": {"rows": 1, "predicted_mean": 0.45, "observed_rate": 1.0, "brier": 0.3025}},
+        {"team_id": 2, "team_code": 102, "team_name": "Beta FC", "team_short_name": "BBB", "attack": {"rows": 1, "distribution_rows": 1, "forecast_total": 0.8, "actual_total": 0.0, "forecast_mean": 0.8, "actual_mean": 0.0, "bias": -0.8, "mae": 0.8, "rmse": 0.8, "crps": 0.4}, "defence": {"rows": 1, "distribution_rows": 1, "forecast_total": 1.8, "actual_total": 2.0, "forecast_mean": 1.8, "actual_mean": 2.0, "bias": 0.2, "mae": 0.2, "rmse": 0.2, "crps": 0.6}, "clean_sheet": {"rows": 1, "predicted_mean": 0.16, "observed_rate": 0.0, "brier": 0.0256}},
+        {"team_id": 3, "team_code": 103, "team_name": "Gamma FC", "team_short_name": "CCC", "attack": {"rows": 1, "distribution_rows": 1, "forecast_total": 1.2, "actual_total": 1.0, "forecast_mean": 1.2, "actual_mean": 1.0, "bias": -0.2, "mae": 0.2, "rmse": 0.2, "crps": 0.5}, "defence": {"rows": 1, "distribution_rows": 1, "forecast_total": 1.4, "actual_total": 3.0, "forecast_mean": 1.4, "actual_mean": 3.0, "bias": 1.6, "mae": 1.6, "rmse": 1.6, "crps": 0.8}, "clean_sheet": {"rows": 1, "predicted_mean": 0.25, "observed_rate": 0.0, "brier": 0.0625}},
+        {"team_id": 4, "team_code": 104, "team_name": "Delta FC", "team_short_name": "DDD", "attack": {"rows": 1, "distribution_rows": 1, "forecast_total": 1.4, "actual_total": 3.0, "forecast_mean": 1.4, "actual_mean": 3.0, "bias": 1.6, "mae": 1.6, "rmse": 1.6, "crps": 0.7}, "defence": {"rows": 1, "distribution_rows": 1, "forecast_total": 1.2, "actual_total": 1.0, "forecast_mean": 1.2, "actual_mean": 1.0, "bias": -0.2, "mae": 0.2, "rmse": 0.2, "crps": 0.5}, "clean_sheet": {"rows": 1, "predicted_mean": 0.3, "observed_rate": 0.0, "brier": 0.09}}
+      ],
+      "by_venue": [
+        {"venue": "home", "attack": {"rows": 2, "distribution_rows": 2, "forecast_total": 3.0, "actual_total": 3.0, "forecast_mean": 1.5, "actual_mean": 1.5, "bias": 0.0, "mae": 0.2, "rmse": 0.2, "crps": 0.55}, "defence": {"rows": 2, "distribution_rows": 2, "forecast_total": 2.2, "actual_total": 3.0, "forecast_mean": 1.1, "actual_mean": 1.5, "bias": 0.4, "mae": 1.2, "rmse": 1.264911, "crps": 0.6}, "clean_sheet": {"rows": 2, "predicted_mean": 0.35, "observed_rate": 0.5, "brier": 0.1825}},
+        {"venue": "away", "attack": {"rows": 2, "distribution_rows": 2, "forecast_total": 2.2, "actual_total": 3.0, "forecast_mean": 1.1, "actual_mean": 1.5, "bias": 0.4, "mae": 1.2, "rmse": 1.264911, "crps": 0.55}, "defence": {"rows": 2, "distribution_rows": 2, "forecast_total": 3.0, "actual_total": 3.0, "forecast_mean": 1.5, "actual_mean": 1.5, "bias": 0.0, "mae": 0.2, "rmse": 0.2, "crps": 0.5}, "clean_sheet": {"rows": 2, "predicted_mean": 0.23, "observed_rate": 0.0, "brier": 0.0578}}
+      ],
+      "by_fallback": [
+        {"stage_a_league_average_team": false, "attack": {"rows": 3, "distribution_rows": 3, "forecast_total": 4.0, "actual_total": 5.0, "forecast_mean": 1.333333, "actual_mean": 1.666667, "bias": 0.333333, "mae": 0.866667, "rmse": 1.0, "crps": 0.566667}, "defence": {"rows": 3, "distribution_rows": 3, "forecast_total": 3.8, "actual_total": 3.0, "forecast_mean": 1.266667, "actual_mean": 1.0, "bias": -0.266667, "mae": 0.4, "rmse": 0.489898, "crps": 0.5}, "clean_sheet": {"rows": 3, "predicted_mean": 0.303333, "observed_rate": 0.333333, "brier": 0.139367}},
+        {"stage_a_league_average_team": true, "attack": {"rows": 1, "distribution_rows": 1, "forecast_total": 1.2, "actual_total": 1.0, "forecast_mean": 1.2, "actual_mean": 1.0, "bias": -0.2, "mae": 0.2, "rmse": 0.2, "crps": 0.5}, "defence": {"rows": 1, "distribution_rows": 1, "forecast_total": 1.4, "actual_total": 3.0, "forecast_mean": 1.4, "actual_mean": 3.0, "bias": 1.6, "mae": 1.6, "rmse": 1.6, "crps": 0.8}, "clean_sheet": {"rows": 1, "predicted_mean": 0.25, "observed_rate": 0.0, "brier": 0.0625}}
+      ],
+      "calibration": [
+        {"event": "goals_ge", "threshold": 1, "bucket": "0.5-0.8", "rows": 4, "predicted_mean": 0.68, "observed_rate": 0.75},
+        {"event": "goals_ge", "threshold": 2, "bucket": "0.2-0.5", "rows": 4, "predicted_mean": 0.35, "observed_rate": 0.5},
+        {"event": "goals_ge", "threshold": 3, "bucket": "0.0-0.2", "rows": 4, "predicted_mean": 0.15, "observed_rate": 0.25},
+        {"event": "clean_sheet", "threshold": null, "bucket": "0.0-0.5", "rows": 4, "predicted_mean": 0.29, "observed_rate": 0.25}
+      ],
+      "observations": [
+        {"fixture": 11, "gw": 1, "kickoff_time": "2026-08-22T12:00:00Z", "team_id": 1, "team_code": 101, "team_name": "Alpha FC", "team_short_name": "AAA", "opponent_team_id": 2, "opponent_team_code": 102, "opponent_team_name": "Beta FC", "opponent_team_short_name": "BBB", "was_home": true, "lambda_for": 1.8, "actual_goals_for": 2, "attack_residual": 0.2, "lambda_against": 0.8, "actual_goals_against": 0, "defence_residual": -0.8, "probability_clean_sheet": 0.45, "actual_clean_sheet": true, "attack_crps": 0.6, "defence_crps": 0.4, "clean_sheet_brier": 0.3025, "stage_a_league_average_team": false},
+        {"fixture": 11, "gw": 1, "kickoff_time": "2026-08-22T12:00:00Z", "team_id": 2, "team_code": 102, "team_name": "Beta FC", "team_short_name": "BBB", "opponent_team_id": 1, "opponent_team_code": 101, "opponent_team_name": "Alpha FC", "opponent_team_short_name": "AAA", "was_home": false, "lambda_for": 0.8, "actual_goals_for": 0, "attack_residual": -0.8, "lambda_against": 1.8, "actual_goals_against": 2, "defence_residual": 0.2, "probability_clean_sheet": 0.16, "actual_clean_sheet": false, "attack_crps": 0.4, "defence_crps": 0.6, "clean_sheet_brier": 0.0256, "stage_a_league_average_team": false},
+        {"fixture": 12, "gw": 2, "kickoff_time": "2026-08-29T15:00:00Z", "team_id": 3, "team_code": 103, "team_name": "Gamma FC", "team_short_name": "CCC", "opponent_team_id": 4, "opponent_team_code": 104, "opponent_team_name": "Delta FC", "opponent_team_short_name": "DDD", "was_home": true, "lambda_for": 1.2, "actual_goals_for": 1, "attack_residual": -0.2, "lambda_against": 1.4, "actual_goals_against": 3, "defence_residual": 1.6, "probability_clean_sheet": 0.25, "actual_clean_sheet": false, "attack_crps": 0.5, "defence_crps": 0.8, "clean_sheet_brier": 0.0625, "stage_a_league_average_team": true},
+        {"fixture": 12, "gw": 2, "kickoff_time": "2026-08-29T15:00:00Z", "team_id": 4, "team_code": 104, "team_name": "Delta FC", "team_short_name": "DDD", "opponent_team_id": 3, "opponent_team_code": 103, "opponent_team_name": "Gamma FC", "opponent_team_short_name": "CCC", "was_home": false, "lambda_for": 1.4, "actual_goals_for": 3, "attack_residual": 1.6, "lambda_against": 1.2, "actual_goals_against": 1, "defence_residual": -0.2, "probability_clean_sheet": 0.3, "actual_clean_sheet": false, "attack_crps": 0.7, "defence_crps": 0.5, "clean_sheet_brier": 0.09, "stage_a_league_average_team": false}
+      ]
+    }
+  ]
+}

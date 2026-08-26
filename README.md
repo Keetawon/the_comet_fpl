@@ -13,13 +13,13 @@ different answers:
 A single `xP` answers only the first.
 
 **Current status: the data foundation, development-only forward pipeline through Stage E,
-append-only forecast/player-outcome ledger, versioned BI semantic export, atomic static publish
-boundary, and eight-route decision dashboard are implemented; no forecast component or squad
-recommendation is promoted as production-valid.** The 2026-08-26 post-deadline dashboard program is
-documentation-first: add player/team deep analytics, then correct and split player/team
-prediction-versus-actual monitoring through immutable outcomes, then add deterministic page
-insights with an optional evidence-bound server-side language renderer. It changes no forecast
-default or frozen evaluation.
+append-only forecast/outcome ledgers, BI semantic contract version 3, dashboard schema version 5,
+atomic static publish boundary, and eleven-route dashboard are implemented; no forecast component
+or squad recommendation is promoted as production-valid.** Player/team deep analytics and exact,
+separate player/team prediction-versus-actual monitoring are implemented development-only. The
+active next step is deterministic page insights with an optional evidence-bound server-side
+language renderer; that P2.4 work is not yet implemented and changes no forecast default or frozen
+evaluation.
 Phase 1 Candidates V1 and V2 were fitted under the fixed walk-forward contract and correctly not
 promoted. Candidate V3's development result was invalidated for leakage; its leakage-safe successor
 V4 was evaluated once and also missed the fixed gate, so `trailing_goals_attack_defence` remains the
@@ -88,14 +88,20 @@ price/selling-value handling remain explicit unmeasured scenario gaps. The appen
 retains player-gameweek, player-fixture, and team-fixture forecast vintages, with finalized outcomes
 attached separately. The versioned BI semantic/star export, atomic Parquet/static-JSON publish
 boundary, platform/custom-plan separation, lock/exclusion flow, and dashboard are implemented
-development-only. Dashboard read-model schema v4 publishes backend-convolved cumulative player
-xP, `P(<=2)`, and `P(>=2/4/6/10/15)` at each exact horizon endpoint. xP may be summed in the
-browser; probabilities never are, and raw PMFs stay out of the bulk payload. The values are raw
+development-only. Dashboard read-model schema v5 retains the backend-convolved cumulative player
+xP, `P(<=2)`, and `P(>=2/4/6/10/15)` endpoints and adds separate exact player/team forecast
+monitoring. Player-gameweek comparisons require the complete official gameweek and all forecast
+fixture legs; a partial double gameweek is never scored. Team attack CRPS uses its exact stored
+goals PMF, defence CRPS uses the opponent's exact stored PMF, and clean-sheet Brier uses the
+published clean-sheet probability. xP may be summed in the browser; probabilities never are, and
+raw PMFs stay out of the bulk payload. The values are raw
 and availability-unadjusted, with independent gameweeks an explicit composition assumption. The
 emitter validates full precision first, then transports named values in six-decimal compact rows;
-the browser only decodes their versioned field order. The dashboard exposes six read-only
-analytic/decision routes plus Plan Builder
-and a browser-only Squad Draft sandbox. The local, development-only manager path now reconstructs
+the browser only decodes their versioned field order. The dashboard exposes nine read-only
+analytic/decision routes, including Player/Team analytics and separate Player/Team prediction vs
+actual pages, plus Plan Builder and a browser-only Squad Draft sandbox. The legacy
+`#forecast-vs-actual` hash aliases the player page only. The local, development-only manager path
+now reconstructs
 a public manager squad into an immutable private capture, applies current bank/purchase/selling
 values and remaining free transfers, and can optimize transfers from the first forecast
 gameweek. Squad Draft remains bound to one exact forecast vintage and recorded rules snapshot,
@@ -379,7 +385,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
 | 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 development-evaluated; exposure-weighted goals V4 (-0.44% vs baseline, ties V3) and assists V2 (+1.85% vs baseline, -0.11% vs the incumbent V1) each run once, development-only, neither promoted; Stage D v3 composer, prospective forecast, and the GW29-38 EV backtest all run and development-only, with the V1 comparator outscoring the V3 primary |
 | 3b | Stage E optimiser + prediction ledger | optimiser, stable input/decision artifacts, no-transfer repair, append-only forecast/outcome ledger, and private public-manager capture plus selling-value/free-transfer-aware transfer planning implemented development-only; horizon availability and future price/selling-value changes remain open |
-| 4 | BI semantic export + dashboard | versioned semantic/star export, atomic Parquet and schema-v4 static JSON with cumulative player outcomes, platform/custom plan separation, locks/exclusions, six analytic routes, manager-aware Plan Builder, and Squad Draft with optimized/current-team handoffs implemented development-only; P2 player/team deep analytics, exact parallel monitoring, and evidence-bound summaries are active; real-deadline validation and authenticated hosted manager operation remain open |
+| 4 | BI semantic export + dashboard | semantic contract v3, atomic Parquet and schema-v5 static JSON, cumulative player endpoints, player/team deep analytics, exact separate player/team monitoring, platform/custom plan separation, locks/exclusions, nine read-only analytic/decision routes, manager-aware Plan Builder, and Squad Draft with optimized/current-team handoffs implemented development-only; evidence-bound deterministic/optional AI summaries are active next but not yet implemented; real-deadline validation and authenticated hosted manager operation remain open |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
 
 Phase 3b is an addition to the original phasing, which ended Phase 3 at simulation and had no

@@ -1,4 +1,4 @@
-"""Attach finalized mart outcomes to the append-only prediction ledger.
+"""Attach finalized historical/live player and team outcomes to the prediction ledger.
 
 The job is intentionally thin.  Source validation, player-fixture grain checks, idempotent exact
 repeats, and immutable-conflict detection live in :mod:`fpl.storage.outcomes`; the ledger owns the
@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fpl.storage.db import initialise
+from fpl.storage.ledger import LedgerError
 from fpl.storage.outcomes import OutcomeAttachmentError, attach_finalized_outcomes
 
 logger = logging.getLogger("fpl.jobs.attach_outcomes")
@@ -34,7 +35,7 @@ def _parse_as_of(value: str) -> datetime:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Attach finalized player-fixture outcomes from the marts to the ledger."
+        description="Attach finalized player-fixture and team-fixture outcomes to the ledger."
     )
     parser.add_argument(
         "--as-of",
@@ -54,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     con = initialise(args.db)
     try:
         result = attach_finalized_outcomes(con, as_of=args.as_of, season=args.season)
-    except OutcomeAttachmentError as exc:
+    except (OutcomeAttachmentError, LedgerError) as exc:
         logger.error("%s", exc)
         return 1
     finally:
@@ -62,7 +63,9 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"selected {result.selected} finalized player-fixture outcomes; "
-        f"attached {result.attached}, unchanged {result.already_attached}"
+        f"attached {result.attached}, unchanged {result.already_attached}; "
+        f"selected {result.team_selected} team-fixture sides; "
+        f"attached {result.team_attached}, unchanged {result.team_already_attached}"
     )
     return 0
 

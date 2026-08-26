@@ -1,6 +1,6 @@
 {
   "schema": "fpl.dashboard-players",
-  "json_schema_version": 4,
+  "json_schema_version": 5,
   "players": [
     {
       "run_id": "run-a",

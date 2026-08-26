@@ -1,4 +1,4 @@
-"""Executable tests for the frozen BI semantic contract, version 2.
+"""Executable tests for the frozen BI semantic contract, version 3.
 
 The contract's value is that it is enforced, not that it is written down, so most of these tests are
 negative: they construct a contract that breaks an invariant and prove the validator rejects it.
@@ -19,6 +19,7 @@ from fpl.publish.contract import (
     SEASON_SCOPED_KEYS,
     SEMANTIC_CONTRACT_V1,
     SEMANTIC_CONTRACT_V2,
+    SEMANTIC_CONTRACT_V3,
     Column,
     Join,
     SemanticContract,
@@ -26,8 +27,18 @@ from fpl.publish.contract import (
     Table,
 )
 
-CONTRACT = SEMANTIC_CONTRACT_V2
+CONTRACT = SEMANTIC_CONTRACT_V3
 LEDGER_SOURCE_TABLES = frozenset(
+    {
+        "ledger_forecast_run",
+        "ledger_prediction_player_gameweek",
+        "ledger_prediction_player_fixture",
+        "ledger_prediction_team_fixture",
+        "ledger_outcome_player_fixture",
+        "ledger_outcome_team_fixture",
+    }
+)
+FORECAST_LEDGER_SOURCE_TABLES = frozenset(
     {
         "ledger_forecast_run",
         "ledger_prediction_player_gameweek",
@@ -35,6 +46,7 @@ LEDGER_SOURCE_TABLES = frozenset(
         "ledger_prediction_team_fixture",
     }
 )
+OUTCOME_LEDGER_SOURCE_TABLES = LEDGER_SOURCE_TABLES - FORECAST_LEDGER_SOURCE_TABLES
 
 
 # --------------------------------------------------------------------------------------
@@ -43,7 +55,7 @@ LEDGER_SOURCE_TABLES = frozenset(
 
 
 def test_contract_publishes_the_expected_tables() -> None:
-    assert CONTRACT.version == 2
+    assert CONTRACT.version == 3
     assert {table.name for table in CONTRACT.tables} == {
         # dimensions
         "dim_forecast_run",
@@ -60,6 +72,8 @@ def test_contract_publishes_the_expected_tables() -> None:
         "fact_forecast_player_fixture",
         "fact_forecast_team_fixture",
         "fact_player_fixture_actual",
+        "fact_finalized_player_fixture_outcome",
+        "fact_finalized_team_fixture_outcome",
         "fact_player_form",
         "fact_team_form",
         "fact_optimizer_plan",
@@ -71,6 +85,16 @@ def test_historical_v1_contract_remains_importable_without_schedule_fdr() -> Non
     fixture = SEMANTIC_CONTRACT_V1.table("dim_fixture")
     assert "home_official_fdr" not in fixture.column_names
     assert "away_official_fdr" not in fixture.column_names
+
+
+def test_historical_v2_contract_remains_importable_without_v3_monitoring_additions() -> None:
+    assert SEMANTIC_CONTRACT_V2.version == 2
+    assert (
+        "goals_for_distribution"
+        not in SEMANTIC_CONTRACT_V2.table("fact_forecast_team_fixture").column_names
+    )
+    assert "fact_finalized_player_fixture_outcome" not in SEMANTIC_CONTRACT_V2.by_name
+    assert "fact_finalized_team_fixture_outcome" not in SEMANTIC_CONTRACT_V2.by_name
 
 
 @pytest.mark.parametrize(
@@ -88,6 +112,8 @@ def test_historical_v1_contract_remains_importable_without_schedule_fdr() -> Non
         ("fact_forecast_player_fixture", ("run_id", "season", "fixture", "code")),
         ("fact_forecast_team_fixture", ("run_id", "season", "fixture", "team_id")),
         ("fact_player_fixture_actual", ("season", "fixture", "code")),
+        ("fact_finalized_player_fixture_outcome", ("season", "fixture", "code")),
+        ("fact_finalized_team_fixture_outcome", ("season", "fixture", "team_id")),
         ("fact_player_form", ("season", "gw", "code", "window")),
         ("fact_team_form", ("season", "gw", "team_code", "window")),
         ("fact_optimizer_plan", ("optimizer_run_id", "gw", "code")),
@@ -99,7 +125,11 @@ def test_each_table_declares_its_frozen_grain(table: str, grain: tuple[str, ...]
 
 def test_player_fixture_facts_use_the_fixture_grain_not_player_gameweek() -> None:
     """Double gameweeks are real, so the fixture facts must key on fixture."""
-    for name in ("fact_forecast_player_fixture", "fact_player_fixture_actual"):
+    for name in (
+        "fact_forecast_player_fixture",
+        "fact_player_fixture_actual",
+        "fact_finalized_player_fixture_outcome",
+    ):
         grain = CONTRACT.table(name).grain
         assert "fixture" in grain
         assert "gw" not in grain
@@ -152,7 +182,13 @@ def test_every_forecast_fact_carries_run_id_and_as_of_and_keys_on_the_vintage() 
 
 def test_actual_and_form_facts_carry_no_run_id() -> None:
     """Outcomes stay separate from predictions until finalisation."""
-    for name in ("fact_player_fixture_actual", "fact_player_form", "fact_team_form"):
+    for name in (
+        "fact_player_fixture_actual",
+        "fact_finalized_player_fixture_outcome",
+        "fact_finalized_team_fixture_outcome",
+        "fact_player_form",
+        "fact_team_form",
+    ):
         assert "run_id" not in CONTRACT.table(name).column_names
 
 
@@ -165,8 +201,9 @@ def test_optimizer_plan_references_a_forecast_vintage_without_being_one() -> Non
 
 
 def test_recorded_and_replayed_points_are_separate_measures() -> None:
-    columns = CONTRACT.table("fact_player_fixture_actual").column_names
-    assert {"total_points_as_recorded", "points_under_rules_2026_27"} <= columns
+    for name in ("fact_player_fixture_actual", "fact_finalized_player_fixture_outcome"):
+        columns = CONTRACT.table(name).column_names
+        assert {"total_points_as_recorded", "points_under_rules_2026_27"} <= columns
 
 
 def test_team_fixture_ease_columns_are_additive_directed_and_versioned() -> None:
@@ -184,6 +221,30 @@ def test_team_fixture_ease_columns_are_additive_directed_and_versioned() -> None
         assert "100 is league average" in by_name[name].description
         assert "higher means" in by_name[name].description
     assert "never blended" in by_name["official_fdr"].description
+    pmf = by_name["goals_for_distribution"]
+    assert pmf.dtype == "string" and not pmf.nullable
+    assert "Exact JSON probability vector" in pmf.description
+
+
+def test_v3_outcome_facts_are_append_only_ledger_owned_and_vintage_independent() -> None:
+    player = CONTRACT.table("fact_finalized_player_fixture_outcome")
+    team = CONTRACT.table("fact_finalized_team_fixture_outcome")
+    assert "ledger_outcome_player_fixture" in player.source_owner
+    assert "mart_fact_player_fixture" not in player.source_owner
+    assert team.source_owner == "fpl.storage.ledger:ledger_outcome_team_fixture"
+    assert "attached_at" in player.column_names
+    assert "attached_at" in team.column_names
+    assert "run_id" not in player.column_names
+    assert "run_id" not in team.column_names
+    assert {
+        "team_code",
+        "opponent_team_id",
+        "gw",
+        "kickoff_time",
+        "was_home",
+        "goals_for",
+        "goals_against",
+    } <= team.column_names
 
 
 def test_fixture_dimension_carries_current_official_fdr_for_both_sides() -> None:
@@ -546,9 +607,13 @@ def test_declared_source_tables_exist_in_the_database(db: duckdb.DuckDBPyConnect
         referenced = _referenced_source_tables(table.source_owner)
         missing = referenced - existing
         if missing:
-            assert referenced <= LEDGER_SOURCE_TABLES and not (existing & LEDGER_SOURCE_TABLES), (
-                f"{table.name} references missing source table(s) {sorted(missing)}"
-            )
+            if referenced <= OUTCOME_LEDGER_SOURCE_TABLES:
+                # A database created before the additive v3 outcome store is a valid empty
+                # outcome fact; the exporter validates the complete shape whenever it exists.
+                continue
+            assert referenced <= FORECAST_LEDGER_SOURCE_TABLES and not (
+                existing & FORECAST_LEDGER_SOURCE_TABLES
+            ), f"{table.name} references missing source table(s) {sorted(missing)}"
             continue
         checked += len(referenced)
     assert checked > 0, "no production source tables were checked"

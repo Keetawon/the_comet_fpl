@@ -1,7 +1,6 @@
-# Dashboard read-model JSON contract, version 4
+# Dashboard read-model JSON contract, version 5
 
-Status: implemented by DEV-ROADMAP P1.7a (backend publish layer) and extended by P1.7d/P1.7e/P1.7j
-with the summary, next-gameweek, forecast-vs-actual, and optimizer-audit read models. This
+Status: implemented development-only by DEV-ROADMAP P1.7a and extended through P2.3. This
 document is the authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The
 static app renders these files and nothing else. Version 2 adds `summary.json`,
 `next_gw.json`, `forecast_vs_actual.json`, and `optimizer_audit.json` to the version-1 file
@@ -16,10 +15,9 @@ convolving the already-published player-gameweek distributions. The browser sele
 endpoint and may filter/sort player records; it never conditions a distribution, sums
 probabilities, parses a PMF, or derives a tail.
 
-## Frozen successor: version 5 monitoring amendment (2026-08-26)
+## Version 5 monitoring amendment (implemented 2026-08-26)
 
-Version 4 remains implemented/current while the documentation-first P2 program builds player and
-team analytics from its existing values. Version 5 is reserved for the exact monitoring repair in
+Version 5 retains all version-4 files/fields and implements the exact monitoring repair in
 `docs/prediction-vs-actual-dashboard.md`. It replaces the ambiguous
 `forecast_vs_actual.json` with `player_forecast_vs_actual.json` and
 `team_forecast_vs_actual.json`, backed by append-only finalized outcomes and exact stored PMFs.
@@ -29,8 +27,8 @@ gameweek leg never scores a full convolved gameweek forecast. Team observations 
 team-fixture grain and use the opponent's exact goal PMF for defensive scoring. Both files publish
 coverage, scalar chart/table observations, score blocks, slices, and calibration; neither exposes a
 PMF to JavaScript. Version-4 consumers are not permitted to treat the old aggregate as version-5
-evidence. The executable emitter, strict frontend loaders, public-package allowlist, manifest,
-prose status, and tests change together when version 5 lands.
+evidence. The executable emitter, strict frontend loaders, public-package allowlist, manifest, and
+tests moved together to version 5.
 
 ## Boundary and provenance chain
 
@@ -62,7 +60,7 @@ identical content hash.
 
 ## Layout
 
-Version 4 adds `player_horizons.json` beside the six page-oriented JSON files shown below.
+Version 5 publishes eight read-model files plus the manifest.
 
 ```text
 data/
@@ -74,7 +72,8 @@ data/
     ├── player_horizons.json
     ├── next_gw.json
     ├── summary.json
-    ├── forecast_vs_actual.json
+    ├── player_forecast_vs_actual.json
+    ├── team_forecast_vs_actual.json
     └── optimizer_audit.json
 ```
 
@@ -281,7 +280,7 @@ also reconciled so an entirely omitted player or run cannot disappear silently.
 ```json
 {
   "schema": "fpl.dashboard-player-horizons",
-  "json_schema_version": 4,
+  "json_schema_version": 5,
   "semantics": {
     "grain": ["run_id", "season", "code", "gw_to"],
     "cumulative_from": "dim_forecast_run.gw_from",
@@ -387,7 +386,7 @@ derives squad/XI overlap and captaincy agreement as set operations. Cross-plan E
 compared anywhere: absolute EV differences between architectures measure the two models'
 calibration against each other, not squad quality (the P0.3 lesson).
 
-## forecast_vs_actual.json — vintages scored against finalised outcomes (P1.7e)
+## Historical `forecast_vs_actual.json` (version 2-4; removed in version 5)
 
 One object per recorded vintage that has at least one scored player-gameweek, plus a
 top-level `has_outcomes` flag. The join is **read-time only**: forecast rows keep their
@@ -404,6 +403,37 @@ against the observed rate. **With no finalised outcomes inside any vintage's hor
 2026-27 GW1 state — `has_outcomes` is false, `runs` is empty, and the UI shows the framework
 with an explicit explanation instead of zero-filled numbers.** Cross-vintage EV differences
 measure calibration, not squad quality; a run is compared only against its own outcomes.
+
+This section preserves the historical P1.7e contract only. Version 5 does not emit or public-package
+this file, and the frontend never accepts it as current monitoring evidence.
+
+## `player_forecast_vs_actual.json` — complete-gameweek player monitoring (P2.3)
+
+One run block per recorded vintage, with explicit coverage/finality, scalar observations, overall
+scores, position/gameweek/team slices, and threshold calibration. Observation grain is
+`(run_id, season, gw, code)`. Forecasts retain `run_id`; ledger outcomes carry none and join only at
+read time. A player-gameweek is scored only when the official gameweek is complete and every
+forecast fixture leg has an immutable replayed-points outcome. One final leg of a double gameweek
+and one pending leg produces no observation. Missing outcomes increment coverage and never become
+zero.
+
+The Python emitter computes signed residual `actual - forecast`, absolute error, RMSE inputs, exact
+discrete CRPS, and inclusive calibration probabilities from the stored gameweek PMF. The JSON
+contains those scalar results, not the PMF. Positive residual means the model under-predicted.
+
+## `team_forecast_vs_actual.json` — directed team-fixture monitoring (P2.3)
+
+Observation grain is `(run_id, season, fixture, team_code)`. Each observation carries the directed
+team/opponent identity, gameweek, kickoff, venue, forecast lambdas, official finalized goals,
+signed attack/defence residuals, clean-sheet probability/outcome, attack CRPS, defence CRPS,
+clean-sheet Brier, and Stage-A fallback status. Attack CRPS uses the named team's exact stored
+`goals_for_distribution`; defence CRPS uses the opponent side's exact distribution for the same
+fixture. Neither distribution is regenerated from a lambda or exposed to JavaScript.
+
+Positive attack residual means more goals scored than forecast. Positive defence residual means
+more goals conceded than forecast and is therefore worse. Each run publishes coverage plus attack,
+defence, and clean-sheet score blocks and slices. A team fixture is eligible only after the two
+official-score outcome sides have been attached reciprocally.
 
 ## summary.json — the landing snapshot (P1.7d)
 
@@ -443,7 +473,7 @@ and the audit page reads both files.
   "source": {
     "export_schema": "fpl.bi-semantic-export",
     "export_schema_version": 1,
-    "semantic_contract_version": 2,
+    "semantic_contract_version": 3,
     "export_content_sha256": "…",
     "export_created_at": "…",
     "database_sha256": "…"
@@ -460,7 +490,8 @@ and the audit page reads both files.
     "player_horizons.json": {"row_count": 2995, "sha256": "…"},
     "next_gw.json": {"row_count": 2, "sha256": "…"},
     "summary.json": {"row_count": 1, "sha256": "…"},
-    "forecast_vs_actual.json": {"row_count": 0, "sha256": "…"},
+    "player_forecast_vs_actual.json": {"row_count": 0, "sha256": "…"},
+    "team_forecast_vs_actual.json": {"row_count": 0, "sha256": "…"},
     "optimizer_audit.json": {"row_count": 2, "sha256": "…"}
   },
   "content_sha256": "…"
@@ -468,7 +499,7 @@ and the audit page reads both files.
 ```
 
 `row_count` is the number of objects in the file's top-level array (`plans` for
-next_gw.json and optimizer_audit.json, `runs` for forecast_vs_actual.json), except that
+next_gw.json and optimizer_audit.json, `runs` for both forecast-monitoring files), except that
 `player_horizons.json` counts its nested cumulative endpoint rows. `summary.json` is a single
 object, so its row count is 1. `runs` is sorted by `run_id` and validated against
 both the source manifest's `exported_run_ids` and the `dim_forecast_run` rows read from the
@@ -478,10 +509,10 @@ closed.
 
 ## Consumers
 
-The P1.7b-P1.7e static app, any notebook, and any external tool read only these files
-(or the Parquet export). Nothing downstream of the BI boundary queries DuckDB. All six
-roadmap pages now have read models; later pages are additive files under this same manifest
-and schema version bump policy. Version-4 consumers load cumulative outcomes through the strict
+The static app, any notebook, and any external tool read only these files (or the Parquet export).
+Nothing downstream of the BI boundary queries DuckDB. All nine read-only dashboard routes have
+read models; later pages require an explicit schema bump under the same manifest policy. Version-5
+consumers load cumulative outcomes through the strict
 `player_horizons.json` boundary and look up an exact `(run_id, season, code, gw_to)` endpoint;
 they never interpolate or substitute another vintage. The Players route renders these scalars
 only under the fixed-start/all-fixtures scope described above.

@@ -68,15 +68,14 @@ predictions only at read time and only after a fixture is final. The recorded FP
 points replayed under this repository's scoring config are **separately named columns** and are
 never conflated (R1).
 
-### Frozen team-outcome addition (P2.3, 2026-08-26)
+### Team-outcome addition (P2.3, implemented 2026-08-26)
 
-The player outcome table above is implemented. The parallel team monitoring contract is frozen but
-not yet implemented: add `ledger_outcome_team_fixture` at `(season, fixture, team_id)` with
+`ledger_outcome_team_fixture` is implemented at `(season, fixture, team_id)` with
 `attached_at`, `gw`, `kickoff_time`, `team_code`, `opponent_team_id`, `was_home`, `goals_for`, and
 `goals_against`. A finalized fixture appends exactly two reciprocal sides. Null/unfinalized scores,
 duplicate sides, inconsistent opponents/home-away/scores, or a changed repeat fail closed; an exact
-repeat is an idempotent no-op. Current live fixture capture must retain official home/away scores so
-the prospective attachment does not reconstruct club goals from player events.
+repeat is an idempotent no-op. Live fixture versions retain official home/away scores, so prospective
+attachment never reconstructs club goals from player events.
 
 The same P2.3 repair makes forecast monitoring consume ledger outcomes rather than mutable mart
 actuals. A player-gameweek aggregate is eligible only after the complete official gameweek and all
@@ -125,15 +124,18 @@ transformation. The artifact carries an explicit `as_of`, so nothing here is inf
   around the artifact into the model: the rows are the same composed distributions the gameweek
   rows are convolved from, and that relation is re-checked on every serialise and read. Vintages
   recorded before P1.2 remain schema version 1 and legitimately have no fixture rows.
-- **Outcome ingestion path — closed by P1.3.** `fpl.storage.outcomes` validates and selects
-  finalized player-fixture outcomes from the marts; `fpl.jobs.attach_outcomes` is the thin CLI that
-  attaches them. It preserves recorded and 2026/27-replayed points as distinct measures, rejects
-  NULL/unfinalized/duplicate source rows, treats exact re-runs as no-ops, appends new fixture keys,
-  and rejects changed values for an attached key. Two fixtures for one player in a double gameweek
-  remain two rows because the grain includes `fixture`.
+- **Outcome ingestion path — extended by P2.3.** `fpl.storage.outcomes` validates and selects
+  finalized player and reciprocal team-fixture outcomes; `fpl.jobs.attach_outcomes` is the thin CLI
+  that attaches both atomically. It preserves recorded and 2026/27-replayed player points as
+  distinct measures, rejects NULL/unfinalized/duplicate/inconsistent source rows, treats exact
+  re-runs as no-ops, appends new fixture keys, and rejects changed values for an attached key. Two
+  fixtures for one player in a double gameweek remain two rows because the grain includes
+  `fixture`.
 - **Read/BI layer — implemented development-only.** The atomic star-schema export consumes the
-  ledger without querying around it. Dashboard schema v4 then derives exact cumulative player
-  endpoints from the published player-gameweek PMFs: xP plus inclusive `P(<=2)` and
-  `P(>=2/4/6/10/15)`. Cross-gameweek probabilities are convolved in the Python emitter under an
-  explicit independence assumption; the browser selects published scalars and never computes a
-  probability from the ledger primitives.
+  ledger without querying around it. Semantic contract v3 transports exact team goal PMFs plus
+  ledger-owned finalized player/team facts. Dashboard schema v5 retains the cumulative player
+  endpoints from v4 — xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)`. Cross-gameweek
+  probabilities are convolved in the Python emitter under an explicit independence assumption; the
+  browser selects published scalars and never computes a probability from ledger primitives.
+  Separate player/team monitoring files enforce complete player-gameweek finality; team defence
+  CRPS uses the opponent's exact stored goal PMF.

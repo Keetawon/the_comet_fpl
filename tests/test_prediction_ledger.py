@@ -27,8 +27,12 @@ from fpl.storage import ledger
 from fpl.storage.db import connect
 from fpl.storage.ledger import (
     DuplicateRunError,
+    InvalidTeamOutcomeError,
     LedgerOutcome,
+    OutcomeValueConflictError,
+    TeamLedgerOutcome,
     attach_outcomes,
+    attach_team_outcomes,
     record_forecast,
 )
 
@@ -221,6 +225,67 @@ def test_outcomes_attach_separately_and_recorded_vs_replayed_stay_named() -> Non
                 )
             ],
         )
+    con.close()
+
+
+def _team_outcome_pair(*, home_goals: int = 2, away_goals: int = 1) -> list[TeamLedgerOutcome]:
+    kickoff = datetime(2026, 8, 22, 14, tzinfo=UTC)
+    return [
+        TeamLedgerOutcome(
+            season="2026-27",
+            fixture=2001,
+            team_id=7,
+            team_code=70,
+            opponent_team_id=8,
+            gw=1,
+            kickoff_time=kickoff,
+            was_home=True,
+            goals_for=home_goals,
+            goals_against=away_goals,
+        ),
+        TeamLedgerOutcome(
+            season="2026-27",
+            fixture=2001,
+            team_id=8,
+            team_code=80,
+            opponent_team_id=7,
+            gw=1,
+            kickoff_time=kickoff,
+            was_home=False,
+            goals_for=away_goals,
+            goals_against=home_goals,
+        ),
+    ]
+
+
+def test_team_outcomes_attach_as_an_idempotent_reciprocal_pair() -> None:
+    con = connect(":memory:")
+    pair = _team_outcome_pair()
+
+    assert attach_team_outcomes(con, pair) == 2
+    assert attach_team_outcomes(con, pair) == 0
+    assert con.execute(
+        """
+        SELECT team_id, opponent_team_id, was_home, goals_for, goals_against
+        FROM ledger_outcome_team_fixture ORDER BY was_home DESC
+        """
+    ).fetchall() == [(7, 8, True, 2, 1), (8, 7, False, 1, 2)]
+    con.close()
+
+
+def test_team_outcomes_reject_changed_or_one_sided_results() -> None:
+    con = connect(":memory:")
+    pair = _team_outcome_pair()
+    attach_team_outcomes(con, pair)
+
+    with pytest.raises(OutcomeValueConflictError, match="differs"):
+        attach_team_outcomes(con, _team_outcome_pair(home_goals=3))
+    with pytest.raises(InvalidTeamOutcomeError, match="exactly two"):
+        attach_team_outcomes(con, pair[:1])
+
+    assert con.execute(
+        "SELECT team_id, goals_for, goals_against FROM ledger_outcome_team_fixture ORDER BY team_id"
+    ).fetchall() == [(7, 2, 1), (8, 1, 2)]
     con.close()
 
 

@@ -1,6 +1,6 @@
 {
   "schema": "fpl.dashboard-fixture-matrix",
-  "json_schema_version": 4,
+  "json_schema_version": 5,
   "teams": [
     {
       "run_id": "sample-run-0001",
@@ -191,5 +191,12 @@
         }
       ]
     }
-  ]
+  ],
+  "schedule": {
+    "schema_version": 2,
+    "semantics": "current_at_export_not_forecast_vintage",
+    "export_created_at": "2026-08-26T00:00:00Z",
+    "database_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "teams": []
+  }
 }

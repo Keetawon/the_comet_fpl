@@ -238,6 +238,8 @@ CREATE TABLE IF NOT EXISTS stg_live_fixture_version (
     kickoff_time      TIMESTAMPTZ,
     team_h            INTEGER NOT NULL,
     team_a            INTEGER NOT NULL,
+    team_h_score      INTEGER,
+    team_a_score      INTEGER,
     team_h_difficulty INTEGER,
     team_a_difficulty INTEGER,
     finished          BOOLEAN,
@@ -618,6 +620,10 @@ ALTER TABLE stg_live_player_fixture_version
     ADD COLUMN IF NOT EXISTS creativity DOUBLE;
 ALTER TABLE stg_live_player_fixture_version
     ADD COLUMN IF NOT EXISTS influence DOUBLE;
+ALTER TABLE stg_live_fixture_version
+    ADD COLUMN IF NOT EXISTS team_h_score INTEGER;
+ALTER TABLE stg_live_fixture_version
+    ADD COLUMN IF NOT EXISTS team_a_score INTEGER;
 ALTER TABLE mart_fact_player_fixture
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE mart_fact_player_fixture

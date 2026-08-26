@@ -4,15 +4,16 @@
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ThemeToggle, initTheme } from "@/components/ThemeToggle";
-import { ForecastVsActualPage } from "@/pages/ForecastVsActualPage";
 import { NextGwPage } from "@/pages/NextGwPage";
 import { OptimizerAuditPage } from "@/pages/OptimizerAuditPage";
 import { PlanBuilderPage } from "@/pages/PlanBuilderPage";
 import { PlayerAnalyticsPage } from "@/pages/PlayerAnalyticsPage";
+import { PlayerForecastVsActualPage } from "@/pages/PlayerForecastVsActualPage";
 import { FixtureMatrixPage } from "@/pages/FixtureMatrixPage";
 import { PlayersPage } from "@/pages/PlayersPage";
 import { SummaryPage } from "@/pages/SummaryPage";
 import { TeamAnalyticsPage } from "@/pages/TeamAnalyticsPage";
+import { TeamForecastVsActualPage } from "@/pages/TeamForecastVsActualPage";
 import { UserDraftPage } from "@/pages/UserDraftPage";
 
 const DEFAULT_ROUTE = "summary";
@@ -26,7 +27,10 @@ const PAGES: Record<string, React.ComponentType> = {
   "next-gw": NextGwPage,
   "plan-builder": PlanBuilderPage,
   "squad-draft": UserDraftPage,
-  "forecast-vs-actual": ForecastVsActualPage,
+  "player-forecast-vs-actual": PlayerForecastVsActualPage,
+  "team-forecast-vs-actual": TeamForecastVsActualPage,
+  // Temporary stable alias for bookmarks from schema v4.
+  "forecast-vs-actual": PlayerForecastVsActualPage,
   optimizer: OptimizerAuditPage,
 };
 

@@ -11,7 +11,7 @@ The ledger consumes the frozen prospective-points artifact (``fpl.artifacts.pros
 and nothing else -- it never reaches around that boundary into the models or the database to
 re-derive a prediction, because the artifact boundary is what makes a recorded run auditable.
 
-Three tables, all prefixed ``ledger_``:
+The tables are all prefixed ``ledger_``:
 
 * ``ledger_forecast_run`` -- one immutable row per recorded run. ``run_id`` is deterministic (a hash
   of the run's identity, so re-ingesting byte-identical input is recognised, never duplicated) and
@@ -21,6 +21,9 @@ Three tables, all prefixed ``ledger_``:
 * ``ledger_outcome_player_fixture`` -- a SEPARATE table at ``(season, code, fixture)`` grain, joined
   to predictions only at read time and only after a fixture is final. Recorded points and points
   replayed under ``scoring_2026_27`` are separately named columns and never conflated.
+* ``ledger_outcome_team_fixture`` -- two reciprocal, immutable rows per finalized fixture, one
+  from each club's perspective. Scores come directly from the official fixture payload, so own
+  goals are represented and are never reconstructed from player events.
 
 There is no update or delete path for a recorded prediction. A later run for the same
 ``(season, gw, code)`` creates a new vintage under a new ``run_id``; it never modifies an earlier
@@ -57,6 +60,14 @@ class DuplicateRunError(LedgerError):
     Refused rather than silently overwritten: an operator re-running a job on an already recorded
     artifact must find out, and a recorded vintage is immutable by contract.
     """
+
+
+class InvalidTeamOutcomeError(LedgerError):
+    """Team outcomes are not a complete, reciprocal two-sided fixture result."""
+
+
+class OutcomeValueConflictError(LedgerError):
+    """A finalized team outcome differs from its already-attached immutable value."""
 
 
 _SCHEMA = """
@@ -163,6 +174,21 @@ CREATE TABLE IF NOT EXISTS ledger_outcome_player_fixture (
     points_under_rules_2026_27 INTEGER,
     PRIMARY KEY (season, code, fixture)
 );
+
+CREATE TABLE IF NOT EXISTS ledger_outcome_team_fixture (
+    season             VARCHAR NOT NULL,
+    fixture            INTEGER NOT NULL,
+    team_id            INTEGER NOT NULL,
+    team_code          INTEGER,
+    opponent_team_id   INTEGER NOT NULL,
+    gw                  INTEGER NOT NULL,
+    kickoff_time        TIMESTAMPTZ NOT NULL,
+    was_home            BOOLEAN NOT NULL,
+    goals_for           INTEGER NOT NULL,
+    goals_against       INTEGER NOT NULL,
+    attached_at         TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (season, fixture, team_id)
+);
 """
 
 
@@ -180,6 +206,27 @@ class LedgerOutcome:
     fixture: int
     total_points_as_recorded: int | None
     points_under_rules_2026_27: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class TeamLedgerOutcome:
+    """One club's view of an official finalized fixture score.
+
+    Rows are attached only as a reciprocal pair. ``team_code`` may be unknown because the
+    season-scoped team id still identifies and validates both sides; NULL is preserved rather than
+    fabricated.
+    """
+
+    season: str
+    fixture: int
+    team_id: int
+    team_code: int | None
+    opponent_team_id: int
+    gw: int
+    kickoff_time: datetime
+    was_home: bool
+    goals_for: int
+    goals_against: int
 
 
 def ensure_ledger_schema(con: duckdb.DuckDBPyConnection) -> None:
@@ -417,51 +464,227 @@ def record_forecast(
     return run_id
 
 
+def _validate_team_outcome_batch(outcomes: Sequence[TeamLedgerOutcome]) -> None:
+    """Require exactly two reciprocal rows for every represented fixture."""
+    fixtures: dict[tuple[str, int], list[TeamLedgerOutcome]] = {}
+    seen: set[tuple[str, int, int]] = set()
+    for outcome in outcomes:
+        key = (outcome.season, outcome.fixture, outcome.team_id)
+        if key in seen:
+            raise InvalidTeamOutcomeError(f"duplicate team outcome row for {key}")
+        seen.add(key)
+        integer_values = {
+            "fixture": outcome.fixture,
+            "team_id": outcome.team_id,
+            "opponent_team_id": outcome.opponent_team_id,
+            "gw": outcome.gw,
+            "goals_for": outcome.goals_for,
+            "goals_against": outcome.goals_against,
+        }
+        for name, value in integer_values.items():
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise InvalidTeamOutcomeError(
+                    f"team outcome {key} has non-integer {name}: {value!r}"
+                )
+        if outcome.team_code is not None and (
+            isinstance(outcome.team_code, bool) or not isinstance(outcome.team_code, int)
+        ):
+            raise InvalidTeamOutcomeError(
+                f"team outcome {key} has non-integer team_code: {outcome.team_code!r}"
+            )
+        if not isinstance(outcome.kickoff_time, datetime):
+            raise InvalidTeamOutcomeError(f"team outcome {key} has invalid kickoff_time")
+        if outcome.kickoff_time.tzinfo is None or outcome.kickoff_time.utcoffset() is None:
+            raise InvalidTeamOutcomeError(f"team outcome {key} has a naive kickoff_time")
+        if type(outcome.was_home) is not bool:  # bool is semantically load-bearing here
+            raise InvalidTeamOutcomeError(f"team outcome {key} has invalid was_home")
+        if outcome.team_id == outcome.opponent_team_id:
+            raise InvalidTeamOutcomeError(f"team outcome {key} names itself as opponent")
+        if outcome.goals_for < 0 or outcome.goals_against < 0:
+            raise InvalidTeamOutcomeError(f"team outcome {key} has a negative score")
+        fixtures.setdefault((outcome.season, outcome.fixture), []).append(outcome)
+
+    for fixture_key, pair in fixtures.items():
+        if len(pair) != 2:
+            raise InvalidTeamOutcomeError(
+                f"fixture {fixture_key} must have exactly two reciprocal team outcomes"
+            )
+        first, second = pair
+        reciprocal = (
+            first.team_id == second.opponent_team_id
+            and second.team_id == first.opponent_team_id
+            and first.was_home is not second.was_home
+            and first.gw == second.gw
+            and first.kickoff_time == second.kickoff_time
+            and first.goals_for == second.goals_against
+            and first.goals_against == second.goals_for
+        )
+        if not reciprocal:
+            raise InvalidTeamOutcomeError(f"fixture {fixture_key} team outcomes are not reciprocal")
+
+
+def _insert_player_outcomes(
+    con: duckdb.DuckDBPyConnection,
+    outcomes: Sequence[LedgerOutcome],
+    stamp: datetime,
+) -> None:
+    for outcome in outcomes:
+        existing = con.execute(
+            """
+            SELECT 1 FROM ledger_outcome_player_fixture
+            WHERE season = ? AND code = ? AND fixture = ?
+            """,
+            [outcome.season, outcome.code, outcome.fixture],
+        ).fetchone()
+        if existing is not None:
+            key = (outcome.season, outcome.code, outcome.fixture)
+            raise DuplicateRunError(f"outcome for {key} already attached")
+        con.execute(
+            """
+            INSERT INTO ledger_outcome_player_fixture (
+                season, code, fixture, attached_at, total_points_as_recorded,
+                points_under_rules_2026_27
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [
+                outcome.season,
+                outcome.code,
+                outcome.fixture,
+                stamp,
+                outcome.total_points_as_recorded,
+                outcome.points_under_rules_2026_27,
+            ],
+        )
+
+
+def _insert_team_outcomes(
+    con: duckdb.DuckDBPyConnection,
+    outcomes: Sequence[TeamLedgerOutcome],
+    stamp: datetime,
+) -> None:
+    for outcome in outcomes:
+        existing = con.execute(
+            """
+            SELECT 1 FROM ledger_outcome_team_fixture
+            WHERE season = ? AND fixture = ? AND team_id = ?
+            """,
+            [outcome.season, outcome.fixture, outcome.team_id],
+        ).fetchone()
+        if existing is not None:
+            key = (outcome.season, outcome.fixture, outcome.team_id)
+            raise DuplicateRunError(f"team outcome for {key} already attached")
+        con.execute(
+            """
+            INSERT INTO ledger_outcome_team_fixture (
+                season, fixture, team_id, team_code, opponent_team_id, gw, kickoff_time,
+                was_home, goals_for, goals_against, attached_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                outcome.season,
+                outcome.fixture,
+                outcome.team_id,
+                outcome.team_code,
+                outcome.opponent_team_id,
+                outcome.gw,
+                outcome.kickoff_time,
+                outcome.was_home,
+                outcome.goals_for,
+                outcome.goals_against,
+                stamp,
+            ],
+        )
+
+
+def attach_outcome_batch(
+    con: duckdb.DuckDBPyConnection,
+    player_outcomes: Sequence[LedgerOutcome],
+    team_outcomes: Sequence[TeamLedgerOutcome],
+    *,
+    attached_at: datetime | None = None,
+) -> tuple[int, int]:
+    """Atomically append new player rows and complete reciprocal team fixture pairs."""
+    ensure_ledger_schema(con)
+    _validate_team_outcome_batch(team_outcomes)
+    stamp = attached_at or datetime.now(UTC)
+    if stamp.tzinfo is None or stamp.utcoffset() is None:
+        raise ValueError("attached_at must be timezone-aware")
+    con.execute("BEGIN TRANSACTION")
+    try:
+        _insert_player_outcomes(con, player_outcomes, stamp)
+        _insert_team_outcomes(con, team_outcomes, stamp)
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    return len(player_outcomes), len(team_outcomes)
+
+
 def attach_outcomes(
     con: duckdb.DuckDBPyConnection,
     outcomes: Sequence[LedgerOutcome],
     *,
     attached_at: datetime | None = None,
 ) -> int:
-    """Attach realised outcomes at ``(season, code, fixture)`` grain, after fixtures are final.
+    """Attach new player-fixture outcomes; a duplicate key remains a strict refusal."""
+    attached, _ = attach_outcome_batch(con, outcomes, (), attached_at=attached_at)
+    return attached
 
-    Predictions are never touched: outcomes live in their own table and are joined to predictions
-    only at read time. Attaching an outcome that already exists is refused, preserving the same
-    append-only discipline as the prediction rows. Returns the number of rows inserted.
+
+def _team_outcome_values(outcome: TeamLedgerOutcome) -> tuple[object, ...]:
+    return (
+        outcome.team_code,
+        outcome.opponent_team_id,
+        outcome.gw,
+        outcome.kickoff_time,
+        outcome.was_home,
+        outcome.goals_for,
+        outcome.goals_against,
+    )
+
+
+def attach_team_outcomes(
+    con: duckdb.DuckDBPyConnection,
+    outcomes: Sequence[TeamLedgerOutcome],
+    *,
+    attached_at: datetime | None = None,
+) -> int:
+    """Idempotently attach complete team results; changed repeats fail closed.
+
+    A fixture is either wholly new or wholly present with exact values. A one-sided pre-existing
+    fixture is treated as corruption and is not silently repaired.
     """
     ensure_ledger_schema(con)
-    stamp = attached_at or datetime.now(UTC)
-    con.execute("BEGIN TRANSACTION")
-    try:
-        for outcome in outcomes:
+    _validate_team_outcome_batch(outcomes)
+    new_outcomes: list[TeamLedgerOutcome] = []
+    grouped: dict[tuple[str, int], list[TeamLedgerOutcome]] = {}
+    for outcome in outcomes:
+        grouped.setdefault((outcome.season, outcome.fixture), []).append(outcome)
+    for fixture_key, pair in grouped.items():
+        existing_count = 0
+        for outcome in pair:
             existing = con.execute(
                 """
-                SELECT 1 FROM ledger_outcome_player_fixture
-                WHERE season = ? AND code = ? AND fixture = ?
+                SELECT team_code, opponent_team_id, gw, kickoff_time, was_home,
+                       goals_for, goals_against
+                FROM ledger_outcome_team_fixture
+                WHERE season = ? AND fixture = ? AND team_id = ?
                 """,
-                [outcome.season, outcome.code, outcome.fixture],
+                [outcome.season, outcome.fixture, outcome.team_id],
             ).fetchone()
-            if existing is not None:
-                key = (outcome.season, outcome.code, outcome.fixture)
-                raise DuplicateRunError(f"outcome for {key} already attached")
-            con.execute(
-                """
-                INSERT INTO ledger_outcome_player_fixture (
-                    season, code, fixture, attached_at, total_points_as_recorded,
-                    points_under_rules_2026_27
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    outcome.season,
-                    outcome.code,
-                    outcome.fixture,
-                    stamp,
-                    outcome.total_points_as_recorded,
-                    outcome.points_under_rules_2026_27,
-                ],
+            if existing is None:
+                continue
+            existing_count += 1
+            if tuple(existing) != _team_outcome_values(outcome):
+                key = (outcome.season, outcome.fixture, outcome.team_id)
+                raise OutcomeValueConflictError(
+                    f"finalized team outcome for {key} differs from its attached immutable values"
+                )
+        if existing_count == 0:
+            new_outcomes.extend(pair)
+        elif existing_count != 2:
+            raise OutcomeValueConflictError(
+                f"finalized team outcome fixture {fixture_key} is only partly attached"
             )
-        con.execute("COMMIT")
-    except Exception:
-        con.execute("ROLLBACK")
-        raise
-    return len(outcomes)
+    _, attached = attach_outcome_batch(con, (), new_outcomes, attached_at=attached_at)
+    return attached

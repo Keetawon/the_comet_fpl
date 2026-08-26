@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Event
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
@@ -38,7 +39,7 @@ from fpl.artifacts.prospective_points import (
     ProspectivePointsArtifact,
     artifact_bytes,
 )
-from fpl.publish.contract import SEMANTIC_CONTRACT_V2
+from fpl.publish.contract import SEMANTIC_CONTRACT_V3
 from fpl.publish.export import (
     EASE_INDEX_FORMULA_VERSION,
     BiExportConcurrentWriterError,
@@ -46,6 +47,8 @@ from fpl.publish.export import (
     BiExportSourceError,
     BiExportValidationError,
     OptimizerPlanResolutionError,
+    _arrow_type,
+    _validate_table_frame,
     export_bi,
     validate_bi_export,
 )
@@ -531,7 +534,53 @@ def _write_optimizer_plan(path: Path, artifact: ProspectivePointsArtifact) -> Pa
 
 
 def _table_paths(output_dir: Path) -> tuple[Path, ...]:
-    return tuple(output_dir / f"{table.name}.parquet" for table in SEMANTIC_CONTRACT_V2.tables)
+    return tuple(output_dir / f"{table.name}.parquet" for table in SEMANTIC_CONTRACT_V3.tables)
+
+
+def _one_row_contract_frame(
+    table_name: str, *, overrides: dict[str, object] | None = None
+) -> pa.Table:
+    table = SEMANTIC_CONTRACT_V3.table(table_name)
+    defaults: dict[str, object] = {
+        "string": "x",
+        "int": 1,
+        "float": 1.0,
+        "bool": True,
+        "timestamp": AS_OF,
+    }
+    row = {
+        column.name: None if column.nullable else defaults[column.dtype] for column in table.columns
+    }
+    row.update(overrides or {})
+    return pa.Table.from_pylist(
+        [row],
+        schema=pa.schema([pa.field(column.name, _arrow_type(column)) for column in table.columns]),
+    )
+
+
+def test_v3_validation_preserves_honest_nulls_in_legacy_non_grain_fields() -> None:
+    table = SEMANTIC_CONTRACT_V3.table("fact_player_fixture_actual")
+    frame = _one_row_contract_frame("fact_player_fixture_actual", overrides={"starts": None})
+
+    _validate_table_frame(table, frame)
+
+
+@pytest.mark.parametrize(
+    ("table_name", "column_name"),
+    [
+        ("fact_forecast_team_fixture", "goals_for_distribution"),
+        ("fact_finalized_player_fixture_outcome", "gw"),
+        ("fact_finalized_team_fixture_outcome", "goals_for"),
+    ],
+)
+def test_v3_validation_rejects_null_in_new_guaranteed_fields(
+    table_name: str, column_name: str
+) -> None:
+    table = SEMANTIC_CONTRACT_V3.table(table_name)
+    frame = _one_row_contract_frame(table_name, overrides={column_name: None})
+
+    with pytest.raises(BiExportValidationError, match="guaranteed v3 field contains NULL"):
+        _validate_table_frame(table, frame)
 
 
 def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> None:
@@ -550,7 +599,7 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     manifest = validate_bi_export(output)
 
     assert output.is_symlink()
-    assert set(result.tables) == {table.name for table in SEMANTIC_CONTRACT_V2.tables}
+    assert set(result.tables) == {table.name for table in SEMANTIC_CONTRACT_V3.tables}
     assert manifest["exported_run_ids"] == [run_id]
     assert manifest["source_known_at"] == {
         "minimum": KNOWN_AT.isoformat(),
@@ -578,6 +627,19 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     assert player_form.column("expected_goals_conceded").to_pylist() == pytest.approx([0.8])
     fixture_forecast = pq.read_table(output / "fact_forecast_player_fixture.parquet")
     assert fixture_forecast.column("expected_minutes").to_pylist() == [None] * 15
+    team_forecast = pq.read_table(output / "fact_forecast_team_fixture.parquet")
+    exported_team_pmfs = {
+        row["team_id"]: json.loads(row["goals_for_distribution"])
+        for row in team_forecast.to_pylist()
+    }
+    expected_team_pmfs = {
+        row.team_id: list(row.goals_for_distribution) for row in artifact.team_fixture_rows
+    }
+    assert exported_team_pmfs.keys() == expected_team_pmfs.keys()
+    for team_id, expected_pmf in expected_team_pmfs.items():
+        assert exported_team_pmfs[team_id] == pytest.approx(expected_pmf)
+    assert pq.read_table(output / "fact_finalized_player_fixture_outcome.parquet").num_rows == 0
+    assert pq.read_table(output / "fact_finalized_team_fixture_outcome.parquet").num_rows == 0
     optimizer = pq.read_table(output / "fact_optimizer_plan.parquet")
     assert optimizer.num_rows == 15
     assert set(optimizer.column("forecast_run_id").to_pylist()) == {run_id}
@@ -625,6 +687,84 @@ def test_team_fixture_ease_indices_are_directed_and_keep_raw_lambdas(tmp_path: P
         EASE_INDEX_FORMULA_VERSION,
     ]
     assert team.column("official_fdr").to_pylist() == [2, 4]
+
+
+def test_append_only_player_and_team_outcomes_export_as_separate_vintage_free_facts(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "outcomes.duckdb"
+    _seed_database(database, record=True)
+    attached_at = datetime(2026, 8, 23, 8, tzinfo=UTC)
+    con = connect(database)
+    try:
+        con.execute(
+            """
+            INSERT INTO ledger_outcome_player_fixture (
+                season, code, fixture, attached_at, total_points_as_recorded,
+                points_under_rules_2026_27
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [SEASON, 1, 100, attached_at, 6, 7],
+        )
+        con.executemany(
+            """
+            INSERT INTO ledger_outcome_team_fixture (
+                season, fixture, team_id, team_code, opponent_team_id, gw, kickoff_time,
+                was_home, goals_for, goals_against, attached_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (SEASON, 100, 1, 101, 2, 1, KICKOFF, True, 2, 0, attached_at),
+                (SEASON, 100, 2, 102, 1, 1, KICKOFF, False, 0, 2, attached_at),
+            ],
+        )
+    finally:
+        con.close()
+
+    output = export_bi(database, tmp_path / "published").output_dir
+    player = pq.read_table(output / "fact_finalized_player_fixture_outcome.parquet").to_pylist()
+    assert player == [
+        {
+            "season": SEASON,
+            "fixture": 100,
+            "code": 1,
+            "gw": 1,
+            "attached_at": attached_at,
+            "total_points_as_recorded": 6,
+            "points_under_rules_2026_27": 7,
+        }
+    ]
+    team = pq.read_table(output / "fact_finalized_team_fixture_outcome.parquet").to_pylist()
+    assert team == [
+        {
+            "season": SEASON,
+            "fixture": 100,
+            "team_id": 1,
+            "team_code": 101,
+            "opponent_team_id": 2,
+            "gw": 1,
+            "kickoff_time": KICKOFF,
+            "was_home": True,
+            "goals_for": 2,
+            "goals_against": 0,
+            "attached_at": attached_at,
+        },
+        {
+            "season": SEASON,
+            "fixture": 100,
+            "team_id": 2,
+            "team_code": 102,
+            "opponent_team_id": 1,
+            "gw": 1,
+            "kickoff_time": KICKOFF,
+            "was_home": False,
+            "goals_for": 0,
+            "goals_against": 2,
+            "attached_at": attached_at,
+        },
+    ]
+    assert "run_id" not in player[0]
+    assert "run_id" not in team[0]
 
 
 def test_low_coverage_and_non_positive_denominators_publish_real_nulls(tmp_path: Path) -> None:
@@ -723,6 +863,8 @@ def test_zero_recorded_runs_is_a_complete_export(tmp_path: Path) -> None:
         "fact_forecast_player_gameweek",
         "fact_forecast_player_fixture",
         "fact_forecast_team_fixture",
+        "fact_finalized_player_fixture_outcome",
+        "fact_finalized_team_fixture_outcome",
         "fact_optimizer_plan",
         "dim_optimizer_run",
     ):
@@ -849,7 +991,7 @@ def test_exports_are_byte_deterministic_except_manifest_created_at(tmp_path: Pat
         created_at=datetime(2026, 8, 26, tzinfo=UTC),
     )
 
-    for table in SEMANTIC_CONTRACT_V2.tables:
+    for table in SEMANTIC_CONTRACT_V3.tables:
         assert (first / f"{table.name}.parquet").read_bytes() == (
             second / f"{table.name}.parquet"
         ).read_bytes()
@@ -965,7 +1107,7 @@ def test_archive_database_exports_the_complete_contract(tmp_path: Path) -> None:
     result = export_bi(default_db_path(), tmp_path / "archive-export")
     manifest = validate_bi_export(result.output_dir)
 
-    assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V2.tables}
+    assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V3.tables}
     # Every contract table (now including dim_optimizer_run) is written to disk, even when a
     # source owner contributes zero rows; assert existence rather than a magic count so an
     # additive table cannot silently re-stale this smoke test.
@@ -987,6 +1129,7 @@ def test_archive_database_exports_the_complete_contract(tmp_path: Path) -> None:
         "defence_ease_index",
         "overall_ease_index",
         "ease_index_formula_version",
+        "goals_for_distribution",
         "official_fdr",
     } <= set(team_fixture.column_names)
     assert team_fixture.column("ease_index_formula_version").null_count == 0

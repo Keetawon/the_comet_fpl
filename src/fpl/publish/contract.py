@@ -1,4 +1,4 @@
-"""The frozen BI semantic contract, version 2.
+"""The frozen BI semantic contract, version 3.
 
 DEV-ROADMAP P1.1 requires each published table's grain, keys, null semantics, source owner, and
 allowed joins to be settled **before** the exporter exists, so P1.2-P1.4 build against a fixed
@@ -37,7 +37,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SEMANTIC_CONTRACT_VERSION = 2
+SEMANTIC_CONTRACT_VERSION = 3
 
 #: Season-scoped identifiers. A join may use one only when ``season`` is bound in the same join.
 SEASON_SCOPED_KEYS: frozenset[str] = frozenset({"element_id", "team_id", "opponent_team_id"})
@@ -773,6 +773,37 @@ FACT_FORECAST_TEAM_FIXTURE = Table(
     ),
 )
 
+# Version 3 transports the exact stored team-goals PMF.  Keep the version-2 declaration above
+# unchanged so readers of historical manifests can still validate their original physical shape.
+FACT_FORECAST_TEAM_FIXTURE_V3 = FACT_FORECAST_TEAM_FIXTURE.model_copy(
+    update={
+        "columns": tuple(
+            column
+            for existing in FACT_FORECAST_TEAM_FIXTURE.columns
+            for column in (
+                existing,
+                *(
+                    (
+                        _key(
+                            "goals_for_distribution",
+                            "string",
+                            "Exact JSON probability vector for goals scored, indexed by whole "
+                            "goals and transported unchanged from the prediction ledger.",
+                        ),
+                    )
+                    if existing.name == "probability_clean_sheet"
+                    else ()
+                ),
+            )
+        ),
+        "notes": (
+            *FACT_FORECAST_TEAM_FIXTURE.notes,
+            "goals_for_distribution is the recorded model distribution. Never recreate it from "
+            "lambda_for; distributional monitoring must score this exact vintage.",
+        ),
+    }
+)
+
 FACT_PLAYER_FIXTURE_ACTUAL = Table(
     name="fact_player_fixture_actual",
     role="fact",
@@ -853,6 +884,99 @@ FACT_PLAYER_FIXTURE_ACTUAL = Table(
         "club's conceded goals than his share of the minutes implies, so never derive on-pitch "
         "exposure from minutes.",
         "Never use total_points_as_recorded as a model feature or a cross-season target.",
+    ),
+)
+
+FACT_FINALIZED_PLAYER_FIXTURE_OUTCOME = Table(
+    name="fact_finalized_player_fixture_outcome",
+    role="fact",
+    subject="An append-only finalized player-fixture outcome eligible for forecast monitoring.",
+    grain=("season", "fixture", "code"),
+    grain_note=(
+        "One row per finalized player-fixture outcome. It is independent of prediction vintage "
+        "and joins to forecasts only at read time."
+    ),
+    source_owner="fpl.storage.ledger:ledger_outcome_player_fixture",
+    columns=(
+        _key("season", "string", "Season."),
+        _key("fixture", "int", "Season-scoped finalized fixture id."),
+        _key("code", "int", "Permanent player identity."),
+        _key("gw", "int", "Gameweek resolved from the season-qualified fixture schedule."),
+        _key("attached_at", "timestamp", "UTC time the immutable outcome was attached."),
+        _nullable(
+            "total_points_as_recorded",
+            "int",
+            "unknown_until_finalised",
+            "Points recorded by FPL under that season's rules, where supplied by the finalized "
+            "source. Kept distinct from replayed points.",
+        ),
+        _nullable(
+            "points_under_rules_2026_27",
+            "int",
+            "unknown_until_finalised",
+            "Final points replayed under the repository's 2026/27 rules. This is the monitoring "
+            "target for forecasts produced under those rules.",
+        ),
+    ),
+    joins=(
+        Join(to_table="dim_player", on=(("code", "code"),), cardinality="many_to_one"),
+        Join(
+            to_table="dim_fixture",
+            on=(("season", "season"), ("fixture", "fixture")),
+            cardinality="many_to_one",
+        ),
+    ),
+    notes=(
+        "Outcome values come only from ledger_outcome_player_fixture. The fixture schedule "
+        "contributes gw only; the mutable historical actual mart is not a monitoring source.",
+        "Carries no run_id. A player gameweek becomes scoreable only when the gameweek is final "
+        "and every forecast fixture leg has a matching finalized outcome.",
+    ),
+)
+
+FACT_FINALIZED_TEAM_FIXTURE_OUTCOME = Table(
+    name="fact_finalized_team_fixture_outcome",
+    role="fact",
+    subject="An append-only finalized club-side outcome eligible for forecast monitoring.",
+    grain=("season", "fixture", "team_id"),
+    grain_note="Two reciprocal rows per finalized fixture, one for each club side.",
+    source_owner="fpl.storage.ledger:ledger_outcome_team_fixture",
+    columns=(
+        _key("season", "string", "Season."),
+        _key("fixture", "int", "Season-scoped finalized fixture id."),
+        _key("team_id", "int", "Season-scoped club id this outcome is about."),
+        _nullable(
+            "team_code",
+            "int",
+            "optional_attribute",
+            "Permanent club identity when the finalized registry could resolve it.",
+        ),
+        _key("opponent_team_id", "int", "Season-scoped opponent club id."),
+        _key("gw", "int", "Finalized fixture gameweek."),
+        _key("kickoff_time", "timestamp", "Fixture kickoff in UTC."),
+        _key("was_home", "bool", "Whether this club was the home side."),
+        _key("goals_for", "int", "Official finalized goals scored by this club."),
+        _key("goals_against", "int", "Official finalized goals scored by its opponent."),
+        _key("attached_at", "timestamp", "UTC time the immutable outcome was attached."),
+    ),
+    joins=(
+        Join(
+            to_table="dim_fixture",
+            on=(("season", "season"), ("fixture", "fixture")),
+            cardinality="many_to_one",
+        ),
+        Join(
+            to_table="dim_team_season",
+            on=(("season", "season"), ("team_id", "team_id")),
+            cardinality="many_to_one",
+        ),
+        Join(to_table="dim_team", on=(("team_code", "team_code"),), cardinality="many_to_one"),
+    ),
+    notes=(
+        "Official fixture scores are retained directly. Never reconstruct club goals from player "
+        "events because own goals make that wrong.",
+        "Carries no run_id. Defensive distributional scoring uses the opponent's exact stored "
+        "goals_for_distribution for the same fixture, never a PMF regenerated from lambda_against.",
     ),
 )
 
@@ -1184,7 +1308,7 @@ DIM_OPTIMIZER_RUN = Table(
 )
 
 SEMANTIC_CONTRACT_V2 = SemanticContract(
-    version=SEMANTIC_CONTRACT_VERSION,
+    version=2,
     tables=(
         DIM_FORECAST_RUN,
         DIM_PLAYER,
@@ -1202,6 +1326,18 @@ SEMANTIC_CONTRACT_V2 = SemanticContract(
         FACT_TEAM_FORM,
         FACT_OPTIMIZER_PLAN,
         DIM_OPTIMIZER_RUN,
+    ),
+)
+
+SEMANTIC_CONTRACT_V3 = SemanticContract(
+    version=SEMANTIC_CONTRACT_VERSION,
+    tables=(
+        *(
+            FACT_FORECAST_TEAM_FIXTURE_V3 if table.name == "fact_forecast_team_fixture" else table
+            for table in SEMANTIC_CONTRACT_V2.tables
+        ),
+        FACT_FINALIZED_PLAYER_FIXTURE_OUTCOME,
+        FACT_FINALIZED_TEAM_FIXTURE_OUTCOME,
     ),
 )
 
@@ -1227,8 +1363,8 @@ SEMANTIC_CONTRACT_V1 = SemanticContract(
     ),
 )
 
-#: Every table in semantic contract v2 has a concrete source owner. P1.4 can therefore reject
-#: only a genuinely future partial contract rather than silently treating a v2 table as optional.
+#: Every table in the current semantic contract has a concrete source owner. The exporter can
+#: therefore reject a genuinely partial contract rather than silently treating a table as optional.
 NOT_YET_SOURCED: frozenset[str] = frozenset()
 
 
@@ -1238,6 +1374,7 @@ __all__ = [
     "SEASON_SCOPED_KEYS",
     "SEMANTIC_CONTRACT_V1",
     "SEMANTIC_CONTRACT_V2",
+    "SEMANTIC_CONTRACT_V3",
     "SEMANTIC_CONTRACT_VERSION",
     "Column",
     "Join",

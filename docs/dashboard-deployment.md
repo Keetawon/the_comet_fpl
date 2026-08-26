@@ -6,16 +6,17 @@ optimizer, and local plan server are never deployed.
 
 ## What the hosted site can do
 
-- Summary, fixtures, players, platform Next-GW suggestion, forecast-versus-actual, and optimizer
-  audit read one validated static JSON generation.
+- Summary, fixtures, players, platform Next-GW suggestion, separate player/team
+  prediction-versus-actual, and optimizer audit read one validated static JSON generation.
 - Player/team deep analytics remain static: they filter, sum published expectations, and draw
   presentation geometry over that same generation.
 - Squad Draft remains browser-local. A friend's selections stay in that browser's local storage.
 - Plan Builder can review rules, but the hosted build does not probe or expose the Python/PuLP
   service. Exact solves remain a trusted-machine workflow.
-- Every route may render its deterministic insight summary. The hosted build never contains a Z.AI
-  or other provider credential and never calls a provider directly. Optional AI prose requires a
-  separately deployed authenticated/rate-limited proxy; until then the action stays unavailable.
+- P2.4 will add a network-free deterministic insight summary to every route. It is active work, not
+  part of the completed P2.3 deployment contract. The hosted build never contains a Z.AI or other
+  provider credential and never calls a provider directly. Optional AI prose requires a separately
+  deployed authenticated/rate-limited proxy; until then the action stays unavailable.
 
 GitHub Pages is public. Anyone with the URL can download every JSON file in the deployed site.
 The public package therefore removes every `user_custom` plan, converts workstation-specific
@@ -38,6 +39,11 @@ Start only from a dashboard generation that already passes the normal publish co
 copy outside the Git repository. Both output paths must be new; the packager deliberately refuses
 to overwrite a previous directory or archive:
 
+The local atomic publisher swaps a directory symlink. On Windows, Developer Mode or an elevated
+shell is required; `WinError 1314` at that final OS call means the environment lacks symlink
+privilege, not that the already-validated read models failed. Do not call the formal publish gate
+green until it is rerun in a symlink-capable environment.
+
 ```powershell
 uv run python -m fpl.jobs.package_public_dashboard `
   --input dashboard/public/data `
@@ -47,7 +53,10 @@ uv run python -m fpl.jobs.package_public_dashboard `
 
 The command prints a single JSON record containing the asset name, asset SHA-256, byte size, and
 sanitized manifest content SHA-256. Inspect its output directory if desired; it must contain
-exactly the seven read-model JSON files plus `manifest.json`.
+exactly the eight read-model JSON files (`fixture_matrix.json`, `players.json`,
+`player_horizons.json`, `next_gw.json`, `summary.json`,
+`player_forecast_vs_actual.json`, `team_forecast_vs_actual.json`, and
+`optimizer_audit.json`) plus `manifest.json`.
 
 Create a new release and tag for that exact generation. Never replace an existing tag or asset:
 

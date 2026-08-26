@@ -225,26 +225,32 @@ absent from the initial squad and every future transfer squad, and lock/exclusio
 closed. The post-deadline local Manager Team path separately captures a public manager entry,
 reconstructs purchase/selling values where its evidence is sufficient, and optimizes transfers from
 that exact squad; it remains private local development functionality rather than a hosted account
-or authenticated My Team integration. Dashboard read-model schema version 3 introduced the explicit separation of formal platform
-default/diagnostic plans from user-custom plans, so hash ordering or browser-local state cannot
-replace the formal Next-GW recommendation. Schema version 4 is current: it adds one cumulative
-player endpoint per `(run_id, season, code, gw_to)` with summed xP, inclusive `P(points <= 2)`, and
-inclusive `P(points >= 2/4/6/10/15)`, computed by independent gameweek convolution in the Python
-static emitter. The browser selects those published scalars only for all fixtures from the run's
-fixed start; it never sums probabilities or derives a CCDF/model quantity. Two
+or authenticated My Team integration. Dashboard read-model schema version 3 introduced the
+explicit separation of formal platform default/diagnostic plans from user-custom plans, and
+version 4 added cumulative player-horizon endpoints. Schema version 5 is current: it retains those
+contracts and replaces the ambiguous player-only comparison with separate
+`player_forecast_vs_actual.json` and `team_forecast_vs_actual.json` read models. Player scoring
+requires complete official-gameweek finality and every forecast fixture leg, so a partial double
+gameweek produces no scored player-gameweek. Team attack CRPS uses the club's exact stored goal PMF;
+team defence CRPS uses the opponent's exact PMF for that fixture, never a distribution regenerated
+from `lambda_against`. The browser receives only published scalar observations and score blocks;
+raw PMFs remain behind the Python emitter. The version-4 player-horizon rule remains: the browser
+selects exact cumulative xP and inclusive `P(points <= 2)` / `P(points >= 2/4/6/10/15)` endpoints
+and never sums probabilities or derives a CCDF/model quantity. Two
 forecast/transfer scenario gaps remain:
 `chance_of_playing_next_round` is repeated across the whole horizon, and future transfers use the
 deadline's static prices with no price-change or selling-value model. The append-only prediction
 ledger is implemented in `src/fpl/storage/ledger.py` and records immutable player-gameweek,
-player-fixture, and team-fixture forecast vintages from the JSONL artifact. Player-fixture outcomes
-are attached separately and append-only. A team-outcome ledger plus a complete-gameweek player
-finality repair are frozen as the next monitoring contract; until they land, the current
-player-only forecast-versus-actual aggregate must not be described as safe for partial double
-gameweeks. The versioned BI semantic export, atomic static JSON publish boundary, and dashboard are
-implemented development-only. The application currently has six read-only analytic/decision routes
-(Summary, Fixture matrix, Players, Next GW suggestion, Forecast vs actual, and Optimizer audit), the
-interactive Plan Builder route, and Squad Draft. The next dashboard schema adds Player analytics,
-Team analytics, and separate player/team forecast-versus-actual pages. Squad Draft uses one formal
+player-fixture, and team-fixture forecast vintages from the JSONL artifact. Player and team fixture
+outcomes are attached separately and append-only; each finalized fixture appends two reciprocal
+team sides from official home/away scores, and exact repeats are idempotent while changed repeats
+fail closed. BI semantic contract version 3 transports the exact team PMF and ledger-owned finalized
+player/team outcome facts. The versioned BI semantic export, atomic static JSON publish boundary,
+and dashboard are implemented development-only. The application currently has nine read-only
+analytic/decision routes (Summary, Fixture matrix, Team analytics, Players, Player analytics, Next
+GW suggestion, Player prediction vs actual, Team prediction vs actual, and Optimizer audit), plus
+the interactive Plan Builder and Squad Draft routes. The legacy `#forecast-vs-actual` hash is only a
+temporary alias to the player page. Squad Draft uses one formal
 forecast vintage, enforces roster shape and club caps, and reports price/xP without enforcing the
 standard budget; it can also receive a private local manager capture but remains neither optimizer
 output nor a shared read model. Goal 2's
@@ -393,12 +399,13 @@ with one atomic replacement only after success.
 
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
-append-only prediction ledger, player/team fixture-grain forecast transport, player-outcome
-attachment, BI semantic export, atomic static publish boundary, and eight-route dashboard are all
+append-only prediction ledger, player/team fixture-grain forecast transport, reciprocal finalized
+outcome attachment, BI semantic v3 export, atomic schema-v5 static publish boundary, and eleven-route
+dashboard are all
 implemented development-only. The dashboard reads only versioned static JSON derived from the
-published Parquet export; it never queries the mutable production DuckDB. The team-outcome ledger,
-deep-analytics routes, exact player/team monitoring pages, and evidence-bound insight renderer are
-the ordered post-deadline additions in `DEV-ROADMAP.md`.
+published Parquet export; it never queries the mutable production DuckDB. Deep analytics and exact
+player/team monitoring are implemented; deterministic and optional evidence-bound insight summaries
+are the active next addition in `DEV-ROADMAP.md`.
 
 ## Non-negotiable correctness rules
 
@@ -960,11 +967,14 @@ permission to displace the active delivery order.
    Diagnosing it is legitimate follow-up work; reinterpreting it as a promotion verdict is not.
    Prospective changes must stay point-in-time safe and must not silently re-run or re-judge any
    frozen historical evaluation.
-9. The append-only player-gameweek/player-fixture/team-fixture prediction ledger, player-outcome
-   ingestion, BI semantic export, atomic static dashboard read models, and dashboard are
-   implemented development-only. Team-outcome attachment and complete-gameweek monitoring finality
-   are the next additive ledger/BI work and must land before the parallel team comparison is called
-   complete. The current six read-only analytic/decision routes are separate from
+9. The append-only player-gameweek/player-fixture/team-fixture prediction ledger, reciprocal team-
+   outcome attachment, player-outcome ingestion, BI semantic contract version 3, dashboard schema
+   version 5, atomic static dashboard read models, and dashboard are implemented development-only.
+   Player monitoring scores a gameweek only when the official gameweek and every forecast fixture
+   leg are final, so a partial double gameweek produces zero scored player observations. Team attack
+   CRPS uses the team's exact stored goals-for PMF; defence CRPS uses the opponent's exact stored PMF,
+   never a distribution reconstructed from lambda. The current nine read-only analytic/decision
+   routes are separate from
    Plan Builder, whose custom runs build a fresh squad, and Squad Draft, whose browser-local manual
    selections ignore affordability while retaining roster shape and club caps. Neither route is a
    manager-team import. Retain both player-fixture and player-gameweek predictions for every pre-deadline run,
@@ -978,9 +988,10 @@ permission to displace the active delivery order.
    only after full-precision validation; exact zero/one probability boundaries stay exact. It never
    carries raw PMFs; any future CCDF uses a small precomputed lazy shard. The decision layer also
    supports fixture difficulty split into overall, attack, and defence; player form (minutes,
-   starts, xG, xA, goals, assists, bonus/BPS, DC, points); and optimiser-plan audits. The frozen
-   successor adds direct-value player/team Pareto analytics plus separately published player and
-   team prediction-versus-actual observations and calibration. Preserve the primitive measures and publish any composite
+   starts, xG, xA, goals, assists, bonus/BPS, DC, points); direct-value player/team Pareto
+   analytics; separately published player/team prediction-versus-actual observations and
+   calibration; and optimiser-plan audits. Deterministic and optional AI page summaries are the
+   active next step, not an implemented capability. Preserve the primitive measures and publish any composite
    difficulty score only with a versioned formula and direction. Export a pivot-friendly star schema
    atomically; BI consumers never query the mutable production DuckDB.
 
