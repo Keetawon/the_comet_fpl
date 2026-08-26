@@ -68,6 +68,21 @@ predictions only at read time and only after a fixture is final. The recorded FP
 points replayed under this repository's scoring config are **separately named columns** and are
 never conflated (R1).
 
+### Frozen team-outcome addition (P2.3, 2026-08-26)
+
+The player outcome table above is implemented. The parallel team monitoring contract is frozen but
+not yet implemented: add `ledger_outcome_team_fixture` at `(season, fixture, team_id)` with
+`attached_at`, `gw`, `kickoff_time`, `team_code`, `opponent_team_id`, `was_home`, `goals_for`, and
+`goals_against`. A finalized fixture appends exactly two reciprocal sides. Null/unfinalized scores,
+duplicate sides, inconsistent opponents/home-away/scores, or a changed repeat fail closed; an exact
+repeat is an idempotent no-op. Current live fixture capture must retain official home/away scores so
+the prospective attachment does not reconstruct club goals from player events.
+
+The same P2.3 repair makes forecast monitoring consume ledger outcomes rather than mutable mart
+actuals. A player-gameweek aggregate is eligible only after the complete official gameweek and all
+of that player's forecast fixture legs are final, preventing a full double-gameweek distribution
+from being compared with one completed leg. See `docs/prediction-vs-actual-dashboard.md`.
+
 ## `run_id` derivation
 
 `run_id = sha256` of a canonical JSON identity record that includes `artifact_sha256` -- the hash of

@@ -8,9 +8,14 @@ optimizer, and local plan server are never deployed.
 
 - Summary, fixtures, players, platform Next-GW suggestion, forecast-versus-actual, and optimizer
   audit read one validated static JSON generation.
+- Player/team deep analytics remain static: they filter, sum published expectations, and draw
+  presentation geometry over that same generation.
 - Squad Draft remains browser-local. A friend's selections stay in that browser's local storage.
 - Plan Builder can review rules, but the hosted build does not probe or expose the Python/PuLP
   service. Exact solves remain a trusted-machine workflow.
+- Every route may render its deterministic insight summary. The hosted build never contains a Z.AI
+  or other provider credential and never calls a provider directly. Optional AI prose requires a
+  separately deployed authenticated/rate-limited proxy; until then the action stays unavailable.
 
 GitHub Pages is public. Anyone with the URL can download every JSON file in the deployed site.
 The public package therefore removes every `user_custom` plan, converts workstation-specific

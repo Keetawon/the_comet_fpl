@@ -13,9 +13,13 @@ different answers:
 A single `xP` answers only the first.
 
 **Current status: the data foundation, development-only forward pipeline through Stage E,
-append-only forecast/outcome ledger, versioned BI semantic export, atomic static publish boundary,
-and eight-route decision dashboard are implemented; no forecast component or squad recommendation
-is promoted as production-valid.**
+append-only forecast/player-outcome ledger, versioned BI semantic export, atomic static publish
+boundary, and eight-route decision dashboard are implemented; no forecast component or squad
+recommendation is promoted as production-valid.** The 2026-08-26 post-deadline dashboard program is
+documentation-first: add player/team deep analytics, then correct and split player/team
+prediction-versus-actual monitoring through immutable outcomes, then add deterministic page
+insights with an optional evidence-bound server-side language renderer. It changes no forecast
+default or frozen evaluation.
 Phase 1 Candidates V1 and V2 were fitted under the fixed walk-forward contract and correctly not
 promoted. Candidate V3's development result was invalidated for leakage; its leakage-safe successor
 V4 was evaluated once and also missed the fixed gate, so `trailing_goals_attack_defence` remains the
@@ -375,7 +379,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
 | 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 development-evaluated; exposure-weighted goals V4 (-0.44% vs baseline, ties V3) and assists V2 (+1.85% vs baseline, -0.11% vs the incumbent V1) each run once, development-only, neither promoted; Stage D v3 composer, prospective forecast, and the GW29-38 EV backtest all run and development-only, with the V1 comparator outscoring the V3 primary |
 | 3b | Stage E optimiser + prediction ledger | optimiser, stable input/decision artifacts, no-transfer repair, append-only forecast/outcome ledger, and private public-manager capture plus selling-value/free-transfer-aware transfer planning implemented development-only; horizon availability and future price/selling-value changes remain open |
-| 4 | BI semantic export + dashboard | versioned semantic/star export, atomic Parquet and schema-v4 static JSON with cumulative player outcomes, platform/custom plan separation, locks/exclusions, six analytic routes, manager-aware Plan Builder, and Squad Draft with optimized/current-team handoffs implemented development-only; real-deadline validation and authenticated hosted manager operation remain open |
+| 4 | BI semantic export + dashboard | versioned semantic/star export, atomic Parquet and schema-v4 static JSON with cumulative player outcomes, platform/custom plan separation, locks/exclusions, six analytic routes, manager-aware Plan Builder, and Squad Draft with optimized/current-team handoffs implemented development-only; P2 player/team deep analytics, exact parallel monitoring, and evidence-bound summaries are active; real-deadline validation and authenticated hosted manager operation remain open |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
 
 Phase 3b is an addition to the original phasing, which ended Phase 3 at simulation and had no
@@ -391,9 +395,12 @@ identities; historical vintages are never overwritten. Finalized outcomes attach
 separate append-only job. The versioned BI semantic export publishes pivot-friendly Parquet, and
 the atomic static publisher derives the dashboard's JSON read models from that export, including
 the schema-v4 cumulative player endpoint file. Dashboards
-and BI tools consume those read-only outputs, never the mutable production DuckDB. The eight
-dashboard routes are Summary, Fixture matrix, Players, Next GW suggestion, Forecast vs actual,
-Optimizer audit, Plan Builder, and Squad Draft. Formal platform default/diagnostic plans remain
+and BI tools consume those read-only outputs, never the mutable production DuckDB. The current
+eight dashboard routes are Summary, Fixture matrix, Players, Next GW suggestion, Forecast vs
+actual, Optimizer audit, Plan Builder, and Squad Draft. The frozen additions are Player analytics,
+Team analytics, separate Player/Team prediction-vs-actual pages, and route-level deterministic
+insights; see `docs/dashboard-deep-analytics.md`, `docs/prediction-vs-actual-dashboard.md`, and
+`docs/dashboard-ai-summaries.md`. Formal platform default/diagnostic plans remain
 separate from user-custom plans and browser-local drafts. The local manager-ID path keeps its
 immutable capture and manager context private, while the public pack strips user-custom and
 manager data. See `docs/manager-team-suggestions.md`, `docs/bi-semantic-contract.md`,

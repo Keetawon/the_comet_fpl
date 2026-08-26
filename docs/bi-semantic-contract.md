@@ -5,6 +5,23 @@ Status: **frozen** (DEV-ROADMAP P1.1). Development-only data, like everything up
 Version 2 is an additive schedule-context revision: it adds nullable directed official FDR for
 both sides of `dim_fixture`. Version 1 remains historical; no forecast fact or ease formula changed.
 
+## Frozen successor: version 3 monitoring amendment (2026-08-26)
+
+Version 2 remains the executable/current contract until the P2.3 implementation and tests land.
+Version 3 is frozen in advance by `docs/prediction-vs-actual-dashboard.md` and will add exactly:
+
+- `goals_for_distribution` to `fact_forecast_team_fixture`, transported unchanged from
+  `ledger_prediction_team_fixture` rather than regenerated from `lambda_for`;
+- `fact_finalized_player_fixture_outcome` at `(season, fixture, code)`, sourced only from
+  `ledger_outcome_player_fixture`;
+- `fact_finalized_team_fixture_outcome` at `(season, fixture, team_id)`, sourced only from the new
+  append-only `ledger_outcome_team_fixture`.
+
+The current mart-sourced `fact_player_fixture_actual` remains an observed-history/form fact during
+migration but is not the version-3 monitoring boundary. Both outcome facts carry no `run_id` and
+join to a recorded prediction only downstream. The executable contract, exporter, prose status,
+schema tests, row accounting, and null/finality semantics change together when version 3 lands.
+
 This is the authoritative description of what the BI export publishes. Its executable counterpart is
 `src/fpl/publish/contract.py`, which declares the same schema as typed data and validates it; the two
 must be changed together. P1.2-P1.4 were built against this contract rather than discovering a

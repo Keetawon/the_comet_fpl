@@ -4,6 +4,21 @@ Static Vite + React + TypeScript + Tailwind + shadcn/ui + @tanstack/react-table 
 renders the **static JSON read models** published by the Python layer and nothing else —
 it never queries DuckDB and never reads Parquet in the browser.
 
+## 2026-08-26 dashboard program
+
+The current schema-v4 application remains the working baseline. The ordered additive work is:
+
+1. Player analytics and Team analytics over existing published values, following
+   `../docs/dashboard-deep-analytics.md`;
+2. schema-v5 parallel player/team prediction-versus-actual pages with complete-gameweek finality,
+   following `../docs/prediction-vs-actual-dashboard.md`;
+3. a deterministic insight panel on every route and an optional trusted-server language renderer
+   on public analytical routes, following `../docs/dashboard-ai-summaries.md`.
+
+The static hosted build never receives a model-provider key and never calls Z.AI directly. Until a
+separately authenticated proxy is deployed it uses deterministic summaries only. Local provider
+configuration belongs to the Python server environment, never `VITE_*` or browser storage.
+
 ## Generate the data
 
 From the repository root (Windows PowerShell; the venv is `.venv`). A fresh clone has no
@@ -350,11 +365,14 @@ interactive Plan builder, and the browser-only Squad draft sandbox.
   not chip recommendations: direct import provides only the captured current 15 and values;
   chip optimization, autosubs, captain fallback, competing chip windows, authenticated account
   state, and the rest of the season remain unavailable.
-- **Forecast vs actual** (implemented, P1.7e): each recorded vintage scored against its own
+- **Forecast vs actual** (legacy aggregate, P1.7e): each recorded vintage scored against its own
   season's finalised outcomes (points under 2026/27 rules, read-time join at
   `(season, gw, code)`) — EV/actual/bias/MAE/CRPS by position and gameweek plus a
   P(≥2 points) calibration table. With no finalised outcomes (the 2026-27 GW1 state) the
-  page shows the framework and says why; unfinalised rows are excluded, never read as zero.
+  page shows the framework and says why; unfinalised rows are excluded, never read as zero. This
+  schema-v4 page does not yet prove whole-gameweek finality for a partial double gameweek and must
+  not be treated as the P2.3 monitoring result. Its version-5 successor splits Player prediction vs
+  actual and Team prediction vs actual and consumes append-only finalized outcomes.
 - **Optimizer audit** (implemented, P1.7e): the provenance behind each optimizer decision
   from `optimizer_audit.json` — Git heads and the clean-worktree guarantee, forecast and
   squad-rule inputs, solver identity/options/seed/status, the bounded-search policy with its
@@ -391,3 +409,9 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
   subtracted, complemented, or reconstructed from PMFs in JavaScript. Filtering/sorting player
   records and drawing presentation geometry are allowed. Any future CCDF drill-down must load a
   small backend-precomputed shard; the bulk payload contains no PMF.
+- Deep-analytics charts may compute direction-labelled Pareto and quadrant display geometry from
+  direct published axes. They are not optimizers. Team expected clean sheets is explicitly a sum of
+  per-fixture probabilities (an expected count), never labelled as a probability.
+- Every route's deterministic insight panel is derived from its visible published facts. Optional
+  remote explanation is explicit opt-in, cites allowlisted fact ids, and never receives private
+  manager/custom-plan state or supplies canonical numbers.

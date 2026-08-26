@@ -16,6 +16,22 @@ convolving the already-published player-gameweek distributions. The browser sele
 endpoint and may filter/sort player records; it never conditions a distribution, sums
 probabilities, parses a PMF, or derives a tail.
 
+## Frozen successor: version 5 monitoring amendment (2026-08-26)
+
+Version 4 remains implemented/current while the documentation-first P2 program builds player and
+team analytics from its existing values. Version 5 is reserved for the exact monitoring repair in
+`docs/prediction-vs-actual-dashboard.md`. It replaces the ambiguous
+`forecast_vs_actual.json` with `player_forecast_vs_actual.json` and
+`team_forecast_vs_actual.json`, backed by append-only finalized outcomes and exact stored PMFs.
+
+Player observations are emitted only after complete-gameweek finality; one completed double-
+gameweek leg never scores a full convolved gameweek forecast. Team observations stay at directed
+team-fixture grain and use the opponent's exact goal PMF for defensive scoring. Both files publish
+coverage, scalar chart/table observations, score blocks, slices, and calibration; neither exposes a
+PMF to JavaScript. Version-4 consumers are not permitted to treat the old aggregate as version-5
+evidence. The executable emitter, strict frontend loaders, public-package allowlist, manifest,
+prose status, and tests change together when version 5 lands.
+
 ## Boundary and provenance chain
 
 ```text

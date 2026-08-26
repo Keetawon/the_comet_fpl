@@ -1,7 +1,7 @@
-# Development roadmap: GW1 decision pack, then BI
+# Development roadmap: GW1 decision record, then decision analytics
 
 Status: active execution plan  
-Last updated: 2026-08-23<br>
+Last updated: 2026-08-26<br>
 Target: 2026/27 GW1  
 Deadline: `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok)  
 First kickoff: `2026-08-21T19:00:00Z`
@@ -10,18 +10,21 @@ This is the canonical near-term delivery order. `AGENTS.md` remains the authorit
 model history, frozen contracts, and working protocol. If a task does not advance one of the two
 owner goals below, defer it unless it is required to keep the deadline path correct.
 
-**Post-deadline note (2026-08-23).** The GW1 deadline has passed. Dated statements below about
+**Post-deadline note (2026-08-26).** The GW1 deadline has passed. Dated statements below about
 pending 2026-08-20/21 operations are retained as the delivery record and do not authorize a rerun
-or reinterpretation of frozen artifacts. Current work is the explicitly post-deadline P2
-manager-team workflow recorded below; no model default or frozen evaluation changed.
+or reinterpretation of frozen artifacts. The local manager-team workflow is now implemented
+development-only. Current work is the ordered P2 dashboard program: contracts first, then player
+and team deep analytics, then exact player/team prediction monitoring, then evidence-bound insight
+summaries. No model default or frozen evaluation changes.
 
 ## Owner goals
 
 1. Produce an auditable, legal GW1 squad, starting XI, captain, vice-captain, and bench before the
    deadline.
-2. Produce a decision dashboard/export for fixture difficulty and player form, including pivot-ready
-   xG, xA, minutes, starts, goals, assists, bonus/BPS, defensive contribution, clean sheets,
-   on-pitch goals conceded, saves, xGC, points, and EV.
+2. Produce a decision dashboard/export for fixture difficulty and player/team form, including
+   pivot-ready xG, xA, minutes, starts, goals, assists, bonus/BPS, defensive contribution, clean
+   sheets, on-pitch goals conceded, saves, xGC, points, and EV; then add risk-aware player/team
+   exploration, exact forecast monitoring, and evidence-bound page summaries.
 
 The goals are ordered. Goal 1 may not be delayed by dashboard polish or new model research.
 
@@ -31,21 +34,22 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   and Plan Builder paths are implemented and rehearsed, and the immutable 2026-08-17 evening pack
   remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
-- **Goal 2 is substantially implemented.** The versioned semantic export, player-fixture forecast
+- **Goal 2's MVP is implemented; its post-deadline analytics extension is active.** The versioned semantic export, player-fixture forecast
   transport, outcome attachment, atomic static-JSON boundary, six analytic pages, Plan Builder,
   and the browser-only Squad Draft sandbox are shipped development-only. P1.8's full Players-page
   form matrix and additive observed
   defensive fields are implemented in code and focused tests; the failure-atomic local database
   rebuild and atomic BI/static republish completed on 2026-08-19, so they are visible locally.
-  The final deadline vintage still requires the same controlled refresh inside Goal 1. Manager-team
-  import belongs to P2, not Goal 2. Neither item may delay Goal 1.
+  The final deadline vintage still requires the same controlled refresh inside Goal 1. The local
+  manager-team path is implemented development-only. Player/team deep analytics, a corrected
+  append-only outcome boundary with parallel comparison pages, and insight summaries are the
+  ordered P2 additions below.
 
 ## Current baseline
 
-The 2026-08-19 audit found clean local `main` at `299de22`, with six reviewed implementation
-commits ahead of `origin/main` and zero behind. This documentation reconciliation must be reviewed
-and committed with that implementation history; push the complete approved history without
-rewriting it before any new deadline artifact is produced.
+The 2026-08-26 dashboard-program audit began with clean local `main` at `7e82915`, equal to
+`origin/main`. This is the baseline before the documentation-first contract and implementation
+series; later handoff records the new commits and full gate rather than rewriting this audit point.
 
 - The latest committed live snapshot was captured at `2026-08-18T06:39:18Z` and contains 590
   elements, 20 teams, 38 events, and 380 fixtures. Its first kickoff is
@@ -61,12 +65,15 @@ rewriting it before any new deadline artifact is produced.
   multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed, and immutable
   platform/default, diagnostic, and custom-plan identities are separated fail-closed.
 - The BI semantic/star export, fixture difficulty and player/team form facts, atomic static JSON,
-  six analytic dashboard pages, and the Plan Builder are implemented development-only. The browser
-  reads only published JSON and never DuckDB.
+  six analytic dashboard pages, Plan Builder, and Squad Draft are implemented development-only.
+  The browser reads only published JSON and never DuckDB. Dashboard schema version 4 is current;
+  deep analytics can use its published values, while exact team monitoring requires the frozen
+  semantic-v3/read-model-v5 additions below.
 - The localhost plan service was live and ready at audit time (PuLP 3.3.2, CBC 2.10.3, clean and
   idle), and the dashboard preview served the latest frontend. These are transient service checks,
   not substitutes for the final immutable artifacts.
-- The dashboard gate is green (80 tests, production build, and lint with 12 pre-existing warnings).
+- The last recorded dashboard gate was green (80 tests, production build, and lint with 12
+  pre-existing warnings).
   Today's full Python run reached 1,623 passed, 4 skipped, and 13 failures; every failure is the
   same known Windows `WinError 1314` directory-symlink privilege case in the BI-export publish
   tests. No model or optimizer regression was observed. This is still not an unqualified green
@@ -83,7 +90,10 @@ Open operational gaps:
 - manager captures now carry current purchase/selling values and cash, but future prices and
   future selling-value changes remain frozen at forecast `now_cost`;
 - authenticated My Team access, hosted manager accounts, and capture-retention policy remain open;
-- real forecast-versus-actual monitoring must wait for finalized 2026/27 outcomes.
+- the current player comparison does not prove complete-gameweek finality and can score a partial
+  double gameweek; it must be replaced by the P2 monitoring contract before use;
+- real prospective forecast monitoring remains empty until immutable finalized 2026/27 outcomes
+  are attached.
 
 ## Delivery rules until the GW1 deadline
 
@@ -886,7 +896,101 @@ silently turn ownership into selection utility.
 
 ## P2: after the deadline
 
-Only after P0 and the BI MVP are secure:
+The current implementation order is binding. Complete each contract and its focused tests before
+advancing; none of these tasks changes a prospective model default or frozen evaluation.
+
+### P2.1 - Freeze the dashboard analytics, monitoring, and insight contracts
+
+**Status (2026-08-26): documentation authored; implementation follows in P2.2-P2.4.** Update this
+roadmap and `AGENTS.md`, then freeze the detailed boundaries in:
+
+- `docs/dashboard-deep-analytics.md`;
+- `docs/prediction-vs-actual-dashboard.md`;
+- `docs/dashboard-ai-summaries.md`;
+- the planned amendments in the BI, ledger, dashboard JSON, deployment, and dashboard runbook docs.
+
+The contracts explicitly separate future exposure exploration from retrospective model diagnosis,
+pin complete-gameweek finality, preserve exact stored team PMFs, and make the language model a
+bounded renderer over cited facts rather than a source of analytics.
+
+Acceptance: every new quantity has a source grain, direction, null/finality rule, allowed consumer
+operation, and test; implementation cannot silently weaken these requirements.
+
+### P2.2 - Player and team deep analytics
+
+**Status: planned next.** Add Player analytics and Team analytics routes using only dashboard schema
+version 4 values. Do not wait for or reach around the P2.3 outcome work.
+
+- Player views: price-versus-cumulative-xP Pareto frontier; published inclusive haul-versus-downside
+  frontier; ownership-versus-xP differential view; and explicitly labelled observed-form versus
+  future-xP context.
+- Team views: forecast `lambda_for` versus `lambda_against`; attack opportunity versus expected
+  clean-sheet count; and observed team form versus future lambdas. Include fixture count and Stage-A
+  league-average fallback count.
+- Use only the selected run's modelled fixtures. Current schedule-only proxy rows never enter an
+  analytics axis.
+- Provide accessible, keyboard-operable SVG plus an exact table/list. Null axis values are omitted
+  with counts, never coerced to zero. Pareto geometry is display logic, not optimization.
+- Call outputs player value/risk and club-environment shortlists. Never claim an optimal squad,
+  guaranteed return, calibrated current-season goal level, or the best asset inside a club.
+
+Acceptance: pure direction-aware Pareto and aggregation tests cover ties, nulls, vintage isolation,
+exact fixed-start horizon endpoints, double and blank gameweeks, venue filtering, expected-count
+labelling, fallback accounting, loading/error/empty states, and accessible table equivalence.
+
+### P2.3 - Exact parallel player/team prediction monitoring
+
+**Status: planned after P2.2.** Replace the current ambiguous player-only aggregate with explicit
+player and team read models and pages. This is a correctness repair, not merely a visual extension.
+
+1. Persist official home/away scores in live fixture versions. Add an append-only
+   `ledger_outcome_team_fixture` with two reciprocal rows per finalized fixture; exact reattachment
+   is a no-op and changed outcomes fail closed.
+2. BI semantic contract version 3 transports exact team goal PMFs and exports player/team finalized
+   outcomes from their ledger tables. It never reconstructs a PMF from a lambda or reads around the
+   immutable attachment boundary for monitoring.
+3. Dashboard schema version 5 publishes `player_forecast_vs_actual.json` and
+   `team_forecast_vs_actual.json`, including coverage, scalar observations, score blocks, splits,
+   and calibration. Raw PMFs remain backend-only.
+4. Player gameweek scoring requires the whole official gameweek and every forecast fixture leg to
+   be final. A partial double gameweek scores zero rows. Team defence CRPS uses the opponent's exact
+   stored goal PMF; clean-sheet Brier uses the published clean-sheet probability.
+5. Add separate Player prediction vs actual and Team prediction vs actual routes. The old route is
+   a temporary alias to the player page. Charts always have exact table equivalents and signed-error
+   direction labels.
+
+Acceptance: the hand-computed and failure cases in
+`docs/prediction-vs-actual-dashboard.md` pass through ledger attachment, Parquet round-trip, static
+publication, public-package sanitization, strict frontend loading, and both pages.
+
+### P2.4 - Deterministic and optional AI insight summaries
+
+**Status: planned after the analytical pages expose stable fact builders.** Every route gets a
+network-free deterministic insight panel. Public analytical routes additionally offer an explicit
+"Explain with AI" action when the trusted local insight service is enabled. Private/decision routes
+remain deterministic-only.
+
+- Implement a provider-neutral Python service and optional Z.AI GLM adapter through the existing
+  protected local server boundary. The browser never holds the API key and hosted static builds make
+  no provider call.
+- Use Z.AI's general Open Platform API, not its coding-tools endpoint. Coding Plan quota is not
+  assumed to license general application calls; configure a general API key/balance under the
+  current provider terms.
+- Send at most a small allowlisted, provenance-keyed set of facts for the visible scope. No PMFs,
+  arbitrary prompts, manager/custom-plan identifiers, squads, bank, selling values, capture data,
+  credentials, or full page payloads.
+- Require structured validated output with citations to submitted fact ids, bounded timeouts/body,
+  narrow retries, rate limiting, single-flight, safe errors, and an ignored provenance-aware cache.
+  AI prose never supplies canonical numbers, arithmetic, a probability, a model verdict, or decision
+  provenance.
+
+Acceptance: the security, privacy, provider, cache, server, frontend, stale-response, and per-route
+tests in `docs/dashboard-ai-summaries.md` pass. Provider failure always leaves the deterministic
+summary usable.
+
+### P2.5 - Other post-deadline work
+
+Only after the ordered dashboard program above, unless an operational blocker requires otherwise:
 
 - measure and contract per-GW availability semantics;
 - design future price-change and future selling-value handling;
