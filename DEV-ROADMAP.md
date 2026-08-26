@@ -1037,6 +1037,15 @@ Only after the ordered dashboard program above, unless an operational blocker re
   live duplicate rejection, finalized-ledger gating, complete-GW filtering, NULL preservation,
   range/DGW aggregation tests, a schema-v6 atomic republish, and visual verification.
 
+  The local semantic-v4/schema-v6 refresh completed after commit `e234197`: the BI generation hash
+  is `1cf46ab421320595df4c4246feeb98ac27a4f3531124efdbfec2e063fbad363e` and the dashboard
+  generation hash is `4cdcd729077cfa66102a4b2581fb2c8852d61b3bd8bb780ccfac0cc43d71676c`.
+  Both formal platform vintages attach 610 finalized GW1 fixture rows, and the other recorded
+  vintages attach 587-609 rows according to their exact selectable-player registry; every range is
+  GW1-GW1 with no prior-season substitution. Contract, point-in-time, UI, build, lint, type, and
+  HTTP smoke checks pass. An interactive visual click-through remains pending because no
+  controllable browser was connected to the implementation session.
+
 - measure and contract per-GW availability semantics;
 - design future price-change and future selling-value handling;
 - monitor recorded real-deadline forecasts against finalized outcomes;

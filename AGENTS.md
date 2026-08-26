@@ -801,10 +801,11 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
 The deadline record is closed to reinterpretation. The post-deadline dashboard sequence in
 `DEV-ROADMAP.md` has completed through the optional evidence-bound language renderer: contracts,
 player/team deep analytics, exact player/team forecast monitoring, and deterministic/optional
-summaries landed in that order. The remaining delivery gate is a fresh outcome attachment, full
-schema-v6 republish, and visual verification. Do not start a new model candidate or tune a known
-bias as part of this UI work. The numbered items below remain binding model-history and research
-guardrails; they are not permission to displace the active delivery order.
+summaries landed in that order. The finalized outcome attachment and full schema-v6 republish are
+complete; the remaining delivery gate is an in-browser visual verification of that generation. Do
+not start a new model candidate or tune a known bias as part of this UI work. The numbered items
+below remain binding model-history and research guardrails; they are not permission to displace the
+active delivery order.
 
 1. Keep `trailing_goals_attack_defence` as the Stage A model. Do not promote any failed
    candidate (V1, V2) and do not reinterpret one after seeing its outer result. Candidate V3
