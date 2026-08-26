@@ -163,6 +163,7 @@ def _documents() -> dict[str, dict[str, Any]]:
                     "season": "2026-27",
                     "code": 1,
                     "web_name": "Preserved Player",
+                    "actuals": [],
                 }
             ],
         },

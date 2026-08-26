@@ -1,10 +1,26 @@
-# BI semantic contract, version 3
+# BI semantic contract, version 4
 
-Status: **implemented and frozen development-only** (P1.1 plus the P2.3 monitoring amendment).
+Status: **implemented and frozen development-only** (P1.1 plus the P2.3/P2.5 amendments).
 
 Version 1 remains historical. Version 2 was the additive schedule-context revision that added
 nullable directed official FDR for both sides of `dim_fixture` without changing a forecast fact or
-ease formula. Both executable historical declarations remain importable.
+ease formula. Version 3 added exact team PMFs and append-only player/team monitoring outcomes.
+All three executable historical declarations remain importable.
+
+## Version 4 current-season actual amendment (2026-08-26)
+
+Version 4 keeps the physical v3 table shape and extends `fact_player_fixture_actual` with finalized
+current-season observations. Archive rows still come from `mart_fact_player_fixture` plus
+`mart_target_player_fixture`. A current-season row may additionally come from
+`mart_fact_player_fixture_live`, selecting exactly one latest component version per
+`(season, fixture, code)` by descending `(known_at, capture_id)`, **only** when the exact same
+season-qualified grain exists in append-only `ledger_outcome_player_fixture`.
+
+The live capture owns observed components; the ledger owns finality and both
+`total_points_as_recorded` and `points_under_rules_2026_27`. A mutable live row without a ledger
+outcome is never published as an actual. Double-gameweek legs remain separate fixture-grain rows,
+NULL measures remain NULL, and an archive/live overlap at the same grain fails export validation
+instead of choosing a source or double counting.
 
 ## Version 3 monitoring amendment (2026-08-26)
 
@@ -17,8 +33,8 @@ Version 3 is executable/current and adds exactly:
 - `fact_finalized_team_fixture_outcome` at `(season, fixture, team_id)`, sourced only from the new
   append-only `ledger_outcome_team_fixture`.
 
-The mart-sourced `fact_player_fixture_actual` remains an observed-history/form fact but is not the
-version-3 monitoring boundary. Both finalized outcome facts carry no `run_id` and join to a
+In v3, the archive-mart-sourced `fact_player_fixture_actual` remained an observed-history/form fact
+rather than the monitoring boundary. Both finalized outcome facts carry no `run_id` and join to a
 recorded prediction only downstream. Empty outcome facts are valid before any immutable finalized
 outcome is attached.
 
@@ -219,8 +235,15 @@ calibrated to the current season.
 
 ### `fact_player_fixture_actual` — grain `(season, fixture, code)`
 
-What a player actually did, from `mart_fact_player_fixture` + `mart_target_player_fixture`. Carries
-**no `run_id`**.
+What a player actually did. Historical components come from `mart_fact_player_fixture` and their
+points from `mart_target_player_fixture`. Current-season components come from the deterministic
+latest `mart_fact_player_fixture_live` version only after the exact player-fixture has an immutable
+`ledger_outcome_player_fixture`; that ledger supplies both points measures. Carries **no
+`run_id`**.
+
+An unfinalized current-season capture is absent, not a zero-filled actual. Archive/live overlap at
+`(season, fixture, code)` is source drift and fails closed. The fixture grain preserves both legs of
+a double gameweek and all season-scoped club joins remain bound by `season`.
 
 `total_points_as_recorded` and `points_under_rules_2026_27` are **different measures** and are never
 conflated or summed together. Recorded points are never a model feature or a cross-season target.
@@ -361,9 +384,9 @@ the work. Three were added, each forced by a documented invariant rather than by
 
 ## Source completeness
 
-Every current v3 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
+Every current v4 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
 P1.6 supplies `fact_player_form`, and P1.6b adds `fact_team_form` (declared and sourced in the same
 change, so it is never in `NOT_YET_SOURCED`). Consequently `contract.NOT_YET_SOURCED` is empty; P1.4
-can require the complete v3 contract rather than silently emitting an apparently complete partial
+can require the complete v4 contract rather than silently emitting an apparently complete partial
 export. A pre-v3 database that has not yet created one additive outcome ledger emits that outcome
 fact empty; if the table exists, its full physical shape is validated strictly.

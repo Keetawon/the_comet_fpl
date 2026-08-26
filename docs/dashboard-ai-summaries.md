@@ -10,7 +10,7 @@ also show an explicit **Explain with AI** action when a trusted local provider i
 Nothing calls a remote model automatically on page load or filter changes. Changing vintage or
 scope immediately rebuilds the deterministic facts and marks prior AI-selected output stale.
 
-Remote v1 scope is limited to Summary, Fixture matrix, Players, Player analytics, Team analytics,
+Remote renderer scope is limited to Summary, Fixture matrix, Players, Player analytics, Team analytics,
 Player prediction vs actual, and Team prediction vs actual. Next-GW plans, Optimizer audit, Plan
 Builder, Squad Draft, manager imports, squads, bank, purchase/selling values, capture identifiers,
 and custom-plan state remain deterministic-only. They still have a summary panel; their data is
@@ -73,15 +73,21 @@ Remove-Item Env:FPL_INSIGHTS_API_KEY, Env:FPL_INSIGHTS_PROVIDER, `
 The existing same-origin/approved-LAN-token Plan Server boundary protects both insight endpoints;
 they are not provider-facing public APIs. `POST /insights/summary` accepts an exact-key,
 Pydantic-validated
-`fpl.insight-summary-request` version 1. The browser sends selectors only:
+`fpl.insight-summary-request` version 2. The browser sends selectors only:
 
 - a public-page enum;
 - manifest content hash, run id, season, and `as_of`;
 - a bounded, exact typed display scope containing only that page's public filters;
 - at most 16 KiB total body.
 
+Version 2 adds the paired `actual_gw_from` / `actual_gw_to` selectors for the Players route. They
+are distinct from forecast `gw_from` / `gw_to`, must be supplied together in ascending order, and
+must remain within the finalized current-season actual range published in `players.json`. Other
+pages reject them. This prevents a visible actual-range change from reusing evidence resolved for
+an unrelated forecast horizon.
+
 There is no fact, caveat, chat, or arbitrary-text field. Extra keys fail closed. The server resolves
-the selector against the explicitly configured dashboard-data directory, verifies the schema-v5
+the selector against the explicitly configured dashboard-data directory, verifies the schema-v6
 manifest content hash, every file hash, run/season/`as_of`, and a stable manifest before and after
 the read, then constructs the bounded fact/caveat packet itself. A caller therefore cannot smuggle
 manager/private state, financial state, credentials, paths, instructions, or invented values to the

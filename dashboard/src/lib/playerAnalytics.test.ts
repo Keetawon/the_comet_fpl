@@ -64,6 +64,7 @@ function player(
     chance_of_playing: null,
     availability_multiplier: 1,
     form: { season: "2025-26", as_at_gw: 38, windows: windows() },
+    actuals: [],
     avg_minutes_last_5: 90,
     fixtures: [],
     ...overrides,

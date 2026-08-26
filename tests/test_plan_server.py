@@ -1398,7 +1398,7 @@ class TestHttpSurface:
         assert status == 503
         assert json.loads(payload) == {
             "schema": "fpl.insight-summary-error",
-            "schema_version": 1,
+            "schema_version": INSIGHT_SCHEMA_VERSION,
             "code": "insights_disabled",
             "message": "AI insight rendering is not configured on this server.",
         }

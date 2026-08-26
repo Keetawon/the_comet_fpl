@@ -39,7 +39,7 @@ from fpl.artifacts.prospective_points import (
     ProspectivePointsArtifact,
     artifact_bytes,
 )
-from fpl.publish.contract import SEMANTIC_CONTRACT_V3
+from fpl.publish.contract import SEMANTIC_CONTRACT_V4
 from fpl.publish.export import (
     EASE_INDEX_FORMULA_VERSION,
     BiExportConcurrentWriterError,
@@ -48,6 +48,9 @@ from fpl.publish.export import (
     BiExportValidationError,
     OptimizerPlanResolutionError,
     _arrow_type,
+    _contract_query,
+    _fetch_arrow_table,
+    _source_queries,
     _validate_table_frame,
     export_bi,
     validate_bi_export,
@@ -418,6 +421,65 @@ def _seed_live_database(
         con.close()
 
 
+def _insert_live_actual_version(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    fixture: int,
+    known_at: datetime,
+    capture_id: str,
+    minutes: int,
+    goals_scored: int,
+) -> None:
+    con.execute(
+        """
+        INSERT INTO mart_fact_player_fixture_live (
+            season, gw, fixture, kickoff_time, code, position, team_id, opponent_team_id,
+            was_home, minutes, starts, goals_scored, assists, clean_sheets, goals_conceded,
+            saves, penalties_saved, penalties_missed, own_goals, yellow_cards, red_cards,
+            bonus, bps, expected_goals, expected_assists, expected_goals_conceded,
+            defensive_contribution, threat, creativity, influence, known_at, capture_id
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?
+        )
+        """,
+        [
+            SEASON,
+            1,
+            fixture,
+            KICKOFF,
+            1,
+            "GK",
+            1,
+            2,
+            True,
+            minutes,
+            1,
+            goals_scored,
+            0,
+            1,
+            0,
+            4,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            30,
+            0.3,
+            None,
+            0.7,
+            None,
+            13.0,
+            14.0,
+            15.0,
+            known_at,
+            capture_id,
+        ],
+    )
+
+
 def _optimizer_artifact(artifact: ProspectivePointsArtifact, *, forecast_sha256: str | None = None):
     positions = _positions()
     members = tuple(
@@ -534,13 +596,13 @@ def _write_optimizer_plan(path: Path, artifact: ProspectivePointsArtifact) -> Pa
 
 
 def _table_paths(output_dir: Path) -> tuple[Path, ...]:
-    return tuple(output_dir / f"{table.name}.parquet" for table in SEMANTIC_CONTRACT_V3.tables)
+    return tuple(output_dir / f"{table.name}.parquet" for table in SEMANTIC_CONTRACT_V4.tables)
 
 
 def _one_row_contract_frame(
     table_name: str, *, overrides: dict[str, object] | None = None
 ) -> pa.Table:
-    table = SEMANTIC_CONTRACT_V3.table(table_name)
+    table = SEMANTIC_CONTRACT_V4.table(table_name)
     defaults: dict[str, object] = {
         "string": "x",
         "int": 1,
@@ -559,7 +621,7 @@ def _one_row_contract_frame(
 
 
 def test_v3_validation_preserves_honest_nulls_in_legacy_non_grain_fields() -> None:
-    table = SEMANTIC_CONTRACT_V3.table("fact_player_fixture_actual")
+    table = SEMANTIC_CONTRACT_V4.table("fact_player_fixture_actual")
     frame = _one_row_contract_frame("fact_player_fixture_actual", overrides={"starts": None})
 
     _validate_table_frame(table, frame)
@@ -576,7 +638,7 @@ def test_v3_validation_preserves_honest_nulls_in_legacy_non_grain_fields() -> No
 def test_v3_validation_rejects_null_in_new_guaranteed_fields(
     table_name: str, column_name: str
 ) -> None:
-    table = SEMANTIC_CONTRACT_V3.table(table_name)
+    table = SEMANTIC_CONTRACT_V4.table(table_name)
     frame = _one_row_contract_frame(table_name, overrides={column_name: None})
 
     with pytest.raises(BiExportValidationError, match="guaranteed v3 field contains NULL"):
@@ -599,7 +661,7 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     manifest = validate_bi_export(output)
 
     assert output.is_symlink()
-    assert set(result.tables) == {table.name for table in SEMANTIC_CONTRACT_V3.tables}
+    assert set(result.tables) == {table.name for table in SEMANTIC_CONTRACT_V4.tables}
     assert manifest["exported_run_ids"] == [run_id]
     assert manifest["source_known_at"] == {
         "minimum": KNOWN_AT.isoformat(),
@@ -666,6 +728,141 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     assert team_form.column("matches_played").to_pylist() == [1]
     assert team_form.column("goals_for").to_pylist() == [2]
     assert team_form.column("goals_for_per_match").to_pylist() == pytest.approx([2.0])
+
+
+def test_player_actual_unions_latest_live_components_only_at_exact_finalized_ledger_grain(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "live-actual.duckdb"
+    _seed_database(database, record=True)
+    con = connect(database)
+    try:
+        con.execute(
+            """
+            INSERT INTO stg_live_team_version (
+                season, team_id, team_code, known_at, capture_id, team_name, short_name, pulse_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [SEASON, 1, 101, KNOWN_AT, "team-live", "Alpha", "ALP", 1001],
+        )
+        con.executemany(
+            """
+            INSERT INTO stg_fixture (
+                season, fixture, pulse_id, gw, kickoff_time, team_h, team_a, finished
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (SEASON, 101, 9002, 1, KICKOFF, 1, 2, True),
+                (SEASON, 102, 9003, 1, KICKOFF, 1, 2, True),
+            ],
+        )
+        # Same known_at deliberately exercises capture_id as the deterministic tie-breaker.
+        _insert_live_actual_version(
+            con,
+            fixture=101,
+            known_at=KNOWN_AT,
+            capture_id="capture-a",
+            minutes=45,
+            goals_scored=0,
+        )
+        _insert_live_actual_version(
+            con,
+            fixture=101,
+            known_at=KNOWN_AT,
+            capture_id="capture-z",
+            minutes=90,
+            goals_scored=1,
+        )
+        # A current live component row without the exact append-only outcome is not finalized and
+        # must stay behind the publish boundary.
+        _insert_live_actual_version(
+            con,
+            fixture=102,
+            known_at=KNOWN_AT,
+            capture_id="capture-only",
+            minutes=90,
+            goals_scored=2,
+        )
+        con.execute(
+            """
+            INSERT INTO ledger_outcome_player_fixture (
+                season, code, fixture, attached_at, total_points_as_recorded,
+                points_under_rules_2026_27
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [SEASON, 1, 101, AS_OF + timedelta(days=2), 12, 13],
+        )
+    finally:
+        con.close()
+
+    con = connect(database, read_only=True)
+    try:
+        table = SEMANTIC_CONTRACT_V4.table("fact_player_fixture_actual")
+        source = _source_queries(
+            True, player_outcomes_present=True, team_outcomes_present=True
+        )[table.name]
+        frame = _fetch_arrow_table(con, _contract_query(table, source))
+        _validate_table_frame(table, frame)
+        rows = frame.to_pylist()
+    finally:
+        con.close()
+
+    assert [(row["fixture"], row["code"]) for row in rows] == [(100, 1), (101, 1)]
+    live = rows[1]
+    assert live["minutes"] == 90
+    assert live["goals_scored"] == 1
+    assert live["team_code"] == 101
+    assert live["total_points_as_recorded"] == 12
+    assert live["points_under_rules_2026_27"] == 13
+
+
+def test_player_actual_rejects_archive_and_finalized_live_duplicate_grain(tmp_path: Path) -> None:
+    database = tmp_path / "duplicate-actual.duckdb"
+    _seed_database(database, record=True)
+    con = connect(database)
+    try:
+        con.execute(
+            """
+            INSERT INTO stg_live_team_version (
+                season, team_id, team_code, known_at, capture_id, team_name, short_name, pulse_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [SEASON, 1, 101, KNOWN_AT, "team-live", "Alpha", "ALP", 1001],
+        )
+        _insert_live_actual_version(
+            con,
+            fixture=100,
+            known_at=KNOWN_AT,
+            capture_id="duplicate-live",
+            minutes=90,
+            goals_scored=1,
+        )
+        con.execute(
+            """
+            INSERT INTO ledger_outcome_player_fixture (
+                season, code, fixture, attached_at, total_points_as_recorded,
+                points_under_rules_2026_27
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [SEASON, 1, 100, AS_OF + timedelta(days=2), 12, 13],
+        )
+    finally:
+        con.close()
+
+    con = connect(database, read_only=True)
+    try:
+        table = SEMANTIC_CONTRACT_V4.table("fact_player_fixture_actual")
+        source = _source_queries(
+            True, player_outcomes_present=True, team_outcomes_present=True
+        )[table.name]
+        frame = _fetch_arrow_table(con, _contract_query(table, source))
+        with pytest.raises(
+            BiExportValidationError,
+            match=r"fact_player_fixture_actual: duplicate row\(s\) at grain",
+        ):
+            _validate_table_frame(table, frame)
+    finally:
+        con.close()
 
 
 def test_team_fixture_ease_indices_are_directed_and_keep_raw_lambdas(tmp_path: Path) -> None:
@@ -991,7 +1188,7 @@ def test_exports_are_byte_deterministic_except_manifest_created_at(tmp_path: Pat
         created_at=datetime(2026, 8, 26, tzinfo=UTC),
     )
 
-    for table in SEMANTIC_CONTRACT_V3.tables:
+    for table in SEMANTIC_CONTRACT_V4.tables:
         assert (first / f"{table.name}.parquet").read_bytes() == (
             second / f"{table.name}.parquet"
         ).read_bytes()
@@ -1107,7 +1304,7 @@ def test_archive_database_exports_the_complete_contract(tmp_path: Path) -> None:
     result = export_bi(default_db_path(), tmp_path / "archive-export")
     manifest = validate_bi_export(result.output_dir)
 
-    assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V3.tables}
+    assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V4.tables}
     # Every contract table (now including dim_optimizer_run) is written to disk, even when a
     # source owner contributes zero rows; assert existence rather than a magic count so an
     # additive table cannot silently re-stale this smoke test.

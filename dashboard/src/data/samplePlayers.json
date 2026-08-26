@@ -1,6 +1,6 @@
 {
   "schema": "fpl.dashboard-players",
-  "json_schema_version": 5,
+  "json_schema_version": 6,
   "players": [
     {
       "run_id": "run-a",
@@ -58,6 +58,7 @@
           }
         }
       },
+      "actuals": [],
       "avg_minutes_last_5": 90.0,
       "fixtures": [
         {
@@ -95,6 +96,7 @@
       "chance_of_playing": 75,
       "availability_multiplier": 0.75,
       "form": null,
+      "actuals": [],
       "avg_minutes_last_5": null,
       "fixtures": [
         {

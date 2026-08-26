@@ -6,7 +6,7 @@ it never queries DuckDB and never reads Parquet in the browser.
 
 ## 2026-08-26 dashboard program
 
-Schema v5 is the current development-only application contract. The ordered program is:
+Schema v6 is the current development-only application contract. The ordered program is:
 
 1. **Implemented development-only:** Player analytics and Team analytics over existing published
    values, following `../docs/dashboard-deep-analytics.md`;
@@ -14,7 +14,10 @@ Schema v5 is the current development-only application contract. The ordered prog
    with complete-gameweek finality, following `../docs/prediction-vs-actual-dashboard.md`;
 3. **Implemented development-only:** a deterministic insight panel on every route and an optional,
    evidence-bound trusted-server language renderer
-   on public analytical routes, following `../docs/dashboard-ai-summaries.md`.
+   on public analytical routes, following `../docs/dashboard-ai-summaries.md`;
+4. **Implemented development-only:** the Players route publishes and filters finalized
+   current-season actual fixtures through a separate `Actual GWs` range. It never reuses the
+   forecast range or fills an early-season view with prior-season matches.
 
 The implemented deep-analytics routes are `#player-analytics` and `#team-analytics`; both are
 linked directly in the sidebar and retain an exact-table equivalent for every chart.
@@ -116,7 +119,7 @@ except OSError:
 its `run_id`/`as_of`; it is required for optional AI eligibility and the server's exact generation
 verification, so deployment packages always include it. `players.json` is by far the largest file and is shared by the Summary,
 Players, and Next-GW pages; it is fetched and parsed once per browser session (a
-module-level cache in `src/data/load.ts`). Introduced in schema v4 and retained in schema v5,
+module-level cache in `src/data/load.ts`). Introduced in schema v4 and retained in schema v6,
 `player_horizons.json` carries cumulative xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)` for every
 player and exact forecast endpoint. Python computes those probabilities by convolving the
 published gameweek PMFs at full precision, then emits a compact positional row whose named values
@@ -165,7 +168,7 @@ $env:FPL_INSIGHTS_BASE_URL = "https://api.z.ai/api/paas/v4/"
 `GET /insights/status` and `POST /insights/summary` use the same same-origin/approved-LAN-token
 boundary as the other local endpoints. After **Explain with AI** is clicked, the browser submits
 only an exact page/vintage/filter selector. The server revalidates the explicitly selected
-schema-v5 dashboard generation (`--dashboard-data`, default `dashboard/public/data`) and constructs
+schema-v6 dashboard generation (`--dashboard-data`, default `dashboard/public/data`) and constructs
 the fact packet itself. The provider cannot receive caller prose, a free-form prompt, PMF,
 manager/capture identifier, squad, bank, purchase/selling value, credential, or custom plan state.
 The provider returns fact-id selections rather than prose; Python renders canonical cited text and

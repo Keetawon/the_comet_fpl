@@ -1,4 +1,4 @@
-"""The frozen BI semantic contract, version 3.
+"""The frozen BI semantic contract, version 4.
 
 DEV-ROADMAP P1.1 requires each published table's grain, keys, null semantics, source owner, and
 allowed joins to be settled **before** the exporter exists, so P1.2-P1.4 build against a fixed
@@ -37,7 +37,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SEMANTIC_CONTRACT_VERSION = 3
+SEMANTIC_CONTRACT_VERSION = 4
 
 #: Season-scoped identifiers. A join may use one only when ``season`` is bound in the same join.
 SEASON_SCOPED_KEYS: frozenset[str] = frozenset({"element_id", "team_id", "opponent_team_id"})
@@ -1330,7 +1330,7 @@ SEMANTIC_CONTRACT_V2 = SemanticContract(
 )
 
 SEMANTIC_CONTRACT_V3 = SemanticContract(
-    version=SEMANTIC_CONTRACT_VERSION,
+    version=3,
     tables=(
         *(
             FACT_FORECAST_TEAM_FIXTURE_V3 if table.name == "fact_forecast_team_fixture" else table
@@ -1338,6 +1338,39 @@ SEMANTIC_CONTRACT_V3 = SemanticContract(
         ),
         FACT_FINALIZED_PLAYER_FIXTURE_OUTCOME,
         FACT_FINALIZED_TEAM_FIXTURE_OUTCOME,
+    ),
+)
+
+# Version 4 keeps the v3 physical table shape and changes the ownership/completeness contract for
+# the observed player-fixture fact. Historical rows still come from the immutable archive marts;
+# current-season component rows may also come from the latest versioned live capture, but only when
+# the append-only finalized outcome ledger carries the exact same season-qualified grain. The
+# ledger owns both points measures for those live rows.
+FACT_PLAYER_FIXTURE_ACTUAL_V4 = FACT_PLAYER_FIXTURE_ACTUAL.model_copy(
+    update={
+        "source_owner": (
+            "fpl.publish.export:mart_fact_player_fixture + mart_target_player_fixture + "
+            "mart_fact_player_fixture_live + ledger_outcome_player_fixture"
+        ),
+        "notes": (
+            *FACT_PLAYER_FIXTURE_ACTUAL.notes,
+            "Current-season live components are published only from the deterministic latest "
+            "(known_at, capture_id) version at (season, fixture, code), and only when an exact "
+            "append-only ledger_outcome_player_fixture row exists. For those rows the ledger "
+            "owns recorded and replayed points; a live capture alone is not finality evidence.",
+            "Archive and eligible live sources must never overlap at (season, fixture, code). "
+            "The exporter fails closed instead of choosing one source or double counting.",
+        ),
+    }
+)
+
+SEMANTIC_CONTRACT_V4 = SemanticContract(
+    version=SEMANTIC_CONTRACT_VERSION,
+    tables=tuple(
+        FACT_PLAYER_FIXTURE_ACTUAL_V4
+        if table.name == "fact_player_fixture_actual"
+        else table
+        for table in SEMANTIC_CONTRACT_V3.tables
     ),
 )
 
@@ -1375,6 +1408,7 @@ __all__ = [
     "SEMANTIC_CONTRACT_V1",
     "SEMANTIC_CONTRACT_V2",
     "SEMANTIC_CONTRACT_V3",
+    "SEMANTIC_CONTRACT_V4",
     "SEMANTIC_CONTRACT_VERSION",
     "Column",
     "Join",

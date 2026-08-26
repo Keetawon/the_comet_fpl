@@ -1,6 +1,6 @@
 ﻿{
   "schema": "fpl.dashboard-summary",
-  "json_schema_version": 5,
+  "json_schema_version": 6,
   "latest_run": {
     "run_id": "86a072ade6dd4d56",
     "as_of": "2026-08-21T17:30:00+00:00",

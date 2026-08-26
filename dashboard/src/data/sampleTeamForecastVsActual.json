@@ -1,6 +1,6 @@
 {
   "schema": "fpl.dashboard-team-forecast-vs-actual",
-  "json_schema_version": 5,
+  "json_schema_version": 6,
   "semantics": {
     "observation_grain": ["run_id", "season", "fixture", "team_code"],
     "residual": "actual-minus-forecast",

@@ -34,7 +34,7 @@ import pyarrow as pa  # type: ignore[import-untyped]
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 from fpl.artifacts.optimizer_plan import OptimizerPlanArtifact, read_optimizer_artifact
-from fpl.publish.contract import SEMANTIC_CONTRACT_V3, Column, Table
+from fpl.publish.contract import SEMANTIC_CONTRACT_V4, Column, Table
 from fpl.storage.db import connect, table_columns, table_exists
 
 BI_EXPORT_SCHEMA: Final[str] = "fpl.bi-semantic-export"
@@ -165,6 +165,40 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "threat",
         "creativity",
         "influence",
+    ),
+    "mart_fact_player_fixture_live": (
+        "season",
+        "fixture",
+        "code",
+        "gw",
+        "kickoff_time",
+        "position",
+        "team_id",
+        "opponent_team_id",
+        "was_home",
+        "minutes",
+        "starts",
+        "goals_scored",
+        "assists",
+        "clean_sheets",
+        "goals_conceded",
+        "saves",
+        "penalties_saved",
+        "penalties_missed",
+        "own_goals",
+        "yellow_cards",
+        "red_cards",
+        "bonus",
+        "bps",
+        "expected_goals",
+        "expected_assists",
+        "expected_goals_conceded",
+        "defensive_contribution",
+        "threat",
+        "creativity",
+        "influence",
+        "known_at",
+        "capture_id",
     ),
     "mart_target_player_fixture": (
         "season",
@@ -643,6 +677,60 @@ def _source_queries(
     player_outcomes_present: bool,
     team_outcomes_present: bool,
 ) -> dict[str, str]:
+    archive_player_actual = """
+        SELECT fact.season, fact.fixture, fact.code, fact.gw, fact.kickoff_time,
+               fact.position, fact.team_id, team.team_code, fact.opponent_team_id,
+               fact.was_home, fact.minutes, fact.starts, fact.goals_scored, fact.assists,
+               fact.clean_sheets, fact.goals_conceded, fact.saves, fact.penalties_saved,
+               fact.penalties_missed, fact.own_goals, fact.yellow_cards, fact.red_cards,
+               fact.bonus, fact.bps, fact.expected_goals, fact.expected_assists,
+               fact.expected_goals_conceded, fact.defensive_contribution, fact.threat,
+               fact.creativity, fact.influence, target.total_points_as_recorded,
+               target.points_under_rules_2026_27
+        FROM mart_fact_player_fixture AS fact
+        LEFT JOIN mart_dim_team AS team
+          ON team.season = fact.season
+         AND team.team_id = fact.team_id
+        LEFT JOIN mart_target_player_fixture AS target
+          ON target.season = fact.season
+         AND target.fixture = fact.fixture
+         AND target.code = fact.code
+    """
+    player_actual = archive_player_actual
+    if player_outcomes_present:
+        # Live component rows are mutable versions, so the deterministic latest capture is the
+        # only eligible component source. Finality and both point measures belong to the exact
+        # append-only outcome-ledger grain; the existence of a live row alone is never enough.
+        # UNION ALL is intentional: if an archive row overlaps an eligible live row, the semantic
+        # grain validator rejects the export instead of silently preferring one source.
+        player_actual = f"""
+            {archive_player_actual}
+            UNION ALL
+            SELECT live.season, live.fixture, live.code, live.gw, live.kickoff_time,
+                   live.position, live.team_id, team.team_code, live.opponent_team_id,
+                   live.was_home, live.minutes, live.starts, live.goals_scored, live.assists,
+                   live.clean_sheets, live.goals_conceded, live.saves, live.penalties_saved,
+                   live.penalties_missed, live.own_goals, live.yellow_cards, live.red_cards,
+                   live.bonus, live.bps, live.expected_goals, live.expected_assists,
+                   live.expected_goals_conceded, live.defensive_contribution, live.threat,
+                   live.creativity, live.influence, outcome.total_points_as_recorded,
+                   outcome.points_under_rules_2026_27
+            FROM (
+                SELECT * EXCLUDE (known_at, capture_id)
+                FROM mart_fact_player_fixture_live
+                QUALIFY row_number() OVER (
+                    PARTITION BY season, fixture, code
+                    ORDER BY known_at DESC, capture_id DESC
+                ) = 1
+            ) AS live
+            INNER JOIN ledger_outcome_player_fixture AS outcome
+              ON outcome.season = live.season
+             AND outcome.fixture = live.fixture
+             AND outcome.code = live.code
+            LEFT JOIN ({_LIVE_TEAM_LATEST}) AS team
+              ON team.season = live.season
+             AND team.team_id = live.team_id
+        """
     queries: dict[str, str] = {
         "dim_player": f"""
             WITH unified AS (
@@ -781,25 +869,7 @@ def _source_queries(
             WHERE gw IS NOT NULL AND season NOT IN (SELECT DISTINCT season FROM stg_fixture)
             GROUP BY season, gw
         """,
-        "fact_player_fixture_actual": """
-            SELECT fact.season, fact.fixture, fact.code, fact.gw, fact.kickoff_time,
-                   fact.position, fact.team_id, team.team_code, fact.opponent_team_id,
-                   fact.was_home, fact.minutes, fact.starts, fact.goals_scored, fact.assists,
-                   fact.clean_sheets, fact.goals_conceded, fact.saves, fact.penalties_saved,
-                   fact.penalties_missed, fact.own_goals, fact.yellow_cards, fact.red_cards,
-                   fact.bonus, fact.bps, fact.expected_goals, fact.expected_assists,
-                   fact.expected_goals_conceded, fact.defensive_contribution, fact.threat,
-                   fact.creativity, fact.influence, target.total_points_as_recorded,
-                   target.points_under_rules_2026_27
-            FROM mart_fact_player_fixture AS fact
-            LEFT JOIN mart_dim_team AS team
-              ON team.season = fact.season
-             AND team.team_id = fact.team_id
-            LEFT JOIN mart_target_player_fixture AS target
-              ON target.season = fact.season
-             AND target.fixture = fact.fixture
-             AND target.code = fact.code
-        """,
+        "fact_player_fixture_actual": player_actual,
         "fact_player_form": """
             SELECT season, gw, code, "window", rostered_fixtures, appearances, starts,
                    did_not_play, minutes, goals_scored, assists, bonus, bps,
@@ -819,7 +889,7 @@ def _source_queries(
     }
     if not ledger_present:
         for table_name in _LEDGER_PUBLISHED_TABLE_NAMES:
-            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V3.table(table_name))
+            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V4.table(table_name))
         return queries
 
     queries.update(
@@ -948,11 +1018,11 @@ def _source_queries(
     )
     if not player_outcomes_present:
         queries["fact_finalized_player_fixture_outcome"] = _empty_source_sql(
-            SEMANTIC_CONTRACT_V3.table("fact_finalized_player_fixture_outcome")
+            SEMANTIC_CONTRACT_V4.table("fact_finalized_player_fixture_outcome")
         )
     if not team_outcomes_present:
         queries["fact_finalized_team_fixture_outcome"] = _empty_source_sql(
-            SEMANTIC_CONTRACT_V3.table("fact_finalized_team_fixture_outcome")
+            SEMANTIC_CONTRACT_V4.table("fact_finalized_team_fixture_outcome")
         )
     return queries
 
@@ -1034,11 +1104,11 @@ def _validate_table_frame(
 def _validate_referential_integrity(tables: Mapping[str, pa.Table]) -> None:
     con = duckdb.connect(":memory:")
     try:
-        for table in SEMANTIC_CONTRACT_V3.tables:
+        for table in SEMANTIC_CONTRACT_V4.tables:
             con.register(table.name, tables[table.name])
-        for child in SEMANTIC_CONTRACT_V3.tables:
+        for child in SEMANTIC_CONTRACT_V4.tables:
             for join in child.joins:
-                parent = SEMANTIC_CONTRACT_V3.table(join.to_table)
+                parent = SEMANTIC_CONTRACT_V4.table(join.to_table)
                 on = " AND ".join(
                     f"child.{_quote_identifier(local)} = parent.{_quote_identifier(remote)}"
                     for local, remote in join.on
@@ -1382,7 +1452,7 @@ def _manifest(
     payload: dict[str, Any] = {
         "schema": BI_EXPORT_SCHEMA,
         "schema_version": BI_EXPORT_SCHEMA_VERSION,
-        "semantic_contract_version": SEMANTIC_CONTRACT_V3.version,
+        "semantic_contract_version": SEMANTIC_CONTRACT_V4.version,
         "created_at": _isoformat(created_at),
         "database_sha256": database_sha256,
         "exported_run_ids": list(exported_run_ids),
@@ -1456,8 +1526,8 @@ def _assert_manifest_shape(manifest: Mapping[str, Any]) -> None:
         or manifest["schema_version"] != BI_EXPORT_SCHEMA_VERSION
     ):
         raise BiExportValidationError("manifest export schema/version does not match this exporter")
-    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V3.version:
-        raise BiExportValidationError("manifest semantic contract version does not match v3")
+    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V4.version:
+        raise BiExportValidationError("manifest semantic contract version does not match v4")
     _manifest_timestamp(manifest["created_at"], "created_at")
     if not _is_sha256(manifest["database_sha256"]):
         raise BiExportValidationError("manifest database_sha256 must be a SHA-256 string")
@@ -1521,14 +1591,14 @@ def _validate_export_directory(
     table_metadata = manifest["tables"]
     if not isinstance(table_metadata, dict):
         raise BiExportValidationError("manifest tables must be an object")
-    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V3.tables}
+    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V4.tables}
     if set(table_metadata) != expected_table_names:
         raise BiExportValidationError(
             "manifest does not enumerate exactly the semantic contract tables"
         )
     expected_files = {MANIFEST_FILENAME}
     frames: dict[str, pa.Table] = {}
-    for table in SEMANTIC_CONTRACT_V3.tables:
+    for table in SEMANTIC_CONTRACT_V4.tables:
         entry = table_metadata[table.name]
         if not isinstance(entry, dict) or set(entry) != {"file", "row_count", "sha256"}:
             raise BiExportValidationError(f"manifest entry for {table.name} is malformed")
@@ -1747,7 +1817,7 @@ def export_bi(
                 }
                 table_exports: dict[str, TableExport] = {}
                 expected_null_counts: dict[str, dict[str, int]] = {}
-                for table in SEMANTIC_CONTRACT_V3.tables:
+                for table in SEMANTIC_CONTRACT_V4.tables:
                     if table.name in injected:
                         rows = injected[table.name]
                         frame = (

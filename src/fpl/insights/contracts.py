@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 INSIGHT_REQUEST_SCHEMA = "fpl.insight-summary-request"
 INSIGHT_RESPONSE_SCHEMA = "fpl.insight-summary-response"
 INSIGHT_ERROR_SCHEMA = "fpl.insight-summary-error"
-INSIGHT_SCHEMA_VERSION = 1
+INSIGHT_SCHEMA_VERSION = 2
 PROMPT_VERSION: Final = "evidence-renderer-v1"
 MAX_INSIGHT_BODY_BYTES = 16 * 1024
 
@@ -207,6 +207,8 @@ def _validate_plain_output(value: str, *, name: str) -> str:
 class InsightDisplayScope(_ExactModel):
     gw_from: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
     gw_to: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
+    actual_gw_from: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
+    actual_gw_to: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
     position: InsightPosition | None = None
     team_code: Annotated[int, Field(strict=True, gt=0, le=1_000_000)] | None = None
     view: InsightView | None = None
@@ -219,7 +221,13 @@ class InsightDisplayScope(_ExactModel):
     availability: InsightAvailability | None = None
     past_metric: InsightPastMetric | None = None
 
-    @field_validator("form_window", "threshold", mode="before")
+    @field_validator(
+        "actual_gw_from",
+        "actual_gw_to",
+        "form_window",
+        "threshold",
+        mode="before",
+    )
     @classmethod
     def reject_non_exact_literal_numbers(cls, value: object) -> object:
         if isinstance(value, (bool, float)):
@@ -241,6 +249,16 @@ class InsightDisplayScope(_ExactModel):
     def validate_range(self) -> Self:
         if self.gw_from is not None and self.gw_to is not None and self.gw_from > self.gw_to:
             raise ValueError("scope.gw_from must not exceed scope.gw_to")
+        if (self.actual_gw_from is None) != (self.actual_gw_to is None):
+            raise ValueError(
+                "scope.actual_gw_from and scope.actual_gw_to must be supplied together"
+            )
+        if (
+            self.actual_gw_from is not None
+            and self.actual_gw_to is not None
+            and self.actual_gw_from > self.actual_gw_to
+        ):
+            raise ValueError("scope.actual_gw_from must not exceed scope.actual_gw_to")
         if (
             self.min_price_tenths is not None
             and self.max_price_tenths is not None
@@ -278,7 +296,7 @@ class InsightFact(_ExactModel):
 
 class InsightSummaryRequest(_ExactModel):
     schema_name: Literal["fpl.insight-summary-request"] = Field(alias="schema")
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     page: InsightPage
     manifest_sha256: str
     run_id: str = Field(min_length=1, max_length=128)
@@ -411,7 +429,7 @@ class ProviderInsightItem(_ExactModel):
 
 class InsightSummaryResponse(_ExactModel):
     schema_name: Literal["fpl.insight-summary-response"] = Field(alias="schema")
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     source: InsightSource
     provider: str
     model: str
@@ -484,7 +502,7 @@ class InsightStatus(_ExactModel):
 
 class InsightErrorResponse(_ExactModel):
     schema_name: Literal["fpl.insight-summary-error"] = Field(alias="schema")
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     code: InsightErrorCode
     message: str = Field(min_length=1, max_length=160)
 

@@ -1,7 +1,7 @@
 // Players page: the player-form pivot. One row per player of the SELECTED vintage (the
 // export carries every recorded run -- the vintage selector picks one, so players never
-// repeat), merging backward form (labelled with its anchor season -- LAST season at
-// GW1) with the vintage's per-fixture xP. Chips headline the xP and are coloured by the
+// repeat), merging a separately selected range of finalized current-season actuals with
+// the vintage's per-fixture xP. Prior-season form is never substituted. Chips headline xP and are coloured by the
 // active colour source (opponent strength by default); the expanded row exposes every
 // primitive behind the colour, ordered by kickoff time.
 
@@ -13,7 +13,6 @@ import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import {
-  FORM_WINDOW_LABEL,
   INITIAL_PLAYER_FILTERS,
   PlayerFiltersBar,
   matchesPlayerFilters,
@@ -22,15 +21,22 @@ import {
 import { PlayerStatTable, type PlayerStatRow } from "@/components/PlayerStatTable";
 import { VintageSelect } from "@/components/VintageSelect";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { loadFixtureMatrix, loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
 import type { DashboardManifest, NextGwPlan, PlayerHorizonsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
+import { actualGameweekRange, aggregatePlayerActuals } from "@/lib/playerActuals";
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 import {
   compactInsightScope,
-  formWindowScope,
   insightFact,
   maxPriceTenthsScope,
   minAverageMinutesScope,
@@ -38,6 +44,11 @@ import {
   playerPositionScope,
   publishedInsightProvenance,
 } from "@/lib/insights";
+
+interface ActualRange {
+  gwFrom: number;
+  gwTo: number;
+}
 
 type PageState =
   | { status: "loading" }
@@ -62,6 +73,7 @@ export function PlayersPage() {
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
   const [filters, setFilters] = useState<FilterState | null>(null);
   const [playerFilters, setPlayerFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
+  const [actualRange, setActualRange] = useState<ActualRange | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +165,8 @@ export function PlayersPage() {
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [runPlayers]);
 
+  const actualBounds = useMemo(() => actualGameweekRange(runPlayers), [runPlayers]);
+
   const horizonIndex = useMemo(
     () => indexPlayerHorizons(state.status === "ready" ? state.playerHorizons : []),
     [state],
@@ -183,6 +197,14 @@ export function PlayersPage() {
     );
   }, [selectedRun]);
 
+  useEffect(() => {
+    setActualRange(
+      actualBounds == null
+        ? null
+        : { gwFrom: actualBounds.minGw, gwTo: actualBounds.maxGw },
+    );
+  }, [actualBounds, selectedRun?.run_id]);
+
   const rows: PlayerStatRow[] = useMemo(() => {
     if (!filters) return [];
     const wanted = runPlayers.filter((p) => matchesPlayerFilters(p, playerFilters));
@@ -209,14 +231,18 @@ export function PlayersPage() {
           )
         : null;
       return {
-        player,
+        // Suppress the shared detail row's retired prior-season form anchor on this page.
+        player: { ...player, form: null },
         filtered,
         totalXp: horizon?.xp ?? (xpValues.length ? xpValues.reduce((a, b) => a + b, 0) : null),
         horizon,
-        form: player.form ? player.form.windows[playerFilters.formWindow] : null,
+        form:
+          actualRange == null
+            ? null
+            : aggregatePlayerActuals(player.actuals, actualRange.gwFrom, actualRange.gwTo),
       };
     });
-  }, [runPlayers, filters, playerFilters, cumulativeOutcomesAvailable, horizonIndex]);
+  }, [runPlayers, filters, playerFilters, cumulativeOutcomesAvailable, horizonIndex, actualRange]);
 
   const cumulativeColumns = useMemo<LegacyColumnDef<PlayerStatRow>[]>(() => {
     if (!cumulativeOutcomesAvailable) return [];
@@ -272,9 +298,6 @@ export function PlayersPage() {
 
   const activeRunId = runId ?? state.defaultRunId;
   const activeRun = runPlayers[0];
-  const formAnchor = activeRun?.form
-    ? `${activeRun.form.season} GW${activeRun.form.as_at_gw}`
-    : "anchor unknown";
   const clearFilters = () => {
     setFilters({
       view: "overall",
@@ -283,11 +306,29 @@ export function PlayersPage() {
       gwTo: selectedRun?.gw_to ?? state.gwTo,
     });
     setPlayerFilters({ ...INITIAL_PLAYER_FILTERS });
+    setActualRange(
+      actualBounds == null
+        ? null
+        : { gwFrom: actualBounds.minGw, gwTo: actualBounds.maxGw },
+    );
   };
   const rankedRows = [...rows]
     .filter((row): row is PlayerStatRow & { totalXp: number } => row.totalXp != null)
     .sort((left, right) => right.totalXp - left.totalXp || left.player.code - right.player.code);
   const topXp = rankedRows[0];
+  const actualRows = rows.filter((row) => row.form != null);
+  const measuredActualPoints = actualRows
+    .filter(
+      (row): row is PlayerStatRow & { form: NonNullable<PlayerStatRow["form"]> } =>
+        row.form?.points_under_rules_2026_27 != null,
+    )
+    .sort(
+      (left, right) =>
+        (right.form.points_under_rules_2026_27 ?? 0) -
+          (left.form.points_under_rules_2026_27 ?? 0) ||
+        left.player.code - right.player.code,
+    );
+  const actualPointsLeader = measuredActualPoints[0];
   const flaggedCount = rows.filter(
     (row) => row.player.availability_status != null && row.player.availability_status !== "a",
   ).length;
@@ -312,11 +353,28 @@ export function PlayersPage() {
       `${flaggedCount} visible players carry a non-available next-round status overlay.`,
       ["players.json"],
     ),
+    insightFact(
+      "coverage.current_season_actuals",
+      "coverage",
+      actualRange == null
+        ? `No visible player has finalized ${activeRun?.season} actuals; prior-season form is not substituted.`
+        : `${actualRows.length} visible players have finalized ${activeRun?.season} observations in the selected GW${actualRange.gwFrom}-GW${actualRange.gwTo} range.`,
+      ["players.json"],
+    ),
+    ...(actualPointsLeader ? [
+      insightFact(
+        "rank.current_actual_points",
+        "rank",
+        `${actualPointsLeader.player.web_name} leads measured replayed points in the selected actual range with ${actualPointsLeader.form.points_under_rules_2026_27}.`,
+        ["players.json"],
+      ),
+    ] : []),
   ];
   const insightCaveats = [
     "xP totals sum already-published player-fixture values or select an exact cumulative endpoint.",
     "Outcome probabilities are shown only for the run's fixed start and all venues.",
     "The availability status is a next-round overlay and is not applied to raw xP.",
+    "Actual GWs contain finalized observations from the selected vintage's current season only.",
   ];
 
   return (
@@ -331,7 +389,8 @@ export function PlayersPage() {
           />
           <p className="text-xs text-muted-foreground">
             {runPlayers.length} players · as of{" "}
-            {activeRun?.as_of?.replace("T", " ").slice(0, 16)} UTC · form anchored {formAnchor}
+            {activeRun?.as_of?.replace("T", " ").slice(0, 16)} UTC · actuals restricted to{" "}
+            {activeRun?.season}
           </p>
         </div>
       </div>
@@ -353,11 +412,76 @@ export function PlayersPage() {
               </Button>
             </div>
           )}
-          <PlayerFiltersBar filters={playerFilters} onChange={setPlayerFilters} teams={teams} />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <PlayerFiltersBar
+              filters={playerFilters}
+              onChange={setPlayerFilters}
+              teams={teams}
+              showFormWindow={false}
+            />
+            {actualBounds != null && actualRange != null && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Actual GWs</span>
+                <Select
+                  value={String(actualRange.gwFrom)}
+                  onValueChange={(value) =>
+                    setActualRange((current) =>
+                      current == null
+                        ? current
+                        : { ...current, gwFrom: Math.min(Number(value), current.gwTo) },
+                    )
+                  }
+                >
+                  <SelectTrigger size="sm" className="w-16" aria-label="Actual from gameweek">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(
+                      { length: actualRange.gwTo - actualBounds.minGw + 1 },
+                      (_, index) => actualBounds.minGw + index,
+                    ).map((gw) => (
+                      <SelectItem key={gw} value={String(gw)}>GW{gw}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span>to</span>
+                <Select
+                  value={String(actualRange.gwTo)}
+                  onValueChange={(value) =>
+                    setActualRange((current) =>
+                      current == null
+                        ? current
+                        : { ...current, gwTo: Math.max(Number(value), current.gwFrom) },
+                    )
+                  }
+                >
+                  <SelectTrigger size="sm" className="w-16" aria-label="Actual to gameweek">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(
+                      { length: actualBounds.maxGw - actualRange.gwFrom + 1 },
+                      (_, index) => actualRange.gwFrom + index,
+                    ).map((gw) => (
+                      <SelectItem key={gw} value={String(gw)}>GW{gw}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
-            Forecast GWs filter upcoming fixtures and xP only. Past form is observed through{" "}
-            {formAnchor} and is controlled separately by Past form window.
+            Forecast GWs filter upcoming fixtures and xP only. Actual GWs independently aggregate
+            finalized {activeRun?.season} observations; they never include a previous season.
+            The Min avg min (L5) filter remains its separately published trailing-five anchor and
+            does not follow Actual GWs.
           </p>
+          {actualBounds == null && (
+            <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
+              No finalized player actuals are published for {activeRun?.season}. Observed columns
+              stay unavailable; prior-season form is not substituted.
+            </p>
+          )}
         </div>
       </FilterPanel>
 
@@ -401,11 +525,12 @@ export function PlayersPage() {
           scope: compactInsightScope({
             gw_from: filters?.gwFrom,
             gw_to: filters?.gwTo,
+            actual_gw_from: actualRange?.gwFrom,
+            actual_gw_to: actualRange?.gwTo,
             position: playerPositionScope(playerFilters.position),
             team_code: playerFilters.teamCode === "all" ? undefined : Number(playerFilters.teamCode),
             view: filters?.view === "defense" ? "defence" : filters?.view,
             venue: filters?.venue,
-            form_window: formWindowScope(playerFilters.formWindow),
             min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
             max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
             min_avg_minutes_l5: minAverageMinutesScope(playerFilters.minMinutes),
@@ -415,6 +540,7 @@ export function PlayersPage() {
             runId: activeRunId,
             filters,
             playerFilters,
+            actualRange,
             colorSource,
           }),
         }}
@@ -429,8 +555,14 @@ export function PlayersPage() {
           gwFrom={filters.gwFrom}
           gwTo={filters.gwTo}
           opponentIndexOf={opponentIndexOf}
-          formHeading={FORM_WINDOW_LABEL[playerFilters.formWindow]}
-          formTitle={`Form window ${FORM_WINDOW_LABEL[playerFilters.formWindow]}, anchored ${formAnchor} (last season at GW1)`}
+          formHeading={
+            actualRange == null ? "Actual" : `Actual GW${actualRange.gwFrom}-${actualRange.gwTo}`
+          }
+          formTitle={
+            actualRange == null
+              ? `No finalized ${activeRun?.season} actuals published`
+              : `Finalized ${activeRun?.season} actuals, GW${actualRange.gwFrom}-GW${actualRange.gwTo}`
+          }
           formColumnProfile="players"
           beforeFixtureColumns={cumulativeColumns}
         />

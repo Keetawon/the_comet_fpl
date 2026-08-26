@@ -24,6 +24,7 @@ import polars as pl
 import pytest
 
 import fpl.storage.db
+from fpl.publish.contract import SEMANTIC_CONTRACT_VERSION
 from fpl.publish.dashboard_json import (
     DASHBOARD_JSON_SCHEMA_VERSION,
     FIXTURE_MATRIX_FILENAME,
@@ -174,6 +175,51 @@ def _player_form_row(gw: int, code: int, window: str, **overrides: Any) -> dict[
         "goals_conceded": 0,
         "saves": 0,
         "expected_goals_conceded": None,
+    }
+    row.update(overrides)
+    return row
+
+
+def _player_actual_row(
+    fixture: int,
+    code: int,
+    gw: int,
+    **overrides: Any,
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "season": SEASON,
+        "fixture": fixture,
+        "code": code,
+        "gw": gw,
+        "kickoff_time": KICKOFFS[fixture],
+        "position": "GK" if code == 1 else "MID",
+        "team_id": 1,
+        "team_code": 101,
+        "opponent_team_id": 2,
+        "was_home": True,
+        "minutes": 90,
+        "starts": 1,
+        "goals_scored": 0,
+        "assists": 0,
+        "clean_sheets": 0,
+        "goals_conceded": 1,
+        "saves": 3,
+        "penalties_saved": 0,
+        "penalties_missed": 0,
+        "own_goals": 0,
+        "yellow_cards": 0,
+        "red_cards": 0,
+        "bonus": 1,
+        "bps": 22,
+        "expected_goals": None,
+        "expected_assists": None,
+        "expected_goals_conceded": 1.1,
+        "defensive_contribution": None,
+        "threat": None,
+        "creativity": None,
+        "influence": None,
+        "total_points_as_recorded": 6,
+        "points_under_rules_2026_27": 6,
     }
     row.update(overrides)
     return row
@@ -409,6 +455,33 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
         "fact_forecast_team_fixture": team_fixture,
         "fact_forecast_player_gameweek": player_gameweek,
         "fact_forecast_player_fixture": player_fixture,
+        "fact_player_fixture_actual": [
+            _player_actual_row(100, 1, 1),
+            _player_actual_row(101, 1, 2, opponent_team_id=3, goals_conceded=2),
+            _player_actual_row(
+                102,
+                1,
+                2,
+                opponent_team_id=2,
+                was_home=False,
+                minutes=28,
+                starts=None,
+                saves=0,
+                expected_goals_conceded=None,
+                points_under_rules_2026_27=2,
+            ),
+            _player_actual_row(
+                100,
+                2,
+                1,
+                position="MID",
+                saves=0,
+                goals_conceded=0,
+                expected_goals=0.25,
+                expected_assists=0.4,
+                points_under_rules_2026_27=1,
+            ),
+        ],
         "dim_optimizer_run": [
             _optimizer_run_row("opt-1", "dec-1"),
             _optimizer_run_row(
@@ -597,7 +670,7 @@ def _write_manifest(export_dir: Path, tables: dict[str, dict[str, Any]]) -> None
     manifest: dict[str, Any] = {
         "schema": "fpl.bi-semantic-export",
         "schema_version": 1,
-        "semantic_contract_version": 3,
+        "semantic_contract_version": SEMANTIC_CONTRACT_VERSION,
         "created_at": CREATED_AT.isoformat(),
         "database_sha256": DATABASE_SHA,
         "exported_run_ids": [RUN_ID],
@@ -947,6 +1020,11 @@ def test_player_horizon_generation_reconciles_players_and_exact_endpoints(
     with pytest.raises(DashboardJsonError, match="does not reconcile"):
         _validate_player_horizon_generation(missing_player, manifest)
 
+    missing_actuals = json.loads(json.dumps(documents))
+    del missing_actuals[PLAYERS_FILENAME]["players"][0]["actuals"]
+    with pytest.raises(DashboardJsonError, match="actuals must be an array"):
+        _validate_player_horizon_generation(missing_actuals, manifest)
+
     extra_run = json.loads(json.dumps(manifest))
     extra_run["runs"].append(
         {
@@ -1127,6 +1205,70 @@ def test_form_anchor_is_the_latest_season_then_gameweek(tmp_path: Path) -> None:
     assert vicario["avg_minutes_last_5"] == pytest.approx(52.0)  # 260 minutes / 5 rostered
     assert _player(models, 2)["form"] is None
     assert _player(models, 2)["avg_minutes_last_5"] is None
+
+
+def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
+    tmp_path: Path,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    prior_kickoff = datetime(2026, 5, 24, 14, tzinfo=UTC)
+    prior = {
+        **_player_actual_row(100, 1, 1),
+        "season": PRIOR,
+        "fixture": 900,
+        "gw": 38,
+        "kickoff_time": prior_kickoff,
+    }
+    _rewrite_table(
+        export_dir,
+        "fact_player_fixture_actual",
+        [*_source_tables()["fact_player_fixture_actual"], prior],
+    )
+    current_gameweeks = [
+        {**row, "finished": row["gw"] == 2}
+        for row in _source_tables()["dim_gameweek"]
+    ]
+    current_gameweeks.append(
+        {
+            "season": PRIOR,
+            "gw": 38,
+            "deadline_time": None,
+            "first_kickoff": prior_kickoff,
+            "last_kickoff": prior_kickoff,
+            "fixture_count": 1,
+            "finished": True,
+        }
+    )
+    _rewrite_table(export_dir, "dim_gameweek", current_gameweeks)
+
+    models = build_dashboard_read_models(export_dir)
+    vicario = _player(models, 1)
+    assert [row["fixture"] for row in vicario["actuals"]] == [101, 102]
+    assert [row["gw"] for row in vicario["actuals"]] == [2, 2]
+    assert vicario["actuals"][1]["starts"] is None
+    assert vicario["actuals"][1]["expected_goals_conceded"] is None
+    assert _player(models, 2)["actuals"] == []
+    assert json.loads(render_read_model_files(models)[PLAYERS_FILENAME])["players"][0][
+        "actuals"
+    ] == vicario["actuals"]
+
+
+def test_player_actuals_fail_closed_on_duplicate_fixture_identity(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_player_fixture_actual"]
+    _rewrite_table(export_dir, "fact_player_fixture_actual", [*rows, dict(rows[0])])
+    with pytest.raises(DashboardJsonError, match="not unique"):
+        build_dashboard_read_models(export_dir)
+
+
+def test_player_actual_source_table_is_required(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    manifest_path = export_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del manifest["tables"]["fact_player_fixture_actual"]
+    manifest_path.write_bytes(_canonical_json_bytes(manifest, indent=2))
+    with pytest.raises(DashboardJsonError, match="required table"):
+        build_dashboard_read_models(export_dir)
 
 
 def test_missing_window_at_the_anchor_fails_closed(tmp_path: Path) -> None:

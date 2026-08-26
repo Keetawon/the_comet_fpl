@@ -60,6 +60,8 @@ _PAGE_SCOPE_FIELDS: Final[dict[InsightPage, frozenset[str]]] = {
         {
             "gw_from",
             "gw_to",
+            "actual_gw_from",
+            "actual_gw_to",
             "position",
             "team_code",
             "view",
@@ -109,7 +111,8 @@ _CAVEATS: Final[dict[InsightPage, tuple[str, ...]]] = {
     ),
     InsightPage.PLAYERS: (
         "Availability is a reported next-round overlay and is not applied to raw expected points.",
-        "Backward-looking form is not a future player forecast.",
+        "Actual-GW totals use only complete finalized current-season fixtures and are not a "
+        "future player forecast.",
     ),
     InsightPage.PLAYER_ANALYTICS: (
         "Frontier membership is display geometry, not a model quantity or model verdict.",
@@ -555,6 +558,77 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
                 InsightReadModel.PLAYERS,
             )
         )
+    actual_from = request.scope.actual_gw_from
+    actual_to = request.scope.actual_gw_to
+    if actual_from is not None and actual_to is not None:
+        run_players = [
+            player
+            for player in generation.documents[InsightReadModel.PLAYERS].get("players", [])
+            if player.get("run_id") == request.run_id
+            and player.get("season") == request.season
+        ]
+        available_gws = sorted(
+            {
+                int(actual["gw"])
+                for player in run_players
+                for actual in player.get("actuals", [])
+                if isinstance(actual.get("gw"), int)
+            }
+        )
+        if not available_gws:
+            raise InsightEvidenceError(
+                "actual-gameweek scope was requested but no finalized current-season actuals exist"
+            )
+        if actual_from < available_gws[0] or actual_to > available_gws[-1]:
+            raise InsightEvidenceError("actual-gameweek scope exceeds finalized current-season data")
+
+        actual_scored: list[tuple[Mapping[str, Any], int]] = []
+        for player in players:
+            selected_actuals = [
+                actual
+                for actual in player.get("actuals", [])
+                if isinstance(actual.get("gw"), int)
+                and actual_from <= int(actual["gw"]) <= actual_to
+            ]
+            appeared = [
+                actual
+                for actual in selected_actuals
+                if isinstance(actual.get("minutes"), int) and int(actual["minutes"]) >= 1
+            ]
+            if not appeared or any(
+                isinstance(actual.get("points_under_rules_2026_27"), bool)
+                or not isinstance(actual.get("points_under_rules_2026_27"), int)
+                for actual in appeared
+            ):
+                continue
+            actual_scored.append(
+                (
+                    player,
+                    sum(int(actual["points_under_rules_2026_27"]) for actual in appeared),
+                )
+            )
+        actual_scored.sort(key=lambda item: (-item[1], int(item[0]["code"])))
+        facts.append(
+            _fact(
+                "players.actual.coverage",
+                InsightFactKind.COVERAGE,
+                f"{len(actual_scored)} selected players have complete replayed actual points "
+                f"from finalized current-season GW{actual_from} through GW{actual_to}; "
+                f"{len(players) - len(actual_scored)} do not.",
+                InsightReadModel.PLAYERS,
+            )
+        )
+        for index, (player, points) in enumerate(actual_scored[:3], 1):
+            facts.append(
+                _fact(
+                    f"players.actual.rank.{index}",
+                    InsightFactKind.RANK,
+                    f"{_label(player.get('web_name'), 'Player')} ranks {index} with {points} "
+                    f"replayed actual points from finalized GW{actual_from} through "
+                    f"GW{actual_to}.",
+                    InsightReadModel.PLAYERS,
+                )
+            )
     return facts
 
 

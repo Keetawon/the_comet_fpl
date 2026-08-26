@@ -1,11 +1,11 @@
-# BI export contract, version 2
+# BI export contract, version 4
 
 Status: implemented by DEV-ROADMAP P1.4. This document describes the durable, read-only BI
 boundary; `src/fpl/publish/contract.py` remains the frozen semantic schema authority.
 
-Version 2 additively carries current directed `home_official_fdr` and
-`away_official_fdr` on `dim_fixture` for the separately versioned schedule overlay. Forecast
-facts and the fixture-ease formula are unchanged.
+Version 4 retains v2's directed schedule FDR and v3's exact team PMFs plus append-only monitoring
+outcomes. It additively lets `fact_player_fixture_actual` publish finalized current-season player
+components without treating a mutable live capture as proof of finality.
 
 ## Boundary
 
@@ -108,9 +108,17 @@ exporter does not invent an artificial role or row to make that field appear pop
 
 ### Actuals and unmeasured values
 
-`fact_player_fixture_actual` comes only from `mart_fact_player_fixture` joined to
-`mart_target_player_fixture`. It carries no `run_id`, and preserves
-`total_points_as_recorded` and `points_under_rules_2026_27` as separate measures.
+Archive rows in `fact_player_fixture_actual` come from `mart_fact_player_fixture` joined to
+`mart_target_player_fixture` on `(season, fixture, code)`. Current-season rows use the latest
+`mart_fact_player_fixture_live` version at that same grain, ordered deterministically by descending
+`(known_at, capture_id)`, and enter only through an exact inner join to append-only
+`ledger_outcome_player_fixture`. The ledger owns finality and supplies both
+`total_points_as_recorded` and `points_under_rules_2026_27`; a mutable live row without that ledger
+outcome is excluded.
+
+Archive and eligible-live rows are combined with `UNION ALL`, so any overlapping grain reaches the
+normal uniqueness validator and fails publication instead of being silently deduplicated. This
+path remains at fixture grain, including both double-gameweek legs. It carries no `run_id`.
 
 No source NULL is zero-filled. Nullable floats remain Parquet NULLs—not `NaN` and not `0.0`—and
 non-finite floats are refused. The P1.2 ledger does not persist fixture-level player minutes/rates,
@@ -174,7 +182,7 @@ characters):
 {
   "schema": "fpl.bi-semantic-export",
   "schema_version": 1,
-  "semantic_contract_version": 2,
+  "semantic_contract_version": 4,
   "created_at": "2026-08-14T00:00:00+00:00",
   "database_sha256": "…",
   "exported_run_ids": [],
@@ -197,6 +205,6 @@ characters):
 }
 ```
 
-The real `tables` object always contains all sixteen contract tables. `created_at`, exported
+The real `tables` object always contains all eighteen contract tables. `created_at`, exported
 `run_id`s, source min/max `known_at`, freshness, database hash, per-table row counts, and per-file
 hashes are all required and validated on read.

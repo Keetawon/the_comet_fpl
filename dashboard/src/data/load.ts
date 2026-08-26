@@ -37,8 +37,8 @@ const BASE: string = import.meta.env.VITE_DATA_BASE ?? "/data";
 // map and the browser tab parses it exactly once. A failed fetch is evicted so it can
 // be retried.
 const cache = new Map<string, Promise<unknown>>();
-const DASHBOARD_SCHEMA_VERSION = 5;
-const FORECAST_ACCURACY_SCHEMA_VERSION = 5;
+const DASHBOARD_SCHEMA_VERSION = 6;
+const FORECAST_ACCURACY_SCHEMA_VERSION = 6;
 const HORIZON_VALUE_DECIMAL_PLACES = 6;
 const PROBABILITY_TOLERANCE = 10 ** -HORIZON_VALUE_DECIMAL_PLACES;
 const PLAN_KINDS = new Set<PlanKind>([
@@ -71,7 +71,7 @@ function readModelObject(
   schema: string,
 ): Record<string, unknown> {
   if (!payload || typeof payload !== "object") {
-    throw new Error(`invalid ${filename}: expected a schema-v5 object`);
+    throw new Error(`invalid ${filename}: expected a schema-v6 object`);
   }
   const candidate = payload as Record<string, unknown>;
   if (
@@ -165,7 +165,14 @@ export async function loadPlayers(): Promise<PlayersData> {
   if (!Array.isArray(candidate.players)) {
     throw new Error("invalid players.json: players must be an array");
   }
-  return { players: candidate.players as PlayerRecord[], manifest };
+  const players = candidate.players as Partial<PlayerRecord>[];
+  if (players.some((player) => !Array.isArray(player.actuals))) {
+    throw new Error(
+      "invalid players.json: every player must carry current-season actuals; " +
+        "republish the dashboard read models",
+    );
+  }
+  return { players: players as PlayerRecord[], manifest };
 }
 
 function sameArray<T extends string | number>(value: unknown, expected: readonly T[]): boolean {
@@ -185,7 +192,7 @@ function hasExactKeys(value: object, expected: readonly string[]): boolean {
 export async function loadPlayerHorizons(): Promise<PlayerHorizonsData> {
   const payload = await fetchJson<unknown>("player_horizons.json");
   if (!payload || typeof payload !== "object") {
-    throw new Error("invalid player_horizons.json: expected a schema-v5 object");
+    throw new Error("invalid player_horizons.json: expected a schema-v6 object");
   }
   const candidate = payload as Record<string, unknown>;
   const semantics = candidate.semantics as Record<string, unknown> | undefined;
@@ -1000,7 +1007,7 @@ function forecastAccuracyEnvelope(
     filename,
   );
   if (envelope.schema !== schema || envelope.json_schema_version !== FORECAST_ACCURACY_SCHEMA_VERSION) {
-    throw new Error(`unsupported ${filename} schema: expected ${schema} version 5; republish the dashboard read models`);
+    throw new Error(`unsupported ${filename} schema: expected ${schema} version 6; republish the dashboard read models`);
   }
   objectValue(envelope.semantics, `${filename}.semantics`);
   if (typeof envelope.has_outcomes !== "boolean" || !Array.isArray(envelope.runs)) {
@@ -1045,7 +1052,7 @@ export async function loadTeamForecastVsActual(): Promise<TeamForecastVsActualDa
   return { ...envelope, runs, manifest } as unknown as TeamForecastVsActualData;
 }
 
-/** Temporary source-compatibility alias; it loads the explicit schema-v5 player file. */
+/** Temporary source-compatibility alias; it loads the explicit schema-v6 player file. */
 export const loadForecastVsActual = loadPlayerForecastVsActual;
 
 export async function loadOptimizerAudit(): Promise<OptimizerAuditData> {

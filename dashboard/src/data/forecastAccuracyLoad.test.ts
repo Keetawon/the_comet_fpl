@@ -24,7 +24,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("schema-v5 forecast accuracy loaders", () => {
+describe("schema-v6 forecast accuracy loaders", () => {
   it("accepts the exact player and team files without transporting PMFs", async () => {
     const loaders = await loadWith({
       "player_forecast_vs_actual.json": playerSample,
@@ -33,25 +33,25 @@ describe("schema-v5 forecast accuracy loaders", () => {
 
     await expect(loaders.loadPlayerForecastVsActual()).resolves.toMatchObject({
       schema: "fpl.dashboard-player-forecast-vs-actual",
-      json_schema_version: 5,
+      json_schema_version: 6,
       has_outcomes: true,
     });
     await expect(loaders.loadTeamForecastVsActual()).resolves.toMatchObject({
       schema: "fpl.dashboard-team-forecast-vs-actual",
-      json_schema_version: 5,
+      json_schema_version: 6,
       has_outcomes: true,
     });
     expect("distribution" in playerSample.runs[0].observations[0]).toBe(false);
     expect("goals_for_distribution" in teamSample.runs[0].observations[0]).toBe(false);
   });
 
-  it("rejects stale or ambiguous schema-v4 monitoring payloads", async () => {
-    const stale = { ...playerSample, json_schema_version: 4 };
+  it("rejects stale or ambiguous schema-v5 monitoring payloads", async () => {
+    const stale = { ...playerSample, json_schema_version: 5 };
     const { loadPlayerForecastVsActual } = await loadWith({
       "player_forecast_vs_actual.json": stale,
     });
     await expect(loadPlayerForecastVsActual()).rejects.toThrow(
-      /expected fpl\.dashboard-player-forecast-vs-actual version 5/,
+      /expected fpl\.dashboard-player-forecast-vs-actual version 6/,
     );
   });
 

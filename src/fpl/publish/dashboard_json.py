@@ -62,7 +62,10 @@ DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
 # v5: retrospective monitoring is split into player and team files.  Both consume only
 # immutable outcome-ledger facts, enforce complete-gameweek/two-sided finality here, and
 # publish scalar observations and scores rather than PMFs to the browser.
-DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 5
+# v6: each player also carries season-scoped, fixture-grain actuals from the observed-history
+# mart.  Only officially complete gameweeks are included; the browser may filter and sum these
+# already-published values but never reaches back into DuckDB.
+DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 6
 FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
 PLAYER_HORIZONS_SCHEMA: Final[str] = "fpl.dashboard-player-horizons"
@@ -95,6 +98,7 @@ _READ_TABLES: Final[tuple[str, ...]] = (
     "fact_team_form",
     "fact_forecast_player_gameweek",
     "fact_player_form",
+    "fact_player_fixture_actual",
     "fact_forecast_player_fixture",
     "fact_optimizer_plan",
     "fact_finalized_player_fixture_outcome",
@@ -102,6 +106,25 @@ _READ_TABLES: Final[tuple[str, ...]] = (
     "dim_optimizer_run",
 )
 _WINDOW_LABELS: Final[tuple[str, ...]] = ("last_3", "last_5", "last_10", "season_to_date")
+_PLAYER_ACTUAL_FIELDS: Final[tuple[str, ...]] = (
+    "gw",
+    "fixture",
+    "kickoff_time",
+    "minutes",
+    "starts",
+    "goals_scored",
+    "assists",
+    "clean_sheets",
+    "goals_conceded",
+    "saves",
+    "bonus",
+    "bps",
+    "defensive_contribution",
+    "expected_goals",
+    "expected_assists",
+    "expected_goals_conceded",
+    "points_under_rules_2026_27",
+)
 _HORIZON_THRESHOLDS: Final[tuple[int, ...]] = (2, 4, 6, 10, 15)
 _HORIZON_FIELDS: Final[tuple[str, ...]] = (
     "gw_to",
@@ -801,6 +824,67 @@ def _build_player_horizons(
     return tuple(result)
 
 
+def _finished_player_actuals(
+    player_actual: pl.DataFrame,
+    gameweeks: pl.DataFrame,
+) -> dict[tuple[str, int], list[dict[str, Any]]]:
+    """Season-scoped observed fixture rows from officially complete gameweeks only."""
+    if player_actual.height == 0:
+        return {}
+    _require_no_nulls(
+        player_actual,
+        ("season", "fixture", "code", "gw"),
+        "a player actual row is missing its season-qualified fixture identity",
+    )
+    duplicate = (
+        player_actual.group_by(["season", "fixture", "code"])
+        .len()
+        .filter(pl.col("len") != 1)
+    )
+    if duplicate.height:
+        raise DashboardJsonError(
+            "player actual rows are not unique at (season, fixture, code)"
+        )
+
+    gameweek_state = gameweeks.select("season", "gw", pl.col("finished").alias("_gw_finished"))
+    duplicate_gameweek = (
+        gameweek_state.group_by(["season", "gw"]).len().filter(pl.col("len") != 1)
+    )
+    if duplicate_gameweek.height:
+        raise DashboardJsonError("dim_gameweek is not unique at (season, gw)")
+
+    finished = (
+        player_actual.join(gameweek_state, on=["season", "gw"], how="left")
+        .filter(pl.col("_gw_finished").fill_null(False))
+        .sort(["season", "code", "gw", "kickoff_time", "fixture"], nulls_last=True)
+    )
+    result: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    for row in finished.iter_rows(named=True):
+        key = (str(row["season"]), int(row["code"]))
+        result.setdefault(key, []).append(
+            {
+                "gw": row["gw"],
+                "fixture": row["fixture"],
+                "kickoff_time": _iso_or_none(row["kickoff_time"]),
+                "minutes": row["minutes"],
+                "starts": row["starts"],
+                "goals_scored": row["goals_scored"],
+                "assists": row["assists"],
+                "clean_sheets": row["clean_sheets"],
+                "goals_conceded": row["goals_conceded"],
+                "saves": row["saves"],
+                "bonus": row["bonus"],
+                "bps": row["bps"],
+                "defensive_contribution": row["defensive_contribution"],
+                "expected_goals": row["expected_goals"],
+                "expected_assists": row["expected_assists"],
+                "expected_goals_conceded": row["expected_goals_conceded"],
+                "points_under_rules_2026_27": row["points_under_rules_2026_27"],
+            }
+        )
+    return result
+
+
 def _build_players(
     player_gameweek: pl.DataFrame,
     player_fixture: pl.DataFrame,
@@ -810,6 +894,8 @@ def _build_players(
     dim_fixture: pl.DataFrame,
     runs: pl.DataFrame,
     player_form: pl.DataFrame,
+    player_actual: pl.DataFrame,
+    gameweeks: pl.DataFrame,
 ) -> tuple[dict[str, Any], ...]:
     # Identity comes from each player's FIRST forecast gameweek: the deadline-known price,
     # ownership and reported availability of the vintage.
@@ -917,6 +1003,7 @@ def _build_players(
     windows = _latest_form_windows(
         player_form.filter(pl.col("code").is_in(sorted(roster_codes))), "code"
     )
+    actuals = _finished_player_actuals(player_actual, gameweeks)
 
     players: list[dict[str, Any]] = []
     for key in sorted(identities):
@@ -941,6 +1028,9 @@ def _build_players(
                 # the ledger repeats it for later ones.  Passed through, never folded in.
                 "form": windows.get(code),
                 "avg_minutes_last_5": _avg_minutes_last_5(windows.get(code)),
+                # Actuals are deliberately keyed by the forecast record's own season.  A
+                # prior-season fallback would make an early-season range silently mix seasons.
+                "actuals": actuals.get((season, code), []),
                 "fixtures": fixtures.get(key, []),
             }
         )
@@ -2322,6 +2412,8 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_fixture"],
         frames["dim_forecast_run"],
         frames["fact_player_form"],
+        frames["fact_player_fixture_actual"],
+        frames["dim_gameweek"],
     )
     player_horizons = _build_player_horizons(
         frames["fact_forecast_player_gameweek"], frames["dim_forecast_run"]
@@ -2666,6 +2758,46 @@ def _validate_player_horizon_generation(
         if player_key in player_keys:
             raise DashboardJsonError(f"players.json repeats player identity {player_key}")
         player_keys.add(player_key)
+
+        actuals = player.get("actuals")
+        if not isinstance(actuals, list):
+            raise DashboardJsonError(f"players.json {player_key} actuals must be an array")
+        previous_order: tuple[int, bool, str, int] | None = None
+        fixture_keys: set[int] = set()
+        for actual in actuals:
+            if not isinstance(actual, dict) or set(actual) != set(_PLAYER_ACTUAL_FIELDS):
+                raise DashboardJsonError(
+                    f"players.json {player_key} has a malformed actual fixture row"
+                )
+            gw, fixture, kickoff = (
+                actual["gw"],
+                actual["fixture"],
+                actual["kickoff_time"],
+            )
+            if (
+                not isinstance(gw, int)
+                or isinstance(gw, bool)
+                or gw <= 0
+                or not isinstance(fixture, int)
+                or isinstance(fixture, bool)
+                or fixture <= 0
+                or (kickoff is not None and not isinstance(kickoff, str))
+            ):
+                raise DashboardJsonError(
+                    f"players.json {player_key} has an invalid actual fixture identity"
+                )
+            if fixture in fixture_keys:
+                raise DashboardJsonError(
+                    f"players.json {player_key} repeats actual fixture {fixture}"
+                )
+            fixture_keys.add(fixture)
+            order = (gw, kickoff is None, kickoff or "", fixture)
+            if previous_order is not None and order < previous_order:
+                raise DashboardJsonError(
+                    f"players.json {player_key} actuals are not ordered by "
+                    "gameweek/kickoff/fixture"
+                )
+            previous_order = order
 
     horizon_keys: set[tuple[str, str, int]] = set()
     for player in horizon_rows:

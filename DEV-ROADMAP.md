@@ -35,9 +35,9 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   and Plan Builder paths are implemented and rehearsed, and the immutable 2026-08-17 evening pack
   remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
-- **Goal 2's MVP, deep analytics, exact parallel monitoring, and evidence-bound summaries are
-  implemented development-only.** Semantic contract version 3, dashboard
-  schema version 5, immutable player/team outcomes, the atomic static-JSON boundary, nine read-only
+- **Goal 2's MVP, deep analytics, exact parallel monitoring, evidence-bound summaries, and
+  current-season Players actual range are implemented development-only.** Semantic contract
+  version 4, dashboard schema version 6, immutable player/team outcomes, the atomic static-JSON boundary, nine read-only
   analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
   development-only. P1.8's full Players-page
   form matrix and additive observed
@@ -68,7 +68,7 @@ series; later handoff records the new commits and full gate rather than rewritin
 - Stage E selects a legal 15-player squad and exact weekly lineup/captain, then performs a bounded
   multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed, and immutable
   platform/default, diagnostic, and custom-plan identities are separated fail-closed.
-- The BI semantic-v3/star export, fixture difficulty and player/team form facts, atomic schema-v5
+- The BI semantic-v4/star export, fixture difficulty and player/team form/actual facts, atomic schema-v6
   static JSON, nine read-only analytic/decision pages, Plan Builder, and Squad Draft are implemented
   development-only. The browser reads only published JSON and never DuckDB. Player/Team analytics
   and separate Player/Team prediction-monitoring pages are current; the old
@@ -929,7 +929,7 @@ operation, and test; implementation cannot silently weaken these requirements.
 
 **Status (2026-08-26): implemented development-only; focused and full dashboard tests pass.**
 Player analytics and Team analytics use only the cumulative/forecast values introduced in dashboard
-schema version 4 and retained unchanged in current schema version 5. They do not reach around P2.3's
+schema version 4 and retained unchanged in current schema version 6. They do not reach around P2.3's
 outcome facts.
 
 - Player views: price-versus-cumulative-xP Pareto frontier; published inclusive haul-versus-downside
@@ -995,7 +995,7 @@ Builder, and Squad Draft remain deterministic-only.
   quota is not assumed to license general application calls; configure a general API key/balance
   under the current provider terms.
 - Requests send only exact typed page/vintage/filter selectors. The server verifies the selected
-  schema-v5 manifest and file hashes, reconstructs the allowlisted facts from that static
+  schema-v6 manifest and file hashes, reconstructs the allowlisted facts from that static
   generation, and refuses mismatched provenance before provider/cache work. No PMFs, caller prose,
   arbitrary prompts, manager/custom-plan identifiers, squads, bank, selling values, capture data,
   credentials, or full page payloads cross the boundary.
@@ -1024,6 +1024,18 @@ selectable. The obsolete `forecast_vs_actual.json` is absent from the replaced g
 ### P2.5 - Other post-deadline work
 
 Only after the ordered dashboard program above, unless an operational blocker requires otherwise:
+
+- **Players current-season Actual-GW range (implemented development-only 2026-08-26).** BI
+  semantic contract v4 extends `fact_player_fixture_actual` with deterministic latest live
+  components only when the exact append-only finalized player outcome exists. Dashboard schema v6
+  attaches only same-season rows from officially complete gameweeks to each player, keeps both
+  double-gameweek legs, and never falls back to prior-season form. The Players route owns a
+  separate `Actual GWs` from/to range, while Forecast GWs continue to control only future fixtures
+  and xP. Browser arithmetic is limited to summing published observed components and forming the
+  documented descriptive per-90 ratios from matching published measured-minute denominators.
+  Insight request schema v2 carries distinct actual-range selectors. Acceptance requires archive/
+  live duplicate rejection, finalized-ledger gating, complete-GW filtering, NULL preservation,
+  range/DGW aggregation tests, a schema-v6 atomic republish, and visual verification.
 
 - measure and contract per-GW availability semantics;
 - design future price-change and future selling-value handling;

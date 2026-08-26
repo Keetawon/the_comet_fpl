@@ -24,6 +24,8 @@ export type InsightPage =
 export interface InsightDisplayScope {
   gw_from?: number;
   gw_to?: number;
+  actual_gw_from?: number;
+  actual_gw_to?: number;
   position?: "all" | "GK" | "DEF" | "MID" | "FWD";
   team_code?: number;
   view?:
@@ -57,7 +59,7 @@ export interface InsightDisplayScope {
 
 export interface InsightSummaryRequest {
   schema: "fpl.insight-summary-request";
-  schema_version: 1;
+  schema_version: 2;
   page: InsightPage;
   manifest_sha256: string;
   run_id: string;
@@ -73,7 +75,7 @@ export interface InsightSummaryItem {
 
 export interface InsightSummaryResponse {
   schema: "fpl.insight-summary-response";
-  schema_version: 1;
+  schema_version: 2;
   source: "provider" | "cache";
   provider: string;
   model: string;
@@ -94,6 +96,8 @@ export interface InsightStatus {
 const INSIGHT_SCOPE_KEYS = [
   "gw_from",
   "gw_to",
+  "actual_gw_from",
+  "actual_gw_to",
   "position",
   "team_code",
   "view",
@@ -118,7 +122,7 @@ export function selectorOnlyInsightRequest(
   ) as InsightDisplayScope;
   return {
     schema: "fpl.insight-summary-request",
-    schema_version: 1,
+    schema_version: 2,
     page: request.page,
     manifest_sha256: request.manifest_sha256,
     run_id: request.run_id,
@@ -330,7 +334,7 @@ export function parseInsightSummaryResponse(payload: unknown): InsightSummaryRes
   );
   if (
     value.schema !== "fpl.insight-summary-response" ||
-    value.schema_version !== 1 ||
+    value.schema_version !== 2 ||
     (value.source !== "provider" && value.source !== "cache") ||
     value.prompt_version !== "evidence-renderer-v1"
   ) {

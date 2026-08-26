@@ -213,6 +213,8 @@ class TestSelectorContract:
         [
             ("gw_from", 1.0),
             ("gw_to", True),
+            ("actual_gw_from", 1.0),
+            ("actual_gw_to", False),
             ("team_code", 1.0),
             ("form_window", 5.0),
             ("threshold", 6.0),
@@ -232,6 +234,8 @@ class TestSelectorContract:
             scope={
                 "gw_from": 1,
                 "gw_to": 2,
+                "actual_gw_from": 1,
+                "actual_gw_to": 1,
                 "position": "all",
                 "team_code": 101,
                 "view": "past_future",
@@ -244,7 +248,17 @@ class TestSelectorContract:
                 "past_metric": "xg_per_90",
             }
         )
-        assert InsightSummaryRequest.model_validate(payload).scope.form_window == "season_to_date"
+        scope = InsightSummaryRequest.model_validate(payload).scope
+        assert scope.form_window == "season_to_date"
+        assert (scope.actual_gw_from, scope.actual_gw_to) == (1, 1)
+
+    def test_actual_gameweek_scope_requires_a_complete_ordered_pair(self) -> None:
+        payload = _request_dict(scope={"actual_gw_from": 1})
+        with pytest.raises(ValidationError, match="must be supplied together"):
+            InsightSummaryRequest.model_validate(payload)
+        payload = _request_dict(scope={"actual_gw_from": 2, "actual_gw_to": 1})
+        with pytest.raises(ValidationError, match="must not exceed"):
+            InsightSummaryRequest.model_validate(payload)
 
     def test_as_of_is_an_iso_string_and_duplicate_json_keys_fail(self) -> None:
         with pytest.raises(ValidationError):
@@ -253,7 +267,7 @@ class TestSelectorContract:
             with pytest.raises(ValidationError):
                 InsightSummaryRequest.model_validate(_request_dict(schema_version=value))
         raw = json.dumps(_request_dict()).replace(
-            '"schema_version": 1,', '"schema_version": 1, "schema_version": 1,'
+            '"schema_version": 2,', '"schema_version": 2, "schema_version": 2,'
         )
         with pytest.raises(ValueError, match="strict UTF-8 JSON"):
             parse_insight_request_bytes(raw.encode())
@@ -796,6 +810,72 @@ def _rewrite_insight_read_model(
     manifest["files"][filename]["sha256"] = hashlib.sha256(rendered).hexdigest()
     manifest["content_sha256"] = _manifest_content_sha256(manifest)
     (data / "manifest.json").write_bytes(_canonical_json_bytes(manifest, indent=2))
+
+
+def test_players_insight_resolves_independent_finalized_actual_gameweek_scope(
+    tmp_path: Path,
+) -> None:
+    data, manifest = _generation(tmp_path)
+
+    def add_finalized_actuals(document: dict[str, Any]) -> None:
+        for player in document["players"]:
+            points = 6 if player["code"] == 1 else 1
+            player["actuals"] = [
+                {
+                    "gw": 1,
+                    "fixture": 100,
+                    "kickoff_time": "2026-08-22T14:00:00+00:00",
+                    "minutes": 90,
+                    "starts": 1,
+                    "goals_scored": 0,
+                    "assists": 0,
+                    "clean_sheets": 0,
+                    "goals_conceded": 1,
+                    "saves": 0,
+                    "bonus": 0,
+                    "bps": 10,
+                    "defensive_contribution": None,
+                    "expected_goals": None,
+                    "expected_assists": None,
+                    "expected_goals_conceded": None,
+                    "points_under_rules_2026_27": points,
+                }
+            ]
+
+    _rewrite_insight_read_model(data, manifest, "players.json", add_finalized_actuals)
+    request = InsightSummaryRequest.model_validate(
+        _request_dict(
+            str(manifest["content_sha256"]),
+            page="players",
+            scope={
+                "gw_from": 1,
+                "gw_to": 2,
+                "actual_gw_from": 1,
+                "actual_gw_to": 1,
+                "position": "all",
+                "view": "overall",
+                "venue": "all",
+                "availability": "all",
+            },
+        )
+    )
+
+    evidence = resolve_insight_evidence(data, request)
+    coverage = next(fact for fact in evidence.facts if fact.id == "players.actual.coverage")
+    leader = next(fact for fact in evidence.facts if fact.id == "players.actual.rank.1")
+    assert "2 selected players" in coverage.statement
+    assert "finalized current-season GW1 through GW1" in coverage.statement
+    assert leader.statement.startswith("Vicario ranks 1 with 6 replayed actual points")
+
+    outside = request.model_copy(
+        update={
+            "scope": request.scope.model_copy(
+                update={"actual_gw_from": 2, "actual_gw_to": 2}
+            )
+        }
+    )
+    with pytest.raises(InsightEvidenceError, match="exceeds finalized"):
+        resolve_insight_evidence(data, outside)
 
 
 def test_insight_venue_filter_does_not_classify_null_as_away(tmp_path: Path) -> None:

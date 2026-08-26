@@ -1,6 +1,6 @@
-# Dashboard read-model JSON contract, version 5
+# Dashboard read-model JSON contract, version 6
 
-Status: implemented development-only by DEV-ROADMAP P1.7a and extended through P2.3. This
+Status: implemented development-only by DEV-ROADMAP P1.7a and extended through P2.5. This
 document is the authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The
 static app renders these files and nothing else. Version 2 adds `summary.json`,
 `next_gw.json`, `forecast_vs_actual.json`, and `optimizer_audit.json` to the version-1 file
@@ -29,6 +29,20 @@ coverage, scalar chart/table observations, score blocks, slices, and calibration
 PMF to JavaScript. Version-4 consumers are not permitted to treat the old aggregate as version-5
 evidence. The executable emitter, strict frontend loaders, public-package allowlist, manifest, and
 tests moved together to version 5.
+
+## Version 6 current-season player actuals amendment (implemented 2026-08-26)
+
+Version 6 retains every version-5 file and adds `actuals` to each `players.json` player record.
+The rows come from the published `fact_player_fixture_actual` table, never DuckDB, and match the
+player record on exactly `(season, code)`. Only rows whose `(season, gw)` resolves to
+`dim_gameweek.finished = true` are included. There is no prior-season fallback: at the start of a
+season, an empty current-season range is an empty array rather than last season's form.
+
+Actuals stay at fixture grain, so both legs of a completed double gameweek remain separate and are
+ordered by gameweek, kickoff, then fixture. A duplicate `(season, fixture, code)` fails the build.
+The browser may select a current-season gameweek range and sum these already-published observed
+values; it does not query DuckDB or derive model quantities. Source `null` values remain JSON
+`null` and are never rewritten as zero.
 
 ## Boundary and provenance chain
 
@@ -60,7 +74,7 @@ identical content hash.
 
 ## Layout
 
-Version 5 publishes eight read-model files plus the manifest.
+Version 6 publishes eight read-model files plus the manifest.
 
 ```text
 data/
@@ -195,6 +209,12 @@ The population is every player with rows in `fact_forecast_player_gameweek` for 
   addition to the existing availability, attack, bonus/BPS, DC, and points measures. The first
   three are `null` when the player did not appear; xGC is `null` when no appeared row measured it
   and otherwise sums the measured appeared rows, including a partially measured window.
+- `actuals` is the current forecast record's **same-season** observed fixture history through
+  officially complete gameweeks. Each item contains `gw`, `fixture`, `kickoff_time`, `minutes`,
+  `starts`, `goals_scored`, `assists`, `clean_sheets`, `goals_conceded`, `saves`, `bonus`, `bps`,
+  `defensive_contribution`, `expected_goals`, `expected_assists`,
+  `expected_goals_conceded`, and `points_under_rules_2026_27`. Double-gameweek legs remain
+  distinct. No field falls back across seasons and nullable observations stay `null`.
 - `fixtures` is every player-fixture row of that vintage (double gameweek = two entries),
   each carrying the player's own xP/probabilities **plus the player's club fixture fields for
   that fixture** (`team_attack_ease_index`, `team_defence_ease_index`,
@@ -226,6 +246,13 @@ Sample record (abbreviated):
   "availability_multiplier": 1.0,
   "form": {"season": "2025-26", "as_at_gw": 38, "windows": {"…": "…"}},
   "avg_minutes_last_5": 52.0,
+  "actuals": [
+    {"gw": 1, "fixture": 90, "kickoff_time": "2026-08-15T14:00:00+00:00",
+     "minutes": 90, "starts": 1, "goals_scored": 0, "assists": 0,
+     "clean_sheets": 1, "goals_conceded": 0, "saves": 3, "bonus": 1, "bps": 24,
+     "defensive_contribution": null, "expected_goals": null, "expected_assists": null,
+     "expected_goals_conceded": 0.8, "points_under_rules_2026_27": 7}
+  ],
   "fixtures": [
     {"gw": 1, "fixture": 100, "kickoff_time": "2026-08-22T14:00:00+00:00",
      "opponent_team_code": 102, "opponent_short_name": "BET", "was_home": true,
@@ -280,7 +307,7 @@ also reconciled so an entirely omitted player or run cannot disappear silently.
 ```json
 {
   "schema": "fpl.dashboard-player-horizons",
-  "json_schema_version": 5,
+  "json_schema_version": 6,
   "semantics": {
     "grain": ["run_id", "season", "code", "gw_to"],
     "cumulative_from": "dim_forecast_run.gw_from",
@@ -468,12 +495,12 @@ and the audit page reads both files.
 ```json
 {
   "schema": "fpl.dashboard-read-models",
-  "json_schema_version": 4,
+  "json_schema_version": 6,
   "generated_at": "2026-08-15T00:00:00+00:00",
   "source": {
     "export_schema": "fpl.bi-semantic-export",
     "export_schema_version": 1,
-    "semantic_contract_version": 3,
+    "semantic_contract_version": 4,
     "export_content_sha256": "…",
     "export_created_at": "…",
     "database_sha256": "…"
@@ -511,7 +538,7 @@ closed.
 
 The static app, any notebook, and any external tool read only these files (or the Parquet export).
 Nothing downstream of the BI boundary queries DuckDB. All nine read-only dashboard routes have
-read models; later pages require an explicit schema bump under the same manifest policy. Version-5
+read models; later pages require an explicit schema bump under the same manifest policy. Version-6
 consumers load cumulative outcomes through the strict
 `player_horizons.json` boundary and look up an exact `(run_id, season, code, gw_to)` endpoint;
 they never interpolate or substitute another vintage. The Players route renders these scalars

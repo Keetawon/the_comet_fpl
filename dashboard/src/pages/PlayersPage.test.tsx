@@ -13,6 +13,7 @@ import nextGwSample from "@/data/sampleNextGw.json";
 import horizonsSample from "@/data/samplePlayerHorizons.json";
 import type {
   NextGwPlan,
+  PlayerActualFixture,
   PlayerFormWindow,
   PlayerHorizonsData,
   PlayerRecord,
@@ -61,6 +62,47 @@ beforeAll(() => {
 
 const teamsForRunA: TeamRecord[] = teamsSample.teams.map((t) => ({ ...t, run_id: "run-a" }));
 
+function actualFromForm(
+  form: Partial<PlayerFormWindow>,
+  patch: Partial<PlayerActualFixture> = {},
+): PlayerActualFixture {
+  return {
+    gw: 1,
+    fixture: 901,
+    kickoff_time: "2026-08-22T14:00:00+00:00",
+    minutes: form.minutes ?? 90,
+    starts: form.starts ?? 1,
+    goals_scored: form.goals_scored ?? 0,
+    assists: form.assists ?? 0,
+    clean_sheets: form.clean_sheets ?? 0,
+    goals_conceded: form.goals_conceded ?? 0,
+    saves: form.saves ?? 0,
+    bonus: form.bonus ?? 0,
+    bps: form.bps ?? 0,
+    defensive_contribution: form.defensive_contribution ?? 0,
+    expected_goals: form.expected_goals ?? null,
+    expected_assists: form.expected_assists ?? null,
+    expected_goals_conceded: form.expected_goals_conceded ?? null,
+    points_under_rules_2026_27: form.points_under_rules_2026_27 ?? null,
+    ...patch,
+  };
+}
+
+const playersWithActuals: PlayerRecord[] = playersSample.players.map((player, index) => {
+  const source = player as unknown as PlayerRecord;
+  const form: Partial<PlayerFormWindow> = source.form?.windows.last_5 ?? {};
+  return {
+    ...source,
+    actuals: [
+      actualFromForm(form, {
+        fixture: 901 + index,
+        minutes: index === 0 ? (form.minutes ?? 90) : 0,
+        starts: index === 0 ? (form.starts ?? 1) : 0,
+      }),
+    ],
+  };
+});
+
 function playerWithLastFive(
   code: number,
   webName: string,
@@ -74,6 +116,7 @@ function playerWithLastFive(
     code,
     web_name: webName,
     position,
+    actuals: [actualFromForm({ ...source.form.windows.last_5, ...form }, { fixture: 950 + code })],
     form: {
       ...source.form,
       windows: {
@@ -85,7 +128,7 @@ function playerWithLastFive(
 }
 
 beforeEach(() => {
-  vi.mocked(loadPlayers).mockResolvedValue({ players: playersSample.players, manifest: null });
+  vi.mocked(loadPlayers).mockResolvedValue({ players: playersWithActuals, manifest: null });
   vi.mocked(loadPlayerHorizons).mockResolvedValue(
     horizonsData,
   );
@@ -112,13 +155,17 @@ describe("PlayersPage", () => {
       screen.getByRole("button", { name: "Enter Players table fullscreen" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Beta")).toBeInTheDocument();
-    // the form window is a named column set anchored to the season it measured
-    expect(screen.getByText("Last 5 App")).toBeInTheDocument();
+    expect(screen.getByText("Actual GW1-1 App")).toBeInTheDocument();
     expect(screen.getByText("Forecast GWs")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Past form window" })).toBeInTheDocument();
+    expect(screen.getByText("Actual GWs")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Actual from gameweek" })).toHaveTextContent("GW1");
+    expect(screen.getByRole("combobox", { name: "Actual to gameweek" })).toHaveTextContent("GW1");
+    expect(screen.queryByRole("combobox", { name: "Past form window" })).not.toBeInTheDocument();
     expect(
       screen.getByText(/Forecast GWs filter upcoming fixtures and xP only/),
-    ).toHaveTextContent("Past form is observed through 2025-26 GW38");
+    ).toHaveTextContent("Min avg min (L5) filter remains its separately published trailing-five anchor");
+    expect(screen.getByText(/visible players have finalized 2026-27 observations/)).toBeInTheDocument();
+    expect(screen.getByText(/leads measured replayed points in the selected actual range/)).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /xP GW1-5/ })).toBeInTheDocument();
     for (const name of ["P(≤2)", "P(≥2)", "P(≥4)", "P(≥6)", "P(≥10)", "P(≥15)"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
@@ -243,8 +290,8 @@ describe("PlayersPage", () => {
   it("derives fallback bounds from horizons and never substitutes another vintage", async () => {
     const user = userEvent.setup();
     const duplicated = [
-      ...playersSample.players,
-      ...playersSample.players.map((p, index) => ({
+      ...playersWithActuals,
+      ...playersWithActuals.map((p, index) => ({
         ...p,
         run_id: "run-b",
         // An empty fixture list must not contaminate the whole run with a synthetic GW0.
@@ -300,6 +347,60 @@ describe("PlayersPage", () => {
     expect(within(alpha()).getByTitle("P(≥6), raw model probability")).toHaveTextContent("50%");
   });
 
+  it("changes current-season actuals independently from forecast GWs and resets both", async () => {
+    const user = userEvent.setup();
+    const players = playersWithActuals.map((player, index) => ({
+      ...player,
+      actuals:
+        index === 0
+          ? [
+              actualFromForm({ goals_scored: 1 }, { gw: 1, fixture: 971 }),
+              actualFromForm({ goals_scored: 2 }, { gw: 2, fixture: 972 }),
+            ]
+          : [actualFromForm({}, { gw: 1, fixture: 973, minutes: 0, starts: 0 })],
+    }));
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Actual GW1-2 App")).toBeInTheDocument());
+
+    const forecastFrom = screen.getByRole("combobox", { name: "From gameweek" });
+    const forecastTo = screen.getByRole("combobox", { name: "To gameweek" });
+    const alpha = () => screen.getByText("Alpha").closest("tr")!;
+    expect(within(alpha()).getByTitle("Observed G: 3")).toHaveTextContent("3");
+
+    await user.click(screen.getByRole("combobox", { name: "Actual from gameweek" }));
+    await user.click(screen.getByRole("option", { name: "GW2" }));
+    expect(screen.getByText("Actual GW2-2 App")).toBeInTheDocument();
+    expect(within(alpha()).getByTitle("Observed G: 2")).toHaveTextContent("2");
+    expect(forecastFrom).toHaveTextContent("GW1");
+    expect(forecastTo).toHaveTextContent("GW5");
+
+    await user.click(forecastTo);
+    await user.click(screen.getByRole("option", { name: "GW1" }));
+    expect(screen.getByRole("combobox", { name: "Actual from gameweek" })).toHaveTextContent("GW2");
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByRole("combobox", { name: "Actual from gameweek" })).toHaveTextContent("GW1");
+    expect(screen.getByRole("combobox", { name: "Actual to gameweek" })).toHaveTextContent("GW2");
+    expect(forecastTo).toHaveTextContent("GW5");
+  });
+
+  it("does not substitute prior-season form when current-season actuals are unavailable", async () => {
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: playersWithActuals.map((player) => ({ ...player, actuals: [] })),
+      manifest: null,
+    });
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    expect(
+      screen.getByText(/No finalized player actuals are published for 2026-27/),
+    ).toHaveTextContent("prior-season form is not substituted");
+    expect(screen.queryByText("Actual GWs")).not.toBeInTheDocument();
+    expect(screen.getByText("Actual App")).toBeInTheDocument();
+    expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("No observed form is available for G"))
+      .toHaveTextContent("–");
+  });
+
   it("expands a row to the per-fixture primitives behind the colour", async () => {
     const user = userEvent.setup();
     render(<PlayersPage />);
@@ -315,7 +416,7 @@ describe("PlayersPage", () => {
     expect(within(detailTable).getByRole("columnheader", { name: "Club CS" })).not.toHaveClass(
       "opacity-50",
     );
-    expect(screen.getAllByText(/form anchored 2025-26 GW38/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/form anchored 2025-26 GW38/)).not.toBeInTheDocument();
     // the detail table leads with match time, not the main table's sort
     expect(screen.getByText("Kickoff (UTC)")).toBeInTheDocument();
   });

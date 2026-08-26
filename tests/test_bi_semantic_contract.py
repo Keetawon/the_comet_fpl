@@ -1,4 +1,4 @@
-"""Executable tests for the frozen BI semantic contract, version 3.
+"""Executable tests for the frozen BI semantic contract, version 4.
 
 The contract's value is that it is enforced, not that it is written down, so most of these tests are
 negative: they construct a contract that breaks an invariant and prove the validator rejects it.
@@ -20,6 +20,7 @@ from fpl.publish.contract import (
     SEMANTIC_CONTRACT_V1,
     SEMANTIC_CONTRACT_V2,
     SEMANTIC_CONTRACT_V3,
+    SEMANTIC_CONTRACT_V4,
     Column,
     Join,
     SemanticContract,
@@ -27,7 +28,7 @@ from fpl.publish.contract import (
     Table,
 )
 
-CONTRACT = SEMANTIC_CONTRACT_V3
+CONTRACT = SEMANTIC_CONTRACT_V4
 LEDGER_SOURCE_TABLES = frozenset(
     {
         "ledger_forecast_run",
@@ -55,7 +56,7 @@ OUTCOME_LEDGER_SOURCE_TABLES = LEDGER_SOURCE_TABLES - FORECAST_LEDGER_SOURCE_TAB
 
 
 def test_contract_publishes_the_expected_tables() -> None:
-    assert CONTRACT.version == 3
+    assert CONTRACT.version == 4
     assert {table.name for table in CONTRACT.tables} == {
         # dimensions
         "dim_forecast_run",
@@ -95,6 +96,13 @@ def test_historical_v2_contract_remains_importable_without_v3_monitoring_additio
     )
     assert "fact_finalized_player_fixture_outcome" not in SEMANTIC_CONTRACT_V2.by_name
     assert "fact_finalized_team_fixture_outcome" not in SEMANTIC_CONTRACT_V2.by_name
+
+
+def test_historical_v3_contract_remains_importable_with_archive_only_actual_ownership() -> None:
+    assert SEMANTIC_CONTRACT_V3.version == 3
+    actual = SEMANTIC_CONTRACT_V3.table("fact_player_fixture_actual")
+    assert "mart_fact_player_fixture_live" not in actual.source_owner
+    assert "ledger_outcome_player_fixture" not in actual.source_owner
 
 
 @pytest.mark.parametrize(
@@ -226,7 +234,7 @@ def test_team_fixture_ease_columns_are_additive_directed_and_versioned() -> None
     assert "Exact JSON probability vector" in pmf.description
 
 
-def test_v3_outcome_facts_are_append_only_ledger_owned_and_vintage_independent() -> None:
+def test_outcome_facts_are_append_only_ledger_owned_and_vintage_independent() -> None:
     player = CONTRACT.table("fact_finalized_player_fixture_outcome")
     team = CONTRACT.table("fact_finalized_team_fixture_outcome")
     assert "ledger_outcome_player_fixture" in player.source_owner
@@ -245,6 +253,18 @@ def test_v3_outcome_facts_are_append_only_ledger_owned_and_vintage_independent()
         "goals_for",
         "goals_against",
     } <= team.column_names
+
+
+def test_v4_actual_uses_live_components_only_with_ledger_owned_finality_and_points() -> None:
+    actual = CONTRACT.table("fact_player_fixture_actual")
+    assert "mart_fact_player_fixture" in actual.source_owner
+    assert "mart_target_player_fixture" in actual.source_owner
+    assert "mart_fact_player_fixture_live" in actual.source_owner
+    assert "ledger_outcome_player_fixture" in actual.source_owner
+    notes = " ".join(actual.notes)
+    assert "deterministic latest" in notes
+    assert "ledger" in notes
+    assert "fails closed" in notes
 
 
 def test_fixture_dimension_carries_current_official_fdr_for_both_sides() -> None:

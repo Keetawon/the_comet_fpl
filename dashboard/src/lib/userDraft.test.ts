@@ -74,6 +74,7 @@ function player(
     chance_of_playing: null,
     availability_multiplier: null,
     form: null,
+    actuals: [],
     avg_minutes_last_5: null,
     fixtures,
   };

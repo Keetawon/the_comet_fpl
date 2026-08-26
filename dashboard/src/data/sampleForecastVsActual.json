@@ -1,6 +1,6 @@
 {
   "schema": "fpl.dashboard-forecast-vs-actual",
-  "json_schema_version": 5,
+  "json_schema_version": 6,
   "has_outcomes": true,
   "runs": [
     {

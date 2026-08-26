@@ -170,7 +170,7 @@ describe("plan server token transport", () => {
 describe("insight client contract", () => {
   const request: InsightSummaryRequest = {
     schema: "fpl.insight-summary-request",
-    schema_version: 1,
+    schema_version: 2,
     page: "summary",
     manifest_sha256: "a".repeat(64),
     run_id: "run-1",
@@ -189,7 +189,7 @@ describe("insight client contract", () => {
   };
   const summaryResponse = {
     schema: "fpl.insight-summary-response",
-    schema_version: 1,
+    schema_version: 2,
     source: "provider",
     provider: "zai_glm",
     model: "glm-test",

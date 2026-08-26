@@ -132,10 +132,13 @@ transformation. The artifact carries an explicit `as_of`, so nothing here is inf
   fixtures for one player in a double gameweek remain two rows because the grain includes
   `fixture`.
 - **Read/BI layer — implemented development-only.** The atomic star-schema export consumes the
-  ledger without querying around it. Semantic contract v3 transports exact team goal PMFs plus
-  ledger-owned finalized player/team facts. Dashboard schema v5 retains the cumulative player
+  ledger without querying around it. Semantic contract v4 retains v3's exact team goal PMFs and
+  ledger-owned finalized player/team facts, and uses the player-outcome ledger as the finality gate
+  for current-season live components in the observed player-fixture fact. Dashboard schema v6 retains the cumulative player
   endpoints from v4 — xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)`. Cross-gameweek
   probabilities are convolved in the Python emitter under an explicit independence assumption; the
   browser selects published scalars and never computes a probability from ledger primitives.
   Separate player/team monitoring files enforce complete player-gameweek finality; team defence
-  CRPS uses the opponent's exact stored goal PMF.
+  CRPS uses the opponent's exact stored goal PMF. Schema v6 additionally supplies the Players
+  route with same-season actual fixtures from complete official gameweeks; these remain observed
+  display facts and never become forecast inputs.
