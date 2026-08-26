@@ -8,9 +8,11 @@ import { ForecastVsActualPage } from "@/pages/ForecastVsActualPage";
 import { NextGwPage } from "@/pages/NextGwPage";
 import { OptimizerAuditPage } from "@/pages/OptimizerAuditPage";
 import { PlanBuilderPage } from "@/pages/PlanBuilderPage";
+import { PlayerAnalyticsPage } from "@/pages/PlayerAnalyticsPage";
 import { FixtureMatrixPage } from "@/pages/FixtureMatrixPage";
 import { PlayersPage } from "@/pages/PlayersPage";
 import { SummaryPage } from "@/pages/SummaryPage";
+import { TeamAnalyticsPage } from "@/pages/TeamAnalyticsPage";
 import { UserDraftPage } from "@/pages/UserDraftPage";
 
 const DEFAULT_ROUTE = "summary";
@@ -18,7 +20,9 @@ const DEFAULT_ROUTE = "summary";
 const PAGES: Record<string, React.ComponentType> = {
   summary: SummaryPage,
   fixtures: FixtureMatrixPage,
+  "team-analytics": TeamAnalyticsPage,
   players: PlayersPage,
+  "player-analytics": PlayerAnalyticsPage,
   "next-gw": NextGwPage,
   "plan-builder": PlanBuilderPage,
   "squad-draft": UserDraftPage,

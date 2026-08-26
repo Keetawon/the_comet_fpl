@@ -5,10 +5,12 @@
 import {
   CalendarDays,
   ClipboardList,
+  Goal,
   LayoutDashboard,
   LineChart,
   ListPlus,
   Scale,
+  ScatterChart,
   Users,
   Wand2,
 } from "lucide-react";
@@ -23,7 +25,9 @@ export interface PageDef {
 const PAGES: readonly PageDef[] = [
   { id: "summary", label: "Summary", icon: LayoutDashboard },
   { id: "fixtures", label: "Fixture matrix", icon: CalendarDays },
+  { id: "team-analytics", label: "Team analytics", icon: Goal },
   { id: "players", label: "Players", icon: Users },
+  { id: "player-analytics", label: "Player analytics", icon: ScatterChart },
   { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList },
   { id: "plan-builder", label: "Plan builder", icon: Wand2 },
   { id: "squad-draft", label: "Squad draft", icon: ListPlus },

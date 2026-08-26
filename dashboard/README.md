@@ -6,14 +6,17 @@ it never queries DuckDB and never reads Parquet in the browser.
 
 ## 2026-08-26 dashboard program
 
-The current schema-v4 application remains the working baseline. The ordered additive work is:
+The schema-v4 application remains the working baseline. The ordered additive work is:
 
-1. Player analytics and Team analytics over existing published values, following
-   `../docs/dashboard-deep-analytics.md`;
+1. **Implemented development-only:** Player analytics and Team analytics over existing published
+   values, following `../docs/dashboard-deep-analytics.md`;
 2. schema-v5 parallel player/team prediction-versus-actual pages with complete-gameweek finality,
    following `../docs/prediction-vs-actual-dashboard.md`;
 3. a deterministic insight panel on every route and an optional trusted-server language renderer
    on public analytical routes, following `../docs/dashboard-ai-summaries.md`.
+
+The implemented deep-analytics routes are `#player-analytics` and `#team-analytics`; both are
+linked directly in the sidebar and retain an exact-table equivalent for every chart.
 
 The static hosted build never receives a model-provider key and never calls Z.AI directly. Until a
 separately authenticated proxy is deployed it uses deterministic summaries only. Local provider

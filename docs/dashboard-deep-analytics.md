@@ -1,8 +1,8 @@
 # Deep analytics dashboard contract
 
-Status: pre-implementation contract, frozen 2026-08-26. The existing dashboard read-model schema
-version 4 is sufficient for the first implementation; this document does not change a model,
-forecast vintage, optimizer objective, or published probability.
+Status: contract frozen and first implementation completed development-only on 2026-08-26. The
+dashboard read-model schema version 4 is sufficient for this implementation; this document does
+not change a model, forecast vintage, optimizer objective, or published probability.
 
 ## Decision question
 

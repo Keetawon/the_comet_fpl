@@ -918,8 +918,9 @@ operation, and test; implementation cannot silently weaken these requirements.
 
 ### P2.2 - Player and team deep analytics
 
-**Status: planned next.** Add Player analytics and Team analytics routes using only dashboard schema
-version 4 values. Do not wait for or reach around the P2.3 outcome work.
+**Status (2026-08-26): implemented development-only; focused and full dashboard tests pass.**
+Player analytics and Team analytics now use only dashboard schema version 4 values. They do not
+wait for or reach around the P2.3 outcome work.
 
 - Player views: price-versus-cumulative-xP Pareto frontier; published inclusive haul-versus-downside
   frontier; ownership-versus-xP differential view; and explicitly labelled observed-form versus
@@ -940,7 +941,7 @@ labelling, fallback accounting, loading/error/empty states, and accessible table
 
 ### P2.3 - Exact parallel player/team prediction monitoring
 
-**Status: planned after P2.2.** Replace the current ambiguous player-only aggregate with explicit
+**Status: active after P2.2.** Replace the current ambiguous player-only aggregate with explicit
 player and team read models and pages. This is a correctness repair, not merely a visual extension.
 
 1. Persist official home/away scores in live fixture versions. Add an append-only
