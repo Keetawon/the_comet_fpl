@@ -203,20 +203,29 @@ platform suggestions downstream. `GET /status` reports busy/stage/worktree state
 never computes anything — it
 asks this process to run the fail-closed jobs and then refetches the published JSON.
 
-The development-only own-team surface adds three local POST endpoints:
+The development-only own-team surface adds four manager-team POST endpoints plus the manager
+optimizer endpoint:
 
 - `/manager-team {"manager_id": 123}` fetches the public entry/picks/transfers/history payloads,
   reconstructs purchase and selling values from the committed start-deadline bootstrap plus
   transfer replay, maps season-scoped elements to stable player codes, and atomically creates
   `<base>/manager-captures/<capture_id>.json`;
 - `/manager-team/capture {"capture_id": "manager-..."}` reloads that exact immutable capture;
+- `/manager-team/members {"manager_id": 123}` and
+  `/manager-team/members/capture {"capture_id": "manager-..."}` serve only the read-only Players
+  filter and non-optimizer Squad Draft. They tolerate unrelated selectable-player additions but
+  still reconcile the exact 15 members against the forecast season, planning gameweek, stable
+  code, position, club identity, and deadline price before returning anything;
 - `/manager-plan` consumes the capture id, locks, exclusions, threshold, and optional
   `free_transfers_override` (0-5), then runs the same optimizer/publish chain from the imported
   squad.
 
-The manager capture and active forecast must agree on season, first gameweek, and a canonical
-full selectable-player registry hash covering season element, stable code, club, position, and
-price. Volatile bootstrap statistics are deliberately excluded. Public reconstruction currently
+Plan Builder and the manager optimizer require the manager capture and active forecast to agree on
+season, first gameweek, and a canonical full selectable-player registry hash covering season
+element, stable code, club, position, and price. Volatile bootstrap statistics are deliberately
+excluded. The member-only endpoints do not weaken that optimizer gate: their narrower contract is
+valid only for displaying the captured 15, while any optimizer solve still fails closed until its
+complete transfer-candidate registry is refreshed. Public reconstruction currently
 fails closed for entries that started after GW1 because their acquisition prices are unavailable.
 An exact registry mismatch invalidates the imported capture and its player rules in Plan Builder
 and returns the user to **Import my team** while preserving the manager id. Refresh both paired
@@ -359,10 +368,13 @@ comparison page and is not a twelfth navigation item.
   player-level saves/DC/GC/xGC forecasts are unavailable and are not
   inferred from club lambdas or clean-sheet probabilities. Filters: position, team, price range,
   minimum average minutes (last 5), availability, plus the shared view/venue/gameweek bar, all
-  inside a distinct Filters panel. Local development additionally offers **My squad**: a Manager
-  ID is resolved through the trusted Plan Server, all 15 stable player codes plus position, club,
-  price, and planning-GW metadata must match the selected forecast vintage before the scope is
-  activated, and the verified membership then intersects every other filter. A failed or partial
+  inside a distinct Filters panel placed immediately before the scrollable table. Local
+  development additionally offers **My squad**: a Manager ID is resolved through the trusted Plan
+  Server's member-only endpoint, all 15 stable player codes plus position, club, price, and
+  planning-GW metadata must match the selected forecast vintage before the scope is activated,
+  and the verified membership then intersects every other filter. Unrelated league-wide registry
+  additions do not block this display-only scope; the optimizer's complete-registry gate remains
+  unchanged. A failed or partial
   import leaves the existing table scope unchanged. Changing forecast vintage clears the private
   scope and requires a fresh verification; hosted static builds cannot use it. Rows are compact
   and paginated; the expanded row exposes every
@@ -439,7 +451,9 @@ comparison page and is not a twelfth navigation item.
   squad. A manager-current handoff reloads the exact private capture instead. The page's direct
   **Fetch current team** shortcut creates a new manager capture and atomically replaces the draft
   only after all 15 players map into the exact selected forecast/rules context; failure preserves
-  the old draft. The user can then select zero to 15 players manually. It enforces duplicate, position,
+  the old draft. This non-optimizer import uses the member-only endpoint, so an unrelated new
+  league registration does not block it; any owned-player position, club, or deadline-price drift
+  still fails atomically. The user can then select zero to 15 players manually. It enforces duplicate, position,
   squad-size, and three-per-club
   limits but deliberately does not enforce the standard £100m budget; an over-budget draft is
   labelled as such rather than blocked. The sortable/fullscreen selected-player table shows

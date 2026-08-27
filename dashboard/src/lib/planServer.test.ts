@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchManagerTeam,
   fetchManagerTeamCapture,
+  fetchManagerTeamMembers,
+  fetchManagerTeamMembersCapture,
   fetchInsightStatus,
   fetchInsightSummary,
   fetchPlanStatus,
@@ -310,6 +312,8 @@ describe("manager-team client contract", () => {
 
     await fetchManagerTeam(" 123456 ", "lan-secret");
     await fetchManagerTeamCapture(" capture-1 ", "lan-secret");
+    await fetchManagerTeamMembers(" 123456 ", "lan-secret");
+    await fetchManagerTeamMembersCapture(" capture-1 ", "lan-secret");
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -326,6 +330,20 @@ describe("manager-team client contract", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "http://localhost:8765/manager-team/capture",
+      expect.objectContaining({
+        body: JSON.stringify({ capture_id: "capture-1" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "http://localhost:8765/manager-team/members",
+      expect.objectContaining({
+        body: JSON.stringify({ manager_id: 123456 }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "http://localhost:8765/manager-team/members/capture",
       expect.objectContaining({
         body: JSON.stringify({ capture_id: "capture-1" }),
       }),

@@ -187,8 +187,16 @@ def _load_manager_capture(state: ServerState, capture_id: str) -> ManagerTeamCap
 def _manager_team_preview(
     state: ServerState,
     capture: ManagerTeamCapture,
+    *,
+    require_full_registry: bool,
 ) -> dict[str, Any]:
-    """Map one private capture to the minimal browser DTO, bound to the active forecast."""
+    """Map one private capture to the minimal browser DTO, bound to the active forecast.
+
+    Optimizer callers require the complete selectable-player registry because every legal
+    transfer candidate must be represented. Read-only squad consumers may instead validate the
+    exact 15 captured members; unrelated additions elsewhere in the league do not change their
+    displayed membership.
+    """
     try:
         forecast = read_artifact_bytes(state.forecast_path.read_bytes())
     except (OSError, ValueError) as exc:
@@ -203,16 +211,17 @@ def _manager_team_preview(
             f"at GW{forecast.manifest.gw_from}; regenerate the forecast"
         )
     forecast_registry_sha = forecast.manifest.live_inputs.selectable_player_registry_sha256
-    if forecast_registry_sha is None:
-        raise RequestError(
-            "the active forecast has no selectable-player registry binding; regenerate the "
-            "forecast before importing a manager team"
-        )
-    if forecast_registry_sha != capture.provenance.selectable_player_registry_sha256:
-        raise RequestError(
-            "manager capture and forecast use different selectable-player registries; regenerate "
-            "the forecast and fetch the team again"
-        )
+    if require_full_registry:
+        if forecast_registry_sha is None:
+            raise RequestError(
+                "the active forecast has no selectable-player registry binding; regenerate the "
+                "forecast before importing a manager team"
+            )
+        if forecast_registry_sha != capture.provenance.selectable_player_registry_sha256:
+            raise RequestError(
+                "manager capture and forecast use different selectable-player registries; "
+                "regenerate the forecast and fetch the team again"
+            )
     first_by_code: dict[int, Any] = {}
     for artifact_row in forecast.rows:
         first_by_code.setdefault(artifact_row.code, artifact_row)
@@ -261,7 +270,12 @@ def _manager_team_preview(
     }
 
 
-def fetch_and_store_manager_team(state: ServerState, manager_id: int) -> dict[str, Any]:
+def fetch_and_store_manager_team(
+    state: ServerState,
+    manager_id: int,
+    *,
+    require_full_registry: bool,
+) -> dict[str, Any]:
     """Fetch, validate, and immutably store one public manager-team capture."""
     if manager_id <= 0:
         raise RequestError("manager_id must be a positive integer")
@@ -271,7 +285,11 @@ def fetch_and_store_manager_team(state: ServerState, manager_id: int) -> dict[st
         try:
             with FplApiClient() as client:
                 capture = capture_manager_team(manager_id, client=client)
-            preview = _manager_team_preview(state, capture)
+            preview = _manager_team_preview(
+                state,
+                capture,
+                require_full_registry=require_full_registry,
+            )
             path = _manager_capture_path(state, capture.capture_id)
             write_manager_capture_atomic(path, capture)
             return preview
@@ -776,7 +794,7 @@ def run_manager_plan(
                 "artifact that cannot pin how it was produced"
             )
         capture = _load_manager_capture(state, capture_id)
-        preview = _manager_team_preview(state, capture)
+        preview = _manager_team_preview(state, capture, require_full_registry=True)
         owned = {player.code for player in capture.squad}
         missing_locks = sorted(set(locks) - owned)
         if missing_locks:
@@ -935,6 +953,8 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                 "/plan",
                 "/manager-team",
                 "/manager-team/capture",
+                "/manager-team/members",
+                "/manager-team/members/capture",
                 "/manager-plan",
                 "/insights/summary",
             }:
@@ -994,7 +1014,7 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                 if route == "/plan":
                     locks, excludes, bench = validate_request(body)
                     result = run_plan(state, locks, excludes, bench)
-                elif route == "/manager-team":
+                elif route in {"/manager-team", "/manager-team/members"}:
                     manager_id = body.get("manager_id")
                     if (
                         not isinstance(manager_id, int)
@@ -1002,12 +1022,23 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                         or manager_id <= 0
                     ):
                         raise RequestError("manager_id must be a positive integer")
-                    result = fetch_and_store_manager_team(state, manager_id)
-                elif route == "/manager-team/capture":
+                    result = fetch_and_store_manager_team(
+                        state,
+                        manager_id,
+                        require_full_registry=route == "/manager-team",
+                    )
+                elif route in {
+                    "/manager-team/capture",
+                    "/manager-team/members/capture",
+                }:
                     capture_id = body.get("capture_id")
                     if not isinstance(capture_id, str):
                         raise RequestError("capture_id must be a string")
-                    result = _manager_team_preview(state, _load_manager_capture(state, capture_id))
+                    result = _manager_team_preview(
+                        state,
+                        _load_manager_capture(state, capture_id),
+                        require_full_registry=route == "/manager-team/capture",
+                    )
                 else:
                     capture_id, locks, excludes, bench, override = validate_manager_plan_request(
                         body
@@ -1073,7 +1104,8 @@ def serve(
         f"LAN access token ({ACCESS_TOKEN_HEADER}; loopback does not need it): {state.access_token}"
     )
     print(
-        "POST /plan | /manager-team | /manager-team/capture | /manager-plan | "
+        "POST /plan | /manager-team | /manager-team/capture | /manager-team/members | "
+        "/manager-team/members/capture | /manager-plan | "
         "/insights/summary and GET /status | /insights/status"
     )
     try:

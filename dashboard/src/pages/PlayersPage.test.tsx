@@ -22,7 +22,7 @@ import type {
 } from "@/data/types";
 import { PLAYER_HORIZON_FIELDS } from "@/data/types";
 import {
-  fetchManagerTeam,
+  fetchManagerTeamMembers,
   type ManagerTeamPlayer,
   type ManagerTeamPreview,
 } from "@/lib/planServer";
@@ -62,7 +62,7 @@ vi.mock("@/data/load", () => ({
 
 vi.mock("@/lib/planServer", async () => {
   const actual = await vi.importActual<typeof import("@/lib/planServer")>("@/lib/planServer");
-  return { ...actual, fetchManagerTeam: vi.fn() };
+  return { ...actual, fetchManagerTeamMembers: vi.fn() };
 });
 
 beforeAll(() => {
@@ -208,7 +208,7 @@ function playerWithLastFive(
 beforeEach(() => {
   window.history.replaceState(null, "", "/");
   window.localStorage.clear();
-  vi.mocked(fetchManagerTeam).mockReset();
+  vi.mocked(fetchManagerTeamMembers).mockReset();
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersWithActuals, manifest: null });
   vi.mocked(loadPlayerActuals).mockResolvedValue(actualsData);
   vi.mocked(loadPlayerHorizons).mockResolvedValue(
@@ -237,9 +237,15 @@ describe("PlayersPage", () => {
   it("renders the pivot: players, form columns, availability overlay, GW chips", async () => {
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
-    expect(
-      screen.getByRole("button", { name: "Enter Players table fullscreen" }),
-    ).toBeInTheDocument();
+    const fullscreenButton = screen.getByRole("button", {
+      name: "Enter Players table fullscreen",
+    });
+    expect(fullscreenButton).toBeInTheDocument();
+    const tableShell = fullscreenButton.closest("[data-fullscreen-mode]");
+    expect(tableShell).not.toBeNull();
+    expect(screen.getByRole("region", { name: "Filters" }).nextElementSibling).toBe(
+      tableShell,
+    );
     expect(screen.getByText("Beta")).toBeInTheDocument();
     const appHeader = screen.getByRole("columnheader", { name: "App" });
     expect(appHeader).toHaveAttribute("title", "Finalized 2026-27 actuals, GW1-GW1");
@@ -288,14 +294,14 @@ describe("PlayersPage", () => {
       players: [...squad, outsider],
       manifest: null,
     });
-    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview(squad));
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValue(managerPreview(squad));
 
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Outside Defender")).toBeInTheDocument());
     await user.type(screen.getByLabelText("FPL manager ID"), "123456");
     await user.click(screen.getByRole("button", { name: "Show my squad" }));
 
-    expect(fetchManagerTeam).toHaveBeenCalledWith("123456", "");
+    expect(fetchManagerTeamMembers).toHaveBeenCalledWith("123456", "");
     await waitFor(() => expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument());
     expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(15);
     expect(
@@ -334,7 +340,7 @@ describe("PlayersPage", () => {
       players: [...squad, outsider],
       manifest: null,
     });
-    vi.mocked(fetchManagerTeam)
+    vi.mocked(fetchManagerTeamMembers)
       .mockResolvedValueOnce(managerPreview(squad))
       .mockRejectedValueOnce(new Error("manager not found"));
 
@@ -369,7 +375,7 @@ describe("PlayersPage", () => {
       players: [...squad, outsider, ...extras],
       manifest: null,
     });
-    vi.mocked(fetchManagerTeam).mockResolvedValueOnce(managerPreview(squad));
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValueOnce(managerPreview(squad));
 
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("1–50 of 60")).toBeInTheDocument());
@@ -402,7 +408,7 @@ describe("PlayersPage", () => {
         ...horizonsData.players.map((player) => ({ ...player, run_id: "run-b" })),
       ],
     });
-    vi.mocked(fetchManagerTeam).mockResolvedValueOnce(managerPreview(squad));
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValueOnce(managerPreview(squad));
 
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Outside Defender")).toBeInTheDocument());
@@ -439,7 +445,7 @@ describe("PlayersPage", () => {
       ],
     });
     let resolveManager!: (preview: ManagerTeamPreview) => void;
-    vi.mocked(fetchManagerTeam).mockReturnValueOnce(
+    vi.mocked(fetchManagerTeamMembers).mockReturnValueOnce(
       new Promise<ManagerTeamPreview>((resolve) => {
         resolveManager = resolve;
       }),
@@ -477,7 +483,7 @@ describe("PlayersPage", () => {
       players: [...squad, outsider],
       manifest: null,
     });
-    vi.mocked(fetchManagerTeam).mockResolvedValueOnce(incomplete);
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValueOnce(incomplete);
 
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Outside Defender")).toBeInTheDocument());
@@ -502,7 +508,7 @@ describe("PlayersPage", () => {
     expect(
       screen.getByText(/Manager-squad filtering is local-only and requires the trusted Plan Server/),
     ).toBeInTheDocument();
-    expect(fetchManagerTeam).not.toHaveBeenCalled();
+    expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
   });
 
   it("switches the Players-only observed columns between Overall, Attack, and Defense", async () => {

@@ -39,7 +39,7 @@ import {
   averageBpsPerAppearance,
 } from "@/lib/playerActuals";
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
-import { fetchManagerTeam, type ManagerTeamPreview } from "@/lib/planServer";
+import { fetchManagerTeamMembers, type ManagerTeamPreview } from "@/lib/planServer";
 import { loadPlanServerToken } from "@/lib/planServerToken";
 import { rawPlayerGameweekXp } from "@/lib/userDraft";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
@@ -419,7 +419,10 @@ export function PlayersPage() {
     setManagerLoading(true);
     setManagerError(null);
     try {
-      const preview = await fetchManagerTeam(managerId.trim(), loadPlanServerToken());
+      const preview = await fetchManagerTeamMembers(
+        managerId.trim(),
+        loadPlanServerToken(),
+      );
       const nextSquad = managerSquadForRun(
         preview,
         runPlayers,
@@ -597,6 +600,65 @@ export function PlayersPage() {
           </p>
         </div>
       </div>
+
+      <div className="rounded-lg border bg-card p-2">
+        <DifficultyLegend
+          colorSource={colorSource}
+          onColorSourceChange={setColorSource}
+          easeIndexFormulaVersion={state.easeVersion}
+          cleanSheetAnchor={null}
+          defenceScaleNote="Defence view colours on the club's defence ease index (higher = the club concedes less)."
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Observed form columns follow Overall, Attack, or Defense. Chip headline is fixture xP;
+          its colour follows the selected source. GW columns are the pivot -- one per gameweek,
+          two chips in a double gameweek.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          The dense Players table omits the six overlapping P(≤/≥ threshold) columns. Use Player
+          analytics for the exact backend-published blank and haul probabilities; this table keeps
+          cumulative xP and observed stats readable.
+        </p>
+      </div>
+
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "players",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...selectedRun!,
+            as_of: activeRun?.as_of,
+          }),
+          scope: compactInsightScope({
+            gw_from: filters?.gwFrom,
+            gw_to: filters?.gwTo,
+            actual_gw_from: actualRange?.gwFrom,
+            actual_gw_to: actualRange?.gwTo,
+            actual_season: actualRange == null ? undefined : actualSeason ?? undefined,
+            position: playerPositionScope(playerFilters.position),
+            team_code: playerFilters.teamCode === "all" ? undefined : Number(playerFilters.teamCode),
+            view: filters?.view === "defense" ? "defence" : filters?.view,
+            venue: filters?.venue,
+            min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
+            max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
+            min_avg_minutes_l5: minAverageMinutesScope(playerFilters.minMinutes),
+            availability: playerFilters.availability,
+          }),
+          unavailableReason: managerSquad
+            ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
+            : undefined,
+          localScopeKey: JSON.stringify({
+            runId: activeRunId,
+            filters,
+            playerFilters,
+            actualRange,
+            actualSeason,
+            colorSource,
+            managerScope: managerSquad ? "private_manager_squad" : "all_players",
+          }),
+        }}
+      />
 
       <FilterPanel>
         <div className="flex flex-col gap-2">
@@ -784,65 +846,6 @@ export function PlayersPage() {
           )}
         </div>
       </FilterPanel>
-
-      <div className="rounded-lg border bg-card p-2">
-        <DifficultyLegend
-          colorSource={colorSource}
-          onColorSourceChange={setColorSource}
-          easeIndexFormulaVersion={state.easeVersion}
-          cleanSheetAnchor={null}
-          defenceScaleNote="Defence view colours on the club's defence ease index (higher = the club concedes less)."
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Observed form columns follow Overall, Attack, or Defense. Chip headline is fixture xP;
-          its colour follows the selected source. GW columns are the pivot -- one per gameweek,
-          two chips in a double gameweek.
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          The dense Players table omits the six overlapping P(≤/≥ threshold) columns. Use Player
-          analytics for the exact backend-published blank and haul probabilities; this table keeps
-          cumulative xP and observed stats readable.
-        </p>
-      </div>
-
-      <InsightSummaryPanel
-        items={insightFacts}
-        caveats={insightCaveats}
-        remote={{
-          page: "players",
-          provenance: publishedInsightProvenance(state.manifest, {
-            ...selectedRun!,
-            as_of: activeRun?.as_of,
-          }),
-          scope: compactInsightScope({
-            gw_from: filters?.gwFrom,
-            gw_to: filters?.gwTo,
-            actual_gw_from: actualRange?.gwFrom,
-            actual_gw_to: actualRange?.gwTo,
-            actual_season: actualRange == null ? undefined : actualSeason ?? undefined,
-            position: playerPositionScope(playerFilters.position),
-            team_code: playerFilters.teamCode === "all" ? undefined : Number(playerFilters.teamCode),
-            view: filters?.view === "defense" ? "defence" : filters?.view,
-            venue: filters?.venue,
-            min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
-            max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
-            min_avg_minutes_l5: minAverageMinutesScope(playerFilters.minMinutes),
-            availability: playerFilters.availability,
-          }),
-          unavailableReason: managerSquad
-            ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
-            : undefined,
-          localScopeKey: JSON.stringify({
-            runId: activeRunId,
-            filters,
-            playerFilters,
-            actualRange,
-            actualSeason,
-            colorSource,
-            managerScope: managerSquad ? "private_manager_squad" : "all_players",
-          }),
-        }}
-      />
 
       {filters && (
         <PlayerStatTable

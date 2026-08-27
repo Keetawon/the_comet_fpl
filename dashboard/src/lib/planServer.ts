@@ -482,7 +482,11 @@ export function parseManagerTeamPreview(payload: unknown): ManagerTeamPreview {
 }
 
 async function postManagerTeam(
-  path: "/manager-team" | "/manager-team/capture",
+  path:
+    | "/manager-team"
+    | "/manager-team/capture"
+    | "/manager-team/members"
+    | "/manager-team/members/capture",
   body: Record<string, unknown>,
   token?: string | null,
 ): Promise<ManagerTeamPreview> {
@@ -509,7 +513,7 @@ async function postManagerTeam(
   return parseManagerTeamPreview(envelope);
 }
 
-/** Fetch and persist a new immutable current-team capture for one public FPL manager. */
+/** Fetch a new capture with full-registry binding for Plan Builder and optimizer use. */
 export function fetchManagerTeam(
   managerId: number | string,
   token?: string | null,
@@ -521,7 +525,7 @@ export function fetchManagerTeam(
   return postManagerTeam("/manager-team", { manager_id: Number(clean) }, token);
 }
 
-/** Reload an already captured team exactly; this never substitutes a newer live team. */
+/** Reload a capture with full-registry binding for Plan Builder and optimizer use. */
 export function fetchManagerTeamCapture(
   captureId: string,
   token?: string | null,
@@ -529,6 +533,33 @@ export function fetchManagerTeamCapture(
   const clean = captureId.trim();
   if (!clean) return Promise.reject(new Error("Manager capture id must not be empty."));
   return postManagerTeam("/manager-team/capture", { capture_id: clean }, token);
+}
+
+/**
+ * Fetch a manager's current 15-player membership for read-only dashboard filtering.
+ *
+ * The server still reconciles every member with the selected forecast, but unrelated additions
+ * elsewhere in the league do not block this non-optimizer path.
+ */
+export function fetchManagerTeamMembers(
+  managerId: number | string,
+  token?: string | null,
+): Promise<ManagerTeamPreview> {
+  const clean = String(managerId).trim();
+  if (!/^\d{1,10}$/.test(clean) || Number(clean) <= 0) {
+    return Promise.reject(new Error("FPL manager id must be a positive integer."));
+  }
+  return postManagerTeam("/manager-team/members", { manager_id: Number(clean) }, token);
+}
+
+/** Reload an immutable capture for a member-only, non-optimizer dashboard consumer. */
+export function fetchManagerTeamMembersCapture(
+  captureId: string,
+  token?: string | null,
+): Promise<ManagerTeamPreview> {
+  const clean = captureId.trim();
+  if (!clean) return Promise.reject(new Error("Manager capture id must not be empty."));
+  return postManagerTeam("/manager-team/members/capture", { capture_id: clean }, token);
 }
 
 export async function fetchPlanStatus(token?: string | null): Promise<PlanServerStatus | null> {

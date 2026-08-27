@@ -54,9 +54,11 @@ manager preview's selling value and cash are capture facts, not a new Squad Draf
 ### Players statistics shortcut
 
 The local Players route has a separate **My squad** display filter. It reuses the same trusted
-Manager ID capture, but it neither changes a draft nor runs the optimizer. Before activating the
-scope, the browser requires all 15 stable player codes to exist in the selected forecast vintage
-and checks planning gameweek, position, club code, and deadline price. Any missing or mismatched
+Manager ID capture through the member-only Plan Server endpoint, but it neither changes a draft
+nor runs the optimizer. Before activating the scope, the server and browser require all 15 stable
+player codes to exist in the selected forecast vintage and check planning gameweek, position, club
+identity, and deadline price. Unrelated additions elsewhere in the selectable-player registry do
+not block this read-only scope. Any missing or mismatched
 player fails atomically and leaves the current table unchanged. Once verified, squad membership is
 an AND condition over the existing position, team, price, minutes, availability, forecast-GW,
 actual-season, and Actual-GW controls. Changing forecast vintage clears the scope and requires a
@@ -174,11 +176,14 @@ next planning event:
 ```
 
 Omitting `--forecast` retains the legacy `<base>/gw1_5_default.jsonl` convention; post-deadline
-work should pass the current artifact explicitly. The capture and forecast must agree on season,
-first gameweek, and a canonical registry hash over every selectable player's season element,
-stable code, position, club, and price. Volatile points, ownership, and event fields in the full
-bootstrap payload do not invalidate that decision registry. The durable optimizer rechecks the
-same binding; the HTTP preview is not the sole provenance guard.
+work should pass the current artifact explicitly. Plan Builder and every manager optimizer solve
+require the capture and forecast to agree on season, first gameweek, and a canonical registry hash
+over every selectable player's season element, stable code, position, club, and price. Volatile
+points, ownership, and event fields in the full bootstrap payload do not invalidate that decision
+registry. The durable optimizer rechecks the same binding; the HTTP preview is not the sole
+provenance guard. Players and Squad Draft use explicitly separate member-only endpoints: they
+validate the captured 15 against forecast membership metadata but may tolerate an unrelated
+league-wide registry addition because neither path searches the transfer candidate universe.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -186,6 +191,8 @@ same binding; the HTTP preview is not the sole provenance guard.
 | `POST /plan` | existing build-from-scratch custom solve |
 | `POST /manager-team` with `{"manager_id": 123}` | fetch, reconstruct, store, and preview a new capture |
 | `POST /manager-team/capture` with `{"capture_id": "manager-..."}` | reload exactly one immutable capture |
+| `POST /manager-team/members` with `{"manager_id": 123}` | fetch/store and validate the exact 15 for a non-optimizer consumer |
+| `POST /manager-team/members/capture` with `{"capture_id": "manager-..."}` | reload the exact 15 for a non-optimizer consumer |
 | `POST /manager-plan` | solve locks, exclusions, threshold, and optional FT override from a capture |
 
 Loopback use needs no token. Non-loopback/LAN requests require the per-launch

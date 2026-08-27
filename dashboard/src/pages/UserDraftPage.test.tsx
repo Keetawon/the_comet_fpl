@@ -14,8 +14,8 @@ import type {
   PlanPlayer,
 } from "@/data/types";
 import {
-  fetchManagerTeam,
-  fetchManagerTeamCapture,
+  fetchManagerTeamMembers,
+  fetchManagerTeamMembersCapture,
   type ManagerTeamPreview,
 } from "@/lib/planServer";
 import { USER_DRAFT_STORAGE_KEY, UserDraftPage } from "./UserDraftPage";
@@ -26,8 +26,8 @@ vi.mock("@/data/load", () => ({
   loadPlayers: vi.fn(),
 }));
 vi.mock("@/lib/planServer", () => ({
-  fetchManagerTeam: vi.fn(),
-  fetchManagerTeamCapture: vi.fn(),
+  fetchManagerTeamMembers: vi.fn(),
+  fetchManagerTeamMembersCapture: vi.fn(),
 }));
 
 const plans = nextGwSample.plans as unknown as NextGwPlan[];
@@ -100,8 +100,8 @@ beforeEach(() => {
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadOptimizerAudit).mockResolvedValue(audit);
   vi.mocked(loadPlayers).mockResolvedValue({ players: draftPlayers, manifest: null });
-  vi.mocked(fetchManagerTeam).mockReset();
-  vi.mocked(fetchManagerTeamCapture).mockReset();
+  vi.mocked(fetchManagerTeamMembers).mockReset();
+  vi.mocked(fetchManagerTeamMembersCapture).mockReset();
 });
 
 describe("UserDraftPage", () => {
@@ -114,7 +114,7 @@ describe("UserDraftPage", () => {
     expect(screen.getByText(/Current-team import is intentionally local-only/)).toBeInTheDocument();
     expect(screen.queryByLabelText("FPL manager ID")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Plan server token/)).not.toBeInTheDocument();
-    expect(fetchManagerTeam).not.toHaveBeenCalled();
+    expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Add Draft 01" })).toBeEnabled();
   });
 
@@ -129,7 +129,7 @@ describe("UserDraftPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /require the trusted local Plan Server/i,
     );
-    expect(fetchManagerTeamCapture).not.toHaveBeenCalled();
+    expect(fetchManagerTeamMembersCapture).not.toHaveBeenCalled();
   });
 
   it("allows an over-budget legal 15 and keeps cost/xP totals in the final row", async () => {
@@ -337,7 +337,7 @@ describe("UserDraftPage", () => {
   });
 
   it("loads the exact captured current team from a typed handoff", async () => {
-    vi.mocked(fetchManagerTeamCapture).mockResolvedValue(managerPreview);
+    vi.mocked(fetchManagerTeamMembersCapture).mockResolvedValue(managerPreview);
     window.location.hash =
       `#squad-draft?optimizer_run_id=${encodeURIComponent(plans[0].optimizer_run_id)}` +
       "&source=manager_current&manager_capture_id=capture-1";
@@ -345,7 +345,7 @@ describe("UserDraftPage", () => {
     const { container } = render(<UserDraftPage />);
 
     expect(await screen.findByText("15/15 players")).toBeInTheDocument();
-    expect(fetchManagerTeamCapture).toHaveBeenCalledWith("capture-1", "");
+    expect(fetchManagerTeamMembersCapture).toHaveBeenCalledWith("capture-1", "");
     expect(screen.getByRole("status")).toHaveTextContent(
       "Forwarded 15 players from Manager Test XI's captured current team",
     );
@@ -387,7 +387,7 @@ describe("UserDraftPage", () => {
         playerCodes: [1],
       }),
     );
-    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValue(managerPreview);
     render(<UserDraftPage />);
     await screen.findByText("1/15 players");
 
@@ -395,7 +395,7 @@ describe("UserDraftPage", () => {
     await user.click(screen.getByRole("button", { name: "Fetch current team" }));
 
     expect(await screen.findByText("15/15 players")).toBeInTheDocument();
-    expect(fetchManagerTeam).toHaveBeenCalledWith("123456", "");
+    expect(fetchManagerTeamMembers).toHaveBeenCalledWith("123456", "");
     expect(screen.getByText(/does not optimize transfers/i)).toBeInTheDocument();
     expect(
       JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
@@ -409,7 +409,7 @@ describe("UserDraftPage", () => {
 
   it("accepts and explicitly remembers a LAN token for the direct shortcut", async () => {
     const user = userEvent.setup();
-    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValue(managerPreview);
     render(<UserDraftPage />);
     await screen.findByText("0/15 players");
 
@@ -420,7 +420,7 @@ describe("UserDraftPage", () => {
     );
     await user.click(screen.getByRole("button", { name: "Fetch current team" }));
 
-    expect(fetchManagerTeam).toHaveBeenCalledWith("123456", "lan-secret");
+    expect(fetchManagerTeamMembers).toHaveBeenCalledWith("123456", "lan-secret");
     expect(window.localStorage.getItem("fpl-plan-server-token")).toBe("lan-secret");
     expect(await screen.findByText("15/15 players")).toBeInTheDocument();
   });
@@ -440,7 +440,7 @@ describe("UserDraftPage", () => {
       }),
     );
     let resolveImport: ((preview: ManagerTeamPreview) => void) | null = null;
-    vi.mocked(fetchManagerTeam).mockReturnValue(
+    vi.mocked(fetchManagerTeamMembers).mockReturnValue(
       new Promise((resolve) => {
         resolveImport = resolve;
       }),
@@ -482,7 +482,7 @@ describe("UserDraftPage", () => {
       playerCodes: [1],
     };
     window.localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify(stored));
-    vi.mocked(fetchManagerTeam).mockRejectedValue(new Error("manager not found"));
+    vi.mocked(fetchManagerTeamMembers).mockRejectedValue(new Error("manager not found"));
     render(<UserDraftPage />);
     await screen.findByText("1/15 players");
 
@@ -491,6 +491,39 @@ describe("UserDraftPage", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "manager not found Your existing draft was kept unchanged",
+    );
+    expect(screen.getByText("1/15 players")).toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}"),
+    ).toEqual(stored);
+  });
+
+  it("rejects an owned-player price mismatch without replacing the draft", async () => {
+    const user = userEvent.setup();
+    const stored = {
+      version: 3,
+      seedSource: "manual",
+      optimizerRunId: plans[0].optimizer_run_id,
+      forecastRunId: plans[0].forecast_run_id,
+      season: plans[0].season,
+      managerCaptureId: null,
+      playerCodes: [1],
+    };
+    window.localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify(stored));
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValue({
+      ...managerPreview,
+      players: managerPreview.players.map((player, index) =>
+        index === 0 ? { ...player, now_cost: player.now_cost + 1 } : player,
+      ),
+    });
+    render(<UserDraftPage />);
+    await screen.findByText("1/15 players");
+
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Fetch current team" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "does not match the selected forecast roster",
     );
     expect(screen.getByText("1/15 players")).toBeInTheDocument();
     expect(

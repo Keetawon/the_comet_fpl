@@ -58,8 +58,8 @@ import {
   type UserDraftRules,
 } from "@/lib/userDraft";
 import {
-  fetchManagerTeam,
-  fetchManagerTeamCapture,
+  fetchManagerTeamMembers,
+  fetchManagerTeamMembersCapture,
   type ManagerTeamPreview,
 } from "@/lib/planServer";
 import {
@@ -399,7 +399,8 @@ function managerCurrentDraft(
     }
     if (
       player.position !== captured.position ||
-      player.team_code !== captured.team_code
+      player.team_code !== captured.team_code ||
+      player.now_cost !== captured.now_cost
     ) {
       throw new Error(
         `Current-team player ${captured.web_name} does not match the selected forecast roster.`,
@@ -838,7 +839,7 @@ export function UserDraftPage() {
               "Captured-manager Squad Draft handoffs require the trusted local Plan Server.",
             );
           }
-          preview = await fetchManagerTeamCapture(
+          preview = await fetchManagerTeamMembersCapture(
             handoff.managerCaptureId ?? "",
             handoffServerTokenRef.current,
           );
@@ -926,7 +927,7 @@ export function UserDraftPage() {
     setManagerImporting(true);
     setManagerImportError(null);
     try {
-      const preview = await fetchManagerTeam(managerId.trim(), serverToken);
+      const preview = await fetchManagerTeamMembers(managerId.trim(), serverToken);
       if (requestId !== managerImportRequestRef.current) return;
       // Resolve and validate the complete replacement before changing UI or browser storage.
       const imported = managerCurrentDraft(ready, preview);

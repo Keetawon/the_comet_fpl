@@ -490,7 +490,7 @@ class TestManagerTeamPreview:
         state = self._state(tmp_path, monkeypatch)
         capture = _manager_capture()
 
-        preview = _manager_team_preview(state, capture)
+        preview = _manager_team_preview(state, capture, require_full_registry=True)
 
         assert set(preview) == {
             "capture_id",
@@ -552,7 +552,7 @@ class TestManagerTeamPreview:
             capture = _manager_capture()
 
         with pytest.raises(RequestError, match=message):
-            _manager_team_preview(state, capture)
+            _manager_team_preview(state, capture, require_full_registry=True)
 
     def test_preview_tolerates_volatile_bootstrap_payload_changes(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -561,7 +561,11 @@ class TestManagerTeamPreview:
         monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
         state = ServerState(tmp_path)
         _write_forecast(state.forecast_path, bootstrap_sha256="7" * 64)
-        preview = _manager_team_preview(state, _manager_capture(bootstrap_sha256="8" * 64))
+        preview = _manager_team_preview(
+            state,
+            _manager_capture(bootstrap_sha256="8" * 64),
+            require_full_registry=True,
+        )
         assert len(preview["players"]) == 15
 
     def test_preview_requires_forecast_registry_binding(
@@ -572,7 +576,42 @@ class TestManagerTeamPreview:
         state = ServerState(tmp_path)
         _write_forecast(state.forecast_path, registry_sha256=None)
         with pytest.raises(RequestError, match="no selectable-player registry binding"):
-            _manager_team_preview(state, _manager_capture())
+            _manager_team_preview(state, _manager_capture(), require_full_registry=True)
+
+    def test_member_only_preview_tolerates_unrelated_registry_drift(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        _write_forecast(state.forecast_path, registry_sha256="7" * 64)
+
+        preview = _manager_team_preview(
+            state,
+            _manager_capture(registry_sha256="8" * 64),
+            require_full_registry=False,
+        )
+
+        assert len(preview["players"]) == 15
+
+    def test_member_only_preview_still_rejects_owned_player_metadata_drift(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(plan_server, "_pulp_package_version", lambda: "3.3.2")
+        monkeypatch.setattr(plan_server, "_cbc_binary_version", lambda: "2.10.3")
+        state = ServerState(tmp_path)
+        _write_forecast(
+            state.forecast_path,
+            registry_sha256="7" * 64,
+            price_delta_code=1,
+        )
+
+        with pytest.raises(RequestError, match="disagrees with active forecast metadata"):
+            _manager_team_preview(
+                state,
+                _manager_capture(registry_sha256="8" * 64),
+                require_full_registry=False,
+            )
 
     def test_manager_plan_rejects_more_owned_exclusions_than_first_week_depth(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -626,7 +665,7 @@ class TestManagerTeamPreview:
         monkeypatch.setattr(plan_server, "capture_manager_team", fake_capture)
         monkeypatch.setattr(plan_server, "write_manager_capture_atomic", fake_write)
 
-        preview = fetch_and_store_manager_team(state, 42)
+        preview = fetch_and_store_manager_team(state, 42, require_full_registry=True)
 
         assert preview["capture_id"] == capture.capture_id
         assert writes == [
@@ -1300,7 +1339,10 @@ def loopback_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Threadin
     monkeypatch.setattr(
         plan_server,
         "fetch_and_store_manager_team",
-        lambda state, manager_id: {"manager_id_seen": manager_id},
+        lambda state, manager_id, *, require_full_registry: {
+            "manager_id_seen": manager_id,
+            "full_registry_seen": require_full_registry,
+        },
     )
     monkeypatch.setattr(
         plan_server,
@@ -1310,7 +1352,10 @@ def loopback_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Threadin
     monkeypatch.setattr(
         plan_server,
         "_manager_team_preview",
-        lambda state, capture: {"capture_seen": capture["capture_id"]},
+        lambda state, capture, *, require_full_registry: {
+            "capture_seen": capture["capture_id"],
+            "full_registry_seen": require_full_registry,
+        },
     )
     monkeypatch.setattr(
         plan_server,
@@ -1493,7 +1538,11 @@ class TestHttpSurface:
             body=json.dumps({"manager_id": 42}).encode("utf-8"),
         )
         assert status == 200
-        assert json.loads(payload)["manager_id_seen"] == 42
+        assert json.loads(payload) == {
+            "ok": True,
+            "manager_id_seen": 42,
+            "full_registry_seen": True,
+        }
 
         status, _, payload = self._request(
             loopback_server,
@@ -1502,7 +1551,37 @@ class TestHttpSurface:
             body=json.dumps({"capture_id": capture_id}).encode("utf-8"),
         )
         assert status == 200
-        assert json.loads(payload)["capture_seen"] == capture_id
+        assert json.loads(payload) == {
+            "ok": True,
+            "capture_seen": capture_id,
+            "full_registry_seen": True,
+        }
+
+        status, _, payload = self._request(
+            loopback_server,
+            "/manager-team/members",
+            method="POST",
+            body=json.dumps({"manager_id": 42}).encode("utf-8"),
+        )
+        assert status == 200
+        assert json.loads(payload) == {
+            "ok": True,
+            "manager_id_seen": 42,
+            "full_registry_seen": False,
+        }
+
+        status, _, payload = self._request(
+            loopback_server,
+            "/manager-team/members/capture",
+            method="POST",
+            body=json.dumps({"capture_id": capture_id}).encode("utf-8"),
+        )
+        assert status == 200
+        assert json.loads(payload) == {
+            "ok": True,
+            "capture_seen": capture_id,
+            "full_registry_seen": False,
+        }
 
         status, _, payload = self._request(
             loopback_server,
@@ -1531,6 +1610,11 @@ class TestHttpSurface:
         [
             ("/manager-team", {"manager_id": 42}),
             ("/manager-team/capture", {"capture_id": "manager-" + "1" * 64}),
+            ("/manager-team/members", {"manager_id": 42}),
+            (
+                "/manager-team/members/capture",
+                {"capture_id": "manager-" + "1" * 64},
+            ),
             ("/manager-plan", {"capture_id": "manager-" + "1" * 64}),
         ],
     )

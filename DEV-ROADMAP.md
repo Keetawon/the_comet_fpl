@@ -1129,8 +1129,13 @@ Only after the ordered dashboard program above, unless an operational blocker re
   override is explicit provenance. Up to five owned locks mean never sell; an owned exclusion is
   forced out in the first forecast gameweek and a non-owned exclusion is never bought. Future
   prices remain frozen, and the bounded transfer search makes no global-optimality claim.
-- The local Plan Server accepts an explicit `--forecast` and adds `/manager-team`,
-  `/manager-team/capture`, and `/manager-plan` beside the existing `/plan`. Plan Builder shows
+- The local Plan Server accepts an explicit `--forecast` and adds strict `/manager-team` and
+  `/manager-team/capture`, member-only `/manager-team/members` and
+  `/manager-team/members/capture`, and `/manager-plan` beside the existing `/plan`. Plan Builder
+  and the manager optimizer retain exact full selectable-registry binding. Players and Squad Draft
+  use only the member endpoints, which tolerate unrelated registry additions after exact
+  reconciliation of all 15 captured players against forecast gameweek, identity, position, club,
+  and price. Plan Builder shows
   HOLD/OUT/IN, FT, cash, sunk/new hits, and offers both the optimized and captured-current-team
   Squad Draft handoffs. Squad Draft also has a direct manager-ID capture shortcut that preserves
   the old draft on failure. Manager captures/context stay out of shared read models; the public
@@ -1138,10 +1143,13 @@ Only after the ordered dashboard program above, unless an operational blocker re
   Hosted authentication, ownership verification, accounts/entitlements, and a selections log
   remain unimplemented. See `docs/manager-team-suggestions.md` and `dashboard/README.md`.
 - **Players private manager-squad filter (implemented development-only 2026-08-27).** The local
-  Players route reuses `/manager-team` to verify an exact 15-player scope by stable code against
-  the selected forecast's planning GW, position, club code, and deadline price. It composes with
+  Players route uses `/manager-team/members` to verify an exact 15-player scope by stable code against
+  the selected forecast's planning GW, position, club identity, and deadline price. It composes with
   every existing player/forecast/actual filter, preserves the active table atomically on fetch or
-  mapping failure, resets pagination after narrowing, and clears on forecast-vintage changes.
+  mapping failure, resets pagination after narrowing, clears on forecast-vintage changes, and
+  places the complete filter panel immediately before the scrollable player table. League-wide
+  additions outside the captured squad do not block this display filter; optimizer routes remain
+  full-registry fail-closed.
   Hosted static builds cannot call it. Deterministic facts follow the visible scope, while the
   optional renderer is disabled so no manager or capture field can enter the public insight
   contract. Acceptance requires focused success/intersection/reset/failure/partial-mapping/privacy

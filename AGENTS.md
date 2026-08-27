@@ -273,11 +273,15 @@ leg counts once, DNPs are excluded, and any missing BPS on an appeared row makes
 unavailable. Normalized actuals retain fixture-grain BPS, while the selected-range aggregate and
 legacy form BPS measure remain totals. This is backward-looking descriptive arithmetic, not a
 model quantity. Its local **My squad** filter
-reuses the trusted public-manager capture but activates only after all 15 stable codes match the
-selected forecast vintage's planning gameweek, position, club code, and deadline price. It then
+uses the trusted public-manager capture through the explicit member-only Plan Server route and
+activates only after all 15 stable codes match the selected forecast vintage's planning gameweek,
+position, resolved club identity, and deadline price. Unrelated additions elsewhere in the full
+selectable-player registry do not block this display-only filter or the non-optimizer Squad Draft;
+Plan Builder and every optimizer solve retain the exact full-registry fail-closed gate. It then
 intersects the existing filters without changing any published value. Partial/mismatched imports
-fail atomically, a vintage change clears the private scope, and hosted static builds never expose
-the network action. Player Analytics defaults to
+fail atomically, a vintage change clears the private scope, hosted static builds never expose the
+network action, and the complete Players filter panel remains immediately before the scrollable
+table. Player Analytics defaults to
 the reporting-only Established evidence scope, which excludes forecast-marked cold starts from its
 shortlist/Pareto population; the explicit include control restores them without changing xP or any
 probability. Never infer cold-start status from observations or treat this filter as a model change.
