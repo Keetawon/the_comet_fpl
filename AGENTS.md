@@ -260,7 +260,7 @@ immediately preceding season plus a distinct `Actual GWs` range. It never reuses
 horizon selector, mixes seasons, silently substitutes one season for another, or collapses double-
 gameweek legs; it only sums already-published observed components. The dense table presents that
 shared observed scope once above compact `App`/stat headers. A Players-only sortable
-`xP GW{Forecast From}` column sits beside availability and defaults descending for XI/bench review:
+`xP GW{Forecast From}` column sits immediately after `Pts` and defaults descending for XI/bench review:
 it uses the exact fixed-start cumulative endpoint when compatible, otherwise strictly sums the
 selected GW's published fixture xP, including every double-gameweek leg. A true blank is zero;
 null, non-finite, duplicate, or incomplete fixture evidence stays unavailable and sorts last. The

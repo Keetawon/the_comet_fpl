@@ -1059,7 +1059,7 @@ Only after the ordered dashboard program above, unless an operational blocker re
   six overlapping threshold-probability columns are removed from this dense table and remain
   available in Player analytics. The observed season/GW scope is displayed once above compact
   stat headers instead of being repeated inside `App`. A dedicated sortable
-  `xP GW{Forecast From}` column appears beside availability and defaults descending for quick
+  `xP GW{Forecast From}` column appears immediately after `Pts` and defaults descending for quick
   starter/bench review. At the run's fixed start/all-venue scope it selects the exact published
   cumulative endpoint; shifted or venue-filtered scopes strictly sum complete published fixture
   xP for that GW. DGW legs are all included, a true blank is zero, and null/incomplete evidence

@@ -339,7 +339,7 @@ comparison page and is not a twelfth navigation item.
   a selected finalized actual season/GW range with per-gameweek xP chips and a range-total xP.
   The actual scope appears once in a compact strip above the table, so the first observed leaf is
   simply `App`. A Players-only sortable `xP GW{Forecast From}` column sits immediately after
-  availability and defaults descending for starter/bench review. It selects the exact cumulative
+  `Pts` and defaults descending for starter/bench review. It selects the exact cumulative
   endpoint at a compatible fixed-start/all-venue scope and otherwise uses the existing strict raw
   fixture-xP sum: both DGW legs count, a true blank is 0.0, and null/duplicate/incomplete evidence
   remains a dash sorted last. It never applies the availability overlay. A one-GW selection hides

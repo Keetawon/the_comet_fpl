@@ -262,6 +262,10 @@ describe("PlayersPage", () => {
       "aria-sort",
       "descending",
     );
+    const visibleHeaders = screen
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent?.trim());
+    expect(visibleHeaders.indexOf("xP GW1")).toBe(visibleHeaders.indexOf("Pts") + 1);
     for (const name of ["P(≤2)", "P(≥2)", "P(≥4)", "P(≥6)", "P(≥10)", "P(≥15)"]) {
       expect(screen.queryByRole("columnheader", { name })).not.toBeInTheDocument();
     }

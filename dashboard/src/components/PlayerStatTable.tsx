@@ -572,8 +572,8 @@ export function PlayerStatTable({
           );
         },
       },
-      ...gwFromXpColumns,
       ...visibleFormColumns,
+      ...gwFromXpColumns,
       ...totalXpColumns,
       ...beforeFixtureColumns,
       ...gwColumns,
