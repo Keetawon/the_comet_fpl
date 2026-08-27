@@ -36,8 +36,8 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
 - **Goal 2's MVP, deep analytics, exact parallel monitoring, evidence-bound summaries, and
-  current-season Players actual range are implemented development-only.** Semantic contract
-  version 4, dashboard schema version 6, immutable player/team outcomes, the atomic static-JSON boundary, nine read-only
+  explicit prior/current-season Players actual range are implemented development-only.** Semantic contract
+  version 4, dashboard schema version 7, immutable player/team outcomes, the atomic static-JSON boundary, nine read-only
   analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
   development-only. P1.8's full Players-page
   form matrix and additive observed
@@ -68,7 +68,7 @@ series; later handoff records the new commits and full gate rather than rewritin
 - Stage E selects a legal 15-player squad and exact weekly lineup/captain, then performs a bounded
   multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed, and immutable
   platform/default, diagnostic, and custom-plan identities are separated fail-closed.
-- The BI semantic-v4/star export, fixture difficulty and player/team form/actual facts, atomic schema-v6
+- The BI semantic-v4/star export, fixture difficulty and player/team form/actual facts, atomic schema-v7
   static JSON, nine read-only analytic/decision pages, Plan Builder, and Squad Draft are implemented
   development-only. The browser reads only published JSON and never DuckDB. Player/Team analytics
   and separate Player/Team prediction-monitoring pages are current; the old
@@ -928,9 +928,10 @@ operation, and test; implementation cannot silently weaken these requirements.
 ### P2.2 - Player and team deep analytics
 
 **Status (2026-08-26): implemented development-only; focused and full dashboard tests pass.**
-Player analytics and Team analytics use only the cumulative/forecast values introduced in dashboard
-schema version 4 and retained unchanged in current schema version 6. They do not reach around P2.3's
-outcome facts.
+Player analytics and Team analytics use only the cumulative/forecast axis values introduced in
+dashboard schema version 4 and retained unchanged in current schema version 7. Version 7 adds only
+forecast-owned cold-start provenance for reporting eligibility; it does not alter an axis or model
+quantity. The pages do not reach around P2.3's outcome facts.
 
 - Player views: price-versus-cumulative-xP Pareto frontier; published inclusive haul-versus-downside
   frontier; ownership-versus-xP differential view; and explicitly labelled observed-form versus
@@ -942,6 +943,9 @@ outcome facts.
   analytics axis.
 - Provide accessible, keyboard-operable SVG plus an exact table/list. Null axis values are omitted
   with counts, never coerced to zero. Pareto geometry is display logic, not optimization.
+- Keep visible chart copy concise, include one view-specific How-to-read note, and place tooltips
+  edge-aware so they do not clip. Full exact metric/provenance text remains in accessible names and
+  the authoritative table even when the visible run id or axis label is shortened.
 - Let users tighten the horizontal chart viewport and focus on the efficient/Pareto set when
   outliers compress a dense cluster. Classification still uses the full filtered eligible set;
   viewport controls never change exact tables or insight facts. Player probability bounds use
@@ -955,10 +959,15 @@ outcome facts.
 - Label player/team past-vs-future form as latest-at-export reporting context, not state frozen at
   the selected forecast vintage. Show the row's observed `(season, as_at_gw)` anchor because an
   older forecast may be displayed beside later form; this comparison remains explanatory only.
+- Player analytics excludes directly published `cold_start_player` rows by default and offers an
+  explicit include control. This changes only reporting eligibility and Pareto membership. It must
+  not infer newcomer status or alter xP/probabilities; any three-appearance bridge would require
+  separately named, pre-registered model research and evaluation and is not part of this change.
 
 Acceptance: pure direction-aware Pareto and aggregation tests cover ties, nulls, vintage isolation,
 exact fixed-start horizon endpoints, double and blank gameweeks, venue filtering, expected-count
-labelling, fallback accounting, loading/error/empty states, and accessible table equivalence.
+labelling, fallback accounting, cold-start opt-in, unclipped pointer/keyboard tooltips,
+loading/error/empty states, and accessible table equivalence.
 
 ### P2.3 - Exact parallel player/team prediction monitoring
 
@@ -1006,7 +1015,7 @@ Builder, and Squad Draft remain deterministic-only.
   quota is not assumed to license general application calls; configure a general API key/balance
   under the current provider terms.
 - Requests send only exact typed page/vintage/filter selectors. The server verifies the selected
-  schema-v6 manifest and file hashes, reconstructs the allowlisted facts from that static
+  schema-v7 manifest and file hashes, reconstructs the allowlisted facts from that static
   generation, and refuses mismatched provenance before provider/cache work. No PMFs, caller prose,
   arbitrary prompts, manager/custom-plan identifiers, squads, bank, selling values, capture data,
   credentials, or full page payloads cross the boundary.
@@ -1036,17 +1045,23 @@ selectable. The obsolete `forecast_vs_actual.json` is absent from the replaced g
 
 Only after the ordered dashboard program above, unless an operational blocker requires otherwise:
 
-- **Players current-season Actual-GW range (implemented development-only 2026-08-26).** BI
+- **Players explicit-season Actual-GW history (implemented development-only 2026-08-26).** BI
   semantic contract v4 extends `fact_player_fixture_actual` with deterministic latest live
-  components only when the exact append-only finalized player outcome exists. Dashboard schema v6
-  attaches only same-season rows from officially complete gameweeks to each player, keeps both
-  double-gameweek legs, and never falls back to prior-season form. The Players route owns a
-  separate `Actual GWs` from/to range, while Forecast GWs continue to control only future fixtures
-  and xP. Browser arithmetic is limited to summing published observed components and forming the
-  documented descriptive per-90 ratios from matching published measured-minute denominators.
-  Insight request schema v2 carries distinct actual-range selectors. Acceptance requires archive/
+  components only when the exact append-only finalized player outcome exists. Dashboard schema v7
+  publishes normalized `player_actuals.json` records at `(season, code)` grain instead of
+  duplicating observations per forecast vintage. Publication is limited to each forecast season
+  and its immediate predecessor, with the predecessor present only when finalized observations
+  exist. The Players route exposes only the selected run's forecast season and its published
+  predecessor plus a separate `Actual GWs` from/to range; Forecast GWs still control only future
+  fixtures and xP, and seasons are never mixed or silently substituted. The
+  six overlapping threshold-probability columns are removed from this dense table and remain
+  available in Player analytics. Browser arithmetic is limited to summing published observed
+  components and forming the documented descriptive per-90 ratios from matching published
+  measured-minute denominators. Insight request schema v3 limits its explicit actual season to
+  that published/selectable pair and requires both range boundaries to be exact members of the
+  chosen season's finalized-GW set. Acceptance requires archive/
   live duplicate rejection, finalized-ledger gating, complete-GW filtering, NULL preservation,
-  range/DGW aggregation tests, a schema-v6 atomic republish, and visual verification.
+  range/DGW aggregation tests, a schema-v7 atomic republish, and visual verification.
 
   The local semantic-v4/schema-v6 refresh completed after commit `e234197`: the BI generation hash
   is `1cf46ab421320595df4c4246feeb98ac27a4f3531124efdbfec2e063fbad363e` and the dashboard
@@ -1056,6 +1071,23 @@ Only after the ordered dashboard program above, unless an operational blocker re
   GW1-GW1 with no prior-season substitution. Contract, point-in-time, UI, build, lint, type, and
   HTTP smoke checks pass. An interactive visual click-through remains pending because no
   controllable browser was connected to the implementation session.
+
+  The schema-v7 refresh completed locally on 2026-08-27 from that same immutable semantic-v4
+  export. Its dashboard content hash is
+  `cb7759b13484ec939a040b98ed75fd39f2faa5e0faa5db28a41c14ef7338d2c2`; both
+  `dashboard/public/data` and `dashboard/dist/data` carry the identical validated generation.
+  `player_actuals.json` contains 1,078 season/player records and 17,692 finalized fixture rows:
+  468 / 17,082 for 2025-26 and 610 / 610 for 2026-27. No older season is transported. The
+  selected GW2-6 forecast still marks Horníček (`code=470551`) as a cold start, so the default
+  Player analytics reporting scope excludes him without altering his forecast. Automated DOM,
+  contract, build, lint, and HTTP checks cover the implementation; a responsive visual
+  click-through remains pending because the browser-control runtime reported no connected browser.
+
+  Schema v7 additionally publishes the forecast-owned `cold_start_player` flag and defaults Player
+  analytics to Established evidence, with an explicit Include cold starts control. This is a
+  reporting-only risk screen. The discovered live/archive history-path inconsistency and any
+  proposed three-appearance probability bridge remain separate forecast work; neither is silently
+  folded into this dashboard change.
 
 - measure and contract per-GW availability semantics;
 - design future price-change and future selling-value handling;

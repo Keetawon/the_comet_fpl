@@ -1,4 +1,4 @@
-// The static read-model boundary fails closed: schema v6, cumulative-horizon semantics,
+// The static read-model boundary fails closed: schema v7, cumulative-horizon semantics,
 // and explicit plan ownership are
 // required before any page can render optimizer plans.
 
@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import sample from "@/data/sampleNextGw.json";
 import fixtureSample from "@/data/sampleFixtureMatrix.json";
 import horizonsSample from "@/data/samplePlayerHorizons.json";
+import playerActualsSample from "@/data/samplePlayerActuals.json";
 import playerAccuracySample from "@/data/samplePlayerForecastVsActual.json";
 import playersSample from "@/data/samplePlayers.json";
 import optimizerAuditSample from "@/data/sampleOptimizerAudit.json";
@@ -81,12 +82,12 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("atomic schema-v6 generation", () => {
+describe("atomic schema-v7 generation", () => {
   it("loads every current sample envelope and shares its genuine manifest provenance", async () => {
     vi.resetModules();
     const manifest = {
       schema: "fpl.dashboard-read-models",
-      json_schema_version: 6,
+      json_schema_version: 7,
       generated_at: "2026-08-26T00:00:00Z",
       ease_index_formula_version: "fixture-ease-v1",
       run_ids: [],
@@ -99,6 +100,7 @@ describe("atomic schema-v6 generation", () => {
       "manifest.json": manifest,
       "fixture_matrix.json": fixtureSample,
       "players.json": playersSample,
+      "player_actuals.json": playerActualsSample,
       "player_horizons.json": horizonsSample,
       "next_gw.json": sample,
       "summary.json": summarySample,
@@ -117,11 +119,12 @@ describe("atomic schema-v6 generation", () => {
       }),
     );
     const loaders = await import("./load");
-    const [manifestResult, fixture, players, horizons, nextGw, summary, audit, playerAccuracy, teamAccuracy] =
+    const [manifestResult, fixture, players, actuals, horizons, nextGw, summary, audit, playerAccuracy, teamAccuracy] =
       await Promise.all([
         loaders.loadDashboardManifest(),
         loaders.loadFixtureMatrix(),
         loaders.loadPlayers(),
+        loaders.loadPlayerActuals(),
         loaders.loadPlayerHorizons(),
         loaders.loadNextGw(),
         loaders.loadSummary(),
@@ -130,12 +133,13 @@ describe("atomic schema-v6 generation", () => {
         loaders.loadTeamForecastVsActual(),
       ]);
 
-    expect(manifestResult?.json_schema_version).toBe(6);
+    expect(manifestResult?.json_schema_version).toBe(7);
     expect(fixture.manifest?.content_sha256).toBe(manifest.content_sha256);
     expect(players.manifest?.content_sha256).toBe(manifest.content_sha256);
-    expect(horizons.json_schema_version).toBe(6);
+    expect(actuals.players).toEqual(playerActualsSample.players);
+    expect(horizons.json_schema_version).toBe(7);
     expect(nextGw.plans).toEqual(sample.plans);
-    expect(summary).toMatchObject({ json_schema_version: 6 });
+    expect(summary).toMatchObject({ json_schema_version: 7 });
     expect(audit).toMatchObject({ plans: optimizerAuditSample.plans });
     expect(playerAccuracy.manifest?.content_sha256).toBe(manifest.content_sha256);
     expect(teamAccuracy.manifest?.content_sha256).toBe(manifest.content_sha256);
@@ -162,18 +166,18 @@ describe("atomic schema-v6 generation", () => {
 });
 
 describe("loadNextGw schema boundary", () => {
-  it("accepts the current schema-v6 read model", async () => {
+  it("accepts the current schema-v7 read model", async () => {
     await expect(loadPayload(sample)).resolves.toEqual({ plans: sample.plans });
   });
 
   it("rejects stale schema v5 even when architecture fields are present", async () => {
     const stale = { ...sample, json_schema_version: 5 };
     await expect(loadPayload(stale)).rejects.toThrow(
-      /expected fpl.dashboard-next-gw version 6/,
+      /expected fpl.dashboard-next-gw version 7/,
     );
   });
 
-  it("rejects a schema-v6 plan with missing ownership instead of inferring from V3", async () => {
+  it("rejects a schema-v7 plan with missing ownership instead of inferring from V3", async () => {
     const missingKind = JSON.parse(JSON.stringify(sample)) as {
       json_schema_version: number;
       plans: { plan_kind?: string }[];
@@ -186,7 +190,7 @@ describe("loadNextGw schema boundary", () => {
   });
 });
 
-describe("shared schema-v6 envelope", () => {
+describe("shared schema-v7 envelope", () => {
   it("accepts current players and rejects a mixed stale generation", async () => {
     await expect(loadPlayersPayload(playersSample)).resolves.toMatchObject({
       players: playersSample.players,
@@ -194,14 +198,14 @@ describe("shared schema-v6 envelope", () => {
     });
     await expect(
       loadPlayersPayload({ ...playersSample, json_schema_version: 5 }),
-    ).rejects.toThrow(/expected fpl.dashboard-players version 6/);
+    ).rejects.toThrow(/expected fpl.dashboard-players version 7/);
   });
 
-  it("rejects players without the current-season actuals collection", async () => {
+  it("requires explicit player cold-start provenance", async () => {
     const malformed = JSON.parse(JSON.stringify(playersSample)) as typeof playersSample;
-    delete (malformed.players[0] as Partial<(typeof malformed.players)[number]> & { actuals?: unknown[] }).actuals;
+    delete (malformed.players[0] as Partial<(typeof malformed.players)[number]>).cold_start_player;
     await expect(loadPlayersPayload(malformed)).rejects.toThrow(
-      /every player must carry current-season actuals/,
+      /cold-start provenance flag/,
     );
   });
 });
@@ -213,7 +217,7 @@ describe("loadPlayerHorizons schema boundary", () => {
 
   it("rejects a stale schema even when the scalar fields look usable", async () => {
     const stale = { ...horizonsSample, json_schema_version: 5 };
-    await expect(loadHorizonsPayload(stale)).rejects.toThrow(/expected version 6 cumulative/);
+    await expect(loadHorizonsPayload(stale)).rejects.toThrow(/expected version 7 cumulative/);
   });
 
   it("rejects non-monotone cumulative probability rows", async () => {
@@ -248,7 +252,7 @@ describe("loadPlayerHorizons schema boundary", () => {
       reordered.horizon_fields[1],
       reordered.horizon_fields[0],
     ];
-    await expect(loadHorizonsPayload(reordered)).rejects.toThrow(/expected version 6 cumulative/);
+    await expect(loadHorizonsPayload(reordered)).rejects.toThrow(/expected version 7 cumulative/);
 
     const shortTuple = JSON.parse(JSON.stringify(horizonsSample)) as typeof horizonsSample;
     shortTuple.players[0].horizons[0].pop();
@@ -277,11 +281,11 @@ describe("loadPlayerHorizons schema boundary", () => {
   it("requires the six-decimal and exact-boundary semantics", async () => {
     const wrongPlaces = JSON.parse(JSON.stringify(horizonsSample)) as typeof horizonsSample;
     wrongPlaces.semantics.value_decimal_places = 5 as 6;
-    await expect(loadHorizonsPayload(wrongPlaces)).rejects.toThrow(/expected version 6 cumulative/);
+    await expect(loadHorizonsPayload(wrongPlaces)).rejects.toThrow(/expected version 7 cumulative/);
 
     const wrongBoundary = JSON.parse(JSON.stringify(horizonsSample)) as typeof horizonsSample;
     wrongBoundary.semantics.probability_boundary_policy = "rounded-boundaries" as "preserve-exact-zero-one-v1";
-    await expect(loadHorizonsPayload(wrongBoundary)).rejects.toThrow(/expected version 6 cumulative/);
+    await expect(loadHorizonsPayload(wrongBoundary)).rejects.toThrow(/expected version 7 cumulative/);
   });
 
   it("rejects raw PMFs or any other unversioned extra field", async () => {

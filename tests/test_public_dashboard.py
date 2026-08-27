@@ -21,6 +21,8 @@ from fpl.publish.dashboard_json import (
     NEXT_GW_SCHEMA,
     OPTIMIZER_AUDIT_FILENAME,
     OPTIMIZER_AUDIT_SCHEMA,
+    PLAYER_ACTUALS_FILENAME,
+    PLAYER_ACTUALS_SCHEMA,
     PLAYER_FORECAST_VS_ACTUAL_FILENAME,
     PLAYER_FORECAST_VS_ACTUAL_SCHEMA,
     PLAYER_HORIZONS_FILENAME,
@@ -50,6 +52,7 @@ _FILENAMES = (
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
     NEXT_GW_FILENAME,
     OPTIMIZER_AUDIT_FILENAME,
+    PLAYER_ACTUALS_FILENAME,
     PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     SUMMARY_FILENAME,
@@ -163,7 +166,38 @@ def _documents() -> dict[str, dict[str, Any]]:
                     "season": "2026-27",
                     "code": 1,
                     "web_name": "Preserved Player",
-                    "actuals": [],
+                    "cold_start_player": False,
+                }
+            ],
+        },
+        PLAYER_ACTUALS_FILENAME: {
+            "schema": PLAYER_ACTUALS_SCHEMA,
+            "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+            "players": [
+                {
+                    "season": "2025-26",
+                    "code": 1,
+                    "actuals": [
+                        {
+                            "gw": 38,
+                            "fixture": 380,
+                            "kickoff_time": "2026-05-24T15:00:00+00:00",
+                            "minutes": 90,
+                            "starts": 1,
+                            "goals_scored": 1,
+                            "assists": 0,
+                            "clean_sheets": 1,
+                            "goals_conceded": 0,
+                            "saves": 0,
+                            "bonus": 3,
+                            "bps": 40,
+                            "defensive_contribution": 7,
+                            "expected_goals": 0.6,
+                            "expected_assists": 0.1,
+                            "expected_goals_conceded": 0.8,
+                            "points_under_rules_2026_27": 10,
+                        }
+                    ],
                 }
             ],
         },
@@ -319,6 +353,7 @@ def test_packages_only_formal_plans_and_reseals_a_deterministic_root_zip(tmp_pat
         assert plan["search_policy"]["plan_origin"] == "platform"
     assert public_documents[FIXTURE_MATRIX_FILENAME] == _documents()[FIXTURE_MATRIX_FILENAME]
     assert public_documents[PLAYERS_FILENAME] == _documents()[PLAYERS_FILENAME]
+    assert public_documents[PLAYER_ACTUALS_FILENAME] == _documents()[PLAYER_ACTUALS_FILENAME]
     assert public_documents[PLAYER_HORIZONS_FILENAME] == _documents()[PLAYER_HORIZONS_FILENAME]
     horizon_payload = (first.output_dir / PLAYER_HORIZONS_FILENAME).read_bytes()
     assert horizon_payload.endswith(b"\n")

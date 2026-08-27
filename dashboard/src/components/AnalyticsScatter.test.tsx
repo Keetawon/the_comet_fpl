@@ -52,7 +52,7 @@ describe("AnalyticsScatter", () => {
     expect(screen.getByRole("group", { name: "Player value frontier" })).toBeInTheDocument();
     expect(screen.getByText("Deadline price (lower is better)")).toBeInTheDocument();
     expect(screen.getByText("Cumulative xP (higher is better)")).toBeInTheDocument();
-    expect(screen.getByText(/Vintage run-abc123 · horizon GW2–GW6/)).toBeInTheDocument();
+    expect(screen.getByText("Forecast run-abc123 · GW2–GW6")).toBeInTheDocument();
   });
 
   it("labels explanatory axes as context without implying a better direction", () => {
@@ -84,21 +84,67 @@ describe("AnalyticsScatter", () => {
     expect(beta.getAttribute("aria-label")).toContain("not on Pareto frontier");
   });
 
-  it("shows the same exact tooltip for pointer and keyboard focus", () => {
+  it("shows a concise, edge-aware tooltip while preserving the full accessible name", () => {
     render(<AnalyticsScatter {...props} />);
     const alpha = screen.getAllByTestId("analytics-point")[0];
 
     fireEvent.focus(alpha);
     const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.parentElement).toHaveClass("overflow-visible");
     expect(tooltip).toHaveTextContent("Deadline price: £6.5m");
+    expect(tooltip).toHaveTextContent("Efficient frontier");
+    expect(tooltip).not.toHaveTextContent("run-abc123");
+    expect(tooltip).not.toHaveTextContent("GW2–GW6");
+    expect(tooltip).toHaveAttribute("data-horizontal-placement", "start");
+    expect(tooltip).toHaveAttribute("data-vertical-placement", "below");
+    expect(alpha).toHaveAccessibleName(/vintage run-abc123; horizon GW2–GW6/);
     expect(alpha).toHaveAttribute("aria-describedby", tooltip.id);
 
     fireEvent.blur(alpha);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     fireEvent.mouseEnter(alpha);
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Pareto frontier");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Efficient frontier");
     fireEvent.mouseLeave(alpha);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    const beta = screen.getAllByTestId("analytics-point")[1];
+    fireEvent.focus(beta);
+    expect(screen.getByRole("tooltip")).toHaveAttribute("data-horizontal-placement", "end");
+    expect(screen.getByRole("tooltip")).toHaveAttribute("data-vertical-placement", "above");
+    expect(beta).toHaveAccessibleName(/vintage run-abc123; horizon GW2–GW6/);
+  });
+
+  it("supports concise visible axis and provenance labels without weakening accessibility", () => {
+    render(
+      <AnalyticsScatter
+        {...props}
+        xAxis={{ ...props.xAxis, displayLabel: "Price" }}
+        yAxis={{ ...props.yAxis, displayLabel: "xP" }}
+        vintageDisplayLabel="2026-27 · run-abc…"
+        horizonDisplayLabel="GW2-6"
+      />,
+    );
+
+    expect(screen.getByText("Price (lower is better)")).toBeInTheDocument();
+    expect(screen.getByText("xP (higher is better)")).toBeInTheDocument();
+    expect(screen.getByText("Forecast 2026-27 · run-abc… · GW2-6")).toBeInTheDocument();
+    const group = screen.getByRole("group", { name: "Player value frontier" });
+    expect(group.querySelector("desc")).toHaveTextContent(
+      /Deadline price \(lower is better\); Cumulative xP \(higher is better\).*run-abc123/,
+    );
+  });
+
+  it("renders an optional concise chart-reading note", () => {
+    render(
+      <AnalyticsScatter
+        {...props}
+        readingNote="Move up and left; outlined points are Pareto-efficient."
+      />,
+    );
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "How to read: Move up and left; outlined points are Pareto-efficient.",
+    );
   });
 
   it("renders optional median quadrant guides without changing point values", () => {

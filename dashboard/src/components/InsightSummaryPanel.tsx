@@ -42,7 +42,7 @@ function requestFor(remote: RemoteInsightConfig): InsightSummaryRequest | null {
   if (provenance == null) return null;
   return {
     schema: "fpl.insight-summary-request",
-    schema_version: 2,
+    schema_version: 3,
     page: remote.page,
     manifest_sha256: provenance.manifestSha256,
     run_id: provenance.runId,
@@ -115,7 +115,7 @@ export function InsightSummaryPanel({
 
   return (
     <section
-      className={`rounded-lg border bg-card p-4 ${className ?? ""}`}
+      className={`min-w-0 rounded-lg border bg-card p-4 ${className ?? ""}`}
       aria-labelledby="insight-summary-heading"
       data-testid="insight-summary-panel"
     >
@@ -125,7 +125,7 @@ export function InsightSummaryPanel({
             Insight summary
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Authoritative facts from the current visible scope.
+            Facts from the selected filters.
           </p>
         </div>
         {remote && (
@@ -142,8 +142,12 @@ export function InsightSummaryPanel({
       </div>
 
       {displayItems.length ? (
-        <ul className="mt-3 grid gap-2 text-sm md:grid-cols-2">
-          {displayItems.map((item) => <li key={item.id}>{item.statement}</li>)}
+        <ul className="mt-3 grid min-w-0 gap-2 text-sm md:grid-cols-2">
+          {displayItems.map((item) => (
+            <li key={item.id} className="min-w-0 [overflow-wrap:anywhere]">
+              {item.statement}
+            </li>
+          ))}
         </ul>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">
@@ -159,22 +163,30 @@ export function InsightSummaryPanel({
       {disabledReason && <p className="mt-3 text-xs text-muted-foreground">{disabledReason}</p>}
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       {result && (
-        <div className="mt-4 border-t pt-3" aria-label="AI-selected explanation">
+        <div
+          className="mt-4 min-w-0 border-t pt-3 [overflow-wrap:anywhere]"
+          aria-label="AI-selected explanation"
+        >
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             AI-selected - verify cited metrics
           </p>
-          <p className="mt-1 text-sm font-semibold">{result.headline}</p>
+          <p className="mt-1 min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">
+            {result.headline}
+          </p>
           <ul className="mt-2 space-y-2 text-sm">
             {result.items.map((item, index) => (
-              <li key={`${index}-${item.citations.join(".")}`}>
+              <li
+                key={`${index}-${item.citations.join(".")}`}
+                className="min-w-0 [overflow-wrap:anywhere]"
+              >
                 <span>{item.text}</span>{" "}
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
                   [{item.citations.join(", ")}]
                 </span>
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 min-w-0 text-[11px] text-muted-foreground [overflow-wrap:anywhere]">
             {result.provider} · {result.model} · {result.source}
           </p>
         </div>

@@ -6,7 +6,7 @@ it never queries DuckDB and never reads Parquet in the browser.
 
 ## 2026-08-26 dashboard program
 
-Schema v6 is the current development-only application contract. The ordered program is:
+Schema v7 is the current development-only application contract. The ordered program is:
 
 1. **Implemented development-only:** Player analytics and Team analytics over existing published
    values, following `../docs/dashboard-deep-analytics.md`;
@@ -15,9 +15,11 @@ Schema v6 is the current development-only application contract. The ordered prog
 3. **Implemented development-only:** a deterministic insight panel on every route and an optional,
    evidence-bound trusted-server language renderer
    on public analytical routes, following `../docs/dashboard-ai-summaries.md`;
-4. **Implemented development-only:** the Players route publishes and filters finalized
-   current-season actual fixtures through a separate `Actual GWs` range. It never reuses the
-   forecast range or fills an early-season view with prior-season matches.
+4. **Implemented development-only:** the Players route reads normalized finalized observations
+   from `player_actuals.json` and exposes an explicit Actual season plus independent `Actual GWs`
+   range. The payload and selector are limited to the forecast season and its immediately
+   preceding season, with the predecessor present only when finalized observations were published;
+   the page never mixes seasons or silently substitutes one.
 
 The implemented deep-analytics routes are `#player-analytics` and `#team-analytics`; both are
 linked directly in the sidebar and retain an exact-table equivalent for every chart.
@@ -119,7 +121,7 @@ except OSError:
 its `run_id`/`as_of`; it is required for optional AI eligibility and the server's exact generation
 verification, so deployment packages always include it. `players.json` is by far the largest file and is shared by the Summary,
 Players, and Next-GW pages; it is fetched and parsed once per browser session (a
-module-level cache in `src/data/load.ts`). Introduced in schema v4 and retained in schema v6,
+module-level cache in `src/data/load.ts`). Introduced in schema v4 and retained in schema v7,
 `player_horizons.json` carries cumulative xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)` for every
 player and exact forecast endpoint. Python computes those probabilities by convolving the
 published gameweek PMFs at full precision, then emits a compact positional row whose named values
@@ -168,7 +170,7 @@ $env:FPL_INSIGHTS_BASE_URL = "https://api.z.ai/api/paas/v4/"
 `GET /insights/status` and `POST /insights/summary` use the same same-origin/approved-LAN-token
 boundary as the other local endpoints. After **Explain with AI** is clicked, the browser submits
 only an exact page/vintage/filter selector. The server revalidates the explicitly selected
-schema-v6 dashboard generation (`--dashboard-data`, default `dashboard/public/data`) and constructs
+schema-v7 dashboard generation (`--dashboard-data`, default `dashboard/public/data`) and constructs
 the fact packet itself. The provider cannot receive caller prose, a free-form prompt, PMF,
 manager/capture identifier, squad, bank, purchase/selling value, credential, or custom plan state.
 The provider returns fact-id selections rather than prose; Python renders canonical cited text and
@@ -327,7 +329,8 @@ comparison page and is not a twelfth navigation item.
   kickoff time. Expanded schedule-only rows show identity/kickoff, current FDR, and `~`-prefixed
   display proxies; unavailable model primitives remain dashes.
 - **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
-  `players.json` — one row per player of the selected vintage (photo + club badge) merging
+  `players.json` plus normalized `player_actuals.json` — one row per player of the selected
+  vintage (photo + club badge) merging
   backward form (3/5/10/STD window selector) with per-gameweek xP chips and a range-total xP.
   The form-column matrix is view-specific: **Overall** = App, Starts, Min/g, G, A, xG, xA,
   xG/90, xA/90, CS, GC, Saves, DC, xGC, Bonus, BPS, Pts; **Attack** = App, Starts, Min/g, G,
@@ -345,15 +348,17 @@ comparison page and is not a twelfth navigation item.
   republish completed on 2026-08-19, so P1.8 values are visible in the local static UI. An existing
   database's additive columns remain NULL until rebuilt, and the final deadline vintage must repeat
   rebuild/export/republish through P0.
-  Schema v4 adds the strict `player_horizons.json` outcome columns: cumulative xP, `P(≤2)`, and
+  Schema v4 adds the strict `player_horizons.json` outcome values: cumulative xP, `P(≤2)`, and
   `P(≥2/4/6/10/15)` at the selected exact endpoint. They always cover every fixture from the
   forecast run's start, assume independent gameweeks, and remain raw/unadjusted for the reported
   next-round availability overlay. Published scalars are six-decimal emitter values, not
-  browser-derived values. The page hides them for a shifted start or Home/Away filter; those
-  controls cannot subtract or condition a published probability.
-  The two time axes stay separate: **Forecast GWs** filters upcoming fixtures and xP, while
-  **Past form window** selects one backend-published observed Last 3/5/10/Season aggregate at
-  the displayed form anchor. A forecast range never silently reinterprets historical form.
+  browser-derived values. The dense Players table keeps cumulative xP but omits the six
+  overlapping probability columns; Player analytics exposes the exact blank/haul endpoints.
+  The time axes stay separate: **Forecast GWs** filters upcoming fixtures and xP, while **Actual
+  season + Actual GWs** selects finalized observed fixture rows from the forecast season or, only
+  when present in `player_actuals.json`, its immediate predecessor. The available range boundaries
+  come from that season's exact finalized-GW membership. A forecast range never silently
+  reinterprets historical form or actuals.
 - **Summary** (implemented, P1.7d): the landing page — next gameweek kickoff (deadlines are
   not sourced, so none is shown), one optimizer squad summary card per plan (GW1 squad xP,
   cost, hits, captain/vice, XI and bench lines), an availability watch (the official
@@ -480,6 +485,14 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
   the page reports hidden points. Probability-axis inputs use displayed percent units. This is not
   a Markowitz mean-variance/Sharpe frontier: a portfolio view would require backend-published joint
   samples or covariances plus squad constraints.
+- Player analytics defaults to **Established evidence**, excluding only rows whose selected
+  forecast explicitly publishes `cold_start_player=true`; **Include cold starts** restores them.
+  This reporting filter changes the eligible Pareto population, not any forecast value. A
+  three-appearance probability bridge would require separately named, pre-registered model
+  research and evaluation; it is not part of this reporting change.
+- Every analytics view includes concise How-to-read guidance. Visible tooltips use short labels,
+  flip at chart edges to avoid clipping, and retain full exact provenance in accessible names and
+  the authoritative table.
 - Past-vs-future form is latest at static export, not frozen at a selected forecast vintage. Those
   views show the per-row season/gameweek form anchor and warn that form can post-date an older run;
   it remains context only and is never treated as future utility or a model input. Form

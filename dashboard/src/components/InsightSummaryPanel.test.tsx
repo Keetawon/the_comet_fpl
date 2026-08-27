@@ -52,7 +52,7 @@ function panel(gwTo = 5, config = remote(gwTo)) {
 
 const response = {
   schema: "fpl.insight-summary-response" as const,
-  schema_version: 2 as const,
+  schema_version: 3 as const,
   source: "provider" as const,
   provider: "zai_glm",
   model: "glm-test",
@@ -129,7 +129,7 @@ describe("InsightSummaryPanel", () => {
     expect(fetchInsightSummary).toHaveBeenCalledWith(
       {
         schema: "fpl.insight-summary-request",
-        schema_version: 2,
+        schema_version: 3,
         page: "players",
         manifest_sha256: "a".repeat(64),
         run_id: "run-1",
@@ -155,6 +155,9 @@ describe("InsightSummaryPanel", () => {
     expect(screen.getByText("<strong>Injected</strong>")).toBeInTheDocument();
     expect(screen.getByText("[Click](javascript:alert(1))")).toBeInTheDocument();
     expect(screen.getByText("[coverage.players]")).toBeInTheDocument();
+    expect(screen.getByLabelText("AI-selected explanation")).toHaveClass(
+      "[overflow-wrap:anywhere]",
+    );
     expect(container.querySelector("strong")).toBeNull();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });

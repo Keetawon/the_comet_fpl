@@ -16,6 +16,8 @@ import type {
   PlayerForecastCoverage,
   PlayerForecastObservation,
   PlayerForecastVsActualData,
+  PlayerActualsData,
+  PlayerActualsRecord,
   PlayerHorizon,
   PlayerHorizonsData,
   PlayerHorizonsRecord,
@@ -37,8 +39,8 @@ const BASE: string = import.meta.env.VITE_DATA_BASE ?? "/data";
 // map and the browser tab parses it exactly once. A failed fetch is evicted so it can
 // be retried.
 const cache = new Map<string, Promise<unknown>>();
-const DASHBOARD_SCHEMA_VERSION = 6;
-const FORECAST_ACCURACY_SCHEMA_VERSION = 6;
+const DASHBOARD_SCHEMA_VERSION = 7;
+const FORECAST_ACCURACY_SCHEMA_VERSION = 7;
 const HORIZON_VALUE_DECIMAL_PLACES = 6;
 const PROBABILITY_TOLERANCE = 10 ** -HORIZON_VALUE_DECIMAL_PLACES;
 const PLAN_KINDS = new Set<PlanKind>([
@@ -71,7 +73,7 @@ function readModelObject(
   schema: string,
 ): Record<string, unknown> {
   if (!payload || typeof payload !== "object") {
-    throw new Error(`invalid ${filename}: expected a schema-v6 object`);
+    throw new Error(`invalid ${filename}: expected a schema-v7 object`);
   }
   const candidate = payload as Record<string, unknown>;
   if (
@@ -165,14 +167,101 @@ export async function loadPlayers(): Promise<PlayersData> {
   if (!Array.isArray(candidate.players)) {
     throw new Error("invalid players.json: players must be an array");
   }
-  const players = candidate.players as Partial<PlayerRecord>[];
-  if (players.some((player) => !Array.isArray(player.actuals))) {
+  if (candidate.players.some(
+    (player) =>
+      player == null ||
+      typeof player !== "object" ||
+      typeof (player as Record<string, unknown>).cold_start_player !== "boolean",
+  )) {
     throw new Error(
-      "invalid players.json: every player must carry current-season actuals; " +
+      "invalid players.json: every player must carry the forecast cold-start provenance flag; " +
         "republish the dashboard read models",
     );
   }
-  return { players: players as PlayerRecord[], manifest };
+  return { players: candidate.players as PlayerRecord[], manifest };
+}
+
+const PLAYER_ACTUAL_KEYS = [
+  "gw",
+  "fixture",
+  "kickoff_time",
+  "minutes",
+  "starts",
+  "goals_scored",
+  "assists",
+  "clean_sheets",
+  "goals_conceded",
+  "saves",
+  "bonus",
+  "bps",
+  "defensive_contribution",
+  "expected_goals",
+  "expected_assists",
+  "expected_goals_conceded",
+  "points_under_rules_2026_27",
+] as const;
+
+/** Load normalized finalized observations; the browser only filters and aggregates these facts. */
+export async function loadPlayerActuals(): Promise<PlayerActualsData> {
+  const payload = await fetchJson<unknown>("player_actuals.json");
+  const candidate = readModelObject(
+    payload,
+    "player_actuals.json",
+    "fpl.dashboard-player-actuals",
+  );
+  if (!Array.isArray(candidate.players)) {
+    throw new Error("invalid player_actuals.json: players must be an array");
+  }
+  const identities = new Set<string>();
+  let previousIdentity = "";
+  const players = candidate.players.map((value, playerIndex): PlayerActualsRecord => {
+    const subject = `player_actuals.json.players[${playerIndex}]`;
+    const record = strictObject(value, ["season", "code", "actuals"], subject);
+    const season = stringValue(record.season, `${subject}.season`);
+    const code = integerValue(record.code, `${subject}.code`, 1);
+    if (!Array.isArray(record.actuals) || !record.actuals.length) {
+      throw new Error(`invalid ${subject}.actuals: expected a non-empty array`);
+    }
+    const identity = `${season}/${String(code).padStart(12, "0")}`;
+    if (identities.has(identity) || (previousIdentity && identity < previousIdentity)) {
+      throw new Error("invalid player_actuals.json: identities are duplicated or unordered");
+    }
+    identities.add(identity);
+    previousIdentity = identity;
+    const fixtures = new Set<number>();
+    let previousOrder = "";
+    const actuals = record.actuals.map((actual, actualIndex) => {
+      const actualSubject = `${subject}.actuals[${actualIndex}]`;
+      const row = strictObject(actual, PLAYER_ACTUAL_KEYS, actualSubject);
+      const gw = integerValue(row.gw, `${actualSubject}.gw`, 1);
+      const fixture = integerValue(row.fixture, `${actualSubject}.fixture`, 1);
+      if (row.kickoff_time !== null && typeof row.kickoff_time !== "string") {
+        throw new Error(`invalid ${actualSubject}.kickoff_time`);
+      }
+      if (fixtures.has(fixture)) {
+        throw new Error(`invalid ${subject}: duplicate fixture ${fixture}`);
+      }
+      fixtures.add(fixture);
+      const order = `${String(gw).padStart(3, "0")}/${row.kickoff_time ?? "~"}/${String(fixture).padStart(8, "0")}`;
+      if (previousOrder && order < previousOrder) {
+        throw new Error(`invalid ${subject}: actuals are not ordered`);
+      }
+      previousOrder = order;
+      for (const key of PLAYER_ACTUAL_KEYS.slice(3)) {
+        const metric = row[key];
+        if (metric !== null && (typeof metric !== "number" || !Number.isFinite(metric))) {
+          throw new Error(`invalid ${actualSubject}.${key}`);
+        }
+      }
+      return row as unknown as PlayerActualsRecord["actuals"][number];
+    });
+    return { season, code, actuals };
+  });
+  return {
+    schema: "fpl.dashboard-player-actuals",
+    json_schema_version: DASHBOARD_SCHEMA_VERSION,
+    players,
+  };
 }
 
 function sameArray<T extends string | number>(value: unknown, expected: readonly T[]): boolean {
@@ -192,7 +281,7 @@ function hasExactKeys(value: object, expected: readonly string[]): boolean {
 export async function loadPlayerHorizons(): Promise<PlayerHorizonsData> {
   const payload = await fetchJson<unknown>("player_horizons.json");
   if (!payload || typeof payload !== "object") {
-    throw new Error("invalid player_horizons.json: expected a schema-v6 object");
+    throw new Error("invalid player_horizons.json: expected a schema-v7 object");
   }
   const candidate = payload as Record<string, unknown>;
   const semantics = candidate.semantics as Record<string, unknown> | undefined;
@@ -1007,7 +1096,7 @@ function forecastAccuracyEnvelope(
     filename,
   );
   if (envelope.schema !== schema || envelope.json_schema_version !== FORECAST_ACCURACY_SCHEMA_VERSION) {
-    throw new Error(`unsupported ${filename} schema: expected ${schema} version 6; republish the dashboard read models`);
+    throw new Error(`unsupported ${filename} schema: expected ${schema} version ${FORECAST_ACCURACY_SCHEMA_VERSION}; republish the dashboard read models`);
   }
   objectValue(envelope.semantics, `${filename}.semantics`);
   if (typeof envelope.has_outcomes !== "boolean" || !Array.isArray(envelope.runs)) {
@@ -1052,7 +1141,7 @@ export async function loadTeamForecastVsActual(): Promise<TeamForecastVsActualDa
   return { ...envelope, runs, manifest } as unknown as TeamForecastVsActualData;
 }
 
-/** Temporary source-compatibility alias; it loads the explicit schema-v6 player file. */
+/** Temporary source-compatibility alias; it loads the explicit schema-v7 player file. */
 export const loadForecastVsActual = loadPlayerForecastVsActual;
 
 export async function loadOptimizerAudit(): Promise<OptimizerAuditData> {

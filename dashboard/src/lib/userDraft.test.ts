@@ -73,8 +73,8 @@ function player(
     availability_status: "a",
     chance_of_playing: null,
     availability_multiplier: null,
+    cold_start_player: false,
     form: null,
-    actuals: [],
     avg_minutes_last_5: null,
     fixtures,
   };

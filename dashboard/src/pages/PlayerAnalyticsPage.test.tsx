@@ -64,7 +64,10 @@ describe("PlayerAnalyticsPage", () => {
     expect(screen.getByText(/2 plotted · 0 not plotted of 2 filtered players/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
-    expect(screen.getByText(/exact fixed-start GW1-5 endpoint/)).toBeInTheDocument();
+    expect(screen.getByText(/exact GW1-5 cumulative endpoint/)).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent(
+      /Move up and left.*same price or cheaper/i,
+    );
 
     const table = screen.getByRole("table", { name: /Player analytics exact eligible values · Value frontier/ });
     const alpha = within(table).getByText("Alpha").closest("tr")!;
@@ -79,6 +82,37 @@ describe("PlayerAnalyticsPage", () => {
     expect(screen.getByLabelText("Player position colour legend")).toHaveTextContent(
       "outlined = efficient frontier (Pareto)",
     );
+  });
+
+  it("keeps forecast-marked cold starts out of the frontier until explicitly included", async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: playersSample.players.map((player) => ({
+        ...player,
+        cold_start_player: player.web_name === "Beta",
+      })) as unknown as PlayerRecord[],
+      manifest: null,
+    });
+
+    render(<PlayerAnalyticsPage />);
+    await screen.findByRole("heading", { name: "Player analytics" });
+
+    expect(screen.getByText(/Established evidence excludes 1 player/)).toBeInTheDocument();
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(1);
+    let table = screen.getByRole("table", { name: /exact eligible values.*Value frontier/ });
+    expect(within(table).queryByText("Beta")).not.toBeInTheDocument();
+
+    await user.click(within(
+      screen.getByRole("radiogroup", { name: "Cold-start forecast scope" }),
+    ).getByRole("radio", { name: "Include cold starts" }));
+
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(2);
+    table = screen.getByRole("table", { name: /exact eligible values.*Value frontier/ });
+    const betaRow = within(table).getByText("Beta").closest("tr")!;
+    expect(within(betaRow).getByText("cold start")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Beta; GK · BET · cold start/)).toBeInTheDocument();
+    expect(screen.getByText(/reporting filter changes only the shortlist and frontier, not xP/i))
+      .toBeInTheDocument();
   });
 
   it("selects published downside/upside endpoints and changes threshold without arithmetic", async () => {
@@ -188,6 +222,7 @@ describe("PlayerAnalyticsPage", () => {
     await user.click(screen.getByRole("option", { name: "Last 3" }));
     await waitFor(() => expect(horizontalMin).toHaveValue(null));
     expect(screen.getAllByText(/context only/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("note")).toHaveTextContent(/No frontier is calculated here/i);
     expect(screen.queryByText("outlined = efficient frontier (Pareto)")).not.toBeInTheDocument();
     const table = screen.getByRole("table", { name: /Past vs future/ });
     const alpha = within(table).getByText("Alpha").closest("tr")!;

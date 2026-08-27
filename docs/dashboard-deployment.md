@@ -57,8 +57,8 @@ uv run python -m fpl.jobs.package_public_dashboard `
 
 The command prints a single JSON record containing the asset name, asset SHA-256, byte size, and
 sanitized manifest content SHA-256. Inspect its output directory if desired; it must contain
-exactly the eight read-model JSON files (`fixture_matrix.json`, `players.json`,
-`player_horizons.json`, `next_gw.json`, `summary.json`,
+exactly the nine read-model JSON files (`fixture_matrix.json`, `players.json`,
+`player_actuals.json`, `player_horizons.json`, `next_gw.json`, `summary.json`,
 `player_forecast_vs_actual.json`, `team_forecast_vs_actual.json`, and
 `optimizer_audit.json`) plus `manifest.json`.
 

@@ -6,8 +6,10 @@ import type { ParetoDirection } from "@/lib/pareto";
 export type AnalyticsScatterDirection = ParetoDirection | "explanatory";
 
 export interface AnalyticsScatterAxis {
-  /** Exact metric name shown on the axis and repeated in point descriptions. */
+  /** Authoritative metric name used in accessible point and chart descriptions. */
   label: string;
+  /** Optional concise label for the visible axis and tooltip. `label` remains authoritative. */
+  displayLabel?: string;
   /** `explanatory` marks a context axis with no better/worse decision direction. */
   direction: AnalyticsScatterDirection;
   /** Display formatter only; it must not transform the plotted model value. */
@@ -42,11 +44,15 @@ export interface AnalyticsScatterPoint {
 export interface AnalyticsScatterProps {
   title: string;
   description?: string;
+  readingNote?: string;
   points: readonly AnalyticsScatterPoint[];
   xAxis: AnalyticsScatterAxis;
   yAxis: AnalyticsScatterAxis;
   vintageLabel: string;
   horizonLabel: string;
+  /** Optional concise visible provenance; exact labels remain in the SVG description and point name. */
+  vintageDisplayLabel?: string;
+  horizonDisplayLabel?: string;
   medianX?: number | null;
   medianY?: number | null;
   emptyMessage?: string;
@@ -146,14 +152,27 @@ function analyticsPointDescription(
   return fields.filter((value): value is string => Boolean(value)).join("; ");
 }
 
+function frontierText(
+  point: AnalyticsScatterPoint,
+  xAxis: AnalyticsScatterAxis,
+  yAxis: AnalyticsScatterAxis,
+): string | null {
+  if (xAxis.direction === "explanatory" || yAxis.direction === "explanatory") return null;
+  if (point.isFrontier == null) return null;
+  return point.isFrontier ? "Efficient frontier" : "Outside efficient frontier";
+}
+
 export function AnalyticsScatter({
   title,
   description,
+  readingNote,
   points,
   xAxis,
   yAxis,
   vintageLabel,
   horizonLabel,
+  vintageDisplayLabel = vintageLabel,
+  horizonDisplayLabel = horizonLabel,
   medianX = null,
   medianY = null,
   emptyMessage = "No eligible values to plot.",
@@ -186,6 +205,12 @@ export function AnalyticsScatter({
       <section className={cn("rounded-lg border bg-card p-4", className)} aria-labelledby={`${id}-title`}>
         <h2 id={`${id}-title`} className="text-sm font-semibold">{title}</h2>
         {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
+        {readingNote && (
+          <p role="note" className="mt-2 rounded-md bg-muted/60 px-2.5 py-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">How to read: </span>
+            {readingNote}
+          </p>
+        )}
         <p role="status" className="mt-4 text-sm text-muted-foreground">{emptyMessage}</p>
       </section>
     );
@@ -193,23 +218,37 @@ export function AnalyticsScatter({
 
   const formatX = xAxis.format ?? defaultFormat;
   const formatY = yAxis.format ?? defaultFormat;
-  const axisX = `${xAxis.label} (${directionText(xAxis.direction)})`;
-  const axisY = `${yAxis.label} (${directionText(yAxis.direction)})`;
+  const axisX = `${xAxis.displayLabel ?? xAxis.label} (${directionText(xAxis.direction)})`;
+  const axisY = `${yAxis.displayLabel ?? yAxis.label} (${directionText(yAxis.direction)})`;
+  const accessibleAxisX = `${xAxis.label} (${directionText(xAxis.direction)})`;
+  const accessibleAxisY = `${yAxis.label} (${directionText(yAxis.direction)})`;
   const hasDecisionDirections =
     xAxis.direction !== "explanatory" && yAxis.direction !== "explanatory";
   const active = eligible.find((point) => point.id === activeId) ?? null;
   const activeX = active ? scale(active.x, xDomain, MARGIN.left, MARGIN.left + PLOT_WIDTH) : 0;
   const activeY = active ? scale(active.y, yDomain, MARGIN.top + PLOT_HEIGHT, MARGIN.top) : 0;
+  const activeHorizontalPlacement = activeX < WIDTH * 0.34
+    ? "start"
+    : activeX > WIDTH * 0.66
+      ? "end"
+      : "center";
+  const activeVerticalPlacement = activeY < HEIGHT * 0.24 ? "below" : "above";
 
   return (
     <section className={cn("rounded-lg border bg-card p-3", className)} aria-labelledby={`${id}-title`}>
       <h2 id={`${id}-title`} className="text-sm font-semibold">{title}</h2>
       {description && <p id={`${id}-description`} className="mt-1 text-xs text-muted-foreground">{description}</p>}
+      {readingNote && (
+        <p role="note" className="mt-2 rounded-md bg-muted/60 px-2.5 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">How to read: </span>
+          {readingNote}
+        </p>
+      )}
       <p className="mt-1 text-[11px] text-muted-foreground">
-        Vintage {vintageLabel} · horizon {horizonLabel}
+        Forecast {vintageDisplayLabel} · {horizonDisplayLabel}
       </p>
 
-      <div className="relative mt-2 w-full overflow-hidden">
+      <div className="relative mt-2 w-full overflow-visible">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="block h-auto w-full min-w-[32rem]"
@@ -219,7 +258,7 @@ export function AnalyticsScatter({
         >
           <title id={`${id}-chart-title`}>{title}</title>
           <desc id={`${id}-chart-description`}>
-            {description ? `${description} ` : ""}{axisX}; {axisY}. Vintage {vintageLabel}; horizon {horizonLabel}.
+            {description ? `${description} ` : ""}{accessibleAxisX}; {accessibleAxisY}. Vintage {vintageLabel}; horizon {horizonLabel}.
           </desc>
 
           <g aria-hidden="true" className="text-muted-foreground">
@@ -314,9 +353,7 @@ export function AnalyticsScatter({
                   onMouseEnter={() => setActiveId(point.id)}
                   onMouseLeave={() => setActiveId((current) => (current === point.id ? null : current))}
                   className="cursor-pointer outline-none focus:stroke-[5px]"
-                >
-                  <title>{label}</title>
-                </circle>
+                />
               );
             })}
           </g>
@@ -326,7 +363,19 @@ export function AnalyticsScatter({
           <div
             id={`${id}-tooltip-${eligible.indexOf(active)}`}
             role="tooltip"
-            className="pointer-events-none absolute z-10 max-w-64 -translate-x-1/2 -translate-y-[calc(100%+0.5rem)] rounded-md bg-foreground px-3 py-2 text-xs text-background shadow-md"
+            data-horizontal-placement={activeHorizontalPlacement}
+            data-vertical-placement={activeVerticalPlacement}
+            className={cn(
+              "pointer-events-none absolute z-10 max-w-72 rounded-md bg-foreground px-3 py-2 text-xs text-background shadow-md",
+              activeHorizontalPlacement === "start"
+                ? "translate-x-0"
+                : activeHorizontalPlacement === "end"
+                  ? "-translate-x-full"
+                  : "-translate-x-1/2",
+              activeVerticalPlacement === "below"
+                ? "translate-y-2"
+                : "-translate-y-[calc(100%+0.5rem)]",
+            )}
             style={
               {
                 left: `${(activeX / WIDTH) * 100}%`,
@@ -334,7 +383,18 @@ export function AnalyticsScatter({
               } as CSSProperties
             }
           >
-            {analyticsPointDescription(active, xAxis, yAxis, vintageLabel, horizonLabel)}
+            <p className="font-medium">
+              {active.label}{active.groupLabel ? ` · ${active.groupLabel}` : ""}
+            </p>
+            <p className="mt-1">
+              {xAxis.displayLabel ?? xAxis.label}: {active.xDisplay ?? formatX(active.x)}
+            </p>
+            <p>
+              {yAxis.displayLabel ?? yAxis.label}: {active.yDisplay ?? formatY(active.y)}
+            </p>
+            {frontierText(active, xAxis, yAxis) && (
+              <p className="mt-1">{frontierText(active, xAxis, yAxis)}</p>
+            )}
           </div>
         )}
       </div>

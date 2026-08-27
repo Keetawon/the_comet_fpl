@@ -16,6 +16,7 @@ export type LocalInsightReadModel =
   | "summary.json"
   | "fixture_matrix.json"
   | "players.json"
+  | "player_actuals.json"
   | "player_horizons.json"
   | "player_forecast_vs_actual.json"
   | "team_forecast_vs_actual.json";

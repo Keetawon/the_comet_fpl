@@ -63,8 +63,8 @@ function player(
     availability_status: "a",
     chance_of_playing: null,
     availability_multiplier: 1,
+    cold_start_player: false,
     form: { season: "2025-26", as_at_gw: 38, windows: windows() },
-    actuals: [],
     avg_minutes_last_5: 90,
     fixtures: [],
     ...overrides,
@@ -122,7 +122,8 @@ describe("buildPlayerAnalytics", () => {
     expect(result.plotted.find((row) => row.code === 1)?.y).toBe(12);
     expect(result.plotted.find((row) => row.code === 1)?.horizon?.p_ge_6).toBe(0.73);
     expect(result.plotted.every((row) => row.y !== 99)).toBe(true);
-    expect(result.facts[0].statement).toContain("exact fixed-start GW2-3 endpoint");
+    expect(result.facts[0].statement).toContain("exact GW2-3 cumulative endpoint");
+    expect(result.facts[0].statement).not.toContain("run-a");
   });
 
   it("uses published downside and selected upside scalars without probability arithmetic", () => {

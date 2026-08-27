@@ -1,13 +1,19 @@
-import type { PlayerActualFixture, PlayerFormWindow, PlayerRecord } from "@/data/types";
+import type { PlayerActualFixture, PlayerFormWindow } from "@/data/types";
+
+interface PlayerActualCollection {
+  actuals: readonly PlayerActualFixture[];
+}
 
 export interface ActualGameweekRange {
   minGw: number;
   maxGw: number;
 }
 
-/** Bounds come only from finalized actual rows attached to the selected forecast vintage. */
-export function actualGameweekRange(players: readonly PlayerRecord[]): ActualGameweekRange | null {
-  const gameweeks = players.flatMap((player) => (player.actuals ?? []).map((actual) => actual.gw));
+/** Bounds come only from finalized actual rows for the explicitly selected season/player set. */
+export function actualGameweekRange(
+  players: readonly PlayerActualCollection[],
+): ActualGameweekRange | null {
+  const gameweeks = players.flatMap((player) => player.actuals.map((actual) => actual.gw));
   if (gameweeks.length === 0) return null;
   return { minGw: Math.min(...gameweeks), maxGw: Math.max(...gameweeks) };
 }

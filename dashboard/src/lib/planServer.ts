@@ -26,6 +26,7 @@ export interface InsightDisplayScope {
   gw_to?: number;
   actual_gw_from?: number;
   actual_gw_to?: number;
+  actual_season?: string;
   position?: "all" | "GK" | "DEF" | "MID" | "FWD";
   team_code?: number;
   view?:
@@ -55,11 +56,12 @@ export interface InsightDisplayScope {
     | "goals-for"
     | "xgc"
     | "goals-against";
+  include_cold_starts?: boolean;
 }
 
 export interface InsightSummaryRequest {
   schema: "fpl.insight-summary-request";
-  schema_version: 2;
+  schema_version: 3;
   page: InsightPage;
   manifest_sha256: string;
   run_id: string;
@@ -75,7 +77,7 @@ export interface InsightSummaryItem {
 
 export interface InsightSummaryResponse {
   schema: "fpl.insight-summary-response";
-  schema_version: 2;
+  schema_version: 3;
   source: "provider" | "cache";
   provider: string;
   model: string;
@@ -98,6 +100,7 @@ const INSIGHT_SCOPE_KEYS = [
   "gw_to",
   "actual_gw_from",
   "actual_gw_to",
+  "actual_season",
   "position",
   "team_code",
   "view",
@@ -109,6 +112,7 @@ const INSIGHT_SCOPE_KEYS = [
   "min_avg_minutes_l5",
   "availability",
   "past_metric",
+  "include_cold_starts",
 ] as const satisfies readonly (keyof InsightDisplayScope)[];
 
 /** Strip any runtime-added data so browser-authored prose can never cross this boundary. */
@@ -122,7 +126,7 @@ export function selectorOnlyInsightRequest(
   ) as InsightDisplayScope;
   return {
     schema: "fpl.insight-summary-request",
-    schema_version: 2,
+    schema_version: 3,
     page: request.page,
     manifest_sha256: request.manifest_sha256,
     run_id: request.run_id,
@@ -334,7 +338,7 @@ export function parseInsightSummaryResponse(payload: unknown): InsightSummaryRes
   );
   if (
     value.schema !== "fpl.insight-summary-response" ||
-    value.schema_version !== 2 ||
+    value.schema_version !== 3 ||
     (value.source !== "provider" && value.source !== "cache") ||
     value.prompt_version !== "evidence-renderer-v1"
   ) {

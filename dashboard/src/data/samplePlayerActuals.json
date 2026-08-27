@@ -1,0 +1,31 @@
+{
+  "schema": "fpl.dashboard-player-actuals",
+  "json_schema_version": 7,
+  "players": [
+    {
+      "season": "2025-26",
+      "code": 1,
+      "actuals": [
+        {
+          "gw": 38,
+          "fixture": 380,
+          "kickoff_time": "2026-05-24T15:00:00+00:00",
+          "minutes": 90,
+          "starts": 1,
+          "goals_scored": 1,
+          "assists": 0,
+          "clean_sheets": 1,
+          "goals_conceded": 0,
+          "saves": 0,
+          "bonus": 3,
+          "bps": 40,
+          "defensive_contribution": 7,
+          "expected_goals": 0.6,
+          "expected_assists": 0.1,
+          "expected_goals_conceded": 0.8,
+          "points_under_rules_2026_27": 10
+        }
+      ]
+    }
+  ]
+}

@@ -65,9 +65,12 @@ DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
 # v6: each player also carries season-scoped, fixture-grain actuals from the observed-history
 # mart.  Only officially complete gameweeks are included; the browser may filter and sum these
 # already-published values but never reaches back into DuckDB.
-DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 6
+# v7: player_actuals.json normalises complete fixture observations by (season, code), so one
+# browser selector can inspect prior or current seasons without duplicating history per vintage.
+DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 7
 FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
+PLAYER_ACTUALS_SCHEMA: Final[str] = "fpl.dashboard-player-actuals"
 PLAYER_HORIZONS_SCHEMA: Final[str] = "fpl.dashboard-player-horizons"
 SUMMARY_SCHEMA: Final[str] = "fpl.dashboard-summary"
 NEXT_GW_SCHEMA: Final[str] = "fpl.dashboard-next-gw"
@@ -79,6 +82,7 @@ OPTIMIZER_AUDIT_SCHEMA: Final[str] = "fpl.dashboard-optimizer-audit"
 MANIFEST_FILENAME: Final[str] = "manifest.json"
 FIXTURE_MATRIX_FILENAME: Final[str] = "fixture_matrix.json"
 PLAYERS_FILENAME: Final[str] = "players.json"
+PLAYER_ACTUALS_FILENAME: Final[str] = "player_actuals.json"
 PLAYER_HORIZONS_FILENAME: Final[str] = "player_horizons.json"
 SUMMARY_FILENAME: Final[str] = "summary.json"
 NEXT_GW_FILENAME: Final[str] = "next_gw.json"
@@ -125,6 +129,24 @@ _PLAYER_ACTUAL_FIELDS: Final[tuple[str, ...]] = (
     "expected_goals_conceded",
     "points_under_rules_2026_27",
 )
+_PLAYER_ACTUAL_INTEGER_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "minutes",
+        "starts",
+        "goals_scored",
+        "assists",
+        "clean_sheets",
+        "goals_conceded",
+        "saves",
+        "bonus",
+        "bps",
+        "defensive_contribution",
+        "points_under_rules_2026_27",
+    }
+)
+_PLAYER_ACTUAL_FLOAT_FIELDS: Final[frozenset[str]] = frozenset(
+    {"expected_goals", "expected_assists", "expected_goals_conceded"}
+)
 _HORIZON_THRESHOLDS: Final[tuple[int, ...]] = (2, 4, 6, 10, 15)
 _HORIZON_FIELDS: Final[tuple[str, ...]] = (
     "gw_to",
@@ -145,6 +167,7 @@ _HORIZON_WIRE_ABSOLUTE_TOLERANCE: Final[float] = 10**-_HORIZON_VALUE_DECIMAL_PLA
 _FILE_LIST_KEY: Final[dict[str, str | None]] = {
     FIXTURE_MATRIX_FILENAME: "teams",
     PLAYERS_FILENAME: "players",
+    PLAYER_ACTUALS_FILENAME: "players",
     PLAYER_HORIZONS_FILENAME: "players",
     NEXT_GW_FILENAME: "plans",
     SUMMARY_FILENAME: None,
@@ -155,6 +178,7 @@ _FILE_LIST_KEY: Final[dict[str, str | None]] = {
 _FILE_SCHEMA: Final[dict[str, str]] = {
     FIXTURE_MATRIX_FILENAME: FIXTURE_MATRIX_SCHEMA,
     PLAYERS_FILENAME: PLAYERS_SCHEMA,
+    PLAYER_ACTUALS_FILENAME: PLAYER_ACTUALS_SCHEMA,
     PLAYER_HORIZONS_FILENAME: PLAYER_HORIZONS_SCHEMA,
     NEXT_GW_FILENAME: NEXT_GW_SCHEMA,
     SUMMARY_FILENAME: SUMMARY_SCHEMA,
@@ -189,6 +213,7 @@ class DashboardReadModels:
     teams: tuple[dict[str, Any], ...]
     schedule: dict[str, Any]
     players: tuple[dict[str, Any], ...]
+    player_actuals: tuple[dict[str, Any], ...]
     player_horizons: tuple[dict[str, Any], ...]
     summary: dict[str, Any]
     next_gw: dict[str, Any]
@@ -220,6 +245,23 @@ def _iso_or_none(value: object) -> str | None:
             f"expected a timezone-aware datetime in the source export, found {type(value).__name__}"
         )
     return _isoformat(value)
+
+
+def _previous_season_label(season: object) -> str:
+    """Return the immediately preceding ``YYYY-YY`` season or fail closed."""
+    if (
+        not isinstance(season, str)
+        or len(season) != 7
+        or season[4] != "-"
+        or not season[:4].isdigit()
+        or not season[5:].isdigit()
+    ):
+        raise DashboardJsonError(f"invalid forecast season label {season!r}")
+    start = int(season[:4])
+    end = int(season[5:])
+    if start <= 0 or end != (start + 1) % 100:
+        raise DashboardJsonError(f"invalid forecast season label {season!r}")
+    return f"{start - 1:04d}-{start % 100:02d}"
 
 
 def _read_source_manifest(export_dir: Path) -> dict[str, Any]:
@@ -885,6 +927,35 @@ def _finished_player_actuals(
     return result
 
 
+def _build_player_actuals(
+    player_actual: pl.DataFrame,
+    gameweeks: pl.DataFrame,
+    player_gameweek: pl.DataFrame,
+) -> tuple[dict[str, Any], ...]:
+    """Normalise current/prior finalized history for every forecast-roster code."""
+    actuals = _finished_player_actuals(player_actual, gameweeks)
+    eligible_codes = {
+        int(code)
+        for code in player_gameweek.get_column("code").unique().to_list()
+        if code is not None
+    }
+    forecast_seasons = set(player_gameweek.get_column("season").unique().to_list())
+    eligible_seasons = {
+        label
+        for season in forecast_seasons
+        for label in (season, _previous_season_label(season))
+    }
+    return tuple(
+        {
+            "season": season,
+            "code": code,
+            "actuals": rows,
+        }
+        for (season, code), rows in sorted(actuals.items())
+        if code in eligible_codes and season in eligible_seasons
+    )
+
+
 def _build_players(
     player_gameweek: pl.DataFrame,
     player_fixture: pl.DataFrame,
@@ -894,9 +965,22 @@ def _build_players(
     dim_fixture: pl.DataFrame,
     runs: pl.DataFrame,
     player_form: pl.DataFrame,
-    player_actual: pl.DataFrame,
-    gameweeks: pl.DataFrame,
 ) -> tuple[dict[str, Any], ...]:
+    _require_no_nulls(
+        player_gameweek,
+        ("cold_start_player",),
+        "a player forecast lost its cold-start provenance flag",
+    )
+    cold_start_variants = (
+        player_gameweek.group_by(["run_id", "season", "code"])
+        .agg(pl.col("cold_start_player").n_unique().alias("_cold_start_variants"))
+        .filter(pl.col("_cold_start_variants") != 1)
+    )
+    if cold_start_variants.height:
+        raise DashboardJsonError(
+            "cold_start_player changes within one player forecast vintage; refusing to "
+            "publish ambiguous provenance"
+        )
     # Identity comes from each player's FIRST forecast gameweek: the deadline-known price,
     # ownership and reported availability of the vintage.
     first_gw = player_gameweek.group_by(["run_id", "season", "code"]).agg(
@@ -1003,8 +1087,6 @@ def _build_players(
     windows = _latest_form_windows(
         player_form.filter(pl.col("code").is_in(sorted(roster_codes))), "code"
     )
-    actuals = _finished_player_actuals(player_actual, gameweeks)
-
     players: list[dict[str, Any]] = []
     for key in sorted(identities):
         run_id, season, code = key
@@ -1026,11 +1108,10 @@ def _build_players(
                 "availability_multiplier": row["availability_multiplier"],
                 # Availability is a reported overlay valid for the first forecast gameweek;
                 # the ledger repeats it for later ones.  Passed through, never folded in.
+                # This is the forecast's own provenance flag, not a browser inference from form.
+                "cold_start_player": row["cold_start_player"],
                 "form": windows.get(code),
                 "avg_minutes_last_5": _avg_minutes_last_5(windows.get(code)),
-                # Actuals are deliberately keyed by the forecast record's own season.  A
-                # prior-season fallback would make an early-season range silently mix seasons.
-                "actuals": actuals.get((season, code), []),
                 "fixtures": fixtures.get(key, []),
             }
         )
@@ -2412,8 +2493,11 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_fixture"],
         frames["dim_forecast_run"],
         frames["fact_player_form"],
+    )
+    player_actuals = _build_player_actuals(
         frames["fact_player_fixture_actual"],
         frames["dim_gameweek"],
+        frames["fact_forecast_player_gameweek"],
     )
     player_horizons = _build_player_horizons(
         frames["fact_forecast_player_gameweek"], frames["dim_forecast_run"]
@@ -2469,6 +2553,7 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         teams=teams,
         schedule=schedule,
         players=players,
+        player_actuals=player_actuals,
         player_horizons=player_horizons,
         summary=summary,
         next_gw=next_gw,
@@ -2548,6 +2633,14 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
                 "schema": PLAYERS_SCHEMA,
                 "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
                 "players": list(models.players),
+            },
+            indent=2,
+        ),
+        PLAYER_ACTUALS_FILENAME: _canonical_json_bytes(
+            {
+                "schema": PLAYER_ACTUALS_SCHEMA,
+                "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+                "players": list(models.player_actuals),
             },
             indent=2,
         ),
@@ -2702,6 +2795,147 @@ def _validate_player_horizon_document(document: Mapping[str, Any]) -> None:
             previous_ge = {key: float(horizon[key]) for key in probability_keys[1:]}
 
 
+def _validate_player_actual_document(document: Mapping[str, Any]) -> None:
+    if set(document) != {"schema", "json_schema_version", "players"}:
+        raise DashboardJsonError("player_actuals.json has a malformed schema envelope")
+    players = document.get("players")
+    if not isinstance(players, list):
+        raise DashboardJsonError("player_actuals.json players must be an array")
+    identities: set[tuple[str, int]] = set()
+    previous_identity: tuple[str, int] | None = None
+    for player in players:
+        if not isinstance(player, dict) or set(player) != {"season", "code", "actuals"}:
+            raise DashboardJsonError("player_actuals.json has a malformed player record")
+        season, code, actuals = player["season"], player["code"], player["actuals"]
+        if (
+            not isinstance(season, str)
+            or not season
+            or not isinstance(code, int)
+            or isinstance(code, bool)
+            or code <= 0
+            or not isinstance(actuals, list)
+            or not actuals
+        ):
+            raise DashboardJsonError("player_actuals.json has an invalid player identity/history")
+        identity = (season, code)
+        if identity in identities or (
+            previous_identity is not None and identity < previous_identity
+        ):
+            raise DashboardJsonError(
+                "player_actuals.json identities are duplicated or not deterministically ordered"
+            )
+        identities.add(identity)
+        previous_identity = identity
+        previous_order: tuple[int, bool, str, int] | None = None
+        fixture_keys: set[int] = set()
+        for actual in actuals:
+            if not isinstance(actual, dict) or set(actual) != set(_PLAYER_ACTUAL_FIELDS):
+                raise DashboardJsonError(
+                    f"player_actuals.json {identity} has a malformed actual fixture row"
+                )
+            gw, fixture, kickoff = actual["gw"], actual["fixture"], actual["kickoff_time"]
+            if (
+                not isinstance(gw, int)
+                or isinstance(gw, bool)
+                or gw <= 0
+                or not isinstance(fixture, int)
+                or isinstance(fixture, bool)
+                or fixture <= 0
+                or (kickoff is not None and not isinstance(kickoff, str))
+            ):
+                raise DashboardJsonError(
+                    f"player_actuals.json {identity} has an invalid fixture identity"
+                )
+            if kickoff is not None:
+                try:
+                    parsed_kickoff = datetime.fromisoformat(kickoff)
+                except ValueError as exc:
+                    raise DashboardJsonError(
+                        f"player_actuals.json {identity} has an invalid kickoff timestamp"
+                    ) from exc
+                if parsed_kickoff.tzinfo is None or parsed_kickoff.utcoffset() is None:
+                    raise DashboardJsonError(
+                        f"player_actuals.json {identity} has a naive kickoff timestamp"
+                    )
+            for field in _PLAYER_ACTUAL_INTEGER_FIELDS:
+                value = actual[field]
+                if value is not None and (
+                    not isinstance(value, int) or isinstance(value, bool)
+                ):
+                    raise DashboardJsonError(
+                        f"player_actuals.json {identity} {field} is not an integer or null"
+                    )
+            for field in _PLAYER_ACTUAL_FLOAT_FIELDS:
+                value = actual[field]
+                if value is not None and (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(value)
+                ):
+                    raise DashboardJsonError(
+                        f"player_actuals.json {identity} {field} is not a finite number or null"
+                    )
+            if fixture in fixture_keys:
+                raise DashboardJsonError(
+                    f"player_actuals.json {identity} repeats fixture {fixture}"
+                )
+            fixture_keys.add(fixture)
+            order = (gw, kickoff is None, kickoff or "", fixture)
+            if previous_order is not None and order < previous_order:
+                raise DashboardJsonError(
+                    f"player_actuals.json {identity} actuals are not ordered by "
+                    "gameweek/kickoff/fixture"
+                )
+            previous_order = order
+
+
+def _validate_player_actual_generation(
+    documents: Mapping[str, Mapping[str, Any]],
+) -> None:
+    player_rows = documents[PLAYERS_FILENAME].get("players")
+    actual_rows = documents[PLAYER_ACTUALS_FILENAME].get("players")
+    if not isinstance(player_rows, list) or not isinstance(actual_rows, list):
+        raise DashboardJsonError("player read models lost their top-level player arrays")
+    roster_codes = {
+        player.get("code")
+        for player in player_rows
+        if isinstance(player, dict) and isinstance(player.get("code"), int)
+    }
+    forecast_seasons = {
+        player.get("season")
+        for player in player_rows
+        if isinstance(player, dict) and isinstance(player.get("season"), str)
+    }
+    eligible_actual_seasons = {
+        label
+        for season in forecast_seasons
+        for label in (season, _previous_season_label(season))
+    }
+    unexpected_seasons = sorted(
+        {
+            actual["season"]
+            for actual in actual_rows
+            if actual["season"] not in eligible_actual_seasons
+        }
+    )
+    if unexpected_seasons:
+        raise DashboardJsonError(
+            "player_actuals.json contains seasons outside forecast season/immediate-prior "
+            f"scope: {unexpected_seasons[:3]}"
+        )
+    orphans = sorted(
+        {
+            (actual["season"], actual["code"])
+            for actual in actual_rows
+            if actual["code"] not in roster_codes
+        }
+    )
+    if orphans:
+        raise DashboardJsonError(
+            f"player_actuals.json contains player codes absent from players.json: {orphans[:3]}"
+        )
+
+
 def _validate_player_horizon_generation(
     documents: Mapping[str, Mapping[str, Any]], manifest: Mapping[str, Any]
 ) -> None:
@@ -2754,50 +2988,14 @@ def _validate_player_horizon_generation(
             or isinstance(code, bool)
         ):
             raise DashboardJsonError("players.json has an invalid player identity")
+        if not isinstance(player.get("cold_start_player"), bool):
+            raise DashboardJsonError(
+                f"players.json {(run_id, season, code)} lost its cold-start provenance flag"
+            )
         player_key = (run_id, season, code)
         if player_key in player_keys:
             raise DashboardJsonError(f"players.json repeats player identity {player_key}")
         player_keys.add(player_key)
-
-        actuals = player.get("actuals")
-        if not isinstance(actuals, list):
-            raise DashboardJsonError(f"players.json {player_key} actuals must be an array")
-        previous_order: tuple[int, bool, str, int] | None = None
-        fixture_keys: set[int] = set()
-        for actual in actuals:
-            if not isinstance(actual, dict) or set(actual) != set(_PLAYER_ACTUAL_FIELDS):
-                raise DashboardJsonError(
-                    f"players.json {player_key} has a malformed actual fixture row"
-                )
-            gw, fixture, kickoff = (
-                actual["gw"],
-                actual["fixture"],
-                actual["kickoff_time"],
-            )
-            if (
-                not isinstance(gw, int)
-                or isinstance(gw, bool)
-                or gw <= 0
-                or not isinstance(fixture, int)
-                or isinstance(fixture, bool)
-                or fixture <= 0
-                or (kickoff is not None and not isinstance(kickoff, str))
-            ):
-                raise DashboardJsonError(
-                    f"players.json {player_key} has an invalid actual fixture identity"
-                )
-            if fixture in fixture_keys:
-                raise DashboardJsonError(
-                    f"players.json {player_key} repeats actual fixture {fixture}"
-                )
-            fixture_keys.add(fixture)
-            order = (gw, kickoff is None, kickoff or "", fixture)
-            if previous_order is not None and order < previous_order:
-                raise DashboardJsonError(
-                    f"players.json {player_key} actuals are not ordered by "
-                    "gameweek/kickoff/fixture"
-                )
-            previous_order = order
 
     horizon_keys: set[tuple[str, str, int]] = set()
     for player in horizon_rows:
@@ -2872,6 +3070,8 @@ def _validate_directory(
             raise DashboardJsonError(f"{filename} lost its schema envelope")
         if filename == PLAYER_HORIZONS_FILENAME:
             _validate_player_horizon_document(document)
+        if filename == PLAYER_ACTUALS_FILENAME:
+            _validate_player_actual_document(document)
         if _file_row_count(document, filename) != entry["row_count"]:
             raise DashboardJsonError(f"{filename} row count does not match the manifest")
         documents[filename] = document
@@ -2893,6 +3093,7 @@ def _validate_directory(
     if run_ids != sorted(run_ids):
         raise DashboardJsonError("read-model manifest run ids are not deterministically ordered")
     _validate_player_horizon_generation(documents, manifest)
+    _validate_player_actual_generation(documents)
     return manifest
 
 
@@ -2944,6 +3145,7 @@ def export_dashboard_json(
             row_counts = {
                 FIXTURE_MATRIX_FILENAME: len(models.teams),
                 PLAYERS_FILENAME: len(models.players),
+                PLAYER_ACTUALS_FILENAME: len(models.player_actuals),
                 PLAYER_HORIZONS_FILENAME: sum(
                     len(player["horizons"]) for player in models.player_horizons
                 ),
@@ -3014,6 +3216,8 @@ __all__ = [
     "NEXT_GW_SCHEMA",
     "PLAYERS_FILENAME",
     "PLAYERS_SCHEMA",
+    "PLAYER_ACTUALS_FILENAME",
+    "PLAYER_ACTUALS_SCHEMA",
     "PLAYER_FORECAST_VS_ACTUAL_FILENAME",
     "PLAYER_FORECAST_VS_ACTUAL_SCHEMA",
     "PLAYER_HORIZONS_FILENAME",

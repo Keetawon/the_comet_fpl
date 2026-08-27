@@ -13,7 +13,7 @@ import {
 
 const manifest: DashboardManifest = {
   schema: "fpl.dashboard-read-models",
-  json_schema_version: 6,
+  json_schema_version: 7,
   generated_at: "2026-08-26T00:00:00Z",
   ease_index_formula_version: "fixture-ease-v1",
   run_ids: ["run-1"],

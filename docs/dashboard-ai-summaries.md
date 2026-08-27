@@ -73,21 +73,28 @@ Remove-Item Env:FPL_INSIGHTS_API_KEY, Env:FPL_INSIGHTS_PROVIDER, `
 The existing same-origin/approved-LAN-token Plan Server boundary protects both insight endpoints;
 they are not provider-facing public APIs. `POST /insights/summary` accepts an exact-key,
 Pydantic-validated
-`fpl.insight-summary-request` version 2. The browser sends selectors only:
+`fpl.insight-summary-request` version 3. The browser sends selectors only:
 
 - a public-page enum;
 - manifest content hash, run id, season, and `as_of`;
 - a bounded, exact typed display scope containing only that page's public filters;
 - at most 16 KiB total body.
 
-Version 2 adds the paired `actual_gw_from` / `actual_gw_to` selectors for the Players route. They
-are distinct from forecast `gw_from` / `gw_to`, must be supplied together in ascending order, and
-must remain within the finalized current-season actual range published in `players.json`. Other
-pages reject them. This prevents a visible actual-range change from reusing evidence resolved for
-an unrelated forecast horizon.
+Version 2 added the paired `actual_gw_from` / `actual_gw_to` selectors for the Players route.
+Version 3 binds that pair to a required `actual_season`, resolves it from normalized
+`player_actuals.json`, and adds the exact `include_cold_starts` boolean for Player analytics. The
+actual selectors are distinct from forecast `gw_from` / `gw_to`, must be supplied together in
+ascending order, and `actual_season` must be either the selected run's forecast season or its
+immediate predecessor when that predecessor is actually published in `player_actuals.json`. Each
+requested Actual-GW boundary must be an exact member of that season's published finalized-GW set;
+numeric containment between its minimum and maximum is insufficient. Unpublished seasons and
+non-member boundaries fail before provider or cache work. Other pages reject these selectors. The
+cold-start selector changes only reporting eligibility over the directly published provenance
+flag. These selectors prevent a visible season/range or population change from reusing evidence
+resolved for a different page state.
 
 There is no fact, caveat, chat, or arbitrary-text field. Extra keys fail closed. The server resolves
-the selector against the explicitly configured dashboard-data directory, verifies the schema-v6
+the selector against the explicitly configured dashboard-data directory, verifies the schema-v7
 manifest content hash, every file hash, run/season/`as_of`, and a stable manifest before and after
 the read, then constructs the bounded fact/caveat packet itself. A caller therefore cannot smuggle
 manager/private state, financial state, credentials, paths, instructions, or invented values to the

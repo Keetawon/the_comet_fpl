@@ -28,12 +28,15 @@ from fpl.publish.contract import SEMANTIC_CONTRACT_VERSION
 from fpl.publish.dashboard_json import (
     DASHBOARD_JSON_SCHEMA_VERSION,
     FIXTURE_MATRIX_FILENAME,
+    PLAYER_ACTUALS_FILENAME,
     PLAYER_FORECAST_VS_ACTUAL_FILENAME,
     PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
     DashboardJsonError,
     _discrete_crps,
+    _validate_player_actual_document,
+    _validate_player_actual_generation,
     _validate_player_horizon_document,
     _validate_player_horizon_generation,
     build_dashboard_read_models,
@@ -764,6 +767,8 @@ def test_grain_identity_and_season_safe_label_resolution(tmp_path: Path) -> None
     maddison = _player(models, 2)
     assert (maddison["team_code"], maddison["team_short_name"]) == (101, "ALP")
     assert maddison["availability_multiplier"] == 0.75
+    assert vicario["cold_start_player"] is False
+    assert maddison["cold_start_player"] is False
 
     # No season-scoped id may survive as a key anywhere in the published JSON.
     documents = render_read_model_files(models)
@@ -1020,11 +1025,6 @@ def test_player_horizon_generation_reconciles_players_and_exact_endpoints(
     with pytest.raises(DashboardJsonError, match="does not reconcile"):
         _validate_player_horizon_generation(missing_player, manifest)
 
-    missing_actuals = json.loads(json.dumps(documents))
-    del missing_actuals[PLAYERS_FILENAME]["players"][0]["actuals"]
-    with pytest.raises(DashboardJsonError, match="actuals must be an array"):
-        _validate_player_horizon_generation(missing_actuals, manifest)
-
     extra_run = json.loads(json.dumps(manifest))
     extra_run["runs"].append(
         {
@@ -1219,10 +1219,17 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
         "gw": 38,
         "kickoff_time": prior_kickoff,
     }
+    older_kickoff = datetime(2025, 5, 25, 14, tzinfo=UTC)
+    older = {
+        **prior,
+        "season": OLDER,
+        "fixture": 800,
+        "kickoff_time": older_kickoff,
+    }
     _rewrite_table(
         export_dir,
         "fact_player_fixture_actual",
-        [*_source_tables()["fact_player_fixture_actual"], prior],
+        [*_source_tables()["fact_player_fixture_actual"], prior, older],
     )
     current_gameweeks = [
         {**row, "finished": row["gw"] == 2}
@@ -1239,18 +1246,96 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
             "finished": True,
         }
     )
+    current_gameweeks.append(
+        {
+            "season": OLDER,
+            "gw": 38,
+            "deadline_time": None,
+            "first_kickoff": older_kickoff,
+            "last_kickoff": older_kickoff,
+            "fixture_count": 1,
+            "finished": True,
+        }
+    )
     _rewrite_table(export_dir, "dim_gameweek", current_gameweeks)
 
     models = build_dashboard_read_models(export_dir)
-    vicario = _player(models, 1)
-    assert [row["fixture"] for row in vicario["actuals"]] == [101, 102]
-    assert [row["gw"] for row in vicario["actuals"]] == [2, 2]
-    assert vicario["actuals"][1]["starts"] is None
-    assert vicario["actuals"][1]["expected_goals_conceded"] is None
-    assert _player(models, 2)["actuals"] == []
-    assert json.loads(render_read_model_files(models)[PLAYERS_FILENAME])["players"][0][
-        "actuals"
-    ] == vicario["actuals"]
+    assert [
+        (record["season"], record["code"], [row["fixture"] for row in record["actuals"]])
+        for record in models.player_actuals
+    ] == [
+        (PRIOR, 1, [900]),
+        (SEASON, 1, [101, 102]),
+    ]
+    current = next(
+        record
+        for record in models.player_actuals
+        if record["season"] == SEASON and record["code"] == 1
+    )
+    assert [row["gw"] for row in current["actuals"]] == [2, 2]
+    assert current["actuals"][1]["starts"] is None
+    assert current["actuals"][1]["expected_goals_conceded"] is None
+    assert "actuals" not in _player(models, 1)
+    player_actuals_document = json.loads(
+        render_read_model_files(models)[PLAYER_ACTUALS_FILENAME]
+    )
+    assert player_actuals_document["players"] == list(models.player_actuals)
+
+    generation_documents = {
+        PLAYERS_FILENAME: json.loads(render_read_model_files(models)[PLAYERS_FILENAME]),
+        PLAYER_ACTUALS_FILENAME: json.loads(
+            render_read_model_files(models)[PLAYER_ACTUALS_FILENAME]
+        ),
+    }
+    tampered_history = json.loads(json.dumps(generation_documents))
+    tampered_record = json.loads(
+        json.dumps(tampered_history[PLAYER_ACTUALS_FILENAME]["players"][0])
+    )
+    tampered_record["season"] = OLDER
+    tampered_history[PLAYER_ACTUALS_FILENAME]["players"].insert(0, tampered_record)
+    with pytest.raises(DashboardJsonError, match="outside forecast season/immediate-prior"):
+        _validate_player_actual_generation(tampered_history)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("minutes", 90.5, "minutes is not an integer or null"),
+        ("expected_goals", float("inf"), "expected_goals is not a finite number or null"),
+        ("kickoff_time", "2026-08-22T14:00:00", "naive kickoff timestamp"),
+        ("kickoff_time", "not-a-timestamp", "invalid kickoff timestamp"),
+    ],
+)
+def test_player_actual_document_rejects_invalid_scalars_and_kickoffs(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir, gameweeks=(1,))
+    models = build_dashboard_read_models(export_dir)
+    document = json.loads(render_read_model_files(models)[PLAYER_ACTUALS_FILENAME])
+    document["players"][0]["actuals"][0][field] = value
+    with pytest.raises(DashboardJsonError, match=message):
+        _validate_player_actual_document(document)
+
+
+def test_players_publish_exact_cold_start_provenance_and_reject_drift(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = [
+        {**row, "cold_start_player": row["code"] == 2}
+        for row in _source_tables()["fact_forecast_player_gameweek"]
+    ]
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows)
+    models = build_dashboard_read_models(export_dir)
+    assert _player(models, 1)["cold_start_player"] is False
+    assert _player(models, 2)["cold_start_player"] is True
+
+    rows[-1] = {**rows[-1], "cold_start_player": not rows[-1]["cold_start_player"]}
+    _rewrite_table(export_dir, "fact_forecast_player_gameweek", rows)
+    with pytest.raises(DashboardJsonError, match="changes within one player forecast vintage"):
+        build_dashboard_read_models(export_dir)
 
 
 def test_player_actuals_fail_closed_on_duplicate_fixture_identity(tmp_path: Path) -> None:
@@ -1624,6 +1709,7 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
     assert first == second
     assert set(first) == {
         FIXTURE_MATRIX_FILENAME,
+        PLAYER_ACTUALS_FILENAME,
         PLAYER_HORIZONS_FILENAME,
         PLAYERS_FILENAME,
         "next_gw.json",
@@ -1797,6 +1883,7 @@ def test_publication_is_reproducible_and_validates(tmp_path: Path) -> None:
     for filename in (
         FIXTURE_MATRIX_FILENAME,
         PLAYERS_FILENAME,
+        PLAYER_ACTUALS_FILENAME,
         PLAYER_HORIZONS_FILENAME,
     ):
         assert (first.output_dir / filename).read_bytes() == (

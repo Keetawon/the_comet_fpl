@@ -6,7 +6,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayers } from "@/data/load";
 import playersSample from "@/data/samplePlayers.json";
 import teamsSample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
@@ -14,6 +14,7 @@ import horizonsSample from "@/data/samplePlayerHorizons.json";
 import type {
   NextGwPlan,
   PlayerActualFixture,
+  PlayerActualsData,
   PlayerFormWindow,
   PlayerHorizonsData,
   PlayerRecord,
@@ -48,6 +49,7 @@ const horizonsData: PlayerHorizonsData = {
 
 vi.mock("@/data/load", () => ({
   loadPlayers: vi.fn(),
+  loadPlayerActuals: vi.fn(),
   loadPlayerHorizons: vi.fn(),
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
@@ -88,7 +90,9 @@ function actualFromForm(
   };
 }
 
-const playersWithActuals: PlayerRecord[] = playersSample.players.map((player, index) => {
+type PlayerWithTestActuals = PlayerRecord & { actuals: PlayerActualFixture[] };
+
+const playersWithActuals: PlayerWithTestActuals[] = playersSample.players.map((player, index) => {
   const source = player as unknown as PlayerRecord;
   const form: Partial<PlayerFormWindow> = source.form?.windows.last_5 ?? {};
   return {
@@ -103,12 +107,22 @@ const playersWithActuals: PlayerRecord[] = playersSample.players.map((player, in
   };
 });
 
+const actualsData: PlayerActualsData = {
+  schema: "fpl.dashboard-player-actuals",
+  json_schema_version: 7,
+  players: playersWithActuals.map((player) => ({
+    season: player.season,
+    code: player.code,
+    actuals: player.actuals,
+  })),
+};
+
 function playerWithLastFive(
   code: number,
   webName: string,
   position: string,
   form: Partial<PlayerFormWindow>,
-): PlayerRecord {
+): PlayerWithTestActuals {
   const source = playersSample.players[0] as unknown as PlayerRecord;
   if (source.form == null) throw new Error("sample player must carry observed form");
   return {
@@ -129,6 +143,7 @@ function playerWithLastFive(
 
 beforeEach(() => {
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersWithActuals, manifest: null });
+  vi.mocked(loadPlayerActuals).mockResolvedValue(actualsData);
   vi.mocked(loadPlayerHorizons).mockResolvedValue(
     horizonsData,
   );
@@ -155,8 +170,9 @@ describe("PlayersPage", () => {
       screen.getByRole("button", { name: "Enter Players table fullscreen" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Beta")).toBeInTheDocument();
-    expect(screen.getByText("Actual GW1-1 App")).toBeInTheDocument();
+    expect(screen.getByText("Actual 2026-27 GW1-1 App")).toBeInTheDocument();
     expect(screen.getByText("Forecast GWs")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Actual season" })).toHaveTextContent("2026-27");
     expect(screen.getByText("Actual GWs")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Actual from gameweek" })).toHaveTextContent("GW1");
     expect(screen.getByRole("combobox", { name: "Actual to gameweek" })).toHaveTextContent("GW1");
@@ -168,11 +184,9 @@ describe("PlayersPage", () => {
     expect(screen.getByText(/leads measured replayed points in the selected actual range/)).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /xP GW1-5/ })).toBeInTheDocument();
     for (const name of ["P(≤2)", "P(≥2)", "P(≥4)", "P(≥6)", "P(≥10)", "P(≥15)"]) {
-      expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
+      expect(screen.queryByRole("columnheader", { name })).not.toBeInTheDocument();
     }
-    expect(screen.getByText(/backend-convolved independent-gameweek model values/)).toBeInTheDocument();
-    const alpha = screen.getByText("Alpha").closest("tr")!;
-    expect(within(alpha).getByTitle("P(≥6), raw model probability")).toHaveTextContent("99%");
+    expect(screen.getByText(/dense Players table omits the six overlapping/i)).toBeInTheDocument();
     // availability is labelled as the official overlay, never as "starts"
     expect(screen.getAllByText(/doubtful/).length).toBeGreaterThan(0);
     expect(
@@ -242,6 +256,14 @@ describe("PlayersPage", () => {
       }),
     ];
     vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
+      ...actualsData,
+      players: players.map((player) => ({
+        season: player.season,
+        code: player.code,
+        actuals: player.actuals,
+      })),
+    });
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Null Defender")).toBeInTheDocument());
     await user.click(screen.getByRole("radio", { name: "Defense" }));
@@ -331,20 +353,21 @@ describe("PlayersPage", () => {
     );
     expect(screen.getByRole("combobox", { name: "To gameweek" })).toHaveTextContent("GW4");
     const alpha = screen.getByText("Alpha").closest("tr")!;
-    expect(within(alpha).getByTitle("P(≥6), raw model probability")).toHaveTextContent("93%");
+    expect(within(alpha).getByText("17.0")).toBeInTheDocument();
   });
 
-  it("selects the exact cumulative endpoint instead of adding marginal probabilities", async () => {
+  it("selects the exact cumulative xP endpoint while leaving probability detail to Player analytics", async () => {
     const user = userEvent.setup();
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     const alpha = () => screen.getByText("Alpha").closest("tr")!;
-    expect(within(alpha()).getByTitle("P(≥6), raw model probability")).toHaveTextContent("99%");
+    expect(within(alpha()).getByText("27.0")).toBeInTheDocument();
 
     await user.click(screen.getByRole("combobox", { name: "To gameweek" }));
     await user.click(screen.getByRole("option", { name: "GW1" }));
-    expect(within(alpha()).getByTitle("P(≥6), raw model probability")).toHaveTextContent("50%");
+    expect(within(alpha()).getByText("7.4")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
   });
 
   it("changes current-season actuals independently from forecast GWs and resets both", async () => {
@@ -360,8 +383,16 @@ describe("PlayersPage", () => {
           : [actualFromForm({}, { gw: 1, fixture: 973, minutes: 0, starts: 0 })],
     }));
     vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
+      ...actualsData,
+      players: players.map((player) => ({
+        season: player.season,
+        code: player.code,
+        actuals: player.actuals,
+      })),
+    });
     render(<PlayersPage />);
-    await waitFor(() => expect(screen.getByText("Actual GW1-2 App")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Actual 2026-27 GW1-2 App")).toBeInTheDocument());
 
     const forecastFrom = screen.getByRole("combobox", { name: "From gameweek" });
     const forecastTo = screen.getByRole("combobox", { name: "To gameweek" });
@@ -370,7 +401,7 @@ describe("PlayersPage", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Actual from gameweek" }));
     await user.click(screen.getByRole("option", { name: "GW2" }));
-    expect(screen.getByText("Actual GW2-2 App")).toBeInTheDocument();
+    expect(screen.getByText("Actual 2026-27 GW2-2 App")).toBeInTheDocument();
     expect(within(alpha()).getByTitle("Observed G: 2")).toHaveTextContent("2");
     expect(forecastFrom).toHaveTextContent("GW1");
     expect(forecastTo).toHaveTextContent("GW5");
@@ -385,20 +416,39 @@ describe("PlayersPage", () => {
     expect(forecastTo).toHaveTextContent("GW5");
   });
 
-  it("does not substitute prior-season form when current-season actuals are unavailable", async () => {
-    vi.mocked(loadPlayers).mockResolvedValueOnce({
-      players: playersWithActuals.map((player) => ({ ...player, actuals: [] })),
-      manifest: null,
+  it("does not substitute a prior season until the user selects it", async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
+      ...actualsData,
+      players: [
+        {
+          season: "2025-26",
+          code: playersWithActuals[0].code,
+          actuals: [actualFromForm({ goals_scored: 4 }, { gw: 38, fixture: 990 })],
+        },
+        {
+          season: "2024-25",
+          code: playersWithActuals[0].code,
+          actuals: [actualFromForm({ goals_scored: 9 }, { gw: 38, fixture: 991 })],
+        },
+      ],
     });
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(
       screen.getByText(/No finalized player actuals are published for 2026-27/),
-    ).toHaveTextContent("prior-season form is not substituted");
+    ).toHaveTextContent("another season is not substituted");
     expect(screen.queryByText("Actual GWs")).not.toBeInTheDocument();
-    expect(screen.getByText("Actual App")).toBeInTheDocument();
+    expect(screen.getByText("Actual 2026-27 App")).toBeInTheDocument();
     expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("No observed form is available for G"))
       .toHaveTextContent("–");
+
+    await user.click(screen.getByRole("combobox", { name: "Actual season" }));
+    expect(screen.queryByRole("option", { name: "2024-25" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "2025-26" }));
+    expect(await screen.findByText("Actual 2025-26 GW38-38 App")).toBeInTheDocument();
+    expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("Observed G: 4"))
+      .toHaveTextContent("4");
   });
 
   it("expands a row to the per-fixture primitives behind the colour", async () => {
@@ -478,7 +528,7 @@ describe("PlayersPage", () => {
     await user.click(within(view).getByRole("radio", { name: "Defense" }));
     await user.click(within(venue).getByRole("radio", { name: "Away" }));
     expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Cumulative probabilities are hidden/)).toBeInTheDocument();
+    expect(screen.getByText(/dense Players table omits the six overlapping/i)).toBeInTheDocument();
     await user.click(within(availability).getByRole("radio", { name: "Flagged" }));
     await user.type(minPrice, "99");
     expect(await screen.findByText("No players match the current filters.")).toBeInTheDocument();
@@ -490,7 +540,7 @@ describe("PlayersPage", () => {
     expect(screen.getByText("Beta")).toBeInTheDocument();
     expect(within(view).getByRole("radio", { name: "Overall" })).toBeChecked();
     expect(within(venue).getByRole("radio", { name: "All" })).toBeChecked();
-    expect(screen.getByRole("columnheader", { name: "P(≥6)" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
     expect(within(availability).getByRole("radio", { name: "All" })).toBeChecked();
     expect(minPrice).toHaveValue(null);
     expect(clear).toHaveFocus();

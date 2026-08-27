@@ -1,5 +1,5 @@
 // Pure player deep-analytics view model. All probability values are selected from one exact
-// schema-v6 cumulative endpoint; this module never adds, complements, or reconstructs them.
+// schema-v7 cumulative endpoint; this module never adds, complements, or reconstructs them.
 
 import type { PlayerHorizonIndex } from "@/lib/playerHorizons";
 import { playerHorizon } from "@/lib/playerHorizons";
@@ -189,7 +189,7 @@ function factValue(config: PlayerAnalyticsConfig, axis: "x" | "y", value: number
   if (config.view === "upside_downside") return `${(value * 100).toFixed(1)}%`;
   if (axis === "x" && config.view === "value") return `£${value.toFixed(1)}m`;
   if (axis === "x" && config.view === "differential") return `${value.toFixed(1)}%`;
-  return String(value);
+  return value.toFixed(2);
 }
 
 function factsFor(
@@ -200,7 +200,7 @@ function factsFor(
     {
       id: "scope",
       kind: "scope",
-      statement: `${PLAYER_ANALYTICS_VIEW_LABEL[config.view]} uses vintage ${config.runId} and the exact fixed-start GW${config.gwFrom}-${config.gwTo} endpoint.`,
+      statement: `${PLAYER_ANALYTICS_VIEW_LABEL[config.view]} uses the selected forecast vintage and exact GW${config.gwFrom}-${config.gwTo} cumulative endpoint.`,
       sources: ["players.json", "player_horizons.json"],
     },
   ];
@@ -220,7 +220,7 @@ function factsFor(
       facts.push({
         id: "frontier.members",
         kind: "forecast",
-        statement: `Efficient frontier / Pareto set in the full filtered population (${frontier.length}${plotted.filter((row) => row.isFrontier).length > frontier.length ? "+" : ""} named): ${frontier.map((row) => row.webName).join(", ")}.`,
+        statement: `Pareto-efficient players (${frontier.length}${plotted.filter((row) => row.isFrontier).length > frontier.length ? "+" : ""} shown): ${frontier.map((row) => row.webName).join(", ")}.`,
         sources: ["players.json", "player_horizons.json"],
       });
     }

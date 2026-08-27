@@ -24,7 +24,7 @@ instead of choosing a source or double counting.
 
 ## Version 3 monitoring amendment (2026-08-26)
 
-Version 3 is executable/current and adds exactly:
+Version 3 remains executable as the historical monitoring base and adds exactly:
 
 - `goals_for_distribution` to `fact_forecast_team_fixture`, transported unchanged from
   `ledger_prediction_team_fixture` rather than regenerated from `lambda_for`;

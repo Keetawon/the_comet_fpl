@@ -1,4 +1,4 @@
-# Dashboard read-model JSON contract, version 6
+# Dashboard read-model JSON contract, version 7
 
 Status: implemented development-only by DEV-ROADMAP P1.7a and extended through P2.5. This
 document is the authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The
@@ -44,6 +44,25 @@ The browser may select a current-season gameweek range and sum these already-pub
 values; it does not query DuckDB or derive model quantities. Source `null` values remain JSON
 `null` and are never rewritten as zero.
 
+## Version 7 normalized player history and forecast provenance amendment (implemented 2026-08-26)
+
+Version 7 retains every version-6 metric but removes the repeated `actuals` array from each
+forecast-vintage row in `players.json`. It adds `player_actuals.json`, normalized once at
+`(season, code)` grain. Each record contains the same finalized fixture rows and preserves the
+version-6 complete-gameweek, double-gameweek, ordering, duplicate-identity, and NULL rules. The
+file is bounded to each published forecast season and its immediate predecessor for player codes
+present in the published forecast population; a predecessor is emitted only when finalized
+observations exist, and older archive seasons are absent. For a selected run, the Players page
+offers only its forecast season and its published immediate predecessor, and never mixes seasons
+in one aggregate.
+
+Version 7 also transports `cold_start_player` on every `players.json` row. This is the selected
+forecast vintage's own no-usable-history provenance flag from
+`fact_forecast_player_gameweek`; it is never inferred from form, ownership, or later actuals. A
+within-player/vintage disagreement fails publication. Player analytics may exclude those rows as
+an explicit reporting filter and recompute its Pareto geometry over the selected population, but
+it may not alter the stored xP or probabilities.
+
 ## Boundary and provenance chain
 
 ```text
@@ -74,7 +93,7 @@ identical content hash.
 
 ## Layout
 
-Version 6 publishes eight read-model files plus the manifest.
+Version 7 publishes nine read-model files plus the manifest.
 
 ```text
 data/
@@ -83,6 +102,7 @@ data/
     ├── manifest.json
     ├── fixture_matrix.json
     ├── players.json
+    ├── player_actuals.json
     ├── player_horizons.json
     ├── next_gw.json
     ├── summary.json
@@ -215,12 +235,9 @@ The population is every player with rows in `fact_forecast_player_gameweek` for 
   team form, this is the latest snapshot at static export attached across forecast runs, not a
   point-in-time snapshot at the selected run's `as_of`; the per-row `season` and `as_at_gw`
   anchors must remain visible wherever an older forecast is compared with form.
-- `actuals` is the current forecast record's **same-season** observed fixture history through
-  officially complete gameweeks. Each item contains `gw`, `fixture`, `kickoff_time`, `minutes`,
-  `starts`, `goals_scored`, `assists`, `clean_sheets`, `goals_conceded`, `saves`, `bonus`, `bps`,
-  `defensive_contribution`, `expected_goals`, `expected_assists`,
-  `expected_goals_conceded`, and `points_under_rules_2026_27`. Double-gameweek legs remain
-  distinct. No field falls back across seasons and nullable observations stay `null`.
+- `cold_start_player` is copied from the first forecast gameweek after verifying it is constant
+  for the player/vintage. It identifies the forecast's own cold-start path and is not an outcome
+  or a browser-derived newcomer guess.
 - `fixtures` is every player-fixture row of that vintage (double gameweek = two entries),
   each carrying the player's own xP/probabilities **plus the player's club fixture fields for
   that fixture** (`team_attack_ease_index`, `team_defence_ease_index`,
@@ -250,15 +267,9 @@ Sample record (abbreviated):
   "availability_status": "a",
   "chance_of_playing": null,
   "availability_multiplier": 1.0,
+  "cold_start_player": false,
   "form": {"season": "2025-26", "as_at_gw": 38, "windows": {"…": "…"}},
   "avg_minutes_last_5": 52.0,
-  "actuals": [
-    {"gw": 1, "fixture": 90, "kickoff_time": "2026-08-15T14:00:00+00:00",
-     "minutes": 90, "starts": 1, "goals_scored": 0, "assists": 0,
-     "clean_sheets": 1, "goals_conceded": 0, "saves": 3, "bonus": 1, "bps": 24,
-     "defensive_contribution": null, "expected_goals": null, "expected_assists": null,
-     "expected_goals_conceded": 0.8, "points_under_rules_2026_27": 7}
-  ],
   "fixtures": [
     {"gw": 1, "fixture": 100, "kickoff_time": "2026-08-22T14:00:00+00:00",
      "opponent_team_code": 102, "opponent_short_name": "BET", "was_home": true,
@@ -287,6 +298,24 @@ BI/static publication completed successfully on 2026-08-19, and that local gener
 the populated values. The final deadline vintage must still repeat rebuild/export/republish through
 P0; the refreshed development generation does not replace the deadline artifact.
 
+## player_actuals.json — one object per (season, code)
+
+This normalized file carries finalized observed history without repeating it once per forecast
+vintage. Each row has `season`, `code`, and a non-empty `actuals` array. Each actual contains
+`gw`, `fixture`, `kickoff_time`, `minutes`, `starts`, `goals_scored`, `assists`, `clean_sheets`,
+on-pitch `goals_conceded`, `saves`, `bonus`, `bps`, `defensive_contribution`, `expected_goals`,
+`expected_assists`, `expected_goals_conceded`, and `points_under_rules_2026_27`.
+
+Publication is limited to the union of every published run's forecast season and its immediate
+predecessor. A predecessor enters the file only when finalized observed rows exist for an eligible
+forecast-population player; no earlier observed season is transported.
+
+Only officially complete gameweeks enter the file. Rows sort by gameweek, kickoff, then fixture;
+both double-gameweek legs remain separate. Identities sort by season then code, duplicate fixture
+identities fail closed, and source NULLs remain NULL. JavaScript may select one explicit season and
+gameweek range and aggregate these observations; it may not treat them as forecast inputs or query
+DuckDB for missing history.
+
 ## player_horizons.json — cumulative outcomes per player
 
 Each player object contains one cumulative entry for every `gw_to` from its forecast run's
@@ -313,7 +342,7 @@ also reconciled so an entirely omitted player or run cannot disappear silently.
 ```json
 {
   "schema": "fpl.dashboard-player-horizons",
-  "json_schema_version": 6,
+  "json_schema_version": 7,
   "semantics": {
     "grain": ["run_id", "season", "code", "gw_to"],
     "cumulative_from": "dim_forecast_run.gw_from",
@@ -345,10 +374,10 @@ operation is versioned as an independent-across-gameweek convolution rather than
 joint forecast.
 
 Every endpoint always covers **all fixtures** from the run's fixed `gw_from` through its `gw_to`.
-It cannot answer a shifted-start or Home/Away-only question. The Players page therefore shows the
-probability columns only when venue is All and the selected range starts at the run's `gw_from`;
-otherwise it suppresses them and explains why. Arbitrary fixture filtering may still sum published
-xP, but it never subtracts, rescales, or relabels a cumulative probability.
+It cannot answer a shifted-start or Home/Away-only question. The dense Players table intentionally
+omits the six overlapping threshold columns; Player analytics selects the exact fixed-start
+endpoint for its blank/haul view. Arbitrary fixture filtering may still sum published xP, but it
+never subtracts, rescales, or relabels a cumulative probability.
 
 Expected points are summable; probabilities are not. A measured three-gameweek example gives
 `P(total >= 6) = 0.9033` after convolution, while adding its three per-gameweek values gives
@@ -501,7 +530,7 @@ and the audit page reads both files.
 ```json
 {
   "schema": "fpl.dashboard-read-models",
-  "json_schema_version": 6,
+  "json_schema_version": 7,
   "generated_at": "2026-08-15T00:00:00+00:00",
   "source": {
     "export_schema": "fpl.bi-semantic-export",
@@ -520,6 +549,7 @@ and the audit page reads both files.
   "files": {
     "fixture_matrix.json": {"row_count": 20, "sha256": "…"},
     "players.json": {"row_count": 599, "sha256": "…"},
+    "player_actuals.json": {"row_count": 1078, "sha256": "…"},
     "player_horizons.json": {"row_count": 2995, "sha256": "…"},
     "next_gw.json": {"row_count": 2, "sha256": "…"},
     "summary.json": {"row_count": 1, "sha256": "…"},
@@ -532,7 +562,8 @@ and the audit page reads both files.
 ```
 
 `row_count` is the number of objects in the file's top-level array (`plans` for
-next_gw.json and optimizer_audit.json, `runs` for both forecast-monitoring files), except that
+next_gw.json and optimizer_audit.json, `runs` for both forecast-monitoring files, and normalized
+season/player records for `player_actuals.json`), except that
 `player_horizons.json` counts its nested cumulative endpoint rows. `summary.json` is a single
 object, so its row count is 1. `runs` is sorted by `run_id` and validated against
 both the source manifest's `exported_run_ids` and the `dim_forecast_run` rows read from the
@@ -545,7 +576,8 @@ closed.
 The static app, any notebook, and any external tool read only these files (or the Parquet export).
 Nothing downstream of the BI boundary queries DuckDB. All nine read-only dashboard routes have
 read models; later pages require an explicit schema bump under the same manifest policy. Version-6
-consumers load cumulative outcomes through the strict
-`player_horizons.json` boundary and look up an exact `(run_id, season, code, gw_to)` endpoint;
-they never interpolate or substitute another vintage. The Players route renders these scalars
-only under the fixed-start/all-fixtures scope described above.
+consumers must republish before loading version 7. Version-7 consumers load cumulative outcomes
+through the strict `player_horizons.json` boundary and look up an exact
+`(run_id, season, code, gw_to)` endpoint;
+they never interpolate or substitute another vintage. The Players route uses the exact xP endpoint
+when applicable and delegates probability comparison to Player analytics.

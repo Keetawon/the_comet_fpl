@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 INSIGHT_REQUEST_SCHEMA = "fpl.insight-summary-request"
 INSIGHT_RESPONSE_SCHEMA = "fpl.insight-summary-response"
 INSIGHT_ERROR_SCHEMA = "fpl.insight-summary-error"
-INSIGHT_SCHEMA_VERSION = 2
+INSIGHT_SCHEMA_VERSION = 3
 PROMPT_VERSION: Final = "evidence-renderer-v1"
 MAX_INSIGHT_BODY_BYTES = 16 * 1024
 
@@ -80,6 +80,7 @@ class InsightReadModel(StrEnum):
     SUMMARY = "summary.json"
     FIXTURE_MATRIX = "fixture_matrix.json"
     PLAYERS = "players.json"
+    PLAYER_ACTUALS = "player_actuals.json"
     PLAYER_HORIZONS = "player_horizons.json"
     PLAYER_FORECAST_VS_ACTUAL = "player_forecast_vs_actual.json"
     TEAM_FORECAST_VS_ACTUAL = "team_forecast_vs_actual.json"
@@ -154,6 +155,7 @@ _PAGE_READ_MODELS: dict[InsightPage, frozenset[InsightReadModel]] = {
         {
             InsightReadModel.MANIFEST,
             InsightReadModel.PLAYERS,
+            InsightReadModel.PLAYER_ACTUALS,
             InsightReadModel.PLAYER_HORIZONS,
         }
     ),
@@ -209,6 +211,7 @@ class InsightDisplayScope(_ExactModel):
     gw_to: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
     actual_gw_from: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
     actual_gw_to: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
+    actual_season: str | None = None
     position: InsightPosition | None = None
     team_code: Annotated[int, Field(strict=True, gt=0, le=1_000_000)] | None = None
     view: InsightView | None = None
@@ -220,6 +223,20 @@ class InsightDisplayScope(_ExactModel):
     min_avg_minutes_l5: float | None = Field(default=None, ge=0.0, le=90.0)
     availability: InsightAvailability | None = None
     past_metric: InsightPastMetric | None = None
+    include_cold_starts: Annotated[bool, Field(strict=True)] | None = None
+
+    @field_validator("actual_season")
+    @classmethod
+    def validate_actual_season(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        matched = _SEASON.fullmatch(value)
+        if matched is None:
+            raise ValueError("scope.actual_season must use YYYY-YY form")
+        start = int(matched.group(1))
+        if int(matched.group(2)) != (start + 1) % 100:
+            raise ValueError("scope.actual_season end year must immediately follow its start year")
+        return value
 
     @field_validator(
         "actual_gw_from",
@@ -259,6 +276,11 @@ class InsightDisplayScope(_ExactModel):
             and self.actual_gw_from > self.actual_gw_to
         ):
             raise ValueError("scope.actual_gw_from must not exceed scope.actual_gw_to")
+        has_actual_range = self.actual_gw_from is not None
+        if has_actual_range != (self.actual_season is not None):
+            raise ValueError(
+                "scope.actual_season and the paired actual gameweek range must be supplied together"
+            )
         if (
             self.min_price_tenths is not None
             and self.max_price_tenths is not None
@@ -296,7 +318,7 @@ class InsightFact(_ExactModel):
 
 class InsightSummaryRequest(_ExactModel):
     schema_name: Literal["fpl.insight-summary-request"] = Field(alias="schema")
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     page: InsightPage
     manifest_sha256: str
     run_id: str = Field(min_length=1, max_length=128)
@@ -429,7 +451,7 @@ class ProviderInsightItem(_ExactModel):
 
 class InsightSummaryResponse(_ExactModel):
     schema_name: Literal["fpl.insight-summary-response"] = Field(alias="schema")
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     source: InsightSource
     provider: str
     model: str
@@ -502,7 +524,7 @@ class InsightStatus(_ExactModel):
 
 class InsightErrorResponse(_ExactModel):
     schema_name: Literal["fpl.insight-summary-error"] = Field(alias="schema")
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     code: InsightErrorCode
     message: str = Field(min_length=1, max_length=160)
 

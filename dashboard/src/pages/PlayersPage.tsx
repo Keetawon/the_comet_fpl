@@ -1,12 +1,11 @@
 // Players page: the player-form pivot. One row per player of the SELECTED vintage (the
 // export carries every recorded run -- the vintage selector picks one, so players never
-// repeat), merging a separately selected range of finalized current-season actuals with
-// the vintage's per-fixture xP. Prior-season form is never substituted. Chips headline xP and are coloured by the
+// repeat), merging a separately selected season/range of finalized actuals with
+// the vintage's per-fixture xP. A prior season is used only after explicit selection. Chips headline xP and are coloured by the
 // active colour source (opponent strength by default); the expanded row exposes every
 // primitive behind the colour, ordered by kickoff time.
 
 import { useEffect, useMemo, useState } from "react";
-import type { LegacyColumnDef } from "@tanstack/react-table/legacy";
 import { RotateCcw } from "lucide-react";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
@@ -28,8 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { loadFixtureMatrix, loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
-import type { DashboardManifest, NextGwPlan, PlayerHorizonsRecord, PlayerRecord, TeamRecord } from "@/data/types";
+import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayers } from "@/data/load";
+import type { DashboardManifest, NextGwPlan, PlayerActualsRecord, PlayerHorizonsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import { actualGameweekRange, aggregatePlayerActuals } from "@/lib/playerActuals";
@@ -50,12 +49,20 @@ interface ActualRange {
   gwTo: number;
 }
 
+function previousSeason(season: string): string | null {
+  const matched = /^(\d{4})-(\d{2})$/.exec(season);
+  if (matched == null) return null;
+  const start = Number(matched[1]);
+  return `${start - 1}-${String(start % 100).padStart(2, "0")}`;
+}
+
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | {
       status: "ready";
       players: PlayerRecord[];
+      playerActuals: PlayerActualsRecord[];
       playerHorizons: PlayerHorizonsRecord[];
       teams: TeamRecord[];
       plans: NextGwPlan[];
@@ -74,11 +81,18 @@ export function PlayersPage() {
   const [filters, setFilters] = useState<FilterState | null>(null);
   const [playerFilters, setPlayerFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [actualRange, setActualRange] = useState<ActualRange | null>(null);
+  const [actualSeason, setActualSeason] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadPlayers(), loadPlayerHorizons(), loadFixtureMatrix(), loadNextGw()])
-      .then(([playersData, horizonsData, teamsData, nextGw]) => {
+    Promise.all([
+      loadPlayers(),
+      loadPlayerActuals(),
+      loadPlayerHorizons(),
+      loadFixtureMatrix(),
+      loadNextGw(),
+    ])
+      .then(([playersData, actualsData, horizonsData, teamsData, nextGw]) => {
         if (cancelled) return;
         // The manifest owns run bounds when present. Without it, the validated horizon
         // vectors are authoritative: fixture arrays omit blank weeks and may be empty.
@@ -113,6 +127,7 @@ export function PlayersPage() {
         setState({
           status: "ready",
           players: playersData.players,
+          playerActuals: actualsData.players,
           playerHorizons: horizonsData.players,
           teams: teamsData.teams,
           plans: nextGw.plans,
@@ -125,6 +140,7 @@ export function PlayersPage() {
           defaultRunId: defaultRun ?? first?.run_id ?? "",
         });
         setRunId(defaultRun ?? first?.run_id ?? null);
+        setActualSeason(defaultRunRecord?.season ?? first?.season ?? null);
         setFilters({ view: "overall", venue: "all", gwFrom, gwTo });
       })
       .catch((error: unknown) => {
@@ -165,8 +181,6 @@ export function PlayersPage() {
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [runPlayers]);
 
-  const actualBounds = useMemo(() => actualGameweekRange(runPlayers), [runPlayers]);
-
   const horizonIndex = useMemo(
     () => indexPlayerHorizons(state.status === "ready" ? state.playerHorizons : []),
     [state],
@@ -178,6 +192,36 @@ export function PlayersPage() {
     return state.manifestRuns.find((run) => run.run_id === activeRunId) ?? null;
   }, [state, runId]);
 
+  const actualSeasons = useMemo(() => {
+    if (state.status !== "ready" || selectedRun == null) return [];
+    const codes = new Set(runPlayers.map((player) => player.code));
+    const previous = previousSeason(selectedRun.season);
+    const allowed = new Set([selectedRun.season, ...(previous == null ? [] : [previous])]);
+    return [...new Set([
+      selectedRun.season,
+      ...state.playerActuals
+        .filter((record) => codes.has(record.code) && allowed.has(record.season))
+        .map((record) => record.season),
+    ])].sort((left, right) => right.localeCompare(left));
+  }, [runPlayers, selectedRun, state]);
+
+  const selectedActualRecords = useMemo(() => {
+    if (state.status !== "ready" || actualSeason == null) return [];
+    const codes = new Set(runPlayers.map((player) => player.code));
+    return state.playerActuals.filter(
+      (record) => record.season === actualSeason && codes.has(record.code),
+    );
+  }, [actualSeason, runPlayers, state]);
+
+  const actualsByCode = useMemo(
+    () => new Map(selectedActualRecords.map((record) => [record.code, record.actuals])),
+    [selectedActualRecords],
+  );
+  const actualBounds = useMemo(
+    () => actualGameweekRange(selectedActualRecords),
+    [selectedActualRecords],
+  );
+
   const cumulativeOutcomesAvailable =
     filters != null &&
     selectedRun != null &&
@@ -186,6 +230,7 @@ export function PlayersPage() {
 
   useEffect(() => {
     if (selectedRun == null) return;
+    setActualSeason(selectedRun.season);
     setFilters((current) =>
       current == null
         ? current
@@ -203,7 +248,7 @@ export function PlayersPage() {
         ? null
         : { gwFrom: actualBounds.minGw, gwTo: actualBounds.maxGw },
     );
-  }, [actualBounds, selectedRun?.run_id]);
+  }, [actualBounds, actualSeason, selectedRun?.run_id]);
 
   const rows: PlayerStatRow[] = useMemo(() => {
     if (!filters) return [];
@@ -239,39 +284,22 @@ export function PlayersPage() {
         form:
           actualRange == null
             ? null
-            : aggregatePlayerActuals(player.actuals, actualRange.gwFrom, actualRange.gwTo),
+            : aggregatePlayerActuals(
+                actualsByCode.get(player.code) ?? [],
+                actualRange.gwFrom,
+                actualRange.gwTo,
+              ),
       };
     });
-  }, [runPlayers, filters, playerFilters, cumulativeOutcomesAvailable, horizonIndex, actualRange]);
-
-  const cumulativeColumns = useMemo<LegacyColumnDef<PlayerStatRow>[]>(() => {
-    if (!cumulativeOutcomesAvailable) return [];
-    const probability = (
-      key: "p_le_2" | "p_ge_2" | "p_ge_4" | "p_ge_6" | "p_ge_10" | "p_ge_15",
-      label: string,
-    ): LegacyColumnDef<PlayerStatRow> => ({
-      id: key,
-      header: label,
-      accessorFn: (row) => row.horizon?.[key],
-      sortUndefined: "last",
-      cell: ({ row }) => {
-        const value = row.original.horizon?.[key];
-        return (
-          <span className="tabular-nums" title={`${label}, raw model probability`}>
-            {value == null ? "–" : `${Math.round(value * 100)}%`}
-          </span>
-        );
-      },
-    });
-    return [
-      probability("p_le_2", "P(≤2)"),
-      probability("p_ge_2", "P(≥2)"),
-      probability("p_ge_4", "P(≥4)"),
-      probability("p_ge_6", "P(≥6)"),
-      probability("p_ge_10", "P(≥10)"),
-      probability("p_ge_15", "P(≥15)"),
-    ];
-  }, [cumulativeOutcomesAvailable]);
+  }, [
+    runPlayers,
+    filters,
+    playerFilters,
+    cumulativeOutcomesAvailable,
+    horizonIndex,
+    actualRange,
+    actualsByCode,
+  ]);
 
   if (state.status === "loading") {
     return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
@@ -306,10 +334,21 @@ export function PlayersPage() {
       gwTo: selectedRun?.gw_to ?? state.gwTo,
     });
     setPlayerFilters({ ...INITIAL_PLAYER_FILTERS });
+    const resetSeason = selectedRun?.season ?? null;
+    const resetCodes = new Set(runPlayers.map((player) => player.code));
+    const resetBounds =
+      state.status === "ready" && resetSeason != null
+        ? actualGameweekRange(
+            state.playerActuals.filter(
+              (record) => record.season === resetSeason && resetCodes.has(record.code),
+            ),
+          )
+        : null;
+    setActualSeason(resetSeason);
     setActualRange(
-      actualBounds == null
+      resetBounds == null
         ? null
-        : { gwFrom: actualBounds.minGw, gwTo: actualBounds.maxGw },
+        : { gwFrom: resetBounds.minGw, gwTo: resetBounds.maxGw },
     );
   };
   const rankedRows = [...rows]
@@ -354,27 +393,27 @@ export function PlayersPage() {
       ["players.json"],
     ),
     insightFact(
-      "coverage.current_season_actuals",
+      "coverage.selected_season_actuals",
       "coverage",
       actualRange == null
-        ? `No visible player has finalized ${activeRun?.season} actuals; prior-season form is not substituted.`
-        : `${actualRows.length} visible players have finalized ${activeRun?.season} observations in the selected GW${actualRange.gwFrom}-GW${actualRange.gwTo} range.`,
-      ["players.json"],
+        ? `No visible player has finalized ${actualSeason ?? activeRun?.season} actuals; another season is not substituted.`
+        : `${actualRows.length} visible players have finalized ${actualSeason} observations in the selected GW${actualRange.gwFrom}-GW${actualRange.gwTo} range.`,
+      ["player_actuals.json"],
     ),
     ...(actualPointsLeader ? [
       insightFact(
         "rank.current_actual_points",
         "rank",
         `${actualPointsLeader.player.web_name} leads measured replayed points in the selected actual range with ${actualPointsLeader.form.points_under_rules_2026_27}.`,
-        ["players.json"],
+        ["player_actuals.json"],
       ),
     ] : []),
   ];
   const insightCaveats = [
     "xP totals sum already-published player-fixture values or select an exact cumulative endpoint.",
-    "Outcome probabilities are shown only for the run's fixed start and all venues.",
+    "Overlapping cumulative probability columns are intentionally kept out of this dense table; Player analytics exposes the exact published blank/haul endpoints.",
     "The availability status is a next-round overlay and is not applied to raw xP.",
-    "Actual GWs contain finalized observations from the selected vintage's current season only.",
+    "Actual season and GW selectors use finalized observations only; a prior season appears only after explicit selection.",
   ];
 
   return (
@@ -389,7 +428,7 @@ export function PlayersPage() {
           />
           <p className="text-xs text-muted-foreground">
             {runPlayers.length} players · as of{" "}
-            {activeRun?.as_of?.replace("T", " ").slice(0, 16)} UTC · actuals restricted to{" "}
+            {activeRun?.as_of?.replace("T", " ").slice(0, 16)} UTC · forecast season{" "}
             {activeRun?.season}
           </p>
         </div>
@@ -419,6 +458,21 @@ export function PlayersPage() {
               teams={teams}
               showFormWindow={false}
             />
+            {actualSeasons.length > 0 && actualSeason != null && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Actual season</span>
+                <Select value={actualSeason} onValueChange={setActualSeason}>
+                  <SelectTrigger size="sm" className="w-28" aria-label="Actual season">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {actualSeasons.map((season) => (
+                      <SelectItem key={season} value={season}>{season}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {actualBounds != null && actualRange != null && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Actual GWs</span>
@@ -472,14 +526,15 @@ export function PlayersPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Forecast GWs filter upcoming fixtures and xP only. Actual GWs independently aggregate
-            finalized {activeRun?.season} observations; they never include a previous season.
+            finalized {actualSeason} observations. Changing Actual season is explicit and never
+            mixes seasons in one aggregate.
             The Min avg min (L5) filter remains its separately published trailing-five anchor and
             does not follow Actual GWs.
           </p>
           {actualBounds == null && (
             <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
-              No finalized player actuals are published for {activeRun?.season}. Observed columns
-              stay unavailable; prior-season form is not substituted.
+              No finalized player actuals are published for {actualSeason}. Observed columns stay
+              unavailable; another season is not substituted.
             </p>
           )}
         </div>
@@ -498,19 +553,11 @@ export function PlayersPage() {
           its colour follows the selected source. GW columns are the pivot -- one per gameweek,
           two chips in a double gameweek.
         </p>
-        {cumulativeOutcomesAvailable && filters && selectedRun ? (
-          <p className="mt-1 text-xs text-muted-foreground">
-            Outcome probabilities cover every fixture from GW{selectedRun.gw_from} through GW
-            {filters.gwTo}. They are backend-convolved independent-gameweek model values, raw and
-            unadjusted for the next-round availability overlay. Both ≤2 and ≥2 include score 2.
-          </p>
-        ) : selectedRun ? (
-          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-            Cumulative probabilities are hidden for a shifted start or Home/Away filter. Select
-            All venues and start at GW{selectedRun.gw_from}; marginal probabilities cannot be
-            subtracted or conditioned in the browser.
-          </p>
-        ) : null}
+        <p className="mt-1 text-xs text-muted-foreground">
+          The dense Players table omits the six overlapping P(≤/≥ threshold) columns. Use Player
+          analytics for the exact backend-published blank and haul probabilities; this table keeps
+          cumulative xP and observed stats readable.
+        </p>
       </div>
 
       <InsightSummaryPanel
@@ -527,6 +574,7 @@ export function PlayersPage() {
             gw_to: filters?.gwTo,
             actual_gw_from: actualRange?.gwFrom,
             actual_gw_to: actualRange?.gwTo,
+            actual_season: actualRange == null ? undefined : actualSeason ?? undefined,
             position: playerPositionScope(playerFilters.position),
             team_code: playerFilters.teamCode === "all" ? undefined : Number(playerFilters.teamCode),
             view: filters?.view === "defense" ? "defence" : filters?.view,
@@ -541,6 +589,7 @@ export function PlayersPage() {
             filters,
             playerFilters,
             actualRange,
+            actualSeason,
             colorSource,
           }),
         }}
@@ -556,15 +605,16 @@ export function PlayersPage() {
           gwTo={filters.gwTo}
           opponentIndexOf={opponentIndexOf}
           formHeading={
-            actualRange == null ? "Actual" : `Actual GW${actualRange.gwFrom}-${actualRange.gwTo}`
+            actualRange == null
+              ? `Actual ${actualSeason ?? ""}`.trim()
+              : `Actual ${actualSeason} GW${actualRange.gwFrom}-${actualRange.gwTo}`
           }
           formTitle={
             actualRange == null
-              ? `No finalized ${activeRun?.season} actuals published`
-              : `Finalized ${activeRun?.season} actuals, GW${actualRange.gwFrom}-GW${actualRange.gwTo}`
+              ? `No finalized ${actualSeason} actuals published`
+              : `Finalized ${actualSeason} actuals, GW${actualRange.gwFrom}-GW${actualRange.gwTo}`
           }
           formColumnProfile="players"
-          beforeFixtureColumns={cumulativeColumns}
         />
       )}
 

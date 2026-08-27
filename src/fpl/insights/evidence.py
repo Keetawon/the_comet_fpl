@@ -41,7 +41,11 @@ class InsightEvidenceError(ValueError):
 _PAGE_FILES: Final[dict[InsightPage, tuple[InsightReadModel, ...]]] = {
     InsightPage.SUMMARY: (InsightReadModel.SUMMARY,),
     InsightPage.FIXTURE_MATRIX: (InsightReadModel.FIXTURE_MATRIX,),
-    InsightPage.PLAYERS: (InsightReadModel.PLAYERS, InsightReadModel.PLAYER_HORIZONS),
+    InsightPage.PLAYERS: (
+        InsightReadModel.PLAYERS,
+        InsightReadModel.PLAYER_ACTUALS,
+        InsightReadModel.PLAYER_HORIZONS,
+    ),
     InsightPage.PLAYER_ANALYTICS: (
         InsightReadModel.PLAYERS,
         InsightReadModel.PLAYER_HORIZONS,
@@ -62,6 +66,7 @@ _PAGE_SCOPE_FIELDS: Final[dict[InsightPage, frozenset[str]]] = {
             "gw_to",
             "actual_gw_from",
             "actual_gw_to",
+            "actual_season",
             "position",
             "team_code",
             "view",
@@ -87,6 +92,7 @@ _PAGE_SCOPE_FIELDS: Final[dict[InsightPage, frozenset[str]]] = {
             "min_avg_minutes_l5",
             "availability",
             "past_metric",
+            "include_cold_starts",
         }
     ),
     InsightPage.TEAM_ANALYTICS: frozenset(
@@ -111,12 +117,14 @@ _CAVEATS: Final[dict[InsightPage, tuple[str, ...]]] = {
     ),
     InsightPage.PLAYERS: (
         "Availability is a reported next-round overlay and is not applied to raw expected points.",
-        "Actual-GW totals use only complete finalized current-season fixtures and are not a "
+        "Actual-GW totals use only complete finalized fixtures from the explicitly selected "
+        "season and are not a "
         "future player forecast.",
     ),
     InsightPage.PLAYER_ANALYTICS: (
         "Frontier membership is display geometry, not a model quantity or model verdict.",
         "Published cumulative probabilities are selected at one exact horizon, never summed.",
+        "Excluding published cold starts is a reporting filter and does not alter forecasts.",
     ),
     InsightPage.TEAM_ANALYTICS: (
         "Expected clean sheets is a sum of published fixture probabilities, not a new probability.",
@@ -229,6 +237,12 @@ def _scope_values(scope: InsightDisplayScope) -> dict[str, object]:
     }
 
 
+def _previous_season_label(season: str) -> str:
+    """Request seasons have already passed the strict ``YYYY-YY`` contract validator."""
+    start = int(season[:4])
+    return f"{start - 1:04d}-{start % 100:02d}"
+
+
 def _validate_scope(request: InsightSummaryRequest, run: Mapping[str, Any]) -> None:
     values = _scope_values(request.scope)
     unexpected = set(values) - _PAGE_SCOPE_FIELDS[request.page]
@@ -283,6 +297,13 @@ def _validate_scope(request: InsightSummaryRequest, run: Mapping[str, Any]) -> N
         raise InsightEvidenceError("scope ends outside the forecast horizon")
     if request.page is InsightPage.PLAYER_ANALYTICS and gw_from is not None and gw_from != run_from:
         raise InsightEvidenceError("cumulative player horizons must start at the run boundary")
+    if request.scope.actual_season is not None and request.scope.actual_season not in {
+        request.season,
+        _previous_season_label(request.season),
+    }:
+        raise InsightEvidenceError(
+            "actual season is outside the page's forecast-season/immediate-prior scope"
+        )
 
 
 def _gw_bounds(scope: InsightDisplayScope, run: Mapping[str, Any]) -> tuple[int, int]:
@@ -476,12 +497,17 @@ def _selected_players(
 ) -> tuple[list[Mapping[str, Any]], Mapping[str, Any], Mapping[str, Any]]:
     players_doc = generation.documents[InsightReadModel.PLAYERS]
     horizons_doc = generation.documents[InsightReadModel.PLAYER_HORIZONS]
+    include_cold_starts = (
+        request.page is not InsightPage.PLAYER_ANALYTICS
+        or request.scope.include_cold_starts is True
+    )
     candidates = [
         player
         for player in players_doc.get("players", [])
         if player.get("run_id") == request.run_id
         and player.get("season") == request.season
         and _player_matches(player, request.scope)
+        and (include_cold_starts or player.get("cold_start_player") is False)
     ]
     all_run_players = [
         player
@@ -560,33 +586,44 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
         )
     actual_from = request.scope.actual_gw_from
     actual_to = request.scope.actual_gw_to
-    if actual_from is not None and actual_to is not None:
-        run_players = [
-            player
-            for player in generation.documents[InsightReadModel.PLAYERS].get("players", [])
-            if player.get("run_id") == request.run_id
-            and player.get("season") == request.season
+    actual_season = request.scope.actual_season
+    if actual_from is not None and actual_to is not None and actual_season is not None:
+        actual_records = [
+            record
+            for record in generation.documents[InsightReadModel.PLAYER_ACTUALS].get("players", [])
+            if record.get("season") == actual_season
         ]
         available_gws = sorted(
             {
                 int(actual["gw"])
-                for player in run_players
-                for actual in player.get("actuals", [])
+                for record in actual_records
+                for actual in record.get("actuals", [])
                 if isinstance(actual.get("gw"), int)
             }
         )
         if not available_gws:
             raise InsightEvidenceError(
-                "actual-gameweek scope was requested but no finalized current-season actuals exist"
+                "actual-gameweek scope was requested but no finalized actuals exist for that season"
             )
-        if actual_from < available_gws[0] or actual_to > available_gws[-1]:
-            raise InsightEvidenceError("actual-gameweek scope exceeds finalized current-season data")
+        requested_gws = set(range(actual_from, actual_to + 1))
+        missing_gws = sorted(requested_gws - set(available_gws))
+        if missing_gws:
+            raise InsightEvidenceError(
+                "actual-gameweek scope includes gameweeks without finalized selected-season "
+                f"data: {missing_gws[:3]}"
+            )
+
+        actuals_by_code = {
+            int(record["code"]): record.get("actuals", [])
+            for record in actual_records
+            if isinstance(record.get("code"), int)
+        }
 
         actual_scored: list[tuple[Mapping[str, Any], int]] = []
         for player in players:
             selected_actuals = [
                 actual
-                for actual in player.get("actuals", [])
+                for actual in actuals_by_code.get(int(player["code"]), [])
                 if isinstance(actual.get("gw"), int)
                 and actual_from <= int(actual["gw"]) <= actual_to
             ]
@@ -613,9 +650,10 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
                 "players.actual.coverage",
                 InsightFactKind.COVERAGE,
                 f"{len(actual_scored)} selected players have complete replayed actual points "
-                f"from finalized current-season GW{actual_from} through GW{actual_to}; "
+                f"from finalized {actual_season} GW{actual_from} through GW{actual_to}; "
                 f"{len(players) - len(actual_scored)} do not.",
                 InsightReadModel.PLAYERS,
+                InsightReadModel.PLAYER_ACTUALS,
             )
         )
         for index, (player, points) in enumerate(actual_scored[:3], 1):
@@ -624,9 +662,10 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
                     f"players.actual.rank.{index}",
                     InsightFactKind.RANK,
                     f"{_label(player.get('web_name'), 'Player')} ranks {index} with {points} "
-                    f"replayed actual points from finalized GW{actual_from} through "
-                    f"GW{actual_to}.",
+                    f"replayed actual points from finalized {actual_season} GW{actual_from} "
+                    f"through GW{actual_to}.",
                     InsightReadModel.PLAYERS,
+                    InsightReadModel.PLAYER_ACTUALS,
                 )
             )
     return facts

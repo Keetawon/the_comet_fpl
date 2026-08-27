@@ -1,4 +1,4 @@
-// Player deep analytics over one exact schema-v6 cumulative endpoint. This page ranks and draws
+// Player deep analytics over one exact schema-v7 cumulative endpoint. This page ranks and draws
 // presentation geometry only; probabilities remain backend-published scalars.
 
 import { useEffect, useMemo, useState } from "react";
@@ -89,12 +89,23 @@ const POSITION_COLOURS: Record<string, string> = {
 };
 
 const VIEW_DESCRIPTION: Record<PlayerAnalyticsView, string> = {
-  value: "Asset-style efficient frontier: cheaper and higher-xP players form the Pareto-nondominated set.",
+  value: "Lower price and higher cumulative xP define the outlined Pareto frontier.",
   upside_downside:
-    "Risk/reward efficient frontier: lower published blank probability and higher published haul probability are preferred.",
-  differential: "Differential efficient frontier: lower deadline ownership and higher cumulative xP form the Pareto-nondominated set.",
+    "Lower blank chance and higher haul chance define the outlined Pareto frontier.",
+  differential: "Lower ownership and higher cumulative xP define the outlined Pareto frontier.",
   past_future:
     "Latest-at-export observed form is shown beside future cumulative xP for context only; it is not aligned to the selected forecast vintage and no frontier is claimed.",
+};
+
+const VIEW_READING_NOTE: Record<PlayerAnalyticsView, string> = {
+  value:
+    "Move up and left. A player is on the frontier when nobody else is the same price or cheaper with at least as much xP, with one strict improvement.",
+  upside_downside:
+    "Move up and left. Nobody else has the same or lower blank chance and the same or higher haul chance, with one strict improvement.",
+  differential:
+    "Move up and left. Nobody else has the same or lower ownership and the same or higher xP, with one strict improvement.",
+  past_future:
+    "No frontier is calculated here. Observed form is context beside the future forecast, not a buy or avoid signal.",
 };
 
 function deriveRuns(
@@ -130,6 +141,25 @@ function axisTick(view: PlayerAnalyticsView, axis: "x" | "y", value: number): st
   if (axis === "x" && view === "value") return `£${value.toFixed(1)}`;
   if (axis === "x" && view === "differential") return `${value.toFixed(0)}%`;
   return value.toFixed(2);
+}
+
+function chartAxisLabel(
+  view: PlayerAnalyticsView,
+  axis: "x" | "y",
+  haulThreshold: HaulThreshold,
+  pastMetric: PastMetric,
+): string {
+  if (axis === "y") {
+    return view === "upside_downside" ? `Haul chance (${haulThreshold}+)` : "Cumulative xP";
+  }
+  if (view === "value") return "Price";
+  if (view === "upside_downside") return "Blank chance (≤2)";
+  if (view === "differential") return "Ownership";
+  return PAST_METRIC_LABEL[pastMetric];
+}
+
+function shortRunId(runId: string): string {
+  return runId.length > 12 ? `${runId.slice(0, 8)}…` : runId;
 }
 
 function playerFormAnchor(player: PlayerRecord): string | null {
@@ -169,6 +199,7 @@ export function PlayerAnalyticsPage() {
   const [chartXMin, setChartXMin] = useState("");
   const [chartXMax, setChartXMax] = useState("");
   const [chartPointScope, setChartPointScope] = useState<"all" | "frontier">("all");
+  const [includeColdStarts, setIncludeColdStarts] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,12 +276,23 @@ export function PlayerAnalyticsPage() {
     return [...seen.entries()].sort((left, right) => left[1].localeCompare(right[1]));
   }, [exactRunPlayers]);
 
-  const filteredPlayers = useMemo(
+  const playerFilterMatches = useMemo(
     () => exactRunPlayers.filter((player) => matchesPlayerFilters(player, filters)),
     [exactRunPlayers, filters],
   );
+  const filteredPlayers = useMemo(
+    () => playerFilterMatches.filter(
+      (player) => includeColdStarts || !player.cold_start_player,
+    ),
+    [includeColdStarts, playerFilterMatches],
+  );
+  const excludedColdStartCount = playerFilterMatches.length - filteredPlayers.length;
   const formAnchorByCode = useMemo(
     () => new Map(filteredPlayers.map((player) => [player.code, playerFormAnchor(player)])),
+    [filteredPlayers],
+  );
+  const coldStartByCode = useMemo(
+    () => new Map(filteredPlayers.map((player) => [player.code, player.cold_start_player])),
     [filteredPlayers],
   );
 
@@ -293,9 +335,11 @@ export function PlayerAnalyticsPage() {
         yDisplay: formatPlayerAnalyticsValue(analytics.config, "y", row.y),
         isFrontier: row.isFrontier,
         color: POSITION_COLOURS[row.position] ?? "#64748b",
-        groupLabel: `${row.position} · ${row.teamShortName}`,
+        groupLabel: `${row.position} · ${row.teamShortName}${
+          coldStartByCode.get(row.code) ? " · cold start" : ""
+        }`,
       })) ?? [],
-    [analytics],
+    [analytics, coldStartByCode],
   );
 
   const effectiveChartXMin = useMemo(() => {
@@ -388,6 +432,9 @@ export function PlayerAnalyticsPage() {
   const insightCaveats = [
     "Price and ownership are deadline-vintage overlays.",
     "Cumulative probabilities are raw published values from the run's fixed start.",
+    includeColdStarts
+      ? "Published cold-start forecasts are included by explicit choice; their xP is unchanged."
+      : `${excludedColdStartCount} published cold-start forecast${excludedColdStartCount === 1 ? " is" : "s are"} excluded from this reporting scope; their xP is unchanged.`,
     view === "past_future"
       ? "Observed form is the latest snapshot at static export and may post-date the selected forecast vintage. It is reporting context only, not a vintage-aligned input or causal comparison."
       : "Pareto-frontier membership is an exploration aid and does not establish optimality.",
@@ -400,6 +447,7 @@ export function PlayerAnalyticsPage() {
     setChartXMin("");
     setChartXMax("");
     setChartPointScope("all");
+    setIncludeColdStarts(false);
   };
 
   const resetFilters = () => {
@@ -407,6 +455,7 @@ export function PlayerAnalyticsPage() {
     setChartXMin("");
     setChartXMax("");
     setChartPointScope("all");
+    setIncludeColdStarts(false);
   };
 
   const changeFilters = (nextFilters: PlayerFilters) => {
@@ -584,6 +633,19 @@ export function PlayerAnalyticsPage() {
                 <ToggleGroupItem value="frontier">Efficient frontier only</ToggleGroupItem>
               </ToggleGroup>
             )}
+
+            <ToggleGroup
+              type="single"
+              value={includeColdStarts ? "include" : "exclude"}
+              onValueChange={(value) => {
+                if (value) setIncludeColdStarts(value === "include");
+              }}
+              variant="outline"
+              aria-label="Cold-start forecast scope"
+            >
+              <ToggleGroupItem value="exclude">Established evidence</ToggleGroupItem>
+              <ToggleGroupItem value="include">Include cold starts</ToggleGroupItem>
+            </ToggleGroup>
           </div>
 
           <PlayerFiltersBar filters={filters} onChange={changeFilters} teams={teams} />
@@ -608,6 +670,12 @@ export function PlayerAnalyticsPage() {
             Enter values in the active X-axis units shown above. The exact-values table, frontier
             membership, filters, and insight summary still use every eligible published point.
           </p>
+          <p className="text-xs text-muted-foreground">
+            Established evidence excludes {excludedColdStartCount} player
+            {excludedColdStartCount === 1 ? "" : "s"} whose selected forecast used the no-history
+            newcomer path. This reporting filter changes only the shortlist and frontier, not xP;
+            Include cold starts makes those players eligible again.
+          </p>
         </div>
       </FilterPanel>
 
@@ -617,9 +685,11 @@ export function PlayerAnalyticsPage() {
             <AnalyticsScatter
               title={PLAYER_ANALYTICS_VIEW_LABEL[view]}
               description={VIEW_DESCRIPTION[view]}
+              readingNote={VIEW_READING_NOTE[view]}
               points={visibleScatterPoints}
               xAxis={{
                 label: analytics.xAxis.label,
+                displayLabel: chartAxisLabel(view, "x", haulThreshold, pastMetric),
                 direction: analytics.xAxis.direction,
                 format: (value) => axisTick(view, "x", value),
                 bounds:
@@ -635,12 +705,15 @@ export function PlayerAnalyticsPage() {
               }}
               yAxis={{
                 label: analytics.yAxis.label,
+                displayLabel: chartAxisLabel(view, "y", haulThreshold, pastMetric),
                 direction: analytics.yAxis.direction,
                 format: (value) => axisTick(view, "y", value),
                 bounds: view === "upside_downside" ? { min: 0, max: 1 } : { min: 0 },
               }}
               vintageLabel={vintageLabel}
               horizonLabel={horizonLabel}
+              vintageDisplayLabel={`${selectedRun.season} · ${shortRunId(selectedRun.run_id)}`}
+              horizonDisplayLabel={`GW${selectedRun.gw_from}-${effectiveGwTo}`}
               emptyMessage={
                 analytics.eligibleCount === 0
                   ? "No players match the current filters."
@@ -671,6 +744,7 @@ export function PlayerAnalyticsPage() {
                   min_avg_minutes_l5: minAverageMinutesScope(filters.minMinutes),
                   availability: filters.availability,
                   past_metric: playerPastMetricScope(view, pastMetric),
+                  include_cold_starts: includeColdStarts,
                 }),
                 localScopeKey: JSON.stringify({
                   runId: selectedRun.run_id,
@@ -679,6 +753,7 @@ export function PlayerAnalyticsPage() {
                   haulThreshold,
                   pastMetric,
                   filters,
+                  includeColdStarts,
                 }),
               }}
             />
@@ -727,7 +802,14 @@ export function PlayerAnalyticsPage() {
               <TableBody>
                 {analytics.plotted.map((row) => (
                   <TableRow key={row.code}>
-                    <TableCell className="font-medium">{row.webName}</TableCell>
+                    <TableCell>
+                      <span className="font-medium">{row.webName}</span>
+                      {coldStartByCode.get(row.code) && (
+                        <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                          cold start
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{row.teamShortName}</TableCell>
                     <TableCell>{row.position}</TableCell>
                     <TableCell className="tabular-nums">

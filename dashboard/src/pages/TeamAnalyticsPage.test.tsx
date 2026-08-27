@@ -51,14 +51,15 @@ describe("TeamAnalyticsPage", () => {
       "All plotted clubs",
     );
     expect(
-      screen.getByText(/efficient frontier \(Pareto-nondominated direct values\)/i),
+      screen.getByText(/Outline = Pareto frontier/i),
     ).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent(/Move up and left/i);
     expect(screen.getByRole("table", { name: "Exact team analytics values" })).toBeInTheDocument();
     expect(screen.getByText("Expected CS count / fixture")).toBeInTheDocument();
     expect(screen.getByText(/expected count, not P\(at least one clean sheet\)/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
-    expect(screen.getByText(/selected-scope modelled rows use the published Stage A/i)).toBeInTheDocument();
+    expect(screen.getByText(/fixture rows use the league-average fallback/i)).toBeInTheDocument();
     expect(screen.getByText(/Both DGW legs count separately/)).toBeInTheDocument();
   });
 
@@ -74,7 +75,7 @@ describe("TeamAnalyticsPage", () => {
     expect(frontierCount).toBeGreaterThan(0);
     expect(
       screen.getByRole("group", { name: /Two-sided club environment/ }).querySelector("desc"),
-    ).toHaveTextContent(/published λ against/i);
+    ).toHaveTextContent(/Summed expected goals against \(λ against\)/i);
     const insightBeforeFocus = screen.getByTestId("insight-summary-panel").textContent;
 
     await user.click(screen.getByRole("combobox", { name: "Chart extent" }));
@@ -211,6 +212,7 @@ describe("TeamAnalyticsPage", () => {
     await screen.findByRole("table", { name: "Exact team analytics values" });
 
     await user.click(screen.getByRole("radio", { name: "Attack + defensive floor" }));
+    expect(screen.getByRole("note")).toHaveTextContent(/Move up and right/i);
     expect(
       screen.getAllByText(/Expected clean sheets \(summed expected count\) \(higher is better\)/)
         .length,
@@ -224,7 +226,7 @@ describe("TeamAnalyticsPage", () => {
     expect(betaRow).not.toBeNull();
     expect(within(alphaRow!).getByText("Not plotted — missing axis")).toBeInTheDocument();
     expect(within(betaRow!).getByText("0.440000 / 0.220000")).toBeInTheDocument();
-    expect(screen.getByText(/Highest expected CS count: Beta \(0.440000\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Highest expected clean-sheet count: Beta \(0.44\)/)).toBeInTheDocument();
   });
 
   it("makes past-vs-future explicitly explanatory with no frontier claim", async () => {
@@ -238,6 +240,7 @@ describe("TeamAnalyticsPage", () => {
     expect(
       screen.getByRole("group", { name: /Past xG for/ }).querySelector("desc"),
     ).toHaveTextContent("context only");
+    expect(screen.getByRole("note")).toHaveTextContent(/No frontier is calculated here/i);
     expect(screen.getAllByText(/no frontier or buy\/avoid claim/i).length).toBeGreaterThan(0);
     expect(screen.queryByText("Heavy outline = Pareto-nondominated environment")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Chart extent" })).not.toBeInTheDocument();

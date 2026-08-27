@@ -2,7 +2,7 @@
 
 Status: contract frozen and first implementation completed development-only on 2026-08-26. The
 cumulative inputs introduced in dashboard read-model schema version 4 and retained in current
-schema version 6 are sufficient for this implementation; this document does not change a model,
+schema version 7 are sufficient for this implementation; this document does not change a model,
 forecast vintage, optimizer objective, or published probability.
 
 ## Decision question
@@ -63,6 +63,12 @@ Four views are allowed:
 | Differential | deadline ownership percent | cumulative xP | left and up |
 | Past vs future | one directly published observed form rate/value | cumulative xP | explanatory only |
 
+Every view includes a short, view-specific **How to read** note beside the controls. It names both
+axes and their better direction, explains whether frontier membership applies, and states the
+decision limitation: value is not a legal squad, probability endpoints are not summable,
+differential is not a recommendation to avoid popular players, and past-versus-future is context
+rather than a causal or model-quality claim.
+
 The value, upside/downside, and differential fronts are Pareto-nondominated sets, not convex hulls and not optimal
 squads. A player is dominated only when another eligible player is no worse on both axes and
 strictly better on at least one. Exact ties use stable player `code` ordering for display without
@@ -74,10 +80,29 @@ the published haul threshold. A null axis value removes that point and increment
 "not plotted" count; null is never zero. Bubble size may encode ownership and colour may encode
 position, but both need a legend and neither changes dominance.
 
+Player analytics also consumes the directly published forecast provenance
+`cold_start_player`. Cold-start rows are excluded from the analytics population by default and a
+visible count explains the exclusion. An explicit **Include cold starts** control opts
+them back in; when enabled, they participate normally in axis completeness and Pareto
+classification and remain visibly labelled as cold starts. This is reporting-only eligibility:
+it does not alter, replace, discount, or regenerate any player's published forecast value. The UI
+must not infer cold-start status from form, current-season appearances, ownership, or missing
+actuals. A model-side rule that bridges newcomers until three appearances would change forecast
+probabilities and requires a separately named pre-registration and evaluation before it may become
+a prospective default.
+
 The accessible table beside the chart is authoritative for exact values. SVG points must be
-keyboard-focusable and expose player, axes, frontier state, vintage, and horizon to assistive
-technology. The page must state that price and ownership are deadline-vintage overlays and the
-probability distribution is raw and does not apply the reported availability multiplier.
+keyboard-focusable. The page header and chart metadata identify the selected season, forecast
+`as_of`, shortened run identifier, fixed `gw_from`, selected `gw_to`, and any latest-at-export
+observed form anchor; the full run id, metric names, horizon, and provenance remain in the SVG
+description/accessibility name and exact table. Axis titles always include the measure and unit.
+A concise visible tooltip exposes player, club/position, both exact axis values, frontier state,
+and cold-start state; it
+must detect the chart edges and flip or clamp its placement so no content is clipped outside the
+plot or viewport. Hover, pointer focus, and keyboard focus expose equivalent content. The
+accessible name and authoritative table carry the full provenance even when the visible tooltip
+uses shortened labels. The page must state that price and ownership are deadline-vintage overlays
+and the probability distribution is raw and does not apply the reported availability multiplier.
 
 Observed form is reporting context with a different time anchor: `players.json` attaches the
 latest form snapshot available at static export to every forecast-run record. It is not a frozen
@@ -102,6 +127,10 @@ Version 1 exposes three direct, risk-aware environment views:
 | Attack with defensive floor | expected clean sheets (maximise) | summed `lambda_for` (maximise) | attacking opportunity plus defensive floor |
 | Past vs future | observed team xG/GF or xGC/GA per match | future summed matching lambda | regime/context check only |
 
+Each team view has its own **How to read** note naming both axes and directions. It distinguishes a
+two-sided environment screen from an attacking screen with a defensive floor, and labels
+past-versus-future as a scale/context comparison only.
+
 `expected clean sheets` is the sum of per-fixture `probability_clean_sheet` values. It is an
 expected count, not `P(at least one clean sheet)`. The browser must never add probabilities and
 label the result as a probability. The page shows fixture count, per-fixture averages beside totals,
@@ -119,6 +148,12 @@ Team form follows the same latest-at-export rule and is not aligned to the selec
 vintage. Past-vs-future therefore labels the limitation and displays each club's own
 `(season, as_at_gw)` anchor in the exact table. A later form anchor beside an older forecast is
 explicit reporting context, not point-in-time model evidence or a causal comparison.
+
+Team charts follow the same presentation contract as player charts: page/chart metadata shows the
+season, forecast `as_of`, shortened run identifier, horizon, and axes with units. The edge-aware
+visible tooltip carries the club, both exact axis values, and frontier/context state. Keyboard
+focus exposes equivalent content, while the accessible name and exact table retain full run/horizon
+provenance, fixture/fallback counts, and the form anchor.
 
 ## Shared insight facts
 
@@ -140,5 +175,10 @@ The optional language renderer is governed by `docs/dashboard-ai-summaries.md`.
 - Horizontal chart bounds and frontier-only focus are user-adjustable presentation controls. Tests
   prove they leave the authoritative table, full-population Pareto membership, and insight scope
   unchanged, handle invalid bounds safely, and use percent units for probability axes.
+- Player tests prove published cold-start provenance is excluded by default, can be included only
+  by explicit user action, is never inferred from observations, and changes neither stored values
+  nor the forecast contract.
+- Every view has specific How-to-read copy. Tooltip tests cover pointer and keyboard parity, exact
+  values/provenance, and edge-aware placement without clipping.
 - Route and sidebar tests expose Player analytics and Team analytics without changing formal
   optimizer or manager-team state.

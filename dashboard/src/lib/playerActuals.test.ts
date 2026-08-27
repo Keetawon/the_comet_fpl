@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PlayerActualFixture, PlayerRecord } from "@/data/types";
+import type { PlayerActualFixture } from "@/data/types";
 import { actualGameweekRange, aggregatePlayerActuals } from "./playerActuals";
 
 function actual(patch: Partial<PlayerActualFixture> = {}): PlayerActualFixture {
@@ -110,8 +110,8 @@ describe("actualGameweekRange", () => {
     const players = [
       { actuals: [actual({ gw: 3 }), actual({ gw: 5 })] },
       { actuals: [actual({ gw: 4 })] },
-    ] as PlayerRecord[];
+    ];
     expect(actualGameweekRange(players)).toEqual({ minGw: 3, maxGw: 5 });
-    expect(actualGameweekRange([{ actuals: [] } as unknown as PlayerRecord])).toBeNull();
+    expect(actualGameweekRange([{ actuals: [] }])).toBeNull();
   });
 });

@@ -111,9 +111,39 @@ function chartDescription(view: TeamAnalyticsView): string {
     return "Context-only comparison of a directly published latest-at-export observed form rate with future modelled lambdas. It is not vintage-aligned; no frontier or buy/avoid claim is made.";
   }
   if (view === "environment") {
-    return "The efficient frontier is the Pareto-nondominated geometry of selected-scope sums of published λ against (lower is better) and λ for (higher is better). It is not an optimal FPL squad.";
+    return "Lower expected goals against and higher expected goals for define the outlined Pareto frontier.";
   }
-  return "The efficient frontier is the Pareto-nondominated geometry of selected-scope sums of published clean-sheet probabilities and λ for (both higher is better). It is not an optimal FPL squad.";
+  return "Higher expected clean sheets and expected goals for define the outlined Pareto frontier.";
+}
+
+function chartReadingNote(view: TeamAnalyticsView): string {
+  if (view === "environment") {
+    return "Move up and left. No other club is as good or better on both axes and strictly better on one.";
+  }
+  if (view === "attack-floor") {
+    return "Move up and right. No other club is as good or better on both axes and strictly better on one.";
+  }
+  return "No frontier is calculated here. Latest observed form is context beside the future forecast, not a buy or avoid signal.";
+}
+
+function chartAxisLabels(
+  view: TeamAnalyticsView,
+  pastMetric: TeamPastMetric,
+): { x: string; y: string } {
+  if (view === "environment") return { x: "Expected goals against", y: "Expected goals for" };
+  if (view === "attack-floor") return { x: "Expected clean sheets", y: "Expected goals for" };
+  const x = {
+    "xg-for": "Past xG / match",
+    "goals-for": "Past goals / match",
+    xgc: "Past xGC / match",
+    "goals-against": "Past goals against / match",
+  }[pastMetric];
+  const defence = pastMetric === "xgc" || pastMetric === "goals-against";
+  return { x, y: defence ? "Future expected goals against" : "Future expected goals for" };
+}
+
+function shortRunId(runId: string): string {
+  return runId.length > 12 ? `${runId.slice(0, 8)}…` : runId;
 }
 
 function numericBound(value: string): number | null {
@@ -322,14 +352,14 @@ export function TeamAnalyticsPage() {
     insightFact(
       "coverage.fallback_rows",
       "coverage",
-      `${facts.fallbackRows} selected-scope modelled rows use the published Stage A league-average fallback.`,
+      `${facts.fallbackRows} fixture rows use the league-average fallback.`,
       ["fixture_matrix.json"],
     ),
     ...(facts.frontier.length ? [
       insightFact(
         "frontier.clubs",
         "frontier",
-        `${facts.frontier.length} clubs are on the efficient frontier / Pareto set in the full selected axis-complete population; ${facts.frontier.slice(0, 5).map((team) => team.teamName).join(", ")}${facts.frontier.length > 5 ? ", and others" : ""}.`,
+        `Pareto-efficient clubs (${facts.frontier.length}): ${facts.frontier.slice(0, 5).map((team) => team.teamName).join(", ")}${facts.frontier.length > 5 ? ", and others" : ""}.`,
         ["fixture_matrix.json"],
       ),
     ] : []),
@@ -337,7 +367,7 @@ export function TeamAnalyticsPage() {
       insightFact(
         "rank.highest_attack_total",
         "rank",
-        `${facts.highestAttack.teamName} has the highest selected-scope summed expected goals for at ${fmt(facts.highestAttack.value)}.`,
+        `${facts.highestAttack.teamName} has the highest expected goals for (${facts.highestAttack.value.toFixed(2)}).`,
         ["fixture_matrix.json"],
       ),
     ] : []),
@@ -345,7 +375,7 @@ export function TeamAnalyticsPage() {
       insightFact(
         "rank.lowest_defence_total",
         "rank",
-        `${facts.lowestConceding.teamName} has the lowest selected-scope summed expected goals against at ${fmt(facts.lowestConceding.value)}.`,
+        `${facts.lowestConceding.teamName} has the lowest expected goals against (${facts.lowestConceding.value.toFixed(2)}).`,
         ["fixture_matrix.json"],
       ),
     ] : []),
@@ -353,7 +383,7 @@ export function TeamAnalyticsPage() {
       insightFact(
         "rank.highest_expected_clean_sheets",
         "rank",
-        `Highest expected CS count: ${facts.highestExpectedCleanSheets.teamName} (${fmt(facts.highestExpectedCleanSheets.value)}).`,
+        `Highest expected clean-sheet count: ${facts.highestExpectedCleanSheets.teamName} (${facts.highestExpectedCleanSheets.value.toFixed(2)}).`,
         ["fixture_matrix.json"],
       ),
     ] : []),
@@ -373,10 +403,8 @@ export function TeamAnalyticsPage() {
         <div>
           <h1 className="text-lg font-semibold">Team analytics</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Compare risk-aware club environments from one recorded forecast vintage. These are
-            exposure shortlists, not optimal teams or guarantees. Risk here means only the
-            published attack, defence, and clean-sheet primitives shown on the axes; the browser
-            does not regenerate a team PMF.
+            Compare published attack, defence, and clean-sheet signals from one forecast. These
+            are shortlists, not an optimal squad or a guarantee.
           </p>
         </div>
         <VintageSelect
@@ -582,21 +610,26 @@ export function TeamAnalyticsPage() {
           <AnalyticsScatter
             title={chartTitle(view, pastMetric)}
             description={chartDescription(view)}
+            readingNote={chartReadingNote(view)}
             points={visibleScatterPoints}
             xAxis={{
               label: plot.axes.xLabel,
+              displayLabel: chartAxisLabels(view, pastMetric).x,
               direction: plot.axes.xDirection,
               format: (value) => value.toFixed(2),
               bounds: { min: 0 },
             }}
             yAxis={{
               label: plot.axes.yLabel,
+              displayLabel: chartAxisLabels(view, pastMetric).y,
               direction: plot.axes.yDirection,
               format: (value) => value.toFixed(2),
               bounds: { min: 0 },
             }}
             vintageLabel={selectedVintageLabel}
             horizonLabel={horizonLabel}
+            vintageDisplayLabel={`${selectedRun.season} · ${shortRunId(selectedRun.run_id)}`}
+            horizonDisplayLabel={`GW${gwFrom}-${gwTo} · ${venue} · ${analytics.fixtureRows} fixtures`}
             medianX={chartIsFiltered ? null : plot.medianX}
             medianY={chartIsFiltered ? null : plot.medianY}
             emptyMessage={
@@ -622,7 +655,7 @@ export function TeamAnalyticsPage() {
             </span>
             {plot.axes.showFrontier && (
               <span>
-                Heavy outline = efficient frontier (Pareto-nondominated direct values)
+                Outline = Pareto frontier
               </span>
             )}
             <span>Bubble size = modelled fixture count</span>

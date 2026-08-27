@@ -1,6 +1,6 @@
 {
   "schema": "fpl.dashboard-player-forecast-vs-actual",
-  "json_schema_version": 6,
+  "json_schema_version": 7,
   "semantics": {
     "observation_grain": ["run_id", "season", "gw", "code"],
     "actual_measure": "points_under_rules_2026_27",
