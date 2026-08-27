@@ -314,7 +314,10 @@ Only officially complete gameweeks enter the file. Rows sort by gameweek, kickof
 both double-gameweek legs remain separate. Identities sort by season then code, duplicate fixture
 identities fail closed, and source NULLs remain NULL. JavaScript may select one explicit season and
 gameweek range and aggregate these observations; it may not treat them as forecast inputs or query
-DuckDB for missing history.
+DuckDB for missing history. The Players table may present observed xGI as the display-only sum of
+the aggregated xG and xA values, but only when both are measured; it is not a transported field or
+a future model quantity. Its BPS value is the selected-range sum across appeared fixture rows, so
+double-gameweek legs contribute separately and DNPs do not contribute; BPS is not an average.
 
 ## player_horizons.json — cumulative outcomes per player
 

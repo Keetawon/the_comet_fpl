@@ -511,13 +511,32 @@ describe("PlayersPage", () => {
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     // Overall is genuinely balanced: common, attack, and defense form are all present.
-    for (const name of ["Starts", "G", "xG/90", "CS", "GC", "Saves", "DC", "xGC", "BPS"]) {
+    for (const name of ["Starts", "G", "xGI", "xG/90", "CS", "GC", "Saves", "DC", "xGC", "BPS"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
+    let headers = screen.getAllByRole("columnheader").map((header) => header.textContent?.trim());
+    expect(headers.slice(headers.indexOf("xA"), headers.indexOf("xA") + 3)).toEqual([
+      "xA",
+      "xGI",
+      "xG/90",
+    ]);
+    expect(screen.getByRole("columnheader", { name: "BPS" }).querySelector("span")).toHaveAttribute(
+      "title",
+      "Total observed BPS across appeared fixtures in the selected Actual GWs; double-gameweek legs are summed and DNPs excluded",
+    );
+    expect(
+      within(screen.getByText("Alpha").closest("tr")!).getByTitle("Observed BPS total: 90"),
+    ).toHaveTextContent("90");
+    expect(
+      within(screen.getByText("Alpha").closest("tr")!).getByTitle(
+        "Observed xGI (xG + xA): 2.7",
+      ),
+    ).toHaveTextContent("2.7");
 
     await user.click(screen.getByRole("radio", { name: "Defense" }));
     expect(screen.queryByRole("columnheader", { name: "G" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xG/90" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "xGI" })).not.toBeInTheDocument();
     for (const name of ["CS", "GC", "Saves", "DC", "xGC", "Bonus", "BPS", "Pts"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
@@ -525,9 +544,77 @@ describe("PlayersPage", () => {
     await user.click(screen.getByRole("radio", { name: "Attack" }));
     expect(screen.queryByRole("columnheader", { name: "CS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xGC" })).not.toBeInTheDocument();
-    for (const name of ["G", "A", "xG", "xA", "xG/90", "xA/90", "Bonus", "BPS", "Pts"]) {
+    for (const name of ["G", "A", "xG", "xA", "xGI", "xG/90", "xA/90", "Bonus", "BPS", "Pts"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
+    headers = screen.getAllByRole("columnheader").map((header) => header.textContent?.trim());
+    expect(headers.slice(headers.indexOf("xA"), headers.indexOf("xA") + 3)).toEqual([
+      "xA",
+      "xGI",
+      "xG/90",
+    ]);
+  });
+
+  it("keeps observed xGI measured-zero distinct from a missing xG or xA component", async () => {
+    const user = userEvent.setup();
+    const players = [
+      playerWithLastFive(11, "Zero xGI", "MID", {
+        expected_goals: 0,
+        expected_assists: 0,
+      }),
+      playerWithLastFive(12, "Missing xGI", "MID", {
+        expected_goals: 0.4,
+        expected_assists: null,
+      }),
+      playerWithLastFive(13, "Positive xGI", "MID", {
+        expected_goals: 0.4,
+        expected_assists: 0.3,
+      }),
+    ];
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
+      ...actualsData,
+      players: players.map((player) => ({
+        season: player.season,
+        code: player.code,
+        actuals: player.actuals,
+      })),
+    });
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Zero xGI")).toBeInTheDocument());
+
+    expect(
+      within(screen.getByText("Zero xGI").closest("tr")!).getByTitle(
+        "Observed xGI (xG + xA): 0.0",
+      ),
+    ).toHaveTextContent("0.0");
+    expect(
+      within(screen.getByText("Missing xGI").closest("tr")!).getByTitle(
+        "xGI is unmeasured because observed xG or xA is unavailable",
+      ),
+    ).toHaveTextContent("–");
+    expect(
+      within(screen.getByText("Positive xGI").closest("tr")!).getByTitle(
+        "Observed xGI (xG + xA): 0.7",
+      ),
+    ).toHaveTextContent("0.7");
+
+    const xgiHeader = screen.getByRole("columnheader", { name: "xGI" });
+    const table = xgiHeader.closest("table")!;
+    const order = () =>
+      [...table.querySelectorAll("tbody > tr")]
+        .map((row) =>
+          ["Zero xGI", "Missing xGI", "Positive xGI"].find((name) =>
+            row.textContent?.includes(name),
+          ),
+        )
+        .filter((name): name is string => name != null);
+
+    await user.click(within(xgiHeader).getByRole("button"));
+    expect(order()).toEqual(["Positive xGI", "Zero xGI", "Missing xGI"]);
+    await user.click(within(xgiHeader).getByRole("button"));
+    expect(order()).toEqual(["Zero xGI", "Positive xGI", "Missing xGI"]);
   });
 
   it("distinguishes measured zero, unmeasured, and position-inapplicable defense form", async () => {
@@ -892,19 +979,19 @@ describe("PlayersPage", () => {
     ).toHaveTextContent("5.1");
   });
 
-  it("resets a sort whose form column disappears when the view changes", async () => {
+  it("resets an xGI sort when the derived attack column disappears", async () => {
     const user = userEvent.setup();
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
-    const goals = screen.getByRole("columnheader", { name: "G" });
+    const xgi = screen.getByRole("columnheader", { name: "xGI" });
     const gwXp = screen.getByRole("columnheader", { name: /^xP GW1$/ });
-    await user.click(within(goals).getByRole("button"));
-    expect(goals).not.toHaveAttribute("aria-sort", "none");
+    await user.click(within(xgi).getByRole("button"));
+    expect(xgi).not.toHaveAttribute("aria-sort", "none");
     expect(gwXp).toHaveAttribute("aria-sort", "none");
 
     await user.click(screen.getByRole("radio", { name: "Defense" }));
     await waitFor(() => expect(gwXp).toHaveAttribute("aria-sort", "descending"));
-    expect(screen.queryByRole("columnheader", { name: "G" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "xGI" })).not.toBeInTheDocument();
   });
 
   it("says so when no players match the current filters", async () => {

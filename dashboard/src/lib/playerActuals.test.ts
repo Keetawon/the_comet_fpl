@@ -56,7 +56,7 @@ describe("aggregatePlayerActuals", () => {
           goals_conceded: 0,
           saves: 0,
           bonus: 0,
-          bps: 0,
+          bps: 99,
           defensive_contribution: 0,
           expected_goals: 0,
           expected_assists: 0,
@@ -82,6 +82,7 @@ describe("aggregatePlayerActuals", () => {
     });
     expect(result?.expected_assists).toBeCloseTo(0.3);
     expect(result?.expected_assists_per_90).toBeCloseTo(0.18);
+    expect(result?.bps).toBe(58);
   });
 
   it("keeps absent, unmeasured, and zero observations distinct", () => {

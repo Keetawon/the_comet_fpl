@@ -345,12 +345,15 @@ comparison page and is not a twelfth navigation item.
   remains a dash sorted last. It never applies the availability overlay. A one-GW selection hides
   the otherwise duplicate range-total column.
   The form-column matrix is view-specific: **Overall** = App, Starts, Min/g, G, A, xG, xA,
-  xG/90, xA/90, CS, GC, Saves, DC, xGC, Bonus, BPS, Pts; **Attack** = App, Starts, Min/g, G,
-  A, xG, xA, xG/90, xA/90, Bonus, BPS, Pts; **Defence** = App, Starts, Min/g, CS, GC, Saves,
+  xGI, xG/90, xA/90, CS, GC, Saves, DC, xGC, Bonus, BPS, Pts; **Attack** = App, Starts, Min/g, G,
+  A, xG, xA, xGI, xG/90, xA/90, Bonus, BPS, Pts; **Defence** = App, Starts, Min/g, CS, GC, Saves,
   DC, xGC, Bonus, BPS, Pts. Position applicability is explicit: CS = GK/DEF/MID, GC and xGC
   = GK/DEF, Saves = GK, and DC = DEF/MID/FWD. A dash remains a dash for both an inapplicable
   position and an unmeasured value; the cell tooltip distinguishes the reason. These are observed
-  form measures only. Future player-level saves/DC/GC/xGC forecasts are unavailable and are not
+  form measures only. xGI is the display-only sum of observed xG + xA and stays unavailable when
+  either component is unavailable; it is not a forecast field. BPS is the selected-range total
+  across appeared fixtures, including every DGW leg and excluding DNPs, not an average. Future
+  player-level saves/DC/GC/xGC forecasts are unavailable and are not
   inferred from club lambdas or clean-sheet probabilities. Filters: position, team, price range,
   minimum average minutes (last 5), availability, plus the shared view/venue/gameweek bar, all
   inside a distinct Filters panel. Local development additionally offers **My squad**: a Manager

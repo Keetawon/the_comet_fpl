@@ -108,6 +108,7 @@ const ATTACK_FORM_COLUMN_IDS = new Set([
   "form-assists",
   "form-expected_goals",
   "form-expected_assists",
+  "form-expected_goal_involvements",
   "form-expected_goals_per_90",
   "form-expected_assists_per_90",
 ]);
@@ -313,6 +314,7 @@ export function PlayerStatTable({
         digits?: number;
         positions?: readonly string[];
         headerTitle?: string;
+        cellTitleLabel?: string;
       } = {},
     ): LegacyColumnDef<PlayerStatRow> => ({
       id: `form-${key}`,
@@ -335,7 +337,7 @@ export function PlayerStatTable({
             ? form == null
               ? `No observed form is available for ${label}`
               : `${label} is unmeasured in this form window`
-            : `Observed ${label}: ${fmt(value, options.digits ?? 0)}`;
+            : `Observed ${options.cellTitleLabel ?? label}: ${fmt(value, options.digits ?? 0)}`;
         return (
           <span className="tabular-nums" title={title}>
             {fmt(value, options.digits ?? 0)}
@@ -389,11 +391,48 @@ export function PlayerStatTable({
       formStat("starts", "Starts"),
       minutesPerGame,
     ];
+    const expectedGoalInvolvementsColumn: LegacyColumnDef<PlayerStatRow> = {
+      id: "form-expected_goal_involvements",
+      header: () => (
+        <span title="Observed expected goal involvements: xG + xA in the selected Actual GWs">
+          xGI
+        </span>
+      ),
+      accessorFn: (row) => {
+        const expectedGoals = row.form?.expected_goals;
+        const expectedAssists = row.form?.expected_assists;
+        return expectedGoals == null || expectedAssists == null
+          ? undefined
+          : expectedGoals + expectedAssists;
+      },
+      sortUndefined: "last",
+      cell: ({ row }) => {
+        const expectedGoals = row.original.form?.expected_goals;
+        const expectedAssists = row.original.form?.expected_assists;
+        const value =
+          expectedGoals == null || expectedAssists == null
+            ? null
+            : expectedGoals + expectedAssists;
+        return (
+          <span
+            className="tabular-nums"
+            title={
+              value == null
+                ? "xGI is unmeasured because observed xG or xA is unavailable"
+                : `Observed xGI (xG + xA): ${fmt(value, 1)}`
+            }
+          >
+            {fmt(value, 1)}
+          </span>
+        );
+      },
+    };
     const attackFormColumns = [
       formStat("goals_scored", "G"),
       formStat("assists", "A"),
       formStat("expected_goals", "xG", { digits: 1 }),
       formStat("expected_assists", "xA", { digits: 1 }),
+      expectedGoalInvolvementsColumn,
       formStat("expected_goals_per_90", "xG/90", { digits: 2 }),
       formStat("expected_assists_per_90", "xA/90", { digits: 2 }),
     ];
@@ -422,7 +461,11 @@ export function PlayerStatTable({
     ];
     const outcomeFormColumns = [
       formStat("bonus", "Bonus"),
-      formStat("bps", "BPS"),
+      formStat("bps", "BPS", {
+        headerTitle:
+          "Total observed BPS across appeared fixtures in the selected Actual GWs; double-gameweek legs are summed and DNPs excluded",
+        cellTitleLabel: "BPS total",
+      }),
       formStat("points_under_rules_2026_27", "Pts"),
     ];
     const playerFormColumns =

@@ -264,7 +264,12 @@ shared observed scope once above compact `App`/stat headers. A Players-only sort
 it uses the exact fixed-start cumulative endpoint when compatible, otherwise strictly sums the
 selected GW's published fixture xP, including every double-gameweek leg. A true blank is zero;
 null, non-finite, duplicate, or incomplete fixture evidence stays unavailable and sorts last. The
-reported availability overlay is never applied to this raw xP. Its local **My squad** filter
+reported availability overlay is never applied to this raw xP. The Players profile shows observed
+xGI immediately after xA as the display-only sum of the selected Actual-GW range's aggregated xG
+and xA; if either component is unavailable, xGI remains unavailable. It is not a transported field,
+a forecast, or permission to derive future goal involvement in the browser. Observed BPS is the
+selected-range total across appeared fixtures, including every DGW leg and excluding DNPs, not an
+average. Its local **My squad** filter
 reuses the trusted public-manager capture but activates only after all 15 stable codes match the
 selected forecast vintage's planning gameweek, position, club code, and deadline price. It then
 intersects the existing filters without changing any published value. Partial/mismatched imports
