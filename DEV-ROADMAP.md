@@ -1057,7 +1057,14 @@ Only after the ordered dashboard program above, unless an operational blocker re
   predecessor plus a separate `Actual GWs` from/to range; Forecast GWs still control only future
   fixtures and xP, and seasons are never mixed or silently substituted. The
   six overlapping threshold-probability columns are removed from this dense table and remain
-  available in Player analytics. Browser arithmetic is limited to summing published observed
+  available in Player analytics. The observed season/GW scope is displayed once above compact
+  stat headers instead of being repeated inside `App`. A dedicated sortable
+  `xP GW{Forecast From}` column appears beside availability and defaults descending for quick
+  starter/bench review. At the run's fixed start/all-venue scope it selects the exact published
+  cumulative endpoint; shifted or venue-filtered scopes strictly sum complete published fixture
+  xP for that GW. DGW legs are all included, a true blank is zero, and null/incomplete evidence
+  remains unavailable and sorts last; availability is still a separate overlay. Browser arithmetic
+  is limited to summing published observed
   components and forming the documented descriptive per-90 ratios from matching published
   measured-minute denominators. Insight request schema v3 limits its explicit actual season to
   that published/selectable pair and requires every gameweek in the inclusive requested range to

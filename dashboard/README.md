@@ -336,7 +336,14 @@ comparison page and is not a twelfth navigation item.
 - **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
   `players.json` plus normalized `player_actuals.json` — one row per player of the selected
   vintage (photo + club badge) merging
-  backward form (3/5/10/STD window selector) with per-gameweek xP chips and a range-total xP.
+  a selected finalized actual season/GW range with per-gameweek xP chips and a range-total xP.
+  The actual scope appears once in a compact strip above the table, so the first observed leaf is
+  simply `App`. A Players-only sortable `xP GW{Forecast From}` column sits immediately after
+  availability and defaults descending for starter/bench review. It selects the exact cumulative
+  endpoint at a compatible fixed-start/all-venue scope and otherwise uses the existing strict raw
+  fixture-xP sum: both DGW legs count, a true blank is 0.0, and null/duplicate/incomplete evidence
+  remains a dash sorted last. It never applies the availability overlay. A one-GW selection hides
+  the otherwise duplicate range-total column.
   The form-column matrix is view-specific: **Overall** = App, Starts, Min/g, G, A, xG, xA,
   xG/90, xA/90, CS, GC, Saves, DC, xGC, Bonus, BPS, Pts; **Attack** = App, Starts, Min/g, G,
   A, xG, xA, xG/90, xA/90, Bonus, BPS, Pts; **Defence** = App, Starts, Min/g, CS, GC, Saves,

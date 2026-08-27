@@ -101,7 +101,10 @@ raw PMFs stay out of the bulk payload. It also publishes normalized finalized pl
 actuals only for each published forecast season and its immediate predecessor when observed. The
 UI exposes an explicit Actual season plus independent `Actual GWs` range, offers only the selected
 run's forecast season and its actually published immediate predecessor, never mixes them, and
-excludes partial official gameweeks while retaining both double-gameweek legs. The forecast values are raw
+excludes partial official gameweeks while retaining both double-gameweek legs. On Players, that
+observed scope is shown once above compact stat headers, while a sortable raw
+`xP GW{Forecast From}` column defaults descending to support starter/bench review; complete DGW
+legs are summed, blanks are zero, and missing evidence remains unavailable. The forecast values are raw
 and availability-unadjusted, with independent gameweeks an explicit composition assumption. The
 emitter validates full precision first, then transports named values in six-decimal compact rows;
 the browser only decodes their versioned field order. The dashboard exposes nine read-only

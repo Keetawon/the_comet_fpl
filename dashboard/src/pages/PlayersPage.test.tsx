@@ -241,7 +241,11 @@ describe("PlayersPage", () => {
       screen.getByRole("button", { name: "Enter Players table fullscreen" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Beta")).toBeInTheDocument();
-    expect(screen.getByText("Actual 2026-27 GW1-1 App")).toBeInTheDocument();
+    const appHeader = screen.getByRole("columnheader", { name: "App" });
+    expect(appHeader).toHaveAttribute("title", "Finalized 2026-27 actuals, GW1-GW1");
+    expect(screen.getByText("Observed stats")).toBeInTheDocument();
+    expect(screen.getByText("2026-27 · GW1")).toBeInTheDocument();
+    expect(screen.queryByText("Actual 2026-27 GW1-1 App")).not.toBeInTheDocument();
     expect(screen.getByText("Forecast GWs")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Actual season" })).toHaveTextContent("2026-27");
     expect(screen.getByText("Actual GWs")).toBeInTheDocument();
@@ -254,6 +258,10 @@ describe("PlayersPage", () => {
     expect(screen.getByText(/visible players have finalized 2026-27 observations/)).toBeInTheDocument();
     expect(screen.getByText(/leads measured replayed points in the selected actual range/)).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /xP GW1-5/ })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^xP GW1$/ })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
     for (const name of ["P(≤2)", "P(≥2)", "P(≥4)", "P(≥6)", "P(≥10)", "P(≥15)"]) {
       expect(screen.queryByRole("columnheader", { name })).not.toBeInTheDocument();
     }
@@ -266,7 +274,7 @@ describe("PlayersPage", () => {
     // one chip per fixture, blank slot for a gameweek with none (GW2 for Beta)
     expect(screen.getAllByTestId("chip").length).toBeGreaterThanOrEqual(4);
     expect(screen.getAllByTestId("blank-slot").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/7\.4/)).toBeInTheDocument();
+    expect(screen.getByTitle("Published xP for GW1: 7.4")).toHaveTextContent("7.4");
   });
 
   it("filters to an exact manager squad by stable code and composes with player filters", async () => {
@@ -661,6 +669,8 @@ describe("PlayersPage", () => {
 
     await user.click(screen.getByRole("combobox", { name: "To gameweek" }));
     await user.click(screen.getByRole("option", { name: "GW1" }));
+    expect(screen.queryByRole("columnheader", { name: "xP GW1-1" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^xP GW1$/ })).toBeInTheDocument();
     expect(within(alpha()).getByText("7.4")).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
   });
@@ -687,7 +697,7 @@ describe("PlayersPage", () => {
       })),
     });
     render(<PlayersPage />);
-    await waitFor(() => expect(screen.getByText("Actual 2026-27 GW1-2 App")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("2026-27 · GW1-GW2")).toBeInTheDocument());
 
     const forecastFrom = screen.getByRole("combobox", { name: "From gameweek" });
     const forecastTo = screen.getByRole("combobox", { name: "To gameweek" });
@@ -696,7 +706,11 @@ describe("PlayersPage", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Actual from gameweek" }));
     await user.click(screen.getByRole("option", { name: "GW2" }));
-    expect(screen.getByText("Actual 2026-27 GW2-2 App")).toBeInTheDocument();
+    expect(screen.getByText("2026-27 · GW2")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "App" })).toHaveAttribute(
+      "title",
+      "Finalized 2026-27 actuals, GW2-GW2",
+    );
     expect(within(alpha()).getByTitle("Observed G: 2")).toHaveTextContent("2");
     expect(forecastFrom).toHaveTextContent("GW1");
     expect(forecastTo).toHaveTextContent("GW5");
@@ -734,14 +748,22 @@ describe("PlayersPage", () => {
       screen.getByText(/No finalized player actuals are published for 2026-27/),
     ).toHaveTextContent("another season is not substituted");
     expect(screen.queryByText("Actual GWs")).not.toBeInTheDocument();
-    expect(screen.getByText("Actual 2026-27 App")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "App" })).toHaveAttribute(
+      "title",
+      "No finalized 2026-27 actuals published",
+    );
+    expect(screen.getByText("2026-27 · no finalized GWs")).toBeInTheDocument();
     expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("No observed form is available for G"))
       .toHaveTextContent("–");
 
     await user.click(screen.getByRole("combobox", { name: "Actual season" }));
     expect(screen.queryByRole("option", { name: "2024-25" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("option", { name: "2025-26" }));
-    expect(await screen.findByText("Actual 2025-26 GW38-38 App")).toBeInTheDocument();
+    expect(await screen.findByText("2025-26 · GW38")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "App" })).toHaveAttribute(
+      "title",
+      "Finalized 2025-26 actuals, GW38-GW38",
+    );
     expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("Observed G: 4"))
       .toHaveTextContent("4");
   });
@@ -776,15 +798,94 @@ describe("PlayersPage", () => {
     expect(header).toHaveAttribute("aria-sort", "descending");
   });
 
-  it("sorts by the range xP column (the default sort)", async () => {
+  it("sorts by the selected Forecast From GW xP by default", async () => {
     const user = userEvent.setup();
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
-    const header = screen.getByRole("columnheader", { name: /xP GW1-5/ });
-    // the page opens sorted by xP descending; clicking flips it to ascending
-    expect(header).toHaveAttribute("aria-sort", "descending");
+    const gwXp = screen.getByRole("columnheader", { name: /^xP GW1$/ });
+    const rangeXp = screen.getByRole("columnheader", { name: /xP GW1-5/ });
+    expect(gwXp).toHaveAttribute("aria-sort", "descending");
+    expect(rangeXp).toHaveAttribute("aria-sort", "none");
+    await user.click(within(gwXp).getByRole("button"));
+    expect(gwXp).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it("strictly sums and sorts published first-GW xP, keeping missing values last", async () => {
+    const user = userEvent.setup();
+    const source = playersWithActuals[0];
+    const sourceFixture = source.fixtures[0];
+    const player = (
+      code: number,
+      webName: string,
+      fixtures: PlayerRecord["fixtures"],
+    ): PlayerRecord => ({ ...source, code, web_name: webName, fixtures });
+    const players = [
+      player(21, "High xP", [{ ...sourceFixture, fixture: 921, expected_points: 7 }]),
+      player(22, "Double xP", [
+        { ...sourceFixture, fixture: 922, expected_points: 2.25 },
+        { ...sourceFixture, fixture: 923, expected_points: 3.5 },
+      ]),
+      player(23, "Blank xP", [
+        { ...sourceFixture, gw: 2, fixture: 924, expected_points: 4 },
+      ]),
+      player(24, "Missing xP", [
+        { ...sourceFixture, fixture: 925, expected_points: null },
+      ]),
+    ];
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    vi.mocked(loadPlayerHorizons).mockResolvedValueOnce({ ...horizonsData, players: [] });
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("High xP")).toBeInTheDocument());
+    const header = screen.getByRole("columnheader", { name: /^xP GW1$/ });
+    const table = header.closest("table")!;
+    const order = () =>
+      [...table.querySelectorAll("tbody > tr")]
+        .map((row) =>
+          ["High xP", "Double xP", "Blank xP", "Missing xP"].find((name) =>
+            row.textContent?.includes(name),
+          ),
+        )
+        .filter((name): name is string => name != null);
+
+    expect(order()).toEqual(["High xP", "Double xP", "Blank xP", "Missing xP"]);
+    expect(
+      within(screen.getByText("Double xP").closest("tr")!).getByTitle(
+        "Published xP for GW1: 5.8",
+      ),
+    ).toHaveTextContent("5.8");
+    expect(
+      within(screen.getByText("Blank xP").closest("tr")!).getByTitle(
+        "Published xP for GW1: 0.0",
+      ),
+    ).toHaveTextContent("0.0");
+    expect(
+      within(screen.getByText("Missing xP").closest("tr")!).getByTitle(
+        "Published xP for GW1 is unavailable",
+      ),
+    ).toHaveTextContent("–");
+
     await user.click(within(header).getByRole("button"));
-    expect(header).toHaveAttribute("aria-sort", "ascending");
+    expect(order()).toEqual(["Blank xP", "Double xP", "High xP", "Missing xP"]);
+  });
+
+  it("updates the next-GW xP column from Forecast From without changing actual scope", async () => {
+    const user = userEvent.setup();
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    expect(screen.getByText("2026-27 · GW1")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^xP GW1$/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "From gameweek" }));
+    await user.click(screen.getByRole("option", { name: "GW2" }));
+
+    expect(screen.getByRole("columnheader", { name: /^xP GW2$/ })).toBeInTheDocument();
+    expect(screen.getByText("2026-27 · GW1")).toBeInTheDocument();
+    expect(
+      within(screen.getByText("Alpha").closest("tr")!).getByTitle(
+        "Published xP for GW2: 5.1",
+      ),
+    ).toHaveTextContent("5.1");
   });
 
   it("resets a sort whose form column disappears when the view changes", async () => {
@@ -792,13 +893,13 @@ describe("PlayersPage", () => {
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     const goals = screen.getByRole("columnheader", { name: "G" });
-    const rangeXp = screen.getByRole("columnheader", { name: /xP GW1-5/ });
+    const gwXp = screen.getByRole("columnheader", { name: /^xP GW1$/ });
     await user.click(within(goals).getByRole("button"));
     expect(goals).not.toHaveAttribute("aria-sort", "none");
-    expect(rangeXp).toHaveAttribute("aria-sort", "none");
+    expect(gwXp).toHaveAttribute("aria-sort", "none");
 
     await user.click(screen.getByRole("radio", { name: "Defense" }));
-    await waitFor(() => expect(rangeXp).toHaveAttribute("aria-sort", "descending"));
+    await waitFor(() => expect(gwXp).toHaveAttribute("aria-sort", "descending"));
     expect(screen.queryByRole("columnheader", { name: "G" })).not.toBeInTheDocument();
   });
 

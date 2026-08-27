@@ -258,7 +258,13 @@ retains those contracts, normalizes officially complete fixture-grain observatio
 Players route exposes an explicit actual season limited to the selected forecast season and its
 immediately preceding season plus a distinct `Actual GWs` range. It never reuses the forecast-
 horizon selector, mixes seasons, silently substitutes one season for another, or collapses double-
-gameweek legs; it only sums already-published observed components. Its local **My squad** filter
+gameweek legs; it only sums already-published observed components. The dense table presents that
+shared observed scope once above compact `App`/stat headers. A Players-only sortable
+`xP GW{Forecast From}` column sits beside availability and defaults descending for XI/bench review:
+it uses the exact fixed-start cumulative endpoint when compatible, otherwise strictly sums the
+selected GW's published fixture xP, including every double-gameweek leg. A true blank is zero;
+null, non-finite, duplicate, or incomplete fixture evidence stays unavailable and sorts last. The
+reported availability overlay is never applied to this raw xP. Its local **My squad** filter
 reuses the trusted public-manager capture but activates only after all 15 stable codes match the
 selected forecast vintage's planning gameweek, position, club code, and deadline price. It then
 intersects the existing filters without changing any published value. Partial/mismatched imports

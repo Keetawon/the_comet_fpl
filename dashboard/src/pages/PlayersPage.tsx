@@ -6,6 +6,7 @@
 // primitive behind the colour, ordered by kickoff time.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { SortingState } from "@tanstack/table-core";
 import { LoaderCircle, RotateCcw, UserRoundSearch } from "lucide-react";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
@@ -36,6 +37,7 @@ import { actualGameweekRange, aggregatePlayerActuals } from "@/lib/playerActuals
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
 import { fetchManagerTeam, type ManagerTeamPreview } from "@/lib/planServer";
 import { loadPlanServerToken } from "@/lib/planServerToken";
+import { rawPlayerGameweekXp } from "@/lib/userDraft";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 import {
   compactInsightScope,
@@ -56,6 +58,8 @@ interface ManagerSquadFilter {
   preview: ManagerTeamPreview;
   playerCodes: ReadonlySet<number>;
 }
+
+const PLAYERS_TABLE_INITIAL_SORTING: SortingState = [{ id: "gwFromXp", desc: true }];
 
 function initialManagerId(): string {
   try {
@@ -339,10 +343,24 @@ export function PlayersPage() {
             filters.gwTo,
           )
         : null;
+      const gwFromHorizon = cumulativeOutcomesAvailable
+        ? playerHorizon(
+            horizonIndex,
+            player.run_id,
+            player.season,
+            player.code,
+            filters.gwFrom,
+          )
+        : null;
+      const filteredGwFromXp =
+        player.fixtures.length === 0
+          ? null
+          : rawPlayerGameweekXp({ ...player, fixtures: filtered }, filters.gwFrom);
       return {
         // Suppress the shared detail row's retired prior-season form anchor on this page.
         player: { ...player, form: null },
         filtered,
+        gwFromXp: gwFromHorizon?.xp ?? filteredGwFromXp,
         totalXp: horizon?.xp ?? (xpValues.length ? xpValues.reduce((a, b) => a + b, 0) : null),
         horizon,
         form:
@@ -833,7 +851,18 @@ export function PlayersPage() {
               ? `No finalized ${actualSeason} actuals published`
               : `Finalized ${actualSeason} actuals, GW${actualRange.gwFrom}-GW${actualRange.gwTo}`
           }
+          formScopeLabel={
+            actualRange == null
+              ? `${actualSeason ?? "Unknown season"} · no finalized GWs`
+              : `${actualSeason} · ${
+                  actualRange.gwFrom === actualRange.gwTo
+                    ? `GW${actualRange.gwFrom}`
+                    : `GW${actualRange.gwFrom}-GW${actualRange.gwTo}`
+                }`
+          }
           formColumnProfile="players"
+          showGwFromXp
+          initialSorting={PLAYERS_TABLE_INITIAL_SORTING}
         />
       )}
 

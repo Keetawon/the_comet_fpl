@@ -7,7 +7,7 @@
 // Used by the Players page (whole roster) and the Next GW page (squad rows beside plan
 // EV columns via extraColumns).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { flexRender } from "@tanstack/react-table";
 import {
@@ -43,6 +43,8 @@ export interface PlayerStatRow {
   player: PlayerRecord;
   /** Venue/GW-filtered fixtures, sorted by (gw, kickoff). */
   filtered: PlayerFixture[];
+  /** Exact or strictly summed raw xP for the selected forecast-start GW. */
+  gwFromXp?: number | null;
   totalXp: number | null;
   /** Exact backend-published cumulative endpoint; absent under incompatible fixture filters. */
   horizon?: PlayerHorizon | null;
@@ -71,8 +73,12 @@ export interface PlayerStatTableProps {
   formHeading: string;
   /** Tooltip for the form columns: anchor season/gameweek of the window. */
   formTitle?: string;
+  /** Compact visible scope shared by every observed-stat column. */
+  formScopeLabel?: string;
   /** Players uses view-aware form columns; other consumers retain the compact legacy profile. */
   formColumnProfile?: "legacy" | "players";
+  /** Players-only sortable xP for the selected Forecast From GW. */
+  showGwFromXp?: boolean;
   initialSorting?: SortingState;
   pageSize?: number;
   /** Columns inserted just BEFORE the per-gameweek fixture columns (fixtures stay last). */
@@ -265,7 +271,9 @@ export function PlayerStatTable({
   opponentIndexOf,
   formHeading,
   formTitle,
+  formScopeLabel,
   formColumnProfile = "legacy",
+  showGwFromXp = false,
   initialSorting = DEFAULT_SORTING,
   pageSize = 50,
   beforeFixtureColumns = [],
@@ -276,6 +284,7 @@ export function PlayerStatTable({
   summaryNote,
   emptyMessage = "No players match the current filters.",
 }: PlayerStatTableProps) {
+  const formScopeId = useId();
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
   const [expanded, setExpanded] = useState<ExpandedState>({});
 
@@ -376,7 +385,7 @@ export function PlayerStatTable({
       ),
     }));
     const commonFormColumns = [
-      formStat("appearances", `${formHeading} App`),
+      formStat("appearances", "App"),
       formStat("starts", "Starts"),
       minutesPerGame,
     ];
@@ -438,6 +447,52 @@ export function PlayerStatTable({
     ];
     const visibleFormColumns =
       formColumnProfile === "players" ? playerFormColumns : legacyFormColumns;
+    const gwFromXpColumns: LegacyColumnDef<PlayerStatRow>[] = showGwFromXp
+      ? [
+          {
+            id: "gwFromXp",
+            header: () => (
+              <span
+                title={`Raw published xP for the selected Forecast From gameweek, GW${gwFrom}; double-gameweek legs are summed and the availability overlay is not applied`}
+              >
+                xP GW{gwFrom}
+              </span>
+            ),
+            accessorFn: (row) => row.gwFromXp ?? undefined,
+            sortUndefined: "last",
+            cell: ({ row }) => {
+              const value = row.original.gwFromXp;
+              return (
+                <span
+                  className="tabular-nums font-semibold"
+                  title={
+                    value == null
+                      ? `Published xP for GW${gwFrom} is unavailable`
+                      : `Published xP for GW${gwFrom}: ${value.toFixed(1)}`
+                  }
+                >
+                  {value == null ? "–" : value.toFixed(1)}
+                </span>
+              );
+            },
+          },
+        ]
+      : [];
+    const totalXpColumns: LegacyColumnDef<PlayerStatRow>[] =
+      showGwFromXp && gwFrom === gwTo
+        ? []
+        : [
+            {
+              id: "totalXp",
+              header: `xP GW${gwFrom}-${gwTo}`,
+              accessorFn: (row) => row.totalXp,
+              cell: ({ row }) => (
+                <span className="tabular-nums font-semibold">
+                  {row.original.totalXp == null ? "–" : row.original.totalXp.toFixed(1)}
+                </span>
+              ),
+            },
+          ];
     return [
       {
         id: "expander",
@@ -517,17 +572,9 @@ export function PlayerStatTable({
           );
         },
       },
+      ...gwFromXpColumns,
       ...visibleFormColumns,
-      {
-        id: "totalXp",
-        header: `xP GW${gwFrom}-${gwTo}`,
-        accessorFn: (row) => row.totalXp,
-        cell: ({ row }) => (
-          <span className="tabular-nums font-semibold">
-            {row.original.totalXp == null ? "–" : row.original.totalXp.toFixed(1)}
-          </span>
-        ),
-      },
+      ...totalXpColumns,
       ...beforeFixtureColumns,
       ...gwColumns,
       ...extraColumns,
@@ -539,6 +586,7 @@ export function PlayerStatTable({
     gwTo,
     formHeading,
     formColumnProfile,
+    showGwFromXp,
     nameSuffix,
     beforeFixtureColumns,
     extraColumns,
@@ -566,12 +614,25 @@ export function PlayerStatTable({
     <DecisionTableFullscreen label={fullscreenLabel}>
       {({ isFullscreen }) => (
         <div className={`flex flex-col gap-2 ${isFullscreen ? "min-h-0 flex-1" : ""}`}>
+          {formScopeLabel && (
+            <p
+              id={formScopeId}
+              className="flex flex-wrap items-baseline gap-x-2 px-2 text-[11px] text-muted-foreground"
+              title={formTitle}
+            >
+              <span className="font-medium text-foreground">Observed stats</span>
+              <span>{formScopeLabel}</span>
+            </p>
+          )}
           <div
             className={`${
               isFullscreen ? "min-h-0 max-h-none flex-1" : "max-h-[calc(100vh-12rem)]"
             } overflow-auto overscroll-contain`}
           >
-        <Table containerClassName="overflow-visible">
+        <Table
+          containerClassName="overflow-visible"
+          aria-describedby={formScopeLabel ? formScopeId : undefined}
+        >
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
