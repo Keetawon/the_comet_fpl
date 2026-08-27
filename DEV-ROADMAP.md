@@ -1,7 +1,7 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
 Status: active execution plan  
-Last updated: 2026-08-26<br>
+Last updated: 2026-08-27<br>
 Target: 2026/27 GW1  
 Deadline: `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok)  
 First kickoff: `2026-08-21T19:00:00Z`
@@ -13,10 +13,11 @@ owner goals below, defer it unless it is required to keep the deadline path corr
 **Post-deadline note (2026-08-26).** The GW1 deadline has passed. Dated statements below about
 pending 2026-08-20/21 operations are retained as the delivery record and do not authorize a rerun
 or reinterpretation of frozen artifacts. The local manager-team workflow is now implemented
-development-only. The ordered P2 dashboard program is now implemented development-only: contracts
+development-only. The ordered P2 dashboard program is implemented development-only: contracts
 first, then player and team deep analytics, then exact player/team prediction monitoring, then
-evidence-bound insight summaries. No model default or frozen evaluation changed. P2.5 owns any
-later post-deadline work.
+evidence-bound insight summaries. Its implementation and automated gates are complete; final
+responsive in-browser visual verification remains pending where recorded in P2.5. No model default
+or frozen evaluation changed. P2.5 owns any later post-deadline work.
 
 ## Owner goals
 
@@ -36,9 +37,10 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
 - **Goal 2's MVP, deep analytics, exact parallel monitoring, evidence-bound summaries, and
-  explicit prior/current-season Players actual range are implemented development-only.** Semantic contract
-  version 4, dashboard schema version 7, immutable player/team outcomes, the atomic static-JSON boundary, nine read-only
-  analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
+  explicit prior/current-season Players actual range have completed development-only implementation
+  and automated gates; final responsive in-browser visual verification remains pending.** Semantic contract
+  version 4, dashboard schema version 7, immutable player/team outcomes, the atomic static-JSON
+  boundary, nine read-only analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
   development-only. P1.8's full Players-page
   form matrix and additive observed
   defensive fields are implemented in code and focused tests; the failure-atomic local database
@@ -1058,8 +1060,9 @@ Only after the ordered dashboard program above, unless an operational blocker re
   available in Player analytics. Browser arithmetic is limited to summing published observed
   components and forming the documented descriptive per-90 ratios from matching published
   measured-minute denominators. Insight request schema v3 limits its explicit actual season to
-  that published/selectable pair and requires both range boundaries to be exact members of the
-  chosen season's finalized-GW set. Acceptance requires archive/
+  that published/selectable pair and requires every gameweek in the inclusive requested range to
+  be an exact member of the chosen season's finalized-GW set; endpoint membership alone is not
+  sufficient. Acceptance requires archive/
   live duplicate rejection, finalized-ledger gating, complete-GW filtering, NULL preservation,
   range/DGW aggregation tests, a schema-v7 atomic republish, and visual verification.
 

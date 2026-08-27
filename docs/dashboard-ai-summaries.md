@@ -85,10 +85,11 @@ Version 3 binds that pair to a required `actual_season`, resolves it from normal
 `player_actuals.json`, and adds the exact `include_cold_starts` boolean for Player analytics. The
 actual selectors are distinct from forecast `gw_from` / `gw_to`, must be supplied together in
 ascending order, and `actual_season` must be either the selected run's forecast season or its
-immediate predecessor when that predecessor is actually published in `player_actuals.json`. Each
-requested Actual-GW boundary must be an exact member of that season's published finalized-GW set;
-numeric containment between its minimum and maximum is insufficient. Unpublished seasons and
-non-member boundaries fail before provider or cache work. Other pages reject these selectors. The
+immediate predecessor when that predecessor is actually published in `player_actuals.json`. Every
+gameweek in the inclusive requested Actual-GW range must be an exact member of that season's
+published finalized-GW set; endpoint membership or numeric containment between the set's minimum
+and maximum is insufficient. Unpublished seasons and any range containing a non-member gameweek
+fail before provider or cache work. Other pages reject these selectors. The
 cold-start selector changes only reporting eligibility over the directly published provenance
 flag. These selectors prevent a visible season/range or population change from reusing evidence
 resolved for a different page state.

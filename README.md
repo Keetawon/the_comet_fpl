@@ -19,7 +19,10 @@ or squad recommendation is promoted as production-valid.** Player/team deep anal
 separate player/team prediction-versus-actual monitoring are implemented development-only.
 Deterministic insight summaries now appear on all eleven routes, with an optional evidence-bound,
 explicit-opt-in server-side language renderer on exactly seven public analytical routes. This P2.4
-implementation changes no forecast default or frozen evaluation.
+implementation changes no forecast default or frozen evaluation. Automated contract, test, build,
+lint, and HTTP gates pass for the latest analytics/Players refinement; its final interactive
+responsive in-browser visual verification remains pending because no controllable browser was
+connected to the implementation session.
 Phase 1 Candidates V1 and V2 were fitted under the fixed walk-forward contract and correctly not
 promoted. Candidate V3's development result was invalidated for leakage; its leakage-safe successor
 V4 was evaluated once and also missed the fixed gate, so `trailing_goals_attack_defence` remains the
