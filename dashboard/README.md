@@ -218,6 +218,11 @@ The manager capture and active forecast must agree on season, first gameweek, an
 full selectable-player registry hash covering season element, stable code, club, position, and
 price. Volatile bootstrap statistics are deliberately excluded. Public reconstruction currently
 fails closed for entries that started after GW1 because their acquisition prices are unavailable.
+An exact registry mismatch invalidates the imported capture and its player rules in Plan Builder
+and returns the user to **Import my team** while preserving the manager id. Refresh both paired
+forecast artifacts, their standing plans, and their ledger records first; then use **Get your
+team** again. A successful fresh fetch re-checks the server, and any other solve error keeps an
+explicit **Re-check** action available instead of leaving the tab terminally disabled.
 The first forecast gameweek may contain transfers.
 Captured bank and per-player selling values govern affordability; already-incurred hits are sunk,
 while newly recommended transfers beyond the effective remaining free transfers cost four points

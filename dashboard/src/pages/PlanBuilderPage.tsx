@@ -112,6 +112,8 @@ const DEV_PLAN_OUTPUT_DIR = "D:\\tmp\\gw1\\dev-latest";
 const SOLVED_MANAGER_RESULT_STORAGE_KEY = "fpl-solved-manager-result-v1";
 const LEGACY_MANAGER_CAPTURE_STORAGE_KEY = "fpl-solved-manager-capture";
 const LEGACY_MANAGER_SUMMARY_STORAGE_KEY = "fpl-solved-manager-summary";
+const MANAGER_FORECAST_REGISTRY_MISMATCH =
+  "manager capture and forecast use different selectable-player registries; regenerate the forecast and fetch the team again";
 
 function newManualPlanOutput(): string {
   const token =
@@ -694,6 +696,10 @@ export function PlanBuilderPage() {
         setLocks([]);
         setExcludes([]);
         setManagerLoad("loaded");
+        // A failed solve leaves the status in a terminal error state. A successful fresh
+        // capture is new evidence, so probe the server again instead of making the user reload
+        // the whole dashboard before they can retry.
+        if (solver.status === "error") checkSolver();
         try {
           localStorage.setItem("fpl-manager-id", String(preview.manager_id));
         } catch {
@@ -822,9 +828,24 @@ export function PlanBuilderPage() {
         reloadPublishedReadModels();
       })
       .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (
+          buildMode === "manager" &&
+          message === MANAGER_FORECAST_REGISTRY_MISMATCH
+        ) {
+          // This capture can never be solved against the regenerated forecast. Fail closed and
+          // require a fresh manager fetch, while preserving the manager id for the retry.
+          setManagerTeam(null);
+          setLocks([]);
+          setExcludes([]);
+          setFreeTransfersOverride(null);
+          setManagerLoad("error");
+          setManagerLoadError(message);
+          setStep(1);
+        }
         setSolver({
           status: "error",
-          message: error instanceof Error ? error.message : String(error),
+          message,
         });
       });
   };
@@ -2323,7 +2344,8 @@ export function PlanBuilderPage() {
               {(solver.status === "offline" ||
                 solver.status === "runtime-unready" ||
                 solver.status === "worktree-dirty" ||
-                solver.status === "forecast-missing") && (
+                solver.status === "forecast-missing" ||
+                solver.status === "error") && (
                 <Button variant="ghost" size="sm" onClick={checkSolver}>
                   Re-check
                 </Button>

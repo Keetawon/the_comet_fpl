@@ -539,6 +539,98 @@ describe("PlanBuilderPage", () => {
     expect(screen.getByRole("button", { name: /Next: Review & run/ })).toBeEnabled();
   });
 
+  it("re-checks the plan server after a successful manager re-fetch clears a prior solve error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: true,
+      runtime: readyRuntime,
+    });
+    vi.mocked(solveManagerPlan).mockRejectedValue(new Error("temporary manager solve failure"));
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Import my team"));
+    await user.type(screen.getByLabelText("FPL manager id"), "1234567");
+    await user.click(screen.getByRole("button", { name: "Get your team" }));
+    await user.click(screen.getByRole("button", { name: /Set squad rules/ }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+    expect(await screen.findByText("plan server online")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Solve now with my rules" }));
+    expect(await screen.findByText(/temporary manager solve failure/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back to rules" }));
+    await user.click(screen.getByRole("button", { name: "Back to start" }));
+    await user.click(screen.getByText("Import my team"));
+
+    vi.mocked(fetchPlanStatus).mockClear();
+    await user.click(screen.getByRole("button", { name: "Get your team" }));
+    await waitFor(() => expect(fetchPlanStatus).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: /Set squad rules/ }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+
+    expect(await screen.findByText("plan server online")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Solve now with my rules" })).toBeEnabled();
+  });
+
+  it("invalidates a manager capture after the exact forecast-registry mismatch", async () => {
+    const user = userEvent.setup();
+    const registryMismatch =
+      "manager capture and forecast use different selectable-player registries; regenerate the forecast and fetch the team again";
+    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: true,
+      runtime: readyRuntime,
+    });
+    vi.mocked(solveManagerPlan).mockRejectedValue(new Error(registryMismatch));
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText("Import my team"));
+    await user.type(screen.getByLabelText("FPL manager id"), "1234567");
+    await user.click(screen.getByRole("button", { name: "Get your team" }));
+    await user.click(screen.getByRole("button", { name: /Set squad rules/ }));
+    await user.click(screen.getByRole("radio", { name: "Keep Alpha" }));
+    await user.click(screen.getByRole("radio", { name: "Sell Beta" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Remaining free transfers" }),
+      "1",
+    );
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+    expect(await screen.findByText("plan server online")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Solve now with my rules" }));
+
+    expect(await screen.findByRole("heading", { name: "Import my team" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(registryMismatch);
+    expect(screen.getByLabelText("FPL manager id")).toHaveValue("1234567");
+    expect(screen.getByRole("button", { name: /Set squad rules/ })).toBeDisabled();
+    expect(screen.queryByText("Test Eleven")).not.toBeInTheDocument();
+
+    // The invalid capture's rules cannot leak into another workflow while the user regenerates
+    // the forecast and fetches a fresh team.
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByText(/Build from scratch/));
+    expect(screen.getByRole("img", { name: /^Budget meter/ })).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("locked "),
+    );
+    expect(screen.getByRole("img", { name: /^Budget meter/ })).toHaveAttribute(
+      "aria-label",
+      expect.stringMatching(/locked .*0\.0m/),
+    );
+    expect(screen.getByRole("button", { name: /Alpha/ })).not.toHaveTextContent("locked");
+    expect(screen.getByRole("button", { name: /Beta/ })).not.toHaveTextContent("excluded");
+  });
+
   it("caps owned manager exclusions at the current first-week transfer depth", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview);
@@ -1237,6 +1329,36 @@ describe("PlanBuilderPage", () => {
       await screen.findByText("Your solved plan is not in the published read model"),
     ).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("solved-run-1");
+  });
+
+  it("renders Re-check after a solve error and recovers without a page reload", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchPlanStatus).mockResolvedValue({
+      busy: false,
+      stage: null,
+      last_error: null,
+      last_result: null,
+      worktree_clean: true,
+      forecast_ready: true,
+      runtime: readyRuntime,
+    });
+    vi.mocked(solvePlan).mockRejectedValue(new Error("temporary optimizer failure"));
+
+    render(<PlanBuilderPage />);
+    await user.click(await screen.findByText(/Build from scratch/));
+    await user.click(screen.getByRole("button", { name: /Next: Review & run/ }));
+    expect(await screen.findByText("plan server online")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Solve now with my rules" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("temporary optimizer failure");
+    const recheck = screen.getByRole("button", { name: "Re-check" });
+    expect(recheck).toBeEnabled();
+    await user.click(recheck);
+
+    expect(await screen.findByText("plan server online")).toBeInTheDocument();
+    expect(screen.queryByText("temporary optimizer failure")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Solve now with my rules" })).toBeEnabled();
+    expect(reloadPublishedReadModels).not.toHaveBeenCalled();
   });
 
   it("does not enable solve when HTTP status succeeds but the solver runtime is unready", async () => {
