@@ -51,6 +51,22 @@ transfers; Plan Builder owns that workflow.
 Squad Draft still displays forecast `now_cost` and treats the standard budget as advisory. The
 manager preview's selling value and cash are capture facts, not a new Squad Draft budget rule.
 
+### Players statistics shortcut
+
+The local Players route has a separate **My squad** display filter. It reuses the same trusted
+Manager ID capture, but it neither changes a draft nor runs the optimizer. Before activating the
+scope, the browser requires all 15 stable player codes to exist in the selected forecast vintage
+and checks planning gameweek, position, club code, and deadline price. Any missing or mismatched
+player fails atomically and leaves the current table unchanged. Once verified, squad membership is
+an AND condition over the existing position, team, price, minutes, availability, forecast-GW,
+actual-season, and Actual-GW controls. Changing forecast vintage clears the scope and requires a
+fresh fetch.
+
+This filter is local/private state. It is unavailable in hosted static builds, is never written to
+the static read models or URL, and never enters the public AI insight request. The Players page's
+deterministic facts follow the visible squad-filtered rows; **Explain with AI** is disabled until
+the user returns to all players.
+
 ## Public-manager reconstruction boundary
 
 The public picks response does **not** contain purchase or selling prices. The implementation does

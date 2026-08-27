@@ -16,6 +16,13 @@ Builder, Squad Draft, manager imports, squads, bank, purchase/selling values, ca
 and custom-plan state remain deterministic-only. They still have a summary panel; their data is
 never sent to a third-party model.
 
+The Players route is renderer-eligible only in its public filter scope. When the local **My squad**
+Manager ID filter is active, deterministic facts follow the visible verified 15-player scope but
+the remote action is disabled. Manager ID, stable player codes, entry name, capture identity, and
+all other private capture fields remain absent from the typed request, its cache key, URLs, and
+provider traffic. Returning to all players restores the normal public renderer eligibility and
+invalidates any prior rendered result.
+
 AI output is labelled "AI-selected - verify cited metrics". The provider may select and group
 server-authored fact ids, but it never authors dashboard prose. Python renders the selected
 canonical statements with their citations, so the optional step cannot introduce a new metric,

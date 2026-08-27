@@ -32,6 +32,10 @@ builds never call an insight provider. Provider keys are server-process secrets 
 `VITE_*`, static JSON, URLs, browser storage, logs, cache records, or Git. The browser sends only
 typed public selectors; Python verifies the static generation, constructs the facts, and renders
 canonical text from provider-selected fact ids. Failure always leaves deterministic facts usable.
+Players is renderer-eligible only in its public scope: activating its local private **My squad**
+Manager ID filter keeps deterministic visible-row facts but disables the optional renderer. Manager
+ID, capture identity, entry metadata, and squad membership never enter an insight request, URL,
+static read model, cache identity, or provider call.
 The implemented Z.AI adapter targets the general Open Platform API; never assume a GLM
 Coding Plan quota licenses general dashboard traffic without a separate provider agreement.
 
@@ -254,7 +258,12 @@ retains those contracts, normalizes officially complete fixture-grain observatio
 Players route exposes an explicit actual season limited to the selected forecast season and its
 immediately preceding season plus a distinct `Actual GWs` range. It never reuses the forecast-
 horizon selector, mixes seasons, silently substitutes one season for another, or collapses double-
-gameweek legs; it only sums already-published observed components. Player Analytics defaults to
+gameweek legs; it only sums already-published observed components. Its local **My squad** filter
+reuses the trusted public-manager capture but activates only after all 15 stable codes match the
+selected forecast vintage's planning gameweek, position, club code, and deadline price. It then
+intersects the existing filters without changing any published value. Partial/mismatched imports
+fail atomically, a vintage change clears the private scope, and hosted static builds never expose
+the network action. Player Analytics defaults to
 the reporting-only Established evidence scope, which excludes forecast-marked cold starts from its
 shortlist/Pareto population; the explicit include control restores them without changing xP or any
 probability. Never infer cold-start status from observations or treat this filter as a model change.

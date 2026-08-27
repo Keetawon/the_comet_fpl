@@ -5,7 +5,7 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayers } from "@/data/load";
 import playersSample from "@/data/samplePlayers.json";
 import teamsSample from "@/data/sampleFixtureMatrix.json";
@@ -21,6 +21,11 @@ import type {
   TeamRecord,
 } from "@/data/types";
 import { PLAYER_HORIZON_FIELDS } from "@/data/types";
+import {
+  fetchManagerTeam,
+  type ManagerTeamPlayer,
+  type ManagerTeamPreview,
+} from "@/lib/planServer";
 import { PlayersPage } from "./PlayersPage";
 
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
@@ -54,6 +59,11 @@ vi.mock("@/data/load", () => ({
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
 }));
+
+vi.mock("@/lib/planServer", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/planServer")>("@/lib/planServer");
+  return { ...actual, fetchManagerTeam: vi.fn() };
+});
 
 beforeAll(() => {
   HTMLElement.prototype.hasPointerCapture = () => false;
@@ -117,6 +127,60 @@ const actualsData: PlayerActualsData = {
   })),
 };
 
+function managerPreview(players: readonly PlayerRecord[]): ManagerTeamPreview {
+  const managerPlayers: ManagerTeamPlayer[] = players.map((player, index) => ({
+    element_id: 10_000 + index,
+    code: player.code,
+    web_name: player.web_name,
+    position: player.position as ManagerTeamPlayer["position"],
+    team_id: 1,
+    team_code: player.team_code,
+    now_cost: player.now_cost ?? 0,
+    purchase_price: player.now_cost ?? 0,
+    selling_price: player.now_cost ?? 0,
+  }));
+  return {
+    capture_id: "manager-capture-1",
+    captured_at: "2026-08-27T15:30:00+07:00",
+    manager_id: 123456,
+    entry_name: "Test XI",
+    picks_event: 1,
+    planning_gw: 1,
+    bank_tenths: 0,
+    squad_selling_value_tenths: managerPlayers.reduce(
+      (total, player) => total + player.selling_price,
+      0,
+    ),
+    free_transfers_available: 1,
+    free_transfers_source: "reconstructed",
+    existing_hit_points: 0,
+    players: managerPlayers,
+  };
+}
+
+function managerFilterPlayers(): { squad: PlayerRecord[]; outsider: PlayerRecord } {
+  const source = playersWithActuals[0];
+  const squad = Array.from({ length: 15 }, (_, index): PlayerRecord => ({
+    ...source,
+    code: 100 + index,
+    web_name: `Squad ${index + 1}`,
+    position: index < 5 ? "DEF" : "MID",
+    now_cost: 50,
+    form: source.form,
+  }));
+  return {
+    squad,
+    outsider: {
+      ...source,
+      code: 999,
+      web_name: "Outside Defender",
+      position: "DEF",
+      now_cost: 50,
+      form: source.form,
+    },
+  };
+}
+
 function playerWithLastFive(
   code: number,
   webName: string,
@@ -142,6 +206,9 @@ function playerWithLastFive(
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
+  window.localStorage.clear();
+  vi.mocked(fetchManagerTeam).mockReset();
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersWithActuals, manifest: null });
   vi.mocked(loadPlayerActuals).mockResolvedValue(actualsData);
   vi.mocked(loadPlayerHorizons).mockResolvedValue(
@@ -160,6 +227,10 @@ beforeEach(() => {
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("PlayersPage", () => {
@@ -196,6 +267,230 @@ describe("PlayersPage", () => {
     expect(screen.getAllByTestId("chip").length).toBeGreaterThanOrEqual(4);
     expect(screen.getAllByTestId("blank-slot").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/7\.4/)).toBeInTheDocument();
+  });
+
+  it("filters to an exact manager squad by stable code and composes with player filters", async () => {
+    const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: [...squad, outsider],
+      manifest: null,
+    });
+    vi.mocked(fetchManagerTeam).mockResolvedValue(managerPreview(squad));
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Outside Defender")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+
+    expect(fetchManagerTeam).toHaveBeenCalledWith("123456", "");
+    await waitFor(() => expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument());
+    expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(15);
+    expect(
+      screen.getByText("Verified 15/15 players for Test XI. 15 match the other visible filters."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
+    expect(
+      screen.getByText(/AI explanation is unavailable while the private My squad filter is active/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Position filter" }));
+    await user.click(screen.getByRole("option", { name: "DEF" }));
+    expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(5);
+    expect(screen.queryByText("Squad 6")).not.toBeInTheDocument();
+    expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show all players" }));
+    expect(await screen.findByText("Outside Defender")).toBeInTheDocument();
+    expect(screen.queryByText("Squad 6")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/AI explanation is unavailable while the private My squad filter is active/),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+    await waitFor(() => expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(await screen.findByText("Outside Defender")).toBeInTheDocument();
+    expect(await screen.findByText("Squad 6")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show all players" })).not.toBeInTheDocument();
+  });
+
+  it("preserves the active squad when a replacement manager fetch fails", async () => {
+    const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: [...squad, outsider],
+      manifest: null,
+    });
+    vi.mocked(fetchManagerTeam)
+      .mockResolvedValueOnce(managerPreview(squad))
+      .mockRejectedValueOnce(new Error("manager not found"));
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Outside Defender")).toBeInTheDocument());
+    const managerId = screen.getByLabelText("FPL manager ID");
+    await user.type(managerId, "123456");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+    await waitFor(() => expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument());
+
+    await user.clear(managerId);
+    await user.type(managerId, "654321");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "manager not found The verified My squad filter was kept unchanged.",
+    );
+    expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(15);
+    expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument();
+    expect(screen.getByText(/Verified 15\/15 players for Test XI/)).toBeInTheDocument();
+  });
+
+  it("returns to the first table page when a manager squad narrows a later page", async () => {
+    const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    const extras = Array.from({ length: 44 }, (_, index): PlayerRecord => ({
+      ...outsider,
+      code: 1_000 + index,
+      web_name: `Extra ${index + 1}`,
+    }));
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: [...squad, outsider, ...extras],
+      manifest: null,
+    });
+    vi.mocked(fetchManagerTeam).mockResolvedValueOnce(managerPreview(squad));
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("1–50 of 60")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByText("51–60 of 60")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+
+    expect(await screen.findByText("Squad 1")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(15);
+    expect(screen.queryByText("No players match the current filters.")).not.toBeInTheDocument();
+  });
+
+  it("clears the private squad scope when the forecast vintage changes", async () => {
+    const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    const runBPlayers = [...squad, outsider].map((player) => ({
+      ...player,
+      run_id: "run-b",
+    }));
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: [...squad, outsider, ...runBPlayers],
+      manifest: null,
+    });
+    vi.mocked(loadPlayerHorizons).mockResolvedValueOnce({
+      ...horizonsData,
+      players: [
+        ...horizonsData.players,
+        ...horizonsData.players.map((player) => ({ ...player, run_id: "run-b" })),
+      ],
+    });
+    vi.mocked(fetchManagerTeam).mockResolvedValueOnce(managerPreview(squad));
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Outside Defender")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+    await waitFor(() => expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("combobox", { name: "Forecast vintage" }));
+    await user.click(screen.getByRole("option", { name: /run-b/ }));
+
+    expect(await screen.findByText("Outside Defender")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show all players" })).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The My squad filter was cleared because the forecast vintage changed",
+    );
+  });
+
+  it("ignores a pending manager response after the forecast vintage changes", async () => {
+    const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    const runBPlayers = [...squad, outsider].map((player) => ({
+      ...player,
+      run_id: "run-b",
+    }));
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: [...squad, outsider, ...runBPlayers],
+      manifest: null,
+    });
+    vi.mocked(loadPlayerHorizons).mockResolvedValueOnce({
+      ...horizonsData,
+      players: [
+        ...horizonsData.players,
+        ...horizonsData.players.map((player) => ({ ...player, run_id: "run-b" })),
+      ],
+    });
+    let resolveManager!: (preview: ManagerTeamPreview) => void;
+    vi.mocked(fetchManagerTeam).mockReturnValueOnce(
+      new Promise<ManagerTeamPreview>((resolve) => {
+        resolveManager = resolve;
+      }),
+    );
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Outside Defender")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+    expect(screen.getByRole("button", { name: "Fetching squad…" })).toBeDisabled();
+
+    await user.click(screen.getByRole("combobox", { name: "Forecast vintage" }));
+    await user.click(screen.getByRole("option", { name: /run-b/ }));
+    resolveManager(managerPreview(squad));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "The My squad filter was cleared because the forecast vintage changed",
+      ),
+    );
+    expect(screen.getByText("Outside Defender")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show all players" })).not.toBeInTheDocument();
+  });
+
+  it("rejects a partial manager-to-vintage mapping without changing the table", async () => {
+    const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    const incomplete = managerPreview(squad);
+    incomplete.players[14] = {
+      ...incomplete.players[14],
+      element_id: 99_999,
+      code: 99_999,
+    };
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: [...squad, outsider],
+      manifest: null,
+    });
+    vi.mocked(fetchManagerTeam).mockResolvedValueOnce(incomplete);
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Outside Defender")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "All 15 manager-squad players must match the selected forecast vintage",
+    );
+    expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(16);
+    expect(screen.getByText("Outside Defender")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show all players" })).not.toBeInTheDocument();
+  });
+
+  it("keeps manager-squad filtering local-only in hosted static builds", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+
+    expect(screen.getByLabelText("FPL manager ID")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Show my squad" })).toBeDisabled();
+    expect(
+      screen.getByText(/Manager-squad filtering is local-only and requires the trusted Plan Server/),
+    ).toBeInTheDocument();
+    expect(fetchManagerTeam).not.toHaveBeenCalled();
   });
 
   it("switches the Players-only observed columns between Overall, Attack, and Defense", async () => {

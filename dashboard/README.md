@@ -346,7 +346,13 @@ comparison page and is not a twelfth navigation item.
   form measures only. Future player-level saves/DC/GC/xGC forecasts are unavailable and are not
   inferred from club lambdas or clean-sheet probabilities. Filters: position, team, price range,
   minimum average minutes (last 5), availability, plus the shared view/venue/gameweek bar, all
-  inside a distinct Filters panel. Rows are compact and paginated; the expanded row exposes every
+  inside a distinct Filters panel. Local development additionally offers **My squad**: a Manager
+  ID is resolved through the trusted Plan Server, all 15 stable player codes plus position, club,
+  price, and planning-GW metadata must match the selected forecast vintage before the scope is
+  activated, and the verified membership then intersects every other filter. A failed or partial
+  import leaves the existing table scope unchanged. Changing forecast vintage clears the private
+  scope and requires a fresh verification; hosted static builds cannot use it. Rows are compact
+  and paginated; the expanded row exposes every
   transported fixture primitive behind the chip colour ordered by kickoff time, with attack- vs
   defence-detail ordering driven by the view. The same shared table (`PlayerStatTable`) powers the
   Next GW squad table. The failure-atomic local development database rebuild and atomic BI/static
@@ -363,7 +369,9 @@ comparison page and is not a twelfth navigation item.
   season + Actual GWs** selects finalized observed fixture rows from the forecast season or, only
   when present in `player_actuals.json`, its immediate predecessor. The available range boundaries
   come from that season's exact finalized-GW membership. A forecast range never silently
-  reinterprets historical form or actuals.
+  reinterprets historical form or actuals. Deterministic insight facts follow the verified My
+  squad scope, but the optional remote renderer is disabled while that private filter is active:
+  manager ID, capture identity, and squad membership never enter the public insight request.
 - **Summary** (implemented, P1.7d): the landing page — next gameweek kickoff (deadlines are
   not sourced, so none is shown), one optimizer squad summary card per plan (GW1 squad xP,
   cost, hits, captain/vice, XI and bench lines), an availability watch (the official

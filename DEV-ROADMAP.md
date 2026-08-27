@@ -1124,6 +1124,16 @@ Only after the ordered dashboard program above, unless an operational blocker re
   pack removes user-custom plans and rejects manager IDs, current squads, bank, and selling values.
   Hosted authentication, ownership verification, accounts/entitlements, and a selections log
   remain unimplemented. See `docs/manager-team-suggestions.md` and `dashboard/README.md`.
+- **Players private manager-squad filter (implemented development-only 2026-08-27).** The local
+  Players route reuses `/manager-team` to verify an exact 15-player scope by stable code against
+  the selected forecast's planning GW, position, club code, and deadline price. It composes with
+  every existing player/forecast/actual filter, preserves the active table atomically on fetch or
+  mapping failure, resets pagination after narrowing, and clears on forecast-vintage changes.
+  Hosted static builds cannot call it. Deterministic facts follow the visible scope, while the
+  optional renderer is disabled so no manager or capture field can enter the public insight
+  contract. Acceptance requires focused success/intersection/reset/failure/partial-mapping/privacy
+  tests, full frontend tests/build/lint, local Plan Server HTTP verification, and an interactive
+  click-through when a controllable browser is connected.
 
 These were not GW1 blockers. The post-deadline implementation remains separate and changes no
 frozen forecast or evaluation.

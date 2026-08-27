@@ -5,8 +5,8 @@
 // active colour source (opponent strength by default); the expanded row exposes every
 // primitive behind the colour, ordered by kickoff time.
 
-import { useEffect, useMemo, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { LoaderCircle, RotateCcw, UserRoundSearch } from "lucide-react";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
@@ -20,6 +20,7 @@ import {
 import { PlayerStatTable, type PlayerStatRow } from "@/components/PlayerStatTable";
 import { VintageSelect } from "@/components/VintageSelect";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -33,6 +34,8 @@ import type { ColorSource } from "@/lib/difficulty";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import { actualGameweekRange, aggregatePlayerActuals } from "@/lib/playerActuals";
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
+import { fetchManagerTeam, type ManagerTeamPreview } from "@/lib/planServer";
+import { loadPlanServerToken } from "@/lib/planServerToken";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 import {
   compactInsightScope,
@@ -47,6 +50,50 @@ import {
 interface ActualRange {
   gwFrom: number;
   gwTo: number;
+}
+
+interface ManagerSquadFilter {
+  preview: ManagerTeamPreview;
+  playerCodes: ReadonlySet<number>;
+}
+
+function initialManagerId(): string {
+  try {
+    return window.localStorage.getItem("fpl-manager-id") ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function managerSquadForRun(
+  preview: ManagerTeamPreview,
+  runPlayers: readonly PlayerRecord[],
+  runGwFrom: number,
+): ManagerSquadFilter {
+  if (preview.planning_gw !== runGwFrom) {
+    throw new Error(
+      `The fetched squad is for GW${preview.planning_gw}, but the selected forecast starts at GW${runGwFrom}. Select the current forecast vintage and fetch the squad again.`,
+    );
+  }
+  const playersByCode = new Map(runPlayers.map((player) => [player.code, player]));
+  const mismatched = preview.players.filter((managerPlayer) => {
+    const forecastPlayer = playersByCode.get(managerPlayer.code);
+    return (
+      forecastPlayer == null ||
+      forecastPlayer.position !== managerPlayer.position ||
+      forecastPlayer.team_code !== managerPlayer.team_code ||
+      forecastPlayer.now_cost !== managerPlayer.now_cost
+    );
+  });
+  if (mismatched.length > 0) {
+    throw new Error(
+      "All 15 manager-squad players must match the selected forecast vintage. Select the current vintage and fetch the squad again.",
+    );
+  }
+  return {
+    preview,
+    playerCodes: new Set(preview.players.map((player) => player.code)),
+  };
 }
 
 function previousSeason(season: string): string | null {
@@ -75,6 +122,7 @@ type PageState =
     };
 
 export function PlayersPage() {
+  const hostedStatic = import.meta.env.VITE_HOSTED_STATIC === "true";
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [runId, setRunId] = useState<string | null>(null);
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
@@ -82,6 +130,11 @@ export function PlayersPage() {
   const [playerFilters, setPlayerFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [actualRange, setActualRange] = useState<ActualRange | null>(null);
   const [actualSeason, setActualSeason] = useState<string | null>(null);
+  const [managerId, setManagerId] = useState(initialManagerId);
+  const [managerSquad, setManagerSquad] = useState<ManagerSquadFilter | null>(null);
+  const [managerLoading, setManagerLoading] = useState(false);
+  const [managerError, setManagerError] = useState<string | null>(null);
+  const managerRequestRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +205,13 @@ export function PlayersPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(
+    () => () => {
+      managerRequestRef.current += 1;
+    },
+    [],
+  );
 
   const runPlayers = useMemo(
     () =>
@@ -252,7 +312,11 @@ export function PlayersPage() {
 
   const rows: PlayerStatRow[] = useMemo(() => {
     if (!filters) return [];
-    const wanted = runPlayers.filter((p) => matchesPlayerFilters(p, playerFilters));
+    const wanted = runPlayers.filter(
+      (player) =>
+        (managerSquad == null || managerSquad.playerCodes.has(player.code)) &&
+        matchesPlayerFilters(player, playerFilters),
+    );
     return wanted.map((player) => {
       const filtered = player.fixtures
         .filter(
@@ -299,7 +363,57 @@ export function PlayersPage() {
     horizonIndex,
     actualRange,
     actualsByCode,
+    managerSquad,
   ]);
+
+  const managerIdValid =
+    /^\d{1,10}$/.test(managerId.trim()) && Number(managerId.trim()) > 0;
+
+  const clearManagerSquad = () => {
+    managerRequestRef.current += 1;
+    setManagerSquad(null);
+    setManagerLoading(false);
+    setManagerError(null);
+  };
+
+  const importManagerSquad = async () => {
+    if (hostedStatic) {
+      setManagerError("Manager-squad filtering is available only with the trusted local Plan Server.");
+      return;
+    }
+    if (!managerIdValid || state.status !== "ready" || selectedRun == null) {
+      setManagerError("Enter a positive FPL manager ID.");
+      return;
+    }
+    const requestId = ++managerRequestRef.current;
+    setManagerLoading(true);
+    setManagerError(null);
+    try {
+      const preview = await fetchManagerTeam(managerId.trim(), loadPlanServerToken());
+      const nextSquad = managerSquadForRun(
+        preview,
+        runPlayers,
+        selectedRun.gw_from,
+      );
+      if (requestId !== managerRequestRef.current) return;
+      setManagerSquad(nextSquad);
+      try {
+        window.localStorage.setItem("fpl-manager-id", String(preview.manager_id));
+      } catch {
+        // The verified squad remains active in component state when storage is unavailable.
+      }
+    } catch (error: unknown) {
+      if (requestId !== managerRequestRef.current) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setManagerError(
+        managerSquad
+          ? `${message} The verified My squad filter was kept unchanged.`
+          : `${message} The current table scope was kept unchanged.`,
+      );
+    } finally {
+      if (requestId === managerRequestRef.current) setManagerLoading(false);
+    }
+  };
 
   if (state.status === "loading") {
     return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
@@ -326,6 +440,20 @@ export function PlayersPage() {
 
   const activeRunId = runId ?? state.defaultRunId;
   const activeRun = runPlayers[0];
+  const changeVintage = (nextRunId: string) => {
+    if (nextRunId === activeRunId) return;
+    const hadManagerScope = managerSquad != null;
+    const cancelledManagerFetch = managerLoading;
+    managerRequestRef.current += 1;
+    setManagerLoading(false);
+    setManagerSquad(null);
+    setManagerError(
+      hadManagerScope || cancelledManagerFetch
+        ? "The My squad filter was cleared because the forecast vintage changed. Fetch the squad again to verify all 15 players."
+        : null,
+    );
+    setRunId(nextRunId);
+  };
   const clearFilters = () => {
     setFilters({
       view: "overall",
@@ -334,6 +462,7 @@ export function PlayersPage() {
       gwTo: selectedRun?.gw_to ?? state.gwTo,
     });
     setPlayerFilters({ ...INITIAL_PLAYER_FILTERS });
+    clearManagerSquad();
     const resetSeason = selectedRun?.season ?? null;
     const resetCodes = new Set(runPlayers.map((player) => player.code));
     const resetBounds =
@@ -414,6 +543,11 @@ export function PlayersPage() {
     "Overlapping cumulative probability columns are intentionally kept out of this dense table; Player analytics exposes the exact published blank/haul endpoints.",
     "The availability status is a next-round overlay and is not applied to raw xP.",
     "Actual season and GW selectors use finalized observations only; a prior season appears only after explicit selection.",
+    ...(managerSquad
+      ? [
+          "My squad membership comes from a private local manager capture and only filters already-published player rows; it does not change any statistic.",
+        ]
+      : []),
   ];
 
   return (
@@ -424,7 +558,7 @@ export function PlayersPage() {
           <VintageSelect
             options={vintageOptions(state.manifestRuns, state.plans)}
             value={activeRunId}
-            onChange={setRunId}
+            onChange={changeVintage}
           />
           <p className="text-xs text-muted-foreground">
             {runPlayers.length} players · as of{" "}
@@ -451,6 +585,87 @@ export function PlayersPage() {
               </Button>
             </div>
           )}
+          <section
+            className="rounded-lg border bg-background/50 p-3"
+            aria-labelledby="players-squad-filter-heading"
+            aria-busy={managerLoading}
+          >
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="mr-auto min-w-56 max-w-md">
+                <h2 id="players-squad-filter-heading" className="text-sm font-medium">
+                  My squad
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Filter this table to a verified public FPL squad. Published forecasts and
+                  actual stats are unchanged.
+                </p>
+              </div>
+              <form
+                className="flex flex-wrap items-end gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void importManagerSquad();
+                }}
+              >
+                <div className="w-44">
+                  <label htmlFor="players-manager-id" className="text-xs font-medium">
+                    FPL manager ID
+                  </label>
+                  <Input
+                    id="players-manager-id"
+                    className="mt-1"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={managerId}
+                    disabled={hostedStatic || managerLoading}
+                    aria-invalid={managerId.length > 0 && !managerIdValid}
+                    aria-describedby="players-manager-id-hint"
+                    placeholder="e.g. 123456"
+                    onChange={(event) => {
+                      setManagerId(event.target.value);
+                      setManagerError(null);
+                    }}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={hostedStatic || !managerIdValid || managerLoading}
+                >
+                  {managerLoading ? (
+                    <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <UserRoundSearch className="size-3.5" aria-hidden />
+                  )}
+                  {managerLoading ? "Fetching squad…" : "Show my squad"}
+                </Button>
+                {managerSquad && (
+                  <Button type="button" variant="outline" size="sm" onClick={clearManagerSquad}>
+                    Show all players
+                  </Button>
+                )}
+              </form>
+            </div>
+            <p id="players-manager-id-hint" className="mt-2 text-[11px] text-muted-foreground">
+              {hostedStatic
+                ? "Manager-squad filtering is local-only and requires the trusted Plan Server."
+                : managerId.trim() && !managerIdValid
+                  ? "Use 1–10 digits and a value greater than zero."
+                  : "Use the number in fantasy.premierleague.com/entry/{id}."}
+            </p>
+            {managerSquad && (
+              <p role="status" className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+                Verified 15/15 players for{" "}
+                {managerSquad.preview.entry_name || `manager #${managerSquad.preview.manager_id}`}.
+                {` ${rows.length} match the other visible filters.`}
+              </p>
+            )}
+            {managerError && (
+              <p role="alert" className="mt-2 text-xs text-destructive">
+                {managerError}
+              </p>
+            )}
+          </section>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <PlayerFiltersBar
               filters={playerFilters}
@@ -527,7 +742,7 @@ export function PlayersPage() {
           <p className="text-xs text-muted-foreground">
             Forecast GWs filter upcoming fixtures and xP only. Actual GWs independently aggregate
             finalized {actualSeason} observations. Changing Actual season is explicit and never
-            mixes seasons in one aggregate.
+            mixes seasons in one aggregate. My squad intersects with every other player filter.
             The Min avg min (L5) filter remains its separately published trailing-five anchor and
             does not follow Actual GWs.
           </p>
@@ -584,6 +799,9 @@ export function PlayersPage() {
             min_avg_minutes_l5: minAverageMinutesScope(playerFilters.minMinutes),
             availability: playerFilters.availability,
           }),
+          unavailableReason: managerSquad
+            ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
+            : undefined,
           localScopeKey: JSON.stringify({
             runId: activeRunId,
             filters,
@@ -591,6 +809,7 @@ export function PlayersPage() {
             actualRange,
             actualSeason,
             colorSource,
+            managerScope: managerSquad ? "private_manager_squad" : "all_players",
           }),
         }}
       />
