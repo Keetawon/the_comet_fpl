@@ -18,6 +18,28 @@ export function actualGameweekRange(
   return { minGw: Math.min(...gameweeks), maxGw: Math.max(...gameweeks) };
 }
 
+/**
+ * Descriptive BPS rate for the selected observed scope.
+ * Every appeared fixture is one denominator unit; DNPs are excluded and partial BPS evidence
+ * fails closed rather than depressing the average silently.
+ */
+export function averageBpsPerAppearance(
+  actuals: readonly PlayerActualFixture[],
+  gwFrom: number,
+  gwTo: number,
+): number | null {
+  const appeared = actuals.filter(
+    (row) => row.gw >= gwFrom && row.gw <= gwTo && row.minutes != null && row.minutes >= 1,
+  );
+  if (
+    appeared.length === 0 ||
+    appeared.some((row) => row.bps == null || !Number.isFinite(row.bps))
+  ) {
+    return null;
+  }
+  return appeared.reduce((total, row) => total + (row.bps ?? 0), 0) / appeared.length;
+}
+
 function sumMeasured(
   rows: readonly PlayerActualFixture[],
   key: keyof PlayerActualFixture,

@@ -1068,8 +1068,10 @@ Only after the ordered dashboard program above, unless an operational blocker re
   components and forming the documented descriptive per-90 ratios from matching published
   measured-minute denominators. The table also shows observed xGI immediately after xA as the
   display-only xG + xA sum, unavailable unless both aggregates are measured; this adds no forecast
-  field or read-model schema member. BPS remains the appeared-fixture total over the selected
-  Actual GW range (all DGW legs, no DNP contribution), not an average. Insight request schema v3
+  field or read-model schema member. The Players display exposes BPS/App as the selected-range BPS
+  total divided by appearances; all played DGW legs count, DNPs do not, and incomplete appeared-row
+  evidence stays unavailable. Normalized actuals retain their fixture-grain BPS scores, the legacy
+  form BPS measure remains a total, and no read-model field is added. Insight request schema v3
   limits its explicit actual season to
   that published/selectable pair and requires every gameweek in the inclusive requested range to
   be an exact member of the chosen season's finalized-GW set; endpoint membership alone is not

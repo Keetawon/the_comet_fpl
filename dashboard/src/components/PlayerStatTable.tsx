@@ -45,6 +45,8 @@ export interface PlayerStatRow {
   filtered: PlayerFixture[];
   /** Exact or strictly summed raw xP for the selected forecast-start GW. */
   gwFromXp?: number | null;
+  /** Players-only descriptive BPS average over appeared fixtures in the Actual-GW scope. */
+  bpsPerAppearance?: number | null;
   totalXp: number | null;
   /** Exact backend-published cumulative endpoint; absent under incompatible fixture filters. */
   horizon?: PlayerHorizon | null;
@@ -314,7 +316,6 @@ export function PlayerStatTable({
         digits?: number;
         positions?: readonly string[];
         headerTitle?: string;
-        cellTitleLabel?: string;
       } = {},
     ): LegacyColumnDef<PlayerStatRow> => ({
       id: `form-${key}`,
@@ -337,7 +338,7 @@ export function PlayerStatTable({
             ? form == null
               ? `No observed form is available for ${label}`
               : `${label} is unmeasured in this form window`
-            : `Observed ${options.cellTitleLabel ?? label}: ${fmt(value, options.digits ?? 0)}`;
+            : `Observed ${label}: ${fmt(value, options.digits ?? 0)}`;
         return (
           <span className="tabular-nums" title={title}>
             {fmt(value, options.digits ?? 0)}
@@ -459,13 +460,33 @@ export function PlayerStatTable({
         headerTitle: "Observed expected goals conceded while the player was on the pitch",
       }),
     ];
+    const bpsPerAppearanceColumn: LegacyColumnDef<PlayerStatRow> = {
+      id: "form-bps-per-appearance",
+      header: () => (
+        <span title="Average observed BPS per appearance in the selected Actual GWs (total BPS divided by appearances); each played double-gameweek leg counts once and DNPs are excluded">
+          BPS/App
+        </span>
+      ),
+      accessorFn: (row) => row.bpsPerAppearance ?? undefined,
+      sortUndefined: "last",
+      cell: ({ row }) => {
+        const value = row.original.bpsPerAppearance;
+        const appearances = row.original.form?.appearances;
+        const totalBps = row.original.form?.bps;
+        const title =
+          value == null || appearances == null || appearances <= 0 || totalBps == null
+            ? "BPS per appearance is unavailable because no complete appeared-fixture BPS evidence exists"
+            : `Observed BPS per appearance: ${fmt(value, 1)} (${fmt(totalBps, 0)} total BPS across ${appearances} ${appearances === 1 ? "appearance" : "appearances"})`;
+        return (
+          <span className="tabular-nums" title={title}>
+            {fmt(value, 1)}
+          </span>
+        );
+      },
+    };
     const outcomeFormColumns = [
       formStat("bonus", "Bonus"),
-      formStat("bps", "BPS", {
-        headerTitle:
-          "Total observed BPS across appeared fixtures in the selected Actual GWs; double-gameweek legs are summed and DNPs excluded",
-        cellTitleLabel: "BPS total",
-      }),
+      bpsPerAppearanceColumn,
       formStat("points_under_rules_2026_27", "Pts"),
     ];
     const playerFormColumns =

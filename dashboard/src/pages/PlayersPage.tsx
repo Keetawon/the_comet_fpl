@@ -33,7 +33,11 @@ import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, l
 import type { DashboardManifest, NextGwPlan, PlayerActualsRecord, PlayerHorizonsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
-import { actualGameweekRange, aggregatePlayerActuals } from "@/lib/playerActuals";
+import {
+  actualGameweekRange,
+  aggregatePlayerActuals,
+  averageBpsPerAppearance,
+} from "@/lib/playerActuals";
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
 import { fetchManagerTeam, type ManagerTeamPreview } from "@/lib/planServer";
 import { loadPlanServerToken } from "@/lib/planServerToken";
@@ -361,6 +365,14 @@ export function PlayersPage() {
         player: { ...player, form: null },
         filtered,
         gwFromXp: gwFromHorizon?.xp ?? filteredGwFromXp,
+        bpsPerAppearance:
+          actualRange == null
+            ? null
+            : averageBpsPerAppearance(
+                actualsByCode.get(player.code) ?? [],
+                actualRange.gwFrom,
+                actualRange.gwTo,
+              ),
         totalXp: horizon?.xp ?? (xpValues.length ? xpValues.reduce((a, b) => a + b, 0) : null),
         horizon,
         form:

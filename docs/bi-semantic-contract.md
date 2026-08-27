@@ -292,6 +292,12 @@ xGC). Here **rostered means that a
 matchday squad. A zero-minute row is therefore rostered and is counted as a DNP, but contributes no
 productivity measure.
 
+`bps` remains an appeared-fixture sum in this semantic fact. The Players dashboard may label the
+descriptive ratio `BPS/App`, calculated only as that selected-range total divided by the matching
+appearance count. Each played double-gameweek leg is one appearance, DNPs are excluded, and missing
+BPS on any appeared normalized-actual row makes the displayed ratio unavailable. This reporting
+ratio is not a semantic-contract field or a forecast quantity.
+
 Each anchor is an observed `(season, gw, code)` with a player-fixture row. The rolling windows take
 that player's most recent rostered fixtures ordered by kickoff, with the anchor gameweek's latest
 kickoff as the point-in-time cutoff; double-gameweek legs are retained as two fixture rows, while a

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { PlayerActualFixture } from "@/data/types";
-import { actualGameweekRange, aggregatePlayerActuals } from "./playerActuals";
+import {
+  actualGameweekRange,
+  aggregatePlayerActuals,
+  averageBpsPerAppearance,
+} from "./playerActuals";
 
 function actual(patch: Partial<PlayerActualFixture> = {}): PlayerActualFixture {
   return {
@@ -103,6 +107,24 @@ describe("aggregatePlayerActuals", () => {
       expected_goals_per_90: null,
       points_under_rules_2026_27: null,
     });
+  });
+
+  it("averages BPS over appearances, counts DGW legs, and fails closed on missing evidence", () => {
+    const appeared = [
+      actual({ fixture: 20, bps: 40 }),
+      actual({ fixture: 21, minutes: 60, bps: 18 }),
+      actual({ fixture: 22, minutes: 0, bps: 99 }),
+    ];
+    expect(averageBpsPerAppearance(appeared, 2, 2)).toBe(29);
+    expect(averageBpsPerAppearance([actual({ bps: 0 })], 2, 2)).toBe(0);
+    expect(averageBpsPerAppearance([actual({ minutes: 0, bps: 99 })], 2, 2)).toBeNull();
+    expect(
+      averageBpsPerAppearance(
+        [actual({ fixture: 20, bps: 40 }), actual({ fixture: 21, bps: null })],
+        2,
+        2,
+      ),
+    ).toBeNull();
   });
 });
 

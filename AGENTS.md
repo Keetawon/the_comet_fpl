@@ -267,9 +267,12 @@ null, non-finite, duplicate, or incomplete fixture evidence stays unavailable an
 reported availability overlay is never applied to this raw xP. The Players profile shows observed
 xGI immediately after xA as the display-only sum of the selected Actual-GW range's aggregated xG
 and xA; if either component is unavailable, xGI remains unavailable. It is not a transported field,
-a forecast, or permission to derive future goal involvement in the browser. Observed BPS is the
-selected-range total across appeared fixtures, including every DGW leg and excluding DNPs, not an
-average. Its local **My squad** filter
+a forecast, or permission to derive future goal involvement in the browser. The Players profile
+displays BPS/App as the selected-range observed BPS total divided by appearances. Each played DGW
+leg counts once, DNPs are excluded, and any missing BPS on an appeared row makes the ratio
+unavailable. Normalized actuals retain fixture-grain BPS, while the selected-range aggregate and
+legacy form BPS measure remain totals. This is backward-looking descriptive arithmetic, not a
+model quantity. Its local **My squad** filter
 reuses the trusted public-manager capture but activates only after all 15 stable codes match the
 selected forecast vintage's planning gameweek, position, club code, and deadline price. It then
 intersects the existing filters without changing any published value. Partial/mismatched imports

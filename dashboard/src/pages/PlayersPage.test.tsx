@@ -511,7 +511,7 @@ describe("PlayersPage", () => {
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     // Overall is genuinely balanced: common, attack, and defense form are all present.
-    for (const name of ["Starts", "G", "xGI", "xG/90", "CS", "GC", "Saves", "DC", "xGC", "BPS"]) {
+    for (const name of ["Starts", "G", "xGI", "xG/90", "CS", "GC", "Saves", "DC", "xGC", "BPS/App"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
     let headers = screen.getAllByRole("columnheader").map((header) => header.textContent?.trim());
@@ -520,13 +520,15 @@ describe("PlayersPage", () => {
       "xGI",
       "xG/90",
     ]);
-    expect(screen.getByRole("columnheader", { name: "BPS" }).querySelector("span")).toHaveAttribute(
+    expect(screen.getByRole("columnheader", { name: "BPS/App" }).querySelector("span")).toHaveAttribute(
       "title",
-      "Total observed BPS across appeared fixtures in the selected Actual GWs; double-gameweek legs are summed and DNPs excluded",
+      "Average observed BPS per appearance in the selected Actual GWs (total BPS divided by appearances); each played double-gameweek leg counts once and DNPs are excluded",
     );
     expect(
-      within(screen.getByText("Alpha").closest("tr")!).getByTitle("Observed BPS total: 90"),
-    ).toHaveTextContent("90");
+      within(screen.getByText("Alpha").closest("tr")!).getByTitle(
+        "Observed BPS per appearance: 90.0 (90 total BPS across 1 appearance)",
+      ),
+    ).toHaveTextContent("90.0");
     expect(
       within(screen.getByText("Alpha").closest("tr")!).getByTitle(
         "Observed xGI (xG + xA): 2.7",
@@ -537,14 +539,14 @@ describe("PlayersPage", () => {
     expect(screen.queryByRole("columnheader", { name: "G" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xG/90" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xGI" })).not.toBeInTheDocument();
-    for (const name of ["CS", "GC", "Saves", "DC", "xGC", "Bonus", "BPS", "Pts"]) {
+    for (const name of ["CS", "GC", "Saves", "DC", "xGC", "Bonus", "BPS/App", "Pts"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
 
     await user.click(screen.getByRole("radio", { name: "Attack" }));
     expect(screen.queryByRole("columnheader", { name: "CS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xGC" })).not.toBeInTheDocument();
-    for (const name of ["G", "A", "xG", "xA", "xGI", "xG/90", "xA/90", "Bonus", "BPS", "Pts"]) {
+    for (const name of ["G", "A", "xG", "xA", "xGI", "xG/90", "xA/90", "Bonus", "BPS/App", "Pts"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
     headers = screen.getAllByRole("columnheader").map((header) => header.textContent?.trim());
@@ -615,6 +617,74 @@ describe("PlayersPage", () => {
     expect(order()).toEqual(["Positive xGI", "Zero xGI", "Missing xGI"]);
     await user.click(within(xgiHeader).getByRole("button"));
     expect(order()).toEqual(["Zero xGI", "Positive xGI", "Missing xGI"]);
+  });
+
+  it("shows and sorts BPS per appearance rather than cumulative BPS", async () => {
+    const user = userEvent.setup();
+    const highAverage = playerWithLastFive(31, "High average", "MID", {});
+    const highTotal = playerWithLastFive(32, "High total", "MID", {});
+    const missing = playerWithLastFive(33, "Missing BPS", "MID", {});
+    const players = [highAverage, highTotal, missing];
+    const actuals = new Map<number, PlayerActualFixture[]>([
+      [
+        highAverage.code,
+        [actualFromForm({}, { fixture: 981, minutes: 90, starts: 1, bps: 30 })],
+      ],
+      [
+        highTotal.code,
+        [982, 983, 984, 985].map((fixture) =>
+          actualFromForm({}, { fixture, minutes: 90, starts: 1, bps: 10 }),
+        ),
+      ],
+      [
+        missing.code,
+        [actualFromForm({}, { fixture: 986, minutes: 90, starts: 1, bps: null })],
+      ],
+    ]);
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
+      ...actualsData,
+      players: players.map((player) => ({
+        season: player.season,
+        code: player.code,
+        actuals: actuals.get(player.code) ?? [],
+      })),
+    });
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("High average")).toBeInTheDocument());
+
+    expect(
+      within(screen.getByText("High average").closest("tr")!).getByTitle(
+        "Observed BPS per appearance: 30.0 (30 total BPS across 1 appearance)",
+      ),
+    ).toHaveTextContent("30.0");
+    expect(
+      within(screen.getByText("High total").closest("tr")!).getByTitle(
+        "Observed BPS per appearance: 10.0 (40 total BPS across 4 appearances)",
+      ),
+    ).toHaveTextContent("10.0");
+    expect(
+      within(screen.getByText("Missing BPS").closest("tr")!).getByTitle(
+        "BPS per appearance is unavailable because no complete appeared-fixture BPS evidence exists",
+      ),
+    ).toHaveTextContent("–");
+
+    const header = screen.getByRole("columnheader", { name: "BPS/App" });
+    const table = header.closest("table")!;
+    const order = () =>
+      [...table.querySelectorAll("tbody > tr")]
+        .map((row) =>
+          ["High average", "High total", "Missing BPS"].find((name) =>
+            row.textContent?.includes(name),
+          ),
+        )
+        .filter((name): name is string => name != null);
+
+    await user.click(within(header).getByRole("button"));
+    expect(order()).toEqual(["High average", "High total", "Missing BPS"]);
+    await user.click(within(header).getByRole("button"));
+    expect(order()).toEqual(["High total", "High average", "Missing BPS"]);
   });
 
   it("distinguishes measured zero, unmeasured, and position-inapplicable defense form", async () => {
