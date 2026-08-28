@@ -9,6 +9,49 @@ export interface ActualGameweekRange {
   maxGw: number;
 }
 
+/** Shared newest completed GW labels for the page's explicit season/range. */
+export function latestActualGameweeks(
+  players: readonly PlayerActualCollection[],
+  gwFrom: number,
+  gwTo: number,
+  gameweekLimit = 5,
+): number[] {
+  if (gameweekLimit <= 0) return [];
+  return [
+    ...new Set(
+      players.flatMap((player) =>
+        player.actuals
+          .filter((row) => row.gw >= gwFrom && row.gw <= gwTo)
+          .map((row) => row.gw),
+      ),
+    ),
+  ]
+    .sort((left, right) => right - left)
+    .slice(0, gameweekLimit);
+}
+
+/**
+ * Fixture-grain history for an expanded Players row.
+ *
+ * The limit is five distinct completed gameweeks, not five fixtures: every leg of a
+ * double gameweek is retained. Selection is confined to the caller's explicit Actual-GW range,
+ * and gaps are not backfilled from outside it.
+ */
+export function latestPlayerActualDetails(
+  actuals: readonly PlayerActualFixture[],
+  selectedGameweeks: readonly number[],
+): PlayerActualFixture[] {
+  const wanted = new Set(selectedGameweeks);
+  return actuals
+    .filter((row) => wanted.has(row.gw))
+    .sort(
+      (left, right) =>
+        right.gw - left.gw ||
+        (right.kickoff_time ?? "").localeCompare(left.kickoff_time ?? "") ||
+        right.fixture - left.fixture,
+    );
+}
+
 /** Bounds come only from finalized actual rows for the explicitly selected season/player set. */
 export function actualGameweekRange(
   players: readonly PlayerActualCollection[],

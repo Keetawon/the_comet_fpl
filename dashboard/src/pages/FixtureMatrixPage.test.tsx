@@ -6,13 +6,96 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadTeamActuals } from "@/data/load";
 import sample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
-import type { FixtureScheduleOverlay, NextGwPlan } from "@/data/types";
+import type {
+  FixtureScheduleOverlay,
+  NextGwPlan,
+  TeamActualFixture,
+  TeamActualsData,
+} from "@/data/types";
 import { FixtureMatrixPage } from "./FixtureMatrixPage";
 
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
+
+const actual = (patch: Partial<TeamActualFixture> = {}): TeamActualFixture => ({
+  gw: 1,
+  fixture: 10,
+  kickoff_time: "2026-08-22T14:00:00+00:00",
+  opponent_team_code: 102,
+  opponent_short_name: "BET",
+  was_home: true,
+  goals_for: 2,
+  goals_against: 1,
+  team_xg: 1.75,
+  team_xgc: 0.91,
+  team_bps: 72,
+  defensive_contribution: 61,
+  ...patch,
+});
+
+const teamActuals: TeamActualsData = {
+  schema: "fpl.dashboard-team-actuals",
+  json_schema_version: 8,
+  teams: [
+    {
+      season: "2025-26",
+      team_code: 101,
+      actuals: [
+        actual({
+          gw: 38,
+          fixture: 380,
+          kickoff_time: "2026-05-24T15:00:00+00:00",
+          opponent_team_code: 199,
+          opponent_short_name: "OME",
+          was_home: false,
+          goals_for: 4,
+          goals_against: 2,
+        }),
+      ],
+    },
+    {
+      season: "2026-27",
+      team_code: 101,
+      actuals: [
+        actual({ gw: 1, fixture: 100, kickoff_time: "2026-08-15T14:00:00+00:00" }),
+        actual({ gw: 2, fixture: 200, kickoff_time: "2026-08-22T14:00:00+00:00" }),
+        actual({ gw: 3, fixture: 300, kickoff_time: "2026-08-29T14:00:00+00:00" }),
+        actual({ gw: 4, fixture: 400, kickoff_time: "2026-09-05T14:00:00+00:00" }),
+        actual({ gw: 5, fixture: 500, kickoff_time: "2026-09-12T14:00:00+00:00" }),
+        actual({
+          gw: 6,
+          fixture: 601,
+          kickoff_time: "2026-09-19T12:00:00+00:00",
+          goals_for: 0,
+          goals_against: 0,
+          team_xg: null,
+          team_xgc: null,
+          team_bps: null,
+          defensive_contribution: null,
+        }),
+        actual({
+          gw: 6,
+          fixture: 602,
+          kickoff_time: "2026-09-19T18:00:00+00:00",
+          opponent_team_code: 103,
+          opponent_short_name: "GAM",
+          was_home: false,
+        }),
+      ],
+    },
+    {
+      season: "2026-27",
+      team_code: 102,
+      actuals: [
+        actual({ gw: 1, fixture: 101, opponent_team_code: 101, opponent_short_name: "ALP" }),
+        actual({ gw: 3, fixture: 301, opponent_team_code: 101, opponent_short_name: "ALP" }),
+        actual({ gw: 6, fixture: 603, opponent_team_code: 101, opponent_short_name: "ALP" }),
+      ],
+    },
+  ],
+};
 const schedule: FixtureScheduleOverlay = {
   schema_version: 2,
   semantics: "current_at_export_not_forecast_vintage",
@@ -72,9 +155,11 @@ const schedule: FixtureScheduleOverlay = {
 vi.mock("@/data/load", () => ({
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
+  loadTeamActuals: vi.fn(),
 }));
 
 beforeEach(() => {
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
   vi.mocked(loadFixtureMatrix).mockResolvedValue({
     teams: sample.teams,
     schedule,
@@ -82,6 +167,7 @@ beforeEach(() => {
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
+  vi.mocked(loadTeamActuals).mockResolvedValue(teamActuals);
 });
 
 describe("FixtureMatrixPage", () => {
@@ -211,8 +297,8 @@ describe("FixtureMatrixPage", () => {
     expect(fdrGw6).toHaveTextContent("GW6 · FDR 2");
     expect(fdrGw6).toHaveAccessibleName(/current official FDR 2/i);
 
-    await user.click(within(alphaRow!).getByRole("button", { name: "Expand fixtures" }));
-    expect(screen.getAllByText("Schedule only").length).toBeGreaterThan(0);
+    await user.click(within(alphaRow!).getByRole("button", { name: "Expand recent results" }));
+    expect(screen.getByRole("table", { name: "Alpha recent results" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: "15 GWs" }));
     expect(screen.getByRole("columnheader", { name: "GW15" })).toBeInTheDocument();
@@ -269,6 +355,80 @@ describe("FixtureMatrixPage", () => {
       "w-20",
       "min-w-20",
       "max-w-20",
+    );
+  });
+
+  it("shows the shared latest-five Actual-GW window, DGWs, nulls, and season isolation", async () => {
+    const user = userEvent.setup();
+    render(<FixtureMatrixPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+
+    expect(screen.getByRole("combobox", { name: "Actual season" })).toHaveTextContent("2026-27");
+    const alphaRow = screen.getByText("Alpha").closest("tr");
+    expect(alphaRow).not.toBeNull();
+    await user.click(within(alphaRow!).getByRole("button", { name: "Expand recent results" }));
+
+    const currentDetail = screen.getByTestId("team-actual-details-101");
+    expect(currentDetail).toHaveTextContent("shared window GW6, GW5, GW4, GW3, GW2");
+    const currentFixtures = [
+      ...currentDetail.querySelectorAll<HTMLElement>("[data-actual-fixture]"),
+    ];
+    expect(currentFixtures.map((row) => row.dataset.actualFixture)).toEqual([
+      "602",
+      "601",
+      "500",
+      "400",
+      "300",
+      "200",
+    ]);
+    expect(currentFixtures[0]).toHaveTextContent("GAM (A)");
+    expect(currentFixtures[1]).toHaveTextContent("GW6 · 2026-09-19");
+    expect(currentFixtures[1]).toHaveTextContent("BET (H)");
+    expect(currentFixtures[1]).toHaveTextContent(/0\s*0\s*–\s*–\s*–\s*–/);
+    expect(within(currentDetail).queryByText(/lambda|ease|probability|modelled|schedule only/i)).toBeNull();
+
+    screen.getByRole("combobox", { name: "Actual season" }).focus();
+    await user.keyboard("{Enter}");
+    await user.click(await screen.findByRole("option", { name: "2025-26" }));
+    await waitFor(() => expect(screen.queryByTestId("team-actual-details-101")).toBeNull());
+    const alphaPriorRow = screen.getByText("Alpha").closest("tr");
+    await user.click(
+      within(alphaPriorRow!).getByRole("button", { name: "Expand recent results" }),
+    );
+    const priorDetail = screen.getByTestId("team-actual-details-101");
+    expect(priorDetail).toHaveTextContent("2025-26");
+    expect(priorDetail).toHaveTextContent("GW38");
+    expect(priorDetail).toHaveTextContent("OME (A)");
+    expect(priorDetail).not.toHaveTextContent("GW6");
+  });
+
+  it("defaults to the current season without prior-season backfill and shows an empty club state", async () => {
+    vi.mocked(loadTeamActuals).mockResolvedValueOnce({
+      ...teamActuals,
+      teams: [
+        teamActuals.teams[0],
+        {
+          season: "2026-27",
+          team_code: 101,
+          actuals: [actual({ gw: 1, fixture: 100 })],
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<FixtureMatrixPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+
+    const alphaRow = screen.getByText("Alpha").closest("tr");
+    await user.click(within(alphaRow!).getByRole("button", { name: "Expand recent results" }));
+    const detail = screen.getByTestId("team-actual-details-101");
+    expect(detail).toHaveTextContent("2026-27");
+    expect(detail).toHaveTextContent("GW1");
+    expect(detail).not.toHaveTextContent("GW38");
+
+    const betaRow = screen.getByText("Beta").closest("tr");
+    await user.click(within(betaRow!).getByRole("button", { name: "Expand recent results" }));
+    expect(screen.getByTestId("team-actual-details-102")).toHaveTextContent(
+      /No finalized results are available/,
     );
   });
 

@@ -4,6 +4,8 @@ import {
   actualGameweekRange,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
+  latestActualGameweeks,
+  latestPlayerActualDetails,
 } from "./playerActuals";
 
 function actual(patch: Partial<PlayerActualFixture> = {}): PlayerActualFixture {
@@ -136,5 +138,52 @@ describe("actualGameweekRange", () => {
     ];
     expect(actualGameweekRange(players)).toEqual({ minGw: 3, maxGw: 5 });
     expect(actualGameweekRange([{ actuals: [] }])).toBeNull();
+  });
+});
+
+describe("latestPlayerActualDetails", () => {
+  it("uses shared page-level GW labels, keeps DGWs, and does not backfill a player's gaps", () => {
+    const pageGameweeks = latestActualGameweeks(
+      [
+        {
+          actuals: [6, 7, 8, 9, 10].map((gw) =>
+            actual({ gw, fixture: gw * 10 }),
+          ),
+        },
+      ],
+      1,
+      10,
+    );
+    const result = latestPlayerActualDetails(
+      [
+        actual({ gw: 1, fixture: 10, kickoff_time: "2026-08-01T12:00:00+00:00" }),
+        actual({ gw: 3, fixture: 30, kickoff_time: "2026-08-15T12:00:00+00:00" }),
+        actual({ gw: 5, fixture: 50, kickoff_time: "2026-08-29T12:00:00+00:00" }),
+        actual({ gw: 7, fixture: 70, kickoff_time: "2026-09-12T12:00:00+00:00" }),
+        actual({ gw: 9, fixture: 90, kickoff_time: null }),
+        actual({ gw: 10, fixture: 101, kickoff_time: "2026-10-03T12:00:00+00:00" }),
+        actual({ gw: 10, fixture: 102, kickoff_time: "2026-10-03T16:00:00+00:00" }),
+        actual({ gw: 12, fixture: 120, kickoff_time: "2026-10-17T12:00:00+00:00" }),
+      ],
+      pageGameweeks,
+    );
+
+    expect(pageGameweeks).toEqual([10, 9, 8, 7, 6]);
+    expect(result.map((row) => row.fixture)).toEqual([102, 101, 90, 70]);
+    expect(new Set(result.map((row) => row.gw))).toEqual(new Set([10, 9, 7]));
+  });
+
+  it("preserves DNP, zero, and null fixture evidence without substituting other rows", () => {
+    const dnp = actual({
+      gw: 4,
+      minutes: 0,
+      starts: 0,
+      expected_goals: 0,
+      expected_assists: null,
+      bps: null,
+    });
+    expect(latestPlayerActualDetails([dnp], [4])).toEqual([dnp]);
+    expect(latestPlayerActualDetails([dnp], [5, 6])).toEqual([]);
+    expect(latestActualGameweeks([{ actuals: [dnp] }], 4, 4, 0)).toEqual([]);
   });
 });

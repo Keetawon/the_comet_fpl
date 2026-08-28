@@ -32,6 +32,7 @@ from fpl.publish.dashboard_json import (
     PLAYER_FORECAST_VS_ACTUAL_FILENAME,
     PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
+    TEAM_ACTUALS_FILENAME,
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
     DashboardJsonError,
     _discrete_crps,
@@ -39,6 +40,8 @@ from fpl.publish.dashboard_json import (
     _validate_player_actual_generation,
     _validate_player_horizon_document,
     _validate_player_horizon_generation,
+    _validate_team_actual_document,
+    _validate_team_actual_generation,
     build_dashboard_read_models,
     export_dashboard_json,
     render_read_model_files,
@@ -223,6 +226,36 @@ def _player_actual_row(
         "influence": None,
         "total_points_as_recorded": 6,
         "points_under_rules_2026_27": 6,
+    }
+    row.update(overrides)
+    return row
+
+
+def _team_actual_row(
+    fixture: int,
+    team_id: int,
+    opponent_team_id: int,
+    gw: int,
+    was_home: bool,
+    goals_for: int,
+    goals_against: int,
+    **overrides: Any,
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "season": SEASON,
+        "fixture": fixture,
+        "team_id": team_id,
+        "team_code": 100 + team_id,
+        "opponent_team_id": opponent_team_id,
+        "gw": gw,
+        "kickoff_time": KICKOFFS[fixture],
+        "was_home": was_home,
+        "goals_for": goals_for,
+        "goals_against": goals_against,
+        "team_xg": 1.25,
+        "team_xgc": 0.75,
+        "team_bps": 63,
+        "defensive_contribution": 52,
     }
     row.update(overrides)
     return row
@@ -483,6 +516,24 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 expected_goals=0.25,
                 expected_assists=0.4,
                 points_under_rules_2026_27=1,
+            ),
+        ],
+        "fact_team_fixture_actual": [
+            _team_actual_row(100, 1, 2, 1, True, 2, 1),
+            _team_actual_row(100, 2, 1, 1, False, 1, 2),
+            _team_actual_row(101, 1, 3, 2, True, 0, 2, team_xg=None),
+            _team_actual_row(101, 3, 1, 2, False, 2, 0),
+            _team_actual_row(102, 2, 1, 2, True, 1, 1),
+            _team_actual_row(
+                102,
+                1,
+                2,
+                2,
+                False,
+                1,
+                1,
+                team_xgc=None,
+                defensive_contribution=None,
             ),
         ],
         "dim_optimizer_run": [
@@ -1258,6 +1309,14 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
         }
     )
     _rewrite_table(export_dir, "dim_gameweek", current_gameweeks)
+    _rewrite_table(
+        export_dir,
+        "dim_fixture",
+        [
+            {**row, "finished": row["gw"] == 2}
+            for row in _source_tables()["dim_fixture"]
+        ],
+    )
 
     models = build_dashboard_read_models(export_dir)
     assert [
@@ -1351,6 +1410,166 @@ def test_player_actual_source_table_is_required(tmp_path: Path) -> None:
     manifest_path = export_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     del manifest["tables"]["fact_player_fixture_actual"]
+    manifest_path.write_bytes(_canonical_json_bytes(manifest, indent=2))
+    with pytest.raises(DashboardJsonError, match="required table"):
+        build_dashboard_read_models(export_dir)
+
+
+def test_team_actuals_are_current_and_prior_complete_gameweeks_at_fixture_grain(
+    tmp_path: Path,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    prior_kickoff = datetime(2026, 5, 24, 14, tzinfo=UTC)
+    prior_actuals = [
+        {
+            **_team_actual_row(100, 1, 2, 1, True, 3, 2),
+            "season": PRIOR,
+            "fixture": 900,
+            "gw": 38,
+            "kickoff_time": prior_kickoff,
+        },
+        {
+            **_team_actual_row(100, 2, 1, 1, False, 2, 3),
+            "season": PRIOR,
+            "fixture": 900,
+            "gw": 38,
+            "kickoff_time": prior_kickoff,
+        },
+    ]
+    _rewrite_table(
+        export_dir,
+        "fact_team_fixture_actual",
+        [*_source_tables()["fact_team_fixture_actual"], *prior_actuals],
+    )
+    prior_teams = [
+        {
+            **row,
+            "season": PRIOR,
+        }
+        for row in _source_tables()["dim_team_season"]
+        if row["team_id"] in {1, 2}
+    ]
+    _rewrite_table(
+        export_dir,
+        "dim_team_season",
+        [*_source_tables()["dim_team_season"], *prior_teams],
+    )
+    fixture_rows = [
+        {**row, "finished": row["gw"] == 2}
+        for row in _source_tables()["dim_fixture"]
+    ]
+    fixture_rows.append(
+        {
+            "season": PRIOR,
+            "fixture": 900,
+            "gw": 38,
+            "kickoff_time": prior_kickoff,
+            "home_team_id": 1,
+            "away_team_id": 2,
+            "home_team_code": 101,
+            "away_team_code": 102,
+            "home_official_fdr": 2,
+            "away_official_fdr": 4,
+            "pulse_id": None,
+            "finished": True,
+        }
+    )
+    _rewrite_table(export_dir, "dim_fixture", fixture_rows)
+    gameweeks = [
+        {**row, "finished": row["gw"] == 2}
+        for row in _source_tables()["dim_gameweek"]
+    ]
+    gameweeks.append(
+        {
+            "season": PRIOR,
+            "gw": 38,
+            "deadline_time": None,
+            "first_kickoff": prior_kickoff,
+            "last_kickoff": prior_kickoff,
+            "fixture_count": 1,
+            "finished": True,
+        }
+    )
+    _rewrite_table(export_dir, "dim_gameweek", gameweeks)
+
+    models = build_dashboard_read_models(export_dir)
+    alpha_current = next(
+        row
+        for row in models.team_actuals
+        if row["season"] == SEASON and row["team_code"] == 101
+    )
+    assert [row["fixture"] for row in alpha_current["actuals"]] == [101, 102]
+    assert [row["opponent_short_name"] for row in alpha_current["actuals"]] == ["GAM", "BET"]
+    assert alpha_current["actuals"][0]["team_xg"] is None
+    assert alpha_current["actuals"][1]["team_xgc"] is None
+    assert alpha_current["actuals"][1]["defensive_contribution"] is None
+    assert any(
+        row["season"] == PRIOR and row["team_code"] == 101
+        for row in models.team_actuals
+    )
+    assert "actuals" not in _team(models, 101)
+
+    documents = render_read_model_files(models)
+    team_actuals_document = json.loads(documents[TEAM_ACTUALS_FILENAME])
+    assert team_actuals_document["teams"] == list(models.team_actuals)
+    generation_documents = {
+        FIXTURE_MATRIX_FILENAME: json.loads(documents[FIXTURE_MATRIX_FILENAME]),
+        TEAM_ACTUALS_FILENAME: team_actuals_document,
+    }
+    tampered = json.loads(json.dumps(generation_documents))
+    tampered[TEAM_ACTUALS_FILENAME]["teams"][0]["season"] = OLDER
+    with pytest.raises(DashboardJsonError, match="outside forecast season/immediate-prior"):
+        _validate_team_actual_generation(tampered)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("goals_for", 1.5, "goals_for is not a non-negative integer"),
+        ("team_xg", float("inf"), "team_xg is not a finite non-negative"),
+        ("kickoff_time", "2026-08-22T14:00:00", "naive kickoff timestamp"),
+    ],
+)
+def test_team_actual_document_rejects_invalid_scalars_and_kickoffs(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir, gameweeks=(1,))
+    models = build_dashboard_read_models(export_dir)
+    document = json.loads(render_read_model_files(models)[TEAM_ACTUALS_FILENAME])
+    document["teams"][0]["actuals"][0][field] = value
+    with pytest.raises(DashboardJsonError, match=message):
+        _validate_team_actual_document(document)
+
+
+def test_team_actuals_fail_closed_on_duplicate_fixture_identity(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    rows = _source_tables()["fact_team_fixture_actual"]
+    _rewrite_table(export_dir, "fact_team_fixture_actual", [*rows, dict(rows[0])])
+    with pytest.raises(DashboardJsonError, match="not unique"):
+        build_dashboard_read_models(export_dir)
+
+
+def test_team_actuals_fail_closed_when_fixture_and_club_identity_disagree(
+    tmp_path: Path,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    _mark_final(export_dir, gameweeks=(1,))
+    rows = _source_tables()["fact_team_fixture_actual"]
+    rows[0] = {**rows[0], "team_code": 102}
+    _rewrite_table(export_dir, "fact_team_fixture_actual", rows)
+    with pytest.raises(DashboardJsonError, match="disagrees with its fixture/team identity"):
+        build_dashboard_read_models(export_dir)
+
+
+def test_team_actual_source_table_is_required(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    manifest_path = export_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del manifest["tables"]["fact_team_fixture_actual"]
     manifest_path.write_bytes(_canonical_json_bytes(manifest, indent=2))
     with pytest.raises(DashboardJsonError, match="required table"):
         build_dashboard_read_models(export_dir)
@@ -1712,6 +1931,7 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
         PLAYER_ACTUALS_FILENAME,
         PLAYER_HORIZONS_FILENAME,
         PLAYERS_FILENAME,
+        TEAM_ACTUALS_FILENAME,
         "next_gw.json",
         "summary.json",
         PLAYER_FORECAST_VS_ACTUAL_FILENAME,

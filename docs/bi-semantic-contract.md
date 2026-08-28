@@ -1,11 +1,35 @@
-# BI semantic contract, version 4
+# BI semantic contract, version 5
 
 Status: **implemented and frozen development-only** (P1.1 plus the P2.3/P2.5 amendments).
 
 Version 1 remains historical. Version 2 was the additive schedule-context revision that added
 nullable directed official FDR for both sides of `dim_fixture` without changing a forecast fact or
 ease formula. Version 3 added exact team PMFs and append-only player/team monitoring outcomes.
-All three executable historical declarations remain importable.
+Version 4 added finalized current-season player observations. All four executable historical
+declarations remain importable.
+
+## Version 5 normalized team-fixture actual amendment (2026-08-28)
+
+Version 5 retains every v4 table and adds `fact_team_fixture_actual` at
+`(season, fixture, team_id)` grain. Each finalized fixture contributes two directed club-side rows
+with permanent `team_code`, season-scoped opponent identity, gameweek, kickoff, venue, and official
+goals for/against. Archive scores come directly from `mart_fact_team_match`; current-season scores
+come only from the append-only `ledger_outcome_team_fixture`. They are never reconstructed from
+player events because own goals make that reconstruction wrong.
+
+Nullable `team_xg`, `team_xgc`, summed `team_bps`, and raw `defensive_contribution` actions are
+source-row aggregates. Current-season components use deterministic latest live player-fixture rows
+at an exact finalized team-outcome grain and require every present appeared-player row used by a
+metric to be finalized and measured. That check does not independently prove that the source
+roster contains every appeared player, so these fields must not be described as externally
+reconciled match totals. The DC field sums available appeared-outfield rows and is not fantasy DC
+points. Double-gameweek legs remain separate fixture rows, and an archive/live grain overlap fails
+closed.
+
+Possession and shot counts are absent. The official FPL/archive sources do not carry them, and the
+repository's existing FBref path is only an unpopulated, operator-vendored defensive-actions CSV;
+it cannot supply team possession or shots. No reporting layer may proxy either measure from xG,
+threat, saves, or another primitive.
 
 ## Version 4 current-season actual amendment (2026-08-26)
 
@@ -257,6 +281,30 @@ club's conceded goals than his share of the minutes implies (measured exposure 0
 by minutes bin against 0.254 / 0.837 / 1.000 by minutes), so never derive on-pitch exposure from
 minutes.
 
+### `fact_team_fixture_actual` — grain `(season, fixture, team_id)`
+
+What one club actually did in one finalized fixture. Every completed match contributes two
+reciprocal rows. `team_code` is the permanent club identity; `team_id` and `opponent_team_id` remain
+season-scoped and every dimension join binds `season`. The fact carries no `run_id`.
+
+`goals_for` and `goals_against` are non-null official final scores. Archive rows source them from
+`mart_fact_team_match`; live rows source them from the immutable team-outcome ledger. Never rebuild
+those scores from player events. The fixture grain preserves every double-gameweek leg.
+
+| Nullable field | Meaning | NULL meaning |
+| --- | --- | --- |
+| `team_xg` | Source-owned sum of measured player xG rows for the club | Available source rows do not support a value |
+| `team_xgc` | Source-owned MAX of measured player xGC rows for the club | Available source rows do not support a value |
+| `team_bps` | Sum of available measured player BPS rows for the club | Available source rows do not support a value |
+| `defensive_contribution` | Sum of available appeared-outfield rows' raw DC actions | A present applicable row is unmeasured or no applicable row exists |
+
+`defensive_contribution` is a raw action total, not fantasy DC points. Current-season components
+come only from deterministic latest live player rows for an exact finalized team-outcome grain.
+Their finality/measurement gate covers the rows present in that source; it is not an independent
+roster-completeness witness. No metric is zero-filled. Possession and shots are not fields in this
+fact because no approved
+source supplies them; they must not be inferred from xG, threat, saves, or any other value.
+
 ### `fact_finalized_player_fixture_outcome` — grain `(season, fixture, code)`
 
 The immutable monitoring target sourced from `ledger_outcome_player_fixture`, carrying the
@@ -390,9 +438,10 @@ the work. Three were added, each forced by a documented invariant rather than by
 
 ## Source completeness
 
-Every current v4 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
-P1.6 supplies `fact_player_form`, and P1.6b adds `fact_team_form` (declared and sourced in the same
-change, so it is never in `NOT_YET_SOURCED`). Consequently `contract.NOT_YET_SOURCED` is empty; P1.4
-can require the complete v4 contract rather than silently emitting an apparently complete partial
-export. A pre-v3 database that has not yet created one additive outcome ledger emits that outcome
-fact empty; if the table exists, its full physical shape is validated strictly.
+Every current v5 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
+P1.6 supplies `fact_player_form`, P1.6b adds `fact_team_form`, and P2.5 adds the normalized
+`fact_team_fixture_actual` source path. Each was declared and sourced in the same change, so none is
+ever in `NOT_YET_SOURCED`. Consequently `contract.NOT_YET_SOURCED` is empty; P1.4 can require the
+complete v5 contract rather than silently emitting an apparently complete partial export. A pre-v3
+database that has not yet created one additive outcome ledger emits that outcome fact empty; if the
+table exists, its full physical shape is validated strictly.

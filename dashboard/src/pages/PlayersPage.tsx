@@ -37,6 +37,8 @@ import {
   actualGameweekRange,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
+  latestActualGameweeks,
+  latestPlayerActualDetails,
 } from "@/lib/playerActuals";
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
 import { fetchManagerTeamMembers, type ManagerTeamPreview } from "@/lib/planServer";
@@ -296,6 +298,18 @@ export function PlayersPage() {
     filters.venue === "all" &&
     filters.gwFrom === selectedRun.gw_from;
 
+  const expandedActualGameweeks = useMemo(
+    () =>
+      actualRange == null
+        ? []
+        : latestActualGameweeks(
+            selectedActualRecords,
+            actualRange.gwFrom,
+            actualRange.gwTo,
+          ),
+    [actualRange, selectedActualRecords],
+  );
+
   useEffect(() => {
     if (selectedRun == null) return;
     setActualSeason(selectedRun.season);
@@ -373,6 +387,13 @@ export function PlayersPage() {
                 actualRange.gwFrom,
                 actualRange.gwTo,
               ),
+        actualDetails:
+          actualRange == null
+            ? []
+            : latestPlayerActualDetails(
+                actualsByCode.get(player.code) ?? [],
+                expandedActualGameweeks,
+              ),
         totalXp: horizon?.xp ?? (xpValues.length ? xpValues.reduce((a, b) => a + b, 0) : null),
         horizon,
         form:
@@ -392,6 +413,7 @@ export function PlayersPage() {
     cumulativeOutcomesAvailable,
     horizonIndex,
     actualRange,
+    expandedActualGameweeks,
     actualsByCode,
     managerSquad,
   ]);
@@ -877,6 +899,7 @@ export function PlayersPage() {
           }
           formColumnProfile="players"
           showGwFromXp
+          expandedRowMode="historical"
           initialSorting={PLAYERS_TABLE_INITIAL_SORTING}
         />
       )}

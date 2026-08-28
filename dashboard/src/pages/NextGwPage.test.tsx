@@ -198,6 +198,16 @@ describe("NextGwPage", () => {
     expect(screen.queryByRole("columnheader", { name: "CS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "DC" })).not.toBeInTheDocument();
     expect(screen.getAllByTestId("chip").length).toBeGreaterThan(0);
+    // This shared table intentionally keeps its prospective fixture expansion.
+    const tableShell = screen
+      .getByRole("button", { name: "Enter Next GW suggestion players table fullscreen" })
+      .closest<HTMLElement>("[data-fullscreen-mode]");
+    expect(tableShell).not.toBeNull();
+    await userEvent.click(
+      within(tableShell!).getAllByRole("button", { name: /expand fixtures/i })[0],
+    );
+    expect(within(tableShell!).getByText("Club λ for")).toBeInTheDocument();
+    expect(within(tableShell!).getByRole("columnheader", { name: "xP" })).toBeInTheDocument();
     // captain badge marks Alpha in the table
     expect(screen.getAllByText("C").length).toBeGreaterThan(0);
     // the diff card reports overlap and never compares EV across architectures

@@ -1,7 +1,7 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
 Status: active execution plan  
-Last updated: 2026-08-27<br>
+Last updated: 2026-08-28<br>
 Target: 2026/27 GW1  
 Deadline: `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok)  
 First kickoff: `2026-08-21T19:00:00Z`
@@ -37,9 +37,9 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
   remains the standing fallback. Completion still requires the mandatory 2026-08-20 fallback pack,
   the 2026-08-21 final run, and manual confirmation of the final team in the official FPL UI.
 - **Goal 2's MVP, deep analytics, exact parallel monitoring, evidence-bound summaries, and
-  explicit prior/current-season Players actual range have completed development-only implementation
+  explicit prior/current-season player/team actual ranges have completed development-only implementation
   and automated gates; final responsive in-browser visual verification remains pending.** Semantic contract
-  version 4, dashboard schema version 7, immutable player/team outcomes, the atomic static-JSON
+  version 5, dashboard schema version 8, immutable player/team outcomes, the atomic static-JSON
   boundary, nine read-only analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
   development-only. P1.8's full Players-page
   form matrix and additive observed
@@ -70,7 +70,7 @@ series; later handoff records the new commits and full gate rather than rewritin
 - Stage E selects a legal 15-player squad and exact weekly lineup/captain, then performs a bounded
   multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed, and immutable
   platform/default, diagnostic, and custom-plan identities are separated fail-closed.
-- The BI semantic-v4/star export, fixture difficulty and player/team form/actual facts, atomic schema-v7
+- The BI semantic-v5/star export, fixture difficulty and player/team form/actual facts, atomic schema-v8
   static JSON, nine read-only analytic/decision pages, Plan Builder, and Squad Draft are implemented
   development-only. The browser reads only published JSON and never DuckDB. Player/Team analytics
   and separate Player/Team prediction-monitoring pages are current; the old
@@ -931,9 +931,10 @@ operation, and test; implementation cannot silently weaken these requirements.
 
 **Status (2026-08-26): implemented development-only; focused and full dashboard tests pass.**
 Player analytics and Team analytics use only the cumulative/forecast axis values introduced in
-dashboard schema version 4 and retained unchanged in current schema version 7. Version 7 adds only
-forecast-owned cold-start provenance for reporting eligibility; it does not alter an axis or model
-quantity. The pages do not reach around P2.3's outcome facts.
+dashboard schema version 4 and retained unchanged in current schema version 8. Version 7 added
+forecast-owned cold-start provenance for reporting eligibility; version 8 adds only normalized
+team history for Fixture Matrix drill-downs. Neither changes an analytics axis or model quantity.
+The pages do not reach around P2.3's outcome facts.
 
 - Player views: price-versus-cumulative-xP Pareto frontier; published inclusive haul-versus-downside
   frontier; ownership-versus-xP differential view; and explicitly labelled observed-form versus
@@ -1017,7 +1018,7 @@ Builder, and Squad Draft remain deterministic-only.
   quota is not assumed to license general application calls; configure a general API key/balance
   under the current provider terms.
 - Requests send only exact typed page/vintage/filter selectors. The server verifies the selected
-  schema-v7 manifest and file hashes, reconstructs the allowlisted facts from that static
+  schema-v8 manifest and file hashes, reconstructs the allowlisted facts from that static
   generation, and refuses mismatched provenance before provider/cache work. No PMFs, caller prose,
   arbitrary prompts, manager/custom-plan identifiers, squads, bank, selling values, capture data,
   credentials, or full page payloads cross the boundary.
@@ -1104,6 +1105,40 @@ Only after the ordered dashboard program above, unless an operational blocker re
   reporting-only risk screen. The discovered live/archive history-path inconsistency and any
   proposed three-appearance probability bridge remain separate forecast work; neither is silently
   folded into this dashboard change.
+
+- **Historical latest-five-GW expanded rows (implemented development-only 2026-08-28).** Players
+  expansion now reads the selected Actual season/range from normalized `player_actuals.json`, takes
+  the page-wide set of the latest five distinct selected GW labels, preserves every double-gameweek
+  fixture leg, and orders the rows newest first. It exposes only observed fixture metrics:
+  minutes/start, goals,
+  assists, xG, xA, fail-closed display xGI, clean sheets, on-pitch goals conceded, saves, raw DC
+  actions, xGC, bonus, raw BPS, and points. The shared Next GW table retains the future fixture/xP
+  drill-down; Players never substitutes it into historical detail.
+
+  BI semantic contract v5 adds `fact_team_fixture_actual` at
+  `(season, fixture, team_id)` grain with direct official GF/GA and nullable source-row xG/xGC,
+  summed BPS, and raw DC actions. Present-row finality and measurement are checked, but these
+  aggregates do not claim an independent source-roster completeness witness. Dashboard schema v8
+  adds normalized `team_actuals.json` at
+  `(season, team_code)` grain, bounded to published forecast seasons and their immediate
+  predecessors. Fixture Matrix exposes an explicit Actual season and expands every club against the
+  same page-wide set of the latest five distinct finalized gameweeks from that season, newest
+  first, retaining every DGW leg. A sparse current season is never filled from the predecessor,
+  unavailable present-row components remain NULL, and the future matrix chips remain summary
+  context rather than expanded forecast detail.
+
+  Possession and shot counts remain absent. Official FPL/archive sources do not publish them, and
+  the repository's existing FBref integration is only an unpopulated operator-vendored defensive-
+  actions CSV with no possession/shot contract. No proxy from xG, threat, saves, or another measure
+  is permitted. Adding either field later requires a separately approved, licensed, versioned
+  source and provenance contract.
+
+  Acceptance requires semantic-v5 grain/join/NULL/overlap checks, complete-GW and finalized-ledger
+  gating, schema-v8 normalized-file validation, immediate-predecessor bounds, no cross-season fill,
+  DGW/latest-five ordering tests, route-specific player detail tests, Fixture Matrix loading/error/
+  empty states, public-package inclusion, atomic BI/static republish, and responsive visual
+  verification. This reporting change does not alter a forecast, model default, frozen evaluation,
+  optimizer input, or monitoring score.
 
 - measure and contract per-GW availability semantics;
 - design future price-change and future selling-value handling;

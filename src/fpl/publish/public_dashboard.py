@@ -31,6 +31,7 @@ from fpl.publish.dashboard_json import (
     PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     SUMMARY_FILENAME,
+    TEAM_ACTUALS_FILENAME,
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
     DashboardJsonError,
     _file_row_count,
@@ -55,6 +56,7 @@ _READ_MODEL_FILENAMES: Final[tuple[str, ...]] = tuple(
             FIXTURE_MATRIX_FILENAME,
             PLAYER_HORIZONS_FILENAME,
             PLAYER_ACTUALS_FILENAME,
+            TEAM_ACTUALS_FILENAME,
             PLAYERS_FILENAME,
             SUMMARY_FILENAME,
             NEXT_GW_FILENAME,
@@ -130,6 +132,7 @@ _DOCUMENT_TOP_LEVEL_KEYS: Final[dict[str, frozenset[str]]] = {
     FIXTURE_MATRIX_FILENAME: frozenset({"schema", "json_schema_version", "teams", "schedule"}),
     PLAYERS_FILENAME: frozenset({"schema", "json_schema_version", "players"}),
     PLAYER_ACTUALS_FILENAME: frozenset({"schema", "json_schema_version", "players"}),
+    TEAM_ACTUALS_FILENAME: frozenset({"schema", "json_schema_version", "teams"}),
     PLAYER_HORIZONS_FILENAME: frozenset(
         {"schema", "json_schema_version", "semantics", "horizon_fields", "players"}
     ),
@@ -495,8 +498,8 @@ def _validate_archive(directory: Path, archive_path: Path) -> None:
         with zipfile.ZipFile(archive_path, mode="r") as archive:
             if tuple(archive.namelist()) != _ARCHIVE_FILENAMES:
                 raise PublicDashboardPackageError(
-                    "public dashboard archive must contain exactly the eight read-model "
-                    "files at its root in deterministic order"
+                    "public dashboard archive must contain exactly the declared read-model "
+                    "files and manifest at its root in deterministic order"
                 )
             for filename in _ARCHIVE_FILENAMES:
                 info = archive.getinfo(filename)

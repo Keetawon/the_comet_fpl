@@ -1,4 +1,4 @@
-"""The frozen BI semantic contract, version 4.
+"""The frozen BI semantic contract, version 5.
 
 DEV-ROADMAP P1.1 requires each published table's grain, keys, null semantics, source owner, and
 allowed joins to be settled **before** the exporter exists, so P1.2-P1.4 build against a fixed
@@ -37,7 +37,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SEMANTIC_CONTRACT_VERSION = 4
+SEMANTIC_CONTRACT_VERSION = 5
 
 #: Season-scoped identifiers. A join may use one only when ``season`` is bound in the same join.
 SEASON_SCOPED_KEYS: frozenset[str] = frozenset({"element_id", "team_id", "opponent_team_id"})
@@ -887,6 +887,93 @@ FACT_PLAYER_FIXTURE_ACTUAL = Table(
     ),
 )
 
+FACT_TEAM_FIXTURE_ACTUAL = Table(
+    name="fact_team_fixture_actual",
+    role="fact",
+    subject="What a club actually did in one finalised fixture.",
+    grain=("season", "fixture", "team_id"),
+    grain_note="Two reciprocal rows per finalised fixture, one for each club side.",
+    source_owner=(
+        "fpl.publish.export:mart_fact_team_match + mart_fact_player_fixture + "
+        "mart_fact_player_fixture_live + ledger_outcome_player_fixture + "
+        "ledger_outcome_team_fixture"
+    ),
+    columns=(
+        _key("season", "string", "Season."),
+        _key("fixture", "int", "Season-scoped finalised fixture id."),
+        _key("team_id", "int", "Season-scoped club id this actual is about."),
+        _key("team_code", "int", "Permanent club identity for this fixture."),
+        _key("opponent_team_id", "int", "Season-scoped opponent club id."),
+        _key("gw", "int", "Gameweek."),
+        _key("kickoff_time", "timestamp", "Kickoff (UTC). Event time, not knowledge time."),
+        _key("was_home", "bool", "Whether this club was the home side."),
+        _key("goals_for", "int", "Official finalised goals scored by this club."),
+        _key("goals_against", "int", "Official finalised goals scored by its opponent."),
+        _nullable(
+            "team_xg",
+            "float",
+            "unmeasured",
+            "Source-owned aggregate of measured player xG rows for the club in this fixture; "
+            "NULL where the available component rows do not support a value.",
+        ),
+        _nullable(
+            "team_xgc",
+            "float",
+            "unmeasured",
+            "Source-owned club xGC aggregate (MAX of measured player xGC rows); NULL where the "
+            "available component rows do not support a value.",
+        ),
+        _nullable(
+            "team_bps",
+            "int",
+            "unmeasured",
+            "Sum of measured player BPS rows available for this club and fixture.",
+        ),
+        _nullable(
+            "defensive_contribution",
+            "int",
+            "unmeasured",
+            "Sum of available appeared-outfield player rows' raw defensive-contribution actions. "
+            "NULL when any present applicable row is unmeasured; this is not fantasy DC points.",
+        ),
+    ),
+    joins=(
+        Join(
+            to_table="dim_fixture",
+            on=(("season", "season"), ("fixture", "fixture")),
+            cardinality="many_to_one",
+        ),
+        Join(
+            to_table="dim_team_season",
+            on=(
+                ("season", "season"),
+                ("team_id", "team_id"),
+                ("team_code", "team_code"),
+            ),
+            cardinality="many_to_one",
+        ),
+        Join(
+            to_table="dim_team_season",
+            on=(("season", "season"), ("opponent_team_id", "team_id")),
+            cardinality="many_to_one",
+        ),
+        Join(to_table="dim_team", on=(("team_code", "team_code"),), cardinality="many_to_one"),
+    ),
+    notes=(
+        "Carries no run_id. Archive scores come directly from mart_fact_team_match and current "
+        "scores come only from the append-only finalised team-outcome ledger; never reconstruct "
+        "official goals from player events because own goals make that wrong.",
+        "Current-season xG, xGC, BPS, and DC are aggregated only from the deterministic latest "
+        "live player components for an exact finalised team-outcome grain. The checks prove "
+        "measurement/finality for every player row present in that source, but do not provide "
+        "an independent witness that the source roster itself contains every appeared player.",
+        "Double-gameweek legs remain separate fixture rows. NULL means unmeasured or incomplete "
+        "evidence and is never zero-filled.",
+        "Possession and shot counts are not present in the official FPL/archive sources and are "
+        "not approximated from xG, threat, or another metric.",
+    ),
+)
+
 FACT_FINALIZED_PLAYER_FIXTURE_OUTCOME = Table(
     name="fact_finalized_player_fixture_outcome",
     role="fact",
@@ -1365,13 +1452,18 @@ FACT_PLAYER_FIXTURE_ACTUAL_V4 = FACT_PLAYER_FIXTURE_ACTUAL.model_copy(
 )
 
 SEMANTIC_CONTRACT_V4 = SemanticContract(
-    version=SEMANTIC_CONTRACT_VERSION,
+    version=4,
     tables=tuple(
         FACT_PLAYER_FIXTURE_ACTUAL_V4
         if table.name == "fact_player_fixture_actual"
         else table
         for table in SEMANTIC_CONTRACT_V3.tables
     ),
+)
+
+SEMANTIC_CONTRACT_V5 = SemanticContract(
+    version=SEMANTIC_CONTRACT_VERSION,
+    tables=(*SEMANTIC_CONTRACT_V4.tables, FACT_TEAM_FIXTURE_ACTUAL),
 )
 
 # The executable v1 declaration remains importable for readers of historical manifests. Its only
@@ -1409,6 +1501,7 @@ __all__ = [
     "SEMANTIC_CONTRACT_V2",
     "SEMANTIC_CONTRACT_V3",
     "SEMANTIC_CONTRACT_V4",
+    "SEMANTIC_CONTRACT_V5",
     "SEMANTIC_CONTRACT_VERSION",
     "Column",
     "Join",

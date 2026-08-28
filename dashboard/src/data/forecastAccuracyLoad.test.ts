@@ -24,7 +24,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("schema-v7 forecast accuracy loaders", () => {
+describe("schema-v8 forecast accuracy loaders", () => {
   it("accepts the exact player and team files without transporting PMFs", async () => {
     const loaders = await loadWith({
       "player_forecast_vs_actual.json": playerSample,
@@ -33,12 +33,12 @@ describe("schema-v7 forecast accuracy loaders", () => {
 
     await expect(loaders.loadPlayerForecastVsActual()).resolves.toMatchObject({
       schema: "fpl.dashboard-player-forecast-vs-actual",
-      json_schema_version: 7,
+      json_schema_version: 8,
       has_outcomes: true,
     });
     await expect(loaders.loadTeamForecastVsActual()).resolves.toMatchObject({
       schema: "fpl.dashboard-team-forecast-vs-actual",
-      json_schema_version: 7,
+      json_schema_version: 8,
       has_outcomes: true,
     });
     expect("distribution" in playerSample.runs[0].observations[0]).toBe(false);
@@ -51,7 +51,7 @@ describe("schema-v7 forecast accuracy loaders", () => {
       "player_forecast_vs_actual.json": stale,
     });
     await expect(loadPlayerForecastVsActual()).rejects.toThrow(
-      /expected fpl\.dashboard-player-forecast-vs-actual version 7/,
+      /expected fpl\.dashboard-player-forecast-vs-actual version 8/,
     );
   });
 

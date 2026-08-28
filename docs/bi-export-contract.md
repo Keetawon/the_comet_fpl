@@ -1,11 +1,12 @@
-# BI export contract, version 4
+# BI export contract, version 5
 
 Status: implemented by DEV-ROADMAP P1.4. This document describes the durable, read-only BI
 boundary; `src/fpl/publish/contract.py` remains the frozen semantic schema authority.
 
-Version 4 retains v2's directed schedule FDR and v3's exact team PMFs plus append-only monitoring
-outcomes. It additively lets `fact_player_fixture_actual` publish finalized current-season player
-components without treating a mutable live capture as proof of finality.
+Version 5 retains v2's directed schedule FDR, v3's exact team PMFs plus append-only monitoring
+outcomes, and v4's finalized current-season player components. It additively publishes normalized
+finalized club-side observations in `fact_team_fixture_actual` without treating mutable live player
+components as proof of team finality.
 
 ## Boundary
 
@@ -45,6 +46,7 @@ data/
     ├── fact_forecast_player_fixture.parquet
     ├── fact_forecast_team_fixture.parquet
     ├── fact_player_fixture_actual.parquet
+    ├── fact_team_fixture_actual.parquet
     ├── fact_player_form.parquet
     ├── fact_team_form.parquet
     └── fact_optimizer_plan.parquet
@@ -124,6 +126,30 @@ No source NULL is zero-filled. Nullable floats remain Parquet NULLs—not `NaN` 
 non-finite floats are refused. The P1.2 ledger does not persist fixture-level player minutes/rates,
 so those player-fixture fields are explicit typed NULLs rather than reconstructed values.
 
+### Finalized team-fixture actuals
+
+`fact_team_fixture_actual` is a run-independent directed club-side fact at
+`(season, fixture, team_id)` grain. Archive rows read official scores and available team components
+from `mart_fact_team_match`, with raw defensive-contribution actions aggregated from appeared
+outfield rows in `mart_fact_player_fixture`. Current-season rows enter only through an exact
+`ledger_outcome_team_fixture` side; the ledger supplies finality and official goals for/against.
+The exporter may attach `team_xg`, `team_xgc`, summed `team_bps`, and raw
+`defensive_contribution` only when every present appeared-player row required by that metric is
+finalized and measured. This proves row-level eligibility inside the source, not independent
+source-roster completeness; the values are source-row aggregates rather than externally
+reconciled match totals.
+
+The two clubs in a match remain reciprocal rows, and every double-gameweek leg remains a separate
+fixture. Archive and eligible-live sources use `UNION ALL`, so a duplicate grain fails the normal
+uniqueness gate rather than being silently selected. Missing or unmeasured present-row components stay NULL;
+official score zero remains the measured integer zero. `defensive_contribution` is a raw action
+sum, not fantasy DC points.
+
+Neither approved source contains possession or shot counts. The configured FBref path is only an
+operator-vendored defensive-actions CSV, is currently unpopulated, and has no possession/shot
+contract. The exporter therefore publishes neither field and never proxies them from xG, threat,
+saves, or another metric.
+
 ### Team form
 
 `fact_team_form` is a direct projection of `mart_fact_team_form` — backward-looking observed form at
@@ -182,7 +208,7 @@ characters):
 {
   "schema": "fpl.bi-semantic-export",
   "schema_version": 1,
-  "semantic_contract_version": 4,
+  "semantic_contract_version": 5,
   "created_at": "2026-08-14T00:00:00+00:00",
   "database_sha256": "…",
   "exported_run_ids": [],
@@ -205,6 +231,6 @@ characters):
 }
 ```
 
-The real `tables` object always contains all eighteen contract tables. `created_at`, exported
+The real `tables` object always contains all nineteen contract tables. `created_at`, exported
 `run_id`s, source min/max `known_at`, freshness, database hash, per-table row counts, and per-file
 hashes are all required and validated on read.

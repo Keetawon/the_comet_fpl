@@ -29,6 +29,8 @@ import type {
   TeamForecastCoverage,
   TeamForecastObservation,
   TeamForecastVsActualData,
+  TeamActualsData,
+  TeamActualsRecord,
   TeamRecord,
 } from "./types";
 import { PLAYER_HORIZON_FIELDS } from "./types";
@@ -39,8 +41,8 @@ const BASE: string = import.meta.env.VITE_DATA_BASE ?? "/data";
 // map and the browser tab parses it exactly once. A failed fetch is evicted so it can
 // be retried.
 const cache = new Map<string, Promise<unknown>>();
-const DASHBOARD_SCHEMA_VERSION = 7;
-const FORECAST_ACCURACY_SCHEMA_VERSION = 7;
+const DASHBOARD_SCHEMA_VERSION = 8;
+const FORECAST_ACCURACY_SCHEMA_VERSION = 8;
 const HORIZON_VALUE_DECIMAL_PLACES = 6;
 const PROBABILITY_TOLERANCE = 10 ** -HORIZON_VALUE_DECIMAL_PLACES;
 const PLAN_KINDS = new Set<PlanKind>([
@@ -73,7 +75,7 @@ function readModelObject(
   schema: string,
 ): Record<string, unknown> {
   if (!payload || typeof payload !== "object") {
-    throw new Error(`invalid ${filename}: expected a schema-v7 object`);
+    throw new Error(`invalid ${filename}: expected a schema-v8 object`);
   }
   const candidate = payload as Record<string, unknown>;
   if (
@@ -264,6 +266,92 @@ export async function loadPlayerActuals(): Promise<PlayerActualsData> {
   };
 }
 
+const TEAM_ACTUAL_KEYS = [
+  "gw",
+  "fixture",
+  "kickoff_time",
+  "opponent_team_code",
+  "opponent_short_name",
+  "was_home",
+  "goals_for",
+  "goals_against",
+  "team_xg",
+  "team_xgc",
+  "team_bps",
+  "defensive_contribution",
+] as const;
+
+/** Load normalized finalized club observations; no forecast primitive is accepted here. */
+export async function loadTeamActuals(): Promise<TeamActualsData> {
+  const payload = await fetchJson<unknown>("team_actuals.json");
+  const candidate = readModelObject(
+    payload,
+    "team_actuals.json",
+    "fpl.dashboard-team-actuals",
+  );
+  if (!Array.isArray(candidate.teams)) {
+    throw new Error("invalid team_actuals.json: teams must be an array");
+  }
+  const identities = new Set<string>();
+  let previousIdentity = "";
+  const teams = candidate.teams.map((value, teamIndex): TeamActualsRecord => {
+    const subject = `team_actuals.json.teams[${teamIndex}]`;
+    const record = strictObject(value, ["season", "team_code", "actuals"], subject);
+    const season = stringValue(record.season, `${subject}.season`);
+    const teamCode = integerValue(record.team_code, `${subject}.team_code`, 1);
+    if (!Array.isArray(record.actuals) || !record.actuals.length) {
+      throw new Error(`invalid ${subject}.actuals: expected a non-empty array`);
+    }
+    const identity = `${season}/${String(teamCode).padStart(12, "0")}`;
+    if (identities.has(identity) || (previousIdentity && identity < previousIdentity)) {
+      throw new Error("invalid team_actuals.json: identities are duplicated or unordered");
+    }
+    identities.add(identity);
+    previousIdentity = identity;
+    const fixtures = new Set<number>();
+    let previousOrder = "";
+    const actuals = record.actuals.map((actual, actualIndex) => {
+      const actualSubject = `${subject}.actuals[${actualIndex}]`;
+      const row = strictObject(actual, TEAM_ACTUAL_KEYS, actualSubject);
+      const gw = integerValue(row.gw, `${actualSubject}.gw`, 1);
+      const fixture = integerValue(row.fixture, `${actualSubject}.fixture`, 1);
+      const kickoff = stringValue(row.kickoff_time, `${actualSubject}.kickoff_time`);
+      integerValue(row.opponent_team_code, `${actualSubject}.opponent_team_code`, 1);
+      stringValue(row.opponent_short_name, `${actualSubject}.opponent_short_name`);
+      if (typeof row.was_home !== "boolean") {
+        throw new Error(`invalid ${actualSubject}.was_home`);
+      }
+      integerValue(row.goals_for, `${actualSubject}.goals_for`);
+      integerValue(row.goals_against, `${actualSubject}.goals_against`);
+      for (const key of ["team_xg", "team_xgc"] as const) {
+        const metric = nullableFinite(row[key], `${actualSubject}.${key}`);
+        if (metric !== null && metric < 0) {
+          throw new Error(`invalid ${actualSubject}.${key}: expected a non-negative number`);
+        }
+      }
+      for (const key of ["team_bps", "defensive_contribution"] as const) {
+        if (row[key] !== null) wholeValue(row[key], `${actualSubject}.${key}`);
+      }
+      if (fixtures.has(fixture)) {
+        throw new Error(`invalid ${subject}: duplicate fixture ${fixture}`);
+      }
+      fixtures.add(fixture);
+      const order = `${String(gw).padStart(3, "0")}/${kickoff}/${String(fixture).padStart(8, "0")}`;
+      if (previousOrder && order < previousOrder) {
+        throw new Error(`invalid ${subject}: actuals are not ordered`);
+      }
+      previousOrder = order;
+      return row as unknown as TeamActualsRecord["actuals"][number];
+    });
+    return { season, team_code: teamCode, actuals };
+  });
+  return {
+    schema: "fpl.dashboard-team-actuals",
+    json_schema_version: DASHBOARD_SCHEMA_VERSION,
+    teams,
+  };
+}
+
 function sameArray<T extends string | number>(value: unknown, expected: readonly T[]): boolean {
   return (
     Array.isArray(value) &&
@@ -281,7 +369,7 @@ function hasExactKeys(value: object, expected: readonly string[]): boolean {
 export async function loadPlayerHorizons(): Promise<PlayerHorizonsData> {
   const payload = await fetchJson<unknown>("player_horizons.json");
   if (!payload || typeof payload !== "object") {
-    throw new Error("invalid player_horizons.json: expected a schema-v7 object");
+    throw new Error("invalid player_horizons.json: expected a schema-v8 object");
   }
   const candidate = payload as Record<string, unknown>;
   const semantics = candidate.semantics as Record<string, unknown> | undefined;
@@ -1141,7 +1229,7 @@ export async function loadTeamForecastVsActual(): Promise<TeamForecastVsActualDa
   return { ...envelope, runs, manifest } as unknown as TeamForecastVsActualData;
 }
 
-/** Temporary source-compatibility alias; it loads the explicit schema-v7 player file. */
+/** Temporary source-compatibility alias; it loads the explicit schema-v8 player file. */
 export const loadForecastVsActual = loadPlayerForecastVsActual;
 
 export async function loadOptimizerAudit(): Promise<OptimizerAuditData> {

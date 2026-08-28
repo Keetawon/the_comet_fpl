@@ -2,8 +2,8 @@
 // vintage, one COLUMN per upcoming gameweek (the pivot), default-sorted by average ease
 // (easiest schedule first). Cells colour on the selected source -- opponent strength by
 // default, so a strong club's row is no longer uniformly green: the colour follows the
-// OPPONENT, not the row club. Expanding a row exposes every primitive (raw lambdas,
-// clean-sheet probability, all ease indices, official FDR) ordered by kickoff time.
+// OPPONENT, not the row club. Expanding a row shows finalized results from the latest
+// five completed gameweeks in one explicitly selected Actual season.
 
 import { useEffect, useMemo, useState } from "react";
 import { flexRender } from "@tanstack/react-table";
@@ -41,7 +41,7 @@ import { FixtureChip } from "@/components/FixtureTicker";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import { TeamBadge } from "@/components/Avatars";
 import { VintageSelect } from "@/components/VintageSelect";
-import { loadFixtureMatrix, loadNextGw } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadTeamActuals } from "@/data/load";
 import type {
   DashboardManifest,
   FixtureScheduleOverlay,
@@ -49,6 +49,8 @@ import type {
   ScheduleFixture,
   TeamFixture,
   TeamFormWindow,
+  TeamActualFixture,
+  TeamActualsRecord,
   TeamRecord,
   WindowLabel,
 } from "@/data/types";
@@ -77,6 +79,10 @@ import {
   insightFact,
   publishedInsightProvenance,
 } from "@/lib/insights";
+import {
+  latestTeamActualGameweeks,
+  teamActualDetailsForGameweeks,
+} from "@/lib/teamActuals";
 
 type PageState =
   | { status: "loading" }
@@ -84,6 +90,7 @@ type PageState =
   | {
       status: "ready";
       teams: TeamRecord[];
+      teamActuals: TeamActualsRecord[];
       schedule: FixtureScheduleOverlay;
       plans: NextGwPlan[];
       manifest: DashboardManifest | null;
@@ -101,18 +108,20 @@ interface TeamRow {
   form: TeamFormWindow | null;
   formLabel: string | null;
   avgMetric: number | null;
+  actualDetails: TeamActualFixture[];
 }
 
 type FixtureHorizon = 5 | 10 | 15;
 
-type DetailFixture =
-  | { status: "modelled"; fixture: TeamFixture }
-  | { status: "schedule_only"; fixture: ScheduleFixture };
+function previousSeason(season: string): string | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(season);
+  if (match == null) return null;
+  const start = Number(match[1]);
+  return `${start - 1}-${String(start).slice(-2)}`;
+}
 
 const fmt = (value: number | null | undefined, digits = 1) =>
   value == null ? "–" : value.toFixed(digits);
-const fmtProxy = (value: number | null | undefined, digits = 1) =>
-  value == null ? "–" : `~${value.toFixed(digits)}`;
 
 const VIEW_LABEL: Record<ViewMode, string> = {
   overall: "overall ease",
@@ -284,11 +293,12 @@ export function FixtureMatrixPage() {
   const [filters, setFilters] = useState<FilterState | null>(null);
   const [sorting, setSorting] = useState<SortingState>([{ id: "avgMetric", desc: true }]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
+  const [actualSeason, setActualSeason] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadFixtureMatrix(), loadNextGw()])
-      .then(([fixtureData, nextGw]) => {
+    Promise.all([loadFixtureMatrix(), loadNextGw(), loadTeamActuals()])
+      .then(([fixtureData, nextGw, teamActuals]) => {
         if (cancelled) return;
         const seen = new Map<string, { run_id: string; season: string; gw_from: number; gw_to: number }>();
         for (const t of fixtureData.teams) {
@@ -320,6 +330,7 @@ export function FixtureMatrixPage() {
         setState({
           status: "ready",
           teams: fixtureData.teams,
+          teamActuals: teamActuals.teams,
           schedule: fixtureData.schedule,
           plans: nextGw.plans,
           manifest: fixtureData.manifest,
@@ -330,6 +341,7 @@ export function FixtureMatrixPage() {
           defaultRunId: defaultRun ?? first?.run_id ?? "",
         });
         setRunId(defaultRun ?? first?.run_id ?? null);
+        setActualSeason(first?.season ?? null);
         setFilters({ view: "overall", venue: "all", gwFrom, gwTo });
       })
       .catch((error: unknown) => {
@@ -358,6 +370,46 @@ export function FixtureMatrixPage() {
       season: runTeams[0]?.season ?? null,
     };
   }, [runTeams]);
+
+  const actualSeasonOptions = useMemo(() => {
+    if (state.status !== "ready" || runBounds.season == null) return [];
+    const previous = previousSeason(runBounds.season);
+    const allowed = new Set([
+      runBounds.season,
+      ...(previous == null ? [] : [previous]),
+    ]);
+    return [
+      ...new Set([
+        runBounds.season,
+        ...state.teamActuals
+          .filter((team) => allowed.has(team.season))
+          .map((team) => team.season),
+      ]),
+    ].sort((left, right) => right.localeCompare(left));
+  }, [state, runBounds.season]);
+
+  const actualSeasonTeams = useMemo(
+    () =>
+      state.status === "ready" && actualSeason != null
+        ? state.teamActuals.filter((team) => team.season === actualSeason)
+        : [],
+    [state, actualSeason],
+  );
+
+  const actualGameweeks = useMemo(
+    () => latestTeamActualGameweeks(actualSeasonTeams),
+    [actualSeasonTeams],
+  );
+
+  const actualByTeamCode = useMemo(
+    () => new Map(actualSeasonTeams.map((team) => [team.team_code, team.actuals])),
+    [actualSeasonTeams],
+  );
+
+  useEffect(() => {
+    setActualSeason(runBounds.season);
+    setExpanded({});
+  }, [runBounds.season]);
 
   const scheduleTeams = useMemo(() => {
     if (state.status !== "ready" || runBounds.season == null) return [];
@@ -441,9 +493,21 @@ export function FixtureMatrixPage() {
         form: form ? form.windows[formWindow] : null,
         formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
         avgMetric: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null,
+        actualDetails: teamActualDetailsForGameweeks(
+          actualByTeamCode.get(team.team_code) ?? [],
+          actualGameweeks,
+        ),
       };
     });
-  }, [runTeams, filters, formWindow, scheduleByTeam, runBounds.to]);
+  }, [
+    runTeams,
+    filters,
+    formWindow,
+    scheduleByTeam,
+    runBounds.to,
+    actualByTeamCode,
+    actualGameweeks,
+  ]);
 
   const columns = useMemo<LegacyColumnDef<TeamRow>[]>(
     () => [
@@ -455,7 +519,7 @@ export function FixtureMatrixPage() {
             variant="ghost"
             size="icon"
             className="size-6"
-            aria-label={row.getIsExpanded() ? "Collapse fixtures" : "Expand fixtures"}
+            aria-label={row.getIsExpanded() ? "Collapse recent results" : "Expand recent results"}
             onClick={row.getToggleExpandedHandler()}
           >
             {row.getIsExpanded() ? (
@@ -686,7 +750,37 @@ export function FixtureMatrixPage() {
               </SelectContent>
             </Select>
           </div>
+          {actualSeasonOptions.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              Actual season
+              <Select
+                value={actualSeason ?? undefined}
+                onValueChange={(value) => {
+                  setActualSeason(value);
+                  setExpanded({});
+                }}
+              >
+                <SelectTrigger size="sm" className="w-28" aria-label="Actual season">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {actualSeasonOptions.map((season) => (
+                    <SelectItem key={season} value={season}>
+                      {season}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Expanded rows show finalized results from the latest five completed gameweeks in the
+          selected Actual season. Double-gameweek legs stay separate; an early season is never
+          backfilled with the previous season. xG, xGC, BPS, and DC are source-row aggregates;
+          unavailable evidence is shown as –. Possession and shots are unavailable in the approved
+          published sources, so no proxy is shown.
+        </p>
       </FilterPanel>
 
       <div className="rounded-lg border bg-card p-2">
@@ -808,118 +902,71 @@ export function FixtureMatrixPage() {
                 </TableRow>
               );
               if (!row.getIsExpanded()) return [cells];
-              const byKickoff: DetailFixture[] = [
-                ...row.original.filtered.map(
-                  (fixture): DetailFixture => ({ status: "modelled", fixture }),
-                ),
-                ...row.original.scheduleOnly.map(
-                  (fixture): DetailFixture => ({ status: "schedule_only", fixture }),
-                ),
-              ].sort(
-                (a, b) =>
-                  (a.fixture.kickoff_time ?? "9999").localeCompare(
-                    b.fixture.kickoff_time ?? "9999",
-                  ) ||
-                  a.fixture.gw - b.fixture.gw ||
-                  a.fixture.fixture - b.fixture.fixture,
-              );
               return [
                 cells,
                 <TableRow key={`${row.id}-detail`}>
                   <TableCell colSpan={row.getVisibleCells().length} className="bg-muted/40 p-3">
-                    <div className="max-w-3xl space-y-1">
+                    <div
+                      className="max-w-3xl space-y-1"
+                      data-testid={`team-actual-details-${row.original.team.team_code}`}
+                    >
                       <p className="text-xs font-medium">
-                        {row.original.team.team_name} — selected fixtures by kickoff. Model
-                        primitives end at GW{runBounds.to}; later rows are schedule only, with
-                        current FDR and ~-prefixed selected-vintage display proxies.
+                        {row.original.team.team_name} — recent results · {actualSeason ?? "no Actual season"}
+                        {actualGameweeks.length > 0
+                          ? ` · shared window ${actualGameweeks.map((gw) => `GW${gw}`).join(", ")}`
+                          : ""}
                       </p>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="h-7 px-2 text-[11px]">Kickoff (UTC)</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">GW</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">Opponent</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">Venue</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">Status</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">λ for</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">λ against</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">CS %</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">Atk ease</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">Def ease</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">Ovr ease</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">Opp strength proxy</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">FDR</TableHead>
-                            <TableHead className="h-7 px-2 text-[11px]">Stage A league avg</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {byKickoff.map((detail) => {
-                            const f = detail.fixture;
-                            const model = detail.status === "modelled" ? detail.fixture : null;
-                            const proxy =
-                              detail.status === "schedule_only"
-                                ? scheduleEaseProxy(
-                                    strengthOf(row.original.team.team_code),
-                                    strengthOf(f.opponent_team_code),
-                                  )
-                                : null;
-                            return (
-                            <TableRow key={`${detail.status}-${f.fixture}`}>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {f.kickoff_time ? f.kickoff_time.replace("T", " ").slice(0, 16) : "–"}
-                              </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{f.gw}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px]">{f.opponent_short_name}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px]">{f.was_home == null ? "–" : f.was_home ? "H" : "A"}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px]">
-                                {detail.status === "modelled" ? "Modelled" : "Schedule only"}
-                              </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.lambda_for, 2)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">{fmt(model?.lambda_against, 2)}</TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {model
-                                  ? fmt(
-                                      model.probability_clean_sheet == null
-                                        ? null
-                                        : model.probability_clean_sheet * 100,
-                                      1,
-                                    )
-                                  : fmtProxy(
-                                      proxy?.probabilityCleanSheet == null
-                                        ? null
-                                        : proxy.probabilityCleanSheet * 100,
-                                      1,
-                                    )}
-                              </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {model
-                                  ? fmt(model.attack_ease_index)
-                                  : fmtProxy(proxy?.attackEase)}
-                              </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {model
-                                  ? fmt(model.defence_ease_index)
-                                  : fmtProxy(proxy?.defenceEase)}
-                              </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {model
-                                  ? fmt(model.overall_ease_index)
-                                  : fmtProxy(proxy?.overallEase)}
-                              </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {fmt(opponentIndexOf(f.opponent_team_code), 0)}
-                              </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                {fmt(model ? model.official_fdr : f.official_fdr, 0)}
-                              </TableCell>
-                              <TableCell className="px-2 py-1 text-[11px]">
-                                {model ? (model.stage_a_league_average_team ? "yes" : "no") : "–"}
-                              </TableCell>
+                      {row.original.actualDetails.length === 0 ? (
+                        <p className="py-2 text-xs text-muted-foreground">
+                          No finalized results are available for this club in the selected Actual
+                          season and shared five-gameweek window.
+                        </p>
+                      ) : (
+                        <Table aria-label={`${row.original.team.team_name} recent results`}>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="h-7 px-2 text-[11px]">GW / date</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">Opponent</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">GF</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">GA</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">xG</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">xGC</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">BPS sum</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">DC sum</TableHead>
                             </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {row.original.actualDetails.map((actual) => (
+                              <TableRow key={actual.fixture} data-actual-fixture={actual.fixture}>
+                                <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                  GW{actual.gw} · {actual.kickoff_time.slice(0, 10)}
+                                </TableCell>
+                                <TableCell className="px-2 py-1 text-[11px]">
+                                  {actual.opponent_short_name} ({actual.was_home ? "H" : "A"})
+                                </TableCell>
+                                <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                  {actual.goals_for}
+                                </TableCell>
+                                <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                  {actual.goals_against}
+                                </TableCell>
+                                <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                  {fmt(actual.team_xg, 2)}
+                                </TableCell>
+                                <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                  {fmt(actual.team_xgc, 2)}
+                                </TableCell>
+                                <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                  {fmt(actual.team_bps, 0)}
+                                </TableCell>
+                                <TableCell className="px-2 py-1 text-[11px] tabular-nums">
+                                  {fmt(actual.defensive_contribution, 0)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>,

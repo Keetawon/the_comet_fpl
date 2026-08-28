@@ -34,7 +34,7 @@ import pyarrow as pa  # type: ignore[import-untyped]
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 from fpl.artifacts.optimizer_plan import OptimizerPlanArtifact, read_optimizer_artifact
-from fpl.publish.contract import SEMANTIC_CONTRACT_V4, Column, Table
+from fpl.publish.contract import SEMANTIC_CONTRACT_V5, Column, Table
 from fpl.storage.db import connect, table_columns, table_exists
 
 BI_EXPORT_SCHEMA: Final[str] = "fpl.bi-semantic-export"
@@ -48,7 +48,7 @@ _MIN_EASE_INDEX_ROWS: Final[int] = 2
 # declaration retroactively would make historical exports unusable and misrepresent missing data.
 # Version 3 therefore enforces physical non-nullability only for its newly guaranteed fields; grain
 # columns remain enforced for every contract table below.
-_V3_GUARANTEED_NONNULL_COLUMNS: Final[dict[str, frozenset[str]]] = {
+_GUARANTEED_NONNULL_COLUMNS: Final[dict[str, frozenset[str]]] = {
     "fact_forecast_team_fixture": frozenset({"goals_for_distribution"}),
     "fact_finalized_player_fixture_outcome": frozenset(
         {"season", "fixture", "code", "gw", "attached_at"}
@@ -65,6 +65,20 @@ _V3_GUARANTEED_NONNULL_COLUMNS: Final[dict[str, frozenset[str]]] = {
             "goals_for",
             "goals_against",
             "attached_at",
+        }
+    ),
+    "fact_team_fixture_actual": frozenset(
+        {
+            "season",
+            "fixture",
+            "team_id",
+            "team_code",
+            "opponent_team_id",
+            "gw",
+            "kickoff_time",
+            "was_home",
+            "goals_for",
+            "goals_against",
         }
     ),
 }
@@ -246,7 +260,22 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "known_at",
         "capture_id",
     ),
-    "mart_fact_team_match": ("season", "fixture", "team_id", "fdr"),
+    "mart_fact_team_match": (
+        "season",
+        "gw",
+        "fixture",
+        "kickoff_time",
+        "team_id",
+        "opponent_team_id",
+        "was_home",
+        "goals_for",
+        "goals_against",
+        "team_xg",
+        "team_xgc",
+        "team_bps",
+        "rest_days",
+        "fdr",
+    ),
     "mart_fact_team_form": (
         "season",
         "gw",
@@ -731,6 +760,131 @@ def _source_queries(
               ON team.season = live.season
              AND team.team_id = live.team_id
         """
+    archive_team_actual = """
+        WITH team_dc AS (
+            SELECT season, fixture, team_id,
+                   CASE
+                       WHEN count(*) FILTER (
+                                WHERE position <> 'GK' AND minutes >= 1
+                            ) > 0
+                        AND count(defensive_contribution) FILTER (
+                                WHERE position <> 'GK' AND minutes >= 1
+                            ) = count(*) FILTER (
+                                WHERE position <> 'GK' AND minutes >= 1
+                            )
+                       THEN sum(defensive_contribution) FILTER (
+                                WHERE position <> 'GK' AND minutes >= 1
+                            )
+                   END AS defensive_contribution
+            FROM mart_fact_player_fixture
+            GROUP BY season, fixture, team_id
+        )
+        SELECT actual.season, actual.fixture, actual.team_id, team.team_code,
+               actual.opponent_team_id, actual.gw, actual.kickoff_time, actual.was_home,
+               actual.goals_for, actual.goals_against, actual.team_xg, actual.team_xgc,
+               actual.team_bps, team_dc.defensive_contribution
+        FROM mart_fact_team_match AS actual
+        LEFT JOIN mart_dim_team AS team
+          ON team.season = actual.season
+         AND team.team_id = actual.team_id
+        LEFT JOIN team_dc
+          ON team_dc.season = actual.season
+         AND team_dc.fixture = actual.fixture
+         AND team_dc.team_id = actual.team_id
+    """
+    team_actual = archive_team_actual
+    if team_outcomes_present:
+        live_team_components = """
+            SELECT CAST(NULL AS VARCHAR) AS season,
+                   CAST(NULL AS INTEGER) AS fixture,
+                   CAST(NULL AS INTEGER) AS team_id,
+                   CAST(NULL AS DOUBLE) AS team_xg,
+                   CAST(NULL AS DOUBLE) AS team_xgc,
+                   CAST(NULL AS INTEGER) AS team_bps,
+                   CAST(NULL AS INTEGER) AS defensive_contribution
+            WHERE FALSE
+        """
+        if player_outcomes_present:
+            live_team_components = """
+                WITH latest AS (
+                    SELECT * EXCLUDE (known_at, capture_id)
+                    FROM mart_fact_player_fixture_live
+                    QUALIFY row_number() OVER (
+                        PARTITION BY season, fixture, code
+                        ORDER BY known_at DESC, capture_id DESC
+                    ) = 1
+                ),
+                eligible AS (
+                    SELECT live.*, outcome.code AS finalised_code
+                    FROM latest AS live
+                    LEFT JOIN ledger_outcome_player_fixture AS outcome
+                      ON outcome.season = live.season
+                     AND outcome.fixture = live.fixture
+                     AND outcome.code = live.code
+                )
+                SELECT season, fixture, team_id,
+                       CASE
+                           WHEN count(*) FILTER (WHERE minutes >= 1) > 0
+                            AND count(finalised_code) FILTER (WHERE minutes >= 1)
+                                = count(*) FILTER (WHERE minutes >= 1)
+                            AND count(expected_goals) FILTER (WHERE minutes >= 1)
+                                = count(*) FILTER (WHERE minutes >= 1)
+                           THEN sum(expected_goals) FILTER (WHERE minutes >= 1)
+                       END AS team_xg,
+                       CASE
+                           WHEN count(*) FILTER (WHERE minutes >= 1) > 0
+                            AND count(finalised_code) FILTER (WHERE minutes >= 1)
+                                = count(*) FILTER (WHERE minutes >= 1)
+                            AND count(expected_goals_conceded) FILTER (WHERE minutes >= 1)
+                                = count(*) FILTER (WHERE minutes >= 1)
+                           THEN max(expected_goals_conceded) FILTER (WHERE minutes >= 1)
+                       END AS team_xgc,
+                       CASE
+                           WHEN count(*) FILTER (WHERE minutes >= 1) > 0
+                            AND count(finalised_code) FILTER (WHERE minutes >= 1)
+                                = count(*) FILTER (WHERE minutes >= 1)
+                            AND count(bps) FILTER (WHERE minutes >= 1)
+                                = count(*) FILTER (WHERE minutes >= 1)
+                           THEN sum(bps) FILTER (WHERE minutes >= 1)
+                       END AS team_bps,
+                       CASE
+                           WHEN count(*) FILTER (
+                                    WHERE position <> 'GK' AND minutes >= 1
+                                ) > 0
+                            AND count(finalised_code) FILTER (WHERE minutes >= 1)
+                                = count(*) FILTER (WHERE minutes >= 1)
+                            AND count(defensive_contribution) FILTER (
+                                    WHERE position <> 'GK' AND minutes >= 1
+                                ) = count(*) FILTER (
+                                    WHERE position <> 'GK' AND minutes >= 1
+                                )
+                           THEN sum(defensive_contribution) FILTER (
+                                    WHERE position <> 'GK' AND minutes >= 1
+                                )
+                       END AS defensive_contribution
+                FROM eligible
+                GROUP BY season, fixture, team_id
+            """
+        # UNION ALL is deliberate. If an archive row overlaps a current finalised row, the
+        # semantic grain validator rejects the export rather than silently choosing a source.
+        team_actual = f"""
+            {archive_team_actual}
+            UNION ALL
+            SELECT outcome.season, outcome.fixture, outcome.team_id,
+                   coalesce(outcome.team_code, team.team_code) AS team_code,
+                   outcome.opponent_team_id, outcome.gw, outcome.kickoff_time,
+                   outcome.was_home, outcome.goals_for, outcome.goals_against,
+                   components.team_xg, components.team_xgc, components.team_bps,
+                   components.defensive_contribution
+            FROM ledger_outcome_team_fixture AS outcome
+            LEFT JOIN ({_LIVE_TEAM_LATEST}) AS team
+              ON team.season = outcome.season
+             AND team.team_id = outcome.team_id
+            LEFT JOIN ({live_team_components}) AS components
+              ON components.season = outcome.season
+             AND components.fixture = outcome.fixture
+             AND components.team_id = outcome.team_id
+        """
     queries: dict[str, str] = {
         "dim_player": f"""
             WITH unified AS (
@@ -870,6 +1024,7 @@ def _source_queries(
             GROUP BY season, gw
         """,
         "fact_player_fixture_actual": player_actual,
+        "fact_team_fixture_actual": team_actual,
         "fact_player_form": """
             SELECT season, gw, code, "window", rostered_fixtures, appearances, starts,
                    did_not_play, minutes, goals_scored, assists, bonus, bps,
@@ -889,7 +1044,7 @@ def _source_queries(
     }
     if not ledger_present:
         for table_name in _LEDGER_PUBLISHED_TABLE_NAMES:
-            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V4.table(table_name))
+            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V5.table(table_name))
         return queries
 
     queries.update(
@@ -1018,11 +1173,11 @@ def _source_queries(
     )
     if not player_outcomes_present:
         queries["fact_finalized_player_fixture_outcome"] = _empty_source_sql(
-            SEMANTIC_CONTRACT_V4.table("fact_finalized_player_fixture_outcome")
+            SEMANTIC_CONTRACT_V5.table("fact_finalized_player_fixture_outcome")
         )
     if not team_outcomes_present:
         queries["fact_finalized_team_fixture_outcome"] = _empty_source_sql(
-            SEMANTIC_CONTRACT_V4.table("fact_finalized_team_fixture_outcome")
+            SEMANTIC_CONTRACT_V5.table("fact_finalized_team_fixture_outcome")
         )
     return queries
 
@@ -1074,11 +1229,11 @@ def _validate_table_frame(
                         f"{table.name}.{column.name}: non-finite float cannot cross the BI boundary"
                     )
         if (
-            column.name in _V3_GUARANTEED_NONNULL_COLUMNS.get(table.name, frozenset())
+            column.name in _GUARANTEED_NONNULL_COLUMNS.get(table.name, frozenset())
             and frame.column(column.name).null_count
         ):
             raise BiExportValidationError(
-                f"{table.name}.{column.name}: guaranteed v3 field contains NULL"
+                f"{table.name}.{column.name}: guaranteed field contains NULL"
             )
 
     if expected_null_counts is not None:
@@ -1101,14 +1256,74 @@ def _validate_table_frame(
         )
 
 
+def _validate_team_actual_fixture_consistency(con: duckdb.DuckDBPyConnection) -> None:
+    """Bind each observed club side to one finalized schedule row and its reciprocal side."""
+    violation = con.execute(
+        """
+        WITH checked AS (
+            SELECT actual.season, actual.fixture,
+                   count(*) AS side_count,
+                   count(*) FILTER (WHERE actual.was_home) AS home_count,
+                   count(*) FILTER (WHERE NOT actual.was_home) AS away_count,
+                   bool_and(
+                       fixture.finished IS TRUE
+                       AND actual.gw = fixture.gw
+                       AND actual.kickoff_time = fixture.kickoff_time
+                       AND (
+                           (
+                               actual.was_home
+                               AND actual.team_id = fixture.home_team_id
+                               AND actual.team_code = fixture.home_team_code
+                               AND actual.opponent_team_id = fixture.away_team_id
+                           )
+                           OR (
+                               NOT actual.was_home
+                               AND actual.team_id = fixture.away_team_id
+                               AND actual.team_code = fixture.away_team_code
+                               AND actual.opponent_team_id = fixture.home_team_id
+                           )
+                       )
+                   ) AS identity_matches_fixture,
+                   max(actual.goals_for) FILTER (WHERE actual.was_home) AS home_goals_for,
+                   max(actual.goals_against) FILTER (WHERE actual.was_home) AS home_goals_against,
+                   max(actual.goals_for) FILTER (WHERE NOT actual.was_home) AS away_goals_for,
+                   max(actual.goals_against) FILTER (
+                       WHERE NOT actual.was_home
+                   ) AS away_goals_against
+            FROM fact_team_fixture_actual AS actual
+            LEFT JOIN dim_fixture AS fixture
+              ON fixture.season = actual.season
+             AND fixture.fixture = actual.fixture
+            GROUP BY actual.season, actual.fixture
+        )
+        SELECT season, fixture
+        FROM checked
+        WHERE side_count <> 2
+           OR home_count <> 1
+           OR away_count <> 1
+           OR identity_matches_fixture IS NOT TRUE
+           OR home_goals_for IS DISTINCT FROM away_goals_against
+           OR away_goals_for IS DISTINCT FROM home_goals_against
+        ORDER BY season, fixture
+        LIMIT 1
+        """
+    ).fetchone()
+    if violation is not None:
+        raise BiExportValidationError(
+            "fact_team_fixture_actual: fixture identity/reciprocity violation at "
+            f"(season, fixture)={violation}; expected exactly one finalized home side and one "
+            "finalized away side matching dim_fixture with reciprocal official scores"
+        )
+
+
 def _validate_referential_integrity(tables: Mapping[str, pa.Table]) -> None:
     con = duckdb.connect(":memory:")
     try:
-        for table in SEMANTIC_CONTRACT_V4.tables:
+        for table in SEMANTIC_CONTRACT_V5.tables:
             con.register(table.name, tables[table.name])
-        for child in SEMANTIC_CONTRACT_V4.tables:
+        for child in SEMANTIC_CONTRACT_V5.tables:
             for join in child.joins:
-                parent = SEMANTIC_CONTRACT_V4.table(join.to_table)
+                parent = SEMANTIC_CONTRACT_V5.table(join.to_table)
                 on = " AND ".join(
                     f"child.{_quote_identifier(local)} = parent.{_quote_identifier(remote)}"
                     for local, remote in join.on
@@ -1132,6 +1347,7 @@ def _validate_referential_integrity(tables: Mapping[str, pa.Table]) -> None:
                         f"{child.name}: referential-integrity violation joining {parent.name} "
                         f"on {join.on}; season-scoped ids must resolve within their season"
                     )
+        _validate_team_actual_fixture_consistency(con)
     finally:
         con.close()
 
@@ -1452,7 +1668,7 @@ def _manifest(
     payload: dict[str, Any] = {
         "schema": BI_EXPORT_SCHEMA,
         "schema_version": BI_EXPORT_SCHEMA_VERSION,
-        "semantic_contract_version": SEMANTIC_CONTRACT_V4.version,
+        "semantic_contract_version": SEMANTIC_CONTRACT_V5.version,
         "created_at": _isoformat(created_at),
         "database_sha256": database_sha256,
         "exported_run_ids": list(exported_run_ids),
@@ -1526,8 +1742,8 @@ def _assert_manifest_shape(manifest: Mapping[str, Any]) -> None:
         or manifest["schema_version"] != BI_EXPORT_SCHEMA_VERSION
     ):
         raise BiExportValidationError("manifest export schema/version does not match this exporter")
-    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V4.version:
-        raise BiExportValidationError("manifest semantic contract version does not match v4")
+    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V5.version:
+        raise BiExportValidationError("manifest semantic contract version does not match v5")
     _manifest_timestamp(manifest["created_at"], "created_at")
     if not _is_sha256(manifest["database_sha256"]):
         raise BiExportValidationError("manifest database_sha256 must be a SHA-256 string")
@@ -1591,14 +1807,14 @@ def _validate_export_directory(
     table_metadata = manifest["tables"]
     if not isinstance(table_metadata, dict):
         raise BiExportValidationError("manifest tables must be an object")
-    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V4.tables}
+    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V5.tables}
     if set(table_metadata) != expected_table_names:
         raise BiExportValidationError(
             "manifest does not enumerate exactly the semantic contract tables"
         )
     expected_files = {MANIFEST_FILENAME}
     frames: dict[str, pa.Table] = {}
-    for table in SEMANTIC_CONTRACT_V4.tables:
+    for table in SEMANTIC_CONTRACT_V5.tables:
         entry = table_metadata[table.name]
         if not isinstance(entry, dict) or set(entry) != {"file", "row_count", "sha256"}:
             raise BiExportValidationError(f"manifest entry for {table.name} is malformed")
@@ -1817,7 +2033,7 @@ def export_bi(
                 }
                 table_exports: dict[str, TableExport] = {}
                 expected_null_counts: dict[str, dict[str, int]] = {}
-                for table in SEMANTIC_CONTRACT_V4.tables:
+                for table in SEMANTIC_CONTRACT_V5.tables:
                     if table.name in injected:
                         rows = injected[table.name]
                         frame = (

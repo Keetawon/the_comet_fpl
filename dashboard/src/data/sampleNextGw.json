@@ -1,6 +1,6 @@
 ﻿{
   "schema": "fpl.dashboard-next-gw",
-  "json_schema_version": 7,
+  "json_schema_version": 8,
   "plans": [
 {
       "optimizer_run_id": "opt-default",

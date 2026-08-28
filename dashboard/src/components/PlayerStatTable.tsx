@@ -37,7 +37,13 @@ import { NULL_BUCKET_CLASS } from "@/lib/difficulty";
 import type { ColorSource, ViewMode } from "@/lib/difficulty";
 import { playerChipBucket, playerChipMetric } from "@/lib/playerChips";
 import { availabilityLabel } from "@/lib/availability";
-import type { PlayerFixture, PlayerFormWindow, PlayerHorizon, PlayerRecord } from "@/data/types";
+import type {
+  PlayerActualFixture,
+  PlayerFixture,
+  PlayerFormWindow,
+  PlayerHorizon,
+  PlayerRecord,
+} from "@/data/types";
 
 export interface PlayerStatRow {
   player: PlayerRecord;
@@ -47,6 +53,8 @@ export interface PlayerStatRow {
   gwFromXp?: number | null;
   /** Players-only descriptive BPS average over appeared fixtures in the Actual-GW scope. */
   bpsPerAppearance?: number | null;
+  /** Players-only latest completed fixture history, already restricted to its Actual scope. */
+  actualDetails?: PlayerActualFixture[];
   totalXp: number | null;
   /** Exact backend-published cumulative endpoint; absent under incompatible fixture filters. */
   horizon?: PlayerHorizon | null;
@@ -81,6 +89,8 @@ export interface PlayerStatTableProps {
   formColumnProfile?: "legacy" | "players";
   /** Players-only sortable xP for the selected Forecast From GW. */
   showGwFromXp?: boolean;
+  /** Players shows actual history; other routes retain the forecast-fixture expansion. */
+  expandedRowMode?: "forecast" | "historical";
   initialSorting?: SortingState;
   pageSize?: number;
   /** Columns inserted just BEFORE the per-gameweek fixture columns (fixtures stay last). */
@@ -127,7 +137,7 @@ const VIEW_SPECIFIC_FORM_COLUMN_IDS = new Set([
 ]);
 
 /** One per-fixture detail cell: value text plus whether the active view emphasises it. */
-interface DetailColumn {
+interface ForecastDetailColumn {
   key: string;
   label: string;
   value: (fixture: PlayerFixture) => string;
@@ -135,10 +145,10 @@ interface DetailColumn {
 }
 
 /** The expanded per-fixture table: selected-view primitives lead; Overall treats both honestly. */
-function detailColumns(view: ViewMode): DetailColumn[] {
+function forecastDetailColumns(view: ViewMode): ForecastDetailColumn[] {
   const pct = (v: number | null) => (v == null ? "–" : `${Math.round(v * 100)}%`);
   const clubCs = (f: PlayerFixture) => pct(f.team_probability_clean_sheet);
-  const base: DetailColumn[] = [
+  const base: ForecastDetailColumn[] = [
     { key: "kickoff", label: "Kickoff (UTC)", value: (f) => (f.kickoff_time ? f.kickoff_time.replace("T", " ").slice(0, 16) : "–"), muted: false },
     { key: "gw", label: "GW", value: (f) => String(f.gw), muted: false },
     { key: "opponent_short_name", label: "Opponent", value: (f) => f.opponent_short_name, muted: false },
@@ -155,13 +165,13 @@ function detailColumns(view: ViewMode): DetailColumn[] {
       muted: false,
     },
   ];
-  const attack: DetailColumn[] = [
+  const attack: ForecastDetailColumn[] = [
     { key: "expected_goals", label: "xG", value: (f) => fmt(f.expected_goals, 2), muted: false },
     { key: "expected_assists", label: "xA", value: (f) => fmt(f.expected_assists, 2), muted: false },
     { key: "team_lambda_for", label: "Club λ for", value: (f) => fmt(f.team_lambda_for, 2), muted: false },
     { key: "team_attack_ease_index", label: "Atk ease", value: (f) => fmt(f.team_attack_ease_index, 0), muted: false },
   ];
-  const defense: DetailColumn[] = [
+  const defense: ForecastDetailColumn[] = [
     { key: "probability_appears", label: "P(plays)", value: (f) => pct(f.probability_appears), muted: false },
     { key: "probability_sixty_minutes", label: "P(60+)", value: (f) => pct(f.probability_sixty_minutes), muted: false },
     { key: "probability_clean_sheet", label: "CS (own)", value: (f) => pct(f.probability_clean_sheet), muted: false },
@@ -169,11 +179,12 @@ function detailColumns(view: ViewMode): DetailColumn[] {
     { key: "team_probability_clean_sheet", label: "Club CS", value: clubCs, muted: false },
     { key: "team_defence_ease_index", label: "Def ease", value: (f) => fmt(f.team_defence_ease_index, 0), muted: false },
   ];
-  const tail: DetailColumn[] = [
+  const tail: ForecastDetailColumn[] = [
     { key: "team_overall_ease_index", label: "Ovr ease", value: (f) => fmt(f.team_overall_ease_index, 0), muted: false },
     { key: "team_official_fdr", label: "FDR", value: (f) => fmt(f.team_official_fdr, 0), muted: false },
   ];
-  const muted = (columns: DetailColumn[]) => columns.map((column) => ({ ...column, muted: true }));
+  const muted = (columns: ForecastDetailColumn[]) =>
+    columns.map((column) => ({ ...column, muted: true }));
   const viewed =
     view === "attack"
       ? [...attack, ...muted(defense)]
@@ -182,6 +193,61 @@ function detailColumns(view: ViewMode): DetailColumn[] {
         : [...attack, ...defense];
   return [...base, ...viewed, ...tail];
 }
+
+interface HistoricalDetailColumn {
+  key: string;
+  label: string;
+  title?: string;
+  value: (fixture: PlayerActualFixture) => string;
+}
+
+/** Published fixture-grain observations only; no forecast primitive appears in this profile. */
+const HISTORICAL_DETAIL_COLUMNS: readonly HistoricalDetailColumn[] = [
+  { key: "gw", label: "GW", value: (fixture) => String(fixture.gw) },
+  {
+    key: "kickoff",
+    label: "Kickoff (UTC)",
+    value: (fixture) =>
+      fixture.kickoff_time
+        ? fixture.kickoff_time.replace("T", " ").slice(0, 16)
+        : "–",
+  },
+  { key: "minutes", label: "Min", value: (fixture) => fmt(fixture.minutes, 0) },
+  { key: "starts", label: "Start", value: (fixture) => fmt(fixture.starts, 0) },
+  { key: "goals_scored", label: "G", value: (fixture) => fmt(fixture.goals_scored, 0) },
+  { key: "assists", label: "A", value: (fixture) => fmt(fixture.assists, 0) },
+  { key: "expected_goals", label: "xG", value: (fixture) => fmt(fixture.expected_goals, 2) },
+  { key: "expected_assists", label: "xA", value: (fixture) => fmt(fixture.expected_assists, 2) },
+  {
+    key: "expected_goal_involvements",
+    label: "xGI",
+    value: (fixture) =>
+      fixture.expected_goals == null || fixture.expected_assists == null
+        ? "–"
+        : fmt(fixture.expected_goals + fixture.expected_assists, 2),
+  },
+  { key: "clean_sheets", label: "CS", value: (fixture) => fmt(fixture.clean_sheets, 0) },
+  { key: "goals_conceded", label: "GC", value: (fixture) => fmt(fixture.goals_conceded, 0) },
+  { key: "saves", label: "Saves", value: (fixture) => fmt(fixture.saves, 0) },
+  {
+    key: "defensive_contribution",
+    label: "DC",
+    value: (fixture) => fmt(fixture.defensive_contribution, 0),
+  },
+  {
+    key: "expected_goals_conceded",
+    label: "xGC",
+    value: (fixture) => fmt(fixture.expected_goals_conceded, 2),
+  },
+  { key: "bonus", label: "Bonus", value: (fixture) => fmt(fixture.bonus, 0) },
+  { key: "bps", label: "BPS", value: (fixture) => fmt(fixture.bps, 0) },
+  {
+    key: "points_under_rules_2026_27",
+    label: "Pts (26/27)",
+    title: "Observed fixture points replayed under the 2026/27 scoring rules",
+    value: (fixture) => fmt(fixture.points_under_rules_2026_27, 0),
+  },
+];
 
 function GwCell({
   fixtures,
@@ -277,6 +343,7 @@ export function PlayerStatTable({
   formScopeLabel,
   formColumnProfile = "legacy",
   showGwFromXp = false,
+  expandedRowMode = "forecast",
   initialSorting = DEFAULT_SORTING,
   pageSize = 50,
   beforeFixtureColumns = [],
@@ -736,13 +803,15 @@ export function PlayerStatTable({
                 );
                 if (!row.getIsExpanded()) return [cells];
                 const player = row.original.player;
-                const detail = detailColumns(view);
-                // The detail table follows MATCH TIME, not the main table's sort.
-                const byKickoff = [...player.fixtures].sort(
+                const forecastDetail = forecastDetailColumns(view);
+                // Forecast detail follows match time; historical detail is selected and ordered
+                // by the Players route's explicit Actual season/GW scope.
+                const forecastFixtures = [...player.fixtures].sort(
                   (a, b) =>
                     (a.kickoff_time ?? "9999").localeCompare(b.kickoff_time ?? "9999") ||
                     a.gw - b.gw,
                 );
+                const historicalFixtures = row.original.actualDetails ?? [];
                 return [
                   cells,
                   <TableRow key={`${row.id}-detail`}>
@@ -750,34 +819,75 @@ export function PlayerStatTable({
                       <div className="max-w-4xl space-y-1">
                         <p className="text-xs font-medium">
                           {player.web_name} ({player.position}, {player.team_short_name}) —
-                          per-fixture detail
-                          {player.form
+                          {expandedRowMode === "historical"
+                            ? " latest five completed Actual GWs (newest first)"
+                            : " forecast per-fixture detail"}
+                          {expandedRowMode === "forecast" && player.form
                             ? ` · form anchored ${player.form.season} GW${player.form.as_at_gw}`
-                            : " · no observed form"}
+                            : null}
                         </p>
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              {detail.map((c) => (
-                                <TableHead key={c.key} className={`h-7 px-2 text-[11px] ${c.muted ? "opacity-50" : ""}`}>
-                                  {c.label}
-                                </TableHead>
-                              ))}
+                              {expandedRowMode === "historical"
+                                ? HISTORICAL_DETAIL_COLUMNS.map((column) => (
+                                    <TableHead
+                                      key={column.key}
+                                      className="h-7 px-2 text-[11px]"
+                                      title={column.title}
+                                    >
+                                      {column.label}
+                                    </TableHead>
+                                  ))
+                                : forecastDetail.map((column) => (
+                                    <TableHead
+                                      key={column.key}
+                                      className={`h-7 px-2 text-[11px] ${column.muted ? "opacity-50" : ""}`}
+                                    >
+                                      {column.label}
+                                    </TableHead>
+                                  ))}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {byKickoff.map((f) => (
-                              <TableRow key={f.fixture}>
-                                {detail.map((c) => (
+                            {expandedRowMode === "historical" ? (
+                              historicalFixtures.length > 0 ? (
+                                historicalFixtures.map((fixture) => (
+                                  <TableRow key={fixture.fixture}>
+                                    {HISTORICAL_DETAIL_COLUMNS.map((column) => (
+                                      <TableCell
+                                        key={column.key}
+                                        className="px-2 py-1 text-[11px] tabular-nums"
+                                      >
+                                        {column.value(fixture)}
+                                      </TableCell>
+                                    ))}
+                                  </TableRow>
+                                ))
+                              ) : (
+                                <TableRow>
                                   <TableCell
-                                    key={c.key}
-                                    className={`px-2 py-1 text-[11px] tabular-nums ${c.muted ? "opacity-50" : ""}`}
+                                    colSpan={HISTORICAL_DETAIL_COLUMNS.length}
+                                    className="px-2 py-2 text-[11px] text-muted-foreground"
                                   >
-                                    {c.value(f)}
+                                    No finalized fixture history exists in the selected Actual-GW range.
                                   </TableCell>
-                                ))}
-                              </TableRow>
-                            ))}
+                                </TableRow>
+                              )
+                            ) : (
+                              forecastFixtures.map((fixture) => (
+                                <TableRow key={fixture.fixture}>
+                                  {forecastDetail.map((column) => (
+                                    <TableCell
+                                      key={column.key}
+                                      className={`px-2 py-1 text-[11px] tabular-nums ${column.muted ? "opacity-50" : ""}`}
+                                    >
+                                      {column.value(fixture)}
+                                    </TableCell>
+                                  ))}
+                                </TableRow>
+                              ))
+                            )}
                           </TableBody>
                         </Table>
                       </div>

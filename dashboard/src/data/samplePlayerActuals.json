@@ -1,6 +1,6 @@
 {
   "schema": "fpl.dashboard-player-actuals",
-  "json_schema_version": 7,
+  "json_schema_version": 8,
   "players": [
     {
       "season": "2025-26",

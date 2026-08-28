@@ -6,7 +6,7 @@ it never queries DuckDB and never reads Parquet in the browser.
 
 ## 2026-08-26 dashboard program
 
-Schema v7 is the current development-only application contract. The ordered program is:
+Schema v8 is the current development-only application contract. The ordered program is:
 
 1. **Implemented development-only:** Player analytics and Team analytics over existing published
    values, following `../docs/dashboard-deep-analytics.md`;
@@ -19,7 +19,11 @@ Schema v7 is the current development-only application contract. The ordered prog
    from `player_actuals.json` and exposes an explicit Actual season plus independent `Actual GWs`
    range. The payload and selector are limited to the forecast season and its immediately
    preceding season, with the predecessor present only when finalized observations were published;
-   the page never mixes seasons or silently substitutes one.
+   the page never mixes seasons or silently substitutes one;
+5. **Implemented development-only:** `team_actuals.json` provides the parallel normalized
+   finalized team-fixture history for Fixture Matrix expanded rows. An explicit Actual season shows
+   the page-wide set of the latest five distinct finalized gameweeks from that season, with double-
+   gameweek legs retained and no cross-season fill.
 
 The implemented deep-analytics routes are `#player-analytics` and `#team-analytics`; both are
 linked directly in the sidebar and retain an exact-table equivalent for every chart.
@@ -121,13 +125,16 @@ except OSError:
 its `run_id`/`as_of`; it is required for optional AI eligibility and the server's exact generation
 verification, so deployment packages always include it. `players.json` is by far the largest file and is shared by the Summary,
 Players, and Next-GW pages; it is fetched and parsed once per browser session (a
-module-level cache in `src/data/load.ts`). Introduced in schema v4 and retained in schema v7,
+module-level cache in `src/data/load.ts`). Introduced in schema v4 and retained in schema v8,
 `player_horizons.json` carries cumulative xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)` for every
 player and exact forecast endpoint. Python computes those probabilities by convolving the
 published gameweek PMFs at full precision, then emits a compact positional row whose named values
 are quantized to six decimals. Exact zero/one probability boundaries are preserved. The browser
 data layer validates the field dictionary, decodes the row, and selects an exact
 `(run_id, season, code, gw_to)` endpoint; it never sums probabilities or parses a PMF.
+`player_actuals.json` and schema-v8 `team_actuals.json` are run-independent normalized historical
+files; their strict loaders preserve fixture grain and NULLs rather than consulting the forecast
+fixture arrays.
 
 ## Solve from the dashboard (local plan server)
 
@@ -170,7 +177,7 @@ $env:FPL_INSIGHTS_BASE_URL = "https://api.z.ai/api/paas/v4/"
 `GET /insights/status` and `POST /insights/summary` use the same same-origin/approved-LAN-token
 boundary as the other local endpoints. After **Explain with AI** is clicked, the browser submits
 only an exact page/vintage/filter selector. The server revalidates the explicitly selected
-schema-v7 dashboard generation (`--dashboard-data`, default `dashboard/public/data`) and constructs
+schema-v8 dashboard generation (`--dashboard-data`, default `dashboard/public/data`) and constructs
 the fact packet itself. The provider cannot receive caller prose, a free-form prompt, PMF,
 manager/capture identifier, squad, bank, purchase/selling value, credential, or custom plan state.
 The provider returns fact-id selections rather than prose; Python renders canonical cited text and
@@ -337,11 +344,16 @@ comparison page and is not a twelfth navigation item.
   three-way toggle: **opponent strength** (default; a display-time club-quality index
   derived from the vintage's published lambdas — 100 = average club, higher = stronger
   opponent = red, so a strong club's own row is no longer uniformly green), the row club's
-  model ease (overall/attack/clean-sheet views), or official FDR. Expanding a row exposes
-  every primitive (raw `lambda_for`/`lambda_against`, clean-sheet probability, all ease
-  indices, opponent strength, official FDR, Stage A league-average flag) ordered by
-  kickoff time. Expanded schedule-only rows show identity/kickoff, current FDR, and `~`-prefixed
-  display proxies; unavailable model primitives remain dashes.
+  model ease (overall/attack/clean-sheet views), or official FDR. Expanding a row is historical:
+  an explicit Actual season selects the page-wide set of the latest five distinct finalized
+  gameweeks in `team_actuals.json`, newest first, while retaining every double-gameweek leg. The
+  detail columns are match/GW and kickoff, opponent and venue, official GF/GA, source-row xG/xGC,
+  summed BPS, and raw defensive-contribution actions. These component sums are not independently
+  roster-reconciled. A sparse current season stays sparse; it is never filled from the
+  prior season, and NULL components remain dashes. Possession and shots are unavailable in the
+  approved sources. The existing FBref path is an unpopulated operator-vendored defensive-actions
+  CSV and cannot provide them, so the UI does not display a proxy. Future fixture-level drill-down
+  remains on Next GW only.
 - **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
   `players.json` plus normalized `player_actuals.json` — one row per player of the selected
   vintage (photo + club badge) merging
@@ -377,10 +389,15 @@ comparison page and is not a twelfth navigation item.
   unchanged. A failed or partial
   import leaves the existing table scope unchanged. Changing forecast vintage clears the private
   scope and requires a fresh verification; hosted static builds cannot use it. Rows are compact
-  and paginated; the expanded row exposes every
-  transported fixture primitive behind the chip colour ordered by kickoff time, with attack- vs
-  defence-detail ordering driven by the view. The same shared table (`PlayerStatTable`) powers the
-  Next GW squad table. The failure-atomic local development database rebuild and atomic BI/static
+  and paginated. On Players, the expanded row reads historical `player_actuals.json` rows inside
+  the selected Actual season/range, takes the page-wide set of the latest five distinct GW labels,
+  preserves every DGW leg, and orders the result newest first. It shows GW/kickoff, minutes/start,
+  goals, assists, xG,
+  xA, fail-closed display xGI, clean sheets, on-pitch goals conceded, saves, raw DC actions, xGC,
+  bonus, raw BPS, and points; it contains no future xP, probability, lambda, ease, or FDR field.
+  The shared `PlayerStatTable` retains a separate forecast-detail mode for the Next GW squad table,
+  which is the only future player-fixture drill-down. The failure-atomic local development database
+  rebuild and atomic BI/static
   republish completed on 2026-08-19, so P1.8 values are visible in the local static UI. An existing
   database's additive columns remain NULL until rebuilt, and the final deadline vintage must repeat
   rebuild/export/republish through P0.

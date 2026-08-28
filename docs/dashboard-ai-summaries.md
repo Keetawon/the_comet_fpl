@@ -102,7 +102,7 @@ flag. These selectors prevent a visible season/range or population change from r
 resolved for a different page state.
 
 There is no fact, caveat, chat, or arbitrary-text field. Extra keys fail closed. The server resolves
-the selector against the explicitly configured dashboard-data directory, verifies the schema-v7
+the selector against the explicitly configured dashboard-data directory, verifies the schema-v8
 manifest content hash, every file hash, run/season/`as_of`, and a stable manifest before and after
 the read, then constructs the bounded fact/caveat packet itself. A caller therefore cannot smuggle
 manager/private state, financial state, credentials, paths, instructions, or invented values to the

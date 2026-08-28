@@ -1,5 +1,5 @@
 // Read-model shapes as emitted by fpl.publish.dashboard_json (schema
-// fpl.dashboard-read-models v7; see docs/dashboard-json-contract.md).
+// fpl.dashboard-read-models v8; see docs/dashboard-json-contract.md).
 // Nullable fields are `| null`: NULL means unmeasured/unavailable and must
 // never be rendered as 0, "", or a fabricated colour.
 
@@ -92,6 +92,36 @@ export interface TeamRecord {
   short_name: string;
   form: TeamForm | null;
   fixtures: TeamFixture[];
+}
+
+/** One finalized observed fixture for a club in the enclosing explicit season. */
+export interface TeamActualFixture {
+  gw: number;
+  fixture: number;
+  kickoff_time: string;
+  opponent_team_code: number;
+  opponent_short_name: string;
+  was_home: boolean;
+  goals_for: number;
+  goals_against: number;
+  team_xg: number | null;
+  team_xgc: number | null;
+  /** Sum of the published player BPS rows for the fixture, not an average. */
+  team_bps: number | null;
+  /** Sum of published raw outfield defensive-contribution actions, not fantasy DC points. */
+  defensive_contribution: number | null;
+}
+
+export interface TeamActualsRecord {
+  season: string;
+  team_code: number;
+  actuals: TeamActualFixture[];
+}
+
+export interface TeamActualsData {
+  schema: "fpl.dashboard-team-actuals";
+  json_schema_version: 8;
+  teams: TeamActualsRecord[];
 }
 
 export interface PlayerFormWindow {
@@ -198,7 +228,7 @@ export interface PlayerActualsRecord {
 
 export interface PlayerActualsData {
   schema: "fpl.dashboard-player-actuals";
-  json_schema_version: 7;
+  json_schema_version: 8;
   players: PlayerActualsRecord[];
 }
 
@@ -214,7 +244,7 @@ export interface PlayerHorizon {
   p_ge_15: number;
 }
 
-/** Canonical positional order retained in the compact schema-v7 wire payload. */
+/** Canonical positional order retained in the compact schema-v8 wire payload. */
 export const PLAYER_HORIZON_FIELDS = [
   "gw_to",
   "xp",
@@ -266,7 +296,7 @@ export interface PlayerHorizonSemantics {
 
 export interface PlayerHorizonsData {
   schema: "fpl.dashboard-player-horizons";
-  json_schema_version: 7;
+  json_schema_version: 8;
   semantics: PlayerHorizonSemantics;
   horizon_fields: typeof PLAYER_HORIZON_FIELDS;
   players: PlayerHorizonsRecord[];
@@ -275,7 +305,7 @@ export interface PlayerHorizonsData {
 /** Serialized payload shape before the loader decodes positional horizon values. */
 export interface PlayerHorizonsWireData {
   schema: "fpl.dashboard-player-horizons";
-  json_schema_version: 7;
+  json_schema_version: 8;
   semantics: PlayerHorizonSemantics;
   horizon_fields: typeof PLAYER_HORIZON_FIELDS;
   players: PlayerHorizonsWireRecord[];
@@ -417,7 +447,7 @@ export interface SummaryData {
   ease_index_formula_version: string | null;
 }
 
-// ---- schema-v7 prediction monitoring: immutable forecasts joined to final outcomes ----
+// ---- schema-v8 prediction monitoring: immutable forecasts joined to final outcomes ----
 
 export interface ForecastAccuracySemantics {
   [key: string]: unknown;
@@ -524,7 +554,7 @@ export interface PlayerForecastAccuracyRun extends ForecastAccuracyRunProvenance
 
 export interface PlayerForecastVsActualData {
   schema: "fpl.dashboard-player-forecast-vs-actual";
-  json_schema_version: 7;
+  json_schema_version: 8;
   semantics: ForecastAccuracySemantics;
   has_outcomes: boolean;
   runs: PlayerForecastAccuracyRun[];
@@ -620,7 +650,7 @@ export interface TeamForecastAccuracyRun extends ForecastAccuracyRunProvenance, 
 
 export interface TeamForecastVsActualData {
   schema: "fpl.dashboard-team-forecast-vs-actual";
-  json_schema_version: 7;
+  json_schema_version: 8;
   semantics: ForecastAccuracySemantics;
   has_outcomes: boolean;
   runs: TeamForecastAccuracyRun[];

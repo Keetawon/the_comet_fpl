@@ -31,6 +31,8 @@ from fpl.publish.dashboard_json import (
     PLAYERS_SCHEMA,
     SUMMARY_FILENAME,
     SUMMARY_SCHEMA,
+    TEAM_ACTUALS_FILENAME,
+    TEAM_ACTUALS_SCHEMA,
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
     TEAM_FORECAST_VS_ACTUAL_SCHEMA,
     DashboardJsonError,
@@ -53,6 +55,7 @@ _FILENAMES = (
     NEXT_GW_FILENAME,
     OPTIMIZER_AUDIT_FILENAME,
     PLAYER_ACTUALS_FILENAME,
+    TEAM_ACTUALS_FILENAME,
     PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     SUMMARY_FILENAME,
@@ -154,7 +157,9 @@ def _documents() -> dict[str, dict[str, Any]]:
         FIXTURE_MATRIX_FILENAME: {
             "schema": FIXTURE_MATRIX_SCHEMA,
             "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
-            "teams": [{"team_code": 1, "preserved": "fixture"}],
+            "teams": [
+                {"season": "2026-27", "team_code": 1, "preserved": "fixture"}
+            ],
             "schedule": {"gameweeks": [1, 2, 3, 4, 5]},
         },
         PLAYERS_FILENAME: {
@@ -196,6 +201,32 @@ def _documents() -> dict[str, dict[str, Any]]:
                             "expected_assists": 0.1,
                             "expected_goals_conceded": 0.8,
                             "points_under_rules_2026_27": 10,
+                        }
+                    ],
+                }
+            ],
+        },
+        TEAM_ACTUALS_FILENAME: {
+            "schema": TEAM_ACTUALS_SCHEMA,
+            "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+            "teams": [
+                {
+                    "season": "2025-26",
+                    "team_code": 1,
+                    "actuals": [
+                        {
+                            "gw": 38,
+                            "fixture": 380,
+                            "kickoff_time": "2026-05-24T15:00:00+00:00",
+                            "opponent_team_code": 2,
+                            "opponent_short_name": "BET",
+                            "was_home": True,
+                            "goals_for": 2,
+                            "goals_against": 0,
+                            "team_xg": 1.7,
+                            "team_xgc": 0.6,
+                            "team_bps": 72,
+                            "defensive_contribution": 58,
                         }
                     ],
                 }
@@ -290,7 +321,7 @@ def _write_generation(directory: Path, documents: dict[str, dict[str, Any]]) -> 
         "source": {
             "export_schema": "fpl.bi-semantic-export",
             "export_schema_version": 1,
-            "semantic_contract_version": 3,
+            "semantic_contract_version": 5,
             "export_content_sha256": _sha("2"),
             "export_created_at": "2026-08-21T11:59:00+00:00",
             "database_sha256": _sha("3"),
@@ -354,6 +385,7 @@ def test_packages_only_formal_plans_and_reseals_a_deterministic_root_zip(tmp_pat
     assert public_documents[FIXTURE_MATRIX_FILENAME] == _documents()[FIXTURE_MATRIX_FILENAME]
     assert public_documents[PLAYERS_FILENAME] == _documents()[PLAYERS_FILENAME]
     assert public_documents[PLAYER_ACTUALS_FILENAME] == _documents()[PLAYER_ACTUALS_FILENAME]
+    assert public_documents[TEAM_ACTUALS_FILENAME] == _documents()[TEAM_ACTUALS_FILENAME]
     assert public_documents[PLAYER_HORIZONS_FILENAME] == _documents()[PLAYER_HORIZONS_FILENAME]
     horizon_payload = (first.output_dir / PLAYER_HORIZONS_FILENAME).read_bytes()
     assert horizon_payload.endswith(b"\n")
