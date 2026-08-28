@@ -1,12 +1,12 @@
 // FixtureTicker behaviour: chip colour direction, NULL -> neutral chip, double gameweek
 // -> two chips, blank gameweek -> empty slot. Uses the committed sample read-model data
-// and the page's own chipMetric/chipBucket so the tests cover exactly what ships.
+// and both Fixture Matrix's view-owned and Summary's source-led headline helpers.
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { TeamFixture } from "@/data/types";
 import sample from "@/data/sampleFixtureMatrix.json";
-import { chipBucket, chipMetric } from "@/lib/fixtureChips";
+import { chipBucket, chipMetric, fixtureViewChipMetric } from "@/lib/fixtureChips";
 import { FixtureTicker } from "./FixtureTicker";
 
 const alpha = sample.teams[0];
@@ -18,7 +18,7 @@ function tickerProps(view: "overall" | "attack" | "defense", colorSource: "ease"
     fixtures,
     minGw: 1,
     maxGw: 5,
-    metricOf: (f: TeamFixture) => chipMetric(f, view, colorSource),
+    metricOf: (f: TeamFixture) => fixtureViewChipMetric(f, view, colorSource),
     bucketOf: (f: TeamFixture) => chipBucket(f, view, colorSource, 0.25),
   };
 }
@@ -38,13 +38,53 @@ describe("FixtureTicker", () => {
     expect(hard.className).not.toContain("bg-green");
   });
 
-  it("switches to official FDR as the colour source without blending it into ease", () => {
+  it("switches the colour to official FDR without replacing the overall headline", () => {
     render(<FixtureTicker {...tickerProps("overall", "fdr")} />);
     const fdr2 = chips().find((c) => c.dataset.gw === "1")!;
     const fdr4 = chips().find((c) => c.dataset.gw === "2" && c.textContent?.includes("GAM"))!;
     expect(fdr2.dataset.bucket).toBe("easier");
-    expect(fdr2.textContent).toContain("FDR 2");
+    expect(fdr2.textContent).toContain("130");
+    expect(fdr2).toHaveAccessibleName(/colour uses official FDR 2/i);
     expect(fdr4.dataset.bucket).toBe("harder");
+  });
+
+  it("keeps Attack and Defense headlines independent from opponent colour", () => {
+    const { rerender } = render(
+      <FixtureTicker
+        {...tickerProps("attack", "ease")}
+        metricOf={(fixture) => fixtureViewChipMetric(fixture, "attack", "opponent", 91)}
+        bucketOf={(fixture) => chipBucket(fixture, "attack", "opponent", null, 91)}
+      />,
+    );
+    const attack = chips().find((chip) => chip.dataset.gw === "1")!;
+    expect(attack).toHaveTextContent("xGF 2.10");
+    expect(attack).toHaveAccessibleName(/published expected goals for.*colour uses opponent strength 91/i);
+
+    rerender(
+      <FixtureTicker
+        {...tickerProps("defense", "ease")}
+        metricOf={(fixture) => fixtureViewChipMetric(fixture, "defense", "opponent", 91)}
+        bucketOf={(fixture) => chipBucket(fixture, "defense", "opponent", null, 91)}
+      />,
+    );
+    const defense = chips().find((chip) => chip.dataset.gw === "1")!;
+    expect(defense).toHaveTextContent("CS 41%");
+    expect(defense.dataset.bucket).toBe("easier");
+  });
+
+  it("keeps the Summary ticker's source-led opponent-strength headline", () => {
+    render(
+      <FixtureTicker
+        fixtures={fixtures}
+        minGw={1}
+        maxGw={5}
+        metricOf={(fixture) => chipMetric(fixture, "overall", "opponent", 91)}
+        bucketOf={(fixture) => chipBucket(fixture, "overall", "opponent", null, 91)}
+      />,
+    );
+    const summaryChip = chips().find((chip) => chip.dataset.gw === "1")!;
+    expect(summaryChip).toHaveTextContent(/GW1 · 91/);
+    expect(summaryChip).not.toHaveTextContent("130");
   });
 
   it("renders an unmeasured metric as a neutral chip with no number, never 0", () => {
@@ -79,7 +119,7 @@ describe("FixtureTicker", () => {
   it("carries the raw primitives in the accessible label", () => {
     render(<FixtureTicker {...tickerProps("overall", "ease")} />);
     const easy = chips().find((c) => c.dataset.gw === "1")!;
-    expect(easy.getAttribute("aria-label")).toContain("λfor 2.10");
+    expect(easy.getAttribute("aria-label")).toContain("lambda for 2.10");
     expect(easy.getAttribute("aria-label")).toContain("FDR 2");
   });
 });

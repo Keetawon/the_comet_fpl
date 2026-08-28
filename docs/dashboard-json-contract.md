@@ -228,11 +228,16 @@ clean_sheet_proxy    = exp(-lambda_against_proxy)
 ```
 
 The proxy has no later fixture model, venue adjustment, or new forecast input. Every later chip
-identifies whether its colour is current FDR or a selected-vintage proxy. Later rows never enter
-model-ease averages or sorting and remain current schedule context that may post-date an older
-selected vintage. A moved fixture may therefore appear once in the recorded vintage and again at
-its current schedule gameweek; that is explicit vintage-versus-current context, not a duplicate
-forecast.
+identifies whether its colour is current FDR or a selected-vintage proxy and shows no forecast
+headline. For recorded modelled rows, the selected view owns the headline independently of colour:
+Attack uses `lambda_for`, Defense uses `probability_clean_sheet`, and Overall uses
+`overall_ease_index`. The Attack horizon measure completely sums lambdas; the Defense measure
+completely sums fixture clean-sheet probabilities as an expected count, not as a probability of at
+least one clean sheet; Overall averages its ease index. DGW legs count and a missing selected leg
+makes the applicable total unavailable. Later rows never enter these horizon measures or sorting
+and remain current schedule context that may post-date an older selected vintage. A moved fixture
+may therefore appear once in the recorded vintage and again at its current schedule gameweek; that
+is explicit vintage-versus-current context, not a duplicate forecast.
 
 Sample record (abbreviated):
 

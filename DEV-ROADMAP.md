@@ -717,6 +717,18 @@ neutral opponent/home-away/kickoff fixture context only. The overlay is explicit
 schedule known at an older forecast vintage and does not widen the forecast, ledger, or
 optimizer. This dashboard-only work must not delay or alter the P0 deadline artifacts.
 
+**P1.7b additive view-owned fixture measures (2026-08-28): implemented.** Fixture Matrix
+card headlines are independent of the colour-source toggle. Attack shows published fixture
+`lambda_for` as modelled expected goals for, Defense shows published per-fixture clean-sheet
+probability, and Overall retains overall ease; Opponent strength, Club ease, and Official FDR
+affect only the background. The Attack horizon column is a complete sum of modelled fixture
+lambdas and the Defense column is a complete sum of clean-sheet probabilities labelled as an
+expected clean-sheet count, never as `P(at least one)`. DGW legs count separately, any missing
+selected leg fails the corresponding aggregate closed, and schedule-only rows beyond the recorded
+forecast show no forecast headline and enter no total. Frontend deterministic facts and optional
+server-owned insight evidence use the same published view metric. This changes no model, emitter,
+read-model schema, ledger, or optimizer contract.
+
 **P1.7d Summary + Next GW pages (2026-08-16): implemented.** The read-model manifest grows
 to schema version 2 with two additive files (v1 record shapes unchanged):
 `summary.json` (latest run + parsed component modes, roster coverage, next-gameweek

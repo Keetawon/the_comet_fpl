@@ -1,6 +1,6 @@
 // Page smoke: the Fixture matrix pivot renders from a read model -- one row per club of
 // the selected vintage, per-GW chip columns with blank slots, the three colour sources,
-// default sort by average ease (easiest first), and opponent-strength colouring direction
+// default sort by the selected horizon measure, and opponent-strength colouring direction
 // (a weak opponent colours green, a strong opponent red, regardless of the row club).
 
 import { render, screen, waitFor, within } from "@testing-library/react";
@@ -224,6 +224,53 @@ describe("FixtureMatrixPage", () => {
     expect(firstTeamRow!.textContent).toContain("Beta");
   });
 
+  it("shows view-owned fixture values and complete horizon totals independently of colour", async () => {
+    const user = userEvent.setup();
+    render(<FixtureMatrixPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+
+    await user.click(screen.getByRole("radio", { name: "Attack" }));
+    expect(screen.getByRole("columnheader", { name: /Total expected goals for/ })).toBeInTheDocument();
+    const alphaAttackRow = screen.getByText("Alpha").closest("tr");
+    expect(alphaAttackRow).not.toBeNull();
+    expect(within(alphaAttackRow!).getByText("6.00")).toBeInTheDocument();
+    const alphaAttackGw1 = within(alphaAttackRow!)
+      .getAllByTestId("chip")
+      .find((chip) => chip.dataset.gw === "1");
+    expect(alphaAttackGw1).toHaveTextContent("xGF 2.10");
+    expect(alphaAttackGw1).toHaveAttribute("data-bucket", "easier");
+    expect(screen.getByText(/highest visible published expected goals for at 2\.10/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "Official FDR" }));
+    const attackWithFdrColour = within(alphaAttackRow!)
+      .getAllByTestId("chip")
+      .find((chip) => chip.dataset.gw === "1");
+    expect(attackWithFdrColour).toHaveTextContent("xGF 2.10");
+    expect(attackWithFdrColour).toHaveAccessibleName(/colour uses official FDR 2/i);
+
+    await user.click(screen.getByRole("radio", { name: "10 GWs" }));
+    const scheduleOnlyAttack = within(alphaAttackRow!)
+      .getAllByTestId("schedule-chip")
+      .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
+    expect(scheduleOnlyAttack).toHaveTextContent("GW6 · —");
+    expect(scheduleOnlyAttack).toHaveAccessibleName(/no published expected-goals-for forecast/i);
+
+    await user.click(screen.getByRole("radio", { name: "Defense" }));
+    expect(screen.getByRole("columnheader", { name: /Expected clean sheets/ })).toBeInTheDocument();
+    const betaDefenseRow = screen.getByText("Beta").closest("tr");
+    expect(betaDefenseRow).not.toBeNull();
+    expect(within(betaDefenseRow!).getByText("0.44")).toBeInTheDocument();
+    const betaDefenseGw1 = within(betaDefenseRow!)
+      .getAllByTestId("chip")
+      .find((chip) => chip.dataset.gw === "1");
+    expect(betaDefenseGw1).toHaveTextContent("CS 11%");
+    expect(betaDefenseGw1).toHaveAccessibleName(/published clean-sheet probability 11%/i);
+
+    const alphaDefenseRow = screen.getByText("Alpha").closest("tr");
+    expect(alphaDefenseRow).not.toBeNull();
+    expect(within(alphaDefenseRow!).getAllByRole("cell")[3]).toHaveTextContent("—");
+  });
+
   it("colours later fixtures with explicit proxies and current official FDR", async () => {
     const user = userEvent.setup();
     const { container } = render(<FixtureMatrixPage />);
@@ -249,9 +296,9 @@ describe("FixtureMatrixPage", () => {
     expect(alphaGw6).toBeDefined();
     expect(alphaGw6).toHaveAttribute("data-bucket", "easier");
     expect(alphaGw6!.className).toContain("bg-green");
-    expect(alphaGw6).toHaveTextContent(/GW6 · \d+/);
+    expect(alphaGw6).toHaveTextContent(/GW6 · —/);
     expect(alphaGw6).toHaveAccessibleName(
-      /derived from selected-vintage GW1-GW4 team lambdas, not a GW6 forecast/i,
+      /no published overall-ease forecast.*derived from selected-vintage GW1-GW4 team lambdas/i,
     );
     const gammaGw6 = within(alphaRow!)
       .getAllByTestId("schedule-chip")
@@ -289,7 +336,7 @@ describe("FixtureMatrixPage", () => {
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
     expect(easeGw6).toHaveAttribute("data-bucket", "much-easier");
     expect(easeGw6!.className).toContain("bg-green");
-    expect(easeGw6).toHaveTextContent(/GW6 · \d+/);
+    expect(easeGw6).toHaveTextContent(/GW6 · —/);
     expect(easeGw6).toHaveAccessibleName(/fixture-ease-proxy-v1/i);
 
     await user.click(screen.getByRole("radio", { name: "Official FDR" }));
@@ -298,7 +345,7 @@ describe("FixtureMatrixPage", () => {
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
     expect(fdrGw6).toHaveAttribute("data-bucket", "easier");
     expect(fdrGw6!.className).toContain("bg-green");
-    expect(fdrGw6).toHaveTextContent("GW6 · FDR 2");
+    expect(fdrGw6).toHaveTextContent("GW6 · —");
     expect(fdrGw6).toHaveAccessibleName(/current official FDR 2/i);
 
     await user.click(within(alphaRow!).getByRole("button", { name: "Expand recent results" }));
@@ -350,7 +397,7 @@ describe("FixtureMatrixPage", () => {
     const gw6Proxy = screen
       .getAllByTestId("schedule-chip")
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
-    expect(gw6Proxy).toHaveTextContent(/GW6 · \d+/);
+    expect(gw6Proxy).toHaveTextContent(/GW6 · —/);
     expect(gw6Proxy).toHaveAccessibleName(/selected-vintage opponent strength proxy/i);
 
     await user.click(screen.getByRole("radio", { name: "15 GWs" }));

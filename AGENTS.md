@@ -348,6 +348,17 @@ Cross-season club membership joins only on permanent `team_code`; promoted clubs
 Premier-League evidence stay shorter rather than inheriting another club's history. Possession
 and shots remain absent: the official/archive sources do not carry them and the existing
 operator-vendored FBref defensive-actions path cannot supply them, so no proxy is allowed. The
+Fixture Matrix's modelled fixture-card headline is owned by the selected analytical view:
+Attack shows published fixture `lambda_for` as modelled expected goals for, Defense shows
+published `probability_clean_sheet` as a percentage, and Overall shows published overall ease.
+Opponent strength, Club ease, and Official FDR control only the card colour and never replace that
+headline. The Attack horizon value is the complete sum of selected modelled fixture lambdas; the
+Defense horizon value is the complete sum of selected per-fixture clean-sheet probabilities and is
+labelled as an expected clean-sheet count, never a horizon probability. Every double-gameweek leg
+counts. Any null or non-finite selected leg makes the corresponding horizon value unavailable, and
+schedule-only rows beyond the forecast vintage show no forecast headline and never enter either
+total. Overall alone remains an average of its unitless ease index. These are browser sums of
+already-published expectations; the browser never derives a new model quantity. The
 versioned BI semantic export, atomic static JSON publish boundary,
 and dashboard are implemented development-only. The application currently has nine read-only
 analytic/decision routes (Summary, Fixture matrix, Team analytics, Players, Player analytics, Next

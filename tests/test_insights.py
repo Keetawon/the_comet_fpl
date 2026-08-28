@@ -343,8 +343,28 @@ class TestEvidenceResolution:
             data, _page_request(InsightPage.FIXTURE_MATRIX, manifest)
         )
         rank = next(fact for fact in resolved.facts if fact.id == "fixture.rank.1")
-        assert "0.4" in rank.statement
+        assert "published clean-sheet probability at 40%" in rank.statement
         assert "120" not in rank.statement
+
+    def test_fixture_attack_uses_published_expected_goals_for(self, tmp_path: Path) -> None:
+        data, manifest = _generation(tmp_path)
+        request = InsightSummaryRequest.model_validate(
+            _request_dict(
+                str(manifest["content_sha256"]),
+                page="fixture_matrix",
+                scope={
+                    "gw_from": 1,
+                    "gw_to": 2,
+                    "view": "attack",
+                    "venue": "all",
+                    "form_window": "season_to_date",
+                },
+            )
+        )
+        resolved = resolve_insight_evidence(data, request)
+        rank = next(fact for fact in resolved.facts if fact.id == "fixture.rank.1")
+        assert "published expected goals for at 2.50" in rank.statement
+        assert "140" not in rank.statement
 
     def test_explanatory_views_never_claim_a_frontier(self, tmp_path: Path) -> None:
         data, manifest = _generation(tmp_path)

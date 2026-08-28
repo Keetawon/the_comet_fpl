@@ -22,7 +22,7 @@ export interface TickerFixture {
 
 export interface FixtureChipProps<T extends TickerFixture> {
   fixture: T;
-  /** Chip headline + primitives resolved by the caller (metric + colour source). */
+  /** Chip headline + accessible metric/colour explanation resolved by the caller. */
   metric: ChipMetric;
   bucket: DifficultyBucket | null;
   /** Optional layout override for a consuming table's fixed column geometry. */
@@ -38,7 +38,7 @@ export function FixtureChip<T extends TickerFixture>({
   const venue = fixture.was_home == null ? "" : fixture.was_home ? "(H)" : "(A)";
   const label =
     `GW${fixture.gw} vs ${fixture.opponent_short_name} ${venue}: ` +
-    `${metric.value == null ? "unmeasured" : metric.title}`;
+    `${metric.value == null ? `selected metric unavailable; ${metric.title}` : metric.title}`;
   return (
     <span
       data-testid="chip"

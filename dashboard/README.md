@@ -339,14 +339,19 @@ comparison page and is not a twelfth navigation item.
   5/10/15-GW display controls. The forecast remains bounded to its recorded horizon
   (currently GW1-5); GW6-10/15 comes from a separately versioned current official-schedule
   overlay. It carries current official FDR but no later fixture lambdas, forecasts, or ease
-  indices. Under **Opponent strength** and **Club ease**, later chips use explicitly labelled
-  display proxies composed from the selected vintage's GW1-5 club-average lambdas; they have no
-  later fixture model or venue adjustment. **Official FDR** uses the current schedule-owned value.
+  indices. Modelled card headlines follow the selected view: Attack shows published expected goals
+  for (`lambda_for`), Defense shows published clean-sheet probability, and Overall shows overall
+  ease. The colour toggle affects only the background. Under **Opponent strength** and **Club
+  ease**, later chips may use explicitly labelled colour proxies composed from the selected
+  vintage's GW1-5 club-average lambdas; they have no later fixture model or venue adjustment and
+  show no forecast headline. **Official FDR** uses the current schedule-owned value for colour.
   The overlay carries the BI-export timestamp and database hash and is explicitly not the schedule
   known at an older forecast vintage.
-  The matrix is default
-  sorted by average **modelled** ease (easiest first, any column re-sorts); changing to 10
-  or 15 GWs cannot alter that average or ordering. Recent form is one compact
+  The matrix is default sorted by the selected modelled horizon measure, highest first (any column
+  re-sorts): Attack completely sums fixture lambdas, Defense completely sums fixture clean-sheet
+  probabilities as an expected clean-sheet count, and Overall averages the unitless ease index.
+  Both DGW legs count; a missing selected leg makes the applicable total unavailable. Changing to
+  10 or 15 GWs cannot add schedule-only rows to the measure or ordering. Recent form is one compact
   line labelled with its anchor season (at GW1 that is *last* season). Colour source is a
   three-way toggle: **opponent strength** (default; a display-time club-quality index
   derived from the vintage's published lambdas — 100 = average club, higher = stronger

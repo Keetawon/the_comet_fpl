@@ -167,6 +167,13 @@ builder returns concise source-linked facts and caveats from its visible scope. 
 vintage, horizon, probability, form/forecast, and outcome-finality semantics. Empty pages explain
 why there is no evidence instead of producing generic prose.
 
+Fixture Matrix facts use the same view-owned published metric as the visible modelled cards:
+`lambda_for` for Attack, `probability_clean_sheet` for Defense, and `overall_ease_index` for
+Overall. The Python evidence resolver follows that exact mapping. Attack horizon totals sum
+published lambdas; Defense horizon totals sum fixture clean-sheet probabilities as an expected
+count, not a probability of at least one clean sheet. Schedule-only rows and incomplete aggregates
+remain outside the fact ranking rather than being represented by colour proxies or partial sums.
+
 ## Implemented acceptance
 
 - Contract tests reject extra keys (including facts, caveats, private text, and arbitrary prompts),

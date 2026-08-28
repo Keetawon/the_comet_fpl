@@ -1,6 +1,6 @@
 // Fixture matrix (Team) page: the fixture pivot. One row per club of the SELECTED
-// vintage, one COLUMN per upcoming gameweek (the pivot), default-sorted by average ease
-// (easiest schedule first). Cells colour on the selected source -- opponent strength by
+// vintage, one COLUMN per upcoming gameweek (the pivot), default-sorted by the selected
+// modelled horizon measure. Cells colour on the selected source -- opponent strength by
 // default, so a strong club's row is no longer uniformly green: the colour follows the
 // OPPONENT, not the row club. Expanding a row defaults to the latest five finalized
 // gameweeks across the forecast season boundary, with explicit single-season scopes available.
@@ -63,7 +63,7 @@ import {
   type ColorSource,
   type ViewMode,
 } from "@/lib/difficulty";
-import { chipBucket, chipMetric, viewMetric } from "@/lib/fixtureChips";
+import { chipBucket, fixtureViewChipMetric, viewMetric } from "@/lib/fixtureChips";
 import {
   SCHEDULE_EASE_PROXY_FORMULA,
   buildOpponentStrength,
@@ -107,7 +107,7 @@ interface TeamRow {
   scheduleOnly: ScheduleFixture[];
   form: TeamFormWindow | null;
   formLabel: string | null;
-  avgMetric: number | null;
+  horizonMetric: number | null;
   actualDetails: TeamActualFixtureDetail[];
 }
 
@@ -124,11 +124,34 @@ function previousSeason(season: string): string | null {
 const fmt = (value: number | null | undefined, digits = 1) =>
   value == null ? "–" : value.toFixed(digits);
 
-const VIEW_LABEL: Record<ViewMode, string> = {
-  overall: "overall ease",
-  attack: "attack ease",
-  defense: "clean-sheet probability",
+const HORIZON_HEADER: Record<ViewMode, string> = {
+  overall: "Avg modelled overall ease",
+  attack: "Total expected goals for",
+  defense: "Expected clean sheets",
 };
+
+const HORIZON_TITLE: Record<ViewMode, string> = {
+  overall: "Average published overall ease across measured modelled fixture legs.",
+  attack: "Complete sum of published expected goals for (lambda for); every DGW leg counts.",
+  defense:
+    "Complete sum of published per-fixture clean-sheet probabilities: an expected count, not the probability of at least one clean sheet.",
+};
+
+function horizonMetric(fixtures: TeamFixture[], view: ViewMode): number | null {
+  if (!fixtures.length) return null;
+  if (view === "attack" || view === "defense") {
+    const values = fixtures.map((fixture) => viewMetric(fixture, view));
+    const measured = values.filter(
+      (value): value is number => value != null && Number.isFinite(value),
+    );
+    if (measured.length !== fixtures.length) return null;
+    return measured.reduce((total, value) => total + value, 0);
+  }
+  const values = fixtures
+    .map((fixture) => viewMetric(fixture, view))
+    .filter((value): value is number => value != null && Number.isFinite(value));
+  return values.length ? values.reduce((total, value) => total + value, 0) / values.length : null;
+}
 
 const HEAD_CLASS = "sticky top-0 z-10 h-8 bg-background px-2 text-xs whitespace-nowrap";
 const CELL_CLASS = "px-2 py-1 text-xs whitespace-nowrap";
@@ -193,7 +216,7 @@ function TeamGwCell({
           <FixtureChip
             key={f.fixture}
             fixture={f}
-            metric={chipMetric(f, view, colorSource, opponentIndex)}
+            metric={fixtureViewChipMetric(f, view, colorSource, opponentIndex)}
             bucket={chipBucket(f, view, colorSource, cleanSheetAnchor, opponentIndex)}
             className={FIXTURE_CARD_WIDTH_CLASS}
           />
@@ -242,21 +265,13 @@ function TeamGwCell({
                     : "selected-vintage club-ease proxy unavailable";
         const label =
           `GW${fixture.gw} vs ${fixture.opponent_short_name} ${venue}: current official ` +
-          `schedule only; ${colourLabel}; ${kickoff} UTC`;
-        const display =
-          colorSource === "opponent"
-            ? opponentIndex == null
-              ? "-"
-              : opponentIndex.toFixed(0)
-            : colorSource === "fdr"
-              ? fixture.official_fdr == null
-                ? "-"
-                : `FDR ${fixture.official_fdr}`
-              : easeValue == null
-                ? "-"
-                : view === "defense"
-                  ? `${Math.round(easeValue * 100)}%`
-                  : easeValue.toFixed(0);
+          `schedule only; no published ${
+            view === "attack"
+              ? "expected-goals-for forecast"
+              : view === "defense"
+                ? "clean-sheet probability forecast"
+                : "overall-ease forecast"
+          } for this gameweek; ${colourLabel}; ${kickoff} UTC`;
         return (
           <span
             key={fixture.fixture}
@@ -276,7 +291,7 @@ function TeamGwCell({
               <span className="ml-0.5 font-normal">{venue}</span>
             </span>
             <span className="text-[9px] leading-tight tabular-nums">
-              GW{fixture.gw} · {display}
+              GW{fixture.gw} · —
             </span>
           </span>
         );
@@ -292,7 +307,7 @@ export function FixtureMatrixPage() {
   const [formWindow, setFormWindow] = useState<WindowLabel>("last_5");
   const [horizon, setHorizon] = useState<FixtureHorizon>(5);
   const [filters, setFilters] = useState<FilterState | null>(null);
-  const [sorting, setSorting] = useState<SortingState>([{ id: "avgMetric", desc: true }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "horizonMetric", desc: true }]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
   const [actualScope, setActualScope] = useState(ROLLING_ACTUAL_SCOPE);
 
@@ -492,9 +507,6 @@ export function FixtureMatrixPage() {
             (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? "") ||
             a.fixture - b.fixture,
         );
-      const values = filtered
-        .map((f) => viewMetric(f, filters.view))
-        .filter((v): v is number => v != null);
       const form = team.form;
       return {
         team,
@@ -502,7 +514,7 @@ export function FixtureMatrixPage() {
         scheduleOnly,
         form: form ? form.windows[formWindow] : null,
         formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
-        avgMetric: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null,
+        horizonMetric: horizonMetric(filtered, filters.view),
         actualDetails: teamActualDetailsForGameweeks(
           actualByTeamCode.get(team.team_code) ?? [],
           actualGameweeks,
@@ -570,14 +582,19 @@ export function FixtureMatrixPage() {
         },
       },
       {
-        id: "avgMetric",
-        header: `Avg modelled ${filters ? VIEW_LABEL[filters.view] : ""} (GW${runBounds.from}–${runBounds.to})`,
-        accessorFn: (row) => row.avgMetric,
+        id: "horizonMetric",
+        header: () => (
+          <span title={filters ? HORIZON_TITLE[filters.view] : undefined}>
+            {filters ? HORIZON_HEADER[filters.view] : "Modelled horizon"} (GW{runBounds.from}–
+            {runBounds.to})
+          </span>
+        ),
+        accessorFn: (row) => row.horizonMetric,
         cell: ({ row }) => {
-          const value = row.original.avgMetric;
-          if (value == null) return <span className="text-muted-foreground">–</span>;
+          const value = row.original.horizonMetric;
+          if (value == null) return <span className="text-muted-foreground">—</span>;
           const text =
-            filters?.view === "defense" ? `${Math.round(value * 100)}%` : value.toFixed(1);
+            filters?.view === "overall" ? value.toFixed(1) : value.toFixed(2);
           return <span className="tabular-nums font-medium">{text}</span>;
         },
       },
@@ -670,6 +687,18 @@ export function FixtureMatrixPage() {
         left.fixture.fixture - right.fixture.fixture,
     );
   const bestFixture = rankedFixtures[0];
+  const selectedFixtureMetricLabel =
+    filters?.view === "attack"
+      ? "published expected goals for"
+      : filters?.view === "defense"
+        ? "published clean-sheet probability"
+        : "published overall ease index";
+  const formatSelectedFixtureMetric = (value: number) =>
+    filters?.view === "defense"
+      ? `${Math.round(value * 100)}%`
+      : filters?.view === "attack"
+        ? value.toFixed(2)
+        : value.toFixed(1);
   const scheduleOnlyRows = rows.reduce((total, row) => total + row.scheduleOnly.length, 0);
   const fallbackRows = modelledFacts.filter((row) => row.fixture.stage_a_league_average_team).length;
   const insightFacts = [
@@ -689,15 +718,16 @@ export function FixtureMatrixPage() {
       insightFact(
         "rank.highest_fixture_metric",
         "rank",
-        `${bestFixture.team.team_name} against ${bestFixture.fixture.opponent_short_name} in GW${bestFixture.fixture.gw} has the highest visible ${filters?.view === "defense" ? "clean-sheet probability" : `${filters?.view ?? "overall"} ease index`} at ${bestFixture.value.toFixed(3)}.`,
+        `${bestFixture.team.team_name} against ${bestFixture.fixture.opponent_short_name} in GW${bestFixture.fixture.gw} has the highest visible ${selectedFixtureMetricLabel} at ${formatSelectedFixtureMetric(bestFixture.value)}.`,
         ["fixture_matrix.json"],
       ),
     ] : []),
   ];
   const insightCaveats = [
     "Ranks use directly published fixture values; schedule-only rows do not enter modelled ranks.",
+    "Attack totals sum published expected goals; expected clean sheets sums per-fixture probabilities into an expected count, not a probability of at least one clean sheet.",
     "The current schedule overlay may be newer than the selected forecast vintage.",
-    "Null fixture values are omitted and are never interpreted as zero.",
+    "Null fixture values are omitted from ranks; a missing Attack or Defense fixture leg makes its horizon total unavailable rather than partial.",
   ];
 
   return (
@@ -721,11 +751,15 @@ export function FixtureMatrixPage() {
           cleanSheetAnchor={cleanSheetAnchor}
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Sorted by average modelled ease, easiest schedule first (click any column to re-sort).
-          One column per gameweek; two chips in a double gameweek. Beyond GW{runBounds.to},
-          current official fixtures use current schedule FDR or fixed selected-vintage display
-          proxies for opponent strength and club ease. Those later cards never affect the
-          modelled average.
+          Sorted by the selected modelled horizon measure, highest first (click any column to
+          re-sort). Attack totals published expected goals for; Defense sums per-fixture clean-sheet
+          probabilities as an expected count; Overall averages the ease index. Every double-gameweek
+          leg counts.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Beyond GW{runBounds.to}, current official fixtures show no forecast headline. Their colour
+          may still use current schedule FDR or a fixed selected-vintage display proxy for opponent
+          strength or club ease; those later cards never affect the modelled horizon measure.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Current schedule overlay exported{" "}

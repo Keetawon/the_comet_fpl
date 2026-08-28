@@ -115,6 +115,8 @@ _CAVEATS: Final[dict[InsightPage, tuple[str, ...]]] = {
     InsightPage.FIXTURE_MATRIX: (
         "Future forecast values and backward-looking form remain separate.",
         "Missing published values remain missing rather than zero.",
+        "Expected clean sheets is a sum of published fixture probabilities, not a "
+        "probability of at least one clean sheet.",
     ),
     InsightPage.PLAYERS: (
         "Availability is a reported next-round overlay and is not applied to raw expected points.",
@@ -474,21 +476,28 @@ def _fixture_matrix(generation: _Generation, request: InsightSummaryRequest) -> 
     ]
     view = request.scope.view.value if request.scope.view is not None else "overall"
     key = {
-        "attack": "attack_ease_index",
+        "attack": "lambda_for",
         "defence": "probability_clean_sheet",
         "overall": "overall_ease_index",
     }.get(view, "overall_ease_index")
+    label = {
+        "attack": "published expected goals for",
+        "defence": "published clean-sheet probability",
+        "overall": "published overall ease index",
+    }.get(view, "published overall ease index")
     measured = [
         (team, fixture) for team, fixture in rows if isinstance(fixture.get(key), (int, float))
     ]
     measured.sort(key=lambda item: (-float(item[1][key]), int(item[1]["fixture"])))
     for index, (team, fixture) in enumerate(measured[:2], 1):
+        value = float(fixture[key])
+        display_value = f"{value * 100:.0f}%" if view == "defence" else f"{value:.2f}"
         facts.append(
             _fact(
                 f"fixture.rank.{index}",
                 InsightFactKind.RANK,
-                f"{_label(team.get('short_name'), 'Club')} ranks {index} on the selected "
-                f"published value at {_number(fixture.get(key), 1)} against "
+                f"{_label(team.get('short_name'), 'Club')} ranks {index} on {label} at "
+                f"{display_value} against "
                 f"{_label(fixture.get('opponent_short_name'), 'opponent')}.",
                 InsightReadModel.FIXTURE_MATRIX,
             )
