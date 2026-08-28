@@ -1,7 +1,7 @@
 // Page smoke: the Players pivot renders from a read model without crashing -- one row
 // per player of the SELECTED vintage (never one per recorded run), player filters, the
-// availability overlay label, per-GW chip columns with blank slots, and expanded historical
-// fixture observations from the explicit Actual season/GW scope.
+// availability overlay label, per-GW chip columns with blank slots, and expanded rolling
+// historical fixture observations across the current and immediately preceding seasons.
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -935,76 +935,78 @@ describe("PlayersPage", () => {
       .toHaveTextContent("4");
   });
 
-  it("expands a row over shared latest-five Actual GWs with DGWs, gaps, and nulls intact", async () => {
+  it("expands a row over the shared rolling five GWs across seasons with DGWs and gaps intact", async () => {
     const user = userEvent.setup();
     const alpha = playersWithActuals[0];
     vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
       ...actualsData,
-      players: actualsData.players.map((player) =>
-        player.code === alpha.code
-          ? {
-              ...player,
-              actuals: [
-                actualFromForm({}, { gw: 1, fixture: 1001, kickoff_time: "2026-08-01T12:00:00+00:00" }),
-                actualFromForm({}, { gw: 3, fixture: 1003, kickoff_time: "2026-08-15T12:00:00+00:00" }),
-                actualFromForm({}, { gw: 5, fixture: 1005, kickoff_time: "2026-08-29T12:00:00+00:00" }),
-                actualFromForm(
-                  {},
-                  {
-                    gw: 7,
-                    fixture: 1007,
-                    kickoff_time: "2026-09-12T12:00:00+00:00",
-                    expected_goals: 0,
-                    expected_assists: 0,
-                  },
-                ),
-                actualFromForm(
-                  {},
-                  {
-                    gw: 9,
-                    fixture: 1009,
-                    kickoff_time: "2026-09-26T12:00:00+00:00",
-                    minutes: 0,
-                    starts: 0,
-                    goals_scored: 0,
-                    assists: 0,
-                    expected_goals: null,
-                    expected_assists: 0,
-                    bps: null,
-                  },
-                ),
-                actualFromForm(
-                  {},
-                  {
-                    gw: 10,
-                    fixture: 1010,
-                    kickoff_time: "2026-10-03T12:00:00+00:00",
-                    expected_goals: 0.25,
-                    expected_assists: 0.15,
-                  },
-                ),
-                actualFromForm(
-                  {},
-                  {
-                    gw: 10,
-                    fixture: 1011,
-                    kickoff_time: "2026-10-03T16:00:00+00:00",
-                    expected_goals: 0.4,
-                    expected_assists: 0.2,
-                  },
-                ),
-              ],
-            }
-          : player.code === playersWithActuals[1].code
+      players: [
+        ...actualsData.players.map((player) =>
+          player.code === alpha.code
             ? {
                 ...player,
                 actuals: [
-                  actualFromForm({}, { gw: 6, fixture: 2006 }),
-                  actualFromForm({}, { gw: 8, fixture: 2008 }),
+                  actualFromForm(
+                    {},
+                    {
+                      gw: 1,
+                      fixture: 1010,
+                      kickoff_time: "2026-08-15T12:00:00+00:00",
+                      expected_goals: 0.25,
+                      expected_assists: 0.15,
+                    },
+                  ),
+                  actualFromForm(
+                    {},
+                    {
+                      gw: 1,
+                      fixture: 1011,
+                      kickoff_time: "2026-08-15T16:00:00+00:00",
+                      expected_goals: 0.4,
+                      expected_assists: 0.2,
+                    },
+                  ),
                 ],
               }
-            : player,
-      ),
+            : { ...player, actuals: [] },
+        ),
+        {
+          season: "2025-26",
+          code: alpha.code,
+          actuals: [
+            actualFromForm({}, { gw: 34, fixture: 1034 }),
+            actualFromForm(
+              {},
+              {
+                gw: 35,
+                fixture: 1035,
+                expected_goals: 0,
+                expected_assists: 0,
+              },
+            ),
+            actualFromForm(
+              {},
+              {
+                gw: 36,
+                fixture: 1036,
+                minutes: 0,
+                starts: 0,
+                goals_scored: 0,
+                assists: 0,
+                expected_goals: null,
+                expected_assists: 0,
+                bps: null,
+              },
+            ),
+            actualFromForm({}, { gw: 38, fixture: 1038 }),
+          ],
+        },
+        {
+          season: "2025-26",
+          code: playersWithActuals[1].code,
+          actuals: [actualFromForm({}, { gw: 37, fixture: 2037 })],
+        },
+      ],
     });
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
@@ -1012,12 +1014,12 @@ describe("PlayersPage", () => {
     expect(alphaRow).not.toBeNull();
     await user.click(within(alphaRow!).getByRole("button", { name: /expand fixtures/i }));
 
-    const detailHeading = await screen.findByText(/Alpha.*latest five completed Actual GWs/);
+    const detailHeading = await screen.findByText(/Alpha.*rolling latest five completed GWs/);
     const detailTable = detailHeading.parentElement?.querySelector("table");
     expect(detailTable).not.toBeNull();
     const detail = within(detailTable!);
     expect(detail.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-      "GW",
+      "Season / GW",
       "Kickoff (UTC)",
       "Min",
       "Start",
@@ -1039,19 +1041,21 @@ describe("PlayersPage", () => {
     expect(detail.queryByText("Club λ for")).not.toBeInTheDocument();
 
     const fixtureRows = detail.getAllByRole("row").slice(1);
-    expect(fixtureRows).toHaveLength(4);
+    expect(fixtureRows).toHaveLength(5);
     expect(fixtureRows.map((row) => within(row).getAllByRole("cell")[0].textContent)).toEqual([
-      "10",
-      "10",
-      "9",
-      "7",
+      "2026-27 GW1",
+      "2026-27 GW1",
+      "2025-26 GW38",
+      "2025-26 GW36",
+      "2025-26 GW35",
     ]);
-    expect(within(fixtureRows[0]).getAllByRole("cell")[1]).toHaveTextContent("2026-10-03 16:00");
-    expect(within(fixtureRows[1]).getAllByRole("cell")[1]).toHaveTextContent("2026-10-03 12:00");
-    expect(within(fixtureRows[2]).getAllByRole("cell")[2]).toHaveTextContent("0");
-    expect(within(fixtureRows[2]).getAllByRole("cell")[8]).toHaveTextContent("–");
-    expect(within(fixtureRows[2]).getAllByRole("cell")[15]).toHaveTextContent("–");
-    expect(within(fixtureRows[3]).getAllByRole("cell")[8]).toHaveTextContent("0.00");
+    expect(within(fixtureRows[0]).getAllByRole("cell")[1]).toHaveTextContent("2026-08-15 16:00");
+    expect(within(fixtureRows[1]).getAllByRole("cell")[1]).toHaveTextContent("2026-08-15 12:00");
+    expect(within(fixtureRows[3]).getAllByRole("cell")[2]).toHaveTextContent("0");
+    expect(within(fixtureRows[3]).getAllByRole("cell")[8]).toHaveTextContent("–");
+    expect(within(fixtureRows[3]).getAllByRole("cell")[15]).toHaveTextContent("–");
+    expect(within(fixtureRows[4]).getAllByRole("cell")[8]).toHaveTextContent("0.00");
+    expect(detail.queryByText("2025-26 GW34")).not.toBeInTheDocument();
   });
 
   it("does not fall back to forecast fixtures when selected actual history is empty", async () => {
@@ -1068,7 +1072,7 @@ describe("PlayersPage", () => {
     const alphaRow = screen.getByText("Alpha").closest("tr");
     await user.click(within(alphaRow!).getByRole("button", { name: /expand fixtures/i }));
     expect(
-      await screen.findByText("No finalized fixture history exists in the selected Actual-GW range."),
+      await screen.findByText("No finalized fixture history exists in the rolling latest-five-GW window."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Club λ for")).not.toBeInTheDocument();
   });

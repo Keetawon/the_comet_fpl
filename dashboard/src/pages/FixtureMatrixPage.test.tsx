@@ -175,9 +175,13 @@ describe("FixtureMatrixPage", () => {
     render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Enter Fixture matrix table fullscreen" }),
-    ).toBeInTheDocument();
+    const fullscreenButton = screen.getByRole("button", {
+      name: "Enter Fixture matrix table fullscreen",
+    });
+    expect(fullscreenButton).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Filters" }).nextElementSibling).toContainElement(
+      fullscreenButton,
+    );
     expect(screen.getAllByRole("button", { name: /Fixture matrix table fullscreen/ })).toHaveLength(1);
     expect(screen.getAllByText("Beta").length).toBeGreaterThan(0);
     // recent form from the anchor season, one compact line
@@ -358,18 +362,20 @@ describe("FixtureMatrixPage", () => {
     );
   });
 
-  it("shows the shared latest-five Actual-GW window, DGWs, nulls, and season isolation", async () => {
+  it("shows the shared rolling window, DGWs, nulls, and explicit season isolation", async () => {
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
-    expect(screen.getByRole("combobox", { name: "Actual season" })).toHaveTextContent("2026-27");
+    expect(screen.getByRole("combobox", { name: "Actual scope" })).toHaveTextContent("Rolling 5");
     const alphaRow = screen.getByText("Alpha").closest("tr");
     expect(alphaRow).not.toBeNull();
     await user.click(within(alphaRow!).getByRole("button", { name: "Expand recent results" }));
 
     const currentDetail = screen.getByTestId("team-actual-details-101");
-    expect(currentDetail).toHaveTextContent("shared window GW6, GW5, GW4, GW3, GW2");
+    expect(currentDetail).toHaveTextContent(
+      "shared window 2026-27 GW6, 2026-27 GW5, 2026-27 GW4, 2026-27 GW3, 2026-27 GW2",
+    );
     const currentFixtures = [
       ...currentDetail.querySelectorAll<HTMLElement>("[data-actual-fixture]"),
     ];
@@ -387,7 +393,7 @@ describe("FixtureMatrixPage", () => {
     expect(currentFixtures[1]).toHaveTextContent(/0\s*0\s*–\s*–\s*–\s*–/);
     expect(within(currentDetail).queryByText(/lambda|ease|probability|modelled|schedule only/i)).toBeNull();
 
-    screen.getByRole("combobox", { name: "Actual season" }).focus();
+    screen.getByRole("combobox", { name: "Actual scope" }).focus();
     await user.keyboard("{Enter}");
     await user.click(await screen.findByRole("option", { name: "2025-26" }));
     await waitFor(() => expect(screen.queryByTestId("team-actual-details-101")).toBeNull());
@@ -402,11 +408,19 @@ describe("FixtureMatrixPage", () => {
     expect(priorDetail).not.toHaveTextContent("GW6");
   });
 
-  it("defaults to the current season without prior-season backfill and shows an empty club state", async () => {
+  it("continues the rolling five through the prior season without per-club backfill", async () => {
     vi.mocked(loadTeamActuals).mockResolvedValueOnce({
       ...teamActuals,
       teams: [
-        teamActuals.teams[0],
+        {
+          ...teamActuals.teams[0],
+          actuals: [
+            actual({ gw: 35, fixture: 350, kickoff_time: "2026-05-03T15:00:00+00:00" }),
+            actual({ gw: 36, fixture: 360, kickoff_time: "2026-05-10T15:00:00+00:00" }),
+            actual({ gw: 37, fixture: 370, kickoff_time: "2026-05-17T15:00:00+00:00" }),
+            teamActuals.teams[0].actuals[0],
+          ],
+        },
         {
           season: "2026-27",
           team_code: 101,
@@ -421,15 +435,31 @@ describe("FixtureMatrixPage", () => {
     const alphaRow = screen.getByText("Alpha").closest("tr");
     await user.click(within(alphaRow!).getByRole("button", { name: "Expand recent results" }));
     const detail = screen.getByTestId("team-actual-details-101");
-    expect(detail).toHaveTextContent("2026-27");
-    expect(detail).toHaveTextContent("GW1");
-    expect(detail).not.toHaveTextContent("GW38");
+    expect(detail).toHaveTextContent(
+      "shared window 2026-27 GW1, 2025-26 GW38, 2025-26 GW37, 2025-26 GW36, 2025-26 GW35",
+    );
+    expect(
+      [...detail.querySelectorAll<HTMLElement>("[data-actual-fixture]")].map(
+        (row) => row.dataset.actualFixture,
+      ),
+    ).toEqual(["100", "380", "370", "360", "350"]);
 
     const betaRow = screen.getByText("Beta").closest("tr");
     await user.click(within(betaRow!).getByRole("button", { name: "Expand recent results" }));
     expect(screen.getByTestId("team-actual-details-102")).toHaveTextContent(
       /No finalized results are available/,
     );
+
+    screen.getByRole("combobox", { name: "Actual scope" }).focus();
+    await user.keyboard("{Enter}");
+    await user.click(await screen.findByRole("option", { name: "2026-27" }));
+    const alphaCurrentRow = screen.getByText("Alpha").closest("tr");
+    await user.click(
+      within(alphaCurrentRow!).getByRole("button", { name: "Expand recent results" }),
+    );
+    const currentOnlyDetail = screen.getByTestId("team-actual-details-101");
+    expect(currentOnlyDetail).toHaveTextContent("shared window 2026-27 GW1");
+    expect(currentOnlyDetail).not.toHaveTextContent("2025-26 GW38");
   });
 
   it("explains when the export carries no recorded vintage", async () => {

@@ -101,6 +101,11 @@ cold-start selector changes only reporting eligibility over the directly publish
 flag. These selectors prevent a visible season/range or population change from reusing evidence
 resolved for a different page state.
 
+The Players and Fixture Matrix expanded rows have a separate, local rolling latest-five history
+that may cross from the forecast season into its immediate predecessor. It is display-only and does
+not alter the season-scoped main aggregate, these insight selectors, the deterministic fact packet,
+or provider/cache evidence. No expanded-row payload is sent to the optional renderer.
+
 There is no fact, caveat, chat, or arbitrary-text field. Extra keys fail closed. The server resolves
 the selector against the explicitly configured dashboard-data directory, verifies the schema-v8
 manifest content hash, every file hash, run/season/`as_of`, and a stable manifest before and after

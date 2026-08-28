@@ -38,12 +38,12 @@ import type { ColorSource, ViewMode } from "@/lib/difficulty";
 import { playerChipBucket, playerChipMetric } from "@/lib/playerChips";
 import { availabilityLabel } from "@/lib/availability";
 import type {
-  PlayerActualFixture,
   PlayerFixture,
   PlayerFormWindow,
   PlayerHorizon,
   PlayerRecord,
 } from "@/data/types";
+import type { PlayerHistoricalFixture } from "@/lib/playerActuals";
 
 export interface PlayerStatRow {
   player: PlayerRecord;
@@ -53,8 +53,8 @@ export interface PlayerStatRow {
   gwFromXp?: number | null;
   /** Players-only descriptive BPS average over appeared fixtures in the Actual-GW scope. */
   bpsPerAppearance?: number | null;
-  /** Players-only latest completed fixture history, already restricted to its Actual scope. */
-  actualDetails?: PlayerActualFixture[];
+  /** Players-only rolling completed fixture history across this season and its predecessor. */
+  actualDetails?: PlayerHistoricalFixture[];
   totalXp: number | null;
   /** Exact backend-published cumulative endpoint; absent under incompatible fixture filters. */
   horizon?: PlayerHorizon | null;
@@ -198,12 +198,16 @@ interface HistoricalDetailColumn {
   key: string;
   label: string;
   title?: string;
-  value: (fixture: PlayerActualFixture) => string;
+  value: (fixture: PlayerHistoricalFixture) => string;
 }
 
 /** Published fixture-grain observations only; no forecast primitive appears in this profile. */
 const HISTORICAL_DETAIL_COLUMNS: readonly HistoricalDetailColumn[] = [
-  { key: "gw", label: "GW", value: (fixture) => String(fixture.gw) },
+  {
+    key: "season_gw",
+    label: "Season / GW",
+    value: (fixture) => `${fixture.season} GW${fixture.gw}`,
+  },
   {
     key: "kickoff",
     label: "Kickoff (UTC)",
@@ -805,7 +809,7 @@ export function PlayerStatTable({
                 const player = row.original.player;
                 const forecastDetail = forecastDetailColumns(view);
                 // Forecast detail follows match time; historical detail is selected and ordered
-                // by the Players route's explicit Actual season/GW scope.
+                // by the Players route's rolling page-wide season/gameweek scope.
                 const forecastFixtures = [...player.fixtures].sort(
                   (a, b) =>
                     (a.kickoff_time ?? "9999").localeCompare(b.kickoff_time ?? "9999") ||
@@ -820,7 +824,7 @@ export function PlayerStatTable({
                         <p className="text-xs font-medium">
                           {player.web_name} ({player.position}, {player.team_short_name}) —
                           {expandedRowMode === "historical"
-                            ? " latest five completed Actual GWs (newest first)"
+                            ? " rolling latest five completed GWs across forecast and prior season (newest first)"
                             : " forecast per-fixture detail"}
                           {expandedRowMode === "forecast" && player.form
                             ? ` · form anchored ${player.form.season} GW${player.form.as_at_gw}`
@@ -853,7 +857,7 @@ export function PlayerStatTable({
                             {expandedRowMode === "historical" ? (
                               historicalFixtures.length > 0 ? (
                                 historicalFixtures.map((fixture) => (
-                                  <TableRow key={fixture.fixture}>
+                                  <TableRow key={`${fixture.season}-${fixture.fixture}`}>
                                     {HISTORICAL_DETAIL_COLUMNS.map((column) => (
                                       <TableCell
                                         key={column.key}
@@ -870,7 +874,7 @@ export function PlayerStatTable({
                                     colSpan={HISTORICAL_DETAIL_COLUMNS.length}
                                     className="px-2 py-2 text-[11px] text-muted-foreground"
                                   >
-                                    No finalized fixture history exists in the selected Actual-GW range.
+                                    No finalized fixture history exists in the rolling latest-five-GW window.
                                   </TableCell>
                                 </TableRow>
                               )

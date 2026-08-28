@@ -19,11 +19,12 @@ Schema v8 is the current development-only application contract. The ordered prog
    from `player_actuals.json` and exposes an explicit Actual season plus independent `Actual GWs`
    range. The payload and selector are limited to the forecast season and its immediately
    preceding season, with the predecessor present only when finalized observations were published;
-   the page never mixes seasons or silently substitutes one;
+   the main-table aggregate never mixes seasons or silently substitutes one;
 5. **Implemented development-only:** `team_actuals.json` provides the parallel normalized
-   finalized team-fixture history for Fixture Matrix expanded rows. An explicit Actual season shows
-   the page-wide set of the latest five distinct finalized gameweeks from that season, with double-
-   gameweek legs retained and no cross-season fill.
+   finalized team-fixture history for Fixture Matrix expanded rows. Its Actual scope defaults to
+   the page-wide rolling latest five distinct season-qualified finalized gameweeks across the
+   forecast season and its immediate predecessor; explicit single-season options remain available,
+   and double-gameweek legs are retained.
 
 The implemented deep-analytics routes are `#player-analytics` and `#team-analytics`; both are
 linked directly in the sidebar and retain an exact-table equivalent for every chart.
@@ -344,16 +345,18 @@ comparison page and is not a twelfth navigation item.
   three-way toggle: **opponent strength** (default; a display-time club-quality index
   derived from the vintage's published lambdas — 100 = average club, higher = stronger
   opponent = red, so a strong club's own row is no longer uniformly green), the row club's
-  model ease (overall/attack/clean-sheet views), or official FDR. Expanding a row is historical:
-  an explicit Actual season selects the page-wide set of the latest five distinct finalized
-  gameweeks in `team_actuals.json`, newest first, while retaining every double-gameweek leg. The
+  model ease (overall/attack/clean-sheet views), or official FDR. Expanding a row is historical; its
+  Actual scope defaults to the page-wide rolling latest five distinct season-qualified finalized
+  gameweeks across the forecast season and its immediate predecessor, newest first, with explicit
+  single-season options and every double-gameweek leg retained. The
   detail columns are match/GW and kickoff, opponent and venue, official GF/GA, source-row xG/xGC,
   summed BPS, and raw defensive-contribution actions. These component sums are not independently
-  roster-reconciled. A sparse current season stays sparse; it is never filled from the
-  prior season, and NULL components remain dashes. Possession and shots are unavailable in the
-  approved sources. The existing FBref path is an unpopulated operator-vendored defensive-actions
-  CSV and cannot provide them, so the UI does not display a proxy. Future fixture-level drill-down
-  remains on Next GW only.
+  roster-reconciled. Rows show season plus GW. Returning clubs join across seasons only on permanent
+  `team_code`; a promoted club with no prior-Premier-League row has a shorter expansion rather than
+  inheriting another club's history. NULL components remain dashes. Possession and shots are
+  unavailable in the approved sources. The existing FBref path is an unpopulated operator-vendored
+  defensive-actions CSV and cannot provide them, so the UI does not display a proxy. Future
+  fixture-level drill-down remains on Next GW only.
 - **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
   `players.json` plus normalized `player_actuals.json` — one row per player of the selected
   vintage (photo + club badge) merging
@@ -389,12 +392,16 @@ comparison page and is not a twelfth navigation item.
   unchanged. A failed or partial
   import leaves the existing table scope unchanged. Changing forecast vintage clears the private
   scope and requires a fresh verification; hosted static builds cannot use it. Rows are compact
-  and paginated. On Players, the expanded row reads historical `player_actuals.json` rows inside
-  the selected Actual season/range, takes the page-wide set of the latest five distinct GW labels,
-  preserves every DGW leg, and orders the result newest first. It shows GW/kickoff, minutes/start,
+  and paginated. On Players, the main aggregate still reads the explicit Actual season/range. The
+  expanded row is a separate rolling history over `player_actuals.json`: it takes the page-wide set
+  of the latest five distinct season-qualified finalized GW labels across the forecast season and
+  its immediate predecessor, preserves every DGW leg, and orders the result newest first. It shows
+  season/GW/kickoff, minutes/start,
   goals, assists, xG,
   xA, fail-closed display xGI, clean sheets, on-pitch goals conceded, saves, raw DC actions, xGC,
   bonus, raw BPS, and points; it contains no future xP, probability, lambda, ease, or FDR field.
+  Cross-season player rows join only on permanent `code`; a newcomer without prior-season evidence
+  stays shorter and is never matched by name or season-scoped `element_id`.
   The shared `PlayerStatTable` retains a separate forecast-detail mode for the Next GW squad table,
   which is the only future player-fixture drill-down. The failure-atomic local development database
   rebuild and atomic BI/static

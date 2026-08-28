@@ -4,49 +4,86 @@ interface PlayerActualCollection {
   actuals: readonly PlayerActualFixture[];
 }
 
+interface SeasonalPlayerActualCollection extends PlayerActualCollection {
+  season: string;
+}
+
+export interface ActualSeasonGameweek {
+  season: string;
+  gw: number;
+}
+
+export interface PlayerHistoricalFixture extends PlayerActualFixture {
+  season: string;
+}
+
 export interface ActualGameweekRange {
   minGw: number;
   maxGw: number;
 }
 
-/** Shared newest completed GW labels for the page's explicit season/range. */
+const seasonGameweekKey = (season: string, gw: number) => `${season}\u0000${gw}`;
+
+/**
+ * Shared rolling completed-GW labels across an explicitly ordered set of seasons.
+ *
+ * The caller supplies newest season first, so the season boundary is deterministic and does not
+ * depend on string ordering. The page-wide set is selected before any player's detail is built;
+ * an individual player with a gap therefore cannot backfill an older gameweek.
+ */
 export function latestActualGameweeks(
-  players: readonly PlayerActualCollection[],
-  gwFrom: number,
-  gwTo: number,
+  players: readonly SeasonalPlayerActualCollection[],
+  seasonsNewestFirst: readonly string[],
   gameweekLimit = 5,
-): number[] {
+): ActualSeasonGameweek[] {
   if (gameweekLimit <= 0) return [];
-  return [
-    ...new Set(
-      players.flatMap((player) =>
-        player.actuals
-          .filter((row) => row.gw >= gwFrom && row.gw <= gwTo)
-          .map((row) => row.gw),
-      ),
-    ),
-  ]
-    .sort((left, right) => right - left)
+  const seasonRank = new Map(seasonsNewestFirst.map((season, index) => [season, index]));
+  const gameweeks = new Map<string, ActualSeasonGameweek>();
+  for (const player of players) {
+    if (!seasonRank.has(player.season)) continue;
+    for (const actual of player.actuals) {
+      const gameweek = { season: player.season, gw: actual.gw };
+      gameweeks.set(seasonGameweekKey(gameweek.season, gameweek.gw), gameweek);
+    }
+  }
+  return [...gameweeks.values()]
+    .sort(
+      (left, right) =>
+        (seasonRank.get(left.season) ?? Number.MAX_SAFE_INTEGER) -
+          (seasonRank.get(right.season) ?? Number.MAX_SAFE_INTEGER) ||
+        right.gw - left.gw,
+    )
     .slice(0, gameweekLimit);
 }
 
 /**
  * Fixture-grain history for an expanded Players row.
  *
- * The limit is five distinct completed gameweeks, not five fixtures: every leg of a
- * double gameweek is retained. Selection is confined to the caller's explicit Actual-GW range,
- * and gaps are not backfilled from outside it.
+ * The limit is five distinct completed season/gameweeks, not five fixtures: every leg of a
+ * double gameweek is retained. Selection uses the shared page-level rolling window, so gaps are
+ * not backfilled separately for a player.
  */
 export function latestPlayerActualDetails(
-  actuals: readonly PlayerActualFixture[],
-  selectedGameweeks: readonly number[],
-): PlayerActualFixture[] {
-  const wanted = new Set(selectedGameweeks);
-  return actuals
-    .filter((row) => wanted.has(row.gw))
+  players: readonly SeasonalPlayerActualCollection[],
+  selectedGameweeks: readonly ActualSeasonGameweek[],
+): PlayerHistoricalFixture[] {
+  const selectedOrder = new Map(
+    selectedGameweeks.map((gameweek, index) => [
+      seasonGameweekKey(gameweek.season, gameweek.gw),
+      index,
+    ]),
+  );
+  return players
+    .flatMap((player) =>
+      player.actuals.map((actual) => ({ ...actual, season: player.season })),
+    )
+    .filter((row) => selectedOrder.has(seasonGameweekKey(row.season, row.gw)))
     .sort(
       (left, right) =>
-        right.gw - left.gw ||
+        (selectedOrder.get(seasonGameweekKey(left.season, left.gw)) ??
+          Number.MAX_SAFE_INTEGER) -
+          (selectedOrder.get(seasonGameweekKey(right.season, right.gw)) ??
+            Number.MAX_SAFE_INTEGER) ||
         (right.kickoff_time ?? "").localeCompare(left.kickoff_time ?? "") ||
         right.fixture - left.fixture,
     );

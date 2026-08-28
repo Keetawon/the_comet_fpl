@@ -126,6 +126,11 @@ No source NULL is zero-filled. Nullable floats remain Parquet NULLs—not `NaN` 
 non-finite floats are refused. The P1.2 ledger does not persist fixture-level player minutes/rates,
 so those player-fixture fields are explicit typed NULLs rather than reconstructed values.
 
+The schema-v8 dashboard may select a rolling presentation window from the forecast season and its
+immediate predecessor, but the export remains fixture-grain and season-qualified. Consumers retain
+the outer `season` beside `gw` and join a player's two seasonal records only through permanent
+`code`; no export row is rewritten or copied to fill a missing predecessor history.
+
 ### Finalized team-fixture actuals
 
 `fact_team_fixture_actual` is a run-independent directed club-side fact at
@@ -149,6 +154,11 @@ Neither approved source contains possession or shot counts. The configured FBref
 operator-vendored defensive-actions CSV, is currently unpopulated, and has no possession/shot
 contract. The exporter therefore publishes neither field and never proxies them from xG, threat,
 saves, or another metric.
+
+The corresponding dashboard rolling window joins returning clubs across the two bounded seasons
+only through permanent `team_code`. A promoted club with no predecessor-season Premier League row
+stays shorter; season-scoped `team_id` is never used to borrow the relegated club that occupied the
+same numeric slot.
 
 ### Team form
 

@@ -32,30 +32,39 @@ function team(
 }
 
 describe("latestTeamActualGameweeks", () => {
-  it("selects five shared distinct labels without crossing the caller's season scope", () => {
+  it("selects five shared distinct season/GW labels across a season boundary", () => {
     const current = [
       team("2026-27", 101, [
         actual({ gw: 1, fixture: 10 }),
-        actual({ gw: 3, fixture: 30 }),
-        actual({ gw: 5, fixture: 50 }),
-        actual({ gw: 7, fixture: 70 }),
-        actual({ gw: 9, fixture: 90 }),
-        actual({ gw: 10, fixture: 100 }),
       ]),
-      team("2026-27", 102, [actual({ gw: 10, fixture: 101 })]),
+      team("2026-27", 102, [actual({ gw: 1, fixture: 11 })]),
     ];
-    const prior = [team("2025-26", 101, [actual({ gw: 38, fixture: 380 })])];
+    const prior = [
+      team("2025-26", 101, [
+        actual({ gw: 34, fixture: 340 }),
+        actual({ gw: 35, fixture: 350 }),
+        actual({ gw: 36, fixture: 360 }),
+        actual({ gw: 37, fixture: 370 }),
+        actual({ gw: 38, fixture: 380 }),
+      ]),
+    ];
 
-    expect(latestTeamActualGameweeks(current)).toEqual([10, 9, 7, 5, 3]);
-    expect(latestTeamActualGameweeks(prior)).toEqual([38]);
+    expect(latestTeamActualGameweeks([...current, ...prior])).toEqual([
+      { season: "2026-27", gw: 1 },
+      { season: "2025-26", gw: 38 },
+      { season: "2025-26", gw: 37 },
+      { season: "2025-26", gw: 36 },
+      { season: "2025-26", gw: 35 },
+    ]);
+    expect(latestTeamActualGameweeks(current)).toEqual([{ season: "2026-27", gw: 1 }]);
     expect(latestTeamActualGameweeks(current, 0)).toEqual([]);
   });
 });
 
 describe("teamActualDetailsForGameweeks", () => {
-  it("keeps every DGW leg, nulls, and zeroes in newest-first fixture order", () => {
+  it("keeps every DGW leg, nulls, and zeroes in newest-first cross-season order", () => {
     const missingMetrics = actual({
-      gw: 10,
+      gw: 1,
       fixture: 101,
       kickoff_time: "2026-10-03T12:00:00+00:00",
       goals_for: 0,
@@ -66,17 +75,47 @@ describe("teamActualDetailsForGameweeks", () => {
       defensive_contribution: null,
     });
     const laterDgwLeg = actual({
-      gw: 10,
+      gw: 1,
       fixture: 102,
       kickoff_time: "2026-10-03T18:00:00+00:00",
     });
     const result = teamActualDetailsForGameweeks(
-      [actual({ gw: 2, fixture: 20 }), missingMetrics, laterDgwLeg, actual({ gw: 8, fixture: 80 })],
-      [10, 8],
+      [
+        team("2025-26", 101, [actual({ gw: 38, fixture: 380 })]),
+        team("2026-27", 101, [missingMetrics, laterDgwLeg]),
+      ],
+      [
+        { season: "2026-27", gw: 1 },
+        { season: "2025-26", gw: 38 },
+      ],
     );
 
-    expect(result.map((row) => row.fixture)).toEqual([102, 101, 80]);
-    expect(result[1]).toBe(missingMetrics);
-    expect(result[1]).toMatchObject({ goals_for: 0, team_xg: null, team_bps: null });
+    expect(result.map((row) => row.fixture)).toEqual([102, 101, 380]);
+    expect(result.map((row) => row.season)).toEqual(["2026-27", "2026-27", "2025-26"]);
+    expect(result[1]).toMatchObject({
+      ...missingMetrics,
+      season: "2026-27",
+      goals_for: 0,
+      team_xg: null,
+      team_bps: null,
+    });
+  });
+
+  it("does not backfill a club from gameweeks outside the shared page window", () => {
+    const result = teamActualDetailsForGameweeks(
+      [
+        team("2025-26", 101, [
+          actual({ gw: 34, fixture: 340 }),
+          actual({ gw: 38, fixture: 380 }),
+        ]),
+        team("2026-27", 101, [actual({ gw: 1, fixture: 10 })]),
+      ],
+      [
+        { season: "2026-27", gw: 1 },
+        { season: "2025-26", gw: 38 },
+      ],
+    );
+
+    expect(result.map((row) => row.fixture)).toEqual([10, 380]);
   });
 });

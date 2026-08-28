@@ -2,8 +2,8 @@
 // vintage, one COLUMN per upcoming gameweek (the pivot), default-sorted by average ease
 // (easiest schedule first). Cells colour on the selected source -- opponent strength by
 // default, so a strong club's row is no longer uniformly green: the colour follows the
-// OPPONENT, not the row club. Expanding a row shows finalized results from the latest
-// five completed gameweeks in one explicitly selected Actual season.
+// OPPONENT, not the row club. Expanding a row defaults to the latest five finalized
+// gameweeks across the forecast season boundary, with explicit single-season scopes available.
 
 import { useEffect, useMemo, useState } from "react";
 import { flexRender } from "@tanstack/react-table";
@@ -49,7 +49,6 @@ import type {
   ScheduleFixture,
   TeamFixture,
   TeamFormWindow,
-  TeamActualFixture,
   TeamActualsRecord,
   TeamRecord,
   WindowLabel,
@@ -82,6 +81,7 @@ import {
 import {
   latestTeamActualGameweeks,
   teamActualDetailsForGameweeks,
+  type TeamActualFixtureDetail,
 } from "@/lib/teamActuals";
 
 type PageState =
@@ -108,10 +108,11 @@ interface TeamRow {
   form: TeamFormWindow | null;
   formLabel: string | null;
   avgMetric: number | null;
-  actualDetails: TeamActualFixture[];
+  actualDetails: TeamActualFixtureDetail[];
 }
 
 type FixtureHorizon = 5 | 10 | 15;
+const ROLLING_ACTUAL_SCOPE = "rolling-five";
 
 function previousSeason(season: string): string | null {
   const match = /^(\d{4})-(\d{2})$/.exec(season);
@@ -293,7 +294,7 @@ export function FixtureMatrixPage() {
   const [filters, setFilters] = useState<FilterState | null>(null);
   const [sorting, setSorting] = useState<SortingState>([{ id: "avgMetric", desc: true }]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
-  const [actualSeason, setActualSeason] = useState<string | null>(null);
+  const [actualScope, setActualScope] = useState(ROLLING_ACTUAL_SCOPE);
 
   useEffect(() => {
     let cancelled = false;
@@ -341,7 +342,6 @@ export function FixtureMatrixPage() {
           defaultRunId: defaultRun ?? first?.run_id ?? "",
         });
         setRunId(defaultRun ?? first?.run_id ?? null);
-        setActualSeason(first?.season ?? null);
         setFilters({ view: "overall", venue: "all", gwFrom, gwTo });
       })
       .catch((error: unknown) => {
@@ -388,26 +388,36 @@ export function FixtureMatrixPage() {
     ].sort((left, right) => right.localeCompare(left));
   }, [state, runBounds.season]);
 
-  const actualSeasonTeams = useMemo(
-    () =>
-      state.status === "ready" && actualSeason != null
-        ? state.teamActuals.filter((team) => team.season === actualSeason)
-        : [],
-    [state, actualSeason],
-  );
+  const actualScopeTeams = useMemo(() => {
+    if (state.status !== "ready" || runBounds.season == null) return [];
+    if (actualScope !== ROLLING_ACTUAL_SCOPE) {
+      return state.teamActuals.filter((team) => team.season === actualScope);
+    }
+    const previous = previousSeason(runBounds.season);
+    const rollingSeasons = new Set([
+      runBounds.season,
+      ...(previous == null ? [] : [previous]),
+    ]);
+    return state.teamActuals.filter((team) => rollingSeasons.has(team.season));
+  }, [state, runBounds.season, actualScope]);
 
   const actualGameweeks = useMemo(
-    () => latestTeamActualGameweeks(actualSeasonTeams),
-    [actualSeasonTeams],
+    () => latestTeamActualGameweeks(actualScopeTeams),
+    [actualScopeTeams],
   );
 
-  const actualByTeamCode = useMemo(
-    () => new Map(actualSeasonTeams.map((team) => [team.team_code, team.actuals])),
-    [actualSeasonTeams],
-  );
+  const actualByTeamCode = useMemo(() => {
+    const byTeamCode = new Map<number, TeamActualsRecord[]>();
+    for (const team of actualScopeTeams) {
+      const records = byTeamCode.get(team.team_code) ?? [];
+      records.push(team);
+      byTeamCode.set(team.team_code, records);
+    }
+    return byTeamCode;
+  }, [actualScopeTeams]);
 
   useEffect(() => {
-    setActualSeason(runBounds.season);
+    setActualScope(ROLLING_ACTUAL_SCOPE);
     setExpanded({});
   }, [runBounds.season]);
 
@@ -703,86 +713,6 @@ export function FixtureMatrixPage() {
         </div>
       </div>
 
-      <FilterPanel>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          {filters && (
-            <FilterBar
-              filters={filters}
-              onChange={setFilters}
-              minGw={state.gwFrom}
-              maxGw={state.gwTo}
-              showGameweekRange={false}
-            />
-          )}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            Fixture horizon
-            <ToggleGroup
-              type="single"
-              value={String(horizon)}
-              onValueChange={(value) => {
-                if (value) setHorizon(Number(value) as FixtureHorizon);
-              }}
-              variant="outline"
-              aria-label="Fixture horizon"
-            >
-              {([5, 10, 15] as const).map((weeks) => (
-                <ToggleGroupItem key={weeks} value={String(weeks)}>
-                  {weeks} GWs
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            Form window
-            <Select
-              value={formWindow}
-              onValueChange={(value) => setFormWindow(value as WindowLabel)}
-            >
-              <SelectTrigger size="sm" className="w-28" aria-label="Form window">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {WINDOW_LABELS.map((label) => (
-                  <SelectItem key={label} value={label}>
-                    {FORM_WINDOW_LABEL[label]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {actualSeasonOptions.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              Actual season
-              <Select
-                value={actualSeason ?? undefined}
-                onValueChange={(value) => {
-                  setActualSeason(value);
-                  setExpanded({});
-                }}
-              >
-                <SelectTrigger size="sm" className="w-28" aria-label="Actual season">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {actualSeasonOptions.map((season) => (
-                    <SelectItem key={season} value={season}>
-                      {season}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Expanded rows show finalized results from the latest five completed gameweeks in the
-          selected Actual season. Double-gameweek legs stay separate; an early season is never
-          backfilled with the previous season. xG, xGC, BPS, and DC are source-row aggregates;
-          unavailable evidence is shown as –. Possession and shots are unavailable in the approved
-          published sources, so no proxy is shown.
-        </p>
-      </FilterPanel>
-
       <div className="rounded-lg border bg-card p-2">
         <DifficultyLegend
           colorSource={colorSource}
@@ -833,6 +763,88 @@ export function FixtureMatrixPage() {
           }),
         }}
       />
+
+      <FilterPanel>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {filters && (
+            <FilterBar
+              filters={filters}
+              onChange={setFilters}
+              minGw={state.gwFrom}
+              maxGw={state.gwTo}
+              showGameweekRange={false}
+            />
+          )}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            Fixture horizon
+            <ToggleGroup
+              type="single"
+              value={String(horizon)}
+              onValueChange={(value) => {
+                if (value) setHorizon(Number(value) as FixtureHorizon);
+              }}
+              variant="outline"
+              aria-label="Fixture horizon"
+            >
+              {([5, 10, 15] as const).map((weeks) => (
+                <ToggleGroupItem key={weeks} value={String(weeks)}>
+                  {weeks} GWs
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            Form window
+            <Select
+              value={formWindow}
+              onValueChange={(value) => setFormWindow(value as WindowLabel)}
+            >
+              <SelectTrigger size="sm" className="w-28" aria-label="Form window">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WINDOW_LABELS.map((label) => (
+                  <SelectItem key={label} value={label}>
+                    {FORM_WINDOW_LABEL[label]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {actualSeasonOptions.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              Actual scope
+              <Select
+                value={actualScope}
+                onValueChange={(value) => {
+                  setActualScope(value);
+                  setExpanded({});
+                }}
+              >
+                <SelectTrigger size="sm" className="w-36" aria-label="Actual scope">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ROLLING_ACTUAL_SCOPE}>Rolling 5</SelectItem>
+                  {actualSeasonOptions.map((season) => (
+                    <SelectItem key={season} value={season}>
+                      {season}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Expanded rows default to a shared rolling window of the latest five finalized gameweeks.
+          At a season boundary it continues into the immediately preceding season; the season
+          options isolate either season. Double-gameweek legs stay separate, and clubs are never
+          individually backfilled outside the shared window. xG, xGC, BPS, and DC are source-row
+          aggregates; unavailable evidence is shown as –. Possession and shots are unavailable in
+          the approved published sources, so no proxy is shown.
+        </p>
+      </FilterPanel>
 
       <DecisionTableFullscreen label="Fixture matrix table">
         {({ isFullscreen }) => (
@@ -911,21 +923,26 @@ export function FixtureMatrixPage() {
                       data-testid={`team-actual-details-${row.original.team.team_code}`}
                     >
                       <p className="text-xs font-medium">
-                        {row.original.team.team_name} — recent results · {actualSeason ?? "no Actual season"}
+                        {row.original.team.team_name} — recent results ·{" "}
+                        {actualScope === ROLLING_ACTUAL_SCOPE ? "Rolling 5" : actualScope}
                         {actualGameweeks.length > 0
-                          ? ` · shared window ${actualGameweeks.map((gw) => `GW${gw}`).join(", ")}`
+                          ? ` · shared window ${actualGameweeks
+                              .map(({ season, gw }) => `${season} GW${gw}`)
+                              .join(", ")}`
                           : ""}
                       </p>
                       {row.original.actualDetails.length === 0 ? (
                         <p className="py-2 text-xs text-muted-foreground">
                           No finalized results are available for this club in the selected Actual
-                          season and shared five-gameweek window.
+                          scope and shared five-gameweek window.
                         </p>
                       ) : (
                         <Table aria-label={`${row.original.team.team_name} recent results`}>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="h-7 px-2 text-[11px]">GW / date</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">
+                                Season / GW / date
+                              </TableHead>
                               <TableHead className="h-7 px-2 text-[11px]">Opponent</TableHead>
                               <TableHead className="h-7 px-2 text-[11px]">GF</TableHead>
                               <TableHead className="h-7 px-2 text-[11px]">GA</TableHead>
@@ -937,9 +954,12 @@ export function FixtureMatrixPage() {
                           </TableHeader>
                           <TableBody>
                             {row.original.actualDetails.map((actual) => (
-                              <TableRow key={actual.fixture} data-actual-fixture={actual.fixture}>
+                              <TableRow
+                                key={`${actual.season}-${actual.fixture}`}
+                                data-actual-fixture={actual.fixture}
+                              >
                                 <TableCell className="px-2 py-1 text-[11px] tabular-nums">
-                                  GW{actual.gw} · {actual.kickoff_time.slice(0, 10)}
+                                  {actual.season} GW{actual.gw} · {actual.kickoff_time.slice(0, 10)}
                                 </TableCell>
                                 <TableCell className="px-2 py-1 text-[11px]">
                                   {actual.opponent_short_name} ({actual.was_home ? "H" : "A"})

@@ -100,16 +100,19 @@ published clean-sheet probability. xP may be summed in the browser; probabilitie
 raw PMFs stay out of the bulk payload. It also publishes normalized finalized player- and team-
 fixture actuals only for each published forecast season and its immediate predecessor when observed.
 The UI exposes an explicit Actual season plus independent `Actual GWs` range, offers only the selected
-run's forecast season and its actually published immediate predecessor, never mixes them, and
-excludes partial official gameweeks while retaining both double-gameweek legs. On Players, that
-observed scope is shown once above compact stat headers, while a sortable raw
+run's forecast season and its actually published immediate predecessor, and never mixes them in the
+main-table aggregate. It excludes partial official gameweeks while retaining both double-gameweek
+legs. On Players, that observed scope is shown once above compact stat headers, while a sortable raw
 `xP GW{Forecast From}` column defaults descending to support starter/bench review; complete DGW
-legs are summed, blanks are zero, and missing evidence remains unavailable. Player expanded rows
-show the selected season/range's latest five distinct historical GWs, newest first, including all
-DGW fixture legs and observed xG/xA/xGI/DC/BPS detail. Fixture Matrix has a separate Actual season
-selector and expands to the latest five distinct finalized team GWs with opponent, venue, official
-GF/GA, source-row xG/xGC, summed BPS, and raw DC actions. Neither view fills from another season;
-future fixture
+legs are summed, blanks are zero, and missing evidence remains unavailable. The expanded rows are
+a separate rolling-history view: they take the latest five distinct season-qualified finalized GWs
+across the forecast season and its immediate predecessor, newest first, while retaining every DGW
+fixture leg. Thus an expansion after 2026-27 GW1 shows 2026-27 GW1 and 2025-26 GW38 through GW35,
+even though the main table's Actual season/GW aggregate remains explicitly season-scoped. Player
+detail includes observed xG/xA/xGI/DC/BPS; Fixture Matrix detail includes opponent, venue, official
+GF/GA, source-row xG/xGC, summed BPS, and raw DC actions. Permanent `code` / `team_code` identities
+are the only cross-season joins; newcomers and promoted clubs without prior-Premier-League rows
+remain shorter rather than receiving substituted history. Future fixture
 drill-down stays on Next GW. Possession and shot counts are unavailable in the approved sources,
 and the existing unpopulated FBref defensive-actions path cannot supply them, so no proxy is shown.
 The forecast values are raw

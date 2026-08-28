@@ -1,9 +1,10 @@
 // Players page: the player-form pivot. One row per player of the SELECTED vintage (the
 // export carries every recorded run -- the vintage selector picks one, so players never
 // repeat), merging a separately selected season/range of finalized actuals with
-// the vintage's per-fixture xP. A prior season is used only after explicit selection. Chips headline xP and are coloured by the
-// active colour source (opponent strength by default); the expanded row exposes every
-// primitive behind the colour, ordered by kickoff time.
+// the vintage's per-fixture xP. A prior season is used in the aggregate only after explicit
+// selection. The expanded history is a separate rolling latest-five-GW view across the forecast
+// season and its immediate predecessor. Chips headline xP and are coloured by the active colour
+// source (opponent strength by default).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SortingState } from "@tanstack/table-core";
@@ -262,6 +263,12 @@ export function PlayersPage() {
     return state.manifestRuns.find((run) => run.run_id === activeRunId) ?? null;
   }, [state, runId]);
 
+  const rollingActualSeasons = useMemo(() => {
+    if (selectedRun == null) return [];
+    const previous = previousSeason(selectedRun.season);
+    return [selectedRun.season, ...(previous == null ? [] : [previous])];
+  }, [selectedRun]);
+
   const actualSeasons = useMemo(() => {
     if (state.status !== "ready" || selectedRun == null) return [];
     const codes = new Set(runPlayers.map((player) => player.code));
@@ -287,6 +294,23 @@ export function PlayersPage() {
     () => new Map(selectedActualRecords.map((record) => [record.code, record.actuals])),
     [selectedActualRecords],
   );
+  const rollingActualRecords = useMemo(() => {
+    if (state.status !== "ready") return [];
+    const codes = new Set(runPlayers.map((player) => player.code));
+    const seasons = new Set(rollingActualSeasons);
+    return state.playerActuals.filter(
+      (record) => codes.has(record.code) && seasons.has(record.season),
+    );
+  }, [rollingActualSeasons, runPlayers, state]);
+  const rollingActualsByCode = useMemo(() => {
+    const recordsByCode = new Map<number, PlayerActualsRecord[]>();
+    for (const record of rollingActualRecords) {
+      const existing = recordsByCode.get(record.code);
+      if (existing == null) recordsByCode.set(record.code, [record]);
+      else existing.push(record);
+    }
+    return recordsByCode;
+  }, [rollingActualRecords]);
   const actualBounds = useMemo(
     () => actualGameweekRange(selectedActualRecords),
     [selectedActualRecords],
@@ -299,15 +323,8 @@ export function PlayersPage() {
     filters.gwFrom === selectedRun.gw_from;
 
   const expandedActualGameweeks = useMemo(
-    () =>
-      actualRange == null
-        ? []
-        : latestActualGameweeks(
-            selectedActualRecords,
-            actualRange.gwFrom,
-            actualRange.gwTo,
-          ),
-    [actualRange, selectedActualRecords],
+    () => latestActualGameweeks(rollingActualRecords, rollingActualSeasons),
+    [rollingActualRecords, rollingActualSeasons],
   );
 
   useEffect(() => {
@@ -387,13 +404,10 @@ export function PlayersPage() {
                 actualRange.gwFrom,
                 actualRange.gwTo,
               ),
-        actualDetails:
-          actualRange == null
-            ? []
-            : latestPlayerActualDetails(
-                actualsByCode.get(player.code) ?? [],
-                expandedActualGameweeks,
-              ),
+        actualDetails: latestPlayerActualDetails(
+          rollingActualsByCode.get(player.code) ?? [],
+          expandedActualGameweeks,
+        ),
         totalXp: horizon?.xp ?? (xpValues.length ? xpValues.reduce((a, b) => a + b, 0) : null),
         horizon,
         form:
@@ -415,6 +429,7 @@ export function PlayersPage() {
     actualRange,
     expandedActualGameweeks,
     actualsByCode,
+    rollingActualsByCode,
     managerSquad,
   ]);
 
@@ -858,7 +873,9 @@ export function PlayersPage() {
             finalized {actualSeason} observations. Changing Actual season is explicit and never
             mixes seasons in one aggregate. My squad intersects with every other player filter.
             The Min avg min (L5) filter remains its separately published trailing-five anchor and
-            does not follow Actual GWs.
+            does not follow Actual GWs. Expanded rows use a separate rolling latest-five completed
+            GW window across the forecast season and its immediate predecessor; that window does
+            not follow the Actual season/GW aggregate controls.
           </p>
           {actualBounds == null && (
             <p role="status" className="text-xs text-amber-700 dark:text-amber-300">

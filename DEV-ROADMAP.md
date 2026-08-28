@@ -1056,7 +1056,7 @@ Only after the ordered dashboard program above, unless an operational blocker re
   and its immediate predecessor, with the predecessor present only when finalized observations
   exist. The Players route exposes only the selected run's forecast season and its published
   predecessor plus a separate `Actual GWs` from/to range; Forecast GWs still control only future
-  fixtures and xP, and seasons are never mixed or silently substituted. The
+  fixtures and xP, and the main historical aggregate never mixes or silently substitutes seasons. The
   six overlapping threshold-probability columns are removed from this dense table and remain
   available in Player analytics. The observed season/GW scope is displayed once above compact
   stat headers instead of being repeated inside `App`. A dedicated sortable
@@ -1106,10 +1106,15 @@ Only after the ordered dashboard program above, unless an operational blocker re
   proposed three-appearance probability bridge remain separate forecast work; neither is silently
   folded into this dashboard change.
 
-- **Historical latest-five-GW expanded rows (implemented development-only 2026-08-28).** Players
-  expansion now reads the selected Actual season/range from normalized `player_actuals.json`, takes
-  the page-wide set of the latest five distinct selected GW labels, preserves every double-gameweek
-  fixture leg, and orders the rows newest first. It exposes only observed fixture metrics:
+- **Historical rolling latest-five-GW expanded rows (implemented development-only 2026-08-28;
+  season-boundary correction 2026-08-28).** The main Players aggregate remains bound to its
+  explicit Actual season/range. Expansion is a separate rolling history over normalized
+  `player_actuals.json`: it takes the page-wide set of the latest five distinct season-qualified
+  finalized GW labels across the forecast season and its immediate predecessor, preserves every
+  double-gameweek fixture leg, labels rows by season/GW, and orders them newest first. At 2026-27
+  GW1 this means 2026-27 GW1 plus 2025-26 GW38 through GW35. Cross-season membership uses permanent
+  player `code`; newcomers without predecessor rows remain shorter. It exposes only observed
+  fixture metrics:
   minutes/start, goals,
   assists, xG, xA, fail-closed display xGI, clean sheets, on-pitch goals conceded, saves, raw DC
   actions, xGC, bonus, raw BPS, and points. The shared Next GW table retains the future fixture/xP
@@ -1121,11 +1126,14 @@ Only after the ordered dashboard program above, unless an operational blocker re
   aggregates do not claim an independent source-roster completeness witness. Dashboard schema v8
   adds normalized `team_actuals.json` at
   `(season, team_code)` grain, bounded to published forecast seasons and their immediate
-  predecessors. Fixture Matrix exposes an explicit Actual season and expands every club against the
-  same page-wide set of the latest five distinct finalized gameweeks from that season, newest
-  first, retaining every DGW leg. A sparse current season is never filled from the predecessor,
-  unavailable present-row components remain NULL, and the future matrix chips remain summary
-  context rather than expanded forecast detail.
+  predecessors. Fixture Matrix's expanded-history scope defaults to the same page-wide rolling
+  latest-five season-qualified window across the forecast season and its immediate predecessor,
+  newest first, while explicit single-season options remain available and every DGW leg is
+  retained. Cross-season club membership uses permanent `team_code`; promoted clubs without prior-
+  Premier-League rows remain
+  shorter rather than inheriting a relegated club through season-scoped `team_id`. Unavailable
+  present-row components remain NULL, and the future matrix chips remain summary context rather
+  than expanded forecast detail.
 
   Possession and shot counts remain absent. Official FPL/archive sources do not publish them, and
   the repository's existing FBref integration is only an unpopulated operator-vendored defensive-
@@ -1134,7 +1142,8 @@ Only after the ordered dashboard program above, unless an operational blocker re
   source and provenance contract.
 
   Acceptance requires semantic-v5 grain/join/NULL/overlap checks, complete-GW and finalized-ledger
-  gating, schema-v8 normalized-file validation, immediate-predecessor bounds, no cross-season fill,
+  gating, schema-v8 normalized-file validation, immediate-predecessor bounds, season-qualified
+  current-to-predecessor rolling-window tests, permanent-identity/no-substitution checks,
   DGW/latest-five ordering tests, route-specific player detail tests, Fixture Matrix loading/error/
   empty states, public-package inclusion, atomic BI/static republish, and responsive visual
   verification. This reporting change does not alter a forecast, model default, frozen evaluation,

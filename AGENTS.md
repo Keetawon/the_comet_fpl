@@ -258,9 +258,9 @@ retains those contracts, normalizes officially complete fixture-grain player obs
 owned `cold_start_player` provenance flag. The
 Players route exposes an explicit actual season limited to the selected forecast season and its
 immediately preceding season plus a distinct `Actual GWs` range. It never reuses the forecast-
-horizon selector, mixes seasons, silently substitutes one season for another, or collapses double-
-gameweek legs; it only sums already-published observed components. The dense table presents that
-shared observed scope once above compact `App`/stat headers. A Players-only sortable
+horizon selector. Its main aggregate never mixes seasons, silently substitutes one season for
+another, or collapses double-gameweek legs; it only sums already-published observed components. The
+dense table presents that shared observed scope once above compact `App`/stat headers. A Players-only sortable
 `xP GW{Forecast From}` column sits immediately after `Pts` and defaults descending for XI/bench review:
 it uses the exact fixed-start cumulative endpoint when compatible, otherwise strictly sums the
 selected GW's published fixture xP, including every double-gameweek leg. A true blank is zero;
@@ -273,9 +273,13 @@ displays BPS/App as the selected-range observed BPS total divided by appearances
 leg counts once, DNPs are excluded, and any missing BPS on an appeared row makes the ratio
 unavailable. Normalized actuals retain fixture-grain BPS, while the selected-range aggregate and
 legacy form BPS measure remain totals. This is backward-looking descriptive arithmetic, not a
-model quantity. Its expanded rows use that same selected Actual season/range, retain every fixture
-in the page-wide set of the latest five distinct selected gameweeks, and sort newest first. They
-show observed
+model quantity. The main table remains bound to that explicit Actual season/range, but its expanded
+history is a separate rolling view: it retains every fixture in the page-wide latest five distinct
+**season-qualified** finalized gameweeks across the forecast season and its immediate predecessor,
+then sorts newest first. At 2026-27 GW1 that window is 2026-27 GW1 followed by 2025-26 GW38 through
+GW35. Every row displays its season as well as its GW. Cross-season player membership is joined only
+on permanent `code`; a newcomer without predecessor-season evidence stays shorter and is never
+backfilled by name or season-scoped `element_id`. Expanded rows show observed
 fixture-grain xG, xA, fail-closed display xGI, DC, raw BPS, and the other published actual
 components; they never show future prediction primitives. The shared table's future fixture/xP
 drill-down belongs to Next GW only. Its local **My squad** filter
@@ -311,10 +315,12 @@ finalized player/team outcome facts, and finalized-live observed-player source, 
 `fact_team_fixture_actual` at `(season, fixture, team_id)` grain. It publishes direct official
 goals for/against plus nullable source-row xG/xGC, summed BPS, and raw DC actions; live component
 eligibility is proven for present rows but is not an independent source-roster completeness
-witness. DGW legs remain separate and unavailable evidence remains NULL. Fixture Matrix expanded
-rows select an explicit actual season and
-one page-wide window covering the latest five distinct finalized gameweeks, newest first, without
-cross-season fill. Possession
+witness. DGW legs remain separate and unavailable evidence remains NULL. Fixture Matrix's expanded-
+history scope defaults to one page-wide rolling window covering the latest five distinct season-
+qualified finalized gameweeks across the forecast season and its immediate predecessor, newest
+first, while explicit single-season options remain available. Every row labels both season and GW.
+Cross-season club membership joins only on permanent `team_code`; promoted clubs without prior-
+Premier-League evidence stay shorter rather than inheriting another club's history. Possession
 and shots remain absent: the official/archive sources do not carry them and the existing
 operator-vendored FBref defensive-actions path cannot supply them, so no proxy is allowed. The
 versioned BI semantic export, atomic static JSON publish boundary,

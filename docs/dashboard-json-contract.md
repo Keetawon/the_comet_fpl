@@ -74,14 +74,16 @@ defensive-contribution actions.
 The file uses the same bounded-history policy as `player_actuals.json`: only each published forecast
 season and its immediate predecessor are eligible, a season is present only when finalized rows
 exist, only officially complete gameweeks enter, double-gameweek legs remain separate, and source
-NULLs remain JSON `null`. It never fills a sparse current season with the predecessor.
+NULLs remain JSON `null`.
 
-Version 8 also makes expanded-row ownership explicit. On Players, the expansion is historical and
-uses the selected Actual season/range, retaining every fixture in the page-wide set of the
-latest five distinct selected gameweek labels and ordering the result newest first. On Fixture
-Matrix, an explicit Actual season selects the page-wide set of the latest five distinct finalized
-gameweeks from that season, newest first. Neither expansion displays forecast primitives; fixture-
-level future drill-down remains on Next GW only.
+Version 8 also makes expanded-row ownership explicit. Main-table Actual season/GW aggregates remain
+explicit and never mix seasons. Expanded rows are a separate historical presentation: Players and
+Fixture Matrix each select one page-wide rolling set of the latest five distinct **season-qualified**
+finalized gameweeks across the forecast season and its immediate predecessor, order it newest first,
+and retain every fixture leg. At 2026-27 GW1 the labels are 2026-27 GW1, then 2025-26 GW38, GW37,
+GW36, and GW35. Each detail row displays the outer record's season; a bare GW number is not a
+cross-season key. Neither expansion displays forecast primitives; fixture-level future drill-down
+remains on Next GW only.
 Possession and shot counts are absent because no approved static source publishes them. The existing
 FBref path is only an unpopulated operator-vendored defensive-actions CSV and cannot supply those
 fields; the emitter and browser never proxy them.
@@ -346,14 +348,18 @@ count of appearances. Double-gameweek legs contribute separately, DNPs do not co
 missing BPS on an appeared row makes the display rate unavailable. The legacy form BPS measure
 remains a total, and this descriptive ratio is not a transported field.
 
-The Players expanded row reads these same normalized actuals, not `players.json.fixtures`. Within
-the selected Actual season and inclusive Actual-GW range it takes the page-wide set of the latest
-five distinct GW labels, keeps every fixture leg in those gameweeks, and presents the rows newest
-first (gameweek, kickoff, fixture descending). It shows GW, kickoff, minutes/start, goals, assists,
+The Players expanded row reads these same normalized actuals, not `players.json.fixtures`. It is
+independent of the main table's explicit Actual season/range and takes the page-wide rolling set of
+the latest five distinct season-qualified finalized GW labels across the forecast season and its
+immediate predecessor. It keeps every fixture leg in those gameweeks and presents the rows newest
+first (season, gameweek, kickoff, fixture descending). It shows season, GW, kickoff, minutes/start,
+goals, assists,
 xG, xA,
 display-only fail-closed xGI, clean sheets, on-pitch goals conceded, saves, raw DC actions, xGC,
-bonus, raw BPS, and points. A sparse current season remains sparse; it is never filled from the
-previous season. The future fixture/xP drill-down remains on Next GW.
+bonus, raw BPS, and points. Cross-season membership uses permanent player `code` only. A player with
+no immediate-predecessor record has a shorter list; the emitter/browser never substitutes another
+record by `web_name` or season-scoped `element_id`. The future fixture/xP drill-down remains on
+Next GW.
 
 ## team_actuals.json — one object per (season, team_code)
 
@@ -371,12 +377,14 @@ gameweeks enter. Rows sort canonically by gameweek, kickoff, then fixture; ident
 season then team code. Both double-gameweek legs remain separate, duplicate fixture identities fail
 closed, and source NULLs remain NULL.
 
-Fixture Matrix offers an explicit Actual season drawn only from those published rows. Its expanded
-historical result list takes the page-wide set of the latest five distinct finalized GW labels in
-that season and orders all retained fixture legs newest first. The visible fields are match/GW and
-kickoff, opponent and venue, GF, GA, xG, xGC, summed BPS, and raw DC actions. It does not silently
-cross a season boundary
-or fall back to form/forecast rows. Possession and shots are deliberately absent: neither the
+Fixture Matrix's expanded-history Actual scope defaults to the page-wide rolling set of the latest
+five distinct season-qualified finalized GW labels across the forecast season and its immediate
+predecessor; explicit single-season options remain available. It orders all retained fixture legs
+newest first. The visible fields are season/GW and kickoff, opponent and
+venue, GF, GA, xG, xGC, summed BPS, and raw DC actions. Cross-season membership uses permanent
+`team_code` only. A promoted club with no immediate-predecessor Premier League record has a shorter
+list; it never inherits a relegated club's rows via season-scoped `team_id`, and the expansion never
+falls back to form/forecast rows. Possession and shots are deliberately absent: neither the
 official/archive source nor the repository's existing FBref defensive-actions path supplies them,
 and no proxy is permitted.
 

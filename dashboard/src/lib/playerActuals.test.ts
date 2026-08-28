@@ -142,35 +142,61 @@ describe("actualGameweekRange", () => {
 });
 
 describe("latestPlayerActualDetails", () => {
-  it("uses shared page-level GW labels, keeps DGWs, and does not backfill a player's gaps", () => {
+  it("rolls across the season boundary, keeps DGWs, and does not backfill a player's gaps", () => {
     const pageGameweeks = latestActualGameweeks(
       [
         {
-          actuals: [6, 7, 8, 9, 10].map((gw) =>
-            actual({ gw, fixture: gw * 10 }),
-          ),
+          season: "2026-27",
+          actuals: [actual({ gw: 1, fixture: 101 })],
+        },
+        {
+          season: "2025-26",
+          actuals: [34, 35, 36, 37, 38].map((gw) => actual({ gw, fixture: gw * 10 })),
+        },
+        {
+          season: "2024-25",
+          actuals: [actual({ gw: 38, fixture: 2438 })],
         },
       ],
-      1,
-      10,
+      ["2026-27", "2025-26"],
     );
     const result = latestPlayerActualDetails(
       [
-        actual({ gw: 1, fixture: 10, kickoff_time: "2026-08-01T12:00:00+00:00" }),
-        actual({ gw: 3, fixture: 30, kickoff_time: "2026-08-15T12:00:00+00:00" }),
-        actual({ gw: 5, fixture: 50, kickoff_time: "2026-08-29T12:00:00+00:00" }),
-        actual({ gw: 7, fixture: 70, kickoff_time: "2026-09-12T12:00:00+00:00" }),
-        actual({ gw: 9, fixture: 90, kickoff_time: null }),
-        actual({ gw: 10, fixture: 101, kickoff_time: "2026-10-03T12:00:00+00:00" }),
-        actual({ gw: 10, fixture: 102, kickoff_time: "2026-10-03T16:00:00+00:00" }),
-        actual({ gw: 12, fixture: 120, kickoff_time: "2026-10-17T12:00:00+00:00" }),
+        {
+          season: "2026-27",
+          actuals: [
+            actual({ gw: 1, fixture: 101, kickoff_time: "2026-08-15T12:00:00+00:00" }),
+            actual({ gw: 1, fixture: 102, kickoff_time: "2026-08-15T16:00:00+00:00" }),
+          ],
+        },
+        {
+          season: "2025-26",
+          actuals: [
+            actual({ gw: 34, fixture: 340 }),
+            actual({ gw: 35, fixture: 350 }),
+            actual({ gw: 36, fixture: 360 }),
+            actual({ gw: 38, fixture: 380 }),
+          ],
+        },
       ],
       pageGameweeks,
     );
 
-    expect(pageGameweeks).toEqual([10, 9, 8, 7, 6]);
-    expect(result.map((row) => row.fixture)).toEqual([102, 101, 90, 70]);
-    expect(new Set(result.map((row) => row.gw))).toEqual(new Set([10, 9, 7]));
+    expect(pageGameweeks).toEqual([
+      { season: "2026-27", gw: 1 },
+      { season: "2025-26", gw: 38 },
+      { season: "2025-26", gw: 37 },
+      { season: "2025-26", gw: 36 },
+      { season: "2025-26", gw: 35 },
+    ]);
+    expect(result.map((row) => row.fixture)).toEqual([102, 101, 380, 360, 350]);
+    expect(result.map((row) => `${row.season}/GW${row.gw}`)).toEqual([
+      "2026-27/GW1",
+      "2026-27/GW1",
+      "2025-26/GW38",
+      "2025-26/GW36",
+      "2025-26/GW35",
+    ]);
   });
 
   it("preserves DNP, zero, and null fixture evidence without substituting other rows", () => {
@@ -182,8 +208,24 @@ describe("latestPlayerActualDetails", () => {
       expected_assists: null,
       bps: null,
     });
-    expect(latestPlayerActualDetails([dnp], [4])).toEqual([dnp]);
-    expect(latestPlayerActualDetails([dnp], [5, 6])).toEqual([]);
-    expect(latestActualGameweeks([{ actuals: [dnp] }], 4, 4, 0)).toEqual([]);
+    expect(
+      latestPlayerActualDetails(
+        [{ season: "2026-27", actuals: [dnp] }],
+        [{ season: "2026-27", gw: 4 }],
+      ),
+    ).toEqual([{ ...dnp, season: "2026-27" }]);
+    expect(
+      latestPlayerActualDetails(
+        [{ season: "2026-27", actuals: [dnp] }],
+        [{ season: "2026-27", gw: 5 }, { season: "2025-26", gw: 38 }],
+      ),
+    ).toEqual([]);
+    expect(
+      latestActualGameweeks(
+        [{ season: "2026-27", actuals: [dnp] }],
+        ["2026-27", "2025-26"],
+        0,
+      ),
+    ).toEqual([]);
   });
 });

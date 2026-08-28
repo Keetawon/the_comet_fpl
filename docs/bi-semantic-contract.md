@@ -98,6 +98,13 @@ constructing the violation and asserting the rejection.
 | Team-fixture facts | `(season, team_id, fixture)` | bare `team_id` |
 | Forecast facts | prefixed by `run_id` | any un-versioned forecast row |
 
+The dashboard's rolling historical expansion may place current-season and immediate-predecessor
+fixture rows in one presentation window, but that does not relax these keys. Each selected label is
+`(season, gw)`, player membership binds permanent `code`, and club membership binds permanent
+`team_code`. A newcomer or promoted club without predecessor-season Premier League evidence has a
+shorter history; consumers must not fill it by `web_name`, bare `element_id`, bare `team_id`, or the
+club that occupied the same season-scoped slot.
+
 `web_name` drifts between seasons (`Salah` → `M.Salah`). It is a display attribute, never a key and
 never a join column.
 
