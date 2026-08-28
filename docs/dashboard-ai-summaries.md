@@ -109,9 +109,12 @@ that may cross from the forecast season into its immediate predecessor. It is di
 not follow the Players main-table endpoints or alter the deterministic fact packet. The main-table
 range may independently cross the same season boundary only through the explicit version-4
 selectors above. No expanded-row payload is sent to the optional renderer.
+Dashboard read-model schema v9's fixture-time player club/opponent/venue fields are likewise local
+expanded-row presentation evidence: they do not add an insight selector, enter the fact packet, or
+change insight request schema v4.
 
 There is no fact, caveat, chat, or arbitrary-text field. Extra keys fail closed. The server resolves
-the selector against the explicitly configured dashboard-data directory, verifies the schema-v8
+the selector against the explicitly configured dashboard-data directory, verifies the schema-v9
 manifest content hash, every file hash, run/season/`as_of`, and a stable manifest before and after
 the read, then constructs the bounded fact/caveat packet itself. A caller therefore cannot smuggle
 manager/private state, financial state, credentials, paths, instructions, or invented values to the

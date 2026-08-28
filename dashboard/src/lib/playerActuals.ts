@@ -92,7 +92,7 @@ export function latestPlayerActualDetails(
           Number.MAX_SAFE_INTEGER) -
           (selectedOrder.get(seasonGameweekKey(right.season, right.gw)) ??
             Number.MAX_SAFE_INTEGER) ||
-        (right.kickoff_time ?? "").localeCompare(left.kickoff_time ?? "") ||
+        Date.parse(right.kickoff_time) - Date.parse(left.kickoff_time) ||
         right.fixture - left.fixture,
     );
 }

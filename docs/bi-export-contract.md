@@ -126,10 +126,12 @@ No source NULL is zero-filled. Nullable floats remain Parquet NULLs—not `NaN` 
 non-finite floats are refused. The P1.2 ledger does not persist fixture-level player minutes/rates,
 so those player-fixture fields are explicit typed NULLs rather than reconstructed values.
 
-The schema-v8 dashboard may select a rolling presentation window from the forecast season and its
+The schema-v9 dashboard may select a rolling presentation window from the forecast season and its
 immediate predecessor, but the export remains fixture-grain and season-qualified. Consumers retain
 the outer `season` beside `gw` and join a player's two seasonal records only through permanent
-`code`; no export row is rewritten or copied to fill a missing predecessor history.
+`code`; no export row is rewritten or copied to fill a missing predecessor history. Version 9
+transports the fact's fixture-time club/opponent identity into `player_actuals.json`, but does not
+change BI semantic contract v5.
 
 ### Finalized team-fixture actuals
 

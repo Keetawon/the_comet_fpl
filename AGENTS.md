@@ -252,10 +252,14 @@ team defence CRPS uses the opponent's exact PMF for that fixture, never a distri
 from `lambda_against`. The browser receives only published scalar observations and score blocks;
 raw PMFs remain behind the Python emitter. The version-4 player-horizon rule remains: the browser
 selects exact cumulative xP and inclusive `P(points <= 2)` / `P(points >= 2/4/6/10/15)` endpoints
-and never sums probabilities or derives a CCDF/model quantity. Schema version 8 is current: it
-retains those contracts, normalizes officially complete fixture-grain player observations in
-`player_actuals.json`, adds the parallel normalized `team_actuals.json`, and carries the forecast-
-owned `cold_start_player` provenance flag. The
+and never sums probabilities or derives a CCDF/model quantity. Schema version 9 is current: it
+retains version 8's normalized player/team history, cumulative endpoints, and forecast-owned
+`cold_start_player` provenance, and extends every `player_actuals.json` fixture with its
+fixture-time `team_code`, `team_short_name`, `opponent_team_code`, `opponent_short_name`, and
+`was_home`. Python resolves those club identities through the season-qualified team dimension,
+reconciles side, venue, gameweek, and permanent codes to `dim_fixture`, and publishes that
+fixture dimension's kickoff as the canonical presentation timestamp. A browser never infers an
+historical opponent from the player's current club. The
 Players route exposes two explicit chronological `Actual from` / `Actual to` endpoints. Their
 options are the page-wide exact finalized `(season, gw)` keys from only the selected forecast season
 and its immediate predecessor, ordered from predecessor to forecast season. The default and reset
@@ -286,9 +290,13 @@ five distinct **season-qualified** finalized gameweeks across the forecast seaso
 then sorts newest first. At 2026-27 GW1 that window is 2026-27 GW1 followed by 2025-26 GW38 through
 GW35. Every row displays its season as well as its GW. Cross-season player membership is joined only
 on permanent `code`; a newcomer without predecessor-season evidence stays shorter and is never
-backfilled by name or season-scoped `element_id`. Expanded rows show observed
-fixture-grain xG, xA, fail-closed display xGI, DC, raw BPS, and the other published actual
-components; they never show future prediction primitives. The shared table's future fixture/xP
+backfilled by name or season-scoped `element_id`. Expanded rows show `Match` (season/GW,
+fixture-time Club, and kickoff date) plus `Opp (H/A)`, then observed fixture-grain xG, xA,
+fail-closed display xGI, DC, raw BPS,
+and the other published actual components; they never show future prediction primitives. A player
+who transferred is labelled with the club represented by that exact fixture row, and promoted or
+relegated clubs are never substituted through a current-season registry. The shared table's future
+fixture/xP
 drill-down belongs to Next GW only. Its local **My squad** filter
 uses the trusted public-manager capture through the explicit member-only Plan Server route and
 activates only after all 15 stable codes match the selected forecast vintage's planning gameweek,
@@ -486,7 +494,7 @@ with one atomic replacement only after success.
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
 append-only prediction ledger, player/team fixture-grain forecast transport, reciprocal finalized
-outcome attachment, BI semantic v5 export, atomic schema-v8 static publish boundary, and eleven-route
+outcome attachment, BI semantic v5 export, atomic schema-v9 static publish boundary, and eleven-route
 dashboard are all
 implemented development-only. The dashboard reads only versioned static JSON derived from the
 published Parquet export; it never queries the mutable production DuckDB. Deep analytics and exact
@@ -867,8 +875,8 @@ The deadline record is closed to reinterpretation. The post-deadline dashboard s
 `DEV-ROADMAP.md` has completed through the optional evidence-bound language renderer: contracts,
 player/team deep analytics, exact player/team forecast monitoring, and deterministic/optional
 summaries landed in that order. The finalized outcome attachment and full schema-v7 republish are
-complete. P2.5's schema-v8 historical expanded-row amendment requires its own atomic republish and
-in-browser visual verification. Do
+complete. P2.5's historical schema-v8 amendment remains the base; the schema-v9 player-match
+identity amendment requires its own atomic republish and in-browser visual verification. Do
 not start a new model candidate or tune a known bias as part of this UI work. The numbered items
 below remain binding model-history and research guardrails; they are not permission to displace the
 active delivery order.
@@ -1061,7 +1069,7 @@ active delivery order.
    frozen historical evaluation.
 9. The append-only player-gameweek/player-fixture/team-fixture prediction ledger, reciprocal team-
    outcome attachment, player-outcome ingestion, BI semantic contract version 5, dashboard schema
-   version 8, atomic static dashboard read models, and dashboard are implemented development-only.
+   version 9, atomic static dashboard read models, and dashboard are implemented development-only.
    Player monitoring scores a gameweek only when the official gameweek and every forecast fixture
    leg are final, so a partial double gameweek produces zero scored player observations. Team attack
    CRPS uses the team's exact stored goals-for PMF; defence CRPS uses the opponent's exact stored PMF,

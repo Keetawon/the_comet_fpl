@@ -13,7 +13,7 @@ different answers:
 A single `xP` answers only the first.
 
 **Current status: the data foundation, development-only forward pipeline through Stage E,
-append-only forecast/outcome ledgers, BI semantic contract version 5, dashboard schema version 8,
+append-only forecast/outcome ledgers, BI semantic contract version 5, dashboard schema version 9,
 atomic static publish boundary, and eleven-route dashboard are implemented; no forecast component
 or squad recommendation is promoted as production-valid.** Player/team deep analytics and exact,
 separate player/team prediction-versus-actual monitoring are implemented development-only.
@@ -91,7 +91,7 @@ price/selling-value handling remain explicit unmeasured scenario gaps. The appen
 retains player-gameweek, player-fixture, and team-fixture forecast vintages, with finalized outcomes
 attached separately. The versioned BI semantic/star export, atomic Parquet/static-JSON publish
 boundary, platform/custom-plan separation, lock/exclusion flow, and dashboard are implemented
-development-only. Dashboard read-model schema v8 retains the backend-convolved cumulative player
+development-only. Dashboard read-model schema v9 retains the backend-convolved cumulative player
 xP, `P(<=2)`, and `P(>=2/4/6/10/15)` endpoints and adds separate exact player/team forecast
 monitoring. Player-gameweek comparisons require the complete official gameweek and all forecast
 fixture legs; a partial double gameweek is never scored. Team attack CRPS uses its exact stored
@@ -114,7 +114,11 @@ a separate rolling-history view: they take the latest five distinct season-quali
 across the forecast season and its immediate predecessor, newest first, while retaining every DGW
 fixture leg. Thus an expansion after 2026-27 GW1 shows 2026-27 GW1 and 2025-26 GW38 through GW35.
 That fixed expansion window is independent of the main table's selectable endpoint range. Player
-detail includes observed xG/xA/xGI/DC/BPS; Fixture Matrix detail includes opponent, venue, official
+detail includes `Match` (season/GW, fixture-time Club, and kickoff date) plus `Opp (H/A)`, then
+observed xG/xA/xGI/DC/BPS. Those identities are resolved inside each season and reconciled to the
+exact fixture, whose kickoff is the canonical presentation timestamp, so a transferred player is
+never labelled from the selected forecast vintage's current club. Fixture Matrix detail includes
+opponent, venue, official
 GF/GA, source-row xG/xGC, summed BPS, and raw DC actions. Permanent `code` / `team_code` identities
 are the only cross-season joins; newcomers and promoted clubs without prior-Premier-League rows
 remain shorter rather than receiving substituted history. Future fixture
@@ -414,7 +418,7 @@ Tests marked `archive` need the built database; run `build_db` first or they ski
 | 2 | Stage B minutes model | frozen baselines/metrics/walk-forward harness complete; V1/V2/V3 development-evaluated (development-only, none promoted); V2 and V3 both fail the v1.2 starter-ranking gate — V3 wins every proper score but ranks starters worse, refuting the concentration-adaptive hypothesis |
 | 3 | Stages C/D player events + simulation | attacking V1 historical probe and team-coupled V2/V3 development-evaluated; exposure-weighted goals V4 (-0.44% vs baseline, ties V3) and assists V2 (+1.85% vs baseline, -0.11% vs the incumbent V1) each run once, development-only, neither promoted; Stage D v3 composer, prospective forecast, and the GW29-38 EV backtest all run and development-only, with the V1 comparator outscoring the V3 primary |
 | 3b | Stage E optimiser + prediction ledger | optimiser, stable input/decision artifacts, no-transfer repair, append-only forecast/outcome ledger, and private public-manager capture plus selling-value/free-transfer-aware transfer planning implemented development-only; horizon availability and future price/selling-value changes remain open |
-| 4 | BI semantic export + dashboard | semantic contract v5, atomic Parquet and schema-v8 static JSON, cumulative player endpoints, normalized prior/current-season player/team actuals, historical latest-five-GW expanded rows, player/team deep analytics, exact separate player/team monitoring, platform/custom plan separation, locks/exclusions, nine read-only analytic/decision routes, manager-aware Plan Builder, Squad Draft with optimized/current-team handoffs, and evidence-bound deterministic/optional AI summaries implemented development-only; real-deadline validation and authenticated hosted manager operation remain open |
+| 4 | BI semantic export + dashboard | semantic contract v5, atomic Parquet and schema-v9 static JSON, cumulative player endpoints, normalized prior/current-season player/team actuals with season-safe fixture-time player club/opponent identity, historical latest-five-GW expanded rows, player/team deep analytics, exact separate player/team monitoring, platform/custom plan separation, locks/exclusions, nine read-only analytic/decision routes, manager-aware Plan Builder, Squad Draft with optimized/current-team handoffs, and evidence-bound deterministic/optional AI summaries implemented development-only; real-deadline validation and authenticated hosted manager operation remain open |
 | 5 | External competition calendar — only if Phase 2 shows lift | not started |
 
 Phase 3b is an addition to the original phasing, which ended Phase 3 at simulation and had no
@@ -429,11 +433,15 @@ player-fixture, and team-fixture vintage with its `as_of`, input hashes, and mod
 identities; historical vintages are never overwritten. Finalized outcomes attach through a
 separate append-only job. The versioned BI semantic export publishes pivot-friendly Parquet, and
 the atomic static publisher derives the dashboard's JSON read models from that export, including
-the cumulative player endpoint file introduced in schema v4 and retained in schema v8. Schema v7
+the cumulative player endpoint file introduced in schema v4 and retained in schema v9. Schema v7
 normalizes finalized observations in `player_actuals.json`, limits them to each forecast season
 and its observed immediate predecessor, carries forecast-owned cold-start provenance, and supports
 explicit prior/current-season Players-page actual ranges. Schema v8 adds the parallel normalized
-`team_actuals.json` boundary and historical expanded-row semantics. Dashboards
+`team_actuals.json` boundary and historical expanded-row semantics. Schema v9 adds fixture-time
+club/opponent permanent codes, season-specific short names, and venue to every normalized player
+actual. The publisher resolves those identities by season, checks gameweek/side/venue/codes against
+`dim_fixture`, and uses that dimension's kickoff as the canonical presentation timestamp. It
+changes neither BI semantic contract v5 nor insight request schema v4. Dashboards
 and BI tools consume those read-only outputs, never the mutable production DuckDB. The current
 eleven dashboard routes are Summary, Fixture matrix, Team analytics, Players, Player analytics,
 Next GW suggestion, Player prediction vs actual, Team prediction vs actual, Optimizer audit, Plan

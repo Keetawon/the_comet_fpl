@@ -39,7 +39,7 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
 - **Goal 2's MVP, deep analytics, exact parallel monitoring, evidence-bound summaries, and
   explicit prior/current-season player/team actual ranges have completed development-only implementation
   and automated gates; final responsive in-browser visual verification remains pending.** Semantic contract
-  version 5, dashboard schema version 8, immutable player/team outcomes, the atomic static-JSON
+  version 5, dashboard schema version 9, immutable player/team outcomes, the atomic static-JSON
   boundary, nine read-only analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
   development-only. P1.8's full Players-page
   form matrix and additive observed
@@ -70,7 +70,7 @@ series; later handoff records the new commits and full gate rather than rewritin
 - Stage E selects a legal 15-player squad and exact weekly lineup/captain, then performs a bounded
   multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed, and immutable
   platform/default, diagnostic, and custom-plan identities are separated fail-closed.
-- The BI semantic-v5/star export, fixture difficulty and player/team form/actual facts, atomic schema-v8
+- The BI semantic-v5/star export, fixture difficulty and player/team form/actual facts, atomic schema-v9
   static JSON, nine read-only analytic/decision pages, Plan Builder, and Squad Draft are implemented
   development-only. The browser reads only published JSON and never DuckDB. Player/Team analytics
   and separate Player/Team prediction-monitoring pages are current; the old
@@ -931,9 +931,10 @@ operation, and test; implementation cannot silently weaken these requirements.
 
 **Status (2026-08-26): implemented development-only; focused and full dashboard tests pass.**
 Player analytics and Team analytics use only the cumulative/forecast axis values introduced in
-dashboard schema version 4 and retained unchanged in current schema version 8. Version 7 added
-forecast-owned cold-start provenance for reporting eligibility; version 8 adds only normalized
-team history for Fixture Matrix drill-downs. Neither changes an analytics axis or model quantity.
+dashboard schema version 4 and retained unchanged in current schema version 9. Version 7 added
+forecast-owned cold-start provenance for reporting eligibility; version 8 added normalized team
+history for Fixture Matrix drill-downs; version 9 adds only fixture-time club/opponent presentation
+identity to normalized player actuals. None changes an analytics axis or model quantity.
 The pages do not reach around P2.3's outcome facts.
 
 - Player views: price-versus-cumulative-xP Pareto frontier; published inclusive haul-versus-downside
@@ -1018,7 +1019,7 @@ Builder, and Squad Draft remain deterministic-only.
   quota is not assumed to license general application calls; configure a general API key/balance
   under the current provider terms.
 - Requests send only exact typed page/vintage/filter selectors. The server verifies the selected
-  schema-v8 manifest and file hashes, reconstructs the allowlisted facts from that static
+  schema-v9 manifest and file hashes, reconstructs the allowlisted facts from that static
   generation, and refuses mismatched provenance before provider/cache work. No PMFs, caller prose,
   arbitrary prompts, manager/custom-plan identifiers, squads, bank, selling values, capture data,
   credentials, or full page payloads cross the boundary.
@@ -1079,11 +1080,11 @@ Only after the ordered dashboard program above, unless an operational blocker re
   field or read-model schema member. The Players display exposes BPS/App as the selected-range BPS
   total divided by appearances; all played DGW legs count, DNPs do not, and incomplete appeared-row
   evidence stays unavailable. Normalized actuals retain their fixture-grain BPS scores, the legacy
-  form BPS measure remains a total, and no read-model field is added. Insight request schema v3
-  limits its explicit actual season to
-  that published/selectable pair and requires every gameweek in the inclusive requested range to
-  be an exact member of the chosen season's finalized-GW set; endpoint membership alone is not
-  sufficient. Acceptance requires archive/
+  form BPS measure remains a total, and BPS/App adds no read-model field. Insight request schema v4
+  carries exact `actual_season_from` / `actual_gw_from` and `actual_season_to` / `actual_gw_to`
+  endpoints. Both endpoints must be exact members of the page-wide published period set; the
+  selected scope is their inclusive chronological slice, so absent numeric GWs are not invented.
+  Acceptance requires archive/
   live duplicate rejection, finalized-ledger gating, complete-GW filtering, NULL preservation,
   range/DGW aggregation tests, a schema-v7 atomic republish, and visual verification.
 
@@ -1122,10 +1123,22 @@ Only after the ordered dashboard program above, unless an operational blocker re
   GW1 this means 2026-27 GW1 plus 2025-26 GW38 through GW35. Cross-season membership uses permanent
   player `code`; newcomers without predecessor rows remain shorter. It exposes only observed
   fixture metrics:
-  minutes/start, goals,
+  `Match` (season/GW, fixture-time Club, and kickoff date), `Opp (H/A)`, minutes/start, goals,
   assists, xG, xA, fail-closed display xGI, clean sheets, on-pitch goals conceded, saves, raw DC
   actions, xGC, bonus, raw BPS, and points. The shared Next GW table retains the future fixture/xP
   drill-down; Players never substitutes it into historical detail.
+
+  Dashboard schema v9 extends each normalized player-actual fixture with `team_code`,
+  `team_short_name`, `opponent_team_code`, `opponent_short_name`, and `was_home`. These are the
+  fixture-time identities already owned by BI semantic v5: the publisher resolves each club through
+  `dim_team_season` on `(season, team_id)`, reconciles fixture side, venue, gameweek, and permanent
+  codes to `dim_fixture`, and uses the fixture dimension's kickoff as the canonical presentation
+  timestamp. It never uses the selected forecast player's current club,
+  season-end membership, a bare season-scoped id, or a name join. Transfers therefore retain their
+  actual club for each leg; fixture ids reused in another season cannot collide; prior-season rows
+  involving a now-relegated club remain labelable; and promoted players without prior Premier
+  League evidence stay shorter. This dashboard-only transport does not change BI semantic contract
+  v5 or insight request schema v4.
 
   BI semantic contract v5 adds `fact_team_fixture_actual` at
   `(season, fixture, team_id)` grain with direct official GF/GA and nullable source-row xG/xGC,
@@ -1149,7 +1162,8 @@ Only after the ordered dashboard program above, unless an operational blocker re
   source and provenance contract.
 
   Acceptance requires semantic-v5 grain/join/NULL/overlap checks, complete-GW and finalized-ledger
-  gating, schema-v8 normalized-file validation, immediate-predecessor bounds, season-qualified
+  gating, schema-v9 normalized-file validation and fixture-identity reconciliation,
+  immediate-predecessor bounds, season-qualified
   current-to-predecessor rolling-window tests, permanent-identity/no-substitution checks,
   DGW/latest-five ordering tests, route-specific player detail tests, Fixture Matrix loading/error/
   empty states, public-package inclusion, atomic BI/static republish, and responsive visual

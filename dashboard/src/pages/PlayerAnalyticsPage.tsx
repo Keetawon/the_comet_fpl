@@ -1,4 +1,4 @@
-// Player deep analytics over one exact schema-v8 cumulative endpoint. This page ranks and draws
+// Player deep analytics over one exact schema-v9 cumulative endpoint. This page ranks and draws
 // presentation geometry only; probabilities remain backend-published scalars.
 
 import { useEffect, useMemo, useState } from "react";

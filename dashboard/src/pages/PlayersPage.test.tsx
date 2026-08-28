@@ -82,6 +82,11 @@ function actualFromForm(
     gw: 1,
     fixture: 901,
     kickoff_time: "2026-08-22T14:00:00+00:00",
+    team_code: 101,
+    team_short_name: "ALP",
+    opponent_team_code: 102,
+    opponent_short_name: "BET",
+    was_home: true,
     minutes: form.minutes ?? 90,
     starts: form.starts ?? 1,
     goals_scored: form.goals_scored ?? 0,
@@ -119,7 +124,7 @@ const playersWithActuals: PlayerWithTestActuals[] = playersSample.players.map((p
 
 const actualsData: PlayerActualsData = {
   schema: "fpl.dashboard-player-actuals",
-  json_schema_version: 8,
+  json_schema_version: 9,
   players: playersWithActuals.map((player) => ({
     season: player.season,
     code: player.code,
@@ -966,10 +971,10 @@ describe("PlayersPage", () => {
       }),
     );
     const detailHeading = await screen.findByText(/Alpha.*rolling latest five completed GWs/);
-    const detailTable = detailHeading.parentElement?.querySelector("table");
-    expect(detailTable).not.toBeNull();
-    expect(within(detailTable!).getByText("2025-26 GW35")).toBeInTheDocument();
-    expect(within(detailTable!).queryByText("2025-26 GW34")).not.toBeInTheDocument();
+    const detailTable = screen.getByRole("table", { name: "Alpha recent actual fixtures" });
+    expect(detailHeading.parentElement).toContainElement(detailTable);
+    expect(within(detailTable).getByText(/2025-26 GW35 · ALP/)).toBeInTheDocument();
+    expect(within(detailTable).queryByText(/2025-26 GW34/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent(
@@ -1003,7 +1008,10 @@ describe("PlayersPage", () => {
                     {
                       gw: 1,
                       fixture: 1011,
-                      kickoff_time: "2026-08-15T16:00:00+00:00",
+                      kickoff_time: "2026-08-15T23:00:00+07:00",
+                      opponent_team_code: 103,
+                      opponent_short_name: "GAM",
+                      was_home: false,
                       expected_goals: 0.4,
                       expected_assists: 0.2,
                     },
@@ -1016,12 +1024,16 @@ describe("PlayersPage", () => {
           season: "2025-26",
           code: alpha.code,
           actuals: [
-            actualFromForm({}, { gw: 34, fixture: 1034 }),
+            actualFromForm(
+              {},
+              { gw: 34, fixture: 1034, kickoff_time: "2026-04-26T14:00:00+00:00" },
+            ),
             actualFromForm(
               {},
               {
                 gw: 35,
                 fixture: 1035,
+                kickoff_time: "2026-05-03T14:00:00+00:00",
                 expected_goals: 0,
                 expected_assists: 0,
               },
@@ -1031,6 +1043,7 @@ describe("PlayersPage", () => {
               {
                 gw: 36,
                 fixture: 1036,
+                kickoff_time: "2026-05-10T14:00:00+00:00",
                 minutes: 0,
                 starts: 0,
                 goals_scored: 0,
@@ -1040,7 +1053,19 @@ describe("PlayersPage", () => {
                 bps: null,
               },
             ),
-            actualFromForm({}, { gw: 38, fixture: 1038 }),
+            actualFromForm(
+              {},
+              {
+                gw: 38,
+                fixture: 1038,
+                kickoff_time: "2026-05-24T15:00:00+00:00",
+                team_code: 104,
+                team_short_name: "OLD",
+                opponent_team_code: 105,
+                opponent_short_name: "OME",
+                was_home: false,
+              },
+            ),
           ],
         },
         {
@@ -1057,12 +1082,12 @@ describe("PlayersPage", () => {
     await user.click(within(alphaRow!).getByRole("button", { name: /expand fixtures/i }));
 
     const detailHeading = await screen.findByText(/Alpha.*rolling latest five completed GWs/);
-    const detailTable = detailHeading.parentElement?.querySelector("table");
-    expect(detailTable).not.toBeNull();
-    const detail = within(detailTable!);
+    const detailTable = screen.getByRole("table", { name: "Alpha recent actual fixtures" });
+    expect(detailHeading.parentElement).toContainElement(detailTable);
+    const detail = within(detailTable);
     expect(detail.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-      "Season / GW",
-      "Kickoff (UTC)",
+      "Match",
+      "Opp (H/A)",
       "Min",
       "Start",
       "G",
@@ -1079,20 +1104,42 @@ describe("PlayersPage", () => {
       "BPS",
       "Pts (26/27)",
     ]);
+    expect(detail.getAllByRole("columnheader")).toHaveLength(17);
+    expect(
+      detail.getByRole("columnheader", {
+        name: "Opponent and venue; H means home, A means away",
+      }),
+    ).toHaveAttribute("title", "Opponent and venue; H = home, A = away");
+    expect(detail.queryByRole("columnheader", { name: "Kickoff (UTC)" })).not.toBeInTheDocument();
     expect(detail.queryByRole("columnheader", { name: "xP" })).not.toBeInTheDocument();
     expect(detail.queryByText("Club λ for")).not.toBeInTheDocument();
 
     const fixtureRows = detail.getAllByRole("row").slice(1);
     expect(fixtureRows).toHaveLength(5);
     expect(fixtureRows.map((row) => within(row).getAllByRole("cell")[0].textContent)).toEqual([
-      "2026-27 GW1",
-      "2026-27 GW1",
-      "2025-26 GW38",
-      "2025-26 GW36",
-      "2025-26 GW35",
+      "2026-27 GW1 · ALP2026-08-15",
+      "2026-27 GW1 · ALP2026-08-15",
+      "2025-26 GW38 · OLD2026-05-24",
+      "2025-26 GW36 · ALP2026-05-10",
+      "2025-26 GW35 · ALP2026-05-03",
     ]);
-    expect(within(fixtureRows[0]).getAllByRole("cell")[1]).toHaveTextContent("2026-08-15 16:00");
-    expect(within(fixtureRows[1]).getAllByRole("cell")[1]).toHaveTextContent("2026-08-15 12:00");
+    const latestCells = within(fixtureRows[0]).getAllByRole("cell");
+    expect(latestCells[0]).toHaveAttribute(
+      "title",
+      "2026-27 GW1 · ALP · 2026-08-15 16:00 UTC",
+    );
+    expect(latestCells[0]).toHaveAccessibleName(
+      "2026-27, gameweek 1, club ALP, kickoff 2026-08-15 16:00 UTC",
+    );
+    expect(latestCells[1]).toHaveTextContent("GAM (A)");
+    expect(latestCells[1]).toHaveAccessibleName("Opponent GAM, away");
+    const earlierDgwCells = within(fixtureRows[1]).getAllByRole("cell");
+    expect(earlierDgwCells[1]).toHaveTextContent("BET (H)");
+    expect(earlierDgwCells[1]).toHaveAccessibleName("Opponent BET, home");
+    const priorSeasonCells = within(fixtureRows[2]).getAllByRole("cell");
+    expect(priorSeasonCells[0]).toHaveTextContent("2025-26 GW38 · OLD");
+    expect(priorSeasonCells[1]).toHaveTextContent("OME (A)");
+    expect(priorSeasonCells[1]).toHaveAccessibleName("Opponent OME, away");
     expect(within(fixtureRows[3]).getAllByRole("cell")[2]).toHaveTextContent("0");
     expect(within(fixtureRows[3]).getAllByRole("cell")[8]).toHaveTextContent("–");
     expect(within(fixtureRows[3]).getAllByRole("cell")[15]).toHaveTextContent("–");

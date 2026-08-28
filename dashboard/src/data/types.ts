@@ -120,7 +120,7 @@ export interface TeamActualsRecord {
 
 export interface TeamActualsData {
   schema: "fpl.dashboard-team-actuals";
-  json_schema_version: 8;
+  json_schema_version: 9;
   teams: TeamActualsRecord[];
 }
 
@@ -157,7 +157,12 @@ export interface PlayerForm {
 export interface PlayerActualFixture {
   gw: number;
   fixture: number;
-  kickoff_time: string | null;
+  kickoff_time: string;
+  team_code: number;
+  team_short_name: string;
+  opponent_team_code: number;
+  opponent_short_name: string;
+  was_home: boolean;
   minutes: number | null;
   starts: number | null;
   goals_scored: number | null;
@@ -228,7 +233,7 @@ export interface PlayerActualsRecord {
 
 export interface PlayerActualsData {
   schema: "fpl.dashboard-player-actuals";
-  json_schema_version: 8;
+  json_schema_version: 9;
   players: PlayerActualsRecord[];
 }
 
@@ -244,7 +249,7 @@ export interface PlayerHorizon {
   p_ge_15: number;
 }
 
-/** Canonical positional order retained in the compact schema-v8 wire payload. */
+/** Canonical positional order retained in the compact schema-v9 wire payload. */
 export const PLAYER_HORIZON_FIELDS = [
   "gw_to",
   "xp",
@@ -296,7 +301,7 @@ export interface PlayerHorizonSemantics {
 
 export interface PlayerHorizonsData {
   schema: "fpl.dashboard-player-horizons";
-  json_schema_version: 8;
+  json_schema_version: 9;
   semantics: PlayerHorizonSemantics;
   horizon_fields: typeof PLAYER_HORIZON_FIELDS;
   players: PlayerHorizonsRecord[];
@@ -305,7 +310,7 @@ export interface PlayerHorizonsData {
 /** Serialized payload shape before the loader decodes positional horizon values. */
 export interface PlayerHorizonsWireData {
   schema: "fpl.dashboard-player-horizons";
-  json_schema_version: 8;
+  json_schema_version: 9;
   semantics: PlayerHorizonSemantics;
   horizon_fields: typeof PLAYER_HORIZON_FIELDS;
   players: PlayerHorizonsWireRecord[];
@@ -447,7 +452,7 @@ export interface SummaryData {
   ease_index_formula_version: string | null;
 }
 
-// ---- schema-v8 prediction monitoring: immutable forecasts joined to final outcomes ----
+// ---- schema-v9 prediction monitoring: immutable forecasts joined to final outcomes ----
 
 export interface ForecastAccuracySemantics {
   [key: string]: unknown;
@@ -554,7 +559,7 @@ export interface PlayerForecastAccuracyRun extends ForecastAccuracyRunProvenance
 
 export interface PlayerForecastVsActualData {
   schema: "fpl.dashboard-player-forecast-vs-actual";
-  json_schema_version: 8;
+  json_schema_version: 9;
   semantics: ForecastAccuracySemantics;
   has_outcomes: boolean;
   runs: PlayerForecastAccuracyRun[];
@@ -650,7 +655,7 @@ export interface TeamForecastAccuracyRun extends ForecastAccuracyRunProvenance, 
 
 export interface TeamForecastVsActualData {
   schema: "fpl.dashboard-team-forecast-vs-actual";
-  json_schema_version: 8;
+  json_schema_version: 9;
   semantics: ForecastAccuracySemantics;
   has_outcomes: boolean;
   runs: TeamForecastAccuracyRun[];

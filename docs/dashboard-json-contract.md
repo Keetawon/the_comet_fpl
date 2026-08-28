@@ -1,4 +1,4 @@
-# Dashboard read-model JSON contract, version 8
+# Dashboard read-model JSON contract, version 9
 
 Status: implemented development-only by DEV-ROADMAP P1.7a and extended through P2.5. This
 document is the authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The
@@ -92,6 +92,31 @@ Possession and shot counts are absent because no approved static source publishe
 FBref path is only an unpopulated operator-vendored defensive-actions CSV and cannot supply those
 fields; the emitter and browser never proxy them.
 
+## Version 9 player fixture-identity amendment (implemented 2026-08-28)
+
+Version 9 retains every version-8 file and metric. It extends each fixture inside
+`player_actuals.json` with `team_code`, `team_short_name`, `opponent_team_code`,
+`opponent_short_name`, and `was_home`. These values describe the club represented by that exact
+observed player-fixture row, not the player's club in a selected forecast vintage or at season end.
+
+The semantic source remains BI contract v5's `fact_player_fixture_actual`, which already owns the
+fixture-time `team_id`, permanent `team_code`, season-scoped `opponent_team_id`, and `was_home`.
+The JSON publisher resolves own and opponent display identities through `dim_team_season` on the
+season-qualified `(season, team_id)` key. It then reconciles gameweek, home/away side, fixture-time
+club, opponent, and permanent codes to `dim_fixture` at `(season, fixture)`, and publishes the
+fixture dimension's kickoff as the canonical presentation timestamp. This avoids preserving stale
+source timestamps after a fixture-time correction. Missing, ambiguous, or contradictory identity
+fails the entire atomic publication. Fixture ids and team ids are never joined without season, and
+the browser never guesses an opponent from the current player registry.
+
+This keeps transfers and season changes honest: each leg names the club the player represented in
+that fixture, prior rows involving a now-relegated club remain labelable from their own season, and
+a promoted player with no prior Premier League fact remains shorter rather than receiving synthetic
+history. Double-gameweek legs remain separate. The expanded Players table presents `Match`
+(season/GW, fixture-time Club, and kickoff date) plus `Opp (H/A)` before the observed metrics. BI
+semantic contract v5 and insight request
+schema v4 are unchanged.
+
 ## Boundary and provenance chain
 
 ```text
@@ -122,7 +147,7 @@ identical content hash.
 
 ## Layout
 
-Version 8 publishes ten read-model files plus the manifest.
+Version 9 publishes ten read-model files plus the manifest.
 
 ```text
 data/
@@ -332,9 +357,14 @@ P0; the refreshed development generation does not replace the deadline artifact.
 
 This normalized file carries finalized observed history without repeating it once per forecast
 vintage. Each row has `season`, `code`, and a non-empty `actuals` array. Each actual contains
-`gw`, `fixture`, `kickoff_time`, `minutes`, `starts`, `goals_scored`, `assists`, `clean_sheets`,
+`gw`, `fixture`, `kickoff_time`, fixture-time `team_code`, `team_short_name`,
+`opponent_team_code`, `opponent_short_name`, `was_home`, `minutes`, `starts`, `goals_scored`,
+`assists`, `clean_sheets`,
 on-pitch `goals_conceded`, `saves`, `bonus`, `bps`, `defensive_contribution`, `expected_goals`,
 `expected_assists`, `expected_goals_conceded`, and `points_under_rules_2026_27`.
+`kickoff_time` is the required timezone-aware canonical value from the matched
+season-qualified `dim_fixture` row; a null, naive, or malformed timestamp fails publication and
+strict browser loading.
 
 Publication is limited to the union of every published run's forecast season and its immediate
 predecessor. A predecessor enters the file only when finalized observed rows exist for an eligible
@@ -342,7 +372,11 @@ forecast-population player; no earlier observed season is transported.
 
 Only officially complete gameweeks enter the file. Rows sort by gameweek, kickoff, then fixture;
 both double-gameweek legs remain separate. Identities sort by season then code, duplicate fixture
-identities fail closed, and source NULLs remain NULL. For one selected forecast run, JavaScript
+identities fail closed, and source NULLs remain NULL. Own and opponent club labels resolve through
+`dim_team_season` in the row's season, and every row must agree with the home/away sides and
+permanent codes on the season-qualified `dim_fixture` record. Current forecast membership,
+season-end player membership, names, and bare season-scoped ids are forbidden identity sources.
+For one selected forecast run, JavaScript
 builds the page-wide chronological list of exact finalized `(season, gw)` keys from only that run's
 forecast season and immediate predecessor. `Actual from` / `Actual to` select an inclusive slice of
 that list; absent numeric GWs are not synthesized. Default/reset selects its latest five keys. Every
@@ -362,14 +396,15 @@ The Players expanded row reads these same normalized actuals, not `players.json.
 independent of the main table's selectable Season–GW endpoint range and takes its own fixed
 page-wide rolling set of the latest five distinct season-qualified finalized GW labels across the forecast season and its
 immediate predecessor. It keeps every fixture leg in those gameweeks and presents the rows newest
-first (season, gameweek, kickoff, fixture descending). It shows season, GW, kickoff, minutes/start,
-goals, assists,
+first (season, gameweek, kickoff, fixture descending). It shows `Match` (season/GW, fixture-time
+Club, and kickoff date), `Opp (H/A)`, followed by minutes/start, goals, assists,
 xG, xA,
 display-only fail-closed xGI, clean sheets, on-pitch goals conceded, saves, raw DC actions, xGC,
-bonus, raw BPS, and points. Cross-season membership uses permanent player `code` only. A player with
-no immediate-predecessor record has a shorter list; the emitter/browser never substitutes another
-record by `web_name` or season-scoped `element_id`. The future fixture/xP drill-down remains on
-Next GW.
+bonus, raw BPS, and points. Cross-season player membership uses permanent player `code` only; the
+club fields on each fixture use permanent `team_code` values resolved inside that fixture's season.
+A player with no immediate-predecessor record has a shorter list; the emitter/browser never
+substitutes another record by `web_name` or season-scoped `element_id`. The future fixture/xP
+drill-down remains on Next GW.
 
 ## team_actuals.json — one object per (season, team_code)
 
@@ -401,7 +436,7 @@ and no proxy is permitted.
 ```json
 {
   "schema": "fpl.dashboard-team-actuals",
-  "json_schema_version": 8,
+  "json_schema_version": 9,
   "teams": [{
     "season": "2026-27",
     "team_code": 101,
@@ -449,7 +484,7 @@ also reconciled so an entirely omitted player or run cannot disappear silently.
 ```json
 {
   "schema": "fpl.dashboard-player-horizons",
-  "json_schema_version": 8,
+  "json_schema_version": 9,
   "semantics": {
     "grain": ["run_id", "season", "code", "gw_to"],
     "cumulative_from": "dim_forecast_run.gw_from",
@@ -637,7 +672,7 @@ and the audit page reads both files.
 ```json
 {
   "schema": "fpl.dashboard-read-models",
-  "json_schema_version": 8,
+  "json_schema_version": 9,
   "generated_at": "2026-08-15T00:00:00+00:00",
   "source": {
     "export_schema": "fpl.bi-semantic-export",
@@ -685,10 +720,12 @@ closed.
 The static app, any notebook, and any external tool read only these files (or the Parquet export).
 Nothing downstream of the BI boundary queries DuckDB. All nine read-only dashboard routes have
 read models; later pages require an explicit schema bump under the same manifest policy. Version-7
-consumers must republish before loading version 8. Version-8 consumers load cumulative outcomes
+consumers must republish before loading version 8, and version-8 consumers must republish before
+loading version 9. Version-9 consumers load cumulative outcomes
 through the strict `player_horizons.json` boundary and look up an exact
 `(run_id, season, code, gw_to)` endpoint;
 they never interpolate or substitute another vintage. They load historical club rows only through
-the normalized `team_actuals.json` boundary, never through forecast fixture primitives. The Players
-route uses the exact xP endpoint when applicable and delegates probability comparison to Player
-analytics.
+the normalized `team_actuals.json` boundary, never through forecast fixture primitives. Historical
+player club/opponent labels come only from the fixture-owned version-9 `player_actuals.json`
+fields; consumers never join them from current forecast membership. The Players route uses the
+exact xP endpoint when applicable and delegates probability comparison to Player analytics.

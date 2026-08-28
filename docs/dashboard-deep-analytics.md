@@ -2,9 +2,9 @@
 
 Status: contract frozen and first implementation completed development-only on 2026-08-26. The
 cumulative inputs introduced in dashboard read-model schema version 4 and retained in current
-schema version 8 are sufficient for this implementation. Version 8's normalized team history does
-not change an analytics axis; this document does not change a model, forecast vintage, optimizer
-objective, or published probability.
+schema version 9 are sufficient for this implementation. Version 8's normalized team history and
+version 9's player-actual fixture-time club/opponent identity do not change an analytics axis; this
+document does not change a model, forecast vintage, optimizer objective, or published probability.
 
 ## Decision question
 

@@ -41,8 +41,8 @@ const BASE: string = import.meta.env.VITE_DATA_BASE ?? "/data";
 // map and the browser tab parses it exactly once. A failed fetch is evicted so it can
 // be retried.
 const cache = new Map<string, Promise<unknown>>();
-const DASHBOARD_SCHEMA_VERSION = 8;
-const FORECAST_ACCURACY_SCHEMA_VERSION = 8;
+const DASHBOARD_SCHEMA_VERSION = 9;
+const FORECAST_ACCURACY_SCHEMA_VERSION = 9;
 const HORIZON_VALUE_DECIMAL_PLACES = 6;
 const PROBABILITY_TOLERANCE = 10 ** -HORIZON_VALUE_DECIMAL_PLACES;
 const PLAN_KINDS = new Set<PlanKind>([
@@ -75,7 +75,7 @@ function readModelObject(
   schema: string,
 ): Record<string, unknown> {
   if (!payload || typeof payload !== "object") {
-    throw new Error(`invalid ${filename}: expected a schema-v8 object`);
+    throw new Error(`invalid ${filename}: expected a schema-v9 object`);
   }
   const candidate = payload as Record<string, unknown>;
   if (
@@ -187,6 +187,11 @@ const PLAYER_ACTUAL_KEYS = [
   "gw",
   "fixture",
   "kickoff_time",
+  "team_code",
+  "team_short_name",
+  "opponent_team_code",
+  "opponent_short_name",
+  "was_home",
   "minutes",
   "starts",
   "goals_scored",
@@ -237,19 +242,27 @@ export async function loadPlayerActuals(): Promise<PlayerActualsData> {
       const row = strictObject(actual, PLAYER_ACTUAL_KEYS, actualSubject);
       const gw = integerValue(row.gw, `${actualSubject}.gw`, 1);
       const fixture = integerValue(row.fixture, `${actualSubject}.fixture`, 1);
-      if (row.kickoff_time !== null && typeof row.kickoff_time !== "string") {
-        throw new Error(`invalid ${actualSubject}.kickoff_time`);
+      const kickoff = timezoneAwareIsoValue(
+        row.kickoff_time,
+        `${actualSubject}.kickoff_time`,
+      );
+      integerValue(row.team_code, `${actualSubject}.team_code`, 1);
+      stringValue(row.team_short_name, `${actualSubject}.team_short_name`);
+      integerValue(row.opponent_team_code, `${actualSubject}.opponent_team_code`, 1);
+      stringValue(row.opponent_short_name, `${actualSubject}.opponent_short_name`);
+      if (typeof row.was_home !== "boolean") {
+        throw new Error(`invalid ${actualSubject}.was_home`);
       }
       if (fixtures.has(fixture)) {
         throw new Error(`invalid ${subject}: duplicate fixture ${fixture}`);
       }
       fixtures.add(fixture);
-      const order = `${String(gw).padStart(3, "0")}/${row.kickoff_time ?? "~"}/${String(fixture).padStart(8, "0")}`;
+      const order = `${String(gw).padStart(3, "0")}/${new Date(kickoff).toISOString()}/${String(fixture).padStart(8, "0")}`;
       if (previousOrder && order < previousOrder) {
         throw new Error(`invalid ${subject}: actuals are not ordered`);
       }
       previousOrder = order;
-      for (const key of PLAYER_ACTUAL_KEYS.slice(3)) {
+      for (const key of PLAYER_ACTUAL_KEYS.slice(8)) {
         const metric = row[key];
         if (metric !== null && (typeof metric !== "number" || !Number.isFinite(metric))) {
           throw new Error(`invalid ${actualSubject}.${key}`);
@@ -369,7 +382,7 @@ function hasExactKeys(value: object, expected: readonly string[]): boolean {
 export async function loadPlayerHorizons(): Promise<PlayerHorizonsData> {
   const payload = await fetchJson<unknown>("player_horizons.json");
   if (!payload || typeof payload !== "object") {
-    throw new Error("invalid player_horizons.json: expected a schema-v8 object");
+    throw new Error("invalid player_horizons.json: expected a schema-v9 object");
   }
   const candidate = payload as Record<string, unknown>;
   const semantics = candidate.semantics as Record<string, unknown> | undefined;
@@ -640,6 +653,41 @@ function stringValue(value: unknown, subject: string): string {
     throw new Error(`invalid ${subject}: expected a non-empty string`);
   }
   return value;
+}
+
+const TIMEZONE_AWARE_ISO_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+function timezoneAwareIsoValue(value: unknown, subject: string): string {
+  const text = stringValue(value, subject);
+  const match = TIMEZONE_AWARE_ISO_PATTERN.exec(text);
+  const parsed = Date.parse(text);
+  if (!match || !Number.isFinite(parsed)) {
+    throw new Error(
+      `invalid ${subject}: expected a timezone-aware ISO datetime ending in Z or an offset`,
+    );
+  }
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth[month - 1] ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    throw new Error(`invalid ${subject}: expected a valid ISO calendar datetime`);
+  }
+  return text;
 }
 
 function nullableString(value: unknown, subject: string): string | null {
@@ -1229,7 +1277,7 @@ export async function loadTeamForecastVsActual(): Promise<TeamForecastVsActualDa
   return { ...envelope, runs, manifest } as unknown as TeamForecastVsActualData;
 }
 
-/** Temporary source-compatibility alias; it loads the explicit schema-v8 player file. */
+/** Temporary source-compatibility alias; it loads the explicit schema-v9 player file. */
 export const loadForecastVsActual = loadPlayerForecastVsActual;
 
 export async function loadOptimizerAudit(): Promise<OptimizerAuditData> {

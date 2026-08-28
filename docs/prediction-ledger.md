@@ -134,12 +134,14 @@ transformation. The artifact carries an explicit `as_of`, so nothing here is inf
 - **Read/BI layer — implemented development-only.** The atomic star-schema export consumes the
   ledger without querying around it. Semantic contract v5 retains v4's exact team goal PMFs,
   ledger-owned finalized player/team facts, and finalized live player-component gate, and adds the
-  normalized finalized `fact_team_fixture_actual`. Dashboard schema v8 retains the cumulative player
+  normalized finalized `fact_team_fixture_actual`. Dashboard schema v9 retains the cumulative player
   endpoints from v4 — xP plus inclusive `P(<=2)` and `P(>=2/4/6/10/15)`. Cross-gameweek
   probabilities are convolved in the Python emitter under an explicit independence assumption; the
   browser selects published scalars and never computes a probability from ledger primitives.
   Separate player/team monitoring files enforce complete player-gameweek finality; team defence
-  CRPS uses the opponent's exact stored goal PMF. Schema v8 supplies normalized
+  CRPS uses the opponent's exact stored goal PMF. Schema v8 introduced normalized
   `player_actuals.json` and `team_actuals.json` history from complete official gameweeks, bounded to
-  each forecast season and its immediate predecessor. These remain observed display facts and never
-  become forecast inputs.
+  each forecast season and its immediate predecessor. Schema v9 adds season-resolved fixture-time
+  club/opponent identity and venue to each player-actual fixture. These remain observed display facts
+  and never become forecast inputs; BI semantic contract v5 and insight request schema v4 remain
+  unchanged.

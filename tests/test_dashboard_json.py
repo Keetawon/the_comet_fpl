@@ -36,6 +36,7 @@ from fpl.publish.dashboard_json import (
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
     DashboardJsonError,
     _discrete_crps,
+    _finished_player_actuals,
     _validate_player_actual_document,
     _validate_player_actual_generation,
     _validate_player_horizon_document,
@@ -1266,7 +1267,7 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
     prior = {
         **_player_actual_row(100, 1, 1),
         "season": PRIOR,
-        "fixture": 900,
+        "fixture": 100,
         "gw": 38,
         "kickoff_time": prior_kickoff,
     }
@@ -1274,7 +1275,7 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
     older = {
         **prior,
         "season": OLDER,
-        "fixture": 800,
+        "fixture": 100,
         "kickoff_time": older_kickoff,
     }
     _rewrite_table(
@@ -1309,12 +1310,49 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
         }
     )
     _rewrite_table(export_dir, "dim_gameweek", current_gameweeks)
+    historical_teams = [
+        {
+            **row,
+            "season": season,
+            "team_name": f"{season} {row['team_name']}",
+            "short_name": short_names[row["team_id"]],
+        }
+        for season, short_names in (
+            (PRIOR, {1: "PRA", 2: "PRB"}),
+            (OLDER, {1: "OLA", 2: "OLB"}),
+        )
+        for row in _source_tables()["dim_team_season"]
+        if row["team_id"] in short_names
+    ]
+    _rewrite_table(
+        export_dir,
+        "dim_team_season",
+        [*_source_tables()["dim_team_season"], *historical_teams],
+    )
     _rewrite_table(
         export_dir,
         "dim_fixture",
         [
-            {**row, "finished": row["gw"] == 2}
-            for row in _source_tables()["dim_fixture"]
+            *(
+                {**row, "finished": row["gw"] == 2}
+                for row in _source_tables()["dim_fixture"]
+            ),
+            {
+                **_source_tables()["dim_fixture"][0],
+                "season": PRIOR,
+                "fixture": 100,
+                "gw": 38,
+                "kickoff_time": prior_kickoff,
+                "finished": True,
+            },
+            {
+                **_source_tables()["dim_fixture"][0],
+                "season": OLDER,
+                "fixture": 100,
+                "gw": 38,
+                "kickoff_time": older_kickoff,
+                "finished": True,
+            },
         ],
     )
 
@@ -1323,7 +1361,7 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
         (record["season"], record["code"], [row["fixture"] for row in record["actuals"]])
         for record in models.player_actuals
     ] == [
-        (PRIOR, 1, [900]),
+        (PRIOR, 1, [100]),
         (SEASON, 1, [101, 102]),
     ]
     current = next(
@@ -1332,6 +1370,40 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
         if record["season"] == SEASON and record["code"] == 1
     )
     assert [row["gw"] for row in current["actuals"]] == [2, 2]
+    assert [
+        (
+            row["team_code"],
+            row["team_short_name"],
+            row["opponent_team_code"],
+            row["opponent_short_name"],
+            row["was_home"],
+        )
+        for row in current["actuals"]
+    ] == [
+        (101, "ALP", 103, "GAM", True),
+        (101, "ALP", 102, "BET", False),
+    ]
+    prior_record = next(
+        record
+        for record in models.player_actuals
+        if record["season"] == PRIOR and record["code"] == 1
+    )
+    assert {
+        field: prior_record["actuals"][0][field]
+        for field in (
+            "team_code",
+            "team_short_name",
+            "opponent_team_code",
+            "opponent_short_name",
+            "was_home",
+        )
+    } == {
+        "team_code": 101,
+        "team_short_name": "PRA",
+        "opponent_team_code": 102,
+        "opponent_short_name": "PRB",
+        "was_home": True,
+    }
     assert current["actuals"][1]["starts"] is None
     assert current["actuals"][1]["expected_goals_conceded"] is None
     assert "actuals" not in _player(models, 1)
@@ -1356,11 +1428,161 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
         _validate_player_actual_generation(tampered_history)
 
 
+def test_player_actuals_keep_fixture_club_identity_across_a_transfer(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    transferred = _player_actual_row(
+        102,
+        2,
+        2,
+        position="MID",
+        team_id=2,
+        team_code=102,
+        opponent_team_id=1,
+        was_home=True,
+        saves=0,
+        goals_conceded=0,
+    )
+    _rewrite_table(
+        export_dir,
+        "fact_player_fixture_actual",
+        [*_source_tables()["fact_player_fixture_actual"], transferred],
+    )
+    _mark_final(export_dir)
+
+    models = build_dashboard_read_models(export_dir)
+    record = next(
+        row
+        for row in models.player_actuals
+        if row["season"] == SEASON and row["code"] == 2
+    )
+    assert [
+        (
+            actual["fixture"],
+            actual["team_code"],
+            actual["team_short_name"],
+            actual["opponent_team_code"],
+            actual["opponent_short_name"],
+            actual["was_home"],
+        )
+        for actual in record["actuals"]
+    ] == [
+        (100, 101, "ALP", 102, "BET", True),
+        (102, 102, "BET", 101, "ALP", True),
+    ]
+
+
+def test_player_actuals_use_fixture_kickoff_and_its_canonical_order() -> None:
+    source = _source_tables()
+    actuals = pl.DataFrame(
+        [
+            _player_actual_row(
+                101,
+                1,
+                2,
+                opponent_team_id=3,
+                kickoff_time=KICKOFFS[102] + timedelta(hours=1),
+            ),
+            _player_actual_row(
+                102,
+                1,
+                2,
+                opponent_team_id=2,
+                was_home=False,
+                kickoff_time=KICKOFFS[101] - timedelta(hours=1),
+            ),
+        ]
+    )
+    gameweeks = pl.DataFrame([{**source["dim_gameweek"][1], "finished": True}])
+    fixtures = pl.DataFrame(
+        [
+            {**row, "finished": True}
+            for row in source["dim_fixture"]
+            if row["fixture"] in (101, 102)
+        ]
+        + [
+            {
+                **source["dim_fixture"][0],
+                "gw": None,
+                "kickoff_time": None,
+            }
+        ]
+    )
+
+    rows = _finished_player_actuals(
+        actuals,
+        gameweeks,
+        pl.DataFrame(source["dim_team_season"]),
+        fixtures,
+    )[(SEASON, 1)]
+
+    assert [(row["fixture"], row["kickoff_time"]) for row in rows] == [
+        (101, KICKOFFS[101].isoformat()),
+        (102, KICKOFFS[102].isoformat()),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("actual_patch", "team_rows", "fixture_rows", "message"),
+    [
+        ({"opponent_team_id": 999}, None, None, "cannot resolve"),
+        ({"team_code": 999}, None, None, "disagrees with its finalized fixture/team identity"),
+        ({"was_home": False}, None, None, "disagrees with its finalized fixture/team identity"),
+        ({}, None, "missing", "absent from dim_fixture"),
+        ({}, None, "duplicate", "dim_fixture repeats fixture identity"),
+        ({}, None, "unfinished", "disagrees with its finalized fixture/team identity"),
+        ({}, None, "gw_mismatch", "disagrees with its finalized fixture/team identity"),
+        ({}, None, "missing_gw", "has no canonical gameweek or kickoff"),
+        ({}, None, "missing_kickoff", "has no canonical gameweek or kickoff"),
+        ({}, "duplicate", None, "dim_team_season repeats team identity"),
+    ],
+)
+def test_player_actual_identity_enrichment_fails_closed(
+    actual_patch: dict[str, Any],
+    team_rows: str | None,
+    fixture_rows: str | None,
+    message: str,
+) -> None:
+    actual = pl.DataFrame([_player_actual_row(100, 1, 1, **actual_patch)])
+    gameweeks = pl.DataFrame(
+        [{**_source_tables()["dim_gameweek"][0], "finished": True}]
+    )
+    teams = _source_tables()["dim_team_season"]
+    if team_rows == "duplicate":
+        teams = [*teams, dict(teams[0])]
+    fixtures = [{**_source_tables()["dim_fixture"][0], "finished": True}]
+    if fixture_rows == "missing":
+        fixtures = [{**_source_tables()["dim_fixture"][1], "finished": True}]
+    elif fixture_rows == "duplicate":
+        fixtures.append(dict(fixtures[0]))
+    elif fixture_rows == "unfinished":
+        fixtures[0]["finished"] = False
+    elif fixture_rows == "gw_mismatch":
+        fixtures[0]["gw"] = 2
+    elif fixture_rows == "missing_gw":
+        fixtures[0]["gw"] = None
+    elif fixture_rows == "missing_kickoff":
+        fixtures[0]["kickoff_time"] = None
+
+    with pytest.raises(DashboardJsonError, match=message):
+        _finished_player_actuals(
+            actual,
+            gameweeks,
+            pl.DataFrame(teams),
+            pl.DataFrame(fixtures),
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
         ("minutes", 90.5, "minutes is not an integer or null"),
         ("expected_goals", float("inf"), "expected_goals is not a finite number or null"),
+        ("team_code", 0, "invalid fixture identity"),
+        ("team_short_name", "", "invalid fixture identity"),
+        ("opponent_team_code", False, "invalid fixture identity"),
+        ("opponent_short_name", None, "invalid fixture identity"),
+        ("was_home", None, "invalid fixture identity"),
+        ("kickoff_time", None, "invalid fixture identity"),
         ("kickoff_time", "2026-08-22T14:00:00", "naive kickoff timestamp"),
         ("kickoff_time", "not-a-timestamp", "invalid kickoff timestamp"),
     ],

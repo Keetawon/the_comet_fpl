@@ -1,5 +1,5 @@
 // Pure player deep-analytics view model. All probability values are selected from one exact
-// schema-v8 cumulative endpoint; this module never adds, complements, or reconstructs them.
+// schema-v9 cumulative endpoint; this module never adds, complements, or reconstructs them.
 
 import type { PlayerHorizonIndex } from "@/lib/playerHorizons";
 import { playerHorizon } from "@/lib/playerHorizons";

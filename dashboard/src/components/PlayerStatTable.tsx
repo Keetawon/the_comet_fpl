@@ -198,23 +198,53 @@ interface HistoricalDetailColumn {
   key: string;
   label: string;
   title?: string;
-  value: (fixture: PlayerHistoricalFixture) => string;
+  headerAriaLabel?: string;
+  value: (fixture: PlayerHistoricalFixture) => ReactNode;
+  cellTitle?: (fixture: PlayerHistoricalFixture) => string;
+  cellAriaLabel?: (fixture: PlayerHistoricalFixture) => string;
+}
+
+function kickoffUtcDate(kickoff: string): string {
+  return new Date(kickoff).toISOString().slice(0, 10);
+}
+
+function kickoffUtcLabel(kickoff: string): string {
+  return `${new Date(kickoff).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 /** Published fixture-grain observations only; no forecast primitive appears in this profile. */
 const HISTORICAL_DETAIL_COLUMNS: readonly HistoricalDetailColumn[] = [
   {
-    key: "season_gw",
-    label: "Season / GW",
-    value: (fixture) => `${fixture.season} GW${fixture.gw}`,
+    key: "match",
+    label: "Match",
+    title: "Season, gameweek, fixture-time club, and kickoff date; hover for full UTC kickoff",
+    headerAriaLabel: "Match: season, gameweek, fixture-time club, and kickoff date",
+    value: (fixture) => (
+      <span className="flex flex-col leading-tight">
+        <span>
+          {fixture.season} GW{fixture.gw} · {fixture.team_short_name}
+        </span>
+        <span className="text-muted-foreground">
+          {kickoffUtcDate(fixture.kickoff_time)}
+        </span>
+      </span>
+    ),
+    cellTitle: (fixture) =>
+      `${fixture.season} GW${fixture.gw} · ${fixture.team_short_name} · ${kickoffUtcLabel(fixture.kickoff_time)}`,
+    cellAriaLabel: (fixture) =>
+      `${fixture.season}, gameweek ${fixture.gw}, club ${fixture.team_short_name}, kickoff ${kickoffUtcLabel(fixture.kickoff_time)}`,
   },
   {
-    key: "kickoff",
-    label: "Kickoff (UTC)",
+    key: "opponent",
+    label: "Opp (H/A)",
+    title: "Opponent and venue; H = home, A = away",
+    headerAriaLabel: "Opponent and venue; H means home, A means away",
     value: (fixture) =>
-      fixture.kickoff_time
-        ? fixture.kickoff_time.replace("T", " ").slice(0, 16)
-        : "–",
+      `${fixture.opponent_short_name} (${fixture.was_home ? "H" : "A"})`,
+    cellTitle: (fixture) =>
+      `${fixture.opponent_short_name} · ${fixture.was_home ? "Home" : "Away"}`,
+    cellAriaLabel: (fixture) =>
+      `Opponent ${fixture.opponent_short_name}, ${fixture.was_home ? "home" : "away"}`,
   },
   { key: "minutes", label: "Min", value: (fixture) => fmt(fixture.minutes, 0) },
   { key: "starts", label: "Start", value: (fixture) => fmt(fixture.starts, 0) },
@@ -830,7 +860,13 @@ export function PlayerStatTable({
                             ? ` · form anchored ${player.form.season} GW${player.form.as_at_gw}`
                             : null}
                         </p>
-                        <Table>
+                        <Table
+                          aria-label={
+                            expandedRowMode === "historical"
+                              ? `${player.web_name} recent actual fixtures`
+                              : `${player.web_name} forecast fixtures`
+                          }
+                        >
                           <TableHeader>
                             <TableRow>
                               {expandedRowMode === "historical"
@@ -839,6 +875,7 @@ export function PlayerStatTable({
                                       key={column.key}
                                       className="h-7 px-2 text-[11px]"
                                       title={column.title}
+                                      aria-label={column.headerAriaLabel}
                                     >
                                       {column.label}
                                     </TableHead>
@@ -862,6 +899,8 @@ export function PlayerStatTable({
                                       <TableCell
                                         key={column.key}
                                         className="px-2 py-1 text-[11px] tabular-nums"
+                                        title={column.cellTitle?.(fixture)}
+                                        aria-label={column.cellAriaLabel?.(fixture)}
                                       >
                                         {column.value(fixture)}
                                       </TableCell>

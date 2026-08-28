@@ -1,6 +1,6 @@
 {
   "schema": "fpl.dashboard-player-horizons",
-  "json_schema_version": 8,
+  "json_schema_version": 9,
   "semantics": {
     "grain": ["run_id", "season", "code", "gw_to"],
     "cumulative_from": "dim_forecast_run.gw_from",

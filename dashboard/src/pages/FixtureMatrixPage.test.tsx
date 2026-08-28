@@ -37,7 +37,7 @@ const actual = (patch: Partial<TeamActualFixture> = {}): TeamActualFixture => ({
 
 const teamActuals: TeamActualsData = {
   schema: "fpl.dashboard-team-actuals",
-  json_schema_version: 8,
+  json_schema_version: 9,
   teams: [
     {
       season: "2025-26",

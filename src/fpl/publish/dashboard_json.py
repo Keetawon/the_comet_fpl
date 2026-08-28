@@ -70,7 +70,10 @@ DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
 # v8: team_actuals.json adds the parallel normalized, finalized team-fixture history used by
 # Fixture Matrix drill-downs. Official scores remain direct observations; nullable components
 # stay unavailable rather than being inferred in the reporting layer.
-DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 8
+# v9: player_actuals.json carries the actual fixture club, opponent, and venue identities resolved
+# season-safely from the semantic facts/dimensions. Historical rows therefore never borrow the
+# selected forecast vintage's current club after a transfer.
+DASHBOARD_JSON_SCHEMA_VERSION: Final[int] = 9
 FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
 PLAYER_ACTUALS_SCHEMA: Final[str] = "fpl.dashboard-player-actuals"
@@ -120,6 +123,11 @@ _PLAYER_ACTUAL_FIELDS: Final[tuple[str, ...]] = (
     "gw",
     "fixture",
     "kickoff_time",
+    "team_code",
+    "team_short_name",
+    "opponent_team_code",
+    "opponent_short_name",
+    "was_home",
     "minutes",
     "starts",
     "goals_scored",
@@ -896,14 +904,27 @@ def _build_player_horizons(
 def _finished_player_actuals(
     player_actual: pl.DataFrame,
     gameweeks: pl.DataFrame,
+    team_season: pl.DataFrame,
+    dim_fixture: pl.DataFrame,
 ) -> dict[tuple[str, int], list[dict[str, Any]]]:
     """Season-scoped observed fixture rows from officially complete gameweeks only."""
     if player_actual.height == 0:
         return {}
     _require_no_nulls(
         player_actual,
-        ("season", "fixture", "code", "gw"),
-        "a player actual row is missing its season-qualified fixture identity",
+        (
+            "season",
+            "fixture",
+            "code",
+            "gw",
+            "kickoff_time",
+            "team_id",
+            "team_code",
+            "opponent_team_id",
+            "was_home",
+        ),
+        "a player actual row is missing its season-qualified fixture, club, opponent, or venue "
+        "identity",
     )
     duplicate = (
         player_actual.group_by(["season", "fixture", "code"])
@@ -927,14 +948,100 @@ def _finished_player_actuals(
         .filter(pl.col("_gw_finished").fill_null(False))
         .sort(["season", "code", "gw", "kickoff_time", "fixture"], nulls_last=True)
     )
+
+    _require_no_nulls(
+        team_season,
+        ("season", "team_id", "team_code", "short_name"),
+        "dim_team_season cannot resolve a required club identity",
+    )
+    team_labels: dict[tuple[str, int], dict[str, Any]] = {}
+    for team in team_season.iter_rows(named=True):
+        key = (str(team["season"]), int(team["team_id"]))
+        if key in team_labels:
+            raise DashboardJsonError(f"dim_team_season repeats team identity {key}")
+        if team["team_code"] is None or team["short_name"] is None:
+            raise DashboardJsonError(f"dim_team_season team identity {key} has no code or label")
+        team_labels[key] = team
+
+    _require_no_nulls(
+        dim_fixture,
+        (
+            "season",
+            "fixture",
+            "home_team_id",
+            "away_team_id",
+            "home_team_code",
+            "away_team_code",
+            "finished",
+        ),
+        "dim_fixture is missing a required season-qualified club identity",
+    )
+    fixtures: dict[tuple[str, int], dict[str, Any]] = {}
+    for fixture_row in dim_fixture.iter_rows(named=True):
+        key = (str(fixture_row["season"]), int(fixture_row["fixture"]))
+        if key in fixtures:
+            raise DashboardJsonError(f"dim_fixture repeats fixture identity {key}")
+        fixtures[key] = fixture_row
+
     result: dict[tuple[str, int], list[dict[str, Any]]] = {}
     for row in finished.iter_rows(named=True):
+        fixture_key = (str(row["season"]), int(row["fixture"]))
+        own_key = (fixture_key[0], int(row["team_id"]))
+        opponent_key = (fixture_key[0], int(row["opponent_team_id"]))
+        own = team_labels.get(own_key)
+        opponent = team_labels.get(opponent_key)
+        fixture = fixtures.get(fixture_key)
+        if own is None or opponent is None:
+            raise DashboardJsonError(
+                f"player actual fixture {fixture_key} cannot resolve its season-qualified club "
+                "or opponent identity"
+            )
+        if fixture is None:
+            raise DashboardJsonError(
+                f"player actual fixture {fixture_key} is absent from dim_fixture"
+            )
+        if fixture["gw"] is None or fixture["kickoff_time"] is None:
+            raise DashboardJsonError(
+                f"player actual fixture {fixture_key} has no canonical gameweek or kickoff"
+            )
+        if row["was_home"] is True:
+            expected_team_id = fixture["home_team_id"]
+            expected_team_code = fixture["home_team_code"]
+            expected_opponent_id = fixture["away_team_id"]
+            expected_opponent_code = fixture["away_team_code"]
+        elif row["was_home"] is False:
+            expected_team_id = fixture["away_team_id"]
+            expected_team_code = fixture["away_team_code"]
+            expected_opponent_id = fixture["home_team_id"]
+            expected_opponent_code = fixture["home_team_code"]
+        else:  # guarded above, kept explicit so venue never relies on truthiness
+            raise DashboardJsonError(
+                f"player actual fixture {fixture_key} has no boolean venue identity"
+            )
+        if (
+            fixture["finished"] is not True
+            or row["gw"] != fixture["gw"]
+            or row["team_id"] != expected_team_id
+            or row["team_code"] != expected_team_code
+            or row["opponent_team_id"] != expected_opponent_id
+            or own["team_code"] != row["team_code"]
+            or opponent["team_code"] != expected_opponent_code
+        ):
+            raise DashboardJsonError(
+                f"player actual fixture {fixture_key} disagrees with its finalized fixture/team "
+                "identity"
+            )
         key = (str(row["season"]), int(row["code"]))
         result.setdefault(key, []).append(
             {
                 "gw": row["gw"],
                 "fixture": row["fixture"],
-                "kickoff_time": _iso_or_none(row["kickoff_time"]),
+                "kickoff_time": _iso_or_none(fixture["kickoff_time"]),
+                "team_code": own["team_code"],
+                "team_short_name": own["short_name"],
+                "opponent_team_code": opponent["team_code"],
+                "opponent_short_name": opponent["short_name"],
+                "was_home": row["was_home"],
                 "minutes": row["minutes"],
                 "starts": row["starts"],
                 "goals_scored": row["goals_scored"],
@@ -951,16 +1058,26 @@ def _finished_player_actuals(
                 "points_under_rules_2026_27": row["points_under_rules_2026_27"],
             }
         )
+    for (season, _code), actuals in result.items():
+        actuals.sort(
+            key=lambda actual: (
+                int(actual["gw"]),
+                fixtures[(season, int(actual["fixture"]))]["kickoff_time"],
+                int(actual["fixture"]),
+            )
+        )
     return result
 
 
 def _build_player_actuals(
     player_actual: pl.DataFrame,
     gameweeks: pl.DataFrame,
+    team_season: pl.DataFrame,
+    dim_fixture: pl.DataFrame,
     player_gameweek: pl.DataFrame,
 ) -> tuple[dict[str, Any], ...]:
     """Normalise current/prior finalized history for every forecast-roster code."""
-    actuals = _finished_player_actuals(player_actual, gameweeks)
+    actuals = _finished_player_actuals(player_actual, gameweeks, team_season, dim_fixture)
     eligible_codes = {
         int(code)
         for code in player_gameweek.get_column("code").unique().to_list()
@@ -2706,6 +2823,8 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
     player_actuals = _build_player_actuals(
         frames["fact_player_fixture_actual"],
         frames["dim_gameweek"],
+        frames["dim_team_season"],
+        frames["dim_fixture"],
         frames["fact_forecast_player_gameweek"],
     )
     team_actuals = _build_team_actuals(
@@ -3059,6 +3178,11 @@ def _validate_player_actual_document(document: Mapping[str, Any]) -> None:
                     f"player_actuals.json {identity} has a malformed actual fixture row"
                 )
             gw, fixture, kickoff = actual["gw"], actual["fixture"], actual["kickoff_time"]
+            team_code = actual["team_code"]
+            team_short_name = actual["team_short_name"]
+            opponent_team_code = actual["opponent_team_code"]
+            opponent_short_name = actual["opponent_short_name"]
+            was_home = actual["was_home"]
             if (
                 not isinstance(gw, int)
                 or isinstance(gw, bool)
@@ -3066,22 +3190,32 @@ def _validate_player_actual_document(document: Mapping[str, Any]) -> None:
                 or not isinstance(fixture, int)
                 or isinstance(fixture, bool)
                 or fixture <= 0
-                or (kickoff is not None and not isinstance(kickoff, str))
+                or not isinstance(kickoff, str)
+                or not isinstance(team_code, int)
+                or isinstance(team_code, bool)
+                or team_code <= 0
+                or not isinstance(team_short_name, str)
+                or not team_short_name
+                or not isinstance(opponent_team_code, int)
+                or isinstance(opponent_team_code, bool)
+                or opponent_team_code <= 0
+                or not isinstance(opponent_short_name, str)
+                or not opponent_short_name
+                or not isinstance(was_home, bool)
             ):
                 raise DashboardJsonError(
                     f"player_actuals.json {identity} has an invalid fixture identity"
                 )
-            if kickoff is not None:
-                try:
-                    parsed_kickoff = datetime.fromisoformat(kickoff)
-                except ValueError as exc:
-                    raise DashboardJsonError(
-                        f"player_actuals.json {identity} has an invalid kickoff timestamp"
-                    ) from exc
-                if parsed_kickoff.tzinfo is None or parsed_kickoff.utcoffset() is None:
-                    raise DashboardJsonError(
-                        f"player_actuals.json {identity} has a naive kickoff timestamp"
-                    )
+            try:
+                parsed_kickoff = datetime.fromisoformat(kickoff)
+            except ValueError as exc:
+                raise DashboardJsonError(
+                    f"player_actuals.json {identity} has an invalid kickoff timestamp"
+                ) from exc
+            if parsed_kickoff.tzinfo is None or parsed_kickoff.utcoffset() is None:
+                raise DashboardJsonError(
+                    f"player_actuals.json {identity} has a naive kickoff timestamp"
+                )
             for field in _PLAYER_ACTUAL_INTEGER_FIELDS:
                 value = actual[field]
                 if value is not None and (

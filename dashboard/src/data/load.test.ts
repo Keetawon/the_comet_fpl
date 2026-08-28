@@ -1,4 +1,4 @@
-// The static read-model boundary fails closed: schema v8, cumulative-horizon semantics,
+// The static read-model boundary fails closed: schema v9, cumulative-horizon semantics,
 // and explicit plan ownership are
 // required before any page can render optimizer plans.
 
@@ -57,6 +57,16 @@ async function loadPlayersPayload(payload: unknown) {
   return loadPlayers();
 }
 
+async function loadPlayerActualsPayload(payload: unknown) {
+  vi.resetModules();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({ ok: true, status: 200, json: async () => payload })),
+  );
+  const { loadPlayerActuals } = await import("./load");
+  return loadPlayerActuals();
+}
+
 async function loadTeamActualsPayload(payload: unknown) {
   vi.resetModules();
   vi.stubGlobal(
@@ -93,12 +103,12 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("atomic schema-v8 generation", () => {
+describe("atomic schema-v9 generation", () => {
   it("loads every current sample envelope and shares its genuine manifest provenance", async () => {
     vi.resetModules();
     const manifest = {
       schema: "fpl.dashboard-read-models",
-      json_schema_version: 8,
+      json_schema_version: 9,
       generated_at: "2026-08-26T00:00:00Z",
       ease_index_formula_version: "fixture-ease-v1",
       run_ids: [],
@@ -146,14 +156,14 @@ describe("atomic schema-v8 generation", () => {
         loaders.loadTeamForecastVsActual(),
       ]);
 
-    expect(manifestResult?.json_schema_version).toBe(8);
+    expect(manifestResult?.json_schema_version).toBe(9);
     expect(fixture.manifest?.content_sha256).toBe(manifest.content_sha256);
     expect(players.manifest?.content_sha256).toBe(manifest.content_sha256);
     expect(actuals.players).toEqual(playerActualsSample.players);
     expect(teamActuals.teams).toEqual(teamActualsSample.teams);
-    expect(horizons.json_schema_version).toBe(8);
+    expect(horizons.json_schema_version).toBe(9);
     expect(nextGw.plans).toEqual(sample.plans);
-    expect(summary).toMatchObject({ json_schema_version: 8 });
+    expect(summary).toMatchObject({ json_schema_version: 9 });
     expect(audit).toMatchObject({ plans: optimizerAuditSample.plans });
     expect(playerAccuracy.manifest?.content_sha256).toBe(manifest.content_sha256);
     expect(teamAccuracy.manifest?.content_sha256).toBe(manifest.content_sha256);
@@ -180,18 +190,18 @@ describe("atomic schema-v8 generation", () => {
 });
 
 describe("loadNextGw schema boundary", () => {
-  it("accepts the current schema-v8 read model", async () => {
+  it("accepts the current schema-v9 read model", async () => {
     await expect(loadPayload(sample)).resolves.toEqual({ plans: sample.plans });
   });
 
   it("rejects stale schema v5 even when architecture fields are present", async () => {
     const stale = { ...sample, json_schema_version: 5 };
     await expect(loadPayload(stale)).rejects.toThrow(
-      /expected fpl.dashboard-next-gw version 8/,
+      /expected fpl.dashboard-next-gw version 9/,
     );
   });
 
-  it("rejects a schema-v8 plan with missing ownership instead of inferring from V3", async () => {
+  it("rejects a schema-v9 plan with missing ownership instead of inferring from V3", async () => {
     const missingKind = JSON.parse(JSON.stringify(sample)) as {
       json_schema_version: number;
       plans: { plan_kind?: string }[];
@@ -204,7 +214,7 @@ describe("loadNextGw schema boundary", () => {
   });
 });
 
-describe("shared schema-v8 envelope", () => {
+describe("shared schema-v9 envelope", () => {
   it("accepts current players and rejects a mixed stale generation", async () => {
     await expect(loadPlayersPayload(playersSample)).resolves.toMatchObject({
       players: playersSample.players,
@@ -212,7 +222,7 @@ describe("shared schema-v8 envelope", () => {
     });
     await expect(
       loadPlayersPayload({ ...playersSample, json_schema_version: 5 }),
-    ).rejects.toThrow(/expected fpl.dashboard-players version 8/);
+    ).rejects.toThrow(/expected fpl.dashboard-players version 9/);
   });
 
   it("requires explicit player cold-start provenance", async () => {
@@ -221,6 +231,82 @@ describe("shared schema-v8 envelope", () => {
     await expect(loadPlayersPayload(malformed)).rejects.toThrow(
       /cold-start provenance flag/,
     );
+  });
+});
+
+describe("loadPlayerActuals normalized history boundary", () => {
+  it("accepts required fixture-time club, opponent, venue, and timezone-aware kickoff identity", async () => {
+    await expect(loadPlayerActualsPayload(playerActualsSample)).resolves.toEqual(
+      playerActualsSample,
+    );
+
+    const withZuluKickoff = JSON.parse(JSON.stringify(playerActualsSample)) as unknown as {
+      players: Array<{ actuals: Array<Record<string, unknown>> }>;
+    };
+    withZuluKickoff.players[0].actuals[0].kickoff_time = "2026-05-24T15:00:00Z";
+    await expect(loadPlayerActualsPayload(withZuluKickoff)).resolves.toEqual(withZuluKickoff);
+  });
+
+  it("rejects null, naive, or invalid player-actual kickoff datetimes", async () => {
+    for (const kickoff of [
+      null,
+      "2026-05-24T15:00:00",
+      "not-an-iso-datetime+00:00",
+      "2026-02-30T15:00:00Z",
+    ]) {
+      const malformed = JSON.parse(JSON.stringify(playerActualsSample)) as unknown as {
+        players: Array<{ actuals: Array<Record<string, unknown>> }>;
+      };
+      malformed.players[0].actuals[0].kickoff_time = kickoff;
+      await expect(loadPlayerActualsPayload(malformed)).rejects.toThrow(
+        /invalid .*\.kickoff_time/,
+      );
+    }
+  });
+
+  it("rejects stale or incomplete player match identity", async () => {
+    await expect(
+      loadPlayerActualsPayload({ ...playerActualsSample, json_schema_version: 8 }),
+    ).rejects.toThrow(/expected fpl.dashboard-player-actuals version 9/);
+
+    for (const key of [
+      "team_code",
+      "team_short_name",
+      "opponent_team_code",
+      "opponent_short_name",
+      "was_home",
+    ]) {
+      const missing = JSON.parse(JSON.stringify(playerActualsSample)) as unknown as {
+        players: Array<{ actuals: Array<Record<string, unknown>> }>;
+      };
+      delete missing.players[0].actuals[0][key];
+      await expect(loadPlayerActualsPayload(missing)).rejects.toThrow(/expected exact keys/);
+    }
+
+    const extra = JSON.parse(JSON.stringify(playerActualsSample)) as unknown as {
+      players: Array<{ actuals: Array<Record<string, unknown>> }>;
+    };
+    extra.players[0].actuals[0].opponent_name_from_browser = "Beta";
+    await expect(loadPlayerActualsPayload(extra)).rejects.toThrow(/expected exact keys/);
+  });
+
+  it("rejects malformed club, opponent, or venue values", async () => {
+    const invalidValues: Array<[string, unknown]> = [
+      ["team_code", 0],
+      ["team_short_name", ""],
+      ["opponent_team_code", 0],
+      ["opponent_short_name", ""],
+      ["was_home", null],
+    ];
+    for (const [key, value] of invalidValues) {
+      const malformed = JSON.parse(JSON.stringify(playerActualsSample)) as unknown as {
+        players: Array<{ actuals: Array<Record<string, unknown>> }>;
+      };
+      malformed.players[0].actuals[0][key] = value;
+      await expect(loadPlayerActualsPayload(malformed)).rejects.toThrow(
+        new RegExp(`invalid .*\\.${key}`),
+      );
+    }
   });
 });
 
@@ -234,7 +320,7 @@ describe("loadTeamActuals normalized history boundary", () => {
   it("rejects stale, duplicate, unordered, or non-finite team history", async () => {
     await expect(
       loadTeamActualsPayload({ ...teamActualsSample, json_schema_version: 7 }),
-    ).rejects.toThrow(/expected fpl.dashboard-team-actuals version 8/);
+    ).rejects.toThrow(/expected fpl.dashboard-team-actuals version 9/);
 
     const duplicate = JSON.parse(JSON.stringify(teamActualsSample)) as typeof teamActualsSample;
     duplicate.teams[0].actuals.push({ ...duplicate.teams[0].actuals[0] });
@@ -253,7 +339,7 @@ describe("loadPlayerHorizons schema boundary", () => {
 
   it("rejects a stale schema even when the scalar fields look usable", async () => {
     const stale = { ...horizonsSample, json_schema_version: 5 };
-    await expect(loadHorizonsPayload(stale)).rejects.toThrow(/expected version 8 cumulative/);
+    await expect(loadHorizonsPayload(stale)).rejects.toThrow(/expected version 9 cumulative/);
   });
 
   it("rejects non-monotone cumulative probability rows", async () => {
@@ -288,7 +374,7 @@ describe("loadPlayerHorizons schema boundary", () => {
       reordered.horizon_fields[1],
       reordered.horizon_fields[0],
     ];
-    await expect(loadHorizonsPayload(reordered)).rejects.toThrow(/expected version 8 cumulative/);
+    await expect(loadHorizonsPayload(reordered)).rejects.toThrow(/expected version 9 cumulative/);
 
     const shortTuple = JSON.parse(JSON.stringify(horizonsSample)) as typeof horizonsSample;
     shortTuple.players[0].horizons[0].pop();
@@ -317,11 +403,11 @@ describe("loadPlayerHorizons schema boundary", () => {
   it("requires the six-decimal and exact-boundary semantics", async () => {
     const wrongPlaces = JSON.parse(JSON.stringify(horizonsSample)) as typeof horizonsSample;
     wrongPlaces.semantics.value_decimal_places = 5 as 6;
-    await expect(loadHorizonsPayload(wrongPlaces)).rejects.toThrow(/expected version 8 cumulative/);
+    await expect(loadHorizonsPayload(wrongPlaces)).rejects.toThrow(/expected version 9 cumulative/);
 
     const wrongBoundary = JSON.parse(JSON.stringify(horizonsSample)) as typeof horizonsSample;
     wrongBoundary.semantics.probability_boundary_policy = "rounded-boundaries" as "preserve-exact-zero-one-v1";
-    await expect(loadHorizonsPayload(wrongBoundary)).rejects.toThrow(/expected version 8 cumulative/);
+    await expect(loadHorizonsPayload(wrongBoundary)).rejects.toThrow(/expected version 9 cumulative/);
   });
 
   it("rejects raw PMFs or any other unversioned extra field", async () => {
