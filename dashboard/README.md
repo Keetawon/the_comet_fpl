@@ -16,10 +16,12 @@ Schema v8 is the current development-only application contract. The ordered prog
    evidence-bound trusted-server language renderer
    on public analytical routes, following `../docs/dashboard-ai-summaries.md`;
 4. **Implemented development-only:** the Players route reads normalized finalized observations
-   from `player_actuals.json` and exposes an explicit Actual season plus independent `Actual GWs`
-   range. The payload and selector are limited to the forecast season and its immediately
-   preceding season, with the predecessor present only when finalized observations were published;
-   the main-table aggregate never mixes seasons or silently substitutes one;
+   from `player_actuals.json` and exposes explicit chronological `Actual from` / `Actual to`
+   Season–GW endpoints. Their page-wide options are limited to the forecast season and its
+   immediately preceding season, with the predecessor present only when finalized observations
+   were published. The default/reset scope is the latest five keys (at 2026-27 GW1, 2025-26 GW35
+   through 2026-27 GW1); an explicitly displayed range may cross the season boundary, but no season
+   or missing gameweek is silently substituted;
 5. **Implemented development-only:** `team_actuals.json` provides the parallel normalized
    finalized team-fixture history for Fixture Matrix expanded rows. Its Actual scope defaults to
    the page-wide rolling latest five distinct season-qualified finalized gameweeks across the
@@ -360,7 +362,7 @@ comparison page and is not a twelfth navigation item.
 - **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
   `players.json` plus normalized `player_actuals.json` — one row per player of the selected
   vintage (photo + club badge) merging
-  a selected finalized actual season/GW range with per-gameweek xP chips and a range-total xP.
+  a selected finalized Season–GW endpoint range with per-gameweek xP chips and a range-total xP.
   The actual scope appears once in a compact strip above the table, so the first observed leaf is
   simply `App`. A Players-only sortable `xP GW{Forecast From}` column sits immediately after
   `Pts` and defaults descending for starter/bench review. It selects the exact cumulative
@@ -392,8 +394,12 @@ comparison page and is not a twelfth navigation item.
   unchanged. A failed or partial
   import leaves the existing table scope unchanged. Changing forecast vintage clears the private
   scope and requires a fresh verification; hosted static builds cannot use it. Rows are compact
-  and paginated. On Players, the main aggregate still reads the explicit Actual season/range. The
-  expanded row is a separate rolling history over `player_actuals.json`: it takes the page-wide set
+  and paginated. On Players, the main aggregate reads the inclusive page-wide range between its
+  explicit chronological Season–GW endpoints. The endpoint options cover only the forecast season
+  and its immediate predecessor, default/reset to the latest five finalized keys, join players by
+  permanent `code`, retain every DGW leg, and never backfill a player outside the shared range. The
+  expanded row is a separate fixed rolling history over `player_actuals.json`: it takes the
+  page-wide set
   of the latest five distinct season-qualified finalized GW labels across the forecast season and
   its immediate predecessor, preserves every DGW leg, and orders the result newest first. It shows
   season/GW/kickoff, minutes/start,
@@ -415,10 +421,11 @@ comparison page and is not a twelfth navigation item.
   browser-derived values. The dense Players table keeps cumulative xP but omits the six
   overlapping probability columns; Player analytics exposes the exact blank/haul endpoints.
   The time axes stay separate: **Forecast GWs** filters upcoming fixtures and xP, while **Actual
-  season + Actual GWs** selects finalized observed fixture rows from the forecast season or, only
-  when present in `player_actuals.json`, its immediate predecessor. The available range boundaries
-  come from that season's exact finalized-GW membership. A forecast range never silently
-  reinterprets historical form or actuals. Deterministic insight facts follow the verified My
+  from / Actual to** selects an inclusive chronological range from the page-wide exact finalized
+  Season–GW keys across the forecast season and, only when present in `player_actuals.json`, its
+  immediate predecessor. The controls do not numerically interpolate absent GWs, and their default
+  is the latest five available keys. A forecast range never silently reinterprets historical form
+  or actuals. Deterministic insight facts follow the verified My
   squad scope, but the optional remote renderer is disabled while that private filter is active:
   manager ID, capture identity, and squad membership never enter the public insight request.
 - **Summary** (implemented, P1.7d): the landing page — next gameweek kickoff (deadlines are

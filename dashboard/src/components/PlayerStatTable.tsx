@@ -51,7 +51,7 @@ export interface PlayerStatRow {
   filtered: PlayerFixture[];
   /** Exact or strictly summed raw xP for the selected forecast-start GW. */
   gwFromXp?: number | null;
-  /** Players-only descriptive BPS average over appeared fixtures in the Actual-GW scope. */
+  /** Players-only descriptive BPS average over appeared fixtures between the Actual endpoints. */
   bpsPerAppearance?: number | null;
   /** Players-only rolling completed fixture history across this season and its predecessor. */
   actualDetails?: PlayerHistoricalFixture[];
@@ -466,7 +466,7 @@ export function PlayerStatTable({
     const expectedGoalInvolvementsColumn: LegacyColumnDef<PlayerStatRow> = {
       id: "form-expected_goal_involvements",
       header: () => (
-        <span title="Observed expected goal involvements: xG + xA in the selected Actual GWs">
+        <span title="Observed expected goal involvements: xG + xA between the selected Actual Season–GW endpoints">
           xGI
         </span>
       ),
@@ -534,7 +534,7 @@ export function PlayerStatTable({
     const bpsPerAppearanceColumn: LegacyColumnDef<PlayerStatRow> = {
       id: "form-bps-per-appearance",
       header: () => (
-        <span title="Average observed BPS per appearance in the selected Actual GWs (total BPS divided by appearances); each played double-gameweek leg counts once and DNPs are excluded">
+        <span title="Average observed BPS per appearance between the selected Actual Season–GW endpoints (total BPS divided by appearances); each played double-gameweek leg counts once and DNPs are excluded">
           BPS/App
         </span>
       ),

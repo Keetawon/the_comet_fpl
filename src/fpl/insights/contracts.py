@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 INSIGHT_REQUEST_SCHEMA = "fpl.insight-summary-request"
 INSIGHT_RESPONSE_SCHEMA = "fpl.insight-summary-response"
 INSIGHT_ERROR_SCHEMA = "fpl.insight-summary-error"
-INSIGHT_SCHEMA_VERSION = 3
+INSIGHT_SCHEMA_VERSION = 4
 PROMPT_VERSION: Final = "evidence-renderer-v1"
 MAX_INSIGHT_BODY_BYTES = 16 * 1024
 
@@ -211,7 +211,8 @@ class InsightDisplayScope(_ExactModel):
     gw_to: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
     actual_gw_from: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
     actual_gw_to: Annotated[int, Field(strict=True, ge=1, le=38)] | None = None
-    actual_season: str | None = None
+    actual_season_from: str | None = None
+    actual_season_to: str | None = None
     position: InsightPosition | None = None
     team_code: Annotated[int, Field(strict=True, gt=0, le=1_000_000)] | None = None
     view: InsightView | None = None
@@ -225,17 +226,17 @@ class InsightDisplayScope(_ExactModel):
     past_metric: InsightPastMetric | None = None
     include_cold_starts: Annotated[bool, Field(strict=True)] | None = None
 
-    @field_validator("actual_season")
+    @field_validator("actual_season_from", "actual_season_to")
     @classmethod
     def validate_actual_season(cls, value: str | None) -> str | None:
         if value is None:
             return value
         matched = _SEASON.fullmatch(value)
         if matched is None:
-            raise ValueError("scope.actual_season must use YYYY-YY form")
+            raise ValueError("scope actual seasons must use YYYY-YY form")
         start = int(matched.group(1))
         if int(matched.group(2)) != (start + 1) % 100:
-            raise ValueError("scope.actual_season end year must immediately follow its start year")
+            raise ValueError("scope actual-season end year must immediately follow its start year")
         return value
 
     @field_validator(
@@ -266,21 +267,31 @@ class InsightDisplayScope(_ExactModel):
     def validate_range(self) -> Self:
         if self.gw_from is not None and self.gw_to is not None and self.gw_from > self.gw_to:
             raise ValueError("scope.gw_from must not exceed scope.gw_to")
-        if (self.actual_gw_from is None) != (self.actual_gw_to is None):
-            raise ValueError(
-                "scope.actual_gw_from and scope.actual_gw_to must be supplied together"
-            )
-        if (
-            self.actual_gw_from is not None
-            and self.actual_gw_to is not None
-            and self.actual_gw_from > self.actual_gw_to
+        actual_endpoints = (
+            self.actual_season_from,
+            self.actual_gw_from,
+            self.actual_season_to,
+            self.actual_gw_to,
+        )
+        if any(value is not None for value in actual_endpoints) and not all(
+            value is not None for value in actual_endpoints
         ):
-            raise ValueError("scope.actual_gw_from must not exceed scope.actual_gw_to")
-        has_actual_range = self.actual_gw_from is not None
-        if has_actual_range != (self.actual_season is not None):
             raise ValueError(
-                "scope.actual_season and the paired actual gameweek range must be supplied together"
+                "scope actual season/gameweek endpoints must be supplied together"
             )
+        if all(value is not None for value in actual_endpoints):
+            assert self.actual_season_from is not None
+            assert self.actual_gw_from is not None
+            assert self.actual_season_to is not None
+            assert self.actual_gw_to is not None
+            season_from = int(self.actual_season_from[:4])
+            season_to = int(self.actual_season_to[:4])
+            if season_from > season_to or (
+                season_from == season_to and self.actual_gw_from > self.actual_gw_to
+            ):
+                raise ValueError("scope actual endpoint range must be chronological")
+            if season_to - season_from > 1:
+                raise ValueError("scope actual endpoint seasons must be the same or adjacent")
         if (
             self.min_price_tenths is not None
             and self.max_price_tenths is not None
@@ -318,7 +329,7 @@ class InsightFact(_ExactModel):
 
 class InsightSummaryRequest(_ExactModel):
     schema_name: Literal["fpl.insight-summary-request"] = Field(alias="schema")
-    schema_version: Literal[3]
+    schema_version: Literal[4]
     page: InsightPage
     manifest_sha256: str
     run_id: str = Field(min_length=1, max_length=128)
@@ -451,7 +462,7 @@ class ProviderInsightItem(_ExactModel):
 
 class InsightSummaryResponse(_ExactModel):
     schema_name: Literal["fpl.insight-summary-response"] = Field(alias="schema")
-    schema_version: Literal[3]
+    schema_version: Literal[4]
     source: InsightSource
     provider: str
     model: str
@@ -524,7 +535,7 @@ class InsightStatus(_ExactModel):
 
 class InsightErrorResponse(_ExactModel):
     schema_name: Literal["fpl.insight-summary-error"] = Field(alias="schema")
-    schema_version: Literal[3]
+    schema_version: Literal[4]
     code: InsightErrorCode
     message: str = Field(min_length=1, max_length=160)
 

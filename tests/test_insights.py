@@ -234,9 +234,10 @@ class TestSelectorContract:
             scope={
                 "gw_from": 1,
                 "gw_to": 2,
+                "actual_season_from": "2025-26",
                 "actual_gw_from": 1,
+                "actual_season_to": SEASON,
                 "actual_gw_to": 1,
-                "actual_season": SEASON,
                 "position": "all",
                 "team_code": 101,
                 "view": "past_future",
@@ -253,29 +254,45 @@ class TestSelectorContract:
         scope = InsightSummaryRequest.model_validate(payload).scope
         assert scope.form_window == "season_to_date"
         assert (scope.actual_gw_from, scope.actual_gw_to) == (1, 1)
-        assert scope.actual_season == SEASON
+        assert (scope.actual_season_from, scope.actual_season_to) == ("2025-26", SEASON)
         assert scope.include_cold_starts is False
 
-    def test_actual_gameweek_scope_requires_a_complete_ordered_pair(self) -> None:
+    def test_actual_gameweek_scope_requires_complete_chronological_endpoints(self) -> None:
         payload = _request_dict(scope={"actual_gw_from": 1})
         with pytest.raises(ValidationError, match="must be supplied together"):
             InsightSummaryRequest.model_validate(payload)
-        payload = _request_dict(scope={"actual_gw_from": 2, "actual_gw_to": 1})
-        with pytest.raises(ValidationError, match="must not exceed"):
-            InsightSummaryRequest.model_validate(payload)
         payload = _request_dict(
-            scope={"actual_gw_from": 1, "actual_gw_to": 1}
+            scope={
+                "actual_season_from": SEASON,
+                "actual_gw_from": 2,
+                "actual_season_to": SEASON,
+                "actual_gw_to": 1,
+            }
         )
-        with pytest.raises(ValidationError, match="actual_season"):
+        with pytest.raises(ValidationError, match="chronological"):
+            InsightSummaryRequest.model_validate(payload)
+        payload = _request_dict(scope={"actual_gw_from": 1, "actual_gw_to": 1})
+        with pytest.raises(ValidationError, match="season/gameweek endpoints"):
             InsightSummaryRequest.model_validate(payload)
         payload = _request_dict(
             scope={
+                "actual_season_from": "2026/27",
                 "actual_gw_from": 1,
+                "actual_season_to": SEASON,
                 "actual_gw_to": 1,
-                "actual_season": "2026/27",
             }
         )
         with pytest.raises(ValidationError, match="YYYY-YY"):
+            InsightSummaryRequest.model_validate(payload)
+        payload = _request_dict(
+            scope={
+                "actual_season_from": "2024-25",
+                "actual_gw_from": 38,
+                "actual_season_to": SEASON,
+                "actual_gw_to": 1,
+            }
+        )
+        with pytest.raises(ValidationError, match="same or adjacent"):
             InsightSummaryRequest.model_validate(payload)
 
     def test_cold_start_selector_requires_an_exact_boolean(self) -> None:
@@ -290,6 +307,8 @@ class TestSelectorContract:
         for value in (1.0, True, "1"):
             with pytest.raises(ValidationError):
                 InsightSummaryRequest.model_validate(_request_dict(schema_version=value))
+        with pytest.raises(ValidationError):
+            InsightSummaryRequest.model_validate(_request_dict(schema_version=3))
         raw = json.dumps(_request_dict()).replace(
             f'"schema_version": {INSIGHT_SCHEMA_VERSION},',
             f'"schema_version": {INSIGHT_SCHEMA_VERSION}, '
@@ -839,51 +858,114 @@ def _rewrite_insight_read_model(
     (data / "manifest.json").write_bytes(_canonical_json_bytes(manifest, indent=2))
 
 
-def test_players_insight_resolves_independent_finalized_actual_gameweek_scope(
+def test_players_insight_resolves_exact_cross_season_actual_endpoints(
     tmp_path: Path,
 ) -> None:
     data, manifest = _generation(tmp_path)
+    previous_season = "2025-26"
+
+    def actual(
+        *,
+        gw: int,
+        fixture: int,
+        kickoff_time: str,
+        points: int | None,
+    ) -> dict[str, object]:
+        return {
+            "gw": gw,
+            "fixture": fixture,
+            "kickoff_time": kickoff_time,
+            "minutes": 90,
+            "starts": 1,
+            "goals_scored": 0,
+            "assists": 0,
+            "clean_sheets": 0,
+            "goals_conceded": 1,
+            "saves": 0,
+            "bonus": 0,
+            "bps": 10,
+            "defensive_contribution": None,
+            "expected_goals": None,
+            "expected_assists": None,
+            "expected_goals_conceded": None,
+            "points_under_rules_2026_27": points,
+        }
 
     def add_finalized_actuals(document: dict[str, Any]) -> None:
         document["players"] = [
             {
-                "season": SEASON,
-                "code": code,
+                "season": previous_season,
+                "code": 1,
                 "actuals": [
-                    {
-                        "gw": 1,
-                        "fixture": 100,
-                        "kickoff_time": "2026-08-22T14:00:00+00:00",
-                        "minutes": 90,
-                        "starts": 1,
-                        "goals_scored": 0,
-                        "assists": 0,
-                        "clean_sheets": 0,
-                        "goals_conceded": 1,
-                        "saves": 0,
-                        "bonus": 0,
-                        "bps": 10,
-                        "defensive_contribution": None,
-                        "expected_goals": None,
-                        "expected_assists": None,
-                        "expected_goals_conceded": None,
-                        "points_under_rules_2026_27": 6 if code == 1 else 1,
-                    }
+                    actual(
+                        gw=37,
+                        fixture=100,
+                        kickoff_time="2026-05-10T14:00:00+00:00",
+                        points=1,
+                    ),
+                    actual(
+                        gw=38,
+                        fixture=101,
+                        kickoff_time="2026-05-17T14:00:00+00:00",
+                        points=2,
+                    ),
                 ],
-            }
-            for code in (1, 2)
+            },
+            {
+                "season": previous_season,
+                "code": 2,
+                "actuals": [
+                    actual(
+                        gw=37,
+                        fixture=100,
+                        kickoff_time="2026-05-10T14:00:00+00:00",
+                        points=1,
+                    ),
+                    actual(
+                        gw=38,
+                        fixture=101,
+                        kickoff_time="2026-05-17T14:00:00+00:00",
+                        points=1,
+                    ),
+                ],
+            },
+            {
+                "season": SEASON,
+                "code": 1,
+                "actuals": [
+                    actual(
+                        gw=1,
+                        fixture=100,
+                        kickoff_time="2026-08-22T14:00:00+00:00",
+                        points=3,
+                    ),
+                    actual(
+                        gw=1,
+                        fixture=101,
+                        kickoff_time="2026-08-22T16:00:00+00:00",
+                        points=4,
+                    ),
+                ],
+            },
+            {
+                "season": SEASON,
+                "code": 2,
+                "actuals": [
+                    actual(
+                        gw=1,
+                        fixture=100,
+                        kickoff_time="2026-08-22T14:00:00+00:00",
+                        points=1,
+                    ),
+                    actual(
+                        gw=1,
+                        fixture=101,
+                        kickoff_time="2026-08-22T16:00:00+00:00",
+                        points=None,
+                    ),
+                ],
+            },
         ]
-        for record in document["players"]:
-            first = record["actuals"][0]
-            record["actuals"].append(
-                {
-                    **first,
-                    "gw": 3,
-                    "fixture": 103,
-                    "kickoff_time": "2026-09-05T14:00:00+00:00",
-                    "points_under_rules_2026_27": 2,
-                }
-            )
 
     _rewrite_insight_read_model(data, manifest, "player_actuals.json", add_finalized_actuals)
     request = InsightSummaryRequest.model_validate(
@@ -893,9 +975,10 @@ def test_players_insight_resolves_independent_finalized_actual_gameweek_scope(
             scope={
                 "gw_from": 1,
                 "gw_to": 2,
-                "actual_gw_from": 1,
+                "actual_season_from": previous_season,
+                "actual_gw_from": 37,
+                "actual_season_to": SEASON,
                 "actual_gw_to": 1,
-                "actual_season": SEASON,
                 "position": "all",
                 "view": "overall",
                 "venue": "all",
@@ -907,27 +990,54 @@ def test_players_insight_resolves_independent_finalized_actual_gameweek_scope(
     evidence = resolve_insight_evidence(data, request)
     coverage = next(fact for fact in evidence.facts if fact.id == "players.actual.coverage")
     leader = next(fact for fact in evidence.facts if fact.id == "players.actual.rank.1")
-    assert "2 selected players" in coverage.statement
-    assert f"finalized {SEASON} GW1 through GW1" in coverage.statement
-    assert leader.statement.startswith("Vicario ranks 1 with 6 replayed actual points")
+    assert "1 selected players" in coverage.statement
+    assert f"finalized {previous_season} GW37 through {SEASON} GW1" in coverage.statement
+    assert leader.statement.startswith("Vicario ranks 1 with 10 replayed actual points")
 
     outside = request.model_copy(
         update={
             "scope": request.scope.model_copy(
-                update={"actual_gw_from": 2, "actual_gw_to": 2}
+                update={
+                    "actual_season_from": SEASON,
+                    "actual_gw_from": 2,
+                    "actual_season_to": SEASON,
+                    "actual_gw_to": 2,
+                }
             )
         }
     )
-    with pytest.raises(InsightEvidenceError, match="without finalized"):
+    with pytest.raises(InsightEvidenceError, match="not an exact finalized published"):
         resolve_insight_evidence(data, outside)
 
     hidden_season = request.model_copy(
         update={
-            "scope": request.scope.model_copy(update={"actual_season": "2024-25"})
+            "scope": request.scope.model_copy(update={"actual_season_from": "2024-25"})
         }
     )
     with pytest.raises(InsightEvidenceError, match="outside the page"):
         resolve_insight_evidence(data, hidden_season)
+
+    def remove_intermediate_period(document: dict[str, Any]) -> None:
+        for record in document["players"]:
+            if record["season"] == previous_season:
+                record["actuals"] = [
+                    actual_row for actual_row in record["actuals"] if actual_row["gw"] != 38
+                ]
+
+    _rewrite_insight_read_model(
+        data,
+        manifest,
+        "player_actuals.json",
+        remove_intermediate_period,
+    )
+    gap_request = request.model_copy(
+        update={"manifest_sha256": manifest["content_sha256"]}
+    )
+    gap_evidence = resolve_insight_evidence(data, gap_request)
+    gap_leader = next(
+        fact for fact in gap_evidence.facts if fact.id == "players.actual.rank.1"
+    )
+    assert gap_leader.statement.startswith("Vicario ranks 1 with 8 replayed actual points")
 
 
 def test_insight_venue_filter_does_not_classify_null_as_away(tmp_path: Path) -> None:

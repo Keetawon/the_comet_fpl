@@ -66,7 +66,8 @@ _PAGE_SCOPE_FIELDS: Final[dict[InsightPage, frozenset[str]]] = {
             "gw_to",
             "actual_gw_from",
             "actual_gw_to",
-            "actual_season",
+            "actual_season_from",
+            "actual_season_to",
             "position",
             "team_code",
             "view",
@@ -297,13 +298,26 @@ def _validate_scope(request: InsightSummaryRequest, run: Mapping[str, Any]) -> N
         raise InsightEvidenceError("scope ends outside the forecast horizon")
     if request.page is InsightPage.PLAYER_ANALYTICS and gw_from is not None and gw_from != run_from:
         raise InsightEvidenceError("cumulative player horizons must start at the run boundary")
-    if request.scope.actual_season is not None and request.scope.actual_season not in {
-        request.season,
-        _previous_season_label(request.season),
-    }:
-        raise InsightEvidenceError(
-            "actual season is outside the page's forecast-season/immediate-prior scope"
-        )
+    actual_season_from = request.scope.actual_season_from
+    actual_season_to = request.scope.actual_season_to
+    if actual_season_from is not None and actual_season_to is not None:
+        previous_season = _previous_season_label(request.season)
+        allowed_seasons = {previous_season, request.season}
+        if {actual_season_from, actual_season_to} - allowed_seasons:
+            raise InsightEvidenceError(
+                "actual endpoint season is outside the page's "
+                "forecast-season/immediate-prior scope"
+            )
+        season_rank = {previous_season: 0, request.season: 1}
+        actual_gw_from = request.scope.actual_gw_from
+        actual_gw_to = request.scope.actual_gw_to
+        assert actual_gw_from is not None
+        assert actual_gw_to is not None
+        if (season_rank[actual_season_from], actual_gw_from) > (
+            season_rank[actual_season_to],
+            actual_gw_to,
+        ):
+            raise InsightEvidenceError("actual endpoint range is not chronological")
 
 
 def _gw_bounds(scope: InsightDisplayScope, run: Mapping[str, Any]) -> tuple[int, int]:
@@ -549,7 +563,14 @@ def _has_player_fixture_xp(
 
 
 def _players(generation: _Generation, request: InsightSummaryRequest) -> list[InsightFact]:
-    players, _, _ = _selected_players(generation, request)
+    players, players_document, _ = _selected_players(generation, request)
+    run_player_codes = {
+        int(player["code"])
+        for player in players_document.get("players", [])
+        if player.get("run_id") == request.run_id
+        and player.get("season") == request.season
+        and isinstance(player.get("code"), int)
+    }
     scored = [
         (player, _player_fixture_xp(player, request, generation.run))
         for player in players
@@ -586,46 +607,72 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
         )
     actual_from = request.scope.actual_gw_from
     actual_to = request.scope.actual_gw_to
-    actual_season = request.scope.actual_season
-    if actual_from is not None and actual_to is not None and actual_season is not None:
+    actual_season_from = request.scope.actual_season_from
+    actual_season_to = request.scope.actual_season_to
+    if (
+        actual_from is not None
+        and actual_to is not None
+        and actual_season_from is not None
+        and actual_season_to is not None
+    ):
         actual_records = [
             record
             for record in generation.documents[InsightReadModel.PLAYER_ACTUALS].get("players", [])
-            if record.get("season") == actual_season
+            if record.get("season") in {actual_season_from, actual_season_to}
+            and record.get("code") in run_player_codes
         ]
-        available_gws = sorted(
-            {
-                int(actual["gw"])
-                for record in actual_records
-                for actual in record.get("actuals", [])
-                if isinstance(actual.get("gw"), int)
-            }
-        )
-        if not available_gws:
-            raise InsightEvidenceError(
-                "actual-gameweek scope was requested but no finalized actuals exist for that season"
-            )
-        requested_gws = set(range(actual_from, actual_to + 1))
-        missing_gws = sorted(requested_gws - set(available_gws))
-        if missing_gws:
-            raise InsightEvidenceError(
-                "actual-gameweek scope includes gameweeks without finalized selected-season "
-                f"data: {missing_gws[:3]}"
-            )
-
-        actuals_by_code = {
-            int(record["code"]): record.get("actuals", [])
+        available_periods = {
+            (str(record["season"]), int(actual["gw"]))
             for record in actual_records
-            if isinstance(record.get("code"), int)
+            if isinstance(record.get("season"), str)
+            for actual in record.get("actuals", [])
+            if isinstance(actual.get("gw"), int)
         }
+        season_rank = {
+            _previous_season_label(request.season): 0,
+            request.season: 1,
+        }
+        ordered_periods = sorted(
+            available_periods,
+            key=lambda period: (season_rank[period[0]], period[1]),
+        )
+        endpoint_from = (actual_season_from, actual_from)
+        endpoint_to = (actual_season_to, actual_to)
+        missing_endpoints = [
+            endpoint
+            for endpoint in (endpoint_from, endpoint_to)
+            if endpoint not in available_periods
+        ]
+        if missing_endpoints:
+            missing_labels = [f"{season} GW{gw}" for season, gw in missing_endpoints]
+            raise InsightEvidenceError(
+                "actual endpoint is not an exact finalized published season/gameweek: "
+                f"{missing_labels}"
+            )
+        from_index = ordered_periods.index(endpoint_from)
+        to_index = ordered_periods.index(endpoint_to)
+        requested_periods = tuple(ordered_periods[from_index : to_index + 1])
+        requested_period_set = set(requested_periods)
+
+        actuals_by_code: dict[int, list[tuple[str, Mapping[str, Any]]]] = {}
+        for record in actual_records:
+            code = record.get("code")
+            season = record.get("season")
+            if not isinstance(code, int) or not isinstance(season, str):
+                continue
+            actuals_by_code.setdefault(code, []).extend(
+                (season, actual)
+                for actual in record.get("actuals", [])
+                if isinstance(actual, Mapping)
+            )
 
         actual_scored: list[tuple[Mapping[str, Any], int]] = []
         for player in players:
             selected_actuals = [
                 actual
-                for actual in actuals_by_code.get(int(player["code"]), [])
+                for season, actual in actuals_by_code.get(int(player["code"]), [])
                 if isinstance(actual.get("gw"), int)
-                and actual_from <= int(actual["gw"]) <= actual_to
+                and (season, int(actual["gw"])) in requested_period_set
             ]
             appeared = [
                 actual
@@ -645,12 +692,16 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
                 )
             )
         actual_scored.sort(key=lambda item: (-item[1], int(item[0]["code"])))
+        actual_scope_label = (
+            f"{actual_season_from} GW{actual_from} through "
+            f"{actual_season_to} GW{actual_to}"
+        )
         facts.append(
             _fact(
                 "players.actual.coverage",
                 InsightFactKind.COVERAGE,
                 f"{len(actual_scored)} selected players have complete replayed actual points "
-                f"from finalized {actual_season} GW{actual_from} through GW{actual_to}; "
+                f"from finalized {actual_scope_label}; "
                 f"{len(players) - len(actual_scored)} do not.",
                 InsightReadModel.PLAYERS,
                 InsightReadModel.PLAYER_ACTUALS,
@@ -662,8 +713,7 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
                     f"players.actual.rank.{index}",
                     InsightFactKind.RANK,
                     f"{_label(player.get('web_name'), 'Player')} ranks {index} with {points} "
-                    f"replayed actual points from finalized {actual_season} GW{actual_from} "
-                    f"through GW{actual_to}.",
+                    f"replayed actual points from finalized {actual_scope_label}.",
                     InsightReadModel.PLAYERS,
                     InsightReadModel.PLAYER_ACTUALS,
                 )

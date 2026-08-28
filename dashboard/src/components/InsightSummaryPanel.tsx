@@ -42,7 +42,7 @@ function requestFor(remote: RemoteInsightConfig): InsightSummaryRequest | null {
   if (provenance == null) return null;
   return {
     schema: "fpl.insight-summary-request",
-    schema_version: 3,
+    schema_version: 4,
     page: remote.page,
     manifest_sha256: provenance.manifestSha256,
     run_id: provenance.runId,

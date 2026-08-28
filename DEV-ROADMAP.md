@@ -1048,15 +1048,22 @@ selectable. The obsolete `forecast_vs_actual.json` is absent from the replaced g
 
 Only after the ordered dashboard program above, unless an operational blocker requires otherwise:
 
-- **Players explicit-season Actual-GW history (implemented development-only 2026-08-26).** BI
+- **Players explicit Season–GW Actual history (implemented development-only 2026-08-26;
+  season-boundary scope correction 2026-08-28).** BI
   semantic contract v4 extends `fact_player_fixture_actual` with deterministic latest live
   components only when the exact append-only finalized player outcome exists. Dashboard schema v7
   publishes normalized `player_actuals.json` records at `(season, code)` grain instead of
   duplicating observations per forecast vintage. Publication is limited to each forecast season
   and its immediate predecessor, with the predecessor present only when finalized observations
-  exist. The Players route exposes only the selected run's forecast season and its published
-  predecessor plus a separate `Actual GWs` from/to range; Forecast GWs still control only future
-  fixtures and xP, and the main historical aggregate never mixes or silently substitutes seasons. The
+  exist. The Players route exposes two chronological `Actual from` / `Actual to` endpoints whose
+  page-wide options are the exact finalized `(season, gw)` keys from only the selected run's
+  forecast season and its published predecessor. Default/reset selects the latest five keys—at
+  2026-27 GW1, `Actual from: 2025-26 GW35` through `Actual to: 2026-27 GW1`. The range inclusively
+  retains every published key between its endpoints without interpolating absent
+  numeric gameweeks; it may cross the season boundary only when those endpoints explicitly show
+  that scope. Forecast GWs still control only future fixtures and xP. Cross-season rows join on
+  permanent player `code`, every DGW fixture leg is retained, and no player receives individual
+  backfill outside the shared selected range. The
   six overlapping threshold-probability columns are removed from this dense table and remain
   available in Player analytics. The observed season/GW scope is displayed once above compact
   stat headers instead of being repeated inside `App`. A dedicated sortable
@@ -1108,8 +1115,8 @@ Only after the ordered dashboard program above, unless an operational blocker re
 
 - **Historical rolling latest-five-GW expanded rows (implemented development-only 2026-08-28;
   season-boundary correction 2026-08-28).** The main Players aggregate remains bound to its
-  explicit Actual season/range. Expansion is a separate rolling history over normalized
-  `player_actuals.json`: it takes the page-wide set of the latest five distinct season-qualified
+  selectable inclusive Season–GW endpoint range. Expansion is an independent fixed rolling history
+  over normalized `player_actuals.json`: it takes the page-wide set of the latest five distinct season-qualified
   finalized GW labels across the forecast season and its immediate predecessor, preserves every
   double-gameweek fixture leg, labels rows by season/GW, and orders them newest first. At 2026-27
   GW1 this means 2026-27 GW1 plus 2025-26 GW38 through GW35. Cross-season membership uses permanent

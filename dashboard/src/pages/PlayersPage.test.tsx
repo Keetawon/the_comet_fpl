@@ -248,20 +248,21 @@ describe("PlayersPage", () => {
     );
     expect(screen.getByText("Beta")).toBeInTheDocument();
     const appHeader = screen.getByRole("columnheader", { name: "App" });
-    expect(appHeader).toHaveAttribute("title", "Finalized 2026-27 actuals, GW1-GW1");
+    expect(appHeader).toHaveAttribute(
+      "title",
+      "Finalized actuals from 2026-27 GW1 through 2026-27 GW1",
+    );
     expect(screen.getByText("Observed stats")).toBeInTheDocument();
-    expect(screen.getByText("2026-27 · GW1")).toBeInTheDocument();
     expect(screen.queryByText("Actual 2026-27 GW1-1 App")).not.toBeInTheDocument();
     expect(screen.getByText("Forecast GWs")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Actual season" })).toHaveTextContent("2026-27");
-    expect(screen.getByText("Actual GWs")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Actual from gameweek" })).toHaveTextContent("GW1");
-    expect(screen.getByRole("combobox", { name: "Actual to gameweek" })).toHaveTextContent("GW1");
+    expect(screen.queryByRole("combobox", { name: "Actual season" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent("2026-27 GW1");
+    expect(screen.getByRole("combobox", { name: "Actual to" })).toHaveTextContent("2026-27 GW1");
     expect(screen.queryByRole("combobox", { name: "Past form window" })).not.toBeInTheDocument();
     expect(
       screen.getByText(/Forecast GWs filter upcoming fixtures and xP only/),
-    ).toHaveTextContent("Min avg min (L5) filter remains its separately published trailing-five anchor");
-    expect(screen.getByText(/visible players have finalized 2026-27 observations/)).toBeInTheDocument();
+    ).toHaveTextContent("Expanded rows also remain an independent fixed rolling latest-five view");
+    expect(screen.getByText(/visible players have finalized observations from 2026-27 GW1/)).toBeInTheDocument();
     expect(screen.getByText(/leads measured replayed points in the selected actual range/)).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /xP GW1-5/ })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /^xP GW1$/ })).toHaveAttribute(
@@ -528,7 +529,7 @@ describe("PlayersPage", () => {
     ]);
     expect(screen.getByRole("columnheader", { name: "BPS/App" }).querySelector("span")).toHaveAttribute(
       "title",
-      "Average observed BPS per appearance in the selected Actual GWs (total BPS divided by appearances); each played double-gameweek leg counts once and DNPs are excluded",
+      "Average observed BPS per appearance between the selected Actual Season–GW endpoints (total BPS divided by appearances); each played double-gameweek leg counts once and DNPs are excluded",
     );
     expect(
       within(screen.getByText("Alpha").closest("tr")!).getByTitle(
@@ -842,7 +843,7 @@ describe("PlayersPage", () => {
     expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
   });
 
-  it("changes current-season actuals independently from forecast GWs and resets both", async () => {
+  it("changes exact Actual endpoints independently from forecast GWs and resets both", async () => {
     const user = userEvent.setup();
     const players = playersWithActuals.map((player, index) => ({
       ...player,
@@ -864,19 +865,23 @@ describe("PlayersPage", () => {
       })),
     });
     render(<PlayersPage />);
-    await waitFor(() => expect(screen.getByText("2026-27 · GW1-GW2")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("2026-27 GW1 → 2026-27 GW2")).toBeInTheDocument(),
+    );
 
     const forecastFrom = screen.getByRole("combobox", { name: "From gameweek" });
     const forecastTo = screen.getByRole("combobox", { name: "To gameweek" });
     const alpha = () => screen.getByText("Alpha").closest("tr")!;
     expect(within(alpha()).getByTitle("Observed G: 3")).toHaveTextContent("3");
 
-    await user.click(screen.getByRole("combobox", { name: "Actual from gameweek" }));
-    await user.click(screen.getByRole("option", { name: "GW2" }));
-    expect(screen.getByText("2026-27 · GW2")).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Actual from" }));
+    await user.click(screen.getByRole("option", { name: "2026-27 GW2" }));
+    expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent(
+      "2026-27 GW2",
+    );
     expect(screen.getByRole("columnheader", { name: "App" })).toHaveAttribute(
       "title",
-      "Finalized 2026-27 actuals, GW2-GW2",
+      "Finalized actuals from 2026-27 GW2 through 2026-27 GW2",
     );
     expect(within(alpha()).getByTitle("Observed G: 2")).toHaveTextContent("2");
     expect(forecastFrom).toHaveTextContent("GW1");
@@ -884,55 +889,92 @@ describe("PlayersPage", () => {
 
     await user.click(forecastTo);
     await user.click(screen.getByRole("option", { name: "GW1" }));
-    expect(screen.getByRole("combobox", { name: "Actual from gameweek" })).toHaveTextContent("GW2");
+    expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent("2026-27 GW2");
 
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(screen.getByRole("combobox", { name: "Actual from gameweek" })).toHaveTextContent("GW1");
-    expect(screen.getByRole("combobox", { name: "Actual to gameweek" })).toHaveTextContent("GW2");
+    expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent("2026-27 GW1");
+    expect(screen.getByRole("combobox", { name: "Actual to" })).toHaveTextContent("2026-27 GW2");
     expect(forecastTo).toHaveTextContent("GW5");
   });
 
-  it("does not substitute a prior season until the user selects it", async () => {
+  it("defaults the main aggregate to five exact cross-season keys without per-player backfill", async () => {
     const user = userEvent.setup();
     vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
       ...actualsData,
       players: [
         {
+          season: "2026-27",
+          code: playersWithActuals[0].code,
+          actuals: [
+            actualFromForm({ goals_scored: 1 }, { gw: 1, fixture: 990 }),
+            actualFromForm({ goals_scored: 1 }, { gw: 1, fixture: 991 }),
+          ],
+        },
+        {
+          season: "2026-27",
+          code: playersWithActuals[1].code,
+          actuals: [actualFromForm({}, { gw: 1, fixture: 992, minutes: 0, starts: 0 })],
+        },
+        {
           season: "2025-26",
           code: playersWithActuals[0].code,
-          actuals: [actualFromForm({ goals_scored: 4 }, { gw: 38, fixture: 990 })],
+          actuals: [
+            actualFromForm({ goals_scored: 20 }, { gw: 34, fixture: 1034 }),
+            actualFromForm({ goals_scored: 2 }, { gw: 35, fixture: 1035 }),
+            actualFromForm({ goals_scored: 3 }, { gw: 36, fixture: 1036 }),
+            actualFromForm({ goals_scored: 5 }, { gw: 38, fixture: 1038 }),
+          ],
+        },
+        {
+          season: "2025-26",
+          code: playersWithActuals[1].code,
+          actuals: [actualFromForm({}, { gw: 37, fixture: 2037 })],
         },
         {
           season: "2024-25",
           code: playersWithActuals[0].code,
-          actuals: [actualFromForm({ goals_scored: 9 }, { gw: 38, fixture: 991 })],
+          actuals: [actualFromForm({ goals_scored: 99 }, { gw: 38, fixture: 2438 })],
         },
       ],
     });
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
-    expect(
-      screen.getByText(/No finalized player actuals are published for 2026-27/),
-    ).toHaveTextContent("another season is not substituted");
-    expect(screen.queryByText("Actual GWs")).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "App" })).toHaveAttribute(
-      "title",
-      "No finalized 2026-27 actuals published",
-    );
-    expect(screen.getByText("2026-27 · no finalized GWs")).toBeInTheDocument();
-    expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("No observed form is available for G"))
-      .toHaveTextContent("–");
 
-    await user.click(screen.getByRole("combobox", { name: "Actual season" }));
-    expect(screen.queryByRole("option", { name: "2024-25" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("option", { name: "2025-26" }));
-    expect(await screen.findByText("2025-26 · GW38")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent(
+      "2025-26 GW35",
+    );
+    expect(screen.getByRole("combobox", { name: "Actual to" })).toHaveTextContent(
+      "2026-27 GW1",
+    );
     expect(screen.getByRole("columnheader", { name: "App" })).toHaveAttribute(
       "title",
-      "Finalized 2025-26 actuals, GW38-GW38",
+      "Finalized actuals from 2025-26 GW35 through 2026-27 GW1",
     );
-    expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("Observed G: 4"))
-      .toHaveTextContent("4");
+    expect(screen.getByText("2025-26 GW35 → 2026-27 GW1")).toBeInTheDocument();
+    expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("Observed G: 12"))
+      .toHaveTextContent("12");
+
+    await user.click(screen.getByRole("combobox", { name: "Actual from" }));
+    expect(screen.queryByRole("option", { name: "2024-25 GW38" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "2025-26 GW38" }));
+    expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("Observed G: 7"))
+      .toHaveTextContent("7");
+
+    await user.click(
+      within(screen.getByText("Alpha").closest("tr")!).getByRole("button", {
+        name: /expand fixtures/i,
+      }),
+    );
+    const detailHeading = await screen.findByText(/Alpha.*rolling latest five completed GWs/);
+    const detailTable = detailHeading.parentElement?.querySelector("table");
+    expect(detailTable).not.toBeNull();
+    expect(within(detailTable!).getByText("2025-26 GW35")).toBeInTheDocument();
+    expect(within(detailTable!).queryByText("2025-26 GW34")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent(
+      "2025-26 GW35",
+    );
   });
 
   it("expands a row over the shared rolling five GWs across seasons with DGWs and gaps intact", async () => {
@@ -1162,14 +1204,18 @@ describe("PlayersPage", () => {
     const user = userEvent.setup();
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
-    expect(screen.getByText("2026-27 · GW1")).toBeInTheDocument();
+    const actualFrom = screen.getByRole("combobox", { name: "Actual from" });
+    const actualTo = screen.getByRole("combobox", { name: "Actual to" });
+    expect(actualFrom).toHaveTextContent("2026-27 GW1");
+    expect(actualTo).toHaveTextContent("2026-27 GW1");
     expect(screen.getByRole("columnheader", { name: /^xP GW1$/ })).toBeInTheDocument();
 
     await user.click(screen.getByRole("combobox", { name: "From gameweek" }));
     await user.click(screen.getByRole("option", { name: "GW2" }));
 
     expect(screen.getByRole("columnheader", { name: /^xP GW2$/ })).toBeInTheDocument();
-    expect(screen.getByText("2026-27 · GW1")).toBeInTheDocument();
+    expect(actualFrom).toHaveTextContent("2026-27 GW1");
+    expect(actualTo).toHaveTextContent("2026-27 GW1");
     expect(
       within(screen.getByText("Alpha").closest("tr")!).getByTitle(
         "Published xP for GW2: 5.1",

@@ -1,10 +1,10 @@
 // Players page: the player-form pivot. One row per player of the SELECTED vintage (the
 // export carries every recorded run -- the vintage selector picks one, so players never
-// repeat), merging a separately selected season/range of finalized actuals with
-// the vintage's per-fixture xP. A prior season is used in the aggregate only after explicit
-// selection. The expanded history is a separate rolling latest-five-GW view across the forecast
-// season and its immediate predecessor. Chips headline xP and are coloured by the active colour
-// source (opponent strength by default).
+// repeat), merging an exact cross-season range of finalized actuals with the vintage's
+// per-fixture xP. Actual endpoints span the forecast season and its immediate predecessor and
+// default to their latest five finalized gameweeks. Expanded history remains its own fixed rolling
+// latest-five-GW view. Chips headline xP and are coloured by the active colour source (opponent
+// strength by default).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SortingState } from "@tanstack/table-core";
@@ -35,7 +35,8 @@ import type { DashboardManifest, NextGwPlan, PlayerActualsRecord, PlayerHorizons
 import type { ColorSource } from "@/lib/difficulty";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import {
-  actualGameweekRange,
+  actualGameweekLabel,
+  actualGameweeksChronological,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
   latestActualGameweeks,
@@ -57,8 +58,8 @@ import {
 } from "@/lib/insights";
 
 interface ActualRange {
-  gwFrom: number;
-  gwTo: number;
+  fromIndex: number;
+  toIndex: number;
 }
 
 interface ManagerSquadFilter {
@@ -114,6 +115,14 @@ function previousSeason(season: string): string | null {
   return `${start - 1}-${String(start % 100).padStart(2, "0")}`;
 }
 
+function latestFiveActualRange(gameweekCount: number): ActualRange | null {
+  if (gameweekCount === 0) return null;
+  return {
+    fromIndex: Math.max(0, gameweekCount - 5),
+    toIndex: gameweekCount - 1,
+  };
+}
+
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
@@ -140,7 +149,6 @@ export function PlayersPage() {
   const [filters, setFilters] = useState<FilterState | null>(null);
   const [playerFilters, setPlayerFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [actualRange, setActualRange] = useState<ActualRange | null>(null);
-  const [actualSeason, setActualSeason] = useState<string | null>(null);
   const [managerId, setManagerId] = useState(initialManagerId);
   const [managerSquad, setManagerSquad] = useState<ManagerSquadFilter | null>(null);
   const [managerLoading, setManagerLoading] = useState(false);
@@ -204,7 +212,6 @@ export function PlayersPage() {
           defaultRunId: defaultRun ?? first?.run_id ?? "",
         });
         setRunId(defaultRun ?? first?.run_id ?? null);
-        setActualSeason(defaultRunRecord?.season ?? first?.season ?? null);
         setFilters({ view: "overall", venue: "all", gwFrom, gwTo });
       })
       .catch((error: unknown) => {
@@ -269,31 +276,6 @@ export function PlayersPage() {
     return [selectedRun.season, ...(previous == null ? [] : [previous])];
   }, [selectedRun]);
 
-  const actualSeasons = useMemo(() => {
-    if (state.status !== "ready" || selectedRun == null) return [];
-    const codes = new Set(runPlayers.map((player) => player.code));
-    const previous = previousSeason(selectedRun.season);
-    const allowed = new Set([selectedRun.season, ...(previous == null ? [] : [previous])]);
-    return [...new Set([
-      selectedRun.season,
-      ...state.playerActuals
-        .filter((record) => codes.has(record.code) && allowed.has(record.season))
-        .map((record) => record.season),
-    ])].sort((left, right) => right.localeCompare(left));
-  }, [runPlayers, selectedRun, state]);
-
-  const selectedActualRecords = useMemo(() => {
-    if (state.status !== "ready" || actualSeason == null) return [];
-    const codes = new Set(runPlayers.map((player) => player.code));
-    return state.playerActuals.filter(
-      (record) => record.season === actualSeason && codes.has(record.code),
-    );
-  }, [actualSeason, runPlayers, state]);
-
-  const actualsByCode = useMemo(
-    () => new Map(selectedActualRecords.map((record) => [record.code, record.actuals])),
-    [selectedActualRecords],
-  );
   const rollingActualRecords = useMemo(() => {
     if (state.status !== "ready") return [];
     const codes = new Set(runPlayers.map((player) => player.code));
@@ -311,10 +293,22 @@ export function PlayersPage() {
     }
     return recordsByCode;
   }, [rollingActualRecords]);
-  const actualBounds = useMemo(
-    () => actualGameweekRange(selectedActualRecords),
-    [selectedActualRecords],
+  const actualGameweeks = useMemo(
+    () => actualGameweeksChronological(rollingActualRecords, rollingActualSeasons),
+    [rollingActualRecords, rollingActualSeasons],
   );
+  const selectedActualGameweeks = useMemo(
+    () =>
+      actualRange == null ||
+      actualRange.fromIndex < 0 ||
+      actualRange.toIndex >= actualGameweeks.length ||
+      actualRange.fromIndex > actualRange.toIndex
+        ? []
+        : actualGameweeks.slice(actualRange.fromIndex, actualRange.toIndex + 1),
+    [actualGameweeks, actualRange],
+  );
+  const actualFrom = selectedActualGameweeks[0] ?? null;
+  const actualTo = selectedActualGameweeks.at(-1) ?? null;
 
   const cumulativeOutcomesAvailable =
     filters != null &&
@@ -329,7 +323,6 @@ export function PlayersPage() {
 
   useEffect(() => {
     if (selectedRun == null) return;
-    setActualSeason(selectedRun.season);
     setFilters((current) =>
       current == null
         ? current
@@ -342,12 +335,8 @@ export function PlayersPage() {
   }, [selectedRun]);
 
   useEffect(() => {
-    setActualRange(
-      actualBounds == null
-        ? null
-        : { gwFrom: actualBounds.minGw, gwTo: actualBounds.maxGw },
-    );
-  }, [actualBounds, actualSeason, selectedRun?.run_id]);
+    setActualRange(latestFiveActualRange(actualGameweeks.length));
+  }, [actualGameweeks, selectedRun?.run_id]);
 
   const rows: PlayerStatRow[] = useMemo(() => {
     if (!filters) return [];
@@ -391,6 +380,10 @@ export function PlayersPage() {
         player.fixtures.length === 0
           ? null
           : rawPlayerGameweekXp({ ...player, fixtures: filtered }, filters.gwFrom);
+      const selectedActuals = latestPlayerActualDetails(
+        rollingActualsByCode.get(player.code) ?? [],
+        selectedActualGameweeks,
+      );
       return {
         // Suppress the shared detail row's retired prior-season form anchor on this page.
         player: { ...player, form: null },
@@ -399,11 +392,7 @@ export function PlayersPage() {
         bpsPerAppearance:
           actualRange == null
             ? null
-            : averageBpsPerAppearance(
-                actualsByCode.get(player.code) ?? [],
-                actualRange.gwFrom,
-                actualRange.gwTo,
-              ),
+            : averageBpsPerAppearance(selectedActuals),
         actualDetails: latestPlayerActualDetails(
           rollingActualsByCode.get(player.code) ?? [],
           expandedActualGameweeks,
@@ -413,11 +402,7 @@ export function PlayersPage() {
         form:
           actualRange == null
             ? null
-            : aggregatePlayerActuals(
-                actualsByCode.get(player.code) ?? [],
-                actualRange.gwFrom,
-                actualRange.gwTo,
-              ),
+            : aggregatePlayerActuals(selectedActuals),
       };
     });
   }, [
@@ -427,8 +412,8 @@ export function PlayersPage() {
     cumulativeOutcomesAvailable,
     horizonIndex,
     actualRange,
+    selectedActualGameweeks,
     expandedActualGameweeks,
-    actualsByCode,
     rollingActualsByCode,
     managerSquad,
   ]);
@@ -533,22 +518,7 @@ export function PlayersPage() {
     });
     setPlayerFilters({ ...INITIAL_PLAYER_FILTERS });
     clearManagerSquad();
-    const resetSeason = selectedRun?.season ?? null;
-    const resetCodes = new Set(runPlayers.map((player) => player.code));
-    const resetBounds =
-      state.status === "ready" && resetSeason != null
-        ? actualGameweekRange(
-            state.playerActuals.filter(
-              (record) => record.season === resetSeason && resetCodes.has(record.code),
-            ),
-          )
-        : null;
-    setActualSeason(resetSeason);
-    setActualRange(
-      resetBounds == null
-        ? null
-        : { gwFrom: resetBounds.minGw, gwTo: resetBounds.maxGw },
-    );
+    setActualRange(latestFiveActualRange(actualGameweeks.length));
   };
   const rankedRows = [...rows]
     .filter((row): row is PlayerStatRow & { totalXp: number } => row.totalXp != null)
@@ -594,9 +564,9 @@ export function PlayersPage() {
     insightFact(
       "coverage.selected_season_actuals",
       "coverage",
-      actualRange == null
-        ? `No visible player has finalized ${actualSeason ?? activeRun?.season} actuals; another season is not substituted.`
-        : `${actualRows.length} visible players have finalized ${actualSeason} observations in the selected GW${actualRange.gwFrom}-GW${actualRange.gwTo} range.`,
+      actualFrom == null || actualTo == null
+        ? "No finalized player actuals are published for the current/prior-season scope."
+        : `${actualRows.length} visible players have finalized observations from ${actualGameweekLabel(actualFrom)} through ${actualGameweekLabel(actualTo)}.`,
       ["player_actuals.json"],
     ),
     ...(actualPointsLeader ? [
@@ -612,7 +582,7 @@ export function PlayersPage() {
     "xP totals sum already-published player-fixture values or select an exact cumulative endpoint.",
     "Overlapping cumulative probability columns are intentionally kept out of this dense table; Player analytics exposes the exact published blank/haul endpoints.",
     "The availability status is a next-round overlay and is not applied to raw xP.",
-    "Actual season and GW selectors use finalized observations only; a prior season appears only after explicit selection.",
+    "Actual endpoints use exact finalized season/GW keys from the forecast season and its immediate predecessor.",
     ...(managerSquad
       ? [
           "My squad membership comes from a private local manager capture and only filters already-published player rows; it does not change any statistic.",
@@ -670,9 +640,10 @@ export function PlayersPage() {
           scope: compactInsightScope({
             gw_from: filters?.gwFrom,
             gw_to: filters?.gwTo,
-            actual_gw_from: actualRange?.gwFrom,
-            actual_gw_to: actualRange?.gwTo,
-            actual_season: actualRange == null ? undefined : actualSeason ?? undefined,
+            actual_season_from: actualFrom?.season,
+            actual_gw_from: actualFrom?.gw,
+            actual_season_to: actualTo?.season,
+            actual_gw_to: actualTo?.gw,
             position: playerPositionScope(playerFilters.position),
             team_code: playerFilters.teamCode === "all" ? undefined : Number(playerFilters.teamCode),
             view: filters?.view === "defense" ? "defence" : filters?.view,
@@ -690,7 +661,6 @@ export function PlayersPage() {
             filters,
             playerFilters,
             actualRange,
-            actualSeason,
             colorSource,
             managerScope: managerSquad ? "private_manager_squad" : "all_players",
           }),
@@ -802,66 +772,61 @@ export function PlayersPage() {
               teams={teams}
               showFormWindow={false}
             />
-            {actualSeasons.length > 0 && actualSeason != null && (
+            {actualGameweeks.length > 0 && actualRange != null && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Actual season</span>
-                <Select value={actualSeason} onValueChange={setActualSeason}>
-                  <SelectTrigger size="sm" className="w-28" aria-label="Actual season">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {actualSeasons.map((season) => (
-                      <SelectItem key={season} value={season}>{season}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {actualBounds != null && actualRange != null && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Actual GWs</span>
+                <span>Actual from</span>
                 <Select
-                  value={String(actualRange.gwFrom)}
+                  value={String(actualRange.fromIndex)}
                   onValueChange={(value) =>
                     setActualRange((current) =>
                       current == null
                         ? current
-                        : { ...current, gwFrom: Math.min(Number(value), current.gwTo) },
+                        : {
+                            fromIndex: Number(value),
+                            toIndex: Math.max(Number(value), current.toIndex),
+                          },
                     )
                   }
                 >
-                  <SelectTrigger size="sm" className="w-16" aria-label="Actual from gameweek">
+                  <SelectTrigger size="sm" className="w-36" aria-label="Actual from">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from(
-                      { length: actualRange.gwTo - actualBounds.minGw + 1 },
-                      (_, index) => actualBounds.minGw + index,
-                    ).map((gw) => (
-                      <SelectItem key={gw} value={String(gw)}>GW{gw}</SelectItem>
+                    {actualGameweeks.map((gameweek, index) => (
+                      <SelectItem
+                        key={`${gameweek.season}-${gameweek.gw}`}
+                        value={String(index)}
+                      >
+                        {actualGameweekLabel(gameweek)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <span>to</span>
+                <span>Actual to</span>
                 <Select
-                  value={String(actualRange.gwTo)}
+                  value={String(actualRange.toIndex)}
                   onValueChange={(value) =>
                     setActualRange((current) =>
                       current == null
                         ? current
-                        : { ...current, gwTo: Math.max(Number(value), current.gwFrom) },
+                        : {
+                            fromIndex: Math.min(current.fromIndex, Number(value)),
+                            toIndex: Number(value),
+                          },
                     )
                   }
                 >
-                  <SelectTrigger size="sm" className="w-16" aria-label="Actual to gameweek">
+                  <SelectTrigger size="sm" className="w-36" aria-label="Actual to">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from(
-                      { length: actualBounds.maxGw - actualRange.gwFrom + 1 },
-                      (_, index) => actualRange.gwFrom + index,
-                    ).map((gw) => (
-                      <SelectItem key={gw} value={String(gw)}>GW{gw}</SelectItem>
+                    {actualGameweeks.map((gameweek, index) => (
+                      <SelectItem
+                        key={`${gameweek.season}-${gameweek.gw}`}
+                        value={String(index)}
+                      >
+                        {actualGameweekLabel(gameweek)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -869,18 +834,17 @@ export function PlayersPage() {
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Forecast GWs filter upcoming fixtures and xP only. Actual GWs independently aggregate
-            finalized {actualSeason} observations. Changing Actual season is explicit and never
-            mixes seasons in one aggregate. My squad intersects with every other player filter.
-            The Min avg min (L5) filter remains its separately published trailing-five anchor and
-            does not follow Actual GWs. Expanded rows use a separate rolling latest-five completed
-            GW window across the forecast season and its immediate predecessor; that window does
-            not follow the Actual season/GW aggregate controls.
+            Forecast GWs filter upcoming fixtures and xP only. Actual from/to independently
+            aggregate every exact published season/GW key between the endpoints; reset defaults to
+            the latest five finalized keys across this season and its immediate predecessor. My
+            squad intersects with every other player filter. Min avg min (L5) remains its separate
+            published anchor. Expanded rows also remain an independent fixed rolling latest-five
+            view and do not follow these Actual endpoints.
           </p>
-          {actualBounds == null && (
+          {actualGameweeks.length === 0 && (
             <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
-              No finalized player actuals are published for {actualSeason}. Observed columns stay
-              unavailable; another season is not substituted.
+              No finalized player actuals are published for the forecast season or its immediate
+              predecessor. Observed columns stay unavailable.
             </p>
           )}
         </div>
@@ -896,23 +860,21 @@ export function PlayersPage() {
           gwTo={filters.gwTo}
           opponentIndexOf={opponentIndexOf}
           formHeading={
-            actualRange == null
-              ? `Actual ${actualSeason ?? ""}`.trim()
-              : `Actual ${actualSeason} GW${actualRange.gwFrom}-${actualRange.gwTo}`
+            actualFrom == null || actualTo == null
+              ? "Actual unavailable"
+              : `Actual ${actualGameweekLabel(actualFrom)}–${actualGameweekLabel(actualTo)}`
           }
           formTitle={
-            actualRange == null
-              ? `No finalized ${actualSeason} actuals published`
-              : `Finalized ${actualSeason} actuals, GW${actualRange.gwFrom}-GW${actualRange.gwTo}`
+            actualFrom == null || actualTo == null
+              ? "No finalized current/prior-season actuals published"
+              : `Finalized actuals from ${actualGameweekLabel(actualFrom)} through ${actualGameweekLabel(actualTo)}`
           }
           formScopeLabel={
-            actualRange == null
-              ? `${actualSeason ?? "Unknown season"} · no finalized GWs`
-              : `${actualSeason} · ${
-                  actualRange.gwFrom === actualRange.gwTo
-                    ? `GW${actualRange.gwFrom}`
-                    : `GW${actualRange.gwFrom}-GW${actualRange.gwTo}`
-                }`
+            actualFrom == null || actualTo == null
+              ? "No finalized current/prior-season GWs"
+              : actualFrom.season === actualTo.season && actualFrom.gw === actualTo.gw
+                ? actualGameweekLabel(actualFrom)
+                : `${actualGameweekLabel(actualFrom)} → ${actualGameweekLabel(actualTo)}`
           }
           formColumnProfile="players"
           showGwFromXp

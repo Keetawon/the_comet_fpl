@@ -52,7 +52,7 @@ function panel(gwTo = 5, config = remote(gwTo)) {
 
 const response = {
   schema: "fpl.insight-summary-response" as const,
-  schema_version: 3 as const,
+  schema_version: 4 as const,
   source: "provider" as const,
   provider: "zai_glm",
   model: "glm-test",
@@ -129,7 +129,7 @@ describe("InsightSummaryPanel", () => {
     expect(fetchInsightSummary).toHaveBeenCalledWith(
       {
         schema: "fpl.insight-summary-request",
-        schema_version: 3,
+        schema_version: 4,
         page: "players",
         manifest_sha256: "a".repeat(64),
         run_id: "run-1",

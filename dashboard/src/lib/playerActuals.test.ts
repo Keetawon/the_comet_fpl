@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { PlayerActualFixture } from "@/data/types";
 import {
   actualGameweekRange,
+  actualGameweekLabel,
+  actualGameweeksChronological,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
   latestActualGameweeks,
@@ -70,8 +72,6 @@ describe("aggregatePlayerActuals", () => {
           points_under_rules_2026_27: 0,
         }),
       ],
-      2,
-      3,
     );
 
     expect(result).toMatchObject({
@@ -92,11 +92,9 @@ describe("aggregatePlayerActuals", () => {
   });
 
   it("keeps absent, unmeasured, and zero observations distinct", () => {
-    expect(aggregatePlayerActuals([], 1, 3)).toBeNull();
+    expect(aggregatePlayerActuals([])).toBeNull();
     const dnp = aggregatePlayerActuals(
       [actual({ minutes: 0, starts: null, expected_goals: null, expected_assists: null })],
-      2,
-      2,
     );
     expect(dnp).toMatchObject({
       rostered_fixtures: 1,
@@ -117,14 +115,12 @@ describe("aggregatePlayerActuals", () => {
       actual({ fixture: 21, minutes: 60, bps: 18 }),
       actual({ fixture: 22, minutes: 0, bps: 99 }),
     ];
-    expect(averageBpsPerAppearance(appeared, 2, 2)).toBe(29);
-    expect(averageBpsPerAppearance([actual({ bps: 0 })], 2, 2)).toBe(0);
-    expect(averageBpsPerAppearance([actual({ minutes: 0, bps: 99 })], 2, 2)).toBeNull();
+    expect(averageBpsPerAppearance(appeared)).toBe(29);
+    expect(averageBpsPerAppearance([actual({ bps: 0 })])).toBe(0);
+    expect(averageBpsPerAppearance([actual({ minutes: 0, bps: 99 })])).toBeNull();
     expect(
       averageBpsPerAppearance(
         [actual({ fixture: 20, bps: 40 }), actual({ fixture: 21, bps: null })],
-        2,
-        2,
       ),
     ).toBeNull();
   });
@@ -197,6 +193,35 @@ describe("latestPlayerActualDetails", () => {
       "2025-26/GW36",
       "2025-26/GW35",
     ]);
+  });
+
+  it("enumerates exact endpoint options chronologically and selects inclusively by index", () => {
+    const records = [
+      {
+        season: "2026-27",
+        actuals: [actual({ gw: 1, fixture: 101 }), actual({ gw: 3, fixture: 103 })],
+      },
+      {
+        season: "2025-26",
+        actuals: [actual({ gw: 35, fixture: 350 }), actual({ gw: 38, fixture: 380 })],
+      },
+      {
+        season: "2024-25",
+        actuals: [actual({ gw: 38, fixture: 2438 })],
+      },
+    ];
+    const chronological = actualGameweeksChronological(records, ["2026-27", "2025-26"]);
+
+    expect(chronological.map(actualGameweekLabel)).toEqual([
+      "2025-26 GW35",
+      "2025-26 GW38",
+      "2026-27 GW1",
+      "2026-27 GW3",
+    ]);
+    const selected = chronological.slice(1, 3);
+    expect(
+      latestPlayerActualDetails(records, selected).map((row) => `${row.season}/${row.fixture}`),
+    ).toEqual(["2025-26/380", "2026-27/101"]);
   });
 
   it("preserves DNP, zero, and null fixture evidence without substituting other rows", () => {

@@ -172,8 +172,8 @@ describe("plan server token transport", () => {
 describe("insight client contract", () => {
   const request: InsightSummaryRequest = {
     schema: "fpl.insight-summary-request",
-    schema_version: 3,
-    page: "summary",
+    schema_version: 4,
+    page: "players",
     manifest_sha256: "a".repeat(64),
     run_id: "run-1",
     season: "2026-27",
@@ -181,6 +181,10 @@ describe("insight client contract", () => {
     scope: {
       gw_from: 1,
       gw_to: 5,
+      actual_season_from: "2025-26",
+      actual_gw_from: 38,
+      actual_season_to: "2026-27",
+      actual_gw_to: 1,
       form_window: "season_to_date",
       min_price_tenths: 45,
       max_price_tenths: 150,
@@ -191,7 +195,7 @@ describe("insight client contract", () => {
   };
   const summaryResponse = {
     schema: "fpl.insight-summary-response",
-    schema_version: 3,
+    schema_version: 4,
     source: "provider",
     provider: "zai_glm",
     model: "glm-test",
@@ -213,6 +217,9 @@ describe("insight client contract", () => {
       headline: "Published coverage",
       items: [{ citations: ["coverage.rows"] }],
     });
+    expect(() => parseInsightSummaryResponse({ ...summaryResponse, schema_version: 3 })).toThrow(
+      /unsupported contract/,
+    );
     expect(() => parseInsightStatus({
       enabled: false,
       provider: null,

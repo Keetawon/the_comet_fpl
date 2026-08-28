@@ -80,7 +80,7 @@ Remove-Item Env:FPL_INSIGHTS_API_KEY, Env:FPL_INSIGHTS_PROVIDER, `
 The existing same-origin/approved-LAN-token Plan Server boundary protects both insight endpoints;
 they are not provider-facing public APIs. `POST /insights/summary` accepts an exact-key,
 Pydantic-validated
-`fpl.insight-summary-request` version 3. The browser sends selectors only:
+`fpl.insight-summary-request` version 4. The browser sends selectors only:
 
 - a public-page enum;
 - manifest content hash, run id, season, and `as_of`;
@@ -89,22 +89,26 @@ Pydantic-validated
 
 Version 2 added the paired `actual_gw_from` / `actual_gw_to` selectors for the Players route.
 Version 3 binds that pair to a required `actual_season`, resolves it from normalized
-`player_actuals.json`, and adds the exact `include_cold_starts` boolean for Player analytics. The
-actual selectors are distinct from forecast `gw_from` / `gw_to`, must be supplied together in
-ascending order, and `actual_season` must be either the selected run's forecast season or its
-immediate predecessor when that predecessor is actually published in `player_actuals.json`. Every
-gameweek in the inclusive requested Actual-GW range must be an exact member of that season's
-published finalized-GW set; endpoint membership or numeric containment between the set's minimum
-and maximum is insufficient. Unpublished seasons and any range containing a non-member gameweek
-fail before provider or cache work. Other pages reject these selectors. The
+`player_actuals.json`, and adds the exact `include_cold_starts` boolean for Player analytics.
+Version 4 replaces the singular season selector with exact `actual_season_from` /
+`actual_gw_from` and `actual_season_to` / `actual_gw_to` endpoints. All four endpoint fields are
+supplied together or omitted together. They are distinct from forecast `gw_from` / `gw_to`; each
+season must be the selected run's forecast season or its immediate predecessor, and the endpoint
+pair must be chronological within one season or from the predecessor into the forecast season.
+Both endpoints must be exact members of the page-wide published finalized season/GW set. The
+selected scope is the inclusive chronological slice of that ordered set; an unpublished numeric GW
+between the endpoints is absent rather than synthesized, rejected, or treated as zero. Numeric GW
+comparison without season is forbidden. Unpublished seasons and non-member endpoints fail before
+provider or cache work. Other pages reject these selectors. The
 cold-start selector changes only reporting eligibility over the directly published provenance
 flag. These selectors prevent a visible season/range or population change from reusing evidence
 resolved for a different page state.
 
 The Players and Fixture Matrix expanded rows have a separate, local rolling latest-five history
 that may cross from the forecast season into its immediate predecessor. It is display-only and does
-not alter the season-scoped main aggregate, these insight selectors, the deterministic fact packet,
-or provider/cache evidence. No expanded-row payload is sent to the optional renderer.
+not follow the Players main-table endpoints or alter the deterministic fact packet. The main-table
+range may independently cross the same season boundary only through the explicit version-4
+selectors above. No expanded-row payload is sent to the optional renderer.
 
 There is no fact, caveat, chat, or arbitrary-text field. Extra keys fail closed. The server resolves
 the selector against the explicitly configured dashboard-data directory, verifies the schema-v8

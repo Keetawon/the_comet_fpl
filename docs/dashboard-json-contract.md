@@ -40,8 +40,9 @@ season, an empty current-season range is an empty array rather than last season'
 
 Actuals stay at fixture grain, so both legs of a completed double gameweek remain separate and are
 ordered by gameweek, kickoff, then fixture. A duplicate `(season, fixture, code)` fails the build.
-The browser may select a current-season gameweek range and sum these already-published observed
-values; it does not query DuckDB or derive model quantities. Source `null` values remain JSON
+The version-6 browser could select a current-season gameweek range and sum these already-published
+observed values; version 7 supersedes that UI boundary with the normalized two-season endpoint
+scope below. It does not query DuckDB or derive model quantities. Source `null` values remain JSON
 `null` and are never rewritten as zero.
 
 ## Version 7 normalized player history and forecast provenance amendment (implemented 2026-08-26)
@@ -53,8 +54,10 @@ version-6 complete-gameweek, double-gameweek, ordering, duplicate-identity, and 
 file is bounded to each published forecast season and its immediate predecessor for player codes
 present in the published forecast population; a predecessor is emitted only when finalized
 observations exist, and older archive seasons are absent. For a selected run, the Players page
-offers only its forecast season and its published immediate predecessor, and never mixes seasons
-in one aggregate.
+offers two chronological Season–GW endpoints over only those seasons. The default/reset range is
+the latest five page-wide finalized keys—at 2026-27 GW1, from 2025-26 GW35 through 2026-27 GW1.
+An aggregate may cross their boundary only through that explicit displayed selection; no older
+season is silently substituted.
 
 Version 7 also transports `cold_start_player` on every `players.json` row. This is the selected
 forecast vintage's own no-usable-history provenance flag from
@@ -76,8 +79,9 @@ season and its immediate predecessor are eligible, a season is present only when
 exist, only officially complete gameweeks enter, double-gameweek legs remain separate, and source
 NULLs remain JSON `null`.
 
-Version 8 also makes expanded-row ownership explicit. Main-table Actual season/GW aggregates remain
-explicit and never mix seasons. Expanded rows are a separate historical presentation: Players and
+Version 8 also makes expanded-row ownership explicit. Main-table Actual aggregates use explicit
+chronological Season–GW endpoints and may cross the season boundary when those controls visibly
+select it. Expanded rows are a separate historical presentation: Players and
 Fixture Matrix each select one page-wide rolling set of the latest five distinct **season-qualified**
 finalized gameweeks across the forecast season and its immediate predecessor, order it newest first,
 and retain every fixture leg. At 2026-27 GW1 the labels are 2026-27 GW1, then 2025-26 GW38, GW37,
@@ -338,9 +342,15 @@ forecast-population player; no earlier observed season is transported.
 
 Only officially complete gameweeks enter the file. Rows sort by gameweek, kickoff, then fixture;
 both double-gameweek legs remain separate. Identities sort by season then code, duplicate fixture
-identities fail closed, and source NULLs remain NULL. JavaScript may select one explicit season and
-gameweek range and aggregate these observations; it may not treat them as forecast inputs or query
-DuckDB for missing history. The Players table may present observed xGI as the display-only sum of
+identities fail closed, and source NULLs remain NULL. For one selected forecast run, JavaScript
+builds the page-wide chronological list of exact finalized `(season, gw)` keys from only that run's
+forecast season and immediate predecessor. `Actual from` / `Actual to` select an inclusive slice of
+that list; absent numeric GWs are not synthesized. Default/reset selects its latest five keys. Every
+player is filtered against the same selected keys, cross-season membership joins only on permanent
+`code`, no player is individually backfilled outside them, and every matching DGW fixture leg is
+retained. JavaScript may aggregate these published observations across the explicitly displayed
+season boundary; it may not treat them as forecast inputs or query DuckDB for missing history. The
+Players table may present observed xGI as the display-only sum of
 the aggregated xG and xA values, but only when both are measured; it is not a transported field or
 a future model quantity. Each normalized actual retains its per-fixture BPS score; the browser sums
 complete appeared rows for the selected range, then presents BPS/App as that total divided by the
@@ -349,8 +359,8 @@ missing BPS on an appeared row makes the display rate unavailable. The legacy fo
 remains a total, and this descriptive ratio is not a transported field.
 
 The Players expanded row reads these same normalized actuals, not `players.json.fixtures`. It is
-independent of the main table's explicit Actual season/range and takes the page-wide rolling set of
-the latest five distinct season-qualified finalized GW labels across the forecast season and its
+independent of the main table's selectable Season–GW endpoint range and takes its own fixed
+page-wide rolling set of the latest five distinct season-qualified finalized GW labels across the forecast season and its
 immediate predecessor. It keeps every fixture leg in those gameweeks and presents the rows newest
 first (season, gameweek, kickoff, fixture descending). It shows season, GW, kickoff, minutes/start,
 goals, assists,

@@ -256,26 +256,33 @@ and never sums probabilities or derives a CCDF/model quantity. Schema version 8 
 retains those contracts, normalizes officially complete fixture-grain player observations in
 `player_actuals.json`, adds the parallel normalized `team_actuals.json`, and carries the forecast-
 owned `cold_start_player` provenance flag. The
-Players route exposes an explicit actual season limited to the selected forecast season and its
-immediately preceding season plus a distinct `Actual GWs` range. It never reuses the forecast-
-horizon selector. Its main aggregate never mixes seasons, silently substitutes one season for
-another, or collapses double-gameweek legs; it only sums already-published observed components. The
-dense table presents that shared observed scope once above compact `App`/stat headers. A Players-only sortable
+Players route exposes two explicit chronological `Actual from` / `Actual to` endpoints. Their
+options are the page-wide exact finalized `(season, gw)` keys from only the selected forecast season
+and its immediate predecessor, ordered from predecessor to forecast season. The default and reset
+scope is the latest five such keys; at 2026-27 GW1 that is `Actual from: 2025-26 GW35` through
+`Actual to: 2026-27 GW1`. Selection includes every published key between the endpoints, without
+inventing absent numeric gameweeks. This main aggregate may therefore cross the season
+boundary only when its displayed endpoints explicitly do so. It never silently substitutes a
+season, reuses the forecast-horizon selector, or collapses double-gameweek legs; it only sums
+already-published observed components. The selected key range is page-wide, joins players across
+seasons only on permanent `code`, and never backfills an individual player's missing history from
+outside that range. The dense table presents that shared observed scope once above compact
+`App`/stat headers. A Players-only sortable
 `xP GW{Forecast From}` column sits immediately after `Pts` and defaults descending for XI/bench review:
 it uses the exact fixed-start cumulative endpoint when compatible, otherwise strictly sums the
 selected GW's published fixture xP, including every double-gameweek leg. A true blank is zero;
 null, non-finite, duplicate, or incomplete fixture evidence stays unavailable and sorts last. The
 reported availability overlay is never applied to this raw xP. The Players profile shows observed
-xGI immediately after xA as the display-only sum of the selected Actual-GW range's aggregated xG
-and xA; if either component is unavailable, xGI remains unavailable. It is not a transported field,
-a forecast, or permission to derive future goal involvement in the browser. The Players profile
+xGI immediately after xA as the display-only sum of the selected Season–GW endpoint range's
+aggregated xG and xA; if either component is unavailable, xGI remains unavailable. It is not a
+transported field, a forecast, or permission to derive future goal involvement in the browser. The Players profile
 displays BPS/App as the selected-range observed BPS total divided by appearances. Each played DGW
 leg counts once, DNPs are excluded, and any missing BPS on an appeared row makes the ratio
 unavailable. Normalized actuals retain fixture-grain BPS, while the selected-range aggregate and
 legacy form BPS measure remain totals. This is backward-looking descriptive arithmetic, not a
-model quantity. The main table remains bound to that explicit Actual season/range, but its expanded
-history is a separate rolling view: it retains every fixture in the page-wide latest five distinct
-**season-qualified** finalized gameweeks across the forecast season and its immediate predecessor,
+model quantity. The main table remains bound to its explicit Season–GW endpoint range, but its
+expanded history is a separate fixed rolling view: it retains every fixture in the page-wide latest
+five distinct **season-qualified** finalized gameweeks across the forecast season and its immediate predecessor,
 then sorts newest first. At 2026-27 GW1 that window is 2026-27 GW1 followed by 2025-26 GW38 through
 GW35. Every row displays its season as well as its GW. Cross-season player membership is joined only
 on permanent `code`; a newcomer without predecessor-season evidence stays shorter and is never
@@ -299,9 +306,10 @@ Any proposed bridge through a player's first three appearances requires a separa
 pre-registered, evaluated model candidate.
 BI semantic contract version 4 extends the observed player-fixture fact with deterministic latest
 live components only when an exact append-only finalized outcome exists; the ledger owns both
-points measures for those rows. Insight request schema version 3 carries `actual_season` with the
-paired `actual_gw_from` / `actual_gw_to` selectors and the typed `include_cold_starts` selector so
-optional evidence stays aligned with the visible scope. Analytics copy and tooltips remain concise;
+points measures for those rows. Insight request schema version 4 carries the exact paired
+`actual_season_from` / `actual_gw_from` and `actual_season_to` / `actual_gw_to` endpoints plus the
+typed `include_cold_starts` selector so optional evidence stays aligned with the visible scope.
+Analytics copy and tooltips remain concise;
 full exact run/as-of/horizon/metric provenance stays in accessible names and authoritative tables.
 Two forecast/transfer scenario gaps remain:
 `chance_of_playing_next_round` is repeated across the whole horizon, and future transfers use the

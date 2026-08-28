@@ -37,6 +37,16 @@ export function latestActualGameweeks(
   gameweekLimit = 5,
 ): ActualSeasonGameweek[] {
   if (gameweekLimit <= 0) return [];
+  return actualGameweeksChronological(players, seasonsNewestFirst)
+    .slice(-gameweekLimit)
+    .reverse();
+}
+
+/** Exact published season/GW keys in chronological order across the allowed two-season scope. */
+export function actualGameweeksChronological(
+  players: readonly SeasonalPlayerActualCollection[],
+  seasonsNewestFirst: readonly string[],
+): ActualSeasonGameweek[] {
   const seasonRank = new Map(seasonsNewestFirst.map((season, index) => [season, index]));
   const gameweeks = new Map<string, ActualSeasonGameweek>();
   for (const player of players) {
@@ -49,19 +59,17 @@ export function latestActualGameweeks(
   return [...gameweeks.values()]
     .sort(
       (left, right) =>
-        (seasonRank.get(left.season) ?? Number.MAX_SAFE_INTEGER) -
-          (seasonRank.get(right.season) ?? Number.MAX_SAFE_INTEGER) ||
-        right.gw - left.gw,
-    )
-    .slice(0, gameweekLimit);
+        (seasonRank.get(right.season) ?? Number.MIN_SAFE_INTEGER) -
+          (seasonRank.get(left.season) ?? Number.MIN_SAFE_INTEGER) ||
+        left.gw - right.gw,
+    );
 }
 
 /**
- * Fixture-grain history for an expanded Players row.
+ * Fixture-grain observations for an exact page-wide set of season/gameweek keys.
  *
- * The limit is five distinct completed season/gameweeks, not five fixtures: every leg of a
- * double gameweek is retained. Selection uses the shared page-level rolling window, so gaps are
- * not backfilled separately for a player.
+ * Callers may pass the selectable main-table slice or the fixed latest-five expansion window.
+ * Every double-gameweek leg is retained, and gaps are never backfilled separately for a player.
  */
 export function latestPlayerActualDetails(
   players: readonly SeasonalPlayerActualCollection[],
@@ -89,6 +97,11 @@ export function latestPlayerActualDetails(
     );
 }
 
+/** Stable visible label for an exact finalized season/GW selector. */
+export function actualGameweekLabel(gameweek: ActualSeasonGameweek): string {
+  return `${gameweek.season} GW${gameweek.gw}`;
+}
+
 /** Bounds come only from finalized actual rows for the explicitly selected season/player set. */
 export function actualGameweekRange(
   players: readonly PlayerActualCollection[],
@@ -105,11 +118,9 @@ export function actualGameweekRange(
  */
 export function averageBpsPerAppearance(
   actuals: readonly PlayerActualFixture[],
-  gwFrom: number,
-  gwTo: number,
 ): number | null {
   const appeared = actuals.filter(
-    (row) => row.gw >= gwFrom && row.gw <= gwTo && row.minutes != null && row.minutes >= 1,
+    (row) => row.minutes != null && row.minutes >= 1,
   );
   if (
     appeared.length === 0 ||
@@ -131,15 +142,13 @@ function sumMeasured(
 }
 
 /**
- * Aggregate already-published observations with the same NULL rules as mart_fact_player_form.
- * An empty range has no observed form; it is never replaced by a previous-season window.
+ * Aggregate already-selected, already-published observations with the same NULL rules as
+ * mart_fact_player_form. An empty selection has no observed form; this helper never backfills it.
  */
 export function aggregatePlayerActuals(
   actuals: readonly PlayerActualFixture[],
-  gwFrom: number,
-  gwTo: number,
 ): PlayerFormWindow | null {
-  const selected = actuals.filter((row) => row.gw >= gwFrom && row.gw <= gwTo);
+  const selected = actuals;
   if (selected.length === 0) return null;
 
   const appeared = selected.filter((row) => row.minutes != null && row.minutes >= 1);
