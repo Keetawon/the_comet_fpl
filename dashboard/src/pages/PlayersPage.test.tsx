@@ -318,8 +318,9 @@ describe("PlayersPage", () => {
       screen.getByText(/AI explanation is unavailable while the private My squad filter is active/),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("combobox", { name: "Position filter" }));
-    await user.click(screen.getByRole("option", { name: "DEF" }));
+    await user.click(screen.getByRole("button", { name: /^Position filter:/ }));
+    await user.click(screen.getByRole("checkbox", { name: "DEF" }));
+    await user.keyboard("{Escape}");
     expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(5);
     expect(screen.queryByText("Squad 6")).not.toBeInTheDocument();
     expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument();
@@ -337,6 +338,81 @@ describe("PlayersPage", () => {
     expect(await screen.findByText("Outside Defender")).toBeInTheDocument();
     expect(await screen.findByText("Squad 6")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show all players" })).not.toBeInTheDocument();
+  });
+
+  it("searches player names and composes multi-select player, position, and team filters", async () => {
+    const user = userEvent.setup();
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: /^Player name filter:/ }));
+    const search = screen.getByRole("textbox", { name: "Search player names" });
+    await user.type(search, "alp");
+    expect(screen.getByRole("checkbox", { name: /Alpha · ALP · MID/ })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Beta · BET · GK/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /Alpha · ALP · MID/ }));
+    await user.keyboard("{Escape}");
+
+    expect(screen.getAllByText("Alpha").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Expand fixtures" })).toHaveLength(1);
+    expect(screen.queryByText("Beta")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Player name filter:/ })).toHaveAccessibleName(
+      "Player name filter: Alpha · ALP · MID",
+    );
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
+    expect(
+      screen.getByText(/AI explanation is unavailable while specific player names are selected/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Player name filter:/ }));
+    expect(screen.getByRole("textbox", { name: "Search player names" })).toHaveValue("");
+    await user.click(screen.getByRole("checkbox", { name: /Beta · BET · GK/ }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: /^Player name filter:/ })).toHaveTextContent(
+      "2 selected",
+    );
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Position filter:/ }));
+    await user.click(screen.getByRole("checkbox", { name: "MID" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.queryByText("Beta")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Position filter:/ }));
+    await user.click(screen.getByRole("checkbox", { name: "GK" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Position filter:/ })).toHaveTextContent(
+      "2 selected",
+    );
+
+    await user.click(screen.getByRole("button", { name: /^Team filter:/ }));
+    await user.type(screen.getByRole("textbox", { name: "Search teams" }), "ALP");
+    await user.click(screen.getByRole("checkbox", { name: "ALP" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.queryByText("Beta")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Team filter:/ }));
+    await user.click(screen.getByRole("checkbox", { name: "BET" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Team filter:/ })).toHaveTextContent("2 selected");
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Player name filter:/ })).toHaveTextContent(
+      "All players",
+    );
+    expect(screen.getByRole("button", { name: /^Position filter:/ })).toHaveTextContent(
+      "All positions",
+    );
+    expect(screen.getByRole("button", { name: /^Team filter:/ })).toHaveTextContent("All teams");
   });
 
   it("preserves the active squad when a replacement manager fetch fails", async () => {
@@ -430,6 +506,41 @@ describe("PlayersPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The My squad filter was cleared because the forecast vintage changed",
     );
+  });
+
+  it("removes unavailable name selections when the forecast vintage changes", async () => {
+    const user = userEvent.setup();
+    const runBPlayer: PlayerRecord = {
+      ...playersWithActuals[1],
+      run_id: "run-b",
+    };
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: [...playersWithActuals, runBPlayer],
+      manifest: null,
+    });
+    vi.mocked(loadPlayerHorizons).mockResolvedValueOnce({
+      ...horizonsData,
+      players: [
+        ...horizonsData.players,
+        ...horizonsData.players.map((player) => ({ ...player, run_id: "run-b" })),
+      ],
+    });
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /^Player name filter:/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Alpha · ALP · MID/ }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText("Beta")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Forecast vintage" }));
+    await user.click(screen.getByRole("option", { name: /run-b/ }));
+
+    expect(await screen.findByText("Beta")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Player name filter:/ })).toHaveTextContent(
+      "All players",
+    );
+    expect(screen.queryByText("No players match the current filters.")).not.toBeInTheDocument();
   });
 
   it("ignores a pending manager response after the forecast vintage changes", async () => {

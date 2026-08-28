@@ -387,9 +387,16 @@ comparison page and is not a twelfth navigation item.
   value on each normalized actual remains fixture-grain, while the legacy form BPS measure remains
   a total. Future
   player-level saves/DC/GC/xGC forecasts are unavailable and are not
-  inferred from club lambdas or clean-sheet probabilities. Filters: position, team, price range,
-  minimum average minutes (last 5), availability, plus the shared view/venue/gameweek bar, all
-  inside a distinct Filters panel placed immediately before the scrollable table. Local
+  inferred from club lambdas or clean-sheet probabilities. Filters include a searchable
+  multi-select Player box (stable player code), multi-select Position and Team boxes (permanent
+  team code), price range, minimum average minutes (last 5), availability, plus the shared
+  view/venue/gameweek bar, all inside a distinct Filters panel placed immediately before the
+  scrollable table. Empty identity selections mean all; selections are ORed within each box and
+  ANDed across boxes. Player labels include club and position to disambiguate duplicate names,
+  and the option lists always come from the complete active forecast vintage rather than the
+  already-filtered rows. A vintage change preserves only player/team selections that still exist,
+  so no invisible stale code can keep the table empty. These multi-select controls are local to
+  Players; shared decision-page filters remain scalar. Local
   development additionally offers **My squad**: a Manager ID is resolved through the trusted Plan
   Server's member-only endpoint, all 15 stable player codes plus position, club, price, and
   planning-GW metadata must match the selected forecast vintage before the scope is activated,
@@ -433,7 +440,11 @@ comparison page and is not a twelfth navigation item.
   is the latest five available keys. A forecast range never silently reinterprets historical form
   or actuals. Deterministic insight facts follow the verified My
   squad scope, but the optional remote renderer is disabled while that private filter is active:
-  manager ID, capture identity, and squad membership never enter the public insight request.
+  manager ID, capture identity, and squad membership never enter the public insight request. The
+  same fail-closed evidence rule disables the renderer for a selected player name or more than one
+  Position/Team because insight request schema v4 cannot express those scopes. Empty and singleton
+  Position/Team selections continue to use its exact scalar selector; deterministic facts always
+  follow the visible rows.
 - **Summary** (implemented, P1.7d): the landing page — next gameweek kickoff (deadlines are
   not sourced, so none is shown), one optimizer squad summary card per plan (GW1 squad xP,
   cost, hits, captain/vice, XI and bench lines), an availability watch (the official

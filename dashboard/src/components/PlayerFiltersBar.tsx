@@ -2,7 +2,9 @@
 // matching predicate. Used inside a FilterPanel by the Players page and the Next GW
 // page's squad table. Unmeasured values never satisfy a bound: null is not 0.
 
+import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import {
   Select,
   SelectContent,
@@ -35,6 +37,13 @@ export const INITIAL_PLAYER_FILTERS: PlayerFilters = {
 };
 
 export const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
+export type PlayerPosition = (typeof POSITIONS)[number];
+
+export interface PlayerMultiFilters {
+  playerCodes: number[];
+  positions: PlayerPosition[];
+  teamCodes: number[];
+}
 
 export const FORM_WINDOW_LABEL: Record<WindowLabel, string> = {
   last_3: "Last 3",
@@ -68,6 +77,12 @@ interface PlayerFiltersBarProps {
   teams: [number, string][];
   /** The form-window select does not apply everywhere (e.g. the plan-builder picker); hide it there. */
   showFormWindow?: boolean;
+  /** Players-table mode: searchable names plus multi-select position/team dimensions. */
+  multiSelect?: {
+    players: readonly PlayerRecord[];
+    filters: PlayerMultiFilters;
+    onChange: (filters: PlayerMultiFilters) => void;
+  };
 }
 
 export function PlayerFiltersBar({
@@ -75,42 +90,99 @@ export function PlayerFiltersBar({
   onChange,
   teams,
   showFormWindow = true,
+  multiSelect,
 }: PlayerFiltersBarProps) {
   const set = (patch: Partial<PlayerFilters>) => onChange({ ...filters, ...patch });
+  const setMulti = (patch: Partial<PlayerMultiFilters>) => {
+    if (multiSelect) multiSelect.onChange({ ...multiSelect.filters, ...patch });
+  };
+  const playerOptions = useMemo(
+    () =>
+      multiSelect == null
+        ? []
+        : [...multiSelect.players]
+            .sort(
+              (left, right) =>
+                left.web_name.localeCompare(right.web_name) || left.code - right.code,
+            )
+            .map((player) => ({
+              value: player.code,
+              label: `${player.web_name} · ${player.team_short_name} · ${player.position}`,
+              searchText: `${player.team_short_name} ${player.position}`,
+            })),
+    [multiSelect],
+  );
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-      <div className="flex items-center gap-2">
-        <span>Position</span>
-        <Select value={filters.position} onValueChange={(value) => set({ position: value })}>
-          <SelectTrigger size="sm" className="w-24" aria-label="Position filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            {POSITIONS.map((p) => (
-              <SelectItem key={p} value={p}>
-                {p}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex items-center gap-2">
-        <span>Team</span>
-        <Select value={filters.teamCode} onValueChange={(value) => set({ teamCode: value })}>
-          <SelectTrigger size="sm" className="w-28" aria-label="Team filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            {teams.map(([code, short]) => (
-              <SelectItem key={code} value={String(code)}>
-                {short}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {multiSelect ? (
+        <>
+          <MultiSelectFilter
+            label="Player"
+            ariaLabel="Player name filter"
+            allLabel="All players"
+            options={playerOptions}
+            selected={multiSelect.filters.playerCodes}
+            onChange={(playerCodes) => setMulti({ playerCodes })}
+            searchable
+            searchLabel="Search player names"
+            emptyLabel="No players match that search"
+          />
+          <MultiSelectFilter
+            label="Position"
+            ariaLabel="Position filter"
+            allLabel="All positions"
+            options={POSITIONS.map((position) => ({ value: position, label: position }))}
+            selected={multiSelect.filters.positions}
+            onChange={(positions) => setMulti({ positions })}
+          />
+          <MultiSelectFilter
+            label="Team"
+            ariaLabel="Team filter"
+            allLabel="All teams"
+            options={teams.map(([code, short]) => ({ value: code, label: short }))}
+            selected={multiSelect.filters.teamCodes}
+            onChange={(teamCodes) => setMulti({ teamCodes })}
+            searchable
+            searchLabel="Search teams"
+            emptyLabel="No teams match that search"
+          />
+        </>
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            <span>Position</span>
+            <Select value={filters.position} onValueChange={(value) => set({ position: value })}>
+              <SelectTrigger size="sm" className="w-24" aria-label="Position filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {POSITIONS.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>Team</span>
+            <Select value={filters.teamCode} onValueChange={(value) => set({ teamCode: value })}>
+              <SelectTrigger size="sm" className="w-28" aria-label="Team filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {teams.map(([code, short]) => (
+                  <SelectItem key={code} value={String(code)}>
+                    {short}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
       <div className="flex items-center gap-1">
         <span>Price £m</span>
         <Input

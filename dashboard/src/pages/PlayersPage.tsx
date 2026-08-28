@@ -18,6 +18,8 @@ import {
   PlayerFiltersBar,
   matchesPlayerFilters,
   type PlayerFilters,
+  type PlayerMultiFilters,
+  type PlayerPosition,
 } from "@/components/PlayerFiltersBar";
 import { PlayerStatTable, type PlayerStatRow } from "@/components/PlayerStatTable";
 import { VintageSelect } from "@/components/VintageSelect";
@@ -68,6 +70,22 @@ interface ManagerSquadFilter {
 }
 
 const PLAYERS_TABLE_INITIAL_SORTING: SortingState = [{ id: "gwFromXp", desc: true }];
+const INITIAL_PLAYER_MULTI_FILTERS: PlayerMultiFilters = {
+  playerCodes: [],
+  positions: [],
+  teamCodes: [],
+};
+
+function matchesPlayerMultiFilters(player: PlayerRecord, filters: PlayerMultiFilters): boolean {
+  if (filters.playerCodes.length > 0 && !filters.playerCodes.includes(player.code)) return false;
+  if (
+    filters.positions.length > 0 &&
+    !filters.positions.includes(player.position as PlayerPosition)
+  )
+    return false;
+  if (filters.teamCodes.length > 0 && !filters.teamCodes.includes(player.team_code)) return false;
+  return true;
+}
 
 function initialManagerId(): string {
   try {
@@ -148,6 +166,9 @@ export function PlayersPage() {
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
   const [filters, setFilters] = useState<FilterState | null>(null);
   const [playerFilters, setPlayerFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
+  const [playerMultiFilters, setPlayerMultiFilters] = useState<PlayerMultiFilters>(
+    INITIAL_PLAYER_MULTI_FILTERS,
+  );
   const [actualRange, setActualRange] = useState<ActualRange | null>(null);
   const [managerId, setManagerId] = useState(initialManagerId);
   const [managerSquad, setManagerSquad] = useState<ManagerSquadFilter | null>(null);
@@ -343,7 +364,8 @@ export function PlayersPage() {
     const wanted = runPlayers.filter(
       (player) =>
         (managerSquad == null || managerSquad.playerCodes.has(player.code)) &&
-        matchesPlayerFilters(player, playerFilters),
+        matchesPlayerFilters(player, playerFilters) &&
+        matchesPlayerMultiFilters(player, playerMultiFilters),
     );
     return wanted.map((player) => {
       const filtered = player.fixtures
@@ -409,6 +431,7 @@ export function PlayersPage() {
     runPlayers,
     filters,
     playerFilters,
+    playerMultiFilters,
     cumulativeOutcomesAvailable,
     horizonIndex,
     actualRange,
@@ -497,6 +520,14 @@ export function PlayersPage() {
   const activeRun = runPlayers[0];
   const changeVintage = (nextRunId: string) => {
     if (nextRunId === activeRunId) return;
+    const nextPlayers = state.players.filter((player) => player.run_id === nextRunId);
+    const nextPlayerCodes = new Set(nextPlayers.map((player) => player.code));
+    const nextTeamCodes = new Set(nextPlayers.map((player) => player.team_code));
+    setPlayerMultiFilters((current) => ({
+      playerCodes: current.playerCodes.filter((code) => nextPlayerCodes.has(code)),
+      positions: current.positions,
+      teamCodes: current.teamCodes.filter((code) => nextTeamCodes.has(code)),
+    }));
     const hadManagerScope = managerSquad != null;
     const cancelledManagerFetch = managerLoading;
     managerRequestRef.current += 1;
@@ -517,6 +548,7 @@ export function PlayersPage() {
       gwTo: selectedRun?.gw_to ?? state.gwTo,
     });
     setPlayerFilters({ ...INITIAL_PLAYER_FILTERS });
+    setPlayerMultiFilters({ ...INITIAL_PLAYER_MULTI_FILTERS });
     clearManagerSquad();
     setActualRange(latestFiveActualRange(actualGameweeks.length));
   };
@@ -589,6 +621,12 @@ export function PlayersPage() {
         ]
       : []),
   ];
+  const multiSelectInsightUnavailableReason =
+    playerMultiFilters.playerCodes.length > 0
+      ? "AI explanation is unavailable while specific player names are selected because that scope is not part of the typed public insight contract. Deterministic facts remain available."
+      : playerMultiFilters.positions.length > 1 || playerMultiFilters.teamCodes.length > 1
+        ? "AI explanation is unavailable while multiple positions or teams are selected because the renderer accepts only one of each. Deterministic facts remain available."
+        : undefined;
 
   return (
     <div className="flex flex-col gap-3 p-4 lg:p-6">
@@ -644,8 +682,8 @@ export function PlayersPage() {
             actual_gw_from: actualFrom?.gw,
             actual_season_to: actualTo?.season,
             actual_gw_to: actualTo?.gw,
-            position: playerPositionScope(playerFilters.position),
-            team_code: playerFilters.teamCode === "all" ? undefined : Number(playerFilters.teamCode),
+            position: playerPositionScope(playerMultiFilters.positions[0] ?? "all"),
+            team_code: playerMultiFilters.teamCodes[0],
             view: filters?.view === "defense" ? "defence" : filters?.view,
             venue: filters?.venue,
             min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
@@ -655,11 +693,12 @@ export function PlayersPage() {
           }),
           unavailableReason: managerSquad
             ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
-            : undefined,
+            : multiSelectInsightUnavailableReason,
           localScopeKey: JSON.stringify({
             runId: activeRunId,
             filters,
             playerFilters,
+            playerMultiFilters,
             actualRange,
             colorSource,
             managerScope: managerSquad ? "private_manager_squad" : "all_players",
@@ -771,6 +810,11 @@ export function PlayersPage() {
               onChange={setPlayerFilters}
               teams={teams}
               showFormWindow={false}
+              multiSelect={{
+                players: runPlayers,
+                filters: playerMultiFilters,
+                onChange: setPlayerMultiFilters,
+              }}
             />
             {actualGameweeks.length > 0 && actualRange != null && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -835,8 +879,9 @@ export function PlayersPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Forecast GWs filter upcoming fixtures and xP only. Actual from/to independently
-            aggregate every exact published season/GW key between the endpoints; reset defaults to
-            the latest five finalized keys across this season and its immediate predecessor. My
+            aggregate every exact published season/GW key between the endpoints. Player, position,
+            and team selections use OR within each box and AND across boxes; an empty box means all.
+            Reset defaults to the latest five finalized keys across this season and its immediate predecessor. My
             squad intersects with every other player filter. Min avg min (L5) remains its separate
             published anchor. Expanded rows also remain an independent fixed rolling latest-five
             view and do not follow these Actual endpoints.

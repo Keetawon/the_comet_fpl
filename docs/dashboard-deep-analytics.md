@@ -76,7 +76,9 @@ strictly better on at least one. Exact ties use stable player `code` ordering fo
 claiming that either player dominates the other.
 
 Filters reuse the Players page's position, team, price, minimum last-five average minutes, and
-availability controls. The page also selects the observed form window and, for upside/downside,
+availability dimensions. Player Analytics keeps scalar position/team selectors; the Players
+table's searchable player and multi-value position/team controls are deliberately page-local.
+The page also selects the observed form window and, for upside/downside,
 the published haul threshold. A null axis value removes that point and increments a visible
 "not plotted" count; null is never zero. Bubble size may encode ownership and colour may encode
 position, but both need a legend and neither changes dominance.

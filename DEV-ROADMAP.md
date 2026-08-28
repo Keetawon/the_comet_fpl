@@ -1220,6 +1220,17 @@ Only after the ordered dashboard program above, unless an operational blocker re
   contract. Acceptance requires focused success/intersection/reset/failure/partial-mapping/privacy
   tests, full frontend tests/build/lint, local Plan Server HTTP verification, and an interactive
   click-through when a controllable browser is connected.
+- **Players searchable multi-select filters (implemented development-only 2026-08-28).** The
+  Players table adds a stable-code searchable Player selector and multi-select Position/permanent-
+  team-code selectors. Empty means all, values are ORed within one selector and ANDed across
+  selectors, all other filters, and My squad. Options remain anchored to the complete active
+  vintage; vintage changes reconcile unavailable player/team codes, and global reset clears every
+  selection. This is a page-local UI change: no read model, optimizer registry, or shared decision-
+  page selector changes. Insight request schema v4 remains scalar, so name-restricted and multi-
+  position/team scopes are deterministic-only rather than being broadened silently; singleton
+  Position/Team scopes retain exact renderer eligibility. Acceptance requires search/reset/OR/AND/
+  My-squad/vintage/accessibility tests, full frontend tests/build/lint, and an interactive
+  click-through when a controllable browser is connected.
 
 These were not GW1 blockers. The post-deadline implementation remains separate and changes no
 frozen forecast or evaluation.

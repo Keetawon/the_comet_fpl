@@ -306,7 +306,16 @@ Plan Builder and every optimizer solve retain the exact full-registry fail-close
 intersects the existing filters without changing any published value. Partial/mismatched imports
 fail atomically, a vintage change clears the private scope, hosted static builds never expose the
 network action, and the complete Players filter panel remains immediately before the scrollable
-table. Player Analytics defaults to
+table. The Players table additionally exposes a searchable player-name multi-select keyed by
+permanent player `code` and multi-select Position and Team controls keyed by the position enum and
+permanent `team_code`. Empty selection means all; choices are ORed within a control and ANDed
+across controls and the verified My squad membership. Options always come from the complete active
+forecast vintage, and a vintage change prunes unavailable player/team codes so a hidden stale
+selection cannot empty the table. These controls are page-local: decision routes and Player
+Analytics retain their existing scalar selectors. Insight request schema v4 is unchanged; any
+name selection or multiple Position/Team selection makes Players deterministic-only because that
+scope cannot be represented exactly, while an empty or singleton Position/Team selection retains
+the exact existing scalar renderer scope. Player Analytics defaults to
 the reporting-only Established evidence scope, which excludes forecast-marked cold starts from its
 shortlist/Pareto population; the explicit include control restores them without changing xP or any
 probability. Never infer cold-start status from observations or treat this filter as a model change.

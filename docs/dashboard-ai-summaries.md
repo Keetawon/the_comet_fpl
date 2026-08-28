@@ -23,6 +23,15 @@ all other private capture fields remain absent from the typed request, its cache
 provider traffic. Returning to all players restores the normal public renderer eligibility and
 invalidates any prior rendered result.
 
+The Players table's public UI also has a stable-code player-name multi-select and multi-select
+Position and Team controls. Insight request schema version 4 intentionally remains scalar and has
+no player-list selector. Therefore selecting any player name, more than one position, or more than
+one team disables **Explain with AI** rather than silently resolving broader evidence. Empty and
+singleton Position/Team selections remain representable through the existing exact scalar
+selectors. Deterministic facts always follow the filtered rows. Search text, option labels,
+selected player codes, and multi-value arrays never enter the request, cache key, URL, or provider
+traffic.
+
 AI output is labelled "AI-selected - verify cited metrics". The provider may select and group
 server-authored fact ids, but it never authors dashboard prose. Python renders the selected
 canonical statements with their citations, so the optional step cannot introduce a new metric,
