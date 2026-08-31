@@ -516,7 +516,7 @@ function TeamWatchList({
               minGw={gwFrom}
               maxGw={gwTo}
               metricOf={(f) => chipMetric(f, "overall", "opponent", opponentIndexOf(f.opponent_team_code))}
-              bucketOf={(f) => chipBucket(f, "overall", "opponent", null, opponentIndexOf(f.opponent_team_code))}
+              bucketOf={(f) => chipBucket(f, "overall", "opponent", opponentIndexOf(f.opponent_team_code))}
             />
           </li>
         );

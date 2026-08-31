@@ -213,10 +213,12 @@ not part of any selected forecast vintage:
   readable as a legacy overlay with no `official_fdr`.
 
 The Fixture Matrix keeps the model horizon unchanged and offers 5/10/15-GW display windows.
-Rows after the forecast horizon are schedule-only chips. **Official FDR** uses the current
-schedule-owned `official_fdr`. **Opponent strength** may reuse the selected vintage's display-time
-club-strength proxy. **Club ease** uses display proxy `fixture-ease-proxy-v1`, composed from the
-selected vintage's average club lambdas:
+The selected source owns the sortable average, the per-card headline, and the matching colour
+tier: `Avg Opp str (GWx-y)` for Opponent strength, `Avg Club ease (GWx-y)` for the view-specific
+club ease index, and `Avg FDR` for Official FDR. Rows after the forecast horizon are schedule-only
+chips. **Official FDR** uses the current schedule-owned `official_fdr`. **Opponent strength** may
+reuse the selected vintage's display-time club-strength proxy. **Club ease** uses display proxy
+`fixture-ease-proxy-v1`, composed from the selected vintage's average club lambdas:
 
 ```text
 lambda_for_proxy     = own_avg_for * opponent_avg_against / league_average
@@ -228,14 +230,14 @@ clean_sheet_proxy    = exp(-lambda_against_proxy)
 ```
 
 The proxy has no later fixture model, venue adjustment, or new forecast input. Every later chip
-identifies whether its colour is current FDR or a selected-vintage proxy and shows no forecast
-headline. For recorded modelled rows, the selected view owns the headline independently of colour:
-Attack uses `lambda_for`, Defense uses `probability_clean_sheet`, and Overall uses
-`overall_ease_index`. The Attack horizon measure completely sums lambdas; the Defense measure
-completely sums fixture clean-sheet probabilities as an expected count, not as a probability of at
-least one clean sheet; Overall averages its ease index. DGW legs count and a missing selected leg
-makes the applicable total unavailable. Later rows never enter these horizon measures or sorting
-and remain current schedule context that may post-date an older selected vintage. A moved fixture
+identifies whether its displayed metric is current FDR or a selected-vintage proxy; it remains
+schedule context rather than a later fixture-specific forecast. For recorded modelled rows, the
+selected source likewise owns both headline and tier. The Attack/Defense/Overall view selects the
+attack, defence, or overall Club-ease index only; Opponent strength and Official FDR do not change
+meaning between views. Source averages include every measured visible leg, including DGW legs and
+measured schedule-only cards; unavailable values are omitted and never zero-filled. Later rows may
+therefore affect this display average and sorting while remaining current schedule context that may
+post-date an older selected vintage. A moved fixture
 may therefore appear once in the recorded vintage and again at its current schedule gameweek; that
 is explicit vintage-versus-current context, not a duplicate forecast.
 

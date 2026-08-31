@@ -1,8 +1,8 @@
 // Fixture matrix (Team) page: the fixture pivot. One row per club of the SELECTED
 // vintage, one COLUMN per upcoming gameweek (the pivot), default-sorted by the selected
-// modelled horizon measure. Cells colour on the selected source -- opponent strength by
-// default, so a strong club's row is no longer uniformly green: the colour follows the
-// OPPONENT, not the row club. Expanding a row defaults to the latest five finalized
+// source average. Each source tab owns the horizon average, the per-GW headline, and its
+// tier colour -- opponent strength by default, so the visible number and colour always
+// describe the same metric. Expanding a row defaults to the latest five finalized
 // gameweeks across the forecast season boundary, with explicit single-season scopes available.
 
 import { useEffect, useMemo, useState } from "react";
@@ -57,13 +57,17 @@ import { WINDOW_LABELS } from "@/data/types";
 import {
   BUCKET_CLASSES,
   NULL_BUCKET_CLASS,
-  cleanSheetBucket,
   easeBucket,
   fdrBucket,
   type ColorSource,
   type ViewMode,
 } from "@/lib/difficulty";
-import { chipBucket, fixtureViewChipMetric, viewMetric } from "@/lib/fixtureChips";
+import {
+  chipBucket,
+  chipMetric,
+  sourceMetricValue,
+  viewMetric,
+} from "@/lib/fixtureChips";
 import {
   SCHEDULE_EASE_PROXY_FORMULA,
   buildOpponentStrength,
@@ -124,33 +128,83 @@ function previousSeason(season: string): string | null {
 const fmt = (value: number | null | undefined, digits = 1) =>
   value == null ? "–" : value.toFixed(digits);
 
-const HORIZON_HEADER: Record<ViewMode, string> = {
-  overall: "Avg modelled overall ease",
-  attack: "Total expected goals for",
-  defense: "Expected clean sheets",
-};
+function horizonHeader(colorSource: ColorSource, gwFrom: number, gwTo: number): string {
+  if (colorSource === "opponent") return `Avg Opp str (GW${gwFrom}-${gwTo})`;
+  if (colorSource === "ease") return `Avg Club ease (GW${gwFrom}-${gwTo})`;
+  return "Avg FDR";
+}
 
-const HORIZON_TITLE: Record<ViewMode, string> = {
-  overall: "Average published overall ease across measured modelled fixture legs.",
-  attack: "Complete sum of published expected goals for (lambda for); every DGW leg counts.",
-  defense:
-    "Complete sum of published per-fixture clean-sheet probabilities: an expected count, not the probability of at least one clean sheet.",
-};
-
-function horizonMetric(fixtures: TeamFixture[], view: ViewMode): number | null {
-  if (!fixtures.length) return null;
-  if (view === "attack" || view === "defense") {
-    const values = fixtures.map((fixture) => viewMetric(fixture, view));
-    const measured = values.filter(
-      (value): value is number => value != null && Number.isFinite(value),
-    );
-    if (measured.length !== fixtures.length) return null;
-    return measured.reduce((total, value) => total + value, 0);
+function horizonTitle(
+  colorSource: ColorSource,
+  view: ViewMode,
+  gwFrom: number,
+  gwTo: number,
+): string {
+  const scope = `GW${gwFrom}-${gwTo}`;
+  if (colorSource === "opponent") {
+    return `Average opponent-strength index across measured ${scope} fixture cards; every DGW leg counts.`;
   }
-  const values = fixtures
-    .map((fixture) => viewMetric(fixture, view))
-    .filter((value): value is number => value != null && Number.isFinite(value));
-  return values.length ? values.reduce((total, value) => total + value, 0) / values.length : null;
+  if (colorSource === "fdr") {
+    return `Average official FDR across measured ${scope} fixture cards; every DGW leg counts.`;
+  }
+  return `Average ${view} club-ease index across measured ${scope} fixture cards; every DGW leg counts.`;
+}
+
+function averageMeasured(values: (number | null)[]): number | null {
+  const measured = values.filter(
+    (value): value is number => value != null && Number.isFinite(value),
+  );
+  return measured.length
+    ? measured.reduce((total, value) => total + value, 0) / measured.length
+    : null;
+}
+
+function scheduleEaseValue(
+  easeProxy: ReturnType<typeof scheduleEaseProxy>,
+  view: ViewMode,
+): number | null {
+  if (view === "attack") return easeProxy.attackEase;
+  if (view === "defense") return easeProxy.defenceEase;
+  return easeProxy.overallEase;
+}
+
+function scheduleSourceMetric(
+  fixture: ScheduleFixture,
+  teamCode: number,
+  view: ViewMode,
+  colorSource: ColorSource,
+  strengthOf: (teamCode: number) => OpponentStrength | null,
+) {
+  const opponentStrength = strengthOf(fixture.opponent_team_code);
+  const opponentIndex = opponentStrength?.index ?? null;
+  const easeProxy = scheduleEaseProxy(strengthOf(teamCode), opponentStrength);
+  const value =
+    colorSource === "opponent"
+      ? opponentIndex
+      : colorSource === "fdr"
+        ? fixture.official_fdr ?? null
+        : scheduleEaseValue(easeProxy, view);
+  const bucket =
+    colorSource === "opponent"
+      ? opponentStrengthBucket(value)
+      : colorSource === "fdr"
+        ? fdrBucket(value)
+        : easeBucket(value);
+  const display =
+    value == null ? "—" : colorSource === "fdr" ? `FDR ${value.toFixed(0)}` : value.toFixed(0);
+  const description =
+    colorSource === "opponent"
+      ? value == null
+        ? "selected-vintage opponent strength proxy unavailable"
+        : `selected-vintage opponent strength proxy ${value.toFixed(0)}`
+      : colorSource === "fdr"
+        ? value == null
+          ? "current official FDR unavailable"
+          : `current official FDR ${value.toFixed(0)}`
+        : value == null
+          ? `selected-vintage ${view} club-ease proxy unavailable`
+          : `selected-vintage ${view} club-ease proxy ${value.toFixed(0)} (${SCHEDULE_EASE_PROXY_FORMULA})`;
+  return { value, bucket, display, description };
 }
 
 const HEAD_CLASS = "sticky top-0 z-10 h-8 bg-background px-2 text-xs whitespace-nowrap";
@@ -174,7 +228,6 @@ function TeamGwCell({
   colorSource,
   opponentIndexOf,
   strengthOf,
-  cleanSheetAnchor,
   modelGwFrom,
   modelGwTo,
 }: {
@@ -186,7 +239,6 @@ function TeamGwCell({
   colorSource: ColorSource;
   opponentIndexOf: (teamCode: number) => number | null;
   strengthOf: (teamCode: number) => OpponentStrength | null;
-  cleanSheetAnchor: number | null;
   modelGwFrom: number;
   modelGwTo: number;
 }) {
@@ -216,73 +268,41 @@ function TeamGwCell({
           <FixtureChip
             key={f.fixture}
             fixture={f}
-            metric={fixtureViewChipMetric(f, view, colorSource, opponentIndex)}
-            bucket={chipBucket(f, view, colorSource, cleanSheetAnchor, opponentIndex)}
+            metric={chipMetric(f, view, colorSource, opponentIndex)}
+            bucket={chipBucket(f, view, colorSource, opponentIndex)}
             className={FIXTURE_CARD_WIDTH_CLASS}
           />
         );
       })}
       {scheduleInGw.map((fixture) => {
-        const opponentStrength = strengthOf(fixture.opponent_team_code);
-        const opponentIndex = opponentStrength?.index ?? null;
-        const easeProxy = scheduleEaseProxy(strengthOf(teamCode), opponentStrength);
-        const easeValue =
-          view === "attack"
-            ? easeProxy.attackEase
-            : view === "defense"
-              ? easeProxy.probabilityCleanSheet
-              : easeProxy.overallEase;
-        const scheduleBucket =
-          colorSource === "opponent"
-            ? opponentStrengthBucket(opponentIndex)
-            : colorSource === "fdr"
-              ? fdrBucket(fixture.official_fdr)
-              : view === "defense"
-                ? cleanSheetBucket(easeValue, cleanSheetAnchor)
-                : easeBucket(easeValue);
+        const metric = scheduleSourceMetric(
+          fixture,
+          teamCode,
+          view,
+          colorSource,
+          strengthOf,
+        );
         const venue =
           fixture.was_home == null ? "" : fixture.was_home ? "(H)" : "(A)";
         const kickoff = fixture.kickoff_time
           ? fixture.kickoff_time.replace("T", " ").slice(0, 16)
           : "kickoff TBC";
-        const colourLabel =
-          colorSource === "opponent" && opponentIndex != null
-            ? `colour uses selected-vintage opponent strength proxy ${opponentIndex.toFixed(0)}, ` +
-              `derived from selected-vintage GW${modelGwFrom}-GW${modelGwTo} team lambdas, ` +
-              `not a GW${fixture.gw} forecast`
-            : colorSource === "opponent"
-              ? "selected-vintage opponent strength proxy unavailable; no later-fixture forecast"
-              : colorSource === "fdr" && fixture.official_fdr != null
-                ? `colour uses current official FDR ${fixture.official_fdr} from the schedule overlay, ` +
-                  "not the selected forecast vintage"
-                : colorSource === "fdr"
-                  ? "current official FDR unavailable"
-                  : easeValue != null
-                    ? `colour uses selected-vintage ${view === "defense" ? "clean-sheet" : "club-ease"} ` +
-                      `proxy ${view === "defense" ? `${Math.round(easeValue * 100)}%` : easeValue.toFixed(0)} ` +
-                      `(${SCHEDULE_EASE_PROXY_FORMULA}), composed from GW${modelGwFrom}-GW${modelGwTo} ` +
-                      "club averages with no later fixture model or venue adjustment"
-                    : "selected-vintage club-ease proxy unavailable";
         const label =
           `GW${fixture.gw} vs ${fixture.opponent_short_name} ${venue}: current official ` +
-          `schedule only; no published ${
-            view === "attack"
-              ? "expected-goals-for forecast"
-              : view === "defense"
-                ? "clean-sheet probability forecast"
-                : "overall-ease forecast"
-          } for this gameweek; ${colourLabel}; ${kickoff} UTC`;
+          `schedule only; selected metric is ${metric.description}, derived from ` +
+          `GW${modelGwFrom}-GW${modelGwTo} team lambdas when proxy-based; ` +
+          `no later fixture-specific model or venue adjustment; ${kickoff} UTC`;
         return (
           <span
             key={fixture.fixture}
             data-testid="schedule-chip"
             data-gw={fixture.gw}
-            data-bucket={scheduleBucket ?? "null"}
+            data-bucket={metric.bucket ?? "null"}
             title={label}
             aria-label={label}
             className={`inline-flex h-8 ${FIXTURE_CARD_WIDTH_CLASS} flex-col justify-center rounded-md px-1 text-center ${
-              scheduleBucket
-                ? BUCKET_CLASSES[scheduleBucket]
+              metric.bucket
+                ? BUCKET_CLASSES[metric.bucket]
                 : "border border-border bg-muted text-muted-foreground"
             }`}
           >
@@ -291,7 +311,7 @@ function TeamGwCell({
               <span className="ml-0.5 font-normal">{venue}</span>
             </span>
             <span className="text-[9px] leading-tight tabular-nums">
-              GW{fixture.gw} · —
+              GW{fixture.gw} · {metric.display}
             </span>
           </span>
         );
@@ -461,13 +481,6 @@ export function FixtureMatrixPage() {
     setExpanded({});
   }, [horizon, runBounds.from, runTeams.length, scheduleMaxGw]);
 
-  const cleanSheetAnchor = useMemo(() => {
-    const values = runTeams
-      .flatMap((t) => t.fixtures.map((f) => f.probability_clean_sheet))
-      .filter((v): v is number => v != null);
-    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-  }, [runTeams]);
-
   const opponentStrength = useMemo(() => buildOpponentStrength(runTeams), [runTeams]);
   const strengthOf = useMemo(
     () => (teamCode: number) => opponentStrength.get(teamCode) ?? null,
@@ -508,13 +521,33 @@ export function FixtureMatrixPage() {
             a.fixture - b.fixture,
         );
       const form = team.form;
+      const sourceValues = [
+        ...filtered.map((fixture) =>
+          sourceMetricValue(
+            fixture,
+            filters.view,
+            colorSource,
+            opponentIndexOf(fixture.opponent_team_code),
+          ),
+        ),
+        ...scheduleOnly.map(
+          (fixture) =>
+            scheduleSourceMetric(
+              fixture,
+              team.team_code,
+              filters.view,
+              colorSource,
+              strengthOf,
+            ).value,
+        ),
+      ];
       return {
         team,
         filtered,
         scheduleOnly,
         form: form ? form.windows[formWindow] : null,
         formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
-        horizonMetric: horizonMetric(filtered, filters.view),
+        horizonMetric: averageMeasured(sourceValues),
         actualDetails: teamActualDetailsForGameweeks(
           actualByTeamCode.get(team.team_code) ?? [],
           actualGameweeks,
@@ -525,6 +558,9 @@ export function FixtureMatrixPage() {
     runTeams,
     filters,
     formWindow,
+    colorSource,
+    opponentIndexOf,
+    strengthOf,
     scheduleByTeam,
     runBounds.to,
     actualByTeamCode,
@@ -584,17 +620,23 @@ export function FixtureMatrixPage() {
       {
         id: "horizonMetric",
         header: () => (
-          <span title={filters ? HORIZON_TITLE[filters.view] : undefined}>
-            {filters ? HORIZON_HEADER[filters.view] : "Modelled horizon"} (GW{runBounds.from}–
-            {runBounds.to})
+          <span
+            title={
+              filters
+                ? horizonTitle(colorSource, filters.view, filters.gwFrom, filters.gwTo)
+                : undefined
+            }
+          >
+            {filters
+              ? horizonHeader(colorSource, filters.gwFrom, filters.gwTo)
+              : "Fixture average"}
           </span>
         ),
         accessorFn: (row) => row.horizonMetric,
         cell: ({ row }) => {
           const value = row.original.horizonMetric;
           if (value == null) return <span className="text-muted-foreground">—</span>;
-          const text =
-            filters?.view === "overall" ? value.toFixed(1) : value.toFixed(2);
+          const text = colorSource === "fdr" ? value.toFixed(2) : value.toFixed(1);
           return <span className="tabular-nums font-medium">{text}</span>;
         },
       },
@@ -615,7 +657,6 @@ export function FixtureMatrixPage() {
             colorSource={colorSource}
             opponentIndexOf={opponentIndexOf}
             strengthOf={strengthOf}
-            cleanSheetAnchor={cleanSheetAnchor}
             modelGwFrom={runBounds.from}
             modelGwTo={runBounds.to}
           />
@@ -625,7 +666,6 @@ export function FixtureMatrixPage() {
     [
       filters,
       colorSource,
-      cleanSheetAnchor,
       opponentIndexOf,
       strengthOf,
       formWindow,
@@ -718,16 +758,16 @@ export function FixtureMatrixPage() {
       insightFact(
         "rank.highest_fixture_metric",
         "rank",
-        `${bestFixture.team.team_name} against ${bestFixture.fixture.opponent_short_name} in GW${bestFixture.fixture.gw} has the highest visible ${selectedFixtureMetricLabel} at ${formatSelectedFixtureMetric(bestFixture.value)}.`,
+        `${bestFixture.team.team_name} against ${bestFixture.fixture.opponent_short_name} in GW${bestFixture.fixture.gw} has the highest selected-view modelled ${selectedFixtureMetricLabel} at ${formatSelectedFixtureMetric(bestFixture.value)}.`,
         ["fixture_matrix.json"],
       ),
     ] : []),
   ];
   const insightCaveats = [
-    "Ranks use directly published fixture values; schedule-only rows do not enter modelled ranks.",
-    "Attack totals sum published expected goals; expected clean sheets sums per-fixture probabilities into an expected count, not a probability of at least one clean sheet.",
+    "Insight ranks use the selected analytical view's directly published modelled values; the source tabs separately own the table average, card headline, and colour tier.",
+    "Source averages include every measured visible fixture leg, including schedule-only display proxies; unavailable values are omitted rather than zero-filled.",
     "The current schedule overlay may be newer than the selected forecast vintage.",
-    "Null fixture values are omitted from ranks; a missing Attack or Defense fixture leg makes its horizon total unavailable rather than partial.",
+    "Null fixture values are omitted from ranks and averages; no missing value is treated as zero.",
   ];
 
   return (
@@ -748,18 +788,16 @@ export function FixtureMatrixPage() {
           colorSource={colorSource}
           onColorSourceChange={setColorSource}
           easeIndexFormulaVersion={state.easeVersion}
-          cleanSheetAnchor={cleanSheetAnchor}
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Sorted by the selected modelled horizon measure, highest first (click any column to
-          re-sort). Attack totals published expected goals for; Defense sums per-fixture clean-sheet
-          probabilities as an expected count; Overall averages the ease index. Every double-gameweek
-          leg counts.
+          Sorted by the selected source average, highest first (click any column to re-sort).
+          Opponent strength, club ease, and official FDR each own the table average, every card
+          headline, and the card's colour tier. Every measured double-gameweek leg counts.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Beyond GW{runBounds.to}, current official fixtures show no forecast headline. Their colour
-          may still use current schedule FDR or a fixed selected-vintage display proxy for opponent
-          strength or club ease; those later cards never affect the modelled horizon measure.
+          Beyond GW{runBounds.to}, current official fixtures use current schedule FDR or a fixed
+          selected-vintage display proxy for opponent strength or club ease. Those measured cards
+          enter the displayed GW-range average but remain display context, not later fixture forecasts.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Current schedule overlay exported{" "}
@@ -1034,9 +1072,10 @@ export function FixtureMatrixPage() {
       <p className="text-xs text-muted-foreground">
         Availability and chance-of-playing are reported overlays valid for the next gameweek;
         they are not shown here and never fold into these distributions. The 10- and 15-GW
-        extensions add current official fixtures and FDR only. Their fixed selected-vintage
-        opponent-strength and club-ease proxies are display context, not later fixture-specific
-        forecasts; hover a card for its exact source.
+        extensions add current official fixtures. Their current FDR and fixed selected-vintage
+        opponent-strength or club-ease proxies drive the matching tab's card headline, average,
+        and colour tier, but remain display context rather than later fixture-specific forecasts;
+        hover a card for its exact source.
       </p>
     </div>
   );

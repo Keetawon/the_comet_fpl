@@ -213,62 +213,71 @@ describe("FixtureMatrixPage", () => {
     expect(betaGw1.className).toContain("bg-red");
   });
 
-  it("sorts by average ease by default, easiest schedule first", async () => {
+  it("defaults the table to average opponent strength and sorts highest first", async () => {
     const { container } = render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    expect(
+      screen.getByRole("columnheader", { name: /Avg Opp str \(GW1-5\)/ }),
+    ).toBeInTheDocument();
     const rows = container.querySelectorAll("tbody > tr");
     const firstTeamRow = [...rows].find(
       (r) => r.textContent?.includes("Beta") || r.textContent?.includes("Alpha"),
     );
-    // Beta's only measured fixture averages 118.6 vs Alpha's 106.5, so Beta leads.
+    // Beta faces strong Alpha (~120); Alpha's measured opponents are weak Beta (~90).
     expect(firstTeamRow!.textContent).toContain("Beta");
   });
 
-  it("shows view-owned fixture values and complete horizon totals independently of colour", async () => {
+  it("switches the average, card headline, and tier bucket together for every source tab", async () => {
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     await user.click(screen.getByRole("radio", { name: "Attack" }));
-    expect(screen.getByRole("columnheader", { name: /Total expected goals for/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /Avg Opp str \(GW1-5\)/ }),
+    ).toBeInTheDocument();
     const alphaAttackRow = screen.getByText("Alpha").closest("tr");
     expect(alphaAttackRow).not.toBeNull();
-    expect(within(alphaAttackRow!).getByText("6.00")).toBeInTheDocument();
     const alphaAttackGw1 = within(alphaAttackRow!)
       .getAllByTestId("chip")
       .find((chip) => chip.dataset.gw === "1");
-    expect(alphaAttackGw1).toHaveTextContent("xGF 2.10");
+    expect(alphaAttackGw1).toHaveTextContent(/GW1 · 90/);
     expect(alphaAttackGw1).toHaveAttribute("data-bucket", "easier");
-    expect(screen.getByText(/highest visible published expected goals for at 2\.10/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/highest selected-view modelled published expected goals for at 2\.10/i),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: "Official FDR" }));
-    const attackWithFdrColour = within(alphaAttackRow!)
+    expect(screen.getByRole("columnheader", { name: "Avg FDR" })).toBeInTheDocument();
+    const attackWithFdr = within(alphaAttackRow!)
       .getAllByTestId("chip")
       .find((chip) => chip.dataset.gw === "1");
-    expect(attackWithFdrColour).toHaveTextContent("xGF 2.10");
-    expect(attackWithFdrColour).toHaveAccessibleName(/colour uses official FDR 2/i);
+    expect(attackWithFdr).toHaveTextContent("FDR 2");
+    expect(attackWithFdr).toHaveAttribute("data-bucket", "easier");
+    expect(attackWithFdr).toHaveAccessibleName(/selected official FDR 2/i);
 
     await user.click(screen.getByRole("radio", { name: "10 GWs" }));
+    expect(screen.getByRole("columnheader", { name: "Avg FDR" })).toBeInTheDocument();
     const scheduleOnlyAttack = within(alphaAttackRow!)
       .getAllByTestId("schedule-chip")
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
-    expect(scheduleOnlyAttack).toHaveTextContent("GW6 · —");
-    expect(scheduleOnlyAttack).toHaveAccessibleName(/no published expected-goals-for forecast/i);
+    expect(scheduleOnlyAttack).toHaveTextContent("GW6 · FDR 2");
+    expect(scheduleOnlyAttack).toHaveAttribute("data-bucket", "easier");
+    expect(scheduleOnlyAttack).toHaveAccessibleName(/selected metric is current official FDR 2/i);
 
+    await user.click(screen.getByRole("radio", { name: "Club ease" }));
     await user.click(screen.getByRole("radio", { name: "Defense" }));
-    expect(screen.getByRole("columnheader", { name: /Expected clean sheets/ })).toBeInTheDocument();
-    const betaDefenseRow = screen.getByText("Beta").closest("tr");
-    expect(betaDefenseRow).not.toBeNull();
-    expect(within(betaDefenseRow!).getByText("0.44")).toBeInTheDocument();
-    const betaDefenseGw1 = within(betaDefenseRow!)
-      .getAllByTestId("chip")
-      .find((chip) => chip.dataset.gw === "1");
-    expect(betaDefenseGw1).toHaveTextContent("CS 11%");
-    expect(betaDefenseGw1).toHaveAccessibleName(/published clean-sheet probability 11%/i);
-
+    expect(
+      screen.getByRole("columnheader", { name: /Avg Club ease \(GW1-10\)/ }),
+    ).toBeInTheDocument();
     const alphaDefenseRow = screen.getByText("Alpha").closest("tr");
     expect(alphaDefenseRow).not.toBeNull();
-    expect(within(alphaDefenseRow!).getAllByRole("cell")[3]).toHaveTextContent("—");
+    const alphaDefenseGw1 = within(alphaDefenseRow!)
+      .getAllByTestId("chip")
+      .find((chip) => chip.dataset.gw === "1");
+    expect(alphaDefenseGw1).toHaveTextContent(/GW1 · 131/);
+    expect(alphaDefenseGw1).toHaveAttribute("data-bucket", "much-easier");
+    expect(alphaDefenseGw1).toHaveAccessibleName(/selected club defense ease index 131/i);
   });
 
   it("colours later fixtures with explicit proxies and current official FDR", async () => {
@@ -281,9 +290,9 @@ describe("FixtureMatrixPage", () => {
     const firstTeamBefore = [...container.querySelectorAll("tbody > tr")].find(
       (row) => row.textContent?.includes("Beta") || row.textContent?.includes("Alpha"),
     )?.textContent;
-    const betaBefore = screen.getByText("Beta").closest("tr");
-    expect(betaBefore).not.toBeNull();
-    expect(within(betaBefore!).getByText("118.6")).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /Avg Opp str \(GW1-5\)/ }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: "10 GWs" }));
     expect(screen.getByRole("columnheader", { name: "GW10" })).toBeInTheDocument();
@@ -296,9 +305,9 @@ describe("FixtureMatrixPage", () => {
     expect(alphaGw6).toBeDefined();
     expect(alphaGw6).toHaveAttribute("data-bucket", "easier");
     expect(alphaGw6!.className).toContain("bg-green");
-    expect(alphaGw6).toHaveTextContent(/GW6 · —/);
+    expect(alphaGw6).toHaveTextContent(/GW6 · 90/);
     expect(alphaGw6).toHaveAccessibleName(
-      /no published overall-ease forecast.*derived from selected-vintage GW1-GW4 team lambdas/i,
+      /selected metric is selected-vintage opponent strength proxy 90.*GW1-GW4 team lambdas/i,
     );
     const gammaGw6 = within(alphaRow!)
       .getAllByTestId("schedule-chip")
@@ -319,7 +328,6 @@ describe("FixtureMatrixPage", () => {
     ).toHaveLength(2);
     const betaAfter = screen.getByText("Beta").closest("tr");
     expect(betaAfter).not.toBeNull();
-    expect(within(betaAfter!).getByText("118.6")).toBeInTheDocument();
     expect(
       within(betaAfter!)
         .getAllByTestId("blank-slot")
@@ -331,21 +339,25 @@ describe("FixtureMatrixPage", () => {
     expect(firstTeamAfter?.includes(firstTeamBefore?.includes("Beta") ? "Beta" : "Alpha")).toBe(true);
 
     await user.click(screen.getByRole("radio", { name: "Club ease" }));
+    expect(
+      screen.getByRole("columnheader", { name: /Avg Club ease \(GW1-10\)/ }),
+    ).toBeInTheDocument();
     const easeGw6 = within(alphaRow!)
       .getAllByTestId("schedule-chip")
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
     expect(easeGw6).toHaveAttribute("data-bucket", "much-easier");
     expect(easeGw6!.className).toContain("bg-green");
-    expect(easeGw6).toHaveTextContent(/GW6 · —/);
+    expect(easeGw6).toHaveTextContent(/GW6 · 132/);
     expect(easeGw6).toHaveAccessibleName(/fixture-ease-proxy-v1/i);
 
     await user.click(screen.getByRole("radio", { name: "Official FDR" }));
+    expect(screen.getByRole("columnheader", { name: "Avg FDR" })).toBeInTheDocument();
     const fdrGw6 = within(alphaRow!)
       .getAllByTestId("schedule-chip")
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
     expect(fdrGw6).toHaveAttribute("data-bucket", "easier");
     expect(fdrGw6!.className).toContain("bg-green");
-    expect(fdrGw6).toHaveTextContent("GW6 · —");
+    expect(fdrGw6).toHaveTextContent("GW6 · FDR 2");
     expect(fdrGw6).toHaveAccessibleName(/current official FDR 2/i);
 
     await user.click(within(alphaRow!).getByRole("button", { name: "Expand recent results" }));
@@ -397,7 +409,7 @@ describe("FixtureMatrixPage", () => {
     const gw6Proxy = screen
       .getAllByTestId("schedule-chip")
       .find((chip) => chip.dataset.gw === "6" && chip.textContent?.includes("BET"));
-    expect(gw6Proxy).toHaveTextContent(/GW6 · —/);
+    expect(gw6Proxy).toHaveTextContent(/GW6 · 90/);
     expect(gw6Proxy).toHaveAccessibleName(/selected-vintage opponent strength proxy/i);
 
     await user.click(screen.getByRole("radio", { name: "15 GWs" }));

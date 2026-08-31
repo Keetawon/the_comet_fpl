@@ -651,7 +651,6 @@ export function PlayersPage() {
           colorSource={colorSource}
           onColorSourceChange={setColorSource}
           easeIndexFormulaVersion={state.easeVersion}
-          cleanSheetAnchor={null}
           defenceScaleNote="Defence view colours on the club's defence ease index (higher = the club concedes less)."
         />
         <p className="mt-1 text-xs text-muted-foreground">

@@ -348,17 +348,20 @@ Cross-season club membership joins only on permanent `team_code`; promoted clubs
 Premier-League evidence stay shorter rather than inheriting another club's history. Possession
 and shots remain absent: the official/archive sources do not carry them and the existing
 operator-vendored FBref defensive-actions path cannot supply them, so no proxy is allowed. The
-Fixture Matrix's modelled fixture-card headline is owned by the selected analytical view:
-Attack shows published fixture `lambda_for` as modelled expected goals for, Defense shows
-published `probability_clean_sheet` as a percentage, and Overall shows published overall ease.
-Opponent strength, Club ease, and Official FDR control only the card colour and never replace that
-headline. The Attack horizon value is the complete sum of selected modelled fixture lambdas; the
-Defense horizon value is the complete sum of selected per-fixture clean-sheet probabilities and is
-labelled as an expected clean-sheet count, never a horizon probability. Every double-gameweek leg
-counts. Any null or non-finite selected leg makes the corresponding horizon value unavailable, and
-schedule-only rows beyond the forecast vintage show no forecast headline and never enter either
-total. Overall alone remains an average of its unitless ease index. These are browser sums of
-already-published expectations; the browser never derives a new model quantity. The
+Fixture Matrix's selected metric source owns all three aligned displays: the sortable average
+column, every fixture-card headline, and every fixture-card colour tier. **Opponent strength**
+shows the opponent's selected-vintage display-time strength index and labels the column
+`Avg Opp str (GWx-y)`; **Club ease** shows the row club's view-specific published attack,
+defence, or overall ease index and labels it `Avg Club ease (GWx-y)`; **Official FDR** shows the
+fixture's official FDR and labels it `Avg FDR`. The selected Attack/Defense/Overall view chooses
+only the Club-ease dimension; it never makes a card headline disagree with the active source tab.
+For schedule-only rows beyond the forecast vintage, Opponent strength and Club ease use their
+explicit selected-vintage display proxies while Official FDR uses the current schedule-owned
+value. These later values remain display context, not later fixture forecasts. Source averages
+include every measured visible fixture leg, including both DGW legs and measured schedule-only
+cards; unavailable values are omitted and are never zero-filled. The browser averages only
+published values or the already-sanctioned display proxies and never derives a new model forecast.
+The
 versioned BI semantic export, atomic static JSON publish boundary,
 and dashboard are implemented development-only. The application currently has nine read-only
 analytic/decision routes (Summary, Fixture matrix, Team analytics, Players, Player analytics, Next

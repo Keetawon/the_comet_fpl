@@ -1,7 +1,7 @@
 // Direction-labelled legend for the shared difficulty colour scale, with the
 // colour-source toggle: opponent strength (default), the row club's model ease, or the
-// official FDR. The three sources are never blended; the toggle switches which one
-// colours chips and cells.
+// official FDR. The three sources are never blended; the toggle switches the displayed
+// average, chip headline, and matching colour tier together.
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -16,9 +16,7 @@ interface DifficultyLegendProps {
   colorSource: ColorSource;
   onColorSourceChange: (source: ColorSource) => void;
   easeIndexFormulaVersion: string;
-  /** League-mean clean-sheet probability the defence scale is anchored on (0-1). */
-  cleanSheetAnchor: number | null;
-  /** What the defence view colours on, when a page differs from the team CS default. */
+  /** What the defence view uses for club ease when a page needs a more specific note. */
   defenceScaleNote?: string;
 }
 
@@ -34,7 +32,6 @@ export function DifficultyLegend({
   colorSource,
   onColorSourceChange,
   easeIndexFormulaVersion,
-  cleanSheetAnchor,
   defenceScaleNote,
 }: DifficultyLegendProps) {
   const legend =
@@ -82,9 +79,7 @@ export function DifficultyLegend({
           Ease index: 100 = league average, higher = easier (formula{" "}
           {easeIndexFormulaVersion}).{" "}
           {defenceScaleNote ??
-            `Defence view colours on clean-sheet probability anchored at the league mean (${
-              cleanSheetAnchor == null ? "unavailable" : `${Math.round(cleanSheetAnchor * 100)}%`
-            }).`}
+            "Defence view uses the club defence ease index."}
         </span>
       ) : (
         <span>Official FDR, 1 = easiest … 5 = hardest; never blended into the model index.</span>
