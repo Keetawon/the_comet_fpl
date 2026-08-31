@@ -19,6 +19,7 @@
       "status": "recorded",
       "component_modes": {
         "attacking_mode": "v3",
+        "assists_mode": "coupled",
         "appearance_mode": "seasonal"
       },
       "coverage": {

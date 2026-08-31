@@ -93,6 +93,15 @@ coverage/finality notice. Positive attack residual means more goals than forecas
 defence residual means more goals conceded than forecast and is therefore worse. Labels state the
 direction instead of relying on colour alone.
 
+Both pages derive a display role from the immutable run's complete `component_modes`. Exactly
+`v3` goals / `coupled` assists / `seasonal` appearance is **Prospective default**; exactly
+`v1` / `v1` / `seasonal` is **Diagnostic comparator**; another complete triple is a
+**Recorded sensitivity**; and an incomplete declaration is **Unclassified**, never default. The
+initial selection is the newest scored prospective default, then the newest scored alternative,
+then a pending prospective default, then the newest remaining run. Options are newest-first and
+show the role, all three modes, horizon, scored coverage, and run-id prefix. Recording order alone
+never makes a diagnostic the default.
+
 Both pages provide an accessible table equivalent. P2.4 will derive a deterministic insight packet;
 its optional AI renderer may explain only those published facts under
 `docs/dashboard-ai-summaries.md`. That summary layer is active next and is not part of this P2.3

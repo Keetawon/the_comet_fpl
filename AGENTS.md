@@ -367,7 +367,15 @@ and dashboard are implemented development-only. The application currently has ni
 analytic/decision routes (Summary, Fixture matrix, Team analytics, Players, Player analytics, Next
 GW suggestion, Player prediction vs actual, Team prediction vs actual, and Optimizer audit), plus
 the interactive Plan Builder and Squad Draft routes. The legacy `#forecast-vs-actual` hash is only a
-temporary alias to the player page. Squad Draft uses one formal
+temporary alias to the player page. Both prediction-monitoring routes classify each immutable
+vintage from its complete declared component modes: only `v3` goals / `coupled` assists /
+`seasonal` appearance is the prospective default, `v1` / `v1` / `seasonal` is the diagnostic
+comparator, any other complete triple is a recorded sensitivity, and missing modes remain
+unclassified. They open on the newest **scored prospective-default** vintage; if none exists they
+fall back, in order, to the newest scored vintage, newest pending prospective default, and newest
+remaining vintage. Every selector option remains available, ordered newest-first, and names both
+its role and all three modes. Timestamp order alone never promotes a diagnostic above a scored
+prospective default. Squad Draft uses one formal
 forecast vintage, enforces roster shape and club caps, and reports price/xP without enforcing the
 standard budget; it can also receive a private local manager capture but remains neither optimizer
 output nor a shared read model. Goal 2's

@@ -1054,8 +1054,11 @@ dashboard generation hash is
 `258f0e1f77b536949f82fb4e0f79694f4a52b4a36902f1ed6692ff9832f03cf3`. GW1-capable vintages
 publish 584 scored player-gameweeks with three explicitly missing immutable outcomes and 20/20
 scored reciprocal team sides. Newer GW2-start vintages correctly have no GW1 observations, so both
-monitoring pages default to the newest vintage with scored rows while leaving every vintage
-selectable. The obsolete `forecast_vs_actual.json` is absent from the replaced generation.
+monitoring pages default to the newest scored prospective-default (`v3` / `coupled` / `seasonal`)
+vintage instead of a later-recorded diagnostic, while leaving every role-labelled vintage
+selectable. With no scored prospective default they fall back to a scored alternative, then a
+pending prospective default, then the newest remaining vintage. The obsolete
+`forecast_vs_actual.json` is absent from the replaced generation.
 
 ### P2.5 - Other post-deadline work
 

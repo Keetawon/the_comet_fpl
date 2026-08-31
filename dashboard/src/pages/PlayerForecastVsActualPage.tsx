@@ -11,10 +11,17 @@ import {
 import { loadPlayerForecastVsActual } from "@/data/load";
 import type {
   ForecastAccuracyScoreBlock,
-  PlayerForecastAccuracyRun,
   PlayerForecastObservation,
   PlayerForecastVsActualData,
 } from "@/data/types";
+import {
+  accuracyComponentLabel,
+  accuracyRunLabel,
+  accuracyRunRole,
+  accuracyRunRoleLabel,
+  defaultAccuracyRun,
+  orderedAccuracyRuns,
+} from "@/lib/forecastAccuracyRuns";
 import { compactInsightScope, insightFact, publishedInsightProvenance } from "@/lib/insights";
 import { AccuracyScatter, AccuracyScoreKpis } from "./ForecastAccuracyParts";
 
@@ -29,18 +36,6 @@ const signed = (value: number | null | undefined, digits = 3) =>
   value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
 const pct = (value: number | null | undefined) =>
   value == null ? "—" : `${(value * 100).toFixed(1)}%`;
-
-function newestRun(runs: readonly PlayerForecastAccuracyRun[]) {
-  return [...runs].sort(
-    (left, right) =>
-      (right.created_at ?? right.as_of ?? "").localeCompare(left.created_at ?? left.as_of ?? "") ||
-      right.run_id.localeCompare(left.run_id),
-  )[0];
-}
-
-function defaultRun(runs: readonly PlayerForecastAccuracyRun[]) {
-  return newestRun(runs.filter((run) => run.coverage.scored_rows > 0)) ?? newestRun(runs);
-}
 
 function observationOrder(left: PlayerForecastObservation, right: PlayerForecastObservation) {
   return left.gw - right.gw || left.web_name.localeCompare(right.web_name) || left.code - right.code;
@@ -99,7 +94,7 @@ export function PlayerForecastVsActualPage() {
       .then((data) => {
         if (cancelled) return;
         setState({ status: "ready", data });
-        setRunId(defaultRun(data.runs)?.run_id ?? "");
+        setRunId(defaultAccuracyRun(data.runs)?.run_id ?? "");
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -114,10 +109,13 @@ export function PlayerForecastVsActualPage() {
     };
   }, []);
 
-  const run =
-    state.status === "ready"
-      ? state.data.runs.find((candidate) => candidate.run_id === runId) ?? defaultRun(state.data.runs)
-      : undefined;
+  const runOptions = useMemo(
+    () => state.status === "ready" ? orderedAccuracyRuns(state.data.runs) : [],
+    [state],
+  );
+  const run = state.status === "ready"
+    ? runOptions.find((candidate) => candidate.run_id === runId) ?? defaultAccuracyRun(runOptions)
+    : undefined;
   const completedGws = useMemo(
     () => (run ? [...run.by_gw].sort((a, b) => a.gw - b.gw).map(({ gw }) => gw) : []),
     [run],
@@ -212,6 +210,7 @@ export function PlayerForecastVsActualPage() {
   ];
   const firstCompletedGw = completedGws[0] ?? run.gw_from;
   const lastCompletedGw = completedGws.at(-1) ?? run.gw_to;
+  const selectedRole = accuracyRunRole(run.component_modes);
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -235,9 +234,9 @@ export function PlayerForecastVsActualPage() {
                 setGwFilter("all");
               }}
             >
-              {state.data.runs.map((candidate) => (
+              {runOptions.map((candidate) => (
                 <option key={candidate.run_id} value={candidate.run_id}>
-                  {candidate.run_id.slice(0, 12)} · {candidate.season} GW{candidate.gw_from}-{candidate.gw_to}
+                  {accuracyRunLabel(candidate)}
                 </option>
               ))}
             </select>
@@ -256,6 +255,17 @@ export function PlayerForecastVsActualPage() {
           </label>
         </div>
       </div>
+
+      <p
+        aria-label="Selected player forecast provenance"
+        className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
+      >
+        Viewing <span className="font-medium text-foreground">{accuracyRunRoleLabel(selectedRole)}</span>
+        {" · "}{accuracyComponentLabel(run.component_modes)}
+        {" · "}as of {run.as_of ?? "unknown"}
+        {" · "}{run.coverage.scored_rows} scored
+        {" · "}development-only monitoring
+      </p>
 
       <section className="rounded-lg border bg-card p-4" aria-labelledby="player-coverage-heading">
         <h2 id="player-coverage-heading" className="text-sm font-semibold">Coverage and finality</h2>

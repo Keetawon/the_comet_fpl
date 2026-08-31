@@ -632,6 +632,14 @@ The Python emitter computes signed residual `actual - forecast`, absolute error,
 discrete CRPS, and inclusive calibration probabilities from the stored gameweek PMF. The JSON
 contains those scalar results, not the PMF. Positive residual means the model under-predicted.
 
+The player and team monitoring selectors use the immutable `component_modes` already present on
+every run. Only the complete `v3` goals / `coupled` assists / `seasonal` appearance triple is the
+prospective default; the exact `v1` / `v1` / `seasonal` triple is the diagnostic comparator; other
+complete triples are recorded sensitivities and incomplete modes are unclassified. The browser
+opens the newest scored prospective default, falling back to the newest scored alternative, then a
+pending prospective default, then the newest remaining run. This is display selection only: it
+does not rewrite, pool, compare, or reclassify forecast evidence.
+
 ## `team_forecast_vs_actual.json` — directed team-fixture monitoring (P2.3)
 
 Observation grain is `(run_id, season, fixture, team_code)`. Each observation carries the directed

@@ -64,18 +64,50 @@ describe("TeamForecastVsActualPage", () => {
     expect(screen.getAllByText("+0.700").length).toBeGreaterThan(0);
   });
 
-  it("defaults to the newest scored vintage when a newer run has no actuals", async () => {
+  it("defaults to the scored prospective run and labels newer diagnostic and pending vintages", async () => {
     const mixed = clone(payload);
+    const diagnostic = clone(mixed.runs[0]);
+    diagnostic.run_id = "newer-scored-team-diagnostic";
+    diagnostic.created_at = "2026-08-25T16:04:00Z";
+    diagnostic.component_modes = {
+      attacking_mode: "v1",
+      assists_mode: "v1",
+      appearance_mode: "seasonal",
+    };
     const pending = clone(mixed.runs[0]);
     pending.run_id = "newer-pending-team-run";
     pending.created_at = "2026-08-25T16:05:00Z";
     pending.coverage.scored_rows = 0;
-    mixed.runs.push(pending);
+    mixed.runs.push(diagnostic, pending);
     vi.mocked(loadTeamForecastVsActual).mockResolvedValue(mixed);
 
     render(<TeamForecastVsActualPage />);
     await waitFor(() =>
       expect(screen.getByLabelText("Team forecast vintage")).toHaveValue("team-run-001"),
+    );
+    expect(
+      screen.getAllByRole("option", {
+        name: /Prospective default .* goals v3 .* assists coupled .* appearance seasonal/,
+      }),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole("option", {
+        name: /Diagnostic comparator .* goals v1 .* assists v1 .* appearance seasonal/,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Selected team forecast provenance")).toHaveTextContent(
+      /Prospective default .* goals v3 .* assists coupled .* appearance seasonal/,
+    );
+
+    fireEvent.change(screen.getByLabelText("Completed team gameweek"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText("Team forecast vintage"), {
+      target: { value: diagnostic.run_id },
+    });
+    expect(screen.getByLabelText("Completed team gameweek")).toHaveValue("all");
+    expect(screen.getByLabelText("Selected team forecast provenance")).toHaveTextContent(
+      /Diagnostic comparator .* goals v1 .* assists v1 .* appearance seasonal/,
     );
   });
 

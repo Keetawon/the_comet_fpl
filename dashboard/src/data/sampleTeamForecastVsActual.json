@@ -17,7 +17,11 @@
       "gw_from": 1,
       "gw_to": 2,
       "status": "recorded",
-      "component_modes": {"attacking_mode": "v3"},
+      "component_modes": {
+        "attacking_mode": "v3",
+        "assists_mode": "coupled",
+        "appearance_mode": "seasonal"
+      },
       "coverage": {
         "forecast_rows": 6,
         "pending_rows": 2,

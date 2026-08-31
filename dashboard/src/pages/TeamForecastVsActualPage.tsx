@@ -13,10 +13,17 @@ import type {
   CleanSheetScoreBlock,
   ForecastAccuracyScoreBlock,
   TeamAccuracyScoreSet,
-  TeamForecastAccuracyRun,
   TeamForecastObservation,
   TeamForecastVsActualData,
 } from "@/data/types";
+import {
+  accuracyComponentLabel,
+  accuracyRunLabel,
+  accuracyRunRole,
+  accuracyRunRoleLabel,
+  defaultAccuracyRun,
+  orderedAccuracyRuns,
+} from "@/lib/forecastAccuracyRuns";
 import { compactInsightScope, insightFact, publishedInsightProvenance } from "@/lib/insights";
 import { AccuracyKpis, AccuracyScatter, AccuracyScoreKpis, type AccuracyKpi } from "./ForecastAccuracyParts";
 
@@ -32,18 +39,6 @@ const signed = (value: number | null | undefined, digits = 3) =>
   value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
 const pct = (value: number | null | undefined) =>
   value == null ? "—" : `${(value * 100).toFixed(1)}%`;
-
-function newestRun(runs: readonly TeamForecastAccuracyRun[]) {
-  return [...runs].sort(
-    (left, right) =>
-      (right.created_at ?? right.as_of ?? "").localeCompare(left.created_at ?? left.as_of ?? "") ||
-      right.run_id.localeCompare(left.run_id),
-  )[0];
-}
-
-function defaultRun(runs: readonly TeamForecastAccuracyRun[]) {
-  return newestRun(runs.filter((run) => run.coverage.scored_rows > 0)) ?? newestRun(runs);
-}
 
 function observationOrder(left: TeamForecastObservation, right: TeamForecastObservation) {
   return left.gw - right.gw || left.fixture - right.fixture || left.team_id - right.team_id;
@@ -150,7 +145,7 @@ export function TeamForecastVsActualPage() {
       .then((data) => {
         if (cancelled) return;
         setState({ status: "ready", data });
-        setRunId(defaultRun(data.runs)?.run_id ?? "");
+        setRunId(defaultAccuracyRun(data.runs)?.run_id ?? "");
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -160,8 +155,12 @@ export function TeamForecastVsActualPage() {
     return () => { cancelled = true; };
   }, []);
 
+  const runOptions = useMemo(
+    () => state.status === "ready" ? orderedAccuracyRuns(state.data.runs) : [],
+    [state],
+  );
   const run = state.status === "ready"
-    ? state.data.runs.find((candidate) => candidate.run_id === runId) ?? defaultRun(state.data.runs)
+    ? runOptions.find((candidate) => candidate.run_id === runId) ?? defaultAccuracyRun(runOptions)
     : undefined;
   const completedGws = useMemo(
     () => (run ? [...run.by_gw].sort((a, b) => a.gw - b.gw).map(({ gw }) => gw) : []),
@@ -252,6 +251,7 @@ export function TeamForecastVsActualPage() {
   ];
   const firstCompletedGw = completedGws[0] ?? run.gw_from;
   const lastCompletedGw = completedGws.at(-1) ?? run.gw_to;
+  const selectedRole = accuracyRunRole(run.component_modes);
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -259,13 +259,24 @@ export function TeamForecastVsActualPage() {
         <div><h1 className="text-lg font-semibold">Team prediction vs actual</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">Diagnose recorded team attack, defence, and clean-sheet forecasts against immutable reciprocal fixture outcomes. Historical residuals never become future club-selection signals.</p></div>
         <div className="flex flex-wrap gap-2">
           <label className="text-xs text-muted-foreground">Forecast vintage<select aria-label="Team forecast vintage" className="ml-2 h-8 rounded-md border bg-background px-2 text-sm text-foreground" value={run.run_id} onChange={(event) => { setRunId(event.target.value); setGwFilter("all"); }}>
-            {state.data.runs.map((candidate) => <option key={candidate.run_id} value={candidate.run_id}>{candidate.run_id.slice(0, 12)} · {candidate.season} GW{candidate.gw_from}-{candidate.gw_to}</option>)}
+            {runOptions.map((candidate) => <option key={candidate.run_id} value={candidate.run_id}>{accuracyRunLabel(candidate)}</option>)}
           </select></label>
           <label className="text-xs text-muted-foreground">Finalized scope<select aria-label="Completed team gameweek" className="ml-2 h-8 rounded-md border bg-background px-2 text-sm text-foreground" value={gwFilter} onChange={(event) => setGwFilter(event.target.value)}>
             <option value="all">All scored fixtures</option>{completedGws.map((gw) => <option key={gw} value={gw}>GW{gw}</option>)}
           </select></label>
         </div>
       </div>
+
+      <p
+        aria-label="Selected team forecast provenance"
+        className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
+      >
+        Viewing <span className="font-medium text-foreground">{accuracyRunRoleLabel(selectedRole)}</span>
+        {" · "}{accuracyComponentLabel(run.component_modes)}
+        {" · "}as of {run.as_of ?? "unknown"}
+        {" · "}{run.coverage.scored_rows} scored
+        {" · "}development-only monitoring
+      </p>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Team accuracy view">
         {(["attack", "defence", "clean_sheet"] as const).map((value) => <button key={value} type="button" aria-pressed={view === value} onClick={() => setView(value)} className={`rounded-md border px-3 py-1.5 text-sm ${view === value ? "bg-primary text-primary-foreground" : "bg-background"}`}>{value === "clean_sheet" ? "Clean sheet" : value[0].toUpperCase() + value.slice(1)}</button>)}
