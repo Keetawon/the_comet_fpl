@@ -13,8 +13,9 @@ different answers:
 A single `xP` answers only the first.
 
 **Current status: the data foundation, development-only forward pipeline through Stage E,
-append-only forecast/outcome ledgers, BI semantic contract version 5, dashboard schema version 9,
-atomic static publish boundary, and eleven-route dashboard are implemented; no forecast component
+append-only forecast/outcome ledgers, BI semantic contract version 6, ten established dashboard
+files at schema version 9 plus two provisional preview files at schema version 1, atomic static
+publish boundary, and eleven-route dashboard are implemented; no forecast component
 or squad recommendation is promoted as production-valid.** Player/team deep analytics and exact,
 separate player/team prediction-versus-actual monitoring are implemented development-only.
 Deterministic insight summaries now appear on all eleven routes, with an optional evidence-bound,
@@ -328,6 +329,8 @@ uv run python -m fpl.jobs.daily_snapshot --dry-run
 # Verify and ingest one or more committed workflow snapshot packages.
 uv run python -m fpl.jobs.load_snapshots snapshots/daily/2026-08-22/2026-08-22T060000Z
 uv run python -m fpl.jobs.load_snapshots snapshots/player-history/2026-27/gw-1
+uv run python -m fpl.jobs.load_snapshots \
+  snapshots/player-history-provisional/2026-27/gw-2/<timestamp-content-id>
 ```
 
 `daily_snapshot` **exits non-zero with an explicit diagnostic** when egress is blocked. A
@@ -341,6 +344,26 @@ a newly finalized gameweek and then captures every `element-summary` into one co
 checksummed package. Element history, not the gameweek-aggregated live feed, supplies the
 `(season, code, fixture)` rows needed for double gameweeks. Both workflows are shell-only so
 a broken Python environment cannot stop irreplaceable raw capture.
+
+`provisional-player-history.yml` is the separate early-view path. It runs at 01:00 UTC
+(08:00 Bangkok) with a 05:00 UTC recovery pass, and captures all supported-player
+`element-summary` payloads after at least one fixture leg in the latest played gameweek has both
+an official score and either `finished_provisional=true` or `finished=true`. Saturday, Sunday,
+and Monday legs can therefore arrive incrementally without being mislabeled as final. A cheap
+signal over every scored fixture plus the complete latest-GW event-live payload may avoid the
+unchanged 08:00 sweep.
+The 12:00 recovery and every manual dispatch always perform the full element-summary sweep and
+no-op only when the canonical `content_sha256` is already present. Responses are size-bounded,
+season-rollover fixture/deadline skew is rejected, and each eligible fixture must have at least 20
+aggregate history rows after the coherent before/after signal check. Changed captures are written under
+`snapshots/player-history-provisional/<season>/gw-<gw>/<timestamp>-<content-id>`. The file loader
+classifies every package containing `element-summary.tar.gz` as `player-history`; provisional
+status remains the captured fixture flag, not the loader mode. These rows are display evidence
+only: prediction-ledger outcomes and forecast-vs-actual scoring still require immutable finalized
+evidence after `finished=true`. All three workflows share the `api-snapshot` concurrency lock and
+pin checkout v4.2.2 by its reviewed commit SHA. See
+`docs/provisional-data-refresh.md` for the exact schedule, local loading procedure, and the
+local/public publication boundary.
 
 It also logs the **first `kickoff_time` in the fixtures payload** on every run. As of
 2026-07-26 that endpoint still returns the completed 2025-26 fixtures while

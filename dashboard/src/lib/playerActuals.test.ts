@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { PlayerActualFixture } from "@/data/types";
+import type {
+  PlayerActualFixture,
+  PlayerProvisionalActualFixture,
+} from "@/data/types";
 import {
   actualGameweekRange,
   actualGameweekLabel,
   actualGameweeksChronological,
+  aggregateObservedPoints,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
   latestActualGameweeks,
   latestPlayerActualDetails,
+  mergePlayerActualRecords,
 } from "./playerActuals";
 
 function actual(patch: Partial<PlayerActualFixture> = {}): PlayerActualFixture {
@@ -34,6 +39,17 @@ function actual(patch: Partial<PlayerActualFixture> = {}): PlayerActualFixture {
     expected_assists: 0.1,
     expected_goals_conceded: 0.8,
     points_under_rules_2026_27: 10,
+    ...patch,
+  };
+}
+
+function provisionalActual(
+  patch: Partial<PlayerProvisionalActualFixture> = {},
+): PlayerProvisionalActualFixture {
+  const { points_under_rules_2026_27: _replayedPoints, ...fixture } = actual();
+  return {
+    ...fixture,
+    total_points_as_recorded: 9,
     ...patch,
   };
 }
@@ -129,10 +145,84 @@ describe("aggregatePlayerActuals", () => {
       ),
     ).toBeNull();
   });
+
+  it("keeps provisional raw points separate from replayed points and counts zero-minute points", () => {
+    const finalized = { ...actual({ fixture: 20, points_under_rules_2026_27: 10 }), outcome_status: "finalized" as const };
+    const provisional = {
+      ...provisionalActual({ fixture: 21, minutes: 0, starts: 0, total_points_as_recorded: -1 }),
+      points_under_rules_2026_27: null,
+      outcome_status: "provisional" as const,
+    };
+
+    expect(aggregateObservedPoints([finalized, provisional])).toEqual({
+      points: 9,
+      includesProvisional: true,
+    });
+    expect(aggregatePlayerActuals([finalized, provisional])?.points_under_rules_2026_27)
+      .toBeNull();
+    expect(
+      aggregateObservedPoints([
+        finalized,
+        { ...provisional, total_points_as_recorded: null },
+      ]),
+    ).toEqual({ points: null, includesProvisional: true });
+  });
+});
+
+describe("mergePlayerActualRecords", () => {
+  it("lets finalized rows replace matching provisional rows and fails on identity drift", () => {
+    const finalized = actual({ fixture: 20, points_under_rules_2026_27: 11 });
+    const provisional = provisionalActual({ fixture: 20, total_points_as_recorded: 9 });
+    const merged = mergePlayerActualRecords(
+      [{ season: "2026-27", code: 1001, actuals: [finalized] }],
+      [{ season: "2026-27", code: 1001, actuals: [provisional] }],
+    );
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].actuals).toEqual([
+      {
+        ...finalized,
+        outcome_status: "finalized",
+        total_points_as_recorded: null,
+      },
+    ]);
+    expect(() =>
+      mergePlayerActualRecords(
+        [{ season: "2026-27", code: 1001, actuals: [finalized] }],
+        [
+          {
+            season: "2026-27",
+            code: 1001,
+            actuals: [provisionalActual({ fixture: 20, opponent_team_code: 999 })],
+          },
+        ],
+      ),
+    ).toThrow(/disagree on fixture identity/);
+  });
+
+  it("marks a gameweek provisional when any fixture in that key is provisional", () => {
+    const records = mergePlayerActualRecords(
+      [{ season: "2026-27", code: 1001, actuals: [actual({ gw: 1, fixture: 10 })] }],
+      [
+        {
+          season: "2026-27",
+          code: 1001,
+          actuals: [provisionalActual({ gw: 2, fixture: 20 })],
+        },
+      ],
+    );
+    const gameweeks = actualGameweeksChronological(records, ["2026-27"]);
+
+    expect(gameweeks).toEqual([
+      { season: "2026-27", gw: 1, outcome_status: "finalized" },
+      { season: "2026-27", gw: 2, outcome_status: "provisional" },
+    ]);
+    expect(actualGameweekLabel(gameweeks[1])).toBe("2026-27 GW2 (provisional)");
+  });
 });
 
 describe("actualGameweekRange", () => {
-  it("uses only published finalized actual rows", () => {
+  it("uses only the supplied published observed rows", () => {
     const players = [
       { actuals: [actual({ gw: 3 }), actual({ gw: 5 })] },
       { actuals: [actual({ gw: 4 })] },
@@ -184,11 +274,11 @@ describe("latestPlayerActualDetails", () => {
     );
 
     expect(pageGameweeks).toEqual([
-      { season: "2026-27", gw: 1 },
-      { season: "2025-26", gw: 38 },
-      { season: "2025-26", gw: 37 },
-      { season: "2025-26", gw: 36 },
-      { season: "2025-26", gw: 35 },
+      { season: "2026-27", gw: 1, outcome_status: "finalized" },
+      { season: "2025-26", gw: 38, outcome_status: "finalized" },
+      { season: "2025-26", gw: 37, outcome_status: "finalized" },
+      { season: "2025-26", gw: 36, outcome_status: "finalized" },
+      { season: "2025-26", gw: 35, outcome_status: "finalized" },
     ]);
     expect(result.map((row) => row.fixture)).toEqual([102, 101, 380, 360, 350]);
     expect(result.map((row) => `${row.season}/GW${row.gw}`)).toEqual([
@@ -241,13 +331,21 @@ describe("latestPlayerActualDetails", () => {
     expect(
       latestPlayerActualDetails(
         [{ season: "2026-27", actuals: [dnp] }],
-        [{ season: "2026-27", gw: 4 }],
+        [{ season: "2026-27", gw: 4, outcome_status: "finalized" }],
       ),
-    ).toEqual([{ ...dnp, season: "2026-27" }]);
+    ).toEqual([{
+      ...dnp,
+      season: "2026-27",
+      outcome_status: "finalized",
+      total_points_as_recorded: null,
+    }]);
     expect(
       latestPlayerActualDetails(
         [{ season: "2026-27", actuals: [dnp] }],
-        [{ season: "2026-27", gw: 5 }, { season: "2025-26", gw: 38 }],
+        [
+          { season: "2026-27", gw: 5, outcome_status: "finalized" },
+          { season: "2025-26", gw: 38, outcome_status: "finalized" },
+        ],
       ),
     ).toEqual([]);
     expect(

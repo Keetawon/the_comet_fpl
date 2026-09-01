@@ -1,0 +1,37 @@
+{
+  "schema": "fpl.dashboard-player-provisional-actuals",
+  "json_schema_version": 1,
+  "captured_at": "2026-09-01T02:00:00+00:00",
+  "players": [
+    {
+      "season": "2026-27",
+      "code": 1,
+      "actuals": [
+        {
+          "gw": 2,
+          "fixture": 200,
+          "kickoff_time": "2026-08-29T14:00:00+00:00",
+          "team_code": 101,
+          "team_short_name": "ALP",
+          "opponent_team_code": 102,
+          "opponent_short_name": "BET",
+          "was_home": true,
+          "minutes": 90,
+          "starts": 1,
+          "goals_scored": 1,
+          "assists": 0,
+          "clean_sheets": 0,
+          "goals_conceded": 1,
+          "saves": 0,
+          "bonus": 0,
+          "bps": 31,
+          "defensive_contribution": 5,
+          "expected_goals": 0.55,
+          "expected_assists": 0.1,
+          "expected_goals_conceded": 0.9,
+          "total_points_as_recorded": 6
+        }
+      ]
+    }
+  ]
+}

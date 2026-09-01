@@ -6,7 +6,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayers } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayerProvisionalActuals, loadPlayers } from "@/data/load";
 import playersSample from "@/data/samplePlayers.json";
 import teamsSample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
@@ -17,6 +17,7 @@ import type {
   PlayerActualsData,
   PlayerFormWindow,
   PlayerHorizonsData,
+  PlayerProvisionalActualFixture,
   PlayerRecord,
   TeamRecord,
 } from "@/data/types";
@@ -55,6 +56,7 @@ const horizonsData: PlayerHorizonsData = {
 vi.mock("@/data/load", () => ({
   loadPlayers: vi.fn(),
   loadPlayerActuals: vi.fn(),
+  loadPlayerProvisionalActuals: vi.fn(),
   loadPlayerHorizons: vi.fn(),
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
@@ -103,6 +105,14 @@ function actualFromForm(
     points_under_rules_2026_27: form.points_under_rules_2026_27 ?? null,
     ...patch,
   };
+}
+
+function provisionalFromActual(
+  source: PlayerActualFixture,
+  totalPointsAsRecorded: number | null,
+): PlayerProvisionalActualFixture {
+  const { points_under_rules_2026_27: _replayedPoints, ...fixture } = source;
+  return { ...fixture, total_points_as_recorded: totalPointsAsRecorded };
 }
 
 type PlayerWithTestActuals = PlayerRecord & { actuals: PlayerActualFixture[] };
@@ -216,6 +226,12 @@ beforeEach(() => {
   vi.mocked(fetchManagerTeamMembers).mockReset();
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersWithActuals, manifest: null });
   vi.mocked(loadPlayerActuals).mockResolvedValue(actualsData);
+  vi.mocked(loadPlayerProvisionalActuals).mockResolvedValue({
+    schema: "fpl.dashboard-player-provisional-actuals",
+    json_schema_version: 1,
+    captured_at: null,
+    players: [],
+  });
   vi.mocked(loadPlayerHorizons).mockResolvedValue(
     horizonsData,
   );
@@ -255,7 +271,7 @@ describe("PlayersPage", () => {
     const appHeader = screen.getByRole("columnheader", { name: "App" });
     expect(appHeader).toHaveAttribute(
       "title",
-      "Finalized actuals from 2026-27 GW1 through 2026-27 GW1",
+      "Observed stats from 2026-27 GW1 through 2026-27 GW1",
     );
     expect(screen.getByText("Observed stats")).toBeInTheDocument();
     expect(screen.queryByText("Actual 2026-27 GW1-1 App")).not.toBeInTheDocument();
@@ -267,8 +283,8 @@ describe("PlayersPage", () => {
     expect(
       screen.getByText(/Forecast GWs filter upcoming fixtures and xP only/),
     ).toHaveTextContent("Expanded rows also remain an independent fixed rolling latest-five view");
-    expect(screen.getByText(/visible players have finalized observations from 2026-27 GW1/)).toBeInTheDocument();
-    expect(screen.getByText(/leads measured replayed points in the selected actual range/)).toBeInTheDocument();
+    expect(screen.getByText(/visible players have observations from 2026-27 GW1/)).toBeInTheDocument();
+    expect(screen.getByText(/leads measured observed points in the selected range/)).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /xP GW1-5/ })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /^xP GW1$/ })).toHaveAttribute(
       "aria-sort",
@@ -291,6 +307,88 @@ describe("PlayersPage", () => {
     expect(screen.getAllByTestId("chip").length).toBeGreaterThanOrEqual(4);
     expect(screen.getAllByTestId("blank-slot").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByTitle("Published xP for GW1: 7.4")).toHaveTextContent("7.4");
+  });
+
+  it("includes provisional GW2 in the default Actual scope with raw points and disables AI", async () => {
+    const user = userEvent.setup();
+    const alpha = playersWithActuals[0];
+    vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
+      ...actualsData,
+      players: [
+        {
+          season: "2026-27",
+          code: alpha.code,
+          actuals: [
+            actualFromForm({}, { gw: 1, fixture: 9101, points_under_rules_2026_27: 4 }),
+          ],
+        },
+      ],
+    });
+    vi.mocked(loadPlayerProvisionalActuals).mockResolvedValueOnce({
+      schema: "fpl.dashboard-player-provisional-actuals",
+      json_schema_version: 1,
+      captured_at: "2026-09-01T09:00:00+07:00",
+      players: [
+        {
+          season: "2026-27",
+          code: alpha.code,
+          actuals: [
+            provisionalFromActual(
+              actualFromForm(
+                {},
+                {
+                  gw: 2,
+                  fixture: 9102,
+                  kickoff_time: "2026-08-29T14:00:00+00:00",
+                },
+              ),
+              7,
+            ),
+          ],
+        },
+      ],
+    });
+
+    render(<PlayersPage />);
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Actual to" })).toHaveTextContent(
+        "2026-27 GW2 (provisional)",
+      ),
+    );
+    expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent(
+      "2026-27 GW1",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Provisional stats are included from the live capture at 2026-09-01 02:00 UTC",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "never scored on prediction-vs-actual pages",
+    );
+
+    const alphaRow = screen.getByText("Alpha").closest("tr");
+    expect(alphaRow).not.toBeNull();
+    expect(within(alphaRow!).getByTitle(/Observed points: 11; includes raw provisional/))
+      .toHaveTextContent("11");
+    expect(
+      within(alphaRow!).getByLabelText("includes provisional raw FPL points"),
+    ).toHaveTextContent("P");
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
+    expect(
+      screen.getByText(/AI explanation is unavailable while the selected Actual range includes provisional fixtures/),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(alphaRow!).getByRole("button", { name: /expand fixtures/i }),
+    );
+    const detail = screen.getByRole("table", { name: "Alpha recent actual fixtures" });
+    const provisionalRow = within(detail).getByText(/2026-27 GW2 · ALP/).closest("tr");
+    expect(provisionalRow).not.toBeNull();
+    expect(within(provisionalRow!).getByText("Provisional")).toBeInTheDocument();
+    expect(within(provisionalRow!).getAllByRole("cell").at(-1)).toHaveTextContent("7");
+    expect(within(provisionalRow!).getAllByRole("cell").at(-1)).toHaveAttribute(
+      "title",
+      "Raw provisional FPL points as recorded; may change",
+    );
   });
 
   it("filters to an exact manager squad by stable code and composes with player filters", async () => {
@@ -997,7 +1095,7 @@ describe("PlayersPage", () => {
     );
     expect(screen.getByRole("columnheader", { name: "App" })).toHaveAttribute(
       "title",
-      "Finalized actuals from 2026-27 GW2 through 2026-27 GW2",
+      "Observed stats from 2026-27 GW2 through 2026-27 GW2",
     );
     expect(within(alpha()).getByTitle("Observed G: 2")).toHaveTextContent("2");
     expect(forecastFrom).toHaveTextContent("GW1");
@@ -1064,7 +1162,7 @@ describe("PlayersPage", () => {
     );
     expect(screen.getByRole("columnheader", { name: "App" })).toHaveAttribute(
       "title",
-      "Finalized actuals from 2025-26 GW35 through 2026-27 GW1",
+      "Observed stats from 2025-26 GW35 through 2026-27 GW1",
     );
     expect(screen.getByText("2025-26 GW35 → 2026-27 GW1")).toBeInTheDocument();
     expect(within(screen.getByText("Alpha").closest("tr")!).getByTitle("Observed G: 12"))
@@ -1081,7 +1179,7 @@ describe("PlayersPage", () => {
         name: /expand fixtures/i,
       }),
     );
-    const detailHeading = await screen.findByText(/Alpha.*rolling latest five completed GWs/);
+    const detailHeading = await screen.findByText(/Alpha.*rolling latest five ended GWs/);
     const detailTable = screen.getByRole("table", { name: "Alpha recent actual fixtures" });
     expect(detailHeading.parentElement).toContainElement(detailTable);
     expect(within(detailTable).getByText(/2025-26 GW35 · ALP/)).toBeInTheDocument();
@@ -1192,12 +1290,13 @@ describe("PlayersPage", () => {
     expect(alphaRow).not.toBeNull();
     await user.click(within(alphaRow!).getByRole("button", { name: /expand fixtures/i }));
 
-    const detailHeading = await screen.findByText(/Alpha.*rolling latest five completed GWs/);
+    const detailHeading = await screen.findByText(/Alpha.*rolling latest five ended GWs/);
     const detailTable = screen.getByRole("table", { name: "Alpha recent actual fixtures" });
     expect(detailHeading.parentElement).toContainElement(detailTable);
     const detail = within(detailTable);
     expect(detail.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
       "Match",
+      "Status",
       "Opp (H/A)",
       "Min",
       "Start",
@@ -1213,9 +1312,9 @@ describe("PlayersPage", () => {
       "xGC",
       "Bonus",
       "BPS",
-      "Pts (26/27)",
+      "Pts",
     ]);
-    expect(detail.getAllByRole("columnheader")).toHaveLength(17);
+    expect(detail.getAllByRole("columnheader")).toHaveLength(18);
     expect(
       detail.getByRole("columnheader", {
         name: "Opponent and venue; H means home, A means away",
@@ -1242,19 +1341,20 @@ describe("PlayersPage", () => {
     expect(latestCells[0]).toHaveAccessibleName(
       "2026-27, gameweek 1, club ALP, kickoff 2026-08-15 16:00 UTC",
     );
-    expect(latestCells[1]).toHaveTextContent("GAM (A)");
-    expect(latestCells[1]).toHaveAccessibleName("Opponent GAM, away");
+    expect(latestCells[1]).toHaveTextContent("Final");
+    expect(latestCells[2]).toHaveTextContent("GAM (A)");
+    expect(latestCells[2]).toHaveAccessibleName("Opponent GAM, away");
     const earlierDgwCells = within(fixtureRows[1]).getAllByRole("cell");
-    expect(earlierDgwCells[1]).toHaveTextContent("BET (H)");
-    expect(earlierDgwCells[1]).toHaveAccessibleName("Opponent BET, home");
+    expect(earlierDgwCells[2]).toHaveTextContent("BET (H)");
+    expect(earlierDgwCells[2]).toHaveAccessibleName("Opponent BET, home");
     const priorSeasonCells = within(fixtureRows[2]).getAllByRole("cell");
     expect(priorSeasonCells[0]).toHaveTextContent("2025-26 GW38 · OLD");
-    expect(priorSeasonCells[1]).toHaveTextContent("OME (A)");
-    expect(priorSeasonCells[1]).toHaveAccessibleName("Opponent OME, away");
-    expect(within(fixtureRows[3]).getAllByRole("cell")[2]).toHaveTextContent("0");
-    expect(within(fixtureRows[3]).getAllByRole("cell")[8]).toHaveTextContent("–");
-    expect(within(fixtureRows[3]).getAllByRole("cell")[15]).toHaveTextContent("–");
-    expect(within(fixtureRows[4]).getAllByRole("cell")[8]).toHaveTextContent("0.00");
+    expect(priorSeasonCells[2]).toHaveTextContent("OME (A)");
+    expect(priorSeasonCells[2]).toHaveAccessibleName("Opponent OME, away");
+    expect(within(fixtureRows[3]).getAllByRole("cell")[3]).toHaveTextContent("0");
+    expect(within(fixtureRows[3]).getAllByRole("cell")[9]).toHaveTextContent("–");
+    expect(within(fixtureRows[3]).getAllByRole("cell")[16]).toHaveTextContent("–");
+    expect(within(fixtureRows[4]).getAllByRole("cell")[9]).toHaveTextContent("0.00");
     expect(detail.queryByText("2025-26 GW34")).not.toBeInTheDocument();
   });
 
@@ -1272,7 +1372,7 @@ describe("PlayersPage", () => {
     const alphaRow = screen.getByText("Alpha").closest("tr");
     await user.click(within(alphaRow!).getByRole("button", { name: /expand fixtures/i }));
     expect(
-      await screen.findByText("No finalized fixture history exists in the rolling latest-five-GW window."),
+      await screen.findByText("No ended fixture history exists in the rolling latest-five-GW window."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Club λ for")).not.toBeInTheDocument();
   });

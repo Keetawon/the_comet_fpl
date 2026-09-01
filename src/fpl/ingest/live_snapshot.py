@@ -352,6 +352,7 @@ def load_capture(con: duckdb.DuckDBPyConnection, capture_id: str) -> LoadResult:
                 fixture.team_h_difficulty,
                 fixture.team_a_difficulty,
                 fixture.finished,
+                fixture.finished_provisional,
             )
         )
         for team_id, opponent_id, was_home, fdr in (
@@ -391,6 +392,7 @@ def load_capture(con: duckdb.DuckDBPyConnection, capture_id: str) -> LoadResult:
             "team_h_difficulty",
             "team_a_difficulty",
             "finished",
+            "finished_provisional",
         ),
         fixture_rows,
     )

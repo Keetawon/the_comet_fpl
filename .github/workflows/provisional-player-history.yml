@@ -1,0 +1,508 @@
+name: Provisional player history snapshot (R5)
+
+# The official site marks a match full-time before FPL sets fixture.finished=true.  The
+# finalized player-history workflow deliberately waits for that authoritative flag, but a
+# separate preview capture lets local analytical pages show completed-match statistics sooner.
+# Preview payloads are never prediction-ledger outcomes and must always be labelled provisional.
+#
+# This remains shell-only (curl, jq, gzip, tar, sha256sum).  A broken Python environment or
+# package refactor must not stop the irreplaceable raw capture path.
+
+on:
+  schedule:
+    # Bangkok has no daylight-saving change: 01:00 UTC is 08:00 Asia/Bangkok.
+    - cron: "0 1 * * *"
+    # Recovery pass after late API corrections: 05:00 UTC is 12:00 Asia/Bangkok.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Share the durable snapshot lock with snapshot.yml and player-history.yml.  Apart from
+# avoiding Git races, this preserves DuckDB's downstream single-writer ordering.
+concurrency:
+  group: api-snapshot
+  cancel-in-progress: false
+
+jobs:
+  provisional-player-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Capture changed completed-match statistics
+        id: capture
+        env:
+          API: https://fantasy.premierleague.com/api
+          # The 08:00 Bangkok pass may use the cheap signal. The 12:00 recovery and every manual
+          # dispatch always re-read all element summaries before deciding by content identity.
+          AUTHORITATIVE_SWEEP: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 5 * * *' }}
+        run: |
+          set -euo pipefail
+          WORK="${RUNNER_TEMP}/fpl-provisional-player-history"
+          mkdir -p "${WORK}/elements"
+
+          MAX_BOOTSTRAP_BYTES=8388608
+          MAX_FIXTURES_BYTES=4194304
+          MAX_EVENT_LIVE_BYTES=8388608
+          MAX_ELEMENT_SUMMARY_BYTES=2097152
+          MIN_HISTORY_ROWS_PER_FIXTURE=20
+
+          case "${AUTHORITATIVE_SWEEP}" in
+            true|false) ;;
+            *) echo "::error::invalid AUTHORITATIVE_SWEEP value: ${AUTHORITATIVE_SWEEP}"; exit 1 ;;
+          esac
+
+          get() {
+            local url="$1" out="$2" max_bytes="$3" bytes
+            case "${max_bytes}" in
+              ''|*[!0-9]*) echo "::error::invalid response-size limit: ${max_bytes}"; return 1 ;;
+            esac
+            curl -sS --fail --show-error \
+              --retry 3 --retry-delay 5 --retry-connrefused \
+              --max-time 120 --max-filesize "${max_bytes}" \
+              -H 'Accept: application/json' \
+              -H 'User-Agent: fpl-model-snapshot (+github actions)' \
+              -o "${out}" "${url}"
+            test -s "${out}"
+            bytes="$(wc -c < "${out}")"
+            if [ "${bytes}" -gt "${max_bytes}" ]; then
+              echo "::error::response exceeded ${max_bytes} bytes: ${url}"
+              return 1
+            fi
+            jq -e . "${out}" > /dev/null
+          }
+
+          get "${API}/bootstrap-static/" "${WORK}/bootstrap.json" "${MAX_BOOTSTRAP_BYTES}"
+          sleep 1
+          get "${API}/fixtures/" "${WORK}/fixtures.json" "${MAX_FIXTURES_BYTES}"
+
+          FIRST_DEADLINE="$(jq -r '[.events[].deadline_time | select(. != null)] | min' "${WORK}/bootstrap.json")"
+          if ! [[ "${FIRST_DEADLINE}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+            echo "::error::invalid first deadline: ${FIRST_DEADLINE}"
+            exit 1
+          fi
+          START_YEAR="${FIRST_DEADLINE:0:4}"
+          END_YEAR="$((10#${START_YEAR} + 1))"
+          SEASON="${START_YEAR}-${END_YEAR:2:2}"
+
+          # Bootstrap can roll to a new season before /fixtures/ does. Team and element ids are
+          # season-scoped, so refuse the capture before deriving a GW or making any fan-out calls.
+          FIRST_KICKOFF="$(jq -r '[.[].kickoff_time | select(. != null)] | min // empty' "${WORK}/fixtures.json")"
+          if ! [[ "${FIRST_KICKOFF}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+            echo "::error::invalid first fixture kickoff: ${FIRST_KICKOFF}"
+            exit 1
+          fi
+          if [[ "${FIRST_KICKOFF}" < "${FIRST_DEADLINE}" ]]; then
+            echo "::error::fixtures still belong to the previous season; refusing provisional cross-season ids"
+            exit 1
+          fi
+
+          # A score by itself is insufficient: an in-progress match also has a score.  Admit
+          # only fixture legs that FPL explicitly marks provisional-full-time or final.  Taking
+          # the greatest such event gives Saturday, Sunday, and Monday incremental captures of
+          # the active/latest played gameweek without waiting for every leg in that GW.
+          LATEST_GW="$(jq -r '
+            [.[] |
+              select(
+                .event != null and
+                (.finished_provisional == true or .finished == true) and
+                .team_h_score != null and .team_a_score != null
+              ) |
+              .event
+            ] | max // empty
+          ' "${WORK}/fixtures.json")"
+          case "${LATEST_GW}" in
+            ''|*[!0-9]*)
+              if [ -n "${LATEST_GW}" ]; then
+                echo "::error::invalid completed fixture gameweek: ${LATEST_GW}"
+                exit 1
+              fi
+              echo "no provisionally completed fixture with an official score yet"
+              echo "captured=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          if [ "${LATEST_GW}" -lt 1 ] || [ "${LATEST_GW}" -gt 38 ]; then
+            echo "::error::completed fixture gameweek is out of range: ${LATEST_GW}"
+            exit 1
+          fi
+
+          COMPLETED_COUNT="$(jq --argjson gw "${LATEST_GW}" '[.[] |
+            select(
+              .event == $gw and
+              (.finished_provisional == true or .finished == true) and
+              .team_h_score != null and .team_a_score != null
+            )
+          ] | length' "${WORK}/fixtures.json")"
+          if [ "${COMPLETED_COUNT}" -lt 1 ]; then
+            echo "::error::latest completed gameweek has no eligible fixture legs"
+            exit 1
+          fi
+
+          # Cover every scored provisional/final GW in the fixture payload. This catches an
+          # older/postponed fixture correction instead of watching only the numerically latest GW.
+          mapfile -t SIGNAL_GWS < <(jq -r '[.[] |
+            select(
+              .event != null and
+              (.finished_provisional == true or .finished == true) and
+              .team_h_score != null and .team_a_score != null
+            ) |
+            .event
+          ] | unique | sort | .[]' "${WORK}/fixtures.json")
+          if [ "${#SIGNAL_GWS[@]}" -lt 1 ]; then
+            echo "::error::eligible completed fixtures produced no signal gameweeks"
+            exit 1
+          fi
+          for signal_gw in "${SIGNAL_GWS[@]}"; do
+            case "${signal_gw}" in
+              ''|*[!0-9]*) echo "::error::invalid signal gameweek: ${signal_gw}"; exit 1 ;;
+            esac
+            if [ "${signal_gw}" -lt 1 ] || [ "${signal_gw}" -gt 38 ]; then
+              echo "::error::signal gameweek is out of range: ${signal_gw}"
+              exit 1
+            fi
+          done
+          get "${API}/event/${LATEST_GW}/live/" \
+            "${WORK}/event-live.json" "${MAX_EVENT_LIVE_BYTES}"
+          jq -e '.elements | type == "array"' "${WORK}/event-live.json" > /dev/null
+
+          # event-live is only a cheap change detector here. The archived element-summary
+          # payloads remain the authoritative fixture-grain source, including for DGWs. Hash every
+          # eligible scored fixture leg plus the complete latest-GW event-live payload.
+          signal_sha256() {
+            local bootstrap_path="$1" fixtures_path="$2" event_live_path="$3" signal_gw="$4"
+            {
+              printf '%s\n' 'provisional-signal-v2'
+              jq -cS '{elements: ([.elements[] |
+                select(
+                  .element_type == 1 or .element_type == 2 or
+                  .element_type == 3 or .element_type == 4
+                ) |
+                {id, code, element_type, team}
+              ] | sort_by(.id))}' "${bootstrap_path}"
+              jq -cS '[.[] |
+                select(
+                  .event != null and
+                  (.finished_provisional == true or .finished == true) and
+                  .team_h_score != null and .team_a_score != null
+                ) |
+                {id, event, kickoff_time, started, finished, finished_provisional,
+                 team_h, team_a, team_h_score, team_a_score}
+              ] | sort_by(.event, .id)' "${fixtures_path}"
+              jq -cS --argjson gw "${signal_gw}" \
+                '{gw:$gw, payload:(. | .elements |=
+                  (map(. | .explain |= sort_by(.fixture)) | sort_by(.id)))}' \
+                "${event_live_path}"
+            } | sha256sum | cut -d' ' -f1
+          }
+          SIGNAL_SHA256="$(signal_sha256 "${WORK}/bootstrap.json" \
+            "${WORK}/fixtures.json" "${WORK}/event-live.json" "${LATEST_GW}")"
+          if ! [[ "${SIGNAL_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::invalid provisional signal hash"
+            exit 1
+          fi
+
+          BASE="snapshots/player-history-provisional/${SEASON}/gw-${LATEST_GW}"
+          if [ "${AUTHORITATIVE_SWEEP}" = "false" ] && [ -d "${BASE}" ]; then
+            while IFS= read -r existing_manifest; do
+              existing_signal="$(jq -r '
+                if .signal_schema_version == "2" then .signal_sha256 // empty else empty end
+              ' "${existing_manifest}")"
+              if [ "${existing_signal}" = "${SIGNAL_SHA256}" ]; then
+                echo "provisional GW${LATEST_GW} signal is already captured at $(dirname "${existing_manifest}")"
+                echo "captured=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            done < <(find "${BASE}" -type f -name manifest.json -print | LC_ALL=C sort)
+          fi
+          if [ "${AUTHORITATIVE_SWEEP}" = "true" ]; then
+            echo "authoritative recovery/manual pass: full element-summary sweep required before content comparison"
+          fi
+
+          if ! jq -e '[.elements[] |
+            select(
+              .element_type == 1 or .element_type == 2 or
+              .element_type == 3 or .element_type == 4
+            ) |
+            .id
+          ] as $ids |
+            ($ids | length) >= 100 and ($ids | length) <= 1000 and
+            all($ids[]; type == "number" and . >= 1 and floor == .) and
+            (($ids | unique | length) == ($ids | length))' \
+            "${WORK}/bootstrap.json" > /dev/null; then
+            echo "::error::supported element ids are missing, duplicated, invalid, or out of bounds"
+            exit 1
+          fi
+          mapfile -t ELEMENT_IDS < <(jq -r '.elements[] |
+            select(
+              .element_type == 1 or .element_type == 2 or
+              .element_type == 3 or .element_type == 4
+            ) |
+            .id' "${WORK}/bootstrap.json")
+          if [ "${#ELEMENT_IDS[@]}" -lt 100 ] || [ "${#ELEMENT_IDS[@]}" -gt 1000 ]; then
+            echo "::error::implausible element count: ${#ELEMENT_IDS[@]}"
+            exit 1
+          fi
+          for element_id in "${ELEMENT_IDS[@]}"; do
+            case "${element_id}" in
+              ''|*[!0-9]*) echo "::error::invalid element id: ${element_id}"; exit 1 ;;
+            esac
+            get "${API}/element-summary/${element_id}/" \
+              "${WORK}/elements/${element_id}.json" "${MAX_ELEMENT_SUMMARY_BYTES}"
+            if ! jq -e --argjson element_id "${element_id}" '
+              (.history | type == "array") and
+              all(.history[];
+                .element == $element_id and
+                (.fixture | type == "number") and .fixture >= 1 and
+                .fixture == (.fixture | floor)
+              ) and
+              (([.history[].fixture] | length) ==
+               ([.history[].fixture] | unique | length))
+            ' "${WORK}/elements/${element_id}.json" > /dev/null; then
+              echo "::error::element-summary ${element_id} has foreign, invalid, or duplicate history rows"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # Refuse a mixed-time package if results or live stats changed during the full sweep.
+          # The next scheduled/manual run will restart from one coherent API state.
+          get "${API}/bootstrap-static/" "${WORK}/bootstrap-after.json" "${MAX_BOOTSTRAP_BYTES}"
+          sleep 1
+          get "${API}/fixtures/" "${WORK}/fixtures-after.json" "${MAX_FIXTURES_BYTES}"
+          mapfile -t AFTER_SIGNAL_GWS < <(jq -r '[.[] |
+            select(
+              .event != null and
+              (.finished_provisional == true or .finished == true) and
+              .team_h_score != null and .team_a_score != null
+            ) |
+            .event
+          ] | unique | sort | .[]' "${WORK}/fixtures-after.json")
+          SIGNAL_GW_LIST="$(IFS=,; echo "${SIGNAL_GWS[*]}")"
+          AFTER_SIGNAL_GW_LIST="$(IFS=,; echo "${AFTER_SIGNAL_GWS[*]}")"
+          if [ "${AFTER_SIGNAL_GW_LIST}" != "${SIGNAL_GW_LIST}" ]; then
+            echo "::error::eligible fixture gameweeks changed during element-summary capture; refusing a mixed-time package"
+            exit 1
+          fi
+          get "${API}/event/${LATEST_GW}/live/" \
+            "${WORK}/event-live-after.json" "${MAX_EVENT_LIVE_BYTES}"
+          jq -e '.elements | type == "array"' "${WORK}/event-live-after.json" > /dev/null
+          AFTER_SIGNAL_SHA256="$(signal_sha256 "${WORK}/bootstrap-after.json" \
+            "${WORK}/fixtures-after.json" "${WORK}/event-live-after.json" "${LATEST_GW}")"
+          if [ "${AFTER_SIGNAL_SHA256}" != "${SIGNAL_SHA256}" ]; then
+            echo "::error::fixture/live state changed during element-summary capture; refusing a mixed-time package"
+            exit 1
+          fi
+          mv "${WORK}/fixtures-after.json" "${WORK}/fixtures.json"
+          mv "${WORK}/event-live-after.json" "${WORK}/event-live.json"
+
+          # Validate aggregate history coverage per eligible fixture, not per player. A legitimately
+          # unused player may have no row. Each match still needs 20 total history rows and at least
+          # one appeared row whose side/opponent/schedule/score identity matches each club.
+          COVERAGE_VIOLATION="$(jq -cs \
+            --argjson minimum "${MIN_HISTORY_ROWS_PER_FIXTURE}" \
+            --slurpfile fixtures "${WORK}/fixtures.json" '
+              [.[].history[]?] as $history |
+              [$fixtures[0][] |
+                select(
+                  .id != null and .event != null and
+                  (.finished_provisional == true or .finished == true) and
+                  .team_h_score != null and .team_a_score != null
+                ) |
+                . as $fixture |
+                ($history | map(select(.fixture == $fixture.id))) as $rows |
+                {
+                  fixture:$fixture.id,
+                  event:$fixture.event,
+                  history_rows:($rows | length),
+                  home_appeared:([$rows[] | select(
+                    (.minutes // 0) > 0 and .was_home == true and
+                    .round == $fixture.event and
+                    .opponent_team == $fixture.team_a and
+                    .kickoff_time == $fixture.kickoff_time and
+                    .team_h_score == $fixture.team_h_score and
+                    .team_a_score == $fixture.team_a_score
+                  )] | length),
+                  away_appeared:([$rows[] | select(
+                    (.minutes // 0) > 0 and .was_home == false and
+                    .round == $fixture.event and
+                    .opponent_team == $fixture.team_h and
+                    .kickoff_time == $fixture.kickoff_time and
+                    .team_h_score == $fixture.team_h_score and
+                    .team_a_score == $fixture.team_a_score
+                  )] | length)
+                } |
+                select(
+                  .history_rows < $minimum or
+                  .home_appeared < 1 or .away_appeared < 1
+                )
+              ] | sort_by(.event, .fixture) | .[0] // empty
+            ' "${WORK}"/elements/*.json)"
+          if [ -n "${COVERAGE_VIOLATION}" ]; then
+            echo "::error::implausible per-fixture element-summary coverage: ${COVERAGE_VIOLATION}"
+            exit 1
+          fi
+
+          # Hash canonical payload hashes with stable relative names.  The content identity is
+          # independent of runner paths and gzip/tar metadata.
+          PAYLOAD_INDEX="${WORK}/PAYLOAD-CONTENT-SHA256"
+          : > "${PAYLOAD_INDEX}"
+          for relative in bootstrap.json fixtures.json event-live.json; do
+            payload_sha="$(jq -cS . "${WORK}/${relative}" | sha256sum | cut -d' ' -f1)"
+            printf '%s  %s\n' "${payload_sha}" "${relative}" >> "${PAYLOAD_INDEX}"
+          done
+          while IFS= read -r element_path; do
+            relative="elements/$(basename "${element_path}")"
+            payload_sha="$(jq -cS . "${element_path}" | sha256sum | cut -d' ' -f1)"
+            printf '%s  %s\n' "${payload_sha}" "${relative}" >> "${PAYLOAD_INDEX}"
+          done < <(find "${WORK}/elements" -maxdepth 1 -type f -name '*.json' -print | LC_ALL=C sort -V)
+          CONTENT_SHA256="$(sha256sum "${PAYLOAD_INDEX}" | cut -d' ' -f1)"
+          if ! [[ "${CONTENT_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::invalid package content hash"
+            exit 1
+          fi
+
+          # Recovery/manual runs always reach this point. Avoid a duplicate append only after the
+          # authoritative full sweep proves that every canonical payload is byte-content identical.
+          if [ -d "${BASE}" ]; then
+            while IFS= read -r existing_manifest; do
+              existing_content="$(jq -r '.content_sha256 // empty' "${existing_manifest}")"
+              if [ "${existing_content}" = "${CONTENT_SHA256}" ]; then
+                echo "provisional GW${LATEST_GW} authoritative content is already captured at $(dirname "${existing_manifest}")"
+                echo "captured=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            done < <(find "${BASE}" -type f -name manifest.json -print | LC_ALL=C sort)
+          fi
+
+          STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          STAMP_DIR="$(date -u +%Y-%m-%dT%H%M%SZ)-${CONTENT_SHA256:0:16}"
+          TARGET="${BASE}/${STAMP_DIR}"
+          if [ -e "${TARGET}" ]; then
+            echo "::error::refusing to overwrite existing snapshot path: ${TARGET}"
+            exit 1
+          fi
+          mkdir -p "${TARGET}"
+          gzip -9 -c "${WORK}/bootstrap.json" > "${TARGET}/bootstrap-static.json.gz"
+          gzip -9 -c "${WORK}/fixtures.json" > "${TARGET}/fixtures.json.gz"
+          gzip -9 -c "${WORK}/event-live.json" > "${TARGET}/event-live-${LATEST_GW}.json.gz"
+          tar -C "${WORK}/elements" -czf "${TARGET}/element-summary.tar.gz" .
+          sha256sum "${TARGET}"/*.gz > "${TARGET}/SHA256SUMS"
+
+          HISTORY_ROWS="$(jq -s '[.[].history | length] | add' "${WORK}"/elements/*.json)"
+          COMPLETED_IDS="$(jq -c '[.[] |
+            select(
+              .event != null and
+              (.finished_provisional == true or .finished == true) and
+              .team_h_score != null and .team_a_score != null
+            ) |
+            .id
+          ] | sort' "${WORK}/fixtures.json")"
+          PROVISIONAL_IDS="$(jq -c '[.[] |
+            select(
+              .event != null and .finished != true and .finished_provisional == true and
+              .team_h_score != null and .team_a_score != null
+            ) |
+            .id
+          ] | sort' "${WORK}/fixtures.json")"
+          FINAL_IDS="$(jq -c '[.[] |
+            select(
+              .event != null and .finished == true and
+              .team_h_score != null and .team_a_score != null
+            ) |
+            .id
+          ] | sort' "${WORK}/fixtures.json")"
+          SIGNAL_GWS_JSON="$(jq -c '[.[] |
+            select(
+              .event != null and
+              (.finished_provisional == true or .finished == true) and
+              .team_h_score != null and .team_a_score != null
+            ) |
+            .event
+          ] | unique | sort' "${WORK}/fixtures.json")"
+          ELIGIBLE_FIXTURE_COUNT="$(jq 'length' <<< "${COMPLETED_IDS}")"
+          jq -n \
+            --arg captured_at "${STAMP}" \
+            --arg season "${SEASON}" \
+            --arg signal_sha256 "${SIGNAL_SHA256}" \
+            --arg content_sha256 "${CONTENT_SHA256}" \
+            --argjson gw "${LATEST_GW}" \
+            --argjson elements "${#ELEMENT_IDS[@]}" \
+            --argjson history_rows "${HISTORY_ROWS}" \
+            --argjson minimum_history_rows_per_fixture "${MIN_HISTORY_ROWS_PER_FIXTURE}" \
+            --argjson eligible_fixture_count "${ELIGIBLE_FIXTURE_COUNT}" \
+            --argjson signal_gameweeks "${SIGNAL_GWS_JSON}" \
+            --argjson completed_fixture_ids "${COMPLETED_IDS}" \
+            --argjson provisional_fixture_ids "${PROVISIONAL_IDS}" \
+            --argjson final_fixture_ids "${FINAL_IDS}" \
+            '{schema_version:"1", captured_at:$captured_at, season:$season,
+              mode:"player-history-provisional", history_through_gw:$gw,
+              signal_schema_version:"2",
+              signal_sha256:$signal_sha256, content_sha256:$content_sha256,
+              signal_gameweeks:$signal_gameweeks,
+              completed_fixture_ids:$completed_fixture_ids,
+              provisional_fixture_ids:$provisional_fixture_ids,
+              final_fixture_ids:$final_fixture_ids,
+              eligible_fixture_count:$eligible_fixture_count,
+              minimum_history_rows_per_fixture:$minimum_history_rows_per_fixture,
+              element_payloads:$elements, player_fixture_rows:$history_rows}' \
+            > "${TARGET}/manifest.json"
+
+          echo "captured=true" >> "$GITHUB_OUTPUT"
+          echo "target=${TARGET}" >> "$GITHUB_OUTPUT"
+          echo "season=${SEASON}" >> "$GITHUB_OUTPUT"
+          echo "gw=${LATEST_GW}" >> "$GITHUB_OUTPUT"
+          echo "content_prefix=${CONTENT_SHA256:0:16}" >> "$GITHUB_OUTPUT"
+          ls -l "${TARGET}"
+
+      - name: Commit provisional player histories
+        if: steps.capture.outputs.captured == 'true'
+        env:
+          TARGET: ${{ steps.capture.outputs.target }}
+          SEASON: ${{ steps.capture.outputs.season }}
+          GW: ${{ steps.capture.outputs.gw }}
+          CONTENT_PREFIX: ${{ steps.capture.outputs.content_prefix }}
+        run: |
+          set -euo pipefail
+          if ! [[ "${TARGET}" =~ ^snapshots/player-history-provisional/[0-9]{4}-[0-9]{2}/gw-[1-9][0-9]*/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z-[0-9a-f]{16}$ ]]; then
+            echo "::error::refusing unexpected snapshot path: ${TARGET}"
+            exit 1
+          fi
+          [[ "${SEASON}" =~ ^[0-9]{4}-[0-9]{2}$ ]]
+          [[ "${GW}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${CONTENT_PREFIX}" =~ ^[0-9a-f]{16}$ ]]
+          test -s "${TARGET}/manifest.json"
+          test -s "${TARGET}/SHA256SUMS"
+          test -s "${TARGET}/bootstrap-static.json.gz"
+          test -s "${TARGET}/fixtures.json.gz"
+          test -s "${TARGET}/event-live-${GW}.json.gz"
+          test -s "${TARGET}/element-summary.tar.gz"
+          sha256sum --check --strict "${TARGET}/SHA256SUMS"
+          jq -e \
+            --arg season "${SEASON}" \
+            --arg content_prefix "${CONTENT_PREFIX}" \
+            --argjson gw "${GW}" \
+            '.season == $season and .history_through_gw == $gw and
+             (.content_sha256 | startswith($content_prefix)) and
+             .mode == "player-history-provisional" and
+             .signal_schema_version == "2" and
+             .eligible_fixture_count >= 1 and
+             .minimum_history_rows_per_fixture == 20 and
+             (.signal_gameweeks | index($gw)) != null' \
+            "${TARGET}/manifest.json" > /dev/null
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${TARGET}"
+          git commit -m "snapshot: ${SEASON} provisional player histories GW${GW} ${CONTENT_PREFIX}"
+
+          for attempt in 1 2 3 4; do
+            if git push; then exit 0; fi
+            sleep $((2 ** attempt))
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          done
+          echo "::error::could not push provisional player histories after 4 attempts"
+          exit 1

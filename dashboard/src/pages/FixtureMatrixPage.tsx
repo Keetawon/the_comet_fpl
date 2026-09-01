@@ -2,7 +2,7 @@
 // vintage, one COLUMN per upcoming gameweek (the pivot), default-sorted by the selected
 // source average. Each source tab owns the horizon average, the per-GW headline, and its
 // tier colour -- opponent strength by default, so the visible number and colour always
-// describe the same metric. Expanding a row defaults to the latest five finalized
+// describe the same metric. Expanding a row defaults to the latest five ended
 // gameweeks across the forecast season boundary, with explicit single-season scopes available.
 
 import { useEffect, useMemo, useState } from "react";
@@ -41,7 +41,12 @@ import { FixtureChip } from "@/components/FixtureTicker";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import { TeamBadge } from "@/components/Avatars";
 import { VintageSelect } from "@/components/VintageSelect";
-import { loadFixtureMatrix, loadNextGw, loadTeamActuals } from "@/data/load";
+import {
+  loadFixtureMatrix,
+  loadNextGw,
+  loadTeamActuals,
+  loadTeamProvisionalActuals,
+} from "@/data/load";
 import type {
   DashboardManifest,
   FixtureScheduleOverlay,
@@ -49,7 +54,7 @@ import type {
   ScheduleFixture,
   TeamFixture,
   TeamFormWindow,
-  TeamActualsRecord,
+  TeamObservedActualsRecord,
   TeamRecord,
   WindowLabel,
 } from "@/data/types";
@@ -84,6 +89,8 @@ import {
 } from "@/lib/insights";
 import {
   latestTeamActualGameweeks,
+  mergeTeamActualRecords,
+  teamActualGameweekLabel,
   teamActualDetailsForGameweeks,
   type TeamActualFixtureDetail,
 } from "@/lib/teamActuals";
@@ -94,7 +101,8 @@ type PageState =
   | {
       status: "ready";
       teams: TeamRecord[];
-      teamActuals: TeamActualsRecord[];
+      teamActuals: TeamObservedActualsRecord[];
+      provisionalCapturedAt: string | null;
       schedule: FixtureScheduleOverlay;
       plans: NextGwPlan[];
       manifest: DashboardManifest | null;
@@ -333,8 +341,13 @@ export function FixtureMatrixPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadFixtureMatrix(), loadNextGw(), loadTeamActuals()])
-      .then(([fixtureData, nextGw, teamActuals]) => {
+    Promise.all([
+      loadFixtureMatrix(),
+      loadNextGw(),
+      loadTeamActuals(),
+      loadTeamProvisionalActuals(),
+    ])
+      .then(([fixtureData, nextGw, teamActuals, provisionalActuals]) => {
         if (cancelled) return;
         const seen = new Map<string, { run_id: string; season: string; gw_from: number; gw_to: number }>();
         for (const t of fixtureData.teams) {
@@ -366,7 +379,11 @@ export function FixtureMatrixPage() {
         setState({
           status: "ready",
           teams: fixtureData.teams,
-          teamActuals: teamActuals.teams,
+          teamActuals: mergeTeamActualRecords(
+            teamActuals.teams,
+            provisionalActuals.teams,
+          ),
+          provisionalCapturedAt: provisionalActuals.captured_at,
           schedule: fixtureData.schedule,
           plans: nextGw.plans,
           manifest: fixtureData.manifest,
@@ -440,9 +457,12 @@ export function FixtureMatrixPage() {
     () => latestTeamActualGameweeks(actualScopeTeams),
     [actualScopeTeams],
   );
+  const actualScopeIncludesProvisional = actualGameweeks.some(
+    (gameweek) => gameweek.outcome_status === "provisional",
+  );
 
   const actualByTeamCode = useMemo(() => {
-    const byTeamCode = new Map<number, TeamActualsRecord[]>();
+    const byTeamCode = new Map<number, TeamObservedActualsRecord[]>();
     for (const team of actualScopeTeams) {
       const records = byTeamCode.get(team.team_code) ?? [];
       records.push(team);
@@ -909,13 +929,26 @@ export function FixtureMatrixPage() {
           )}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Expanded rows default to a shared rolling window of the latest five finalized gameweeks.
+          Expanded rows default to a shared rolling window of the latest five ended gameweeks.
           At a season boundary it continues into the immediately preceding season; the season
           options isolate either season. Double-gameweek legs stay separate, and clubs are never
           individually backfilled outside the shared window. xG, xGC, BPS, and DC are source-row
           aggregates; unavailable evidence is shown as –. Possession and shots are unavailable in
           the approved published sources, so no proxy is shown.
         </p>
+        {actualScopeIncludesProvisional && (
+          <p
+            role="status"
+            className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+          >
+            Provisional team results are included from the live capture at{" "}
+            {state.provisionalCapturedAt
+              ? new Date(state.provisionalCapturedAt).toISOString().replace("T", " ").slice(0, 16)
+              : "unknown time"} UTC.
+            These display-only rows are not yet attached to the immutable outcome ledger. Scores
+            and source-row stats may still change and are never used on prediction-vs-actual pages.
+          </p>
+        )}
       </FilterPanel>
 
       <DecisionTableFullscreen label="Fixture matrix table">
@@ -999,14 +1032,14 @@ export function FixtureMatrixPage() {
                         {actualScope === ROLLING_ACTUAL_SCOPE ? "Rolling 5" : actualScope}
                         {actualGameweeks.length > 0
                           ? ` · shared window ${actualGameweeks
-                              .map(({ season, gw }) => `${season} GW${gw}`)
+                              .map(teamActualGameweekLabel)
                               .join(", ")}`
                           : ""}
                       </p>
                       {row.original.actualDetails.length === 0 ? (
                         <p className="py-2 text-xs text-muted-foreground">
-                          No finalized results are available for this club in the selected Actual
-                          scope and shared five-gameweek window.
+                          No ended results are available for this club in the selected Actual scope
+                          and shared five-gameweek window.
                         </p>
                       ) : (
                         <Table aria-label={`${row.original.team.team_name} recent results`}>
@@ -1016,6 +1049,7 @@ export function FixtureMatrixPage() {
                                 Season / GW / date
                               </TableHead>
                               <TableHead className="h-7 px-2 text-[11px]">Opponent</TableHead>
+                              <TableHead className="h-7 px-2 text-[11px]">Status</TableHead>
                               <TableHead className="h-7 px-2 text-[11px]">GF</TableHead>
                               <TableHead className="h-7 px-2 text-[11px]">GA</TableHead>
                               <TableHead className="h-7 px-2 text-[11px]">xG</TableHead>
@@ -1035,6 +1069,15 @@ export function FixtureMatrixPage() {
                                 </TableCell>
                                 <TableCell className="px-2 py-1 text-[11px]">
                                   {actual.opponent_short_name} ({actual.was_home ? "H" : "A"})
+                                </TableCell>
+                                <TableCell className="px-2 py-1 text-[11px]">
+                                  {actual.outcome_status === "provisional" ? (
+                                    <span className="rounded border border-amber-400 bg-amber-50 px-1 text-[9px] font-medium text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                                      Provisional
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">Final</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="px-2 py-1 text-[11px] tabular-nums">
                                   {actual.goals_for}

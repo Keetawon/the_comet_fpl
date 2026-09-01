@@ -158,10 +158,14 @@ jobs:
               "manifest.json",
               "next_gw.json",
               "optimizer_audit.json",
+              "player_actuals.json",
+              "player_provisional_actuals.json",
               "player_forecast_vs_actual.json",
               "player_horizons.json",
               "players.json",
               "summary.json",
+              "team_actuals.json",
+              "team_provisional_actuals.json",
               "team_forecast_vs_actual.json",
           }
           with zipfile.ZipFile(sys.argv[1]) as release:

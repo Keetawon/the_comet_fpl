@@ -1,7 +1,7 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
 Status: active execution plan  
-Last updated: 2026-08-28<br>
+Last updated: 2026-09-01<br>
 Target: 2026/27 GW1  
 Deadline: `2026-08-21T17:30:00Z` (`2026-08-22 00:30` Asia/Bangkok)  
 First kickoff: `2026-08-21T19:00:00Z`
@@ -39,7 +39,8 @@ The goals are ordered. Goal 1 may not be delayed by dashboard polish or new mode
 - **Goal 2's MVP, deep analytics, exact parallel monitoring, evidence-bound summaries, and
   explicit prior/current-season player/team actual ranges have completed development-only implementation
   and automated gates; final responsive in-browser visual verification remains pending.** Semantic contract
-  version 5, dashboard schema version 9, immutable player/team outcomes, the atomic static-JSON
+  version 6, the ten established dashboard files at schema version 9, two separate provisional
+  schema-version-1 files, immutable player/team outcomes, the atomic static-JSON
   boundary, nine read-only analytic/decision pages, Plan Builder, and the browser-only Squad Draft sandbox are shipped
   development-only. P1.8's full Players-page
   form matrix and additive observed
@@ -70,8 +71,9 @@ series; later handoff records the new commits and full gate rather than rewritin
 - Stage E selects a legal 15-player squad and exact weekly lineup/captain, then performs a bounded
   multi-GW transfer search. The forced-transfer/no-transfer pruning defect is fixed, and immutable
   platform/default, diagnostic, and custom-plan identities are separated fail-closed.
-- The BI semantic-v5/star export, fixture difficulty and player/team form/actual facts, atomic schema-v9
-  static JSON, nine read-only analytic/decision pages, Plan Builder, and Squad Draft are implemented
+- The BI semantic-v6/star export, fixture difficulty and player/team form/actual facts, the ten
+  established schema-v9 static files plus two separate provisional schema-v1 files, nine read-only
+  analytic/decision pages, Plan Builder, and Squad Draft are implemented
   development-only. The browser reads only published JSON and never DuckDB. Player/Team analytics
   and separate Player/Team prediction-monitoring pages are current; the old
   `#forecast-vs-actual` route is only a player-page alias.
@@ -1184,6 +1186,48 @@ Only after the ordered dashboard program above, unless an operational blocker re
   empty states, public-package inclusion, atomic BI/static republish, and responsive visual
   verification. This reporting change does not alter a forecast, model default, frozen evaluation,
   optimizer input, or monitoring score.
+
+- **Completed-match provisional preview and daily capture (implemented development-only
+  2026-09-01; local refresh evidence still pending).** The append-only
+  `.github/workflows/provisional-player-history.yml` capture runs at 01:00 UTC / 08:00 Bangkok with
+  a 05:00 UTC / 12:00 Bangkok recovery pass under the shared `api-snapshot` concurrency group. It
+  starts only after a scored fixture leg is marked `finished_provisional=true` or `finished=true`.
+  The 08:00 pass may no-op on a cheap signal covering every scored fixture plus latest-GW
+  event-live; the 12:00 recovery and every manual dispatch always perform the full supported-player
+  element-summary sweep and no-op only on identical canonical content. Endpoint-specific response
+  bounds, the first-kickoff/
+  first-deadline rollover guard, same-signal before/after checks, and a minimum 20 aggregate history
+  rows per eligible fixture fail closed before a timestamp/content-identified package is written under
+  `snapshots/player-history-provisional/<season>/gw-<gw>/` without overwriting an earlier capture.
+  The existing later finalized workflow and outcome-attachment policy remain unchanged.
+
+  BI semantic contract v6 adds the separate run-independent
+  `fact_provisional_player_fixture_observation` and
+  `fact_provisional_team_fixture_observation` facts. Export eligibility is deliberately narrower
+  than a score alone: only the latest complete player-history capture's same-capture fixture rows
+  with `finished_provisional=true OR finished=true`, non-null schedule identity, and both scores are
+  considered. They remain separate provisional-display evidence until any player/team archive or
+  immutable-ledger final evidence exists, when one shared anti-join removes the whole fixture from
+  both provisional facts atomically. Completeness requires exactly one bootstrap, one fixtures
+  payload, and one element-summary for every supported bootstrap player (element types 1-4). Player/team/fixture
+  identity and `observed_at` must agree, team sides must be reciprocal, and provisional rows may
+  not overlap finalized facts at the same grain.
+
+  Dashboard generation keeps the ten established files at schema v9 and additively publishes
+  `player_provisional_actuals.json` and `team_provisional_actuals.json` under independent schema v1
+  envelopes with one `captured_at`. Only Players and Fixture Matrix consume them. The browser marks
+  provisional periods/rows, requires identity agreement before a finalized fixture supersedes a
+  provisional fixture, and keeps provisional raw `total_points_as_recorded` distinct from finalized
+  `points_under_rules_2026_27`. A selected provisional Players range disables the optional language
+  renderer but retains deterministic facts. Neither prediction-versus-actual route, either
+  append-only ledger, or any monitoring score accepts provisional evidence.
+
+  A future manually reviewed sanitized dashboard-data ZIP includes both provisional files so its
+  validated manifest remains complete. That is not automatic publication: the public Pages site
+  remains pinned to an owner-reviewed immutable release through `public-data-release.json`, and a
+  local snapshot load/read-model refresh cannot move that pin. No provisional row count, manifest
+  hash, or local dashboard freshness claim is recorded here until the controlled local refresh
+  produces that evidence.
 
 - measure and contract per-GW availability semantics;
 - design future price-change and future selling-value handling;

@@ -1,12 +1,13 @@
-# BI export contract, version 5
+# BI export contract, version 6
 
 Status: implemented by DEV-ROADMAP P1.4. This document describes the durable, read-only BI
 boundary; `src/fpl/publish/contract.py` remains the frozen semantic schema authority.
 
-Version 5 retains v2's directed schedule FDR, v3's exact team PMFs plus append-only monitoring
-outcomes, and v4's finalized current-season player components. It additively publishes normalized
-finalized club-side observations in `fact_team_fixture_actual` without treating mutable live player
-components as proof of team finality.
+Version 6 retains v2's directed schedule FDR, v3's exact team PMFs plus append-only monitoring
+outcomes, v4's finalized current-season player components, and v5's normalized finalized club-side
+observations. It additively publishes two reporting-only provisional observation facts from one
+complete player-history capture without weakening the finalized actual, outcome-ledger, or
+monitoring boundaries.
 
 ## Boundary
 
@@ -42,11 +43,16 @@ data/
     ├── dim_team_season.parquet
     ├── dim_fixture.parquet
     ├── dim_gameweek.parquet
+    ├── dim_optimizer_run.parquet
     ├── fact_forecast_player_gameweek.parquet
     ├── fact_forecast_player_fixture.parquet
     ├── fact_forecast_team_fixture.parquet
     ├── fact_player_fixture_actual.parquet
     ├── fact_team_fixture_actual.parquet
+    ├── fact_provisional_player_fixture_observation.parquet
+    ├── fact_provisional_team_fixture_observation.parquet
+    ├── fact_finalized_player_fixture_outcome.parquet
+    ├── fact_finalized_team_fixture_outcome.parquet
     ├── fact_player_form.parquet
     ├── fact_team_form.parquet
     └── fact_optimizer_plan.parquet
@@ -130,8 +136,9 @@ The schema-v9 dashboard may select a rolling presentation window from the foreca
 immediate predecessor, but the export remains fixture-grain and season-qualified. Consumers retain
 the outer `season` beside `gw` and join a player's two seasonal records only through permanent
 `code`; no export row is rewritten or copied to fill a missing predecessor history. Version 9
-transports the fact's fixture-time club/opponent identity into `player_actuals.json`, but does not
-change BI semantic contract v5.
+transports the fact's fixture-time club/opponent identity into `player_actuals.json`. Semantic v6
+leaves that established finalized transport unchanged and adds only the separate provisional
+facts described below.
 
 ### Finalized team-fixture actuals
 
@@ -161,6 +168,42 @@ The corresponding dashboard rolling window joins returning clubs across the two 
 only through permanent `team_code`. A promoted club with no predecessor-season Premier League row
 stays shorter; season-scoped `team_id` is never used to borrow the relegated club that occupied the
 same numeric slot.
+
+### Provisional completed-match observations
+
+`fact_provisional_player_fixture_observation` and
+`fact_provisional_team_fixture_observation` are run-independent, reporting-only facts. For each
+season the exporter selects the latest `snapshot_capture` whose loader mode is `player-history`.
+Before using it, the source gate requires exactly one bootstrap payload, exactly one fixtures
+payload, and one element-summary payload for every bootstrap player in supported element types
+1-4. No provisional row is emitted from a partial full-roster sweep.
+
+The two facts then read only that capture's fixture, player-fixture, and team-version rows. A
+fixture is considered only when its same-capture row has
+`finished_provisional = true OR finished = true`, a non-null gameweek and kickoff, and both home
+and away scores. In-progress, future, score-only, and mixed-capture rows are excluded. The API's
+`finished` flag does not itself move the row into a finalized fact.
+
+One shared eligible-fixture relation anti-joins all four final-evidence owners:
+`mart_fact_player_fixture`, `mart_fact_team_match`, `ledger_outcome_player_fixture`, and
+`ledger_outcome_team_fixture`. If any one has any row for a fixture, that fixture is excluded from
+both provisional facts in full. Thus a scored final-flag-only match stays explicitly provisional
+until immutable/archive evidence begins, then every player and both reciprocal team sides hand off
+atomically; a partial player/team or provisional/final mixture is never published.
+
+The player fact retains the API's mutable `total_points` value as the distinctly named
+`total_points_as_recorded` and does not publish `points_under_rules_2026_27`. The team fact sources
+GF/GA directly from the same fixtures payload and derives nullable xG, xGC, BPS, and raw DC action
+aggregates only from the same capture's player rows. Each fact carries one `observed_at` knowledge
+time from the selected capture and no `run_id`.
+
+Publication verifies exactly two reciprocal club sides per provisional fixture, agreement with
+the season-qualified fixture dimension, player-to-team identity/capture agreement, shared fixture-
+level exclusion against all final evidence, and no residual overlap with
+`fact_player_fixture_actual` or `fact_team_fixture_actual` at the same grain. Provisional
+observations never write to either outcome ledger and never enter either forecast-monitoring read
+model. After the authoritative package is loaded, the established outcome-attachment path remains
+the only route from API finality into immutable finalized facts and monitoring.
 
 ### Team form
 
@@ -197,6 +240,10 @@ Before publication, the exporter verifies:
 - non-null, unique and explicitly grain-ordered rows for every table;
 - child-to-parent referential integrity for every declared `Join`, including `season` for every
   `element_id`, `team_id`, or `opponent_team_id` relationship;
+- complete latest player-history capture coverage before provisional selection, same-capture
+  player/team/fixture identity, reciprocal provisional club sides, atomic fixture exclusion after
+  any player/team archive or ledger final evidence, and no residual provisional/finalized overlap
+  at either observation grain;
 - Parquet round-trip row counts and NULL counts, plus the absence of non-finite floats;
 - a strict JSON manifest (`allow_nan=False`), per-file SHA-256 values, and row accounting; and
 - a stable source database SHA-256 before and after reading, so a changing source database cannot
@@ -220,7 +267,7 @@ characters):
 {
   "schema": "fpl.bi-semantic-export",
   "schema_version": 1,
-  "semantic_contract_version": 5,
+  "semantic_contract_version": 6,
   "created_at": "2026-08-14T00:00:00+00:00",
   "database_sha256": "…",
   "exported_run_ids": [],
@@ -243,6 +290,6 @@ characters):
 }
 ```
 
-The real `tables` object always contains all nineteen contract tables. `created_at`, exported
+The real `tables` object always contains all twenty-one contract tables. `created_at`, exported
 `run_id`s, source min/max `known_at`, freshness, database hash, per-table row counts, and per-file
 hashes are all required and validated on read.

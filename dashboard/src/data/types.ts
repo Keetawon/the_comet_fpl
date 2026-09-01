@@ -124,6 +124,36 @@ export interface TeamActualsData {
   teams: TeamActualsRecord[];
 }
 
+export type OutcomeStatus = "finalized" | "provisional";
+
+/** One ended-but-not-finalized club fixture from the latest live capture. */
+export type TeamProvisionalActualFixture = TeamActualFixture;
+
+export interface TeamProvisionalActualsRecord {
+  season: string;
+  team_code: number;
+  actuals: TeamProvisionalActualFixture[];
+}
+
+/** Mutable display context. It is never an input to forecast monitoring. */
+export interface TeamProvisionalActualsData {
+  schema: "fpl.dashboard-team-provisional-actuals";
+  json_schema_version: 1;
+  captured_at: string | null;
+  teams: TeamProvisionalActualsRecord[];
+}
+
+/** Finalized and provisional team rows after the display-only browser merge. */
+export interface TeamObservedFixture extends TeamActualFixture {
+  outcome_status: OutcomeStatus;
+}
+
+export interface TeamObservedActualsRecord {
+  season: string;
+  team_code: number;
+  actuals: TeamObservedFixture[];
+}
+
 export interface PlayerFormWindow {
   rostered_fixtures: number | null;
   appearances: number | null;
@@ -235,6 +265,40 @@ export interface PlayerActualsData {
   schema: "fpl.dashboard-player-actuals";
   json_schema_version: 9;
   players: PlayerActualsRecord[];
+}
+
+/** One ended-but-not-finalized player fixture from the latest live capture. */
+export interface PlayerProvisionalActualFixture
+  extends Omit<PlayerActualFixture, "points_under_rules_2026_27"> {
+  /** Raw FPL points in this capture; bonus and corrections may still change. */
+  total_points_as_recorded: number | null;
+}
+
+export interface PlayerProvisionalActualsRecord {
+  season: string;
+  code: number;
+  actuals: PlayerProvisionalActualFixture[];
+}
+
+/** Mutable display context. It is never an input to forecast monitoring or insights. */
+export interface PlayerProvisionalActualsData {
+  schema: "fpl.dashboard-player-provisional-actuals";
+  json_schema_version: 1;
+  captured_at: string | null;
+  players: PlayerProvisionalActualsRecord[];
+}
+
+/** Finalized and provisional player rows after the display-only browser merge. */
+export interface PlayerObservedFixture extends PlayerActualFixture {
+  outcome_status: OutcomeStatus;
+  /** Present only for provisional rows after normalization; finalized rows use replayed points. */
+  total_points_as_recorded: number | null;
+}
+
+export interface PlayerObservedActualsRecord {
+  season: string;
+  code: number;
+  actuals: PlayerObservedFixture[];
 }
 
 /** One exact endpoint lookup with six-decimal published scalars, for all fixtures. */

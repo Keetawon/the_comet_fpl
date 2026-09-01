@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from fpl.jobs.package_public_dashboard import main
+from fpl.publish.contract import SEMANTIC_CONTRACT_VERSION
 from fpl.publish.dashboard_json import (
     DASHBOARD_JSON_SCHEMA,
     DASHBOARD_JSON_SCHEMA_VERSION,
@@ -27,14 +28,19 @@ from fpl.publish.dashboard_json import (
     PLAYER_FORECAST_VS_ACTUAL_SCHEMA,
     PLAYER_HORIZONS_FILENAME,
     PLAYER_HORIZONS_SCHEMA,
+    PLAYER_PROVISIONAL_ACTUALS_FILENAME,
+    PLAYER_PROVISIONAL_ACTUALS_SCHEMA,
     PLAYERS_FILENAME,
     PLAYERS_SCHEMA,
+    PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
     SUMMARY_FILENAME,
     SUMMARY_SCHEMA,
     TEAM_ACTUALS_FILENAME,
     TEAM_ACTUALS_SCHEMA,
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
     TEAM_FORECAST_VS_ACTUAL_SCHEMA,
+    TEAM_PROVISIONAL_ACTUALS_FILENAME,
+    TEAM_PROVISIONAL_ACTUALS_SCHEMA,
     DashboardJsonError,
     _file_row_count,
     _manifest_content_sha256,
@@ -55,7 +61,9 @@ _FILENAMES = (
     NEXT_GW_FILENAME,
     OPTIMIZER_AUDIT_FILENAME,
     PLAYER_ACTUALS_FILENAME,
+    PLAYER_PROVISIONAL_ACTUALS_FILENAME,
     TEAM_ACTUALS_FILENAME,
+    TEAM_PROVISIONAL_ACTUALS_FILENAME,
     PLAYER_HORIZONS_FILENAME,
     PLAYERS_FILENAME,
     SUMMARY_FILENAME,
@@ -237,6 +245,18 @@ def _documents() -> dict[str, dict[str, Any]]:
                 }
             ],
         },
+        PLAYER_PROVISIONAL_ACTUALS_FILENAME: {
+            "schema": PLAYER_PROVISIONAL_ACTUALS_SCHEMA,
+            "json_schema_version": PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
+            "captured_at": None,
+            "players": [],
+        },
+        TEAM_PROVISIONAL_ACTUALS_FILENAME: {
+            "schema": TEAM_PROVISIONAL_ACTUALS_SCHEMA,
+            "json_schema_version": PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
+            "captured_at": None,
+            "teams": [],
+        },
         PLAYER_HORIZONS_FILENAME: {
             "schema": PLAYER_HORIZONS_SCHEMA,
             "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
@@ -326,7 +346,7 @@ def _write_generation(directory: Path, documents: dict[str, dict[str, Any]]) -> 
         "source": {
             "export_schema": "fpl.bi-semantic-export",
             "export_schema_version": 1,
-            "semantic_contract_version": 5,
+            "semantic_contract_version": SEMANTIC_CONTRACT_VERSION,
             "export_content_sha256": _sha("2"),
             "export_created_at": "2026-08-21T11:59:00+00:00",
             "database_sha256": _sha("3"),
@@ -391,6 +411,12 @@ def test_packages_only_formal_plans_and_reseals_a_deterministic_root_zip(tmp_pat
     assert public_documents[PLAYERS_FILENAME] == _documents()[PLAYERS_FILENAME]
     assert public_documents[PLAYER_ACTUALS_FILENAME] == _documents()[PLAYER_ACTUALS_FILENAME]
     assert public_documents[TEAM_ACTUALS_FILENAME] == _documents()[TEAM_ACTUALS_FILENAME]
+    assert public_documents[PLAYER_PROVISIONAL_ACTUALS_FILENAME] == _documents()[
+        PLAYER_PROVISIONAL_ACTUALS_FILENAME
+    ]
+    assert public_documents[TEAM_PROVISIONAL_ACTUALS_FILENAME] == _documents()[
+        TEAM_PROVISIONAL_ACTUALS_FILENAME
+    ]
     assert public_documents[PLAYER_HORIZONS_FILENAME] == _documents()[PLAYER_HORIZONS_FILENAME]
     horizon_payload = (first.output_dir / PLAYER_HORIZONS_FILENAME).read_bytes()
     assert horizon_payload.endswith(b"\n")

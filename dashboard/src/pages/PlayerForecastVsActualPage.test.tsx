@@ -1,17 +1,24 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadPlayerForecastVsActual } from "@/data/load";
+import {
+  loadPlayerForecastVsActual,
+  loadPlayerProvisionalActuals,
+} from "@/data/load";
 import sample from "@/data/samplePlayerForecastVsActual.json";
 import type { PlayerForecastVsActualData } from "@/data/types";
 import { PlayerForecastVsActualPage } from "./PlayerForecastVsActualPage";
 
-vi.mock("@/data/load", () => ({ loadPlayerForecastVsActual: vi.fn() }));
+vi.mock("@/data/load", () => ({
+  loadPlayerForecastVsActual: vi.fn(),
+  loadPlayerProvisionalActuals: vi.fn(),
+}));
 
 const payload = sample as unknown as PlayerForecastVsActualData;
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 beforeEach(() => {
   vi.mocked(loadPlayerForecastVsActual).mockReset();
+  vi.mocked(loadPlayerProvisionalActuals).mockReset();
 });
 
 describe("PlayerForecastVsActualPage", () => {
@@ -31,6 +38,7 @@ describe("PlayerForecastVsActualPage", () => {
     expect(screen.getAllByText("P(total ≤ 2)")).not.toHaveLength(0);
     expect(screen.getByText(/computed by the static Python emitter/)).toBeInTheDocument();
     expect(screen.getByText(/Largest under-prediction: Alpha GW1 \(\+2\.000\)/)).toBeInTheDocument();
+    expect(loadPlayerProvisionalActuals).not.toHaveBeenCalled();
   });
 
   it("uses a published single-gameweek score block instead of recomputing metrics", async () => {

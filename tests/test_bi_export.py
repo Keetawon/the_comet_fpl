@@ -40,7 +40,8 @@ from fpl.artifacts.prospective_points import (
     ProspectivePointsArtifact,
     artifact_bytes,
 )
-from fpl.publish.contract import SEMANTIC_CONTRACT_V5
+from fpl.ingest.live_snapshot import CapturedPayload, capture_payload, write_capture
+from fpl.publish.contract import SEMANTIC_CONTRACT_V6
 from fpl.publish.export import (
     EASE_INDEX_FORMULA_VERSION,
     BiExportConcurrentWriterError,
@@ -52,20 +53,143 @@ from fpl.publish.export import (
     _contract_query,
     _fetch_arrow_table,
     _source_queries,
+    _validate_latest_player_history_captures,
+    _validate_provisional_fixture_consistency,
     _validate_table_frame,
     export_bi,
     validate_bi_export,
 )
 from fpl.storage.db import connect, default_db_path, initialise
-from fpl.storage.ledger import record_forecast
+from fpl.storage.ledger import ensure_ledger_schema, record_forecast
 
 SEASON = "2026-27"
 AS_OF = datetime(2026, 8, 21, 17, 30, tzinfo=UTC)
 KNOWN_AT = AS_OF - timedelta(hours=2)
 KICKOFF = datetime(2026, 8, 22, 14, tzinfo=UTC)
+PROVISIONAL_KICKOFF = datetime(2026, 8, 29, 14, tzinfo=UTC)
 HASH_A = "a" * 64
 HASH_B = "b" * 64
 HASH_C = "c" * 64
+
+
+def _provisional_capture(
+    *,
+    home_points: int = 8,
+    finished: bool = False,
+    finished_provisional: bool = True,
+    scores_present: bool = True,
+    include_assistant_manager: bool = False,
+) -> list[CapturedPayload]:
+    bootstrap = {
+        "events": [
+            {
+                "id": 2,
+                "name": "Gameweek 2",
+                "deadline_time": "2026-08-28T17:30:00Z",
+            }
+        ],
+        "teams": [
+            {"id": 1, "code": 101, "name": "Alpha", "short_name": "ALP"},
+            {"id": 2, "code": 102, "name": "Beta", "short_name": "BET"},
+        ],
+        "elements": [
+            {
+                "id": 1,
+                "code": 1,
+                "web_name": "Home",
+                "element_type": 3,
+                "team": 1,
+            },
+            {
+                "id": 2,
+                "code": 2,
+                "web_name": "Away",
+                "element_type": 4,
+                "team": 2,
+            },
+        ],
+    }
+    if include_assistant_manager:
+        bootstrap["elements"].append(
+            {
+                "id": 3,
+                "code": 3,
+                "web_name": "Assistant Manager",
+                "element_type": 5,
+                "team": 1,
+            }
+        )
+    fixtures = [
+        {
+            "id": 200,
+            "event": 2,
+            "kickoff_time": PROVISIONAL_KICKOFF.isoformat(),
+            "team_h": 1,
+            "team_a": 2,
+            "team_h_score": 2 if scores_present else None,
+            "team_a_score": 1 if scores_present else None,
+            "finished": finished,
+            "finished_provisional": finished_provisional,
+        }
+    ]
+
+    def summary(
+        element: int,
+        opponent: int,
+        *,
+        was_home: bool,
+        total_points: int,
+        expected_goals: float | None,
+    ) -> dict[str, object]:
+        return {
+            "fixtures": [],
+            "history": [
+                {
+                    "element": element,
+                    "fixture": 200,
+                    "opponent_team": opponent,
+                    "total_points": total_points,
+                    "was_home": was_home,
+                    "kickoff_time": PROVISIONAL_KICKOFF.isoformat(),
+                    "round": 2,
+                    "minutes": 90,
+                    "starts": 1,
+                    "goals_scored": 1 if was_home else 0,
+                    "assists": 0,
+                    "clean_sheets": 0,
+                    "goals_conceded": 1 if was_home else 2,
+                    "saves": 0,
+                    "bonus": 0,
+                    "bps": 20 if was_home else 10,
+                    "expected_goals": expected_goals,
+                    "expected_assists": 0.1,
+                    "expected_goals_conceded": 0.8 if was_home else 1.2,
+                    "defensive_contribution": 5 if was_home else 4,
+                }
+            ],
+            "history_past": [],
+        }
+
+    return [
+        capture_payload("bootstrap-static", bootstrap),
+        capture_payload("fixtures", fixtures),
+        capture_payload(
+            "element-summary",
+            summary(
+                1,
+                2,
+                was_home=True,
+                total_points=home_points,
+                expected_goals=0.7,
+            ),
+            parameter="1",
+        ),
+        capture_payload(
+            "element-summary",
+            summary(2, 1, was_home=False, total_points=2, expected_goals=None),
+            parameter="2",
+        ),
+    ]
 
 
 def _positions() -> tuple[str, ...]:
@@ -606,13 +730,13 @@ def _write_optimizer_plan(path: Path, artifact: ProspectivePointsArtifact) -> Pa
 
 
 def _table_paths(output_dir: Path) -> tuple[Path, ...]:
-    return tuple(output_dir / f"{table.name}.parquet" for table in SEMANTIC_CONTRACT_V5.tables)
+    return tuple(output_dir / f"{table.name}.parquet" for table in SEMANTIC_CONTRACT_V6.tables)
 
 
 def _one_row_contract_frame(
     table_name: str, *, overrides: dict[str, object] | None = None
 ) -> pa.Table:
-    table = SEMANTIC_CONTRACT_V5.table(table_name)
+    table = SEMANTIC_CONTRACT_V6.table(table_name)
     defaults: dict[str, object] = {
         "string": "x",
         "int": 1,
@@ -631,7 +755,7 @@ def _one_row_contract_frame(
 
 
 def test_v3_validation_preserves_honest_nulls_in_legacy_non_grain_fields() -> None:
-    table = SEMANTIC_CONTRACT_V5.table("fact_player_fixture_actual")
+    table = SEMANTIC_CONTRACT_V6.table("fact_player_fixture_actual")
     frame = _one_row_contract_frame("fact_player_fixture_actual", overrides={"starts": None})
 
     _validate_table_frame(table, frame)
@@ -648,11 +772,396 @@ def test_v3_validation_preserves_honest_nulls_in_legacy_non_grain_fields() -> No
 def test_validation_rejects_null_in_guaranteed_fields(
     table_name: str, column_name: str
 ) -> None:
-    table = SEMANTIC_CONTRACT_V5.table(table_name)
+    table = SEMANTIC_CONTRACT_V6.table(table_name)
     frame = _one_row_contract_frame(table_name, overrides={column_name: None})
 
     with pytest.raises(BiExportValidationError, match="guaranteed field contains NULL"):
         _validate_table_frame(table, frame)
+
+
+def _provisional_fact_rows(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    player_outcomes_present: bool = False,
+    team_outcomes_present: bool = False,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    queries = _source_queries(
+        False,
+        player_outcomes_present=player_outcomes_present,
+        team_outcomes_present=team_outcomes_present,
+    )
+    player_table = SEMANTIC_CONTRACT_V6.table(
+        "fact_provisional_player_fixture_observation"
+    )
+    team_table = SEMANTIC_CONTRACT_V6.table("fact_provisional_team_fixture_observation")
+    players = _fetch_arrow_table(
+        con,
+        _contract_query(player_table, queries[player_table.name]),
+    ).to_pylist()
+    teams = _fetch_arrow_table(
+        con,
+        _contract_query(team_table, queries[team_table.name]),
+    ).to_pylist()
+    return players, teams
+
+
+def test_provisional_facts_use_one_latest_complete_player_history_capture(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "provisional.duckdb"
+    con = initialise(database)
+    early_at = datetime(2026, 8, 30, 8, tzinfo=UTC)
+    latest_at = datetime(2026, 8, 31, 8, tzinfo=UTC)
+    try:
+        write_capture(
+            con,
+            _provisional_capture(home_points=3),
+            season=SEASON,
+            gw=2,
+            mode="player-history",
+            captured_at=early_at,
+            capture_id="history-early",
+        )
+        write_capture(
+            con,
+            _provisional_capture(home_points=8, include_assistant_manager=True),
+            season=SEASON,
+            gw=2,
+            mode="player-history",
+            captured_at=latest_at,
+            capture_id="history-latest",
+        )
+
+        # The unsupported Assistant Manager bootstrap element deliberately has no summary.
+        # Completeness is defined by the supported player types 1-4 only.
+        _validate_latest_player_history_captures(con)
+        players, teams = _provisional_fact_rows(con)
+    finally:
+        con.close()
+
+    assert [(row["code"], row["total_points_as_recorded"]) for row in players] == [
+        (1, 8),
+        (2, 2),
+    ]
+    assert all("points_under_rules_2026_27" not in row for row in players)
+    assert {row["observed_at"] for row in players} == {latest_at}
+    assert {row["observed_at"] for row in teams} == {latest_at}
+    assert [
+        (
+            row["team_id"],
+            row["opponent_team_id"],
+            row["was_home"],
+            row["goals_for"],
+            row["goals_against"],
+        )
+        for row in teams
+    ] == [(1, 2, True, 2, 1), (2, 1, False, 1, 2)]
+    assert teams[0]["team_xg"] == pytest.approx(0.7)
+    assert teams[1]["team_xg"] is None
+    assert [row["team_xgc"] for row in teams] == pytest.approx([0.8, 1.2])
+    assert [row["team_bps"] for row in teams] == [20, 10]
+    assert [row["defensive_contribution"] for row in teams] == [5, 4]
+
+
+def test_provisional_capture_completeness_fails_closed_on_missing_player_summary(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "incomplete-provisional.duckdb"
+    captured = _provisional_capture()
+    captured.pop()
+    con = initialise(database)
+    try:
+        write_capture(
+            con,
+            captured,
+            season=SEASON,
+            gw=2,
+            mode="player-history",
+            captured_at=datetime(2026, 8, 31, 8, tzinfo=UTC),
+            capture_id="history-incomplete",
+        )
+        with pytest.raises(BiExportSourceError, match="player-history capture is incomplete"):
+            _validate_latest_player_history_captures(con)
+    finally:
+        con.close()
+
+
+@pytest.mark.parametrize(
+    ("finished", "finished_provisional", "scores_present", "expected_rows"),
+    [
+        (True, False, True, 2),
+        (True, True, True, 2),
+        (False, True, True, 2),
+        (False, False, True, 0),
+        (False, True, False, 0),
+    ],
+    ids=(
+        "official-finished-only",
+        "both-finished-flags",
+        "provisionally-finished",
+        "not-completed",
+        "scores-missing",
+    ),
+)
+def test_provisional_facts_keep_scored_completed_fixtures_visible_until_attachment(
+    tmp_path: Path,
+    finished: bool,
+    finished_provisional: bool,
+    scores_present: bool,
+    expected_rows: int,
+) -> None:
+    database = tmp_path / "provisional-gate.duckdb"
+    con = initialise(database)
+    try:
+        write_capture(
+            con,
+            _provisional_capture(
+                finished=finished,
+                finished_provisional=finished_provisional,
+                scores_present=scores_present,
+            ),
+            season=SEASON,
+            gw=2,
+            mode="player-history",
+            captured_at=datetime(2026, 8, 31, 8, tzinfo=UTC),
+            capture_id="history-gate",
+        )
+        _validate_latest_player_history_captures(con)
+        players, teams = _provisional_fact_rows(con)
+        queries = _source_queries(
+            False,
+            player_outcomes_present=False,
+            team_outcomes_present=False,
+        )
+        monitoring_rows = tuple(
+            _fetch_arrow_table(
+                con,
+                _contract_query(
+                    SEMANTIC_CONTRACT_V6.table(table_name),
+                    queries[table_name],
+                ),
+            ).num_rows
+            for table_name in (
+                "fact_finalized_player_fixture_outcome",
+                "fact_finalized_team_fixture_outcome",
+            )
+        )
+        outcome_tables = con.execute(
+            """
+            SELECT count(*)
+            FROM information_schema.tables
+            WHERE table_name IN (
+                'ledger_outcome_player_fixture', 'ledger_outcome_team_fixture'
+            )
+            """
+        ).fetchone()
+    finally:
+        con.close()
+
+    assert len(players) == expected_rows
+    assert len(teams) == expected_rows
+    assert monitoring_rows == (0, 0)
+    assert outcome_tables == (0,)
+
+
+@pytest.mark.parametrize(
+    "finalized_evidence",
+    ["player-ledger", "team-ledger", "archive-team-actual"],
+)
+def test_any_finalized_evidence_excludes_the_whole_fixture_from_both_provisional_facts(
+    tmp_path: Path,
+    finalized_evidence: str,
+) -> None:
+    database = tmp_path / "provisional-handoff.duckdb"
+    captured_at = datetime(2026, 8, 31, 8, tzinfo=UTC)
+    con = initialise(database)
+    player_outcomes_present = False
+    team_outcomes_present = False
+    try:
+        write_capture(
+            con,
+            _provisional_capture(finished=True, finished_provisional=False),
+            season=SEASON,
+            gw=2,
+            mode="player-history",
+            captured_at=captured_at,
+            capture_id="history-handoff",
+        )
+        if finalized_evidence == "player-ledger":
+            ensure_ledger_schema(con)
+            con.execute(
+                """
+                INSERT INTO ledger_outcome_player_fixture
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [SEASON, 1, 200, captured_at, 8, 8],
+            )
+            player_outcomes_present = True
+        elif finalized_evidence == "team-ledger":
+            ensure_ledger_schema(con)
+            con.execute(
+                """
+                INSERT INTO ledger_outcome_team_fixture
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    SEASON,
+                    200,
+                    1,
+                    101,
+                    2,
+                    2,
+                    PROVISIONAL_KICKOFF,
+                    True,
+                    2,
+                    1,
+                    captured_at,
+                ],
+            )
+            team_outcomes_present = True
+        elif finalized_evidence == "archive-team-actual":
+            con.execute(
+                """
+                INSERT INTO mart_fact_team_match (
+                    season, gw, fixture, kickoff_time, team_id, opponent_team_id,
+                    was_home, goals_for, goals_against
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [SEASON, 2, 200, PROVISIONAL_KICKOFF, 1, 2, True, 2, 1],
+            )
+        else:  # pragma: no cover - closed parameter tuple
+            raise AssertionError(finalized_evidence)
+
+        players, teams = _provisional_fact_rows(
+            con,
+            player_outcomes_present=player_outcomes_present,
+            team_outcomes_present=team_outcomes_present,
+        )
+    finally:
+        con.close()
+
+    assert players == []
+    assert teams == []
+
+
+@pytest.mark.parametrize("overlap_kind", ["player", "team"])
+def test_provisional_consistency_rejects_finalized_grain_overlap(overlap_kind: str) -> None:
+    observed_at = datetime(2026, 8, 31, 8, tzinfo=UTC)
+    fixture = _one_row_contract_frame(
+        "dim_fixture",
+        overrides={
+            "season": SEASON,
+            "fixture": 200,
+            "gw": 2,
+            "kickoff_time": PROVISIONAL_KICKOFF,
+            "home_team_id": 1,
+            "away_team_id": 2,
+            "home_team_code": 101,
+            "away_team_code": 102,
+            "finished": False,
+        },
+    )
+    provisional_home = _one_row_contract_frame(
+        "fact_provisional_team_fixture_observation",
+        overrides={
+            "season": SEASON,
+            "fixture": 200,
+            "team_id": 1,
+            "team_code": 101,
+            "opponent_team_id": 2,
+            "gw": 2,
+            "kickoff_time": PROVISIONAL_KICKOFF,
+            "was_home": True,
+            "goals_for": 2,
+            "goals_against": 1,
+            "observed_at": observed_at,
+        },
+    )
+    provisional_away = _one_row_contract_frame(
+        "fact_provisional_team_fixture_observation",
+        overrides={
+            "season": SEASON,
+            "fixture": 200,
+            "team_id": 2,
+            "team_code": 102,
+            "opponent_team_id": 1,
+            "gw": 2,
+            "kickoff_time": PROVISIONAL_KICKOFF,
+            "was_home": False,
+            "goals_for": 1,
+            "goals_against": 2,
+            "observed_at": observed_at,
+        },
+    )
+    provisional_player = _one_row_contract_frame(
+        "fact_provisional_player_fixture_observation",
+        overrides={
+            "season": SEASON,
+            "fixture": 200,
+            "code": 1,
+            "gw": 2,
+            "kickoff_time": PROVISIONAL_KICKOFF,
+            "position": "MID",
+            "team_id": 1,
+            "team_code": 101,
+            "opponent_team_id": 2,
+            "was_home": True,
+            "total_points_as_recorded": 8,
+            "observed_at": observed_at,
+        },
+    )
+    final_player = _one_row_contract_frame(
+        "fact_player_fixture_actual",
+        overrides={
+            "season": SEASON,
+            "fixture": 200,
+            "code": 1,
+            "gw": 2,
+            "kickoff_time": PROVISIONAL_KICKOFF,
+            "position": "MID",
+            "team_id": 1,
+            "team_code": 101,
+            "opponent_team_id": 2,
+            "was_home": True,
+        },
+    )
+    final_team = _one_row_contract_frame(
+        "fact_team_fixture_actual",
+        overrides={
+            "season": SEASON,
+            "fixture": 200,
+            "team_id": 1,
+            "team_code": 101,
+            "opponent_team_id": 2,
+            "gw": 2,
+            "kickoff_time": PROVISIONAL_KICKOFF,
+            "was_home": True,
+            "goals_for": 2,
+            "goals_against": 1,
+        },
+    )
+    empty_player = pa.Table.from_pylist([], schema=final_player.schema)
+    empty_team = pa.Table.from_pylist([], schema=final_team.schema)
+    con = duckdb.connect(":memory:")
+    try:
+        con.register("dim_fixture", fixture)
+        con.register(
+            "fact_provisional_team_fixture_observation",
+            pa.concat_tables([provisional_home, provisional_away]),
+        )
+        con.register("fact_provisional_player_fixture_observation", provisional_player)
+        con.register(
+            "fact_player_fixture_actual",
+            final_player if overlap_kind == "player" else empty_player,
+        )
+        con.register(
+            "fact_team_fixture_actual",
+            final_team if overlap_kind == "team" else empty_team,
+        )
+        with pytest.raises(BiExportValidationError, match="overlaps a finalized actual"):
+            _validate_provisional_fixture_consistency(con)
+    finally:
+        con.close()
 
 
 def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> None:
@@ -671,7 +1180,7 @@ def test_export_writes_complete_contract_and_preserves_nulls(tmp_path: Path) -> 
     manifest = validate_bi_export(output)
 
     assert output.is_symlink()
-    assert set(result.tables) == {table.name for table in SEMANTIC_CONTRACT_V5.tables}
+    assert set(result.tables) == {table.name for table in SEMANTIC_CONTRACT_V6.tables}
     assert manifest["exported_run_ids"] == [run_id]
     assert manifest["source_known_at"] == {
         "minimum": KNOWN_AT.isoformat(),
@@ -822,7 +1331,7 @@ def test_player_actual_unions_latest_live_components_only_at_exact_finalized_led
 
     con = connect(database, read_only=True)
     try:
-        table = SEMANTIC_CONTRACT_V5.table("fact_player_fixture_actual")
+        table = SEMANTIC_CONTRACT_V6.table("fact_player_fixture_actual")
         source = _source_queries(
             True, player_outcomes_present=True, team_outcomes_present=True
         )[table.name]
@@ -876,7 +1385,7 @@ def test_player_actual_rejects_archive_and_finalized_live_duplicate_grain(tmp_pa
 
     con = connect(database, read_only=True)
     try:
-        table = SEMANTIC_CONTRACT_V5.table("fact_player_fixture_actual")
+        table = SEMANTIC_CONTRACT_V6.table("fact_player_fixture_actual")
         source = _source_queries(
             True, player_outcomes_present=True, team_outcomes_present=True
         )[table.name]
@@ -970,7 +1479,7 @@ def test_team_actual_uses_official_live_scores_and_complete_player_components(
     def read_rows() -> list[dict[str, object]]:
         reader = connect(database, read_only=True)
         try:
-            table = SEMANTIC_CONTRACT_V5.table("fact_team_fixture_actual")
+            table = SEMANTIC_CONTRACT_V6.table("fact_team_fixture_actual")
             source = _source_queries(
                 True, player_outcomes_present=True, team_outcomes_present=True
             )[table.name]
@@ -1450,7 +1959,7 @@ def test_exports_are_byte_deterministic_except_manifest_created_at(tmp_path: Pat
         created_at=datetime(2026, 8, 26, tzinfo=UTC),
     )
 
-    for table in SEMANTIC_CONTRACT_V5.tables:
+    for table in SEMANTIC_CONTRACT_V6.tables:
         assert (first / f"{table.name}.parquet").read_bytes() == (
             second / f"{table.name}.parquet"
         ).read_bytes()
@@ -1566,7 +2075,7 @@ def test_archive_database_exports_the_complete_contract(tmp_path: Path) -> None:
     result = export_bi(default_db_path(), tmp_path / "archive-export")
     manifest = validate_bi_export(result.output_dir)
 
-    assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V5.tables}
+    assert set(manifest["tables"]) == {table.name for table in SEMANTIC_CONTRACT_V6.tables}
     # Every contract table (now including dim_optimizer_run) is written to disk, even when a
     # source owner contributes zero rows; assert existence rather than a magic count so an
     # additive table cannot silently re-stale this smoke test.

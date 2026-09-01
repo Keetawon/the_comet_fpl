@@ -34,7 +34,7 @@ import pyarrow as pa  # type: ignore[import-untyped]
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 from fpl.artifacts.optimizer_plan import OptimizerPlanArtifact, read_optimizer_artifact
-from fpl.publish.contract import SEMANTIC_CONTRACT_V5, Column, Table
+from fpl.publish.contract import SEMANTIC_CONTRACT_V6, Column, Table
 from fpl.storage.db import connect, table_columns, table_exists
 
 BI_EXPORT_SCHEMA: Final[str] = "fpl.bi-semantic-export"
@@ -79,6 +79,36 @@ _GUARANTEED_NONNULL_COLUMNS: Final[dict[str, frozenset[str]]] = {
             "was_home",
             "goals_for",
             "goals_against",
+        }
+    ),
+    "fact_provisional_player_fixture_observation": frozenset(
+        {
+            "season",
+            "fixture",
+            "code",
+            "gw",
+            "kickoff_time",
+            "position",
+            "team_id",
+            "team_code",
+            "opponent_team_id",
+            "was_home",
+            "observed_at",
+        }
+    ),
+    "fact_provisional_team_fixture_observation": frozenset(
+        {
+            "season",
+            "fixture",
+            "team_id",
+            "team_code",
+            "opponent_team_id",
+            "gw",
+            "kickoff_time",
+            "was_home",
+            "goals_for",
+            "goals_against",
+            "observed_at",
         }
     ),
 }
@@ -225,6 +255,7 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "season",
         "code",
         "element",
+        "element_type",
         "known_at",
         "capture_id",
         "web_name",
@@ -250,7 +281,47 @@ _SOURCE_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         "kickoff_time",
         "team_h",
         "team_a",
+        "team_h_score",
+        "team_a_score",
         "finished",
+        "finished_provisional",
+    ),
+    "snapshot_capture": ("capture_id", "captured_at", "season", "mode"),
+    "snapshot_payload": ("capture_id", "endpoint", "parameter"),
+    "stg_live_player_fixture_version": (
+        "season",
+        "fixture",
+        "code",
+        "gw",
+        "kickoff_time",
+        "position",
+        "team_id",
+        "opponent_team_id",
+        "was_home",
+        "minutes",
+        "starts",
+        "goals_scored",
+        "assists",
+        "clean_sheets",
+        "goals_conceded",
+        "saves",
+        "penalties_saved",
+        "penalties_missed",
+        "own_goals",
+        "yellow_cards",
+        "red_cards",
+        "bonus",
+        "bps",
+        "expected_goals",
+        "expected_assists",
+        "expected_goals_conceded",
+        "defensive_contribution",
+        "threat",
+        "creativity",
+        "influence",
+        "total_points",
+        "known_at",
+        "capture_id",
     ),
     "mart_team_fixture_live": (
         "season",
@@ -655,6 +726,63 @@ def _validate_source_schema(con: duckdb.DuckDBPyConnection) -> bool:
     return ledger_present
 
 
+def _validate_latest_player_history_captures(con: duckdb.DuckDBPyConnection) -> None:
+    """Fail closed if the provisional source capture omitted any player endpoint.
+
+    ``daily_snapshot --player-history`` fetches every endpoint before its atomic write.  The mode
+    alone is not a completeness witness, though: a hand-built or historical package could carry
+    one element summary and still call itself player-history.  Provisional reporting therefore
+    checks the latest such capture per season before any rows are selected from it.
+    """
+    violation = con.execute(
+        """
+        WITH latest AS (
+            SELECT capture_id, season,
+                   row_number() OVER (
+                       PARTITION BY season ORDER BY captured_at DESC, capture_id DESC
+                   ) AS capture_rank
+            FROM snapshot_capture
+            WHERE mode = 'player-history'
+        ), counts AS (
+            SELECT latest.season, latest.capture_id,
+                   (SELECT count(*) FROM snapshot_payload AS payload
+                    WHERE payload.capture_id = latest.capture_id
+                      AND payload.endpoint = 'bootstrap-static') AS bootstrap_payloads,
+                   (SELECT count(*) FROM snapshot_payload AS payload
+                    WHERE payload.capture_id = latest.capture_id
+                      AND payload.endpoint = 'fixtures') AS fixture_payloads,
+                   (SELECT count(*)
+                    FROM snapshot_payload AS payload
+                    INNER JOIN stg_live_player_version AS player
+                      ON player.capture_id = payload.capture_id
+                     AND payload.parameter = CAST(player.element AS VARCHAR)
+                     AND player.element_type IN (1, 2, 3, 4)
+                    WHERE payload.capture_id = latest.capture_id
+                      AND payload.endpoint = 'element-summary') AS element_payloads,
+                   (SELECT count(*) FROM stg_live_player_version AS player
+                    WHERE player.capture_id = latest.capture_id
+                      AND player.element_type IN (1, 2, 3, 4)) AS supported_players
+            FROM latest
+            WHERE capture_rank = 1
+        )
+        SELECT season, capture_id, bootstrap_payloads, fixture_payloads,
+               element_payloads, supported_players
+        FROM counts
+        WHERE bootstrap_payloads <> 1
+           OR fixture_payloads <> 1
+           OR element_payloads <> supported_players
+        ORDER BY season
+        LIMIT 1
+        """
+    ).fetchone()
+    if violation is not None:
+        raise BiExportSourceError(
+            "latest player-history capture is incomplete; provisional reporting requires exactly "
+            "one bootstrap, one fixtures payload, and one element-summary per supported player: "
+            f"{violation}"
+        )
+
+
 # Live-season registry, latest committed snapshot per entity. The archive marts cover completed
 # seasons only, so a live-season forecast's players, clubs, fixtures and gameweeks are sourced from
 # the versioned live staging and unioned into the dimensions for seasons the marts do not carry.
@@ -681,6 +809,14 @@ _LIVE_FIXTURE_LATEST: Final[str] = """
     FROM stg_live_fixture_version
     QUALIFY row_number() OVER (
         PARTITION BY season, fixture ORDER BY known_at DESC, capture_id DESC
+    ) = 1
+"""
+_LATEST_PLAYER_HISTORY_CAPTURE: Final[str] = """
+    SELECT season, capture_id, captured_at AS observed_at
+    FROM snapshot_capture
+    WHERE mode = 'player-history'
+    QUALIFY row_number() OVER (
+        PARTITION BY season ORDER BY captured_at DESC, capture_id DESC
     ) = 1
 """
 _LIVE_FDR_LATEST: Final[str] = """
@@ -885,6 +1021,161 @@ def _source_queries(
              AND components.fixture = outcome.fixture
              AND components.team_id = outcome.team_id
         """
+    # Preview-to-final handoff is fixture-atomic. One immutable outcome row is sufficient
+    # evidence that final attachment has started, so neither provisional fact may expose a
+    # partial mixture while the remaining player or reciprocal team rows are being attached.
+    finalized_fixture_sources = [
+        "SELECT season, fixture FROM mart_fact_player_fixture",
+        "SELECT season, fixture FROM mart_fact_team_match",
+    ]
+    if player_outcomes_present:
+        finalized_fixture_sources.append(
+            "SELECT season, fixture FROM ledger_outcome_player_fixture"
+        )
+    if team_outcomes_present:
+        finalized_fixture_sources.append(
+            "SELECT season, fixture FROM ledger_outcome_team_fixture"
+        )
+    finalized_fixture_sql = "\n            UNION\n            ".join(
+        finalized_fixture_sources
+    )
+    provisional_player_observation = f"""
+        WITH selected_capture AS ({_LATEST_PLAYER_HISTORY_CAPTURE}),
+        finalized_fixture AS (
+            {finalized_fixture_sql}
+        ),
+        completed_fixture AS (
+            SELECT fixture.*, selected_capture.observed_at
+            FROM stg_live_fixture_version AS fixture
+            INNER JOIN selected_capture
+              ON selected_capture.season = fixture.season
+             AND selected_capture.capture_id = fixture.capture_id
+            WHERE (fixture.finished_provisional IS TRUE OR fixture.finished IS TRUE)
+              AND fixture.gw IS NOT NULL
+              AND fixture.kickoff_time IS NOT NULL
+              AND fixture.team_h_score IS NOT NULL
+              AND fixture.team_a_score IS NOT NULL
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM finalized_fixture AS final
+                    WHERE final.season = fixture.season
+                      AND final.fixture = fixture.fixture
+              )
+        )
+        SELECT history.season, history.fixture, history.code, history.gw,
+               history.kickoff_time, history.position, history.team_id, team.team_code,
+               history.opponent_team_id, history.was_home, history.minutes, history.starts,
+               history.goals_scored, history.assists, history.clean_sheets,
+               history.goals_conceded, history.saves, history.penalties_saved,
+               history.penalties_missed, history.own_goals, history.yellow_cards,
+               history.red_cards, history.bonus, history.bps, history.expected_goals,
+               history.expected_assists, history.expected_goals_conceded,
+               history.defensive_contribution, history.threat, history.creativity,
+               history.influence, history.total_points AS total_points_as_recorded,
+               fixture.observed_at
+        FROM stg_live_player_fixture_version AS history
+        INNER JOIN completed_fixture AS fixture
+          ON fixture.season = history.season
+         AND fixture.fixture = history.fixture
+         AND fixture.capture_id = history.capture_id
+        LEFT JOIN stg_live_team_version AS team
+          ON team.season = history.season
+         AND team.team_id = history.team_id
+         AND team.capture_id = history.capture_id
+    """
+    provisional_team_observation = f"""
+        WITH selected_capture AS ({_LATEST_PLAYER_HISTORY_CAPTURE}),
+        finalized_fixture AS (
+            {finalized_fixture_sql}
+        ),
+        completed_fixture AS (
+            SELECT fixture.*, selected_capture.observed_at
+            FROM stg_live_fixture_version AS fixture
+            INNER JOIN selected_capture
+              ON selected_capture.season = fixture.season
+             AND selected_capture.capture_id = fixture.capture_id
+            WHERE (fixture.finished_provisional IS TRUE OR fixture.finished IS TRUE)
+              AND fixture.gw IS NOT NULL
+              AND fixture.kickoff_time IS NOT NULL
+              AND fixture.team_h_score IS NOT NULL
+              AND fixture.team_a_score IS NOT NULL
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM finalized_fixture AS final
+                    WHERE final.season = fixture.season
+                      AND final.fixture = fixture.fixture
+              )
+        ), player_components AS (
+            SELECT history.season, history.fixture, history.capture_id, history.team_id,
+                   CASE
+                       WHEN count(*) FILTER (WHERE history.minutes >= 1) > 0
+                        AND count(history.expected_goals) FILTER (WHERE history.minutes >= 1)
+                            = count(*) FILTER (WHERE history.minutes >= 1)
+                       THEN sum(history.expected_goals) FILTER (WHERE history.minutes >= 1)
+                   END AS team_xg,
+                   CASE
+                       WHEN count(*) FILTER (WHERE history.minutes >= 1) > 0
+                        AND count(history.expected_goals_conceded)
+                                FILTER (WHERE history.minutes >= 1)
+                            = count(*) FILTER (WHERE history.minutes >= 1)
+                       THEN max(history.expected_goals_conceded)
+                                FILTER (WHERE history.minutes >= 1)
+                   END AS team_xgc,
+                   CASE
+                       WHEN count(*) FILTER (WHERE history.minutes >= 1) > 0
+                        AND count(history.bps) FILTER (WHERE history.minutes >= 1)
+                            = count(*) FILTER (WHERE history.minutes >= 1)
+                       THEN sum(history.bps) FILTER (WHERE history.minutes >= 1)
+                   END AS team_bps,
+                   CASE
+                       WHEN count(*) FILTER (
+                                WHERE history.position <> 'GK' AND history.minutes >= 1
+                            ) > 0
+                        AND count(history.defensive_contribution) FILTER (
+                                WHERE history.position <> 'GK' AND history.minutes >= 1
+                            ) = count(*) FILTER (
+                                WHERE history.position <> 'GK' AND history.minutes >= 1
+                            )
+                       THEN sum(history.defensive_contribution) FILTER (
+                                WHERE history.position <> 'GK' AND history.minutes >= 1
+                            )
+                   END AS defensive_contribution
+            FROM stg_live_player_fixture_version AS history
+            INNER JOIN selected_capture
+              ON selected_capture.season = history.season
+             AND selected_capture.capture_id = history.capture_id
+            GROUP BY history.season, history.fixture, history.capture_id, history.team_id
+        ), sides AS (
+            SELECT fixture.season, fixture.fixture, fixture.team_h AS team_id,
+                   fixture.team_a AS opponent_team_id, fixture.gw, fixture.kickoff_time,
+                   TRUE AS was_home, fixture.team_h_score AS goals_for,
+                   fixture.team_a_score AS goals_against, fixture.capture_id,
+                   fixture.observed_at
+            FROM completed_fixture AS fixture
+            UNION ALL
+            SELECT fixture.season, fixture.fixture, fixture.team_a AS team_id,
+                   fixture.team_h AS opponent_team_id, fixture.gw, fixture.kickoff_time,
+                   FALSE AS was_home, fixture.team_a_score AS goals_for,
+                   fixture.team_h_score AS goals_against, fixture.capture_id,
+                   fixture.observed_at
+            FROM completed_fixture AS fixture
+        )
+        SELECT sides.season, sides.fixture, sides.team_id, team.team_code,
+               sides.opponent_team_id, sides.gw, sides.kickoff_time, sides.was_home,
+               sides.goals_for, sides.goals_against, components.team_xg,
+               components.team_xgc, components.team_bps, components.defensive_contribution,
+               sides.observed_at
+        FROM sides
+        LEFT JOIN stg_live_team_version AS team
+          ON team.season = sides.season
+         AND team.team_id = sides.team_id
+         AND team.capture_id = sides.capture_id
+        LEFT JOIN player_components AS components
+          ON components.season = sides.season
+         AND components.fixture = sides.fixture
+         AND components.capture_id = sides.capture_id
+         AND components.team_id = sides.team_id
+    """
     queries: dict[str, str] = {
         "dim_player": f"""
             WITH unified AS (
@@ -1025,6 +1316,8 @@ def _source_queries(
         """,
         "fact_player_fixture_actual": player_actual,
         "fact_team_fixture_actual": team_actual,
+        "fact_provisional_player_fixture_observation": provisional_player_observation,
+        "fact_provisional_team_fixture_observation": provisional_team_observation,
         "fact_player_form": """
             SELECT season, gw, code, "window", rostered_fixtures, appearances, starts,
                    did_not_play, minutes, goals_scored, assists, bonus, bps,
@@ -1044,7 +1337,7 @@ def _source_queries(
     }
     if not ledger_present:
         for table_name in _LEDGER_PUBLISHED_TABLE_NAMES:
-            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V5.table(table_name))
+            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V6.table(table_name))
         return queries
 
     queries.update(
@@ -1173,11 +1466,11 @@ def _source_queries(
     )
     if not player_outcomes_present:
         queries["fact_finalized_player_fixture_outcome"] = _empty_source_sql(
-            SEMANTIC_CONTRACT_V5.table("fact_finalized_player_fixture_outcome")
+            SEMANTIC_CONTRACT_V6.table("fact_finalized_player_fixture_outcome")
         )
     if not team_outcomes_present:
         queries["fact_finalized_team_fixture_outcome"] = _empty_source_sql(
-            SEMANTIC_CONTRACT_V5.table("fact_finalized_team_fixture_outcome")
+            SEMANTIC_CONTRACT_V6.table("fact_finalized_team_fixture_outcome")
         )
     return queries
 
@@ -1316,14 +1609,122 @@ def _validate_team_actual_fixture_consistency(con: duckdb.DuckDBPyConnection) ->
         )
 
 
+def _validate_provisional_fixture_consistency(con: duckdb.DuckDBPyConnection) -> None:
+    """Keep mutable reporting rows reciprocal, same-capture, and disjoint from final facts."""
+    team_violation = con.execute(
+        """
+        WITH checked AS (
+            SELECT provisional.season, provisional.fixture,
+                   count(*) AS side_count,
+                   count(*) FILTER (WHERE provisional.was_home) AS home_count,
+                   count(*) FILTER (WHERE NOT provisional.was_home) AS away_count,
+                   count(DISTINCT provisional.observed_at) AS observed_at_count,
+                   bool_and(
+                       provisional.gw = fixture.gw
+                       AND provisional.kickoff_time = fixture.kickoff_time
+                       AND (
+                           (provisional.was_home
+                            AND provisional.team_id = fixture.home_team_id
+                            AND provisional.team_code = fixture.home_team_code
+                            AND provisional.opponent_team_id = fixture.away_team_id)
+                           OR
+                           (NOT provisional.was_home
+                            AND provisional.team_id = fixture.away_team_id
+                            AND provisional.team_code = fixture.away_team_code
+                            AND provisional.opponent_team_id = fixture.home_team_id)
+                       )
+                   ) AS identity_matches_fixture,
+                   max(provisional.goals_for) FILTER (WHERE provisional.was_home)
+                       AS home_goals_for,
+                   max(provisional.goals_against) FILTER (WHERE provisional.was_home)
+                       AS home_goals_against,
+                   max(provisional.goals_for) FILTER (WHERE NOT provisional.was_home)
+                       AS away_goals_for,
+                   max(provisional.goals_against) FILTER (WHERE NOT provisional.was_home)
+                       AS away_goals_against
+            FROM fact_provisional_team_fixture_observation AS provisional
+            LEFT JOIN dim_fixture AS fixture
+              ON fixture.season = provisional.season
+             AND fixture.fixture = provisional.fixture
+            GROUP BY provisional.season, provisional.fixture
+        )
+        SELECT season, fixture
+        FROM checked
+        WHERE side_count <> 2
+           OR home_count <> 1
+           OR away_count <> 1
+           OR observed_at_count <> 1
+           OR identity_matches_fixture IS NOT TRUE
+           OR home_goals_for IS DISTINCT FROM away_goals_against
+           OR away_goals_for IS DISTINCT FROM home_goals_against
+        ORDER BY season, fixture
+        LIMIT 1
+        """
+    ).fetchone()
+    if team_violation is not None:
+        raise BiExportValidationError(
+            "fact_provisional_team_fixture_observation: fixture identity/reciprocity violation "
+            f"at (season, fixture)={team_violation}"
+        )
+
+    player_violation = con.execute(
+        """
+        SELECT player.season, player.fixture, player.code
+        FROM fact_provisional_player_fixture_observation AS player
+        LEFT JOIN fact_provisional_team_fixture_observation AS team
+          ON team.season = player.season
+         AND team.fixture = player.fixture
+         AND team.team_id = player.team_id
+        WHERE team.team_id IS NULL
+           OR player.team_code <> team.team_code
+           OR player.opponent_team_id <> team.opponent_team_id
+           OR player.gw <> team.gw
+           OR player.kickoff_time <> team.kickoff_time
+           OR player.was_home <> team.was_home
+           OR player.observed_at <> team.observed_at
+        ORDER BY player.season, player.fixture, player.code
+        LIMIT 1
+        """
+    ).fetchone()
+    if player_violation is not None:
+        raise BiExportValidationError(
+            "fact_provisional_player_fixture_observation: player/team provisional identity "
+            f"violation at (season, fixture, code)={player_violation}"
+        )
+
+    overlap = con.execute(
+        """
+        SELECT 'player', provisional.season, provisional.fixture
+        FROM fact_provisional_player_fixture_observation AS provisional
+        INNER JOIN fact_player_fixture_actual AS final
+          ON final.season = provisional.season
+         AND final.fixture = provisional.fixture
+         AND final.code = provisional.code
+        UNION ALL
+        SELECT 'team', provisional.season, provisional.fixture
+        FROM fact_provisional_team_fixture_observation AS provisional
+        INNER JOIN fact_team_fixture_actual AS final
+          ON final.season = provisional.season
+         AND final.fixture = provisional.fixture
+         AND final.team_id = provisional.team_id
+        LIMIT 1
+        """
+    ).fetchone()
+    if overlap is not None:
+        raise BiExportValidationError(
+            "provisional observation overlaps a finalized actual at the same grain: "
+            f"{overlap}"
+        )
+
+
 def _validate_referential_integrity(tables: Mapping[str, pa.Table]) -> None:
     con = duckdb.connect(":memory:")
     try:
-        for table in SEMANTIC_CONTRACT_V5.tables:
+        for table in SEMANTIC_CONTRACT_V6.tables:
             con.register(table.name, tables[table.name])
-        for child in SEMANTIC_CONTRACT_V5.tables:
+        for child in SEMANTIC_CONTRACT_V6.tables:
             for join in child.joins:
-                parent = SEMANTIC_CONTRACT_V5.table(join.to_table)
+                parent = SEMANTIC_CONTRACT_V6.table(join.to_table)
                 on = " AND ".join(
                     f"child.{_quote_identifier(local)} = parent.{_quote_identifier(remote)}"
                     for local, remote in join.on
@@ -1348,6 +1749,7 @@ def _validate_referential_integrity(tables: Mapping[str, pa.Table]) -> None:
                         f"on {join.on}; season-scoped ids must resolve within their season"
                     )
         _validate_team_actual_fixture_consistency(con)
+        _validate_provisional_fixture_consistency(con)
     finally:
         con.close()
 
@@ -1668,7 +2070,7 @@ def _manifest(
     payload: dict[str, Any] = {
         "schema": BI_EXPORT_SCHEMA,
         "schema_version": BI_EXPORT_SCHEMA_VERSION,
-        "semantic_contract_version": SEMANTIC_CONTRACT_V5.version,
+        "semantic_contract_version": SEMANTIC_CONTRACT_V6.version,
         "created_at": _isoformat(created_at),
         "database_sha256": database_sha256,
         "exported_run_ids": list(exported_run_ids),
@@ -1742,8 +2144,8 @@ def _assert_manifest_shape(manifest: Mapping[str, Any]) -> None:
         or manifest["schema_version"] != BI_EXPORT_SCHEMA_VERSION
     ):
         raise BiExportValidationError("manifest export schema/version does not match this exporter")
-    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V5.version:
-        raise BiExportValidationError("manifest semantic contract version does not match v5")
+    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V6.version:
+        raise BiExportValidationError("manifest semantic contract version does not match v6")
     _manifest_timestamp(manifest["created_at"], "created_at")
     if not _is_sha256(manifest["database_sha256"]):
         raise BiExportValidationError("manifest database_sha256 must be a SHA-256 string")
@@ -1807,14 +2209,14 @@ def _validate_export_directory(
     table_metadata = manifest["tables"]
     if not isinstance(table_metadata, dict):
         raise BiExportValidationError("manifest tables must be an object")
-    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V5.tables}
+    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V6.tables}
     if set(table_metadata) != expected_table_names:
         raise BiExportValidationError(
             "manifest does not enumerate exactly the semantic contract tables"
         )
     expected_files = {MANIFEST_FILENAME}
     frames: dict[str, pa.Table] = {}
-    for table in SEMANTIC_CONTRACT_V5.tables:
+    for table in SEMANTIC_CONTRACT_V6.tables:
         entry = table_metadata[table.name]
         if not isinstance(entry, dict) or set(entry) != {"file", "row_count", "sha256"}:
             raise BiExportValidationError(f"manifest entry for {table.name} is malformed")
@@ -1984,7 +2386,7 @@ def export_bi(
     maximum_source_age: timedelta | None = None,
     before_publish: Callable[[], None] | None = None,
 ) -> BiExportResult:
-    """Materialise and atomically publish the complete v1 semantic contract.
+    """Materialise and atomically publish the complete current semantic contract.
 
     ``optimizer_plan_paths`` is an explicit 0..N input.  Each parsed optimizer artifact must map
     through its forecast SHA to exactly one recorded ledger run; passing no paths publishes an empty
@@ -2008,6 +2410,7 @@ def export_bi(
             con = connect(source_path, read_only=True)
             try:
                 ledger_present = _validate_source_schema(con)
+                _validate_latest_player_history_captures(con)
                 exported_run_ids, freshness, source_known_at = _assess_freshness(
                     con,
                     ledger_present=ledger_present,
@@ -2033,7 +2436,7 @@ def export_bi(
                 }
                 table_exports: dict[str, TableExport] = {}
                 expected_null_counts: dict[str, dict[str, int]] = {}
-                for table in SEMANTIC_CONTRACT_V5.tables:
+                for table in SEMANTIC_CONTRACT_V6.tables:
                     if table.name in injected:
                         rows = injected[table.name]
                         frame = (

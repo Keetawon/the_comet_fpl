@@ -6,7 +6,8 @@ it never queries DuckDB and never reads Parquet in the browser.
 
 ## 2026-08-26 dashboard program
 
-Schema v9 is the current development-only application contract. The ordered program is:
+Schema v9 remains the development-only contract for the ten established read models. Two additive
+completed-match preview files have their own schema version 1. The ordered program is:
 
 1. **Implemented development-only:** Player analytics and Team analytics over existing published
    values, following `../docs/dashboard-deep-analytics.md`;
@@ -27,7 +28,16 @@ Schema v9 is the current development-only application contract. The ordered prog
    finalized team-fixture history for Fixture Matrix expanded rows. Its Actual scope defaults to
    the page-wide rolling latest five distinct season-qualified finalized gameweeks across the
    forecast season and its immediate predecessor; explicit single-season options remain available,
-   and double-gameweek legs are retained.
+   and double-gameweek legs are retained;
+6. **Implemented development-only (2026-09-01):** BI semantic v6 and the independently versioned
+   `player_provisional_actuals.json` / `team_provisional_actuals.json` files expose one coherent
+   provisional-display player-history capture to Players and Fixture Matrix only. A score-present
+   `finished_provisional` or `finished` fixture stays there until any whole-fixture final evidence
+   exists, then finalized evidence replaces it atomically. Rows and
+   Season–GW options are explicitly labelled provisional, finalized rows win after exact identity
+   reconciliation, and Players keeps provisional `total_points_as_recorded` distinct from finalized
+   `points_under_rules_2026_27`. The finalized ledgers and both prediction-monitoring routes are
+   unchanged.
 
 The implemented deep-analytics routes are `#player-analytics` and `#team-analytics`; both are
 linked directly in the sidebar and retain an exact-table equivalent for every chart.
@@ -142,6 +152,15 @@ fixture arrays. Every normalized player-actual fixture also carries its fixture-
 opponent, and venue identity. The publisher resolves those identities within their own season,
 checks gameweek/side/venue/codes against `dim_fixture`, and uses that dimension's kickoff as the
 canonical presentation timestamp.
+
+`player_provisional_actuals.json` and `team_provisional_actuals.json` are separate schema-v1
+envelopes with one shared `captured_at`. They are populated only from BI semantic v6's latest
+complete same-capture player-history facts for score-present fixtures marked
+`finished_provisional=true OR finished=true`, excluding the entire fixture once any player/team
+archive or immutable-ledger final evidence exists. Load the append-only provisional snapshot packages first by
+following `../docs/provisional-data-refresh.md`; then run the same BI/dashboard publish commands
+above. This refreshes observed display data only and is not a reason to regenerate a forecast.
+Empty provisional files are valid and carry `captured_at: null`.
 
 ## Solve from the dashboard (local plan server)
 
@@ -311,7 +330,15 @@ optimizer and directs exact solves back to a trusted machine. Manager fetch/solv
 manager-to-Draft import likewise require the trusted local Plan Server; the hosted site has no
 manager account, capture store, or authenticated My Team integration. The public-data packager
 removes user-custom plans and rejects manager IDs, bank/selling values, current-squad payloads,
-workstation paths, or secret-like values before rebuilding and validating the manifest.
+workstation paths, or secret-like values before rebuilding and validating the manifest. A future
+manually reviewed sanitized ZIP includes both provisional schema-v1 files because the validated
+read-model generation is complete only with all twelve files. Their explicit `captured_at`, status
+semantics, and raw points name are retained.
+
+Packaging never deploys by itself. GitHub Pages changes only after an owner publishes the reviewed
+immutable ZIP and manually updates the exact release/hash pin in `public-data-release.json`.
+Fetching or loading a daily provisional package, republishing local JSON, or running the dashboard
+server does not update the public site; the current unpublished/manual pin remains authoritative.
 
 See [Public dashboard deployment](../docs/dashboard-deployment.md) for the one-time Pages setting,
 release/pin workflow, privacy boundary, refresh, and rollback procedure.
@@ -358,9 +385,12 @@ comparison page and is not a twelfth navigation item.
   derived from the vintage's published lambdas — 100 = average club, higher = stronger
   opponent = red, so a strong club's own row is no longer uniformly green), the row club's
   model ease (overall/attack/defence views), or official FDR. Expanding a row is historical; its
-  Actual scope defaults to the page-wide rolling latest five distinct season-qualified finalized
+  Actual scope defaults to the page-wide rolling latest five distinct season-qualified ended-match
   gameweeks across the forecast season and its immediate predecessor, newest first, with explicit
-  single-season options and every double-gameweek leg retained. The
+  single-season options and every double-gameweek leg retained. That scope merges finalized
+  `team_actuals.json` with explicitly labelled `team_provisional_actuals.json`; finalized fixture
+  rows win only after identity reconciliation, provisional Season–GW labels include
+  `(provisional)`, and a capture-time banner identifies the mutable preview. The
   detail columns are match/GW and kickoff, opponent and venue, official GF/GA, source-row xG/xGC,
   summed BPS, and raw defensive-contribution actions. These component sums are not independently
   roster-reconciled. Rows show season plus GW. Returning clubs join across seasons only on permanent
@@ -370,9 +400,14 @@ comparison page and is not a twelfth navigation item.
   defensive-actions CSV and cannot provide them, so the UI does not display a proxy. Future
   fixture-level drill-down remains on Next GW only.
 - **Players** (implemented, P1.7c + P1.8 code/tests): the player-form pivot from
-  `players.json` plus normalized `player_actuals.json` — one row per player of the selected
+  `players.json` plus normalized finalized `player_actuals.json` and separate provisional
+  `player_provisional_actuals.json` — one row per player of the selected
   vintage (photo + club badge) merging
-  a selected finalized Season–GW endpoint range with per-gameweek xP chips and a range-total xP.
+  a selected observed Season–GW endpoint range with per-gameweek xP chips and a range-total xP.
+  Provisional keys and rows are labelled, the preview banner shows `captured_at`, and finalized
+  fixtures win after exact identity reconciliation. `Pts` uses finalized
+  `points_under_rules_2026_27` or provisional `total_points_as_recorded` according to row status;
+  the two fields are never renamed, combined, or replayed.
   The actual scope appears once in a compact strip above the table, so the first observed leaf is
   simply `App`. A Players-only sortable `xP GW{Forecast From}` column sits immediately after
   `Pts` and defaults descending for starter/bench review. It selects the exact cumulative
@@ -413,12 +448,14 @@ comparison page and is not a twelfth navigation item.
   scope and requires a fresh verification; hosted static builds cannot use it. Rows are compact
   and paginated. On Players, the main aggregate reads the inclusive page-wide range between its
   explicit chronological Season–GW endpoints. The endpoint options cover only the forecast season
-  and its immediate predecessor, default/reset to the latest five finalized keys, join players by
-  permanent `code`, retain every DGW leg, and never backfill a player outside the shared range. The
-  expanded row is a separate fixed rolling history over `player_actuals.json`: it takes the
+  and its immediate predecessor, default/reset to the latest five finalized or explicitly
+  provisional ended-match keys, join players by permanent `code`, retain every DGW leg, and never
+  backfill a player outside the shared range. The expanded row is a separate fixed rolling history
+  over the reconciled finalized/provisional observations: it takes the
   page-wide set
-  of the latest five distinct season-qualified finalized GW labels across the forecast season and
-  its immediate predecessor, preserves every DGW leg, and orders the result newest first. It shows
+  of the latest five distinct season-qualified ended-match GW labels across the forecast season and
+  its immediate predecessor, preserves every DGW leg, labels provisional periods/rows, and orders
+  the result newest first. It shows
   `Match` (season/GW, fixture-time Club, and kickoff date), `Opp (H/A)`, then minutes/start,
   goals, assists, xG,
   xA, fail-closed display xGI, clean sheets, on-pitch goals conceded, saves, raw DC actions, xGC,
@@ -441,10 +478,12 @@ comparison page and is not a twelfth navigation item.
   overlapping probability columns; Player analytics exposes the exact blank/haul endpoints.
   The time axes stay separate: **Forecast GWs** filters upcoming fixtures and xP, while **Actual
   from / Actual to** selects an inclusive chronological range from the page-wide exact finalized
-  Season–GW keys across the forecast season and, only when present in `player_actuals.json`, its
-  immediate predecessor. The controls do not numerically interpolate absent GWs, and their default
-  is the latest five available keys. A forecast range never silently reinterprets historical form
-  or actuals. Deterministic insight facts follow the verified My
+  or explicitly provisional Season–GW keys across the forecast season and, only when present in
+  the normalized actual files, its immediate predecessor. The controls do not numerically
+  interpolate absent GWs, and their default is the latest five available keys. A forecast range
+  never silently reinterprets historical form or actuals. Any selected provisional period disables
+  the optional language renderer because insight request schema v4 cannot represent that mutable
+  evidence; deterministic facts remain available. Deterministic insight facts follow the verified My
   squad scope, but the optional remote renderer is disabled while that private filter is active:
   manager ID, capture identity, and squad membership never enter the public insight request. The
   same fail-closed evidence rule disables the renderer for a selected player name or more than one

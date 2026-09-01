@@ -243,6 +243,7 @@ CREATE TABLE IF NOT EXISTS stg_live_fixture_version (
     team_h_difficulty INTEGER,
     team_a_difficulty INTEGER,
     finished          BOOLEAN,
+    finished_provisional BOOLEAN,
     PRIMARY KEY (season, fixture, capture_id)
 );
 
@@ -624,6 +625,8 @@ ALTER TABLE stg_live_fixture_version
     ADD COLUMN IF NOT EXISTS team_h_score INTEGER;
 ALTER TABLE stg_live_fixture_version
     ADD COLUMN IF NOT EXISTS team_a_score INTEGER;
+ALTER TABLE stg_live_fixture_version
+    ADD COLUMN IF NOT EXISTS finished_provisional BOOLEAN;
 ALTER TABLE mart_fact_player_fixture
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE mart_fact_player_fixture

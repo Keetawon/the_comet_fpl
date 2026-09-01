@@ -252,18 +252,22 @@ team defence CRPS uses the opponent's exact PMF for that fixture, never a distri
 from `lambda_against`. The browser receives only published scalar observations and score blocks;
 raw PMFs remain behind the Python emitter. The version-4 player-horizon rule remains: the browser
 selects exact cumulative xP and inclusive `P(points <= 2)` / `P(points >= 2/4/6/10/15)` endpoints
-and never sums probabilities or derives a CCDF/model quantity. Schema version 9 is current: it
-retains version 8's normalized player/team history, cumulative endpoints, and forecast-owned
+and never sums probabilities or derives a CCDF/model quantity. Schema version 9 remains current
+for the ten established read-model files: it retains version 8's normalized player/team history,
+cumulative endpoints, and forecast-owned
 `cold_start_player` provenance, and extends every `player_actuals.json` fixture with its
 fixture-time `team_code`, `team_short_name`, `opponent_team_code`, `opponent_short_name`, and
 `was_home`. Python resolves those club identities through the season-qualified team dimension,
 reconciles side, venue, gameweek, and permanent codes to `dim_fixture`, and publishes that
 fixture dimension's kickoff as the canonical presentation timestamp. A browser never infers an
-historical opponent from the player's current club. The
-Players route exposes two explicit chronological `Actual from` / `Actual to` endpoints. Their
-options are the page-wide exact finalized `(season, gw)` keys from only the selected forecast season
-and its immediate predecessor, ordered from predecessor to forecast season. The default and reset
-scope is the latest five such keys; at 2026-27 GW1 that is `Actual from: 2025-26 GW35` through
+historical opponent from the player's current club. The separate
+`player_provisional_actuals.json` and `team_provisional_actuals.json` preview envelopes each use
+their own JSON schema version 1; they do not bump or reinterpret any established schema-v9 file.
+The Players route exposes two explicit chronological `Actual from` / `Actual to` endpoints. Their
+options are the page-wide exact finalized or explicitly provisional `(season, gw)` keys from only
+the selected forecast season and its immediate predecessor, ordered from predecessor to forecast
+season. The default and reset scope is the latest five such keys; at 2026-27 GW1 that is
+`Actual from: 2025-26 GW35` through
 `Actual to: 2026-27 GW1`. Selection includes every published key between the endpoints, without
 inventing absent numeric gameweeks. This main aggregate may therefore cross the season
 boundary only when its displayed endpoints explicitly do so. It never silently substitutes a
@@ -284,9 +288,13 @@ displays BPS/App as the selected-range observed BPS total divided by appearances
 leg counts once, DNPs are excluded, and any missing BPS on an appeared row makes the ratio
 unavailable. Normalized actuals retain fixture-grain BPS, while the selected-range aggregate and
 legacy form BPS measure remain totals. This is backward-looking descriptive arithmetic, not a
-model quantity. The main table remains bound to its explicit Season–GW endpoint range, but its
+model quantity. A provisional player row keeps the API's mutable points only as
+`total_points_as_recorded`; a finalized row keeps `points_under_rules_2026_27`. The browser selects
+the correctly named measure by explicit outcome status and never aliases, combines, or replays the
+provisional value. The main table remains bound to its explicit Season–GW endpoint range, but its
 expanded history is a separate fixed rolling view: it retains every fixture in the page-wide latest
-five distinct **season-qualified** finalized gameweeks across the forecast season and its immediate predecessor,
+five distinct **season-qualified** finalized or explicitly provisional ended-match gameweeks across
+the forecast season and its immediate predecessor,
 then sorts newest first. At 2026-27 GW1 that window is 2026-27 GW1 followed by 2025-26 GW38 through
 GW35. Every row displays its season as well as its GW. Cross-season player membership is joined only
 on permanent `code`; a newcomer without predecessor-season evidence stays shorter and is never
@@ -313,9 +321,10 @@ across controls and the verified My squad membership. Options always come from t
 forecast vintage, and a vintage change prunes unavailable player/team codes so a hidden stale
 selection cannot empty the table. These controls are page-local: decision routes and Player
 Analytics retain their existing scalar selectors. Insight request schema v4 is unchanged; any
-name selection or multiple Position/Team selection makes Players deterministic-only because that
-scope cannot be represented exactly, while an empty or singleton Position/Team selection retains
-the exact existing scalar renderer scope. Player Analytics defaults to
+name selection, multiple Position/Team selection, or selected actual range containing provisional
+evidence makes Players deterministic-only because that scope cannot be represented exactly, while
+an empty or singleton Position/Team selection over finalized evidence retains the exact existing
+scalar renderer scope. Player Analytics defaults to
 the reporting-only Established evidence scope, which excludes forecast-marked cold starts from its
 shortlist/Pareto population; the explicit include control restores them without changing xP or any
 probability. Never infer cold-start status from observations or treat this filter as a model change.
@@ -342,13 +351,38 @@ goals for/against plus nullable source-row xG/xGC, summed BPS, and raw DC action
 eligibility is proven for present rows but is not an independent source-roster completeness
 witness. DGW legs remain separate and unavailable evidence remains NULL. Fixture Matrix's expanded-
 history scope defaults to one page-wide rolling window covering the latest five distinct season-
-qualified finalized gameweeks across the forecast season and its immediate predecessor, newest
-first, while explicit single-season options remain available. Every row labels both season and GW.
+qualified finalized or explicitly provisional ended-match gameweeks across the forecast season and
+its immediate predecessor, newest first, while explicit single-season options remain available.
+Every row labels both season and GW, and provisional periods/rows are marked as such.
 Cross-season club membership joins only on permanent `team_code`; promoted clubs without prior-
 Premier-League evidence stay shorter rather than inheriting another club's history. Possession
 and shots remain absent: the official/archive sources do not carry them and the existing
 operator-vendored FBref defensive-actions path cannot supply them, so no proxy is allowed. The
-Fixture Matrix's selected metric source owns all three aligned displays: the sortable average
+BI semantic contract version 6 retains every finalized v5 fact and adds the separate
+`fact_provisional_player_fixture_observation` and
+`fact_provisional_team_fixture_observation` facts. They carry no `run_id` and come only from one
+latest complete player-history capture per season: exactly one bootstrap, one fixtures payload,
+and one element-summary for every supported element type 1-4 player. Only score-present same-
+capture fixture rows with `finished_provisional=true OR finished=true` and non-null schedule
+identity are considered. They remain separate provisional-display evidence until any player/team
+archive or immutable-ledger final evidence exists; a shared anti-join then removes the whole
+fixture from both provisional facts atomically. Fixture/player/team identity and `observed_at` must
+agree, team sides must be reciprocal, and any residual provisional/finalized overlap fails closed.
+These facts never enter the
+append-only outcome ledgers, prediction-versus-actual read models, calibration, CRPS, or model
+evaluation; official `finished=true` attachment remains the only final monitoring path. Only
+Players and Fixture Matrix may merge their separate schema-v1 preview files, with finalized rows
+winning after identity reconciliation. The append-only provisional capture runs daily at 01:00 UTC
+(08:00 Bangkok) with a 05:00 UTC (12:00 Bangkok) recovery under the shared `api-snapshot`
+concurrency group. The morning pass may skip on a cheap all-scored-fixture plus latest-GW
+event-live signal; the recovery and every manual dispatch always sweep all supported element
+summaries, then no-op
+only on identical canonical content. Response-size, season-rollover, before/after signal, and
+per-eligible-fixture aggregate history-coverage guards fail closed. Loading into the single-writer
+local DuckDB and republishing local read models remain explicit operator actions. A future reviewed public ZIP includes both preview files to
+preserve a complete validated manifest, but Pages stays manually pinned to the exact immutable
+release in `public-data-release.json`; local refresh and daily capture do not deploy it. The Fixture
+Matrix's selected metric source owns all three aligned displays: the sortable average
 column, every fixture-card headline, and every fixture-card colour tier. **Opponent strength**
 shows the opponent's selected-vintage display-time strength index and labels the column
 `Avg Opp str (GWx-y)`; **Club ease** shows the row club's view-specific published attack,
@@ -525,8 +559,8 @@ with one atomic replacement only after success.
 `README.md` is the best current overview. Treat `docs/phase0-design.md` as a mixed historical
 design/as-built audit: its opening status and pre-implementation decisions are stale. The
 append-only prediction ledger, player/team fixture-grain forecast transport, reciprocal finalized
-outcome attachment, BI semantic v5 export, atomic schema-v9 static publish boundary, and eleven-route
-dashboard are all
+outcome attachment, BI semantic v6 export, atomic ten-file schema-v9 plus two-file provisional-
+schema-v1 static publish boundary, and eleven-route dashboard are all
 implemented development-only. The dashboard reads only versioned static JSON derived from the
 published Parquet export; it never queries the mutable production DuckDB. Deep analytics and exact
 player/team monitoring and deterministic/optional evidence-bound insight summaries are implemented
@@ -1099,8 +1133,9 @@ active delivery order.
    Prospective changes must stay point-in-time safe and must not silently re-run or re-judge any
    frozen historical evaluation.
 9. The append-only player-gameweek/player-fixture/team-fixture prediction ledger, reciprocal team-
-   outcome attachment, player-outcome ingestion, BI semantic contract version 5, dashboard schema
-   version 9, atomic static dashboard read models, and dashboard are implemented development-only.
+   outcome attachment, player-outcome ingestion, BI semantic contract version 6, the ten
+   established dashboard files at schema version 9, the two separate provisional files at schema
+   version 1, atomic static dashboard read models, and dashboard are implemented development-only.
    Player monitoring scores a gameweek only when the official gameweek and every forecast fixture
    leg are final, so a partial double gameweek produces zero scored player observations. Team attack
    CRPS uses the team's exact stored goals-for PMF; defence CRPS uses the opponent's exact stored PMF,

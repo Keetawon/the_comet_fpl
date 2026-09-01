@@ -1,17 +1,21 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadTeamForecastVsActual } from "@/data/load";
+import { loadTeamForecastVsActual, loadTeamProvisionalActuals } from "@/data/load";
 import sample from "@/data/sampleTeamForecastVsActual.json";
 import type { TeamForecastVsActualData } from "@/data/types";
 import { TeamForecastVsActualPage } from "./TeamForecastVsActualPage";
 
-vi.mock("@/data/load", () => ({ loadTeamForecastVsActual: vi.fn() }));
+vi.mock("@/data/load", () => ({
+  loadTeamForecastVsActual: vi.fn(),
+  loadTeamProvisionalActuals: vi.fn(),
+}));
 
 const payload = sample as unknown as TeamForecastVsActualData;
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 beforeEach(() => {
   vi.mocked(loadTeamForecastVsActual).mockReset();
+  vi.mocked(loadTeamProvisionalActuals).mockReset();
 });
 
 describe("TeamForecastVsActualPage", () => {
@@ -29,6 +33,7 @@ describe("TeamForecastVsActualPage", () => {
     expect(screen.getByRole("table", { name: "Cumulative club prediction residuals" })).toBeInTheDocument();
     expect(screen.getByText(/expected count—not P\(at least one clean sheet\)/)).toBeInTheDocument();
     expect(screen.getByText(/browser does not compute probabilities, CRPS, calibration, or buckets/)).toBeInTheDocument();
+    expect(loadTeamProvisionalActuals).not.toHaveBeenCalled();
   });
 
   it("labels defence residual direction in prose and exact values, not colour alone", async () => {

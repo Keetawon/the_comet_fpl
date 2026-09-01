@@ -24,16 +24,21 @@ import polars as pl
 import pytest
 
 import fpl.storage.db
-from fpl.publish.contract import SEMANTIC_CONTRACT_VERSION
+from fpl.publish.contract import SEMANTIC_CONTRACT_V6, SEMANTIC_CONTRACT_VERSION
 from fpl.publish.dashboard_json import (
     DASHBOARD_JSON_SCHEMA_VERSION,
     FIXTURE_MATRIX_FILENAME,
     PLAYER_ACTUALS_FILENAME,
     PLAYER_FORECAST_VS_ACTUAL_FILENAME,
     PLAYER_HORIZONS_FILENAME,
+    PLAYER_PROVISIONAL_ACTUALS_FILENAME,
+    PLAYER_PROVISIONAL_ACTUALS_SCHEMA,
     PLAYERS_FILENAME,
+    PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
     TEAM_ACTUALS_FILENAME,
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
+    TEAM_PROVISIONAL_ACTUALS_FILENAME,
+    TEAM_PROVISIONAL_ACTUALS_SCHEMA,
     DashboardJsonError,
     _discrete_crps,
     _finished_player_actuals,
@@ -41,6 +46,7 @@ from fpl.publish.dashboard_json import (
     _validate_player_actual_generation,
     _validate_player_horizon_document,
     _validate_player_horizon_generation,
+    _validate_provisional_actual_generation,
     _validate_team_actual_document,
     _validate_team_actual_generation,
     build_dashboard_read_models,
@@ -66,6 +72,7 @@ KICKOFFS = {
     100: datetime(2026, 8, 22, 14, tzinfo=UTC),
     101: datetime(2026, 8, 29, 14, tzinfo=UTC),
     102: datetime(2026, 8, 31, 16, tzinfo=UTC),
+    103: datetime(2026, 8, 31, 18, tzinfo=UTC),
 }
 CREATED_AT = datetime(2026, 8, 21, 18, tzinfo=UTC)
 DATABASE_SHA = "d" * 64
@@ -258,6 +265,45 @@ def _team_actual_row(
         "team_bps": 63,
         "defensive_contribution": 52,
     }
+    row.update(overrides)
+    return row
+
+
+def _player_provisional_actual_row(
+    fixture: int,
+    code: int,
+    gw: int,
+    observed_at: datetime,
+    **overrides: Any,
+) -> dict[str, Any]:
+    row = _player_actual_row(fixture, code, gw)
+    row.pop("points_under_rules_2026_27")
+    row["observed_at"] = observed_at
+    row.update(overrides)
+    return row
+
+
+def _team_provisional_actual_row(
+    fixture: int,
+    team_id: int,
+    opponent_team_id: int,
+    gw: int,
+    was_home: bool,
+    goals_for: int,
+    goals_against: int,
+    observed_at: datetime,
+    **overrides: Any,
+) -> dict[str, Any]:
+    row = _team_actual_row(
+        fixture,
+        team_id,
+        opponent_team_id,
+        gw,
+        was_home,
+        goals_for,
+        goals_against,
+    )
+    row["observed_at"] = observed_at
     row.update(overrides)
     return row
 
@@ -537,6 +583,8 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
                 defensive_contribution=None,
             ),
         ],
+        "fact_provisional_player_fixture_observation": [],
+        "fact_provisional_team_fixture_observation": [],
         "dim_optimizer_run": [
             _optimizer_run_row("opt-1", "dec-1"),
             _optimizer_run_row(
@@ -717,7 +765,19 @@ def _source_tables() -> dict[str, list[dict[str, Any]]]:
 
 
 def _write_parquet(path: Path, rows: list[dict[str, Any]]) -> int:
-    pl.DataFrame(rows).write_parquet(path)
+    if rows:
+        frame = pl.DataFrame(rows)
+    else:
+        dtype = {
+            "string": pl.String,
+            "int": pl.Int64,
+            "float": pl.Float64,
+            "bool": pl.Boolean,
+            "timestamp": pl.Datetime(time_unit="us", time_zone="UTC"),
+        }
+        table = SEMANTIC_CONTRACT_V6.table(path.stem)
+        frame = pl.DataFrame(schema={column.name: dtype[column.dtype] for column in table.columns})
+    frame.write_parquet(path)
     return len(rows)
 
 
@@ -830,6 +890,178 @@ def test_grain_identity_and_season_safe_label_resolution(tmp_path: Path) -> None
             "opponent_team_id",
             "element_id",
         }
+
+
+def test_provisional_actuals_are_separate_v1_files_and_clear_to_empty(
+    tmp_path: Path,
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    baseline = build_dashboard_read_models(export_dir)
+    baseline_documents = render_read_model_files(baseline)
+    captured_at = datetime(2026, 9, 1, 7, 30, tzinfo=UTC)
+    source = _source_tables()
+    source["dim_fixture"].append(
+        {
+            "season": SEASON,
+            "fixture": 103,
+            "gw": 2,
+            "kickoff_time": KICKOFFS[103],
+            "home_team_id": 1,
+            "away_team_id": 2,
+            "home_team_code": 101,
+            "away_team_code": 102,
+            "home_official_fdr": 2,
+            "away_official_fdr": 4,
+            "pulse_id": None,
+            "finished": False,
+        }
+    )
+    player_rows = [
+        _player_provisional_actual_row(
+            103,
+            1,
+            2,
+            captured_at,
+            total_points_as_recorded=11,
+            expected_goals=0.6,
+        )
+    ]
+    team_rows = [
+        _team_provisional_actual_row(
+            103,
+            1,
+            2,
+            2,
+            True,
+            3,
+            1,
+            captured_at,
+            team_xg=1.6,
+        ),
+        _team_provisional_actual_row(
+            103,
+            2,
+            1,
+            2,
+            False,
+            1,
+            3,
+            captured_at,
+            team_xg=None,
+            team_xgc=None,
+            defensive_contribution=None,
+        ),
+    ]
+    _rewrite_table(export_dir, "dim_fixture", source["dim_fixture"])
+    _rewrite_table(
+        export_dir,
+        "fact_provisional_player_fixture_observation",
+        player_rows,
+    )
+    _rewrite_table(
+        export_dir,
+        "fact_provisional_team_fixture_observation",
+        team_rows,
+    )
+
+    models = build_dashboard_read_models(export_dir)
+    documents = render_read_model_files(models)
+    player_document = json.loads(documents[PLAYER_PROVISIONAL_ACTUALS_FILENAME])
+    team_document = json.loads(documents[TEAM_PROVISIONAL_ACTUALS_FILENAME])
+
+    assert player_document == {
+        "schema": PLAYER_PROVISIONAL_ACTUALS_SCHEMA,
+        "json_schema_version": PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
+        "captured_at": captured_at.isoformat(),
+        "players": [
+            {
+                "season": SEASON,
+                "code": 1,
+                "actuals": [
+                    {
+                        "gw": 2,
+                        "fixture": 103,
+                        "kickoff_time": KICKOFFS[103].isoformat(),
+                        "team_code": 101,
+                        "team_short_name": "ALP",
+                        "opponent_team_code": 102,
+                        "opponent_short_name": "BET",
+                        "was_home": True,
+                        "minutes": 90,
+                        "starts": 1,
+                        "goals_scored": 0,
+                        "assists": 0,
+                        "clean_sheets": 0,
+                        "goals_conceded": 1,
+                        "saves": 3,
+                        "bonus": 1,
+                        "bps": 22,
+                        "defensive_contribution": None,
+                        "expected_goals": 0.6,
+                        "expected_assists": None,
+                        "expected_goals_conceded": 1.1,
+                        "total_points_as_recorded": 11,
+                    }
+                ],
+            }
+        ],
+    }
+    assert team_document["schema"] == TEAM_PROVISIONAL_ACTUALS_SCHEMA
+    assert team_document["json_schema_version"] == PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION
+    assert team_document["captured_at"] == captured_at.isoformat()
+    assert [team["team_code"] for team in team_document["teams"]] == [101, 102]
+    assert team_document["teams"][0]["actuals"][0]["goals_for"] == 3
+    assert team_document["teams"][1]["actuals"][0]["goals_against"] == 3
+    assert team_document["teams"][1]["actuals"][0]["team_xg"] is None
+    assert "points_under_rules_2026_27" not in _all_keys(player_document)
+    assert "capture_id" not in _all_keys(player_document) | _all_keys(team_document)
+
+    # Mutable observations neither enter finalized history nor forecast monitoring.
+    for filename in (
+        PLAYER_ACTUALS_FILENAME,
+        TEAM_ACTUALS_FILENAME,
+        PLAYER_FORECAST_VS_ACTUAL_FILENAME,
+        TEAM_FORECAST_VS_ACTUAL_FILENAME,
+    ):
+        assert documents[filename] == baseline_documents[filename]
+
+    _rewrite_table(export_dir, "fact_provisional_player_fixture_observation", [])
+    _rewrite_table(export_dir, "fact_provisional_team_fixture_observation", [])
+    cleared = render_read_model_files(build_dashboard_read_models(export_dir))
+    assert json.loads(cleared[PLAYER_PROVISIONAL_ACTUALS_FILENAME]) == {
+        "schema": PLAYER_PROVISIONAL_ACTUALS_SCHEMA,
+        "json_schema_version": PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
+        "captured_at": None,
+        "players": [],
+    }
+    assert json.loads(cleared[TEAM_PROVISIONAL_ACTUALS_FILENAME]) == {
+        "schema": TEAM_PROVISIONAL_ACTUALS_SCHEMA,
+        "json_schema_version": PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
+        "captured_at": None,
+        "teams": [],
+    }
+    assert cleared[PLAYER_ACTUALS_FILENAME] == baseline_documents[PLAYER_ACTUALS_FILENAME]
+    assert cleared[TEAM_ACTUALS_FILENAME] == baseline_documents[TEAM_ACTUALS_FILENAME]
+
+
+def test_provisional_player_and_team_files_must_share_one_capture_timestamp() -> None:
+    documents = {
+        PLAYERS_FILENAME: {"players": [{"season": SEASON, "code": 1}]},
+        FIXTURE_MATRIX_FILENAME: {"teams": [{"season": SEASON, "team_code": 101}]},
+        PLAYER_ACTUALS_FILENAME: {"players": []},
+        TEAM_ACTUALS_FILENAME: {"teams": []},
+        PLAYER_PROVISIONAL_ACTUALS_FILENAME: {
+            "captured_at": "2026-09-01T07:30:00+00:00",
+            "players": [{"season": SEASON, "code": 1, "actuals": [{"fixture": 103}]}],
+        },
+        TEAM_PROVISIONAL_ACTUALS_FILENAME: {
+            "captured_at": "2026-09-01T07:31:00+00:00",
+            "teams": [{"season": SEASON, "team_code": 101, "actuals": [{"fixture": 103}]}],
+        },
+    }
+
+    with pytest.raises(DashboardJsonError, match="share one capture timestamp"):
+        _validate_provisional_actual_generation(documents)
 
 
 def test_player_horizons_are_convolved_upstream_with_inclusive_thresholds(
@@ -2152,8 +2384,10 @@ def test_render_is_deterministic_for_identical_models(tmp_path: Path) -> None:
         FIXTURE_MATRIX_FILENAME,
         PLAYER_ACTUALS_FILENAME,
         PLAYER_HORIZONS_FILENAME,
+        PLAYER_PROVISIONAL_ACTUALS_FILENAME,
         PLAYERS_FILENAME,
         TEAM_ACTUALS_FILENAME,
+        TEAM_PROVISIONAL_ACTUALS_FILENAME,
         "next_gw.json",
         "summary.json",
         PLAYER_FORECAST_VS_ACTUAL_FILENAME,

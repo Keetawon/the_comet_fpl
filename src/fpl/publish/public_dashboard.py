@@ -29,10 +29,12 @@ from fpl.publish.dashboard_json import (
     PLAYER_ACTUALS_FILENAME,
     PLAYER_FORECAST_VS_ACTUAL_FILENAME,
     PLAYER_HORIZONS_FILENAME,
+    PLAYER_PROVISIONAL_ACTUALS_FILENAME,
     PLAYERS_FILENAME,
     SUMMARY_FILENAME,
     TEAM_ACTUALS_FILENAME,
     TEAM_FORECAST_VS_ACTUAL_FILENAME,
+    TEAM_PROVISIONAL_ACTUALS_FILENAME,
     DashboardJsonError,
     _file_row_count,
     _manifest_content_sha256,
@@ -56,7 +58,9 @@ _READ_MODEL_FILENAMES: Final[tuple[str, ...]] = tuple(
             FIXTURE_MATRIX_FILENAME,
             PLAYER_HORIZONS_FILENAME,
             PLAYER_ACTUALS_FILENAME,
+            PLAYER_PROVISIONAL_ACTUALS_FILENAME,
             TEAM_ACTUALS_FILENAME,
+            TEAM_PROVISIONAL_ACTUALS_FILENAME,
             PLAYERS_FILENAME,
             SUMMARY_FILENAME,
             NEXT_GW_FILENAME,
@@ -132,7 +136,13 @@ _DOCUMENT_TOP_LEVEL_KEYS: Final[dict[str, frozenset[str]]] = {
     FIXTURE_MATRIX_FILENAME: frozenset({"schema", "json_schema_version", "teams", "schedule"}),
     PLAYERS_FILENAME: frozenset({"schema", "json_schema_version", "players"}),
     PLAYER_ACTUALS_FILENAME: frozenset({"schema", "json_schema_version", "players"}),
+    PLAYER_PROVISIONAL_ACTUALS_FILENAME: frozenset(
+        {"schema", "json_schema_version", "captured_at", "players"}
+    ),
     TEAM_ACTUALS_FILENAME: frozenset({"schema", "json_schema_version", "teams"}),
+    TEAM_PROVISIONAL_ACTUALS_FILENAME: frozenset(
+        {"schema", "json_schema_version", "captured_at", "teams"}
+    ),
     PLAYER_HORIZONS_FILENAME: frozenset(
         {"schema", "json_schema_version", "semantics", "horizon_fields", "players"}
     ),

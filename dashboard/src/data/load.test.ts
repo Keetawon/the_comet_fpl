@@ -7,12 +7,14 @@ import sample from "@/data/sampleNextGw.json";
 import fixtureSample from "@/data/sampleFixtureMatrix.json";
 import horizonsSample from "@/data/samplePlayerHorizons.json";
 import playerActualsSample from "@/data/samplePlayerActuals.json";
+import playerProvisionalActualsSample from "@/data/samplePlayerProvisionalActuals.json";
 import playerAccuracySample from "@/data/samplePlayerForecastVsActual.json";
 import playersSample from "@/data/samplePlayers.json";
 import optimizerAuditSample from "@/data/sampleOptimizerAudit.json";
 import summarySample from "@/data/sampleSummary.json";
 import teamAccuracySample from "@/data/sampleTeamForecastVsActual.json";
 import teamActualsSample from "@/data/sampleTeamActuals.json";
+import teamProvisionalActualsSample from "@/data/sampleTeamProvisionalActuals.json";
 
 async function loadPayload(payload: unknown) {
   vi.resetModules();
@@ -77,6 +79,26 @@ async function loadTeamActualsPayload(payload: unknown) {
   return loadTeamActuals();
 }
 
+async function loadPlayerProvisionalActualsPayload(payload: unknown) {
+  vi.resetModules();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({ ok: true, status: 200, json: async () => payload })),
+  );
+  const { loadPlayerProvisionalActuals } = await import("./load");
+  return loadPlayerProvisionalActuals();
+}
+
+async function loadTeamProvisionalActualsPayload(payload: unknown) {
+  vi.resetModules();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({ ok: true, status: 200, json: async () => payload })),
+  );
+  const { loadTeamProvisionalActuals } = await import("./load");
+  return loadTeamProvisionalActuals();
+}
+
 function decodedHorizonsSample() {
   return {
     ...horizonsSample,
@@ -123,6 +145,8 @@ describe("atomic schema-v9 generation", () => {
       "players.json": playersSample,
       "player_actuals.json": playerActualsSample,
       "team_actuals.json": teamActualsSample,
+      "player_provisional_actuals.json": playerProvisionalActualsSample,
+      "team_provisional_actuals.json": teamProvisionalActualsSample,
       "player_horizons.json": horizonsSample,
       "next_gw.json": sample,
       "summary.json": summarySample,
@@ -141,13 +165,15 @@ describe("atomic schema-v9 generation", () => {
       }),
     );
     const loaders = await import("./load");
-    const [manifestResult, fixture, players, actuals, teamActuals, horizons, nextGw, summary, audit, playerAccuracy, teamAccuracy] =
+    const [manifestResult, fixture, players, actuals, teamActuals, playerProvisional, teamProvisional, horizons, nextGw, summary, audit, playerAccuracy, teamAccuracy] =
       await Promise.all([
         loaders.loadDashboardManifest(),
         loaders.loadFixtureMatrix(),
         loaders.loadPlayers(),
         loaders.loadPlayerActuals(),
         loaders.loadTeamActuals(),
+        loaders.loadPlayerProvisionalActuals(),
+        loaders.loadTeamProvisionalActuals(),
         loaders.loadPlayerHorizons(),
         loaders.loadNextGw(),
         loaders.loadSummary(),
@@ -161,6 +187,8 @@ describe("atomic schema-v9 generation", () => {
     expect(players.manifest?.content_sha256).toBe(manifest.content_sha256);
     expect(actuals.players).toEqual(playerActualsSample.players);
     expect(teamActuals.teams).toEqual(teamActualsSample.teams);
+    expect(playerProvisional.players).toEqual(playerProvisionalActualsSample.players);
+    expect(teamProvisional.teams).toEqual(teamProvisionalActualsSample.teams);
     expect(horizons.json_schema_version).toBe(9);
     expect(nextGw.plans).toEqual(sample.plans);
     expect(summary).toMatchObject({ json_schema_version: 9 });
@@ -329,6 +357,68 @@ describe("loadTeamActuals normalized history boundary", () => {
     const invalid = JSON.parse(JSON.stringify(teamActualsSample)) as typeof teamActualsSample;
     invalid.teams[0].actuals[0].team_xg = Number.POSITIVE_INFINITY;
     await expect(loadTeamActualsPayload(invalid)).rejects.toThrow(/expected a finite number/);
+  });
+});
+
+describe("provisional actuals latest-capture boundaries", () => {
+  it("accepts separate player and reciprocal team provisional files", async () => {
+    await expect(
+      loadPlayerProvisionalActualsPayload(playerProvisionalActualsSample),
+    ).resolves.toEqual(playerProvisionalActualsSample);
+    await expect(
+      loadTeamProvisionalActualsPayload(teamProvisionalActualsSample),
+    ).resolves.toEqual(teamProvisionalActualsSample);
+  });
+
+  it("accepts an explicit empty capture without inventing freshness", async () => {
+    await expect(
+      loadPlayerProvisionalActualsPayload({
+        schema: "fpl.dashboard-player-provisional-actuals",
+        json_schema_version: 1,
+        captured_at: null,
+        players: [],
+      }),
+    ).resolves.toMatchObject({ captured_at: null, players: [] });
+    await expect(
+      loadTeamProvisionalActualsPayload({
+        schema: "fpl.dashboard-team-provisional-actuals",
+        json_schema_version: 1,
+        captured_at: null,
+        teams: [],
+      }),
+    ).resolves.toMatchObject({ captured_at: null, teams: [] });
+  });
+
+  it("rejects replayed points or implicit status fields on a provisional player fixture", async () => {
+    for (const [key, value] of [
+      ["points_under_rules_2026_27", 6],
+      ["outcome_status", "provisional"],
+    ] as const) {
+      const malformed = JSON.parse(JSON.stringify(playerProvisionalActualsSample)) as {
+        players: Array<{ actuals: Array<Record<string, unknown>> }>;
+      };
+      malformed.players[0].actuals[0][key] = value;
+      await expect(loadPlayerProvisionalActualsPayload(malformed)).rejects.toThrow(
+        /expected exact keys/,
+      );
+    }
+  });
+
+  it("rejects non-empty rows without capture time and non-reciprocal team sides", async () => {
+    await expect(
+      loadPlayerProvisionalActualsPayload({
+        ...playerProvisionalActualsSample,
+        captured_at: null,
+      }),
+    ).rejects.toThrow(/requires captured_at/);
+
+    const malformed = JSON.parse(JSON.stringify(teamProvisionalActualsSample)) as {
+      teams: Array<{ actuals: Array<{ goals_for: number }> }>;
+    };
+    malformed.teams[1].actuals[0].goals_for = 9;
+    await expect(loadTeamProvisionalActualsPayload(malformed)).rejects.toThrow(
+      /sides are not reciprocal/,
+    );
   });
 });
 

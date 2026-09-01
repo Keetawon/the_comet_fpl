@@ -1,10 +1,15 @@
-# Dashboard read-model JSON contract, version 9
+# Dashboard read-model JSON contract, established schema version 9 plus provisional schemas version 1
 
 Status: implemented development-only by DEV-ROADMAP P1.7a and extended through P2.5. This
 document is the authoritative prose counterpart of `src/fpl/publish/dashboard_json.py`. The
 static app renders these files and nothing else. Version 2 adds `summary.json`,
 `next_gw.json`, `forecast_vs_actual.json`, and `optimizer_audit.json` to the version-1 file
 set; the version-1 record shapes are unchanged.
+
+The ten established read-model files remain on `json_schema_version: 9`. The additive
+`player_provisional_actuals.json` and `team_provisional_actuals.json` envelopes are independently
+versioned at schema version 1; adding them does not bump or reinterpret any established schema-v9
+file.
 
 Version 3 adds explicit optimizer-plan classification and owner-policy fields. It does not
 infer plan ownership from run-id, hash, input, or row order.
@@ -99,7 +104,8 @@ Version 9 retains every version-8 file and metric. It extends each fixture insid
 `opponent_short_name`, and `was_home`. These values describe the club represented by that exact
 observed player-fixture row, not the player's club in a selected forecast vintage or at season end.
 
-The semantic source remains BI contract v5's `fact_player_fixture_actual`, which already owns the
+The semantic source remains `fact_player_fixture_actual`, introduced on this path by BI contract
+v5 and retained unchanged in current BI contract v6. It already owns the
 fixture-time `team_id`, permanent `team_code`, season-scoped `opponent_team_id`, and `was_home`.
 The JSON publisher resolves own and opponent display identities through `dim_team_season` on the
 season-qualified `(season, team_id)` key. It then reconciles gameweek, home/away side, fixture-time
@@ -113,9 +119,46 @@ This keeps transfers and season changes honest: each leg names the club the play
 that fixture, prior rows involving a now-relegated club remain labelable from their own season, and
 a promoted player with no prior Premier League fact remains shorter rather than receiving synthetic
 history. Double-gameweek legs remain separate. The expanded Players table presents `Match`
-(season/GW, fixture-time Club, and kickoff date) plus `Opp (H/A)` before the observed metrics. BI
-semantic contract v5 and insight request
-schema v4 are unchanged.
+(season/GW, fixture-time Club, and kickoff date) plus `Opp (H/A)` before the observed metrics. The
+established schema-v9 files and insight request schema v4 are unchanged by the separate
+provisional schema-v1 amendment below.
+
+## Provisional completed-match preview amendment (implemented 2026-09-01)
+
+The emitter reads BI semantic v6's two reporting-only provisional facts and publishes them as
+separate files:
+
+- `player_provisional_actuals.json`, schema `fpl.dashboard-player-provisional-actuals`, version 1;
+- `team_provisional_actuals.json`, schema `fpl.dashboard-team-provisional-actuals`, version 1.
+
+Each envelope has a timezone-aware `captured_at` shared by all included rows; it is `null` only
+when the corresponding top-level record array is empty. These files do not replace, widen, or
+change `player_actuals.json` or `team_actuals.json`. They contain scored completed-match
+observations that are not yet backed by any player/team archive or immutable-ledger final evidence,
+and never feed either prediction-versus-actual file. A same-capture fixture may have
+`finished_provisional=true` or `finished=true`; the API flag alone does not change its display
+status.
+
+BI semantic v6 owns the atomic handoff. As soon as any row exists for a fixture in
+`mart_fact_player_fixture`, `mart_fact_team_match`, `ledger_outcome_player_fixture`, or
+`ledger_outcome_team_fixture`, both provisional source facts exclude that fixture in full.
+Dashboard generation therefore never publishes only some provisional players or one provisional
+club side while final evidence exists for the same match. The established finalized files populate
+through their unchanged gates.
+
+Only Players and Fixture Matrix load these files. The browser reconciles provisional and finalized
+rows at fixture grain: a finalized row wins only after its identity agrees with a provisional row
+at the same fixture, and disagreement fails closed. Every merged row carries a browser-only
+`outcome_status` of `finalized` or `provisional`; a Season–GW option is labelled provisional when
+any row in that page-wide period remains provisional. The Players range aggregate and expanded
+history may therefore show ended matches before official finality, while still naming that status.
+
+Player points remain two different measures. A finalized row displays
+`points_under_rules_2026_27`; a provisional row displays the separately named mutable
+`total_points_as_recorded`. The browser never renames, combines, or replays the provisional value.
+If a selected Players actual range contains any provisional period, the optional language renderer
+is disabled while deterministic facts remain usable. Player and Team prediction-versus-actual,
+their scoring/finality gates, and both append-only outcome ledgers are unchanged.
 
 ## Boundary and provenance chain
 
@@ -147,7 +190,8 @@ identical content hash.
 
 ## Layout
 
-Version 9 publishes ten read-model files plus the manifest.
+The current generation publishes the ten established schema-v9 read-model files, the two separate
+provisional schema-v1 read-model files, and the manifest.
 
 ```text
 data/
@@ -158,6 +202,8 @@ data/
     ├── players.json
     ├── player_actuals.json
     ├── team_actuals.json
+    ├── player_provisional_actuals.json
+    ├── team_provisional_actuals.json
     ├── player_horizons.json
     ├── next_gw.json
     ├── summary.json
@@ -465,6 +511,109 @@ and no proxy is permitted.
 }
 ```
 
+## player_provisional_actuals.json — schema version 1, one object per (season, code)
+
+This file is the mutable preview companion to, not a replacement for, schema-v9
+`player_actuals.json`. Its envelope is exactly `schema`, `json_schema_version`, `captured_at`, and
+`players`. `captured_at` is the timezone-aware knowledge time shared by every included observation;
+it must be non-null for a non-empty file and null for an empty one.
+
+Each player object has `season`, permanent `code`, and a non-empty `actuals` array. Each actual has
+the established fixture-time identity and observed component fields:
+`gw`, `fixture`, `kickoff_time`, `team_code`, `team_short_name`, `opponent_team_code`,
+`opponent_short_name`, `was_home`, `minutes`, `starts`, `goals_scored`, `assists`, `clean_sheets`,
+on-pitch `goals_conceded`, `saves`, `bonus`, `bps`, `defensive_contribution`, `expected_goals`,
+`expected_assists`, and `expected_goals_conceded`. Its only points field is the nullable raw API
+value `total_points_as_recorded`; `points_under_rules_2026_27` is forbidden.
+
+Records are bounded to published forecast seasons and forecast-population player codes, retain
+each DGW leg, and sort by season/code then gameweek/kickoff/fixture. The publisher resolves both
+clubs in the observation's own season and reconciles fixture side, venue, gameweek, kickoff, and
+permanent identities to `dim_fixture`. Duplicate, missing, mixed-capture, naive-time, or
+contradictory rows fail the whole atomic generation.
+
+```json
+{
+  "schema": "fpl.dashboard-player-provisional-actuals",
+  "json_schema_version": 1,
+  "captured_at": "2026-09-01T01:05:00+00:00",
+  "players": [{
+    "season": "2026-27",
+    "code": 123456,
+    "actuals": [{
+      "gw": 2,
+      "fixture": 110,
+      "kickoff_time": "2026-08-29T14:00:00+00:00",
+      "team_code": 101,
+      "team_short_name": "AAA",
+      "opponent_team_code": 102,
+      "opponent_short_name": "BBB",
+      "was_home": true,
+      "minutes": 90,
+      "starts": 1,
+      "goals_scored": 1,
+      "assists": 0,
+      "clean_sheets": 0,
+      "goals_conceded": 1,
+      "saves": 0,
+      "bonus": 2,
+      "bps": 30,
+      "defensive_contribution": 7,
+      "expected_goals": 0.42,
+      "expected_assists": 0.08,
+      "expected_goals_conceded": 1.11,
+      "total_points_as_recorded": 8
+    }]
+  }]
+}
+```
+
+## team_provisional_actuals.json — schema version 1, one object per (season, team_code)
+
+This is the same-capture club-side companion to schema-v9 `team_actuals.json`. Its envelope is
+exactly `schema`, `json_schema_version`, `captured_at`, and `teams`, with the same non-empty/null
+capture-time rule. Each team object has `season`, permanent `team_code`, and a non-empty `actuals`
+array. Fixture fields are `gw`, `fixture`, `kickoff_time`, `opponent_team_code`,
+`opponent_short_name`, `was_home`, `goals_for`, `goals_against`, nullable `team_xg`, nullable
+`team_xgc`, nullable summed `team_bps`, and nullable raw `defensive_contribution` actions.
+
+Every included fixture must have exactly two reciprocal club sides with one shared capture time and
+must agree with the season-qualified schedule. Records are bounded to published forecast seasons
+and club codes in `fixture_matrix.json`, retain each DGW leg, and sort canonically. NULL continues
+to mean unavailable measurement; it is never zero-filled.
+
+```json
+{
+  "schema": "fpl.dashboard-team-provisional-actuals",
+  "json_schema_version": 1,
+  "captured_at": "2026-09-01T01:05:00+00:00",
+  "teams": [{
+    "season": "2026-27",
+    "team_code": 101,
+    "actuals": [{
+      "gw": 2,
+      "fixture": 110,
+      "kickoff_time": "2026-08-29T14:00:00+00:00",
+      "opponent_team_code": 102,
+      "opponent_short_name": "BBB",
+      "was_home": true,
+      "goals_for": 2,
+      "goals_against": 1,
+      "team_xg": 1.74,
+      "team_xgc": 0.82,
+      "team_bps": 72,
+      "defensive_contribution": 61
+    }]
+  }]
+}
+```
+
+These files are merged only for Players and Fixture Matrix presentation. At a matching fixture,
+the finalized schema-v9 row takes precedence after exact identity reconciliation. A mismatched
+duplicate is an error. The browser adds `outcome_status`; that field is not persisted in either
+JSON source. Players displays finalized `points_under_rules_2026_27` or provisional
+`total_points_as_recorded` according to that status, never one under the other's name.
+
 ## player_horizons.json — cumulative outcomes per player
 
 Each player object contains one cumulative entry for every `gw_to` from its forecast run's
@@ -684,37 +833,27 @@ and the audit page reads both files.
 
 ## Read-model manifest
 
+The abbreviated shape below intentionally omits per-file row counts and hashes. A new local refresh
+has not yet established those generation-specific values; the generated, validated manifest is
+the only authority for them.
+
 ```json
 {
   "schema": "fpl.dashboard-read-models",
   "json_schema_version": 9,
-  "generated_at": "2026-08-15T00:00:00+00:00",
+  "generated_at": "…",
   "source": {
     "export_schema": "fpl.bi-semantic-export",
     "export_schema_version": 1,
-    "semantic_contract_version": 5,
+    "semantic_contract_version": 6,
     "export_content_sha256": "…",
     "export_created_at": "…",
     "database_sha256": "…"
   },
-  "runs": [
-    {"run_id": "…", "as_of": "…", "season": "2026-27", "gw_from": 1, "gw_to": 5,
-     "horizon_gameweeks": 5}
-  ],
-  "run_ids": ["…"],
+  "runs": [],
+  "run_ids": [],
   "ease_index_formula_version": "fixture-ease-v1",
-  "files": {
-    "fixture_matrix.json": {"row_count": 20, "sha256": "…"},
-    "players.json": {"row_count": 599, "sha256": "…"},
-    "player_actuals.json": {"row_count": 1078, "sha256": "…"},
-    "team_actuals.json": {"row_count": 40, "sha256": "…"},
-    "player_horizons.json": {"row_count": 2995, "sha256": "…"},
-    "next_gw.json": {"row_count": 2, "sha256": "…"},
-    "summary.json": {"row_count": 1, "sha256": "…"},
-    "player_forecast_vs_actual.json": {"row_count": 0, "sha256": "…"},
-    "team_forecast_vs_actual.json": {"row_count": 0, "sha256": "…"},
-    "optimizer_audit.json": {"row_count": 2, "sha256": "…"}
-  },
+  "files": {"…": "all twelve read-model entries are required"},
   "content_sha256": "…"
 }
 ```
@@ -722,13 +861,17 @@ and the audit page reads both files.
 `row_count` is the number of objects in the file's top-level array (`plans` for
 next_gw.json and optimizer_audit.json, `runs` for both forecast-monitoring files, normalized
 season/player records for `player_actuals.json`, and normalized season/team records for
-`team_actuals.json`), except that
-`player_horizons.json` counts its nested cumulative endpoint rows. `summary.json` is a single
+`team_actuals.json`, and the corresponding normalized record count for each provisional file),
+except that `player_horizons.json` counts its nested cumulative endpoint rows. `summary.json` is a single
 object, so its row count is 1. `runs` is sorted by `run_id` and validated against
 both the source manifest's `exported_run_ids` and the `dim_forecast_run` rows read from the
 export. Every fixture row must fall inside its run's `gw_from..gw_to` horizon and season;
 anything outside fails closed. A source export that mixes ease formula versions also fails
 closed.
+
+The real `files` map contains exactly the twelve names in the Layout section, each with a generated
+integer `row_count` and 64-hex SHA-256. No provisional count or content hash is asserted in this
+document before the first local semantic-v6/read-model refresh.
 
 ## Consumers
 
@@ -742,5 +885,14 @@ through the strict `player_horizons.json` boundary and look up an exact
 they never interpolate or substitute another vintage. They load historical club rows only through
 the normalized `team_actuals.json` boundary, never through forecast fixture primitives. Historical
 player club/opponent labels come only from the fixture-owned version-9 `player_actuals.json`
-fields; consumers never join them from current forecast membership. The Players route uses the
-exact xP endpoint when applicable and delegates probability comparison to Player analytics.
+fields; consumers never join them from current forecast membership. Players and Fixture Matrix
+may additionally load the two independently versioned provisional files and apply the finalized-
+wins, identity-reconciled display merge above. No other route may consume them. In particular,
+both prediction-versus-actual routes remain bound only to append-only finalized outcomes.
+
+The public sanitizer includes both provisional envelopes in any future manually reviewed immutable
+dashboard-data ZIP because a complete generated read-model manifest requires all twelve files.
+That inclusion is packaging, not deployment: GitHub Pages remains pinned to the exact reviewed
+release through `public-data-release.json`, and creating or refreshing local provisional data never
+changes the hosted site. The Players route uses the exact xP endpoint when applicable and delegates
+probability comparison to Player analytics.

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { TeamActualFixture, TeamActualsRecord } from "@/data/types";
 import {
   latestTeamActualGameweeks,
+  mergeTeamActualRecords,
+  teamActualGameweekLabel,
   teamActualDetailsForGameweeks,
 } from "./teamActuals";
 
@@ -50,14 +52,53 @@ describe("latestTeamActualGameweeks", () => {
     ];
 
     expect(latestTeamActualGameweeks([...current, ...prior])).toEqual([
-      { season: "2026-27", gw: 1 },
-      { season: "2025-26", gw: 38 },
-      { season: "2025-26", gw: 37 },
-      { season: "2025-26", gw: 36 },
-      { season: "2025-26", gw: 35 },
+      { season: "2026-27", gw: 1, outcome_status: "finalized" },
+      { season: "2025-26", gw: 38, outcome_status: "finalized" },
+      { season: "2025-26", gw: 37, outcome_status: "finalized" },
+      { season: "2025-26", gw: 36, outcome_status: "finalized" },
+      { season: "2025-26", gw: 35, outcome_status: "finalized" },
     ]);
-    expect(latestTeamActualGameweeks(current)).toEqual([{ season: "2026-27", gw: 1 }]);
+    expect(latestTeamActualGameweeks(current)).toEqual([
+      { season: "2026-27", gw: 1, outcome_status: "finalized" },
+    ]);
     expect(latestTeamActualGameweeks(current, 0)).toEqual([]);
+  });
+
+  it("marks and labels a gameweek provisional when any club row is provisional", () => {
+    const records = mergeTeamActualRecords(
+      [team("2026-27", 101, [actual({ gw: 1, fixture: 10 })])],
+      [team("2026-27", 101, [actual({ gw: 2, fixture: 20 })])],
+    );
+    const gameweeks = latestTeamActualGameweeks(records);
+
+    expect(gameweeks).toEqual([
+      { season: "2026-27", gw: 2, outcome_status: "provisional" },
+      { season: "2026-27", gw: 1, outcome_status: "finalized" },
+    ]);
+    expect(teamActualGameweekLabel(gameweeks[0])).toBe("2026-27 GW2 (provisional)");
+  });
+});
+
+describe("mergeTeamActualRecords", () => {
+  it("lets finalized rows replace matching provisional rows and fails on identity drift", () => {
+    const finalized = actual({ fixture: 70, goals_for: 3 });
+    const provisional = actual({ fixture: 70, goals_for: 2 });
+    const merged = mergeTeamActualRecords(
+      [team("2026-27", 101, [finalized])],
+      [team("2026-27", 101, [provisional])],
+    );
+
+    expect(merged[0].actuals).toEqual([{ ...finalized, outcome_status: "finalized" }]);
+    expect(() =>
+      mergeTeamActualRecords(
+        [team("2026-27", 101, [finalized])],
+        [
+          team("2026-27", 101, [
+            actual({ fixture: 70, opponent_team_code: 999 }),
+          ]),
+        ],
+      ),
+    ).toThrow(/disagree on fixture identity/);
   });
 });
 
@@ -85,8 +126,8 @@ describe("teamActualDetailsForGameweeks", () => {
         team("2026-27", 101, [missingMetrics, laterDgwLeg]),
       ],
       [
-        { season: "2026-27", gw: 1 },
-        { season: "2025-26", gw: 38 },
+        { season: "2026-27", gw: 1, outcome_status: "finalized" },
+        { season: "2025-26", gw: 38, outcome_status: "finalized" },
       ],
     );
 
@@ -95,6 +136,7 @@ describe("teamActualDetailsForGameweeks", () => {
     expect(result[1]).toMatchObject({
       ...missingMetrics,
       season: "2026-27",
+      outcome_status: "finalized",
       goals_for: 0,
       team_xg: null,
       team_bps: null,
@@ -111,8 +153,8 @@ describe("teamActualDetailsForGameweeks", () => {
         team("2026-27", 101, [actual({ gw: 1, fixture: 10 })]),
       ],
       [
-        { season: "2026-27", gw: 1 },
-        { season: "2025-26", gw: 38 },
+        { season: "2026-27", gw: 1, outcome_status: "finalized" },
+        { season: "2025-26", gw: 38, outcome_status: "finalized" },
       ],
     );
 

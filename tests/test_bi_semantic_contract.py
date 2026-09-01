@@ -1,4 +1,4 @@
-"""Executable tests for the frozen BI semantic contract, version 5.
+"""Executable tests for the frozen BI semantic contract, version 6.
 
 The contract's value is that it is enforced, not that it is written down, so most of these tests are
 negative: they construct a contract that breaks an invariant and prove the validator rejects it.
@@ -22,6 +22,7 @@ from fpl.publish.contract import (
     SEMANTIC_CONTRACT_V3,
     SEMANTIC_CONTRACT_V4,
     SEMANTIC_CONTRACT_V5,
+    SEMANTIC_CONTRACT_V6,
     Column,
     Join,
     SemanticContract,
@@ -29,7 +30,7 @@ from fpl.publish.contract import (
     Table,
 )
 
-CONTRACT = SEMANTIC_CONTRACT_V5
+CONTRACT = SEMANTIC_CONTRACT_V6
 LEDGER_SOURCE_TABLES = frozenset(
     {
         "ledger_forecast_run",
@@ -57,7 +58,7 @@ OUTCOME_LEDGER_SOURCE_TABLES = LEDGER_SOURCE_TABLES - FORECAST_LEDGER_SOURCE_TAB
 
 
 def test_contract_publishes_the_expected_tables() -> None:
-    assert CONTRACT.version == 5
+    assert CONTRACT.version == 6
     assert {table.name for table in CONTRACT.tables} == {
         # dimensions
         "dim_forecast_run",
@@ -75,6 +76,8 @@ def test_contract_publishes_the_expected_tables() -> None:
         "fact_forecast_team_fixture",
         "fact_player_fixture_actual",
         "fact_team_fixture_actual",
+        "fact_provisional_player_fixture_observation",
+        "fact_provisional_team_fixture_observation",
         "fact_finalized_player_fixture_outcome",
         "fact_finalized_team_fixture_outcome",
         "fact_player_form",
@@ -103,6 +106,31 @@ def test_historical_v2_contract_remains_importable_without_v3_monitoring_additio
 def test_historical_v4_contract_remains_importable_without_team_actuals() -> None:
     assert SEMANTIC_CONTRACT_V4.version == 4
     assert "fact_team_fixture_actual" not in SEMANTIC_CONTRACT_V4.by_name
+
+
+def test_historical_v5_contract_remains_importable_without_provisional_reporting() -> None:
+    assert SEMANTIC_CONTRACT_V5.version == 5
+    assert "fact_provisional_player_fixture_observation" not in SEMANTIC_CONTRACT_V5.by_name
+    assert "fact_provisional_team_fixture_observation" not in SEMANTIC_CONTRACT_V5.by_name
+
+
+def test_provisional_contract_keeps_raw_points_distinct_from_final_replay() -> None:
+    player = CONTRACT.table("fact_provisional_player_fixture_observation")
+    team = CONTRACT.table("fact_provisional_team_fixture_observation")
+    assert player.grain == ("season", "fixture", "code")
+    assert team.grain == ("season", "fixture", "team_id")
+    assert player.forecast_scoped is False
+    assert team.forecast_scoped is False
+    assert "run_id" not in player.column_names
+    assert "run_id" not in team.column_names
+    assert "total_points_as_recorded" in player.column_names
+    assert "points_under_rules_2026_27" not in player.column_names
+    assert "observed_at" in player.column_names
+    assert "observed_at" in team.column_names
+    notes = " ".join((*player.notes, *team.notes))
+    assert "finished_provisional=true or finished=true" in notes
+    assert "whole fixture" in notes
+    assert "never enters either finalized outcome ledger" in notes
 
 
 def test_team_actual_contract_pins_finalised_match_grain_and_null_semantics() -> None:

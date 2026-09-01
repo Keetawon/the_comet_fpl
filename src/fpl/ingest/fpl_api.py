@@ -139,6 +139,7 @@ class ApiFixture(_Payload):
     code: int | None = None
     event: int | None = None
     finished: bool = False
+    finished_provisional: bool = False
     kickoff_time: datetime | None = None
     team_h: int
     team_a: int

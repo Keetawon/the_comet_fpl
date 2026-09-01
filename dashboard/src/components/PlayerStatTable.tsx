@@ -53,7 +53,10 @@ export interface PlayerStatRow {
   gwFromXp?: number | null;
   /** Players-only descriptive BPS average over appeared fixtures between the Actual endpoints. */
   bpsPerAppearance?: number | null;
-  /** Players-only rolling completed fixture history across this season and its predecessor. */
+  /** Display-only points: finalized replay plus clearly marked raw provisional FPL points. */
+  observedPoints?: number | null;
+  actualPointsProvisional?: boolean;
+  /** Players-only rolling ended fixture history across this season and its predecessor. */
   actualDetails?: PlayerHistoricalFixture[];
   totalXp: number | null;
   /** Exact backend-published cumulative endpoint; absent under incompatible fixture filters. */
@@ -235,6 +238,27 @@ const HISTORICAL_DETAIL_COLUMNS: readonly HistoricalDetailColumn[] = [
       `${fixture.season}, gameweek ${fixture.gw}, club ${fixture.team_short_name}, kickoff ${kickoffUtcLabel(fixture.kickoff_time)}`,
   },
   {
+    key: "status",
+    label: "Status",
+    title: "Finalized rows are immutable; provisional rows may still receive FPL corrections",
+    value: (fixture) =>
+      fixture.outcome_status === "provisional" ? (
+        <span className="rounded border border-amber-400 bg-amber-50 px-1 text-[9px] font-medium text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          Provisional
+        </span>
+      ) : (
+        <span className="text-muted-foreground">Final</span>
+      ),
+    cellTitle: (fixture) =>
+      fixture.outcome_status === "provisional"
+        ? "Display-only FPL statistics not yet attached to the immutable final ledger; source values may still change"
+        : "Officially finalized fixture statistics",
+    cellAriaLabel: (fixture) =>
+      fixture.outcome_status === "provisional"
+        ? "Provisional fixture statistics"
+        : "Finalized fixture statistics",
+  },
+  {
     key: "opponent",
     label: "Opp (H/A)",
     title: "Opponent and venue; H = home, A = away",
@@ -277,9 +301,19 @@ const HISTORICAL_DETAIL_COLUMNS: readonly HistoricalDetailColumn[] = [
   { key: "bps", label: "BPS", value: (fixture) => fmt(fixture.bps, 0) },
   {
     key: "points_under_rules_2026_27",
-    label: "Pts (26/27)",
-    title: "Observed fixture points replayed under the 2026/27 scoring rules",
-    value: (fixture) => fmt(fixture.points_under_rules_2026_27, 0),
+    label: "Pts",
+    title: "Finalized rows use the 2026/27 replay; provisional rows use raw FPL points from the latest capture",
+    value: (fixture) =>
+      fmt(
+        fixture.outcome_status === "provisional"
+          ? fixture.total_points_as_recorded
+          : fixture.points_under_rules_2026_27,
+        0,
+      ),
+    cellTitle: (fixture) =>
+      fixture.outcome_status === "provisional"
+        ? "Raw provisional FPL points as recorded; may change"
+        : "Finalized fixture points replayed under the 2026/27 scoring rules",
   },
 ];
 
@@ -585,10 +619,46 @@ export function PlayerStatTable({
         );
       },
     };
+    const observedPointsColumn: LegacyColumnDef<PlayerStatRow> = {
+      id: "form-points_under_rules_2026_27",
+      header: () => (
+        <span title="Finalized fixtures use replayed 2026/27 points; provisional fixtures use raw FPL points and are marked P">
+          Pts
+        </span>
+      ),
+      accessorFn: (row) => row.observedPoints ?? undefined,
+      sortUndefined: "last",
+      cell: ({ row }) => {
+        const value = row.original.observedPoints;
+        const provisional = row.original.actualPointsProvisional === true;
+        return (
+          <span
+            className="inline-flex items-center gap-1 tabular-nums"
+            title={
+              value == null
+                ? "Observed points are unavailable because the selected fixture evidence is incomplete"
+                : provisional
+                  ? `Observed points: ${fmt(value, 0)}; includes raw provisional FPL points that may change`
+                  : `Observed finalized replayed points: ${fmt(value, 0)}`
+            }
+          >
+            {fmt(value, 0)}
+            {provisional && value != null && (
+              <span
+                aria-label="includes provisional raw FPL points"
+                className="rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+              >
+                P
+              </span>
+            )}
+          </span>
+        );
+      },
+    };
     const outcomeFormColumns = [
       formStat("bonus", "Bonus"),
       bpsPerAppearanceColumn,
-      formStat("points_under_rules_2026_27", "Pts"),
+      observedPointsColumn,
     ];
     const playerFormColumns =
       view === "attack"
@@ -854,7 +924,7 @@ export function PlayerStatTable({
                         <p className="text-xs font-medium">
                           {player.web_name} ({player.position}, {player.team_short_name}) —
                           {expandedRowMode === "historical"
-                            ? " rolling latest five completed GWs across forecast and prior season (newest first)"
+                            ? " rolling latest five ended GWs across forecast and prior season (newest first)"
                             : " forecast per-fixture detail"}
                           {expandedRowMode === "forecast" && player.form
                             ? ` · form anchored ${player.form.season} GW${player.form.as_at_gw}`
@@ -913,7 +983,7 @@ export function PlayerStatTable({
                                     colSpan={HISTORICAL_DETAIL_COLUMNS.length}
                                     className="px-2 py-2 text-[11px] text-muted-foreground"
                                   >
-                                    No finalized fixture history exists in the rolling latest-five-GW window.
+                                    No ended fixture history exists in the rolling latest-five-GW window.
                                   </TableCell>
                                 </TableRow>
                               )

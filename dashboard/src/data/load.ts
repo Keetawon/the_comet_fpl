@@ -18,6 +18,8 @@ import type {
   PlayerForecastVsActualData,
   PlayerActualsData,
   PlayerActualsRecord,
+  PlayerProvisionalActualsData,
+  PlayerProvisionalActualsRecord,
   PlayerHorizon,
   PlayerHorizonsData,
   PlayerHorizonsRecord,
@@ -31,6 +33,8 @@ import type {
   TeamForecastVsActualData,
   TeamActualsData,
   TeamActualsRecord,
+  TeamProvisionalActualsData,
+  TeamProvisionalActualsRecord,
   TeamRecord,
 } from "./types";
 import { PLAYER_HORIZON_FIELDS } from "./types";
@@ -361,6 +365,226 @@ export async function loadTeamActuals(): Promise<TeamActualsData> {
   return {
     schema: "fpl.dashboard-team-actuals",
     json_schema_version: DASHBOARD_SCHEMA_VERSION,
+    teams,
+  };
+}
+
+const PLAYER_PROVISIONAL_ACTUAL_KEYS = [
+  ...PLAYER_ACTUAL_KEYS.filter((key) => key !== "points_under_rules_2026_27"),
+  "total_points_as_recorded",
+] as const;
+
+const TEAM_PROVISIONAL_ACTUAL_KEYS = [...TEAM_ACTUAL_KEYS] as const;
+
+function provisionalEnvelope(
+  payload: unknown,
+  filename: string,
+  schema: string,
+  recordsKey: "players" | "teams",
+): {
+  capturedAt: string | null;
+  records: unknown[];
+} {
+  const envelope = strictObject(
+    payload,
+    ["schema", "json_schema_version", "captured_at", recordsKey],
+    filename,
+  );
+  if (envelope.schema !== schema || envelope.json_schema_version !== 1) {
+    throw new Error(`unsupported ${filename}: expected ${schema} version 1`);
+  }
+  const capturedAt =
+    envelope.captured_at === null
+      ? null
+      : timezoneAwareIsoValue(envelope.captured_at, `${filename}.captured_at`);
+  const records = envelope[recordsKey];
+  if (!Array.isArray(records)) {
+    throw new Error(`invalid ${filename}.${recordsKey}: expected an array`);
+  }
+  if (records.length > 0 && capturedAt === null) {
+    throw new Error(`invalid ${filename}: non-empty provisional history requires captured_at`);
+  }
+  return { capturedAt, records };
+}
+
+/** Load ended player fixtures from one latest live capture; these rows remain mutable. */
+export async function loadPlayerProvisionalActuals(): Promise<PlayerProvisionalActualsData> {
+  const filename = "player_provisional_actuals.json";
+  const payload = await fetchJson<unknown>(filename);
+  const envelope = provisionalEnvelope(
+    payload,
+    filename,
+    "fpl.dashboard-player-provisional-actuals",
+    "players",
+  );
+  const identities = new Set<string>();
+  let previousIdentity = "";
+  const players = envelope.records.map(
+    (value, recordIndex): PlayerProvisionalActualsRecord => {
+      const subject = `${filename}.players[${recordIndex}]`;
+      const record = strictObject(value, ["season", "code", "actuals"], subject);
+      const season = stringValue(record.season, `${subject}.season`);
+      const code = integerValue(record.code, `${subject}.code`, 1);
+      if (!Array.isArray(record.actuals) || !record.actuals.length) {
+        throw new Error(`invalid ${subject}.actuals: expected a non-empty array`);
+      }
+      const identity = `${season}/${String(code).padStart(12, "0")}`;
+      if (identities.has(identity) || (previousIdentity && identity < previousIdentity)) {
+        throw new Error(`invalid ${filename}: identities are duplicated or unordered`);
+      }
+      identities.add(identity);
+      previousIdentity = identity;
+      const fixtures = new Set<number>();
+      let previousOrder = "";
+      const actuals = record.actuals.map((actual, actualIndex) => {
+        const actualSubject = `${subject}.actuals[${actualIndex}]`;
+        const row = strictObject(actual, PLAYER_PROVISIONAL_ACTUAL_KEYS, actualSubject);
+        const gw = integerValue(row.gw, `${actualSubject}.gw`, 1);
+        const fixture = integerValue(row.fixture, `${actualSubject}.fixture`, 1);
+        const kickoff = timezoneAwareIsoValue(
+          row.kickoff_time,
+          `${actualSubject}.kickoff_time`,
+        );
+        integerValue(row.team_code, `${actualSubject}.team_code`, 1);
+        stringValue(row.team_short_name, `${actualSubject}.team_short_name`);
+        integerValue(row.opponent_team_code, `${actualSubject}.opponent_team_code`, 1);
+        stringValue(row.opponent_short_name, `${actualSubject}.opponent_short_name`);
+        if (typeof row.was_home !== "boolean") {
+          throw new Error(`invalid ${actualSubject}.was_home`);
+        }
+        if (row.total_points_as_recorded !== null) {
+          wholeValue(row.total_points_as_recorded, `${actualSubject}.total_points_as_recorded`);
+        }
+        for (const key of PLAYER_ACTUAL_KEYS.slice(8).filter(
+          (key) => key !== "points_under_rules_2026_27",
+        )) {
+          const metric = row[key];
+          if (metric !== null && (typeof metric !== "number" || !Number.isFinite(metric))) {
+            throw new Error(`invalid ${actualSubject}.${key}`);
+          }
+        }
+        if (fixtures.has(fixture)) {
+          throw new Error(`invalid ${subject}: duplicate fixture ${fixture}`);
+        }
+        fixtures.add(fixture);
+        const order = `${String(gw).padStart(3, "0")}/${new Date(kickoff).toISOString()}/${String(fixture).padStart(8, "0")}`;
+        if (previousOrder && order < previousOrder) {
+          throw new Error(`invalid ${subject}: actuals are not ordered`);
+        }
+        previousOrder = order;
+        return row as unknown as PlayerProvisionalActualsRecord["actuals"][number];
+      });
+      return { season, code, actuals };
+    },
+  );
+  return {
+    schema: "fpl.dashboard-player-provisional-actuals",
+    json_schema_version: 1,
+    captured_at: envelope.capturedAt,
+    players,
+  };
+}
+
+/** Load ended club fixtures from one latest live capture; every fixture must be reciprocal. */
+export async function loadTeamProvisionalActuals(): Promise<TeamProvisionalActualsData> {
+  const filename = "team_provisional_actuals.json";
+  const payload = await fetchJson<unknown>(filename);
+  const envelope = provisionalEnvelope(
+    payload,
+    filename,
+    "fpl.dashboard-team-provisional-actuals",
+    "teams",
+  );
+  const identities = new Set<string>();
+  let previousIdentity = "";
+  const teams = envelope.records.map(
+    (value, recordIndex): TeamProvisionalActualsRecord => {
+      const subject = `${filename}.teams[${recordIndex}]`;
+      const record = strictObject(value, ["season", "team_code", "actuals"], subject);
+      const season = stringValue(record.season, `${subject}.season`);
+      const teamCode = integerValue(record.team_code, `${subject}.team_code`, 1);
+      if (!Array.isArray(record.actuals) || !record.actuals.length) {
+        throw new Error(`invalid ${subject}.actuals: expected a non-empty array`);
+      }
+      const identity = `${season}/${String(teamCode).padStart(12, "0")}`;
+      if (identities.has(identity) || (previousIdentity && identity < previousIdentity)) {
+        throw new Error(`invalid ${filename}: identities are duplicated or unordered`);
+      }
+      identities.add(identity);
+      previousIdentity = identity;
+      const fixtures = new Set<number>();
+      let previousOrder = "";
+      const actuals = record.actuals.map((actual, actualIndex) => {
+        const actualSubject = `${subject}.actuals[${actualIndex}]`;
+        const row = strictObject(actual, TEAM_PROVISIONAL_ACTUAL_KEYS, actualSubject);
+        const gw = integerValue(row.gw, `${actualSubject}.gw`, 1);
+        const fixture = integerValue(row.fixture, `${actualSubject}.fixture`, 1);
+        const kickoff = timezoneAwareIsoValue(
+          row.kickoff_time,
+          `${actualSubject}.kickoff_time`,
+        );
+        integerValue(row.opponent_team_code, `${actualSubject}.opponent_team_code`, 1);
+        stringValue(row.opponent_short_name, `${actualSubject}.opponent_short_name`);
+        if (typeof row.was_home !== "boolean") {
+          throw new Error(`invalid ${actualSubject}.was_home`);
+        }
+        integerValue(row.goals_for, `${actualSubject}.goals_for`);
+        integerValue(row.goals_against, `${actualSubject}.goals_against`);
+        for (const key of ["team_xg", "team_xgc"] as const) {
+          const metric = nullableFinite(row[key], `${actualSubject}.${key}`);
+          if (metric !== null && metric < 0) {
+            throw new Error(`invalid ${actualSubject}.${key}: expected a non-negative number`);
+          }
+        }
+        for (const key of ["team_bps", "defensive_contribution"] as const) {
+          if (row[key] !== null) wholeValue(row[key], `${actualSubject}.${key}`);
+        }
+        if (fixtures.has(fixture)) {
+          throw new Error(`invalid ${subject}: duplicate fixture ${fixture}`);
+        }
+        fixtures.add(fixture);
+        const order = `${String(gw).padStart(3, "0")}/${new Date(kickoff).toISOString()}/${String(fixture).padStart(8, "0")}`;
+        if (previousOrder && order < previousOrder) {
+          throw new Error(`invalid ${subject}: actuals are not ordered`);
+        }
+        previousOrder = order;
+        return row as unknown as TeamProvisionalActualsRecord["actuals"][number];
+      });
+      return { season, team_code: teamCode, actuals };
+    },
+  );
+
+  const fixtureSides = new Map<string, Array<TeamProvisionalActualsRecord["actuals"][number] & { team_code: number }>>();
+  for (const record of teams) {
+    for (const actual of record.actuals) {
+      const key = `${record.season}/${actual.fixture}`;
+      const sides = fixtureSides.get(key) ?? [];
+      sides.push({ ...actual, team_code: record.team_code });
+      fixtureSides.set(key, sides);
+    }
+  }
+  for (const [fixture, sides] of fixtureSides) {
+    if (sides.length !== 2) {
+      throw new Error(`invalid ${filename}: provisional fixture ${fixture} does not have two sides`);
+    }
+    const [first, second] = sides;
+    if (
+      first.team_code !== second.opponent_team_code ||
+      second.team_code !== first.opponent_team_code ||
+      first.was_home === second.was_home ||
+      first.gw !== second.gw ||
+      first.kickoff_time !== second.kickoff_time ||
+      first.goals_for !== second.goals_against ||
+      first.goals_against !== second.goals_for
+    ) {
+      throw new Error(`invalid ${filename}: provisional fixture ${fixture} sides are not reciprocal`);
+    }
+  }
+
+  return {
+    schema: "fpl.dashboard-team-provisional-actuals",
+    json_schema_version: 1,
+    captured_at: envelope.capturedAt,
     teams,
   };
 }

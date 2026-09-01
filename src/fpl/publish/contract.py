@@ -1,4 +1,4 @@
-"""The frozen BI semantic contract, version 5.
+"""The frozen BI semantic contract, version 6.
 
 DEV-ROADMAP P1.1 requires each published table's grain, keys, null semantics, source owner, and
 allowed joins to be settled **before** the exporter exists, so P1.2-P1.4 build against a fixed
@@ -37,7 +37,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SEMANTIC_CONTRACT_VERSION = 5
+SEMANTIC_CONTRACT_VERSION = 6
 
 #: Season-scoped identifiers. A join may use one only when ``season`` is bound in the same join.
 SEASON_SCOPED_KEYS: frozenset[str] = frozenset({"element_id", "team_id", "opponent_team_id"})
@@ -974,6 +974,88 @@ FACT_TEAM_FIXTURE_ACTUAL = Table(
     ),
 )
 
+
+# Reporting-only mutable observations. These are deliberately separate from the finalised actual
+# facts and the append-only outcome ledger: consumers may show them with an explicit provisional
+# label, but prediction monitoring must never score them.
+FACT_PROVISIONAL_PLAYER_FIXTURE_OBSERVATION = FACT_PLAYER_FIXTURE_ACTUAL.model_copy(
+    update={
+        "name": "fact_provisional_player_fixture_observation",
+        "subject": "What the live API provisionally reports for a player in one completed fixture.",
+        "source_owner": (
+            "fpl.publish.export:latest complete player-history snapshot capture + "
+            "stg_live_fixture_version + stg_live_player_fixture_version + "
+            "stg_live_team_version"
+        ),
+        "columns": (
+            *(
+                column.model_copy(
+                    update={
+                        "description": (
+                            "Raw points currently reported by the live FPL element-summary "
+                            "payload. The value remains mutable reporting evidence until "
+                            "immutable final attachment."
+                        )
+                    }
+                )
+                if column.name == "total_points_as_recorded"
+                else column
+                for column in FACT_PLAYER_FIXTURE_ACTUAL.columns
+                if column.name != "points_under_rules_2026_27"
+            ),
+            _key(
+                "observed_at",
+                "timestamp",
+                "Knowledge time of the single coherent player-history capture that supplied row.",
+            ),
+        ),
+        "notes": (
+            "Carries no run_id and never enters either finalized outcome ledger.",
+            "Only scored fixtures whose same-capture schedule row says "
+            "finished_provisional=true or finished=true are eligible for display.",
+            "A fixture remains explicitly provisional until final attachment starts. Any row in "
+            "an immutable player/team outcome ledger or finalized archive fact excludes that "
+            "whole fixture from both provisional facts.",
+            "Every published row comes from one latest complete player-history capture per season; "
+            "fixture, player, club identity, score and components are never mixed across captures.",
+            "The raw recorded points are mutable reporting context, not a final target or a replay "
+            "under the 2026/27 rules.",
+        ),
+    }
+)
+
+
+FACT_PROVISIONAL_TEAM_FIXTURE_OBSERVATION = FACT_TEAM_FIXTURE_ACTUAL.model_copy(
+    update={
+        "name": "fact_provisional_team_fixture_observation",
+        "subject": "What the live API provisionally reports for a club in one completed fixture.",
+        "grain_note": "Two reciprocal provisional rows per completed fixture, one per club side.",
+        "source_owner": (
+            "fpl.publish.export:latest complete player-history snapshot capture + "
+            "stg_live_fixture_version + stg_live_player_fixture_version + "
+            "stg_live_team_version"
+        ),
+        "columns": (
+            *FACT_TEAM_FIXTURE_ACTUAL.columns,
+            _key(
+                "observed_at",
+                "timestamp",
+                "Knowledge time of the single coherent player-history capture that supplied row.",
+            ),
+        ),
+        "notes": (
+            "Carries no run_id and never enters either finalized outcome ledger.",
+            "Scores come directly from the same capture's fixtures payload and are reciprocal; "
+            "they remain mutable reporting evidence until immutable final attachment.",
+            "The fixture remains an explicitly provisional display row even after finished=true "
+            "until any immutable finalized outcome or archive actual exists; that first evidence "
+            "removes both club sides and every player row together.",
+            "xG, xGC, BPS and defensive contribution are same-capture player aggregates. NULL "
+            "continues to mean unavailable or incomplete measurement, never zero.",
+        ),
+    }
+)
+
 FACT_FINALIZED_PLAYER_FIXTURE_OUTCOME = Table(
     name="fact_finalized_player_fixture_outcome",
     role="fact",
@@ -1462,8 +1544,18 @@ SEMANTIC_CONTRACT_V4 = SemanticContract(
 )
 
 SEMANTIC_CONTRACT_V5 = SemanticContract(
-    version=SEMANTIC_CONTRACT_VERSION,
+    version=5,
     tables=(*SEMANTIC_CONTRACT_V4.tables, FACT_TEAM_FIXTURE_ACTUAL),
+)
+
+
+SEMANTIC_CONTRACT_V6 = SemanticContract(
+    version=SEMANTIC_CONTRACT_VERSION,
+    tables=(
+        *SEMANTIC_CONTRACT_V5.tables,
+        FACT_PROVISIONAL_PLAYER_FIXTURE_OBSERVATION,
+        FACT_PROVISIONAL_TEAM_FIXTURE_OBSERVATION,
+    ),
 )
 
 # The executable v1 declaration remains importable for readers of historical manifests. Its only
@@ -1502,6 +1594,7 @@ __all__ = [
     "SEMANTIC_CONTRACT_V3",
     "SEMANTIC_CONTRACT_V4",
     "SEMANTIC_CONTRACT_V5",
+    "SEMANTIC_CONTRACT_V6",
     "SEMANTIC_CONTRACT_VERSION",
     "Column",
     "Join",

@@ -78,6 +78,9 @@ FIXTURE_MATRIX_SCHEMA: Final[str] = "fpl.dashboard-fixture-matrix"
 PLAYERS_SCHEMA: Final[str] = "fpl.dashboard-players"
 PLAYER_ACTUALS_SCHEMA: Final[str] = "fpl.dashboard-player-actuals"
 TEAM_ACTUALS_SCHEMA: Final[str] = "fpl.dashboard-team-actuals"
+PLAYER_PROVISIONAL_ACTUALS_SCHEMA: Final[str] = "fpl.dashboard-player-provisional-actuals"
+TEAM_PROVISIONAL_ACTUALS_SCHEMA: Final[str] = "fpl.dashboard-team-provisional-actuals"
+PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION: Final[int] = 1
 PLAYER_HORIZONS_SCHEMA: Final[str] = "fpl.dashboard-player-horizons"
 SUMMARY_SCHEMA: Final[str] = "fpl.dashboard-summary"
 NEXT_GW_SCHEMA: Final[str] = "fpl.dashboard-next-gw"
@@ -91,6 +94,8 @@ FIXTURE_MATRIX_FILENAME: Final[str] = "fixture_matrix.json"
 PLAYERS_FILENAME: Final[str] = "players.json"
 PLAYER_ACTUALS_FILENAME: Final[str] = "player_actuals.json"
 TEAM_ACTUALS_FILENAME: Final[str] = "team_actuals.json"
+PLAYER_PROVISIONAL_ACTUALS_FILENAME: Final[str] = "player_provisional_actuals.json"
+TEAM_PROVISIONAL_ACTUALS_FILENAME: Final[str] = "team_provisional_actuals.json"
 PLAYER_HORIZONS_FILENAME: Final[str] = "player_horizons.json"
 SUMMARY_FILENAME: Final[str] = "summary.json"
 NEXT_GW_FILENAME: Final[str] = "next_gw.json"
@@ -112,6 +117,8 @@ _READ_TABLES: Final[tuple[str, ...]] = (
     "fact_player_form",
     "fact_player_fixture_actual",
     "fact_team_fixture_actual",
+    "fact_provisional_player_fixture_observation",
+    "fact_provisional_team_fixture_observation",
     "fact_forecast_player_fixture",
     "fact_optimizer_plan",
     "fact_finalized_player_fixture_outcome",
@@ -179,6 +186,20 @@ _TEAM_ACTUAL_NULLABLE_INTEGER_FIELDS: Final[frozenset[str]] = frozenset(
     {"team_bps", "defensive_contribution"}
 )
 _TEAM_ACTUAL_FLOAT_FIELDS: Final[frozenset[str]] = frozenset({"team_xg", "team_xgc"})
+_PLAYER_PROVISIONAL_ACTUAL_FIELDS: Final[tuple[str, ...]] = (
+    *tuple(field for field in _PLAYER_ACTUAL_FIELDS if field != "points_under_rules_2026_27"),
+    "total_points_as_recorded",
+)
+_PLAYER_PROVISIONAL_INTEGER_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        *(
+            field
+            for field in _PLAYER_ACTUAL_INTEGER_FIELDS
+            if field != "points_under_rules_2026_27"
+        ),
+        "total_points_as_recorded",
+    }
+)
 _HORIZON_THRESHOLDS: Final[tuple[int, ...]] = (2, 4, 6, 10, 15)
 _HORIZON_FIELDS: Final[tuple[str, ...]] = (
     "gw_to",
@@ -201,6 +222,8 @@ _FILE_LIST_KEY: Final[dict[str, str | None]] = {
     PLAYERS_FILENAME: "players",
     PLAYER_ACTUALS_FILENAME: "players",
     TEAM_ACTUALS_FILENAME: "teams",
+    PLAYER_PROVISIONAL_ACTUALS_FILENAME: "players",
+    TEAM_PROVISIONAL_ACTUALS_FILENAME: "teams",
     PLAYER_HORIZONS_FILENAME: "players",
     NEXT_GW_FILENAME: "plans",
     SUMMARY_FILENAME: None,
@@ -213,6 +236,8 @@ _FILE_SCHEMA: Final[dict[str, str]] = {
     PLAYERS_FILENAME: PLAYERS_SCHEMA,
     PLAYER_ACTUALS_FILENAME: PLAYER_ACTUALS_SCHEMA,
     TEAM_ACTUALS_FILENAME: TEAM_ACTUALS_SCHEMA,
+    PLAYER_PROVISIONAL_ACTUALS_FILENAME: PLAYER_PROVISIONAL_ACTUALS_SCHEMA,
+    TEAM_PROVISIONAL_ACTUALS_FILENAME: TEAM_PROVISIONAL_ACTUALS_SCHEMA,
     PLAYER_HORIZONS_FILENAME: PLAYER_HORIZONS_SCHEMA,
     NEXT_GW_FILENAME: NEXT_GW_SCHEMA,
     SUMMARY_FILENAME: SUMMARY_SCHEMA,
@@ -220,6 +245,18 @@ _FILE_SCHEMA: Final[dict[str, str]] = {
     TEAM_FORECAST_VS_ACTUAL_FILENAME: TEAM_FORECAST_VS_ACTUAL_SCHEMA,
     OPTIMIZER_AUDIT_FILENAME: OPTIMIZER_AUDIT_SCHEMA,
 }
+_FILE_JSON_SCHEMA_VERSION: Final[dict[str, int]] = {
+    filename: (
+        PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION
+        if filename
+        in {PLAYER_PROVISIONAL_ACTUALS_FILENAME, TEAM_PROVISIONAL_ACTUALS_FILENAME}
+        else DASHBOARD_JSON_SCHEMA_VERSION
+    )
+    for filename in _FILE_SCHEMA
+}
+_PROVISIONAL_READ_MODEL_FILENAMES: Final[frozenset[str]] = frozenset(
+    {PLAYER_PROVISIONAL_ACTUALS_FILENAME, TEAM_PROVISIONAL_ACTUALS_FILENAME}
+)
 _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
     {
         "schema",
@@ -249,6 +286,10 @@ class DashboardReadModels:
     players: tuple[dict[str, Any], ...]
     player_actuals: tuple[dict[str, Any], ...]
     team_actuals: tuple[dict[str, Any], ...]
+    player_provisional_actuals: tuple[dict[str, Any], ...]
+    team_provisional_actuals: tuple[dict[str, Any], ...]
+    player_provisional_captured_at: str | None
+    team_provisional_captured_at: str | None
     player_horizons: tuple[dict[str, Any], ...]
     summary: dict[str, Any]
     next_gw: dict[str, Any]
@@ -1280,6 +1321,265 @@ def _build_team_actuals(
         for (season, team_code), rows in sorted(actuals.items())
         if team_code in eligible_codes and season in eligible_seasons
     )
+
+
+def _provisional_captured_at(frame: pl.DataFrame, subject: str) -> str | None:
+    if frame.height == 0:
+        return None
+    observed = frame.get_column("observed_at").unique().to_list()
+    if len(observed) != 1:
+        raise DashboardJsonError(
+            f"{subject} mixes {len(observed)} provisional player-history capture timestamps"
+        )
+    return _iso_or_none(observed[0])
+
+
+def _build_player_provisional_actuals(
+    provisional: pl.DataFrame,
+    team_season: pl.DataFrame,
+    dim_fixture: pl.DataFrame,
+    player_gameweek: pl.DataFrame,
+) -> tuple[tuple[dict[str, Any], ...], str | None]:
+    """Normalize reporting-only player rows without weakening final actual semantics."""
+    eligible_codes = {
+        int(code)
+        for code in player_gameweek.get_column("code").unique().to_list()
+        if code is not None
+    }
+    eligible_seasons = {
+        str(season)
+        for season in player_gameweek.get_column("season").unique().to_list()
+        if season is not None
+    }
+    selected = provisional.filter(
+        pl.col("code").is_in(sorted(eligible_codes))
+        & pl.col("season").is_in(sorted(eligible_seasons))
+    )
+    if selected.height == 0:
+        return (), None
+    _require_no_nulls(
+        selected,
+        (
+            "season",
+            "fixture",
+            "code",
+            "gw",
+            "kickoff_time",
+            "team_id",
+            "team_code",
+            "opponent_team_id",
+            "was_home",
+            "observed_at",
+        ),
+        "a provisional player row is missing its fixture, club, opponent, venue, or capture time",
+    )
+    if selected.group_by(["season", "fixture", "code"]).len().filter(pl.col("len") != 1).height:
+        raise DashboardJsonError(
+            "provisional player rows are not unique at (season, fixture, code)"
+        )
+
+    team_labels = {
+        (str(row["season"]), int(row["team_id"])): row
+        for row in team_season.iter_rows(named=True)
+    }
+    fixtures = {
+        (str(row["season"]), int(row["fixture"])): row
+        for row in dim_fixture.iter_rows(named=True)
+    }
+    result: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    rows = selected.sort(
+        ["season", "code", "gw", "kickoff_time", "fixture"], nulls_last=True
+    )
+    for row in rows.iter_rows(named=True):
+        season = str(row["season"])
+        fixture_key = (season, int(row["fixture"]))
+        fixture = fixtures.get(fixture_key)
+        own = team_labels.get((season, int(row["team_id"])))
+        opponent = team_labels.get((season, int(row["opponent_team_id"])))
+        if fixture is None or own is None or opponent is None:
+            raise DashboardJsonError(
+                f"provisional player fixture {fixture_key} cannot resolve its "
+                "schedule/club identity"
+            )
+        if row["was_home"] is True:
+            expected_team_id = fixture["home_team_id"]
+            expected_team_code = fixture["home_team_code"]
+            expected_opponent_id = fixture["away_team_id"]
+            expected_opponent_code = fixture["away_team_code"]
+        elif row["was_home"] is False:
+            expected_team_id = fixture["away_team_id"]
+            expected_team_code = fixture["away_team_code"]
+            expected_opponent_id = fixture["home_team_id"]
+            expected_opponent_code = fixture["home_team_code"]
+        else:
+            raise DashboardJsonError(
+                f"provisional player fixture {fixture_key} has no boolean venue identity"
+            )
+        if (
+            row["gw"] != fixture["gw"]
+            or row["kickoff_time"] != fixture["kickoff_time"]
+            or row["team_id"] != expected_team_id
+            or row["team_code"] != expected_team_code
+            or row["opponent_team_id"] != expected_opponent_id
+            or own["team_code"] != expected_team_code
+            or opponent["team_code"] != expected_opponent_code
+        ):
+            raise DashboardJsonError(
+                f"provisional player fixture {fixture_key} disagrees with its "
+                "schedule/team identity"
+            )
+        key = (season, int(row["code"]))
+        result.setdefault(key, []).append(
+            {
+                "gw": row["gw"],
+                "fixture": row["fixture"],
+                "kickoff_time": _iso_or_none(row["kickoff_time"]),
+                "team_code": own["team_code"],
+                "team_short_name": own["short_name"],
+                "opponent_team_code": opponent["team_code"],
+                "opponent_short_name": opponent["short_name"],
+                "was_home": row["was_home"],
+                "minutes": row["minutes"],
+                "starts": row["starts"],
+                "goals_scored": row["goals_scored"],
+                "assists": row["assists"],
+                "clean_sheets": row["clean_sheets"],
+                "goals_conceded": row["goals_conceded"],
+                "saves": row["saves"],
+                "bonus": row["bonus"],
+                "bps": row["bps"],
+                "defensive_contribution": row["defensive_contribution"],
+                "expected_goals": row["expected_goals"],
+                "expected_assists": row["expected_assists"],
+                "expected_goals_conceded": row["expected_goals_conceded"],
+                "total_points_as_recorded": row["total_points_as_recorded"],
+            }
+        )
+    records = tuple(
+        {"season": season, "code": code, "actuals": actuals}
+        for (season, code), actuals in sorted(result.items())
+    )
+    return records, _provisional_captured_at(selected, "player provisional read model")
+
+
+def _build_team_provisional_actuals(
+    provisional: pl.DataFrame,
+    team_season: pl.DataFrame,
+    dim_fixture: pl.DataFrame,
+    team_fixture: pl.DataFrame,
+) -> tuple[tuple[dict[str, Any], ...], str | None]:
+    """Normalize same-capture reciprocal club rows for reporting only."""
+    eligible_codes = {
+        int(code)
+        for code in team_fixture.get_column("team_code").unique().to_list()
+        if code is not None
+    }
+    eligible_seasons = {
+        str(season)
+        for season in team_fixture.get_column("season").unique().to_list()
+        if season is not None
+    }
+    selected = provisional.filter(
+        pl.col("team_code").is_in(sorted(eligible_codes))
+        & pl.col("season").is_in(sorted(eligible_seasons))
+    )
+    if selected.height == 0:
+        return (), None
+    _require_no_nulls(
+        selected,
+        (
+            "season",
+            "fixture",
+            "team_id",
+            "team_code",
+            "opponent_team_id",
+            "gw",
+            "kickoff_time",
+            "was_home",
+            "goals_for",
+            "goals_against",
+            "observed_at",
+        ),
+        "a provisional team row is missing its fixture identity, score, or capture time",
+    )
+    if selected.group_by(["season", "fixture", "team_id"]).len().filter(
+        pl.col("len") != 1
+    ).height:
+        raise DashboardJsonError(
+            "provisional team rows are not unique at (season, fixture, team_id)"
+        )
+    team_labels = {
+        (str(row["season"]), int(row["team_id"])): row
+        for row in team_season.iter_rows(named=True)
+    }
+    fixtures = {
+        (str(row["season"]), int(row["fixture"])): row
+        for row in dim_fixture.iter_rows(named=True)
+    }
+    sides_by_fixture: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    for row in selected.iter_rows(named=True):
+        sides_by_fixture.setdefault((str(row["season"]), int(row["fixture"])), []).append(row)
+    for fixture_key, sides in sides_by_fixture.items():
+        fixture = fixtures.get(fixture_key)
+        home = [side for side in sides if side["was_home"] is True]
+        away = [side for side in sides if side["was_home"] is False]
+        if fixture is None or len(sides) != 2 or len(home) != 1 or len(away) != 1:
+            raise DashboardJsonError(
+                f"provisional team fixture {fixture_key} is not one reciprocal side per club"
+            )
+        if (
+            home[0]["team_id"] != fixture["home_team_id"]
+            or home[0]["team_code"] != fixture["home_team_code"]
+            or home[0]["opponent_team_id"] != fixture["away_team_id"]
+            or away[0]["team_id"] != fixture["away_team_id"]
+            or away[0]["team_code"] != fixture["away_team_code"]
+            or away[0]["opponent_team_id"] != fixture["home_team_id"]
+            or home[0]["gw"] != fixture["gw"]
+            or away[0]["gw"] != fixture["gw"]
+            or home[0]["kickoff_time"] != fixture["kickoff_time"]
+            or away[0]["kickoff_time"] != fixture["kickoff_time"]
+            or home[0]["goals_for"] != away[0]["goals_against"]
+            or away[0]["goals_for"] != home[0]["goals_against"]
+            or home[0]["observed_at"] != away[0]["observed_at"]
+        ):
+            raise DashboardJsonError(
+                f"provisional team fixture {fixture_key} disagrees with its schedule or "
+                "reciprocal score"
+            )
+
+    result: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    rows = selected.sort(
+        ["season", "team_code", "gw", "kickoff_time", "fixture"], nulls_last=True
+    )
+    for row in rows.iter_rows(named=True):
+        season = str(row["season"])
+        opponent = team_labels.get((season, int(row["opponent_team_id"])))
+        if opponent is None:
+            raise DashboardJsonError(
+                f"provisional team fixture {(season, row['fixture'])} cannot resolve its opponent"
+            )
+        key = (season, int(row["team_code"]))
+        result.setdefault(key, []).append(
+            {
+                "gw": row["gw"],
+                "fixture": row["fixture"],
+                "kickoff_time": _iso_or_none(row["kickoff_time"]),
+                "opponent_team_code": opponent["team_code"],
+                "opponent_short_name": opponent["short_name"],
+                "was_home": row["was_home"],
+                "goals_for": row["goals_for"],
+                "goals_against": row["goals_against"],
+                "team_xg": row["team_xg"],
+                "team_xgc": row["team_xgc"],
+                "team_bps": row["team_bps"],
+                "defensive_contribution": row["defensive_contribution"],
+            }
+        )
+    records = tuple(
+        {"season": season, "team_code": team_code, "actuals": actuals}
+        for (season, team_code), actuals in sorted(result.items())
+    )
+    return records, _provisional_captured_at(selected, "team provisional read model")
 
 
 def _build_players(
@@ -2834,6 +3134,20 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_fixture"],
         frames["fact_forecast_team_fixture"],
     )
+    player_provisional_actuals, player_provisional_captured_at = (
+        _build_player_provisional_actuals(
+            frames["fact_provisional_player_fixture_observation"],
+            frames["dim_team_season"],
+            frames["dim_fixture"],
+            frames["fact_forecast_player_gameweek"],
+        )
+    )
+    team_provisional_actuals, team_provisional_captured_at = _build_team_provisional_actuals(
+        frames["fact_provisional_team_fixture_observation"],
+        frames["dim_team_season"],
+        frames["dim_fixture"],
+        frames["fact_forecast_team_fixture"],
+    )
     player_horizons = _build_player_horizons(
         frames["fact_forecast_player_gameweek"], frames["dim_forecast_run"]
     )
@@ -2890,6 +3204,10 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         players=players,
         player_actuals=player_actuals,
         team_actuals=team_actuals,
+        player_provisional_actuals=player_provisional_actuals,
+        team_provisional_actuals=team_provisional_actuals,
+        player_provisional_captured_at=player_provisional_captured_at,
+        team_provisional_captured_at=team_provisional_captured_at,
         player_horizons=player_horizons,
         summary=summary,
         next_gw=next_gw,
@@ -2985,6 +3303,24 @@ def render_read_model_files(models: DashboardReadModels) -> dict[str, bytes]:
                 "schema": TEAM_ACTUALS_SCHEMA,
                 "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
                 "teams": list(models.team_actuals),
+            },
+            indent=2,
+        ),
+        PLAYER_PROVISIONAL_ACTUALS_FILENAME: _canonical_json_bytes(
+            {
+                "schema": PLAYER_PROVISIONAL_ACTUALS_SCHEMA,
+                "json_schema_version": PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
+                "captured_at": models.player_provisional_captured_at,
+                "players": list(models.player_provisional_actuals),
+            },
+            indent=2,
+        ),
+        TEAM_PROVISIONAL_ACTUALS_FILENAME: _canonical_json_bytes(
+            {
+                "schema": TEAM_PROVISIONAL_ACTUALS_SCHEMA,
+                "json_schema_version": PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION,
+                "captured_at": models.team_provisional_captured_at,
+                "teams": list(models.team_provisional_actuals),
             },
             indent=2,
         ),
@@ -3408,6 +3744,161 @@ def _validate_team_actual_document(document: Mapping[str, Any]) -> None:
             previous_order = order
 
 
+def _validate_provisional_captured_at(value: object, *, has_records: bool, subject: str) -> None:
+    if not has_records:
+        if value is not None:
+            raise DashboardJsonError(
+                f"{subject} captured_at must be null when no rows are published"
+            )
+        return
+    if not isinstance(value, str):
+        raise DashboardJsonError(f"{subject} has no provisional capture timestamp")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise DashboardJsonError(f"{subject} has an invalid capture timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise DashboardJsonError(f"{subject} has a naive capture timestamp")
+
+
+def _validate_player_provisional_actual_document(document: Mapping[str, Any]) -> None:
+    if set(document) != {"schema", "json_schema_version", "captured_at", "players"}:
+        raise DashboardJsonError("player_provisional_actuals.json has a malformed schema envelope")
+    players = document.get("players")
+    if not isinstance(players, list):
+        raise DashboardJsonError("player_provisional_actuals.json players must be an array")
+    _validate_provisional_captured_at(
+        document.get("captured_at"),
+        has_records=bool(players),
+        subject="player_provisional_actuals.json",
+    )
+    identities: set[tuple[str, int]] = set()
+    previous_identity: tuple[str, int] | None = None
+    for player in players:
+        if not isinstance(player, dict) or set(player) != {"season", "code", "actuals"}:
+            raise DashboardJsonError(
+                "player_provisional_actuals.json has a malformed player record"
+            )
+        actuals = player.get("actuals")
+        season = player.get("season")
+        code = player.get("code")
+        if (
+            not isinstance(season, str)
+            or not season
+            or not isinstance(code, int)
+            or isinstance(code, bool)
+            or code <= 0
+            or not isinstance(actuals, list)
+            or not actuals
+        ):
+            raise DashboardJsonError(
+                "player_provisional_actuals.json has an invalid player identity/history"
+            )
+        identity = (season, code)
+        if identity in identities or (
+            previous_identity is not None and identity < previous_identity
+        ):
+            raise DashboardJsonError(
+                "player_provisional_actuals.json identities are duplicated or unordered"
+            )
+        identities.add(identity)
+        previous_identity = identity
+        previous_order: tuple[int, str, int] | None = None
+        fixtures: set[int] = set()
+        for actual in actuals:
+            if not isinstance(actual, dict) or set(actual) != set(
+                _PLAYER_PROVISIONAL_ACTUAL_FIELDS
+            ):
+                raise DashboardJsonError(
+                    "player_provisional_actuals.json has a malformed fixture row"
+                )
+            gw = actual["gw"]
+            fixture = actual["fixture"]
+            kickoff = actual["kickoff_time"]
+            if (
+                not isinstance(gw, int)
+                or isinstance(gw, bool)
+                or gw <= 0
+                or not isinstance(fixture, int)
+                or isinstance(fixture, bool)
+                or fixture <= 0
+                or not isinstance(kickoff, str)
+                or not isinstance(actual["team_code"], int)
+                or isinstance(actual["team_code"], bool)
+                or actual["team_code"] <= 0
+                or not isinstance(actual["team_short_name"], str)
+                or not actual["team_short_name"]
+                or not isinstance(actual["opponent_team_code"], int)
+                or isinstance(actual["opponent_team_code"], bool)
+                or actual["opponent_team_code"] <= 0
+                or not isinstance(actual["opponent_short_name"], str)
+                or not actual["opponent_short_name"]
+                or not isinstance(actual["was_home"], bool)
+            ):
+                raise DashboardJsonError(
+                    f"player_provisional_actuals.json {identity} has invalid fixture identity"
+                )
+            try:
+                parsed_kickoff = datetime.fromisoformat(kickoff)
+            except ValueError as exc:
+                raise DashboardJsonError(
+                    f"player_provisional_actuals.json {identity} has invalid kickoff"
+                ) from exc
+            if parsed_kickoff.tzinfo is None or parsed_kickoff.utcoffset() is None:
+                raise DashboardJsonError(
+                    f"player_provisional_actuals.json {identity} has naive kickoff"
+                )
+            for field in _PLAYER_PROVISIONAL_INTEGER_FIELDS:
+                value = actual[field]
+                if value is not None and (
+                    not isinstance(value, int) or isinstance(value, bool)
+                ):
+                    raise DashboardJsonError(
+                        f"player_provisional_actuals.json {identity} {field} is not integer/null"
+                    )
+            for field in _PLAYER_ACTUAL_FLOAT_FIELDS:
+                value = actual[field]
+                if value is not None and (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(value)
+                ):
+                    raise DashboardJsonError(
+                        f"player_provisional_actuals.json {identity} {field} is not finite/null"
+                    )
+            if fixture in fixtures:
+                raise DashboardJsonError(
+                    f"player_provisional_actuals.json {identity} repeats fixture {fixture}"
+                )
+            fixtures.add(fixture)
+            order = (gw, kickoff, fixture)
+            if previous_order is not None and order < previous_order:
+                raise DashboardJsonError(
+                    f"player_provisional_actuals.json {identity} fixture rows are unordered"
+                )
+            previous_order = order
+
+
+def _validate_team_provisional_actual_document(document: Mapping[str, Any]) -> None:
+    if set(document) != {"schema", "json_schema_version", "captured_at", "teams"}:
+        raise DashboardJsonError("team_provisional_actuals.json has a malformed schema envelope")
+    teams = document.get("teams")
+    if not isinstance(teams, list):
+        raise DashboardJsonError("team_provisional_actuals.json teams must be an array")
+    _validate_provisional_captured_at(
+        document.get("captured_at"),
+        has_records=bool(teams),
+        subject="team_provisional_actuals.json",
+    )
+    _validate_team_actual_document(
+        {
+            "schema": TEAM_ACTUALS_SCHEMA,
+            "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
+            "teams": teams,
+        }
+    )
+
+
 def _validate_team_actual_generation(
     documents: Mapping[str, Mapping[str, Any]],
 ) -> None:
@@ -3454,6 +3945,72 @@ def _validate_team_actual_generation(
             f"team_actuals.json contains club codes absent from fixture_matrix.json: "
             f"{orphans[:3]}"
         )
+
+
+def _validate_provisional_actual_generation(
+    documents: Mapping[str, Mapping[str, Any]],
+) -> None:
+    player_captured_at = documents[PLAYER_PROVISIONAL_ACTUALS_FILENAME].get("captured_at")
+    team_captured_at = documents[TEAM_PROVISIONAL_ACTUALS_FILENAME].get("captured_at")
+    if player_captured_at != team_captured_at:
+        raise DashboardJsonError(
+            "provisional player/team read models do not share one capture timestamp"
+        )
+    player_rows = documents[PLAYERS_FILENAME].get("players")
+    team_rows = documents[FIXTURE_MATRIX_FILENAME].get("teams")
+    final_players = documents[PLAYER_ACTUALS_FILENAME].get("players")
+    final_teams = documents[TEAM_ACTUALS_FILENAME].get("teams")
+    provisional_players = documents[PLAYER_PROVISIONAL_ACTUALS_FILENAME].get("players")
+    provisional_teams = documents[TEAM_PROVISIONAL_ACTUALS_FILENAME].get("teams")
+    if (
+        not isinstance(player_rows, list)
+        or not isinstance(team_rows, list)
+        or not isinstance(final_players, list)
+        or not isinstance(final_teams, list)
+        or not isinstance(provisional_players, list)
+        or not isinstance(provisional_teams, list)
+    ):
+        raise DashboardJsonError("provisional actual generation lost a required top-level array")
+
+    player_codes = {row["code"] for row in player_rows}
+    player_seasons = {row["season"] for row in player_rows}
+    for record in provisional_players:
+        if record["code"] not in player_codes or record["season"] not in player_seasons:
+            raise DashboardJsonError(
+                "player_provisional_actuals.json contains an identity outside players.json"
+            )
+    team_codes = {row["team_code"] for row in team_rows}
+    team_seasons = {row["season"] for row in team_rows}
+    for record in provisional_teams:
+        if record["team_code"] not in team_codes or record["season"] not in team_seasons:
+            raise DashboardJsonError(
+                "team_provisional_actuals.json contains an identity outside fixture_matrix.json"
+            )
+
+    final_player_grains = {
+        (record["season"], record["code"], actual["fixture"])
+        for record in final_players
+        for actual in record["actuals"]
+    }
+    provisional_player_grains = {
+        (record["season"], record["code"], actual["fixture"])
+        for record in provisional_players
+        for actual in record["actuals"]
+    }
+    final_team_grains = {
+        (record["season"], record["team_code"], actual["fixture"])
+        for record in final_teams
+        for actual in record["actuals"]
+    }
+    provisional_team_grains = {
+        (record["season"], record["team_code"], actual["fixture"])
+        for record in provisional_teams
+        for actual in record["actuals"]
+    }
+    if final_player_grains & provisional_player_grains:
+        raise DashboardJsonError("a player fixture is published as both final and provisional")
+    if final_team_grains & provisional_team_grains:
+        raise DashboardJsonError("a team fixture is published as both final and provisional")
 
 
 def _validate_player_horizon_generation(
@@ -3585,7 +4142,7 @@ def _validate_directory(
         document = _strict_json_loads(payload.decode("utf-8"))
         if (
             document.get("schema") != _FILE_SCHEMA[filename]
-            or document.get("json_schema_version") != DASHBOARD_JSON_SCHEMA_VERSION
+            or document.get("json_schema_version") != _FILE_JSON_SCHEMA_VERSION[filename]
         ):
             raise DashboardJsonError(f"{filename} lost its schema envelope")
         if filename == PLAYER_HORIZONS_FILENAME:
@@ -3594,6 +4151,10 @@ def _validate_directory(
             _validate_player_actual_document(document)
         if filename == TEAM_ACTUALS_FILENAME:
             _validate_team_actual_document(document)
+        if filename == PLAYER_PROVISIONAL_ACTUALS_FILENAME:
+            _validate_player_provisional_actual_document(document)
+        if filename == TEAM_PROVISIONAL_ACTUALS_FILENAME:
+            _validate_team_provisional_actual_document(document)
         if _file_row_count(document, filename) != entry["row_count"]:
             raise DashboardJsonError(f"{filename} row count does not match the manifest")
         documents[filename] = document
@@ -3617,6 +4178,11 @@ def _validate_directory(
     _validate_player_horizon_generation(documents, manifest)
     _validate_player_actual_generation(documents)
     _validate_team_actual_generation(documents)
+    provisional_files = _PROVISIONAL_READ_MODEL_FILENAMES & documents.keys()
+    if provisional_files and provisional_files != _PROVISIONAL_READ_MODEL_FILENAMES:
+        raise DashboardJsonError("provisional player/team read models must be present as a pair")
+    if provisional_files:
+        _validate_provisional_actual_generation(documents)
     return manifest
 
 
@@ -3670,6 +4236,8 @@ def export_dashboard_json(
                 PLAYERS_FILENAME: len(models.players),
                 PLAYER_ACTUALS_FILENAME: len(models.player_actuals),
                 TEAM_ACTUALS_FILENAME: len(models.team_actuals),
+                PLAYER_PROVISIONAL_ACTUALS_FILENAME: len(models.player_provisional_actuals),
+                TEAM_PROVISIONAL_ACTUALS_FILENAME: len(models.team_provisional_actuals),
                 PLAYER_HORIZONS_FILENAME: sum(
                     len(player["horizons"]) for player in models.player_horizons
                 ),
@@ -3746,12 +4314,17 @@ __all__ = [
     "PLAYER_FORECAST_VS_ACTUAL_SCHEMA",
     "PLAYER_HORIZONS_FILENAME",
     "PLAYER_HORIZONS_SCHEMA",
+    "PLAYER_PROVISIONAL_ACTUALS_FILENAME",
+    "PLAYER_PROVISIONAL_ACTUALS_SCHEMA",
+    "PROVISIONAL_ACTUALS_JSON_SCHEMA_VERSION",
     "SUMMARY_FILENAME",
     "SUMMARY_SCHEMA",
     "TEAM_ACTUALS_FILENAME",
     "TEAM_ACTUALS_SCHEMA",
     "TEAM_FORECAST_VS_ACTUAL_FILENAME",
     "TEAM_FORECAST_VS_ACTUAL_SCHEMA",
+    "TEAM_PROVISIONAL_ACTUALS_FILENAME",
+    "TEAM_PROVISIONAL_ACTUALS_SCHEMA",
     "DashboardJsonError",
     "DashboardJsonResult",
     "DashboardReadModels",

@@ -57,10 +57,16 @@ uv run python -m fpl.jobs.package_public_dashboard `
 
 The command prints a single JSON record containing the asset name, asset SHA-256, byte size, and
 sanitized manifest content SHA-256. Inspect its output directory if desired; it must contain
-exactly the nine read-model JSON files (`fixture_matrix.json`, `players.json`,
-`player_actuals.json`, `player_horizons.json`, `next_gw.json`, `summary.json`,
-`player_forecast_vs_actual.json`, `team_forecast_vs_actual.json`, and
-`optimizer_audit.json`) plus `manifest.json`.
+exactly the twelve read-model JSON files (`fixture_matrix.json`, `players.json`,
+`player_actuals.json`, `team_actuals.json`, `player_provisional_actuals.json`,
+`team_provisional_actuals.json`, `player_horizons.json`, `next_gw.json`, `summary.json`,
+`player_forecast_vs_actual.json`, `team_forecast_vs_actual.json`, and `optimizer_audit.json`) plus
+`manifest.json`.
+
+The two provisional files retain their explicit schema-v1 envelopes and `captured_at`; they are
+available only to Players and Fixture Matrix and never become monitoring outcomes. Their inclusion
+keeps the sanitized generation and its manifest complete. It does not publish that generation:
+the owner must still inspect the ZIP, create the immutable release, and commit the exact pin below.
 
 Create a new release and tag for that exact generation. Never replace an existing tag or asset:
 

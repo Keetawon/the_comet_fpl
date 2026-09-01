@@ -163,6 +163,23 @@ def test_consistent_season_passes_the_guard() -> None:
     assert_same_season(bootstrap, fixtures)  # must not raise
 
 
+def test_fixture_parses_provisional_completion_without_relabelling_it_final() -> None:
+    fixture = ApiFixture.model_validate(
+        {
+            "id": 1,
+            "team_h": 1,
+            "team_a": 2,
+            "finished": False,
+            "finished_provisional": True,
+        }
+    )
+    assert fixture.finished is False
+    assert fixture.finished_provisional is True
+
+    historical = ApiFixture.model_validate({"id": 2, "team_h": 1, "team_a": 2})
+    assert historical.finished_provisional is False
+
+
 # --------------------------------------------------------------------------------------
 # Client behaviour: throttling, retries, and blocked egress
 # --------------------------------------------------------------------------------------

@@ -32,17 +32,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayers } from "@/data/load";
-import type { DashboardManifest, NextGwPlan, PlayerActualsRecord, PlayerHorizonsRecord, PlayerRecord, TeamRecord } from "@/data/types";
+import {
+  loadFixtureMatrix,
+  loadNextGw,
+  loadPlayerActuals,
+  loadPlayerHorizons,
+  loadPlayerProvisionalActuals,
+  loadPlayers,
+} from "@/data/load";
+import type { DashboardManifest, NextGwPlan, PlayerHorizonsRecord, PlayerObservedActualsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import {
   actualGameweekLabel,
   actualGameweeksChronological,
+  aggregateObservedPoints,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
   latestActualGameweeks,
   latestPlayerActualDetails,
+  mergePlayerActualRecords,
 } from "@/lib/playerActuals";
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
 import { fetchManagerTeamMembers, type ManagerTeamPreview } from "@/lib/planServer";
@@ -147,7 +156,8 @@ type PageState =
   | {
       status: "ready";
       players: PlayerRecord[];
-      playerActuals: PlayerActualsRecord[];
+      playerActuals: PlayerObservedActualsRecord[];
+      provisionalCapturedAt: string | null;
       playerHorizons: PlayerHorizonsRecord[];
       teams: TeamRecord[];
       plans: NextGwPlan[];
@@ -181,11 +191,12 @@ export function PlayersPage() {
     Promise.all([
       loadPlayers(),
       loadPlayerActuals(),
+      loadPlayerProvisionalActuals(),
       loadPlayerHorizons(),
       loadFixtureMatrix(),
       loadNextGw(),
     ])
-      .then(([playersData, actualsData, horizonsData, teamsData, nextGw]) => {
+      .then(([playersData, actualsData, provisionalActuals, horizonsData, teamsData, nextGw]) => {
         if (cancelled) return;
         // The manifest owns run bounds when present. Without it, the validated horizon
         // vectors are authoritative: fixture arrays omit blank weeks and may be empty.
@@ -220,7 +231,11 @@ export function PlayersPage() {
         setState({
           status: "ready",
           players: playersData.players,
-          playerActuals: actualsData.players,
+          playerActuals: mergePlayerActualRecords(
+            actualsData.players,
+            provisionalActuals.players,
+          ),
+          provisionalCapturedAt: provisionalActuals.captured_at,
           playerHorizons: horizonsData.players,
           teams: teamsData.teams,
           plans: nextGw.plans,
@@ -306,7 +321,7 @@ export function PlayersPage() {
     );
   }, [rollingActualSeasons, runPlayers, state]);
   const rollingActualsByCode = useMemo(() => {
-    const recordsByCode = new Map<number, PlayerActualsRecord[]>();
+    const recordsByCode = new Map<number, PlayerObservedActualsRecord[]>();
     for (const record of rollingActualRecords) {
       const existing = recordsByCode.get(record.code);
       if (existing == null) recordsByCode.set(record.code, [record]);
@@ -330,6 +345,9 @@ export function PlayersPage() {
   );
   const actualFrom = selectedActualGameweeks[0] ?? null;
   const actualTo = selectedActualGameweeks.at(-1) ?? null;
+  const selectedActualsIncludeProvisional = selectedActualGameweeks.some(
+    (gameweek) => gameweek.outcome_status === "provisional",
+  );
 
   const cumulativeOutcomesAvailable =
     filters != null &&
@@ -406,6 +424,7 @@ export function PlayersPage() {
         rollingActualsByCode.get(player.code) ?? [],
         selectedActualGameweeks,
       );
+      const observedPoints = aggregateObservedPoints(selectedActuals);
       return {
         // Suppress the shared detail row's retired prior-season form anchor on this page.
         player: { ...player, form: null },
@@ -415,6 +434,8 @@ export function PlayersPage() {
           actualRange == null
             ? null
             : averageBpsPerAppearance(selectedActuals),
+        observedPoints: observedPoints.points,
+        actualPointsProvisional: observedPoints.includesProvisional,
         actualDetails: latestPlayerActualDetails(
           rollingActualsByCode.get(player.code) ?? [],
           expandedActualGameweeks,
@@ -559,13 +580,12 @@ export function PlayersPage() {
   const actualRows = rows.filter((row) => row.form != null);
   const measuredActualPoints = actualRows
     .filter(
-      (row): row is PlayerStatRow & { form: NonNullable<PlayerStatRow["form"]> } =>
-        row.form?.points_under_rules_2026_27 != null,
+      (row): row is PlayerStatRow & { observedPoints: number } =>
+        row.observedPoints != null,
     )
     .sort(
       (left, right) =>
-        (right.form.points_under_rules_2026_27 ?? 0) -
-          (left.form.points_under_rules_2026_27 ?? 0) ||
+        right.observedPoints - left.observedPoints ||
         left.player.code - right.player.code,
     );
   const actualPointsLeader = measuredActualPoints[0];
@@ -597,16 +617,20 @@ export function PlayersPage() {
       "coverage.selected_season_actuals",
       "coverage",
       actualFrom == null || actualTo == null
-        ? "No finalized player actuals are published for the current/prior-season scope."
-        : `${actualRows.length} visible players have finalized observations from ${actualGameweekLabel(actualFrom)} through ${actualGameweekLabel(actualTo)}.`,
-      ["player_actuals.json"],
+        ? "No ended player observations are published for the current/prior-season scope."
+        : `${actualRows.length} visible players have observations from ${actualGameweekLabel(actualFrom)} through ${actualGameweekLabel(actualTo)}${selectedActualsIncludeProvisional ? "; provisional rows may still change" : ""}.`,
+      selectedActualsIncludeProvisional
+        ? ["player_actuals.json", "player_provisional_actuals.json"]
+        : ["player_actuals.json"],
     ),
     ...(actualPointsLeader ? [
       insightFact(
         "rank.current_actual_points",
         "rank",
-        `${actualPointsLeader.player.web_name} leads measured replayed points in the selected actual range with ${actualPointsLeader.form.points_under_rules_2026_27}.`,
-        ["player_actuals.json"],
+        `${actualPointsLeader.player.web_name} leads measured observed points in the selected range with ${actualPointsLeader.observedPoints}${selectedActualsIncludeProvisional ? "; provisional fixtures use raw FPL points and may change" : ""}.`,
+        selectedActualsIncludeProvisional
+          ? ["player_actuals.json", "player_provisional_actuals.json"]
+          : ["player_actuals.json"],
       ),
     ] : []),
   ];
@@ -614,7 +638,12 @@ export function PlayersPage() {
     "xP totals sum already-published player-fixture values or select an exact cumulative endpoint.",
     "Overlapping cumulative probability columns are intentionally kept out of this dense table; Player analytics exposes the exact published blank/haul endpoints.",
     "The availability status is a next-round overlay and is not applied to raw xP.",
-    "Actual endpoints use exact finalized season/GW keys from the forecast season and its immediate predecessor.",
+    "Actual endpoints use exact ended season/GW keys from the forecast season and its immediate predecessor.",
+    ...(selectedActualsIncludeProvisional
+      ? [
+          "Provisional rows come from ended fixtures in the latest live capture. Raw FPL points, bonus, BPS, and other stats may change; prediction monitoring remains finalized-only.",
+        ]
+      : []),
     ...(managerSquad
       ? [
           "My squad membership comes from a private local manager capture and only filters already-published player rows; it does not change any statistic.",
@@ -627,6 +656,9 @@ export function PlayersPage() {
       : playerMultiFilters.positions.length > 1 || playerMultiFilters.teamCodes.length > 1
         ? "AI explanation is unavailable while multiple positions or teams are selected because the renderer accepts only one of each. Deterministic facts remain available."
         : undefined;
+  const provisionalInsightUnavailableReason = selectedActualsIncludeProvisional
+    ? "AI explanation is unavailable while the selected Actual range includes provisional fixtures. Deterministic facts remain available, and prediction monitoring remains finalized-only."
+    : undefined;
 
   return (
     <div className="flex flex-col gap-3 p-4 lg:p-6">
@@ -692,7 +724,7 @@ export function PlayersPage() {
           }),
           unavailableReason: managerSquad
             ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
-            : multiSelectInsightUnavailableReason,
+            : provisionalInsightUnavailableReason ?? multiSelectInsightUnavailableReason,
           localScopeKey: JSON.stringify({
             runId: activeRunId,
             filters,
@@ -880,14 +912,27 @@ export function PlayersPage() {
             Forecast GWs filter upcoming fixtures and xP only. Actual from/to independently
             aggregate every exact published season/GW key between the endpoints. Player, position,
             and team selections use OR within each box and AND across boxes; an empty box means all.
-            Reset defaults to the latest five finalized keys across this season and its immediate predecessor. My
+            Reset defaults to the latest five ended keys across this season and its immediate predecessor. My
             squad intersects with every other player filter. Min avg min (L5) remains its separate
             published anchor. Expanded rows also remain an independent fixed rolling latest-five
             view and do not follow these Actual endpoints.
           </p>
+          {selectedActualsIncludeProvisional && (
+            <p
+              role="status"
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              Provisional stats are included from the live capture at{" "}
+              {state.provisionalCapturedAt
+                ? new Date(state.provisionalCapturedAt).toISOString().replace("T", " ").slice(0, 16)
+              : "unknown time"} UTC. These display-only rows are not yet attached to the immutable
+              outcome ledger; raw FPL points, bonus, BPS, and other source values may still change.
+              They are never scored on prediction-vs-actual pages.
+            </p>
+          )}
           {actualGameweeks.length === 0 && (
             <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
-              No finalized player actuals are published for the forecast season or its immediate
+              No ended player observations are published for the forecast season or its immediate
               predecessor. Observed columns stay unavailable.
             </p>
           )}
@@ -910,12 +955,12 @@ export function PlayersPage() {
           }
           formTitle={
             actualFrom == null || actualTo == null
-              ? "No finalized current/prior-season actuals published"
-              : `Finalized actuals from ${actualGameweekLabel(actualFrom)} through ${actualGameweekLabel(actualTo)}`
+              ? "No ended current/prior-season observations published"
+              : `Observed stats from ${actualGameweekLabel(actualFrom)} through ${actualGameweekLabel(actualTo)}${selectedActualsIncludeProvisional ? "; provisional values may change" : ""}`
           }
           formScopeLabel={
             actualFrom == null || actualTo == null
-              ? "No finalized current/prior-season GWs"
+              ? "No ended current/prior-season GWs"
               : actualFrom.season === actualTo.season && actualFrom.gw === actualTo.gw
                 ? actualGameweekLabel(actualFrom)
                 : `${actualGameweekLabel(actualFrom)} → ${actualGameweekLabel(actualTo)}`

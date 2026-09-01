@@ -54,6 +54,7 @@ def _fixtures(*, kickoff: str = "2026-08-22T14:00:00Z") -> list[dict[str, object
             "code": 9001,
             "event": 1,
             "finished": True,
+            "finished_provisional": True,
             "kickoff_time": kickoff,
             "team_h": 1,
             "team_a": 2,
@@ -128,10 +129,10 @@ def test_capture_manifest_and_live_loader_are_atomic() -> None:
         assert con.execute("SELECT count(*) FROM stg_live_team_version").fetchone() == (2,)
         assert con.execute(
             """
-            SELECT team_h_score, team_a_score
+            SELECT team_h_score, team_a_score, finished, finished_provisional
             FROM stg_live_fixture_version WHERE fixture = 501
             """
-        ).fetchone() == (3, 1)
+        ).fetchone() == (3, 1, True, True)
         team_row = con.execute(
             """
             SELECT team_id, team_name, short_name
@@ -155,6 +156,83 @@ def test_capture_manifest_and_live_loader_are_atomic() -> None:
             ).fetchall()
         }
         assert "total_points" not in columns
+    finally:
+        con.close()
+
+
+def test_existing_live_fixture_table_migrates_finished_provisional_additively(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "legacy-live-fixture.duckdb"
+    legacy = duckdb.connect(str(database))
+    try:
+        legacy.execute(
+            """
+            CREATE TABLE stg_live_fixture_version (
+                season VARCHAR NOT NULL,
+                fixture INTEGER NOT NULL,
+                known_at TIMESTAMPTZ NOT NULL,
+                capture_id VARCHAR NOT NULL,
+                gw INTEGER,
+                kickoff_time TIMESTAMPTZ,
+                team_h INTEGER NOT NULL,
+                team_a INTEGER NOT NULL,
+                team_h_score INTEGER,
+                team_a_score INTEGER,
+                team_h_difficulty INTEGER,
+                team_a_difficulty INTEGER,
+                finished BOOLEAN,
+                PRIMARY KEY (season, fixture, capture_id)
+            )
+            """
+        )
+        legacy.execute(
+            """
+            INSERT INTO stg_live_fixture_version
+            VALUES ('2025-26', 400, '2026-05-24T18:00:00Z', 'legacy', 38,
+                    '2026-05-24T15:00:00Z', 1, 2, 2, 0, 2, 4, TRUE)
+            """
+        )
+    finally:
+        legacy.close()
+
+    con = initialise(database)
+    try:
+        columns = {
+            row[0]
+            for row in con.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'stg_live_fixture_version'
+                """
+            ).fetchall()
+        }
+        assert "finished_provisional" in columns
+        assert con.execute(
+            """
+            SELECT finished, finished_provisional
+            FROM stg_live_fixture_version
+            WHERE capture_id = 'legacy'
+            """
+        ).fetchone() == (True, None)
+
+        write_capture(
+            con,
+            _capture(),  # type: ignore[arg-type]
+            season="2026-27",
+            gw=1,
+            mode="player-history",
+            captured_at=datetime(2026, 8, 23, 12, tzinfo=UTC),
+            capture_id="capture-after-migration",
+        )
+        assert con.execute(
+            """
+            SELECT finished, finished_provisional
+            FROM stg_live_fixture_version
+            WHERE capture_id = 'capture-after-migration'
+            """
+        ).fetchone() == (True, True)
     finally:
         con.close()
 

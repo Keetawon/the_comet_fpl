@@ -1,12 +1,46 @@
-# BI semantic contract, version 5
+# BI semantic contract, version 6
 
 Status: **implemented and frozen development-only** (P1.1 plus the P2.3/P2.5 amendments).
 
 Version 1 remains historical. Version 2 was the additive schedule-context revision that added
 nullable directed official FDR for both sides of `dim_fixture` without changing a forecast fact or
 ease formula. Version 3 added exact team PMFs and append-only player/team monitoring outcomes.
-Version 4 added finalized current-season player observations. All four executable historical
-declarations remain importable.
+Version 4 added finalized current-season player observations, and version 5 added normalized
+finalized team-fixture observations. All five executable historical declarations remain
+importable.
+
+## Version 6 provisional completed-match observation amendment (2026-09-01)
+
+Version 6 retains every v5 table and adds two explicitly mutable, reporting-only facts:
+
+- `fact_provisional_player_fixture_observation` at `(season, fixture, code)` grain; and
+- `fact_provisional_team_fixture_observation` at `(season, fixture, team_id)` grain.
+
+Both facts come from one latest complete `player-history` capture per season. A complete capture
+has exactly one bootstrap payload, exactly one fixtures payload, and one element-summary payload
+for every supported bootstrap player (`element_type` 1, 2, 3, or 4). Fixture state, player
+components, club identity, scores, and `observed_at` are all selected from that same capture; the
+export never combines payloads from different captures.
+
+Only a fixture whose same-capture schedule row has
+`finished_provisional = true OR finished = true`, non-null gameweek/kickoff, and both scores is
+eligible for consideration. This is deliberately stricter than merely observing a score and is
+still not immutable finality evidence. A shared fixture-level anti-join then excludes the entire
+fixture from both provisional facts as soon as any row exists in `mart_fact_player_fixture`,
+`mart_fact_team_match`, `ledger_outcome_player_fixture`, or `ledger_outcome_team_fixture`. A final
+API flag alone therefore remains explicitly provisional display evidence until an archive/final
+actual or immutable ledger path starts; once it does, every player and both club sides disappear
+from the provisional facts atomically.
+
+Both facts carry no `run_id`, never enter either append-only outcome ledger, and are never inputs
+to forecast monitoring, calibration, CRPS, model evaluation, or a finalized actual fact.
+
+The player fact keeps the API's mutable raw points only as `total_points_as_recorded`; it does not
+publish `points_under_rules_2026_27`. The team fact keeps official-payload scores and nullable
+same-capture aggregates for xG, xGC, BPS, and raw defensive-contribution actions. Two club sides
+must be reciprocal, every player row must agree with its matching team side and capture time, and
+the shared fixture exclusion prevents a partially handed-off match. Any residual
+provisional/finalized overlap at a semantic grain still fails the export closed.
 
 ## Version 5 normalized team-fixture actual amendment (2026-08-28)
 
@@ -312,6 +346,47 @@ roster-completeness witness. No metric is zero-filled. Possession and shots are 
 fact because no approved
 source supplies them; they must not be inferred from xG, threat, saves, or any other value.
 
+### `fact_provisional_player_fixture_observation` — grain `(season, fixture, code)`
+
+What one coherent live player-history capture currently reports for a player in a completed
+fixture not yet backed by archive or immutable-ledger final evidence. It has the same fixture,
+player, club/opponent, venue, and
+observed component columns as `fact_player_fixture_actual`, plus the capture knowledge time
+`observed_at`, but it deliberately omits `points_under_rules_2026_27`.
+
+`total_points_as_recorded` is the raw value in the same-capture element-summary payload. It may
+change before official finalization and must remain distinctly named in every downstream read
+model and display. It is not a rules replay, an immutable outcome, a model target, or permission
+to attach or score an outcome.
+
+Rows are considered only from the latest complete player-history capture for the season and only
+when the same capture marks the fixture `finished_provisional = true OR finished = true` with both
+scores present. The shared fixture-level final-evidence anti-join described above must also admit
+the match. `observed_at` is common to every provisional row emitted from that capture.
+The fact carries no `run_id`; double-gameweek legs remain separate and nullable source measures
+remain NULL rather than being zero-filled.
+
+### `fact_provisional_team_fixture_observation` — grain `(season, fixture, team_id)`
+
+The reporting-only club-side companion to the provisional player fact. Every eligible fixture
+contributes exactly two directed rows whose team/opponent identities, venue, gameweek, kickoff,
+scores, and `observed_at` agree with the same-capture fixture payload. `goals_for` and
+`goals_against` are reciprocal between the two sides and may still change before official
+finalization.
+
+`team_xg`, `team_xgc`, `team_bps`, and `defensive_contribution` are nullable aggregates from that
+same capture's player rows. They retain the finalized fact's measurement and NULL meanings, but
+they are provisional observations rather than externally reconciled totals. Defensive
+contribution remains raw actions, not fantasy points. The fact carries no `run_id` and never joins
+to a forecast for monitoring.
+
+At publication, each provisional player row must resolve to the matching provisional team side
+with identical fixture identity and `observed_at`. The same eligible-fixture relation feeds both
+facts, so evidence in any archive or player/team outcome source removes all player and team rows
+for that fixture together. Neither provisional fact may overlap its finalized actual counterpart
+at the same grain. A residual overlap is a stale or mixed source generation, not a preference
+rule, and fails closed.
+
 ### `fact_finalized_player_fixture_outcome` — grain `(season, fixture, code)`
 
 The immutable monitoring target sourced from `ledger_outcome_player_fixture`, carrying the
@@ -445,10 +520,16 @@ the work. Three were added, each forced by a documented invariant rather than by
 
 ## Source completeness
 
-Every current v5 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast facts,
-P1.6 supplies `fact_player_form`, P1.6b adds `fact_team_form`, and P2.5 adds the normalized
-`fact_team_fixture_actual` source path. Each was declared and sourced in the same change, so none is
-ever in `NOT_YET_SOURCED`. Consequently `contract.NOT_YET_SOURCED` is empty; P1.4 can require the
-complete v5 contract rather than silently emitting an apparently complete partial export. A pre-v3
-database that has not yet created one additive outcome ledger emits that outcome fact empty; if the
-table exists, its full physical shape is validated strictly.
+Every current v6 table has a concrete source owner: P1.2 supplies the two fixture-grain forecast
+facts, P1.6 supplies `fact_player_form`, P1.6b adds `fact_team_form`, P2.5 adds the normalized
+`fact_team_fixture_actual` source path, and the 2026-09-01 P2.5 amendment supplies both provisional
+facts from the latest complete player-history capture. Each was declared and sourced in the same
+change, so none is ever in `NOT_YET_SOURCED`. Consequently `contract.NOT_YET_SOURCED` is empty;
+P1.4 can require the complete v6 contract rather than silently emitting an apparently complete
+partial export.
+
+A pre-v3 database that has not yet created one additive outcome ledger emits that outcome fact
+empty; if the table exists, its full physical shape is validated strictly. A database with no
+player-history capture emits both provisional facts empty. Once such a capture exists, its
+bootstrap/fixtures/full supported-player element-summary roster must be complete or publication
+fails rather than publishing a partial provisional view.
