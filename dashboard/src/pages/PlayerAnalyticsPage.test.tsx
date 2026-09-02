@@ -233,6 +233,28 @@ describe("PlayerAnalyticsPage", () => {
     expect(screen.getAllByText(/may post-date the selected forecast vintage/i).length).toBeGreaterThan(0);
   });
 
+  it("compares derived observed xGI/90 and keeps the unsupported AI scope deterministic-only", async () => {
+    const user = userEvent.setup();
+    render(<PlayerAnalyticsPage />);
+    await screen.findByRole("heading", { name: "Player analytics" });
+
+    await user.click(screen.getByRole("radio", { name: "Past vs future" }));
+    await user.click(screen.getByRole("combobox", { name: "Past form metric" }));
+    await user.click(screen.getByRole("option", { name: "Observed xGI/90" }));
+
+    const table = screen.getByRole("table", { name: /Past vs future/ });
+    expect(
+      within(table).getByRole("columnheader", { name: /Observed xGI\/90/ }),
+    ).toBeInTheDocument();
+    expect(within(within(table).getByText("Alpha").closest("tr")!).getByText("0.54"))
+      .toBeInTheDocument();
+    expect(screen.getByText(/display-only sum of published xG\/90 and xA\/90/))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
+    expect(screen.getByText(/selector is not part of the typed public insight contract/))
+      .toBeInTheDocument();
+  });
+
   it("reuses player filters and explains a fully empty filtered scope", async () => {
     const user = userEvent.setup();
     render(<PlayerAnalyticsPage />);

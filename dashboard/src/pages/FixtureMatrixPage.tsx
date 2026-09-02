@@ -39,6 +39,7 @@ import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FixtureChip } from "@/components/FixtureTicker";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { TeamBadge } from "@/components/Avatars";
 import { VintageSelect } from "@/components/VintageSelect";
 import {
@@ -338,6 +339,7 @@ export function FixtureMatrixPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: "horizonMetric", desc: true }]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
   const [actualScope, setActualScope] = useState(ROLLING_ACTUAL_SCOPE);
+  const [selectedTeamCodes, setSelectedTeamCodes] = useState<number[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -412,6 +414,21 @@ export function FixtureMatrixPage() {
         ? state.teams.filter((t) => t.run_id === (runId ?? state.defaultRunId))
         : [],
     [state, runId],
+  );
+
+  const teamOptions = useMemo(
+    () =>
+      [...runTeams]
+        .sort(
+          (left, right) =>
+            left.team_name.localeCompare(right.team_name) || left.team_code - right.team_code,
+        )
+        .map((team) => ({
+          value: team.team_code,
+          label: team.short_name,
+          searchText: team.team_name,
+        })),
+    [runTeams],
   );
 
   const runBounds = useMemo(() => {
@@ -513,69 +530,78 @@ export function FixtureMatrixPage() {
 
   const rows: TeamRow[] = useMemo(() => {
     if (!filters) return [];
-    return runTeams.map((team) => {
-      const filtered = team.fixtures
-        .filter(
-          (f) =>
-            f.gw >= filters.gwFrom &&
-            f.gw <= filters.gwTo &&
-            (filters.venue === "all" ||
-              (filters.venue === "home" ? f.was_home === true : f.was_home === false)),
-        )
-        .sort((a, b) => a.gw - b.gw || (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? ""));
-      const scheduleOnly = (scheduleByTeam.get(team.team_code)?.fixtures ?? [])
-        .filter(
-          (fixture) =>
-            fixture.gw > runBounds.to &&
-            fixture.gw >= filters.gwFrom &&
-            fixture.gw <= filters.gwTo &&
-            (filters.venue === "all" ||
-              (filters.venue === "home"
-                ? fixture.was_home === true
-                : fixture.was_home === false)),
-        )
-        .sort(
-          (a, b) =>
-            a.gw - b.gw ||
-            (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? "") ||
-            a.fixture - b.fixture,
-        );
-      const form = team.form;
-      const sourceValues = [
-        ...filtered.map((fixture) =>
-          sourceMetricValue(
-            fixture,
-            filters.view,
-            colorSource,
-            opponentIndexOf(fixture.opponent_team_code),
-          ),
-        ),
-        ...scheduleOnly.map(
-          (fixture) =>
-            scheduleSourceMetric(
+    return runTeams
+      .filter(
+        (team) =>
+          selectedTeamCodes.length === 0 || selectedTeamCodes.includes(team.team_code),
+      )
+      .map((team) => {
+        const filtered = team.fixtures
+          .filter(
+            (f) =>
+              f.gw >= filters.gwFrom &&
+              f.gw <= filters.gwTo &&
+              (filters.venue === "all" ||
+                (filters.venue === "home" ? f.was_home === true : f.was_home === false)),
+          )
+          .sort(
+            (a, b) =>
+              a.gw - b.gw || (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? ""),
+          );
+        const scheduleOnly = (scheduleByTeam.get(team.team_code)?.fixtures ?? [])
+          .filter(
+            (fixture) =>
+              fixture.gw > runBounds.to &&
+              fixture.gw >= filters.gwFrom &&
+              fixture.gw <= filters.gwTo &&
+              (filters.venue === "all" ||
+                (filters.venue === "home"
+                  ? fixture.was_home === true
+                  : fixture.was_home === false)),
+          )
+          .sort(
+            (a, b) =>
+              a.gw - b.gw ||
+              (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? "") ||
+              a.fixture - b.fixture,
+          );
+        const form = team.form;
+        const sourceValues = [
+          ...filtered.map((fixture) =>
+            sourceMetricValue(
               fixture,
-              team.team_code,
               filters.view,
               colorSource,
-              strengthOf,
-            ).value,
-        ),
-      ];
-      return {
-        team,
-        filtered,
-        scheduleOnly,
-        form: form ? form.windows[formWindow] : null,
-        formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
-        horizonMetric: averageMeasured(sourceValues),
-        actualDetails: teamActualDetailsForGameweeks(
-          actualByTeamCode.get(team.team_code) ?? [],
-          actualGameweeks,
-        ),
-      };
-    });
+              opponentIndexOf(fixture.opponent_team_code),
+            ),
+          ),
+          ...scheduleOnly.map(
+            (fixture) =>
+              scheduleSourceMetric(
+                fixture,
+                team.team_code,
+                filters.view,
+                colorSource,
+                strengthOf,
+              ).value,
+          ),
+        ];
+        return {
+          team,
+          filtered,
+          scheduleOnly,
+          form: form ? form.windows[formWindow] : null,
+          formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
+          horizonMetric: averageMeasured(sourceValues),
+          actualDetails: teamActualDetailsForGameweeks(
+            actualByTeamCode.get(team.team_code) ?? [],
+            actualGameweeks,
+          ),
+        };
+      });
   }, [
     runTeams,
+    selectedTeamCodes,
     filters,
     formWindow,
     colorSource,
@@ -731,6 +757,17 @@ export function FixtureMatrixPage() {
 
   const activeRunId = runId ?? state.defaultRunId;
   const activeRun = runTeams[0];
+  const changeVintage = (nextRunId: string) => {
+    if (nextRunId === activeRunId) return;
+    const nextTeamCodes = new Set(
+      state.teams
+        .filter((team) => team.run_id === nextRunId)
+        .map((team) => team.team_code),
+    );
+    setSelectedTeamCodes((current) => current.filter((code) => nextTeamCodes.has(code)));
+    setExpanded({});
+    setRunId(nextRunId);
+  };
   const modelledFacts = rows.flatMap((row) =>
     row.filtered.map((fixture) => ({
       team: row.team,
@@ -789,15 +826,26 @@ export function FixtureMatrixPage() {
     "The current schedule overlay may be newer than the selected forecast vintage.",
     "Null fixture values are omitted from ranks and averages; no missing value is treated as zero.",
   ];
+  const multiTeamInsightUnavailableReason =
+    selectedTeamCodes.length > 1
+      ? "AI explanation is unavailable while multiple teams are selected because the renderer accepts only one club. Deterministic facts remain available."
+      : undefined;
 
   return (
     <div className="flex flex-col gap-3 p-4 lg:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-semibold">Fixture matrix</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <VintageSelect options={vintageOptions(state.runs, state.plans)} value={activeRunId} onChange={setRunId} />
+          <VintageSelect
+            options={vintageOptions(state.runs, state.plans)}
+            value={activeRunId}
+            onChange={changeVintage}
+          />
           <p className="text-xs text-muted-foreground">
-            {runTeams.length} clubs · as of {activeRun?.as_of?.replace("T", " ").slice(0, 16)} UTC
+            {rows.length === runTeams.length
+              ? `${runTeams.length} clubs`
+              : `${rows.length} of ${runTeams.length} clubs`} · as of{" "}
+            {activeRun?.as_of?.replace("T", " ").slice(0, 16)} UTC
             {activeRun?.form ? ` · form anchored ${activeRun.form.season} GW${activeRun.form.as_at_gw}` : ""}
           </p>
         </div>
@@ -841,6 +889,7 @@ export function FixtureMatrixPage() {
           scope: compactInsightScope({
             gw_from: filters?.gwFrom,
             gw_to: filters?.gwTo,
+            team_code: selectedTeamCodes.length === 1 ? selectedTeamCodes[0] : undefined,
             view: filters?.view === "defense" ? "defence" : filters?.view,
             venue: filters?.venue,
             form_window: formWindowScope(formWindow),
@@ -852,12 +901,29 @@ export function FixtureMatrixPage() {
             formWindow,
             colorSource,
             sorting,
+            selectedTeamCodes,
           }),
+          unavailableReason: multiTeamInsightUnavailableReason,
         }}
       />
 
       <FilterPanel>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <MultiSelectFilter
+            label="Team"
+            ariaLabel="Team filter"
+            allLabel="All teams"
+            options={teamOptions}
+            selected={selectedTeamCodes}
+            onChange={(teamCodes) => {
+              setSelectedTeamCodes(teamCodes);
+              setExpanded({});
+            }}
+            searchable
+            searchLabel="Search teams"
+            emptyLabel="No teams match that search"
+            className="text-sm text-muted-foreground"
+          />
           {filters && (
             <FilterBar
               filters={filters}

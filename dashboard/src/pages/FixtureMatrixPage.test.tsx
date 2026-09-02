@@ -203,6 +203,78 @@ describe("FixtureMatrixPage", () => {
     expect(screen.getAllByTestId("blank-slot").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("filters team rows with an OR multi-select and clears back to every club", async () => {
+    const user = userEvent.setup();
+    render(<FixtureMatrixPage />);
+    const matrix = await screen.findByRole("table", { name: "Fixture matrix" });
+
+    const teamFilter = screen.getByRole("button", { name: /^Team filter:/ });
+    expect(teamFilter).toHaveTextContent("All teams");
+
+    await user.click(teamFilter);
+    await user.type(screen.getByRole("textbox", { name: "Search teams" }), "Alpha");
+    await user.click(screen.getByRole("checkbox", { name: "ALP" }));
+    await user.keyboard("{Escape}");
+
+    expect(within(matrix).getByText("Alpha")).toBeInTheDocument();
+    expect(within(matrix).queryByText("Beta")).not.toBeInTheDocument();
+    expect(teamFilter).toHaveTextContent("ALP");
+    expect(screen.getByText("1 of 2 clubs", { exact: false })).toBeInTheDocument();
+
+    await user.click(teamFilter);
+    expect(screen.getByRole("checkbox", { name: "BET" })).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "BET" }));
+    await user.keyboard("{Escape}");
+
+    expect(within(matrix).getByText("Alpha")).toBeInTheDocument();
+    expect(within(matrix).getByText("Beta")).toBeInTheDocument();
+    expect(teamFilter).toHaveTextContent("2 selected");
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
+    expect(screen.getByText(/multiple teams are selected because the renderer accepts only one club/i))
+      .toBeInTheDocument();
+
+    await user.click(teamFilter);
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    await user.keyboard("{Escape}");
+
+    expect(within(matrix).getByText("Alpha")).toBeInTheDocument();
+    expect(within(matrix).getByText("Beta")).toBeInTheDocument();
+    expect(teamFilter).toHaveTextContent("All teams");
+  });
+
+  it("prunes unavailable permanent team codes when the forecast vintage changes", async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadFixtureMatrix).mockResolvedValueOnce({
+      teams: [
+        ...sample.teams,
+        {
+          ...sample.teams[1],
+          run_id: "zz-run",
+          as_of: "2026-08-28T17:30:00+00:00",
+        },
+      ],
+      schedule,
+      manifest: null,
+      easeIndexFormulaVersion: "fixture-ease-v1",
+    });
+
+    render(<FixtureMatrixPage />);
+    await screen.findByText("Alpha");
+    const teamFilter = screen.getByRole("button", { name: /^Team filter:/ });
+    await user.click(teamFilter);
+    await user.click(screen.getByRole("checkbox", { name: "ALP" }));
+    await user.click(screen.getByRole("checkbox", { name: "BET" }));
+    await user.keyboard("{Escape}");
+
+    screen.getByRole("combobox", { name: "Forecast vintage" }).focus();
+    await user.keyboard("{Enter}");
+    await user.click(screen.getByRole("option", { name: /zz-run/ }));
+
+    expect(await screen.findByText("Beta")).toBeInTheDocument();
+    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
+    expect(teamFilter).toHaveTextContent("BET");
+  });
+
   it("adds provisional GW2 to Rolling 5 and labels the mutable team score", async () => {
     const user = userEvent.setup();
     vi.mocked(loadTeamActuals).mockResolvedValueOnce({

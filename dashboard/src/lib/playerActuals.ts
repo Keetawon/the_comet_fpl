@@ -311,6 +311,23 @@ function sumMeasured(
 }
 
 /**
+ * Display-only observed xGI/90. Keep the two published component rates authoritative and
+ * fail closed unless both are finite; a missing component must never be treated as zero.
+ */
+export function expectedGoalInvolvementsPer90(
+  form: PlayerFormWindow | null | undefined,
+): number | null {
+  const expectedGoalsPer90 = form?.expected_goals_per_90;
+  const expectedAssistsPer90 = form?.expected_assists_per_90;
+  return expectedGoalsPer90 != null &&
+    expectedAssistsPer90 != null &&
+    Number.isFinite(expectedGoalsPer90) &&
+    Number.isFinite(expectedAssistsPer90)
+    ? expectedGoalsPer90 + expectedAssistsPer90
+    : null;
+}
+
+/**
  * Aggregate already-selected, already-published observations with the same NULL rules as
  * mart_fact_player_form. An empty selection has no observed form; this helper never backfills it.
  */

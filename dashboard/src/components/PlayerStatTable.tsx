@@ -43,7 +43,10 @@ import type {
   PlayerHorizon,
   PlayerRecord,
 } from "@/data/types";
-import type { PlayerHistoricalFixture } from "@/lib/playerActuals";
+import {
+  expectedGoalInvolvementsPer90,
+  type PlayerHistoricalFixture,
+} from "@/lib/playerActuals";
 
 export interface PlayerStatRow {
   player: PlayerRecord;
@@ -126,6 +129,7 @@ const ATTACK_FORM_COLUMN_IDS = new Set([
   "form-expected_goal_involvements",
   "form-expected_goals_per_90",
   "form-expected_assists_per_90",
+  "form-expected_goal_involvements_per_90",
 ]);
 const DEFENSE_FORM_COLUMN_IDS = new Set([
   "form-clean_sheets",
@@ -563,6 +567,31 @@ export function PlayerStatTable({
         );
       },
     };
+    const expectedGoalInvolvementsPer90Column: LegacyColumnDef<PlayerStatRow> = {
+      id: "form-expected_goal_involvements_per_90",
+      header: () => (
+        <span title="Display-only observed xGI/90: published xG/90 + xA/90; unavailable unless both component rates are measured">
+          xGI/90
+        </span>
+      ),
+      accessorFn: (row) => expectedGoalInvolvementsPer90(row.form) ?? undefined,
+      sortUndefined: "last",
+      cell: ({ row }) => {
+        const value = expectedGoalInvolvementsPer90(row.original.form);
+        return (
+          <span
+            className="tabular-nums"
+            title={
+              value == null
+                ? "xGI/90 is unmeasured because observed xG/90 or xA/90 is unavailable"
+                : `Observed xGI/90 (xG/90 + xA/90): ${fmt(value, 2)}`
+            }
+          >
+            {fmt(value, 2)}
+          </span>
+        );
+      },
+    };
     const attackFormColumns = [
       formStat("goals_scored", "G"),
       formStat("assists", "A"),
@@ -571,6 +600,7 @@ export function PlayerStatTable({
       expectedGoalInvolvementsColumn,
       formStat("expected_goals_per_90", "xG/90", { digits: 2 }),
       formStat("expected_assists_per_90", "xA/90", { digits: 2 }),
+      expectedGoalInvolvementsPer90Column,
     ];
     const defenseFormColumns = [
       formStat("clean_sheets", "CS", {

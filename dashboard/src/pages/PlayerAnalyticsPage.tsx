@@ -438,7 +438,16 @@ export function PlayerAnalyticsPage() {
     view === "past_future"
       ? "Observed form is the latest snapshot at static export and may post-date the selected forecast vintage. It is reporting context only, not a vintage-aligned input or causal comparison."
       : "Pareto-frontier membership is an exploration aid and does not establish optimality.",
+    ...(view === "past_future" && pastMetric === "xgi_per_90"
+      ? [
+          "Observed xGI/90 is the display-only sum of published xG/90 and xA/90; it is unavailable unless both component rates are measured.",
+        ]
+      : []),
   ];
+  const derivedPastMetricInsightUnavailableReason =
+    view === "past_future" && pastMetric === "xgi_per_90"
+      ? "AI explanation is unavailable for derived observed xGI/90 because that selector is not part of the typed public insight contract. Deterministic facts remain available."
+      : undefined;
 
   const changeRun = (nextRunId: string) => {
     setRunId(nextRunId);
@@ -743,9 +752,13 @@ export function PlayerAnalyticsPage() {
                   max_price_tenths: maxPriceTenthsScope(filters.maxPrice),
                   min_avg_minutes_l5: minAverageMinutesScope(filters.minMinutes),
                   availability: filters.availability,
-                  past_metric: playerPastMetricScope(view, pastMetric),
+                  past_metric:
+                    pastMetric === "xgi_per_90"
+                      ? undefined
+                      : playerPastMetricScope(view, pastMetric),
                   include_cold_starts: includeColdStarts,
                 }),
+                unavailableReason: derivedPastMetricInsightUnavailableReason,
                 localScopeKey: JSON.stringify({
                   runId: selectedRun.run_id,
                   gwTo: effectiveGwTo,

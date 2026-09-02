@@ -732,7 +732,7 @@ describe("PlayersPage", () => {
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     // Overall is genuinely balanced: common, attack, and defense form are all present.
-    for (const name of ["Starts", "G", "xGI", "xG/90", "CS", "GC", "Saves", "DC", "xGC", "BPS/App"]) {
+    for (const name of ["Starts", "G", "xGI", "xG/90", "xA/90", "xGI/90", "CS", "GC", "Saves", "DC", "xGC", "BPS/App"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
     let headers = screen.getAllByRole("columnheader").map((header) => header.textContent?.trim());
@@ -740,6 +740,11 @@ describe("PlayersPage", () => {
       "xA",
       "xGI",
       "xG/90",
+    ]);
+    expect(headers.slice(headers.indexOf("xG/90"), headers.indexOf("xG/90") + 3)).toEqual([
+      "xG/90",
+      "xA/90",
+      "xGI/90",
     ]);
     expect(screen.getByRole("columnheader", { name: "BPS/App" }).querySelector("span")).toHaveAttribute(
       "title",
@@ -755,10 +760,16 @@ describe("PlayersPage", () => {
         "Observed xGI (xG + xA): 2.7",
       ),
     ).toHaveTextContent("2.7");
+    expect(
+      within(screen.getByText("Alpha").closest("tr")!).getByTitle(
+        "Observed xGI/90 (xG/90 + xA/90): 0.54",
+      ),
+    ).toHaveTextContent("0.54");
 
     await user.click(screen.getByRole("radio", { name: "Defense" }));
     expect(screen.queryByRole("columnheader", { name: "G" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xG/90" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "xGI/90" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xGI" })).not.toBeInTheDocument();
     for (const name of ["CS", "GC", "Saves", "DC", "xGC", "Bonus", "BPS/App", "Pts"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
@@ -767,7 +778,7 @@ describe("PlayersPage", () => {
     await user.click(screen.getByRole("radio", { name: "Attack" }));
     expect(screen.queryByRole("columnheader", { name: "CS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xGC" })).not.toBeInTheDocument();
-    for (const name of ["G", "A", "xG", "xA", "xGI", "xG/90", "xA/90", "Bonus", "BPS/App", "Pts"]) {
+    for (const name of ["G", "A", "xG", "xA", "xGI", "xG/90", "xA/90", "xGI/90", "Bonus", "BPS/App", "Pts"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
     headers = screen.getAllByRole("columnheader").map((header) => header.textContent?.trim());
@@ -775,6 +786,11 @@ describe("PlayersPage", () => {
       "xA",
       "xGI",
       "xG/90",
+    ]);
+    expect(headers.slice(headers.indexOf("xG/90"), headers.indexOf("xG/90") + 3)).toEqual([
+      "xG/90",
+      "xA/90",
+      "xGI/90",
     ]);
   });
 
@@ -822,6 +838,21 @@ describe("PlayersPage", () => {
         "Observed xGI (xG + xA): 0.7",
       ),
     ).toHaveTextContent("0.7");
+    expect(
+      within(screen.getByText("Zero xGI").closest("tr")!).getByTitle(
+        "Observed xGI/90 (xG/90 + xA/90): 0.00",
+      ),
+    ).toHaveTextContent("0.00");
+    expect(
+      within(screen.getByText("Missing xGI").closest("tr")!).getByTitle(
+        "xGI/90 is unmeasured because observed xG/90 or xA/90 is unavailable",
+      ),
+    ).toHaveTextContent("–");
+    expect(
+      within(screen.getByText("Positive xGI").closest("tr")!).getByTitle(
+        "Observed xGI/90 (xG/90 + xA/90): 0.14",
+      ),
+    ).toHaveTextContent("0.14");
 
     const xgiHeader = screen.getByRole("columnheader", { name: "xGI" });
     const table = xgiHeader.closest("table")!;
@@ -837,6 +868,12 @@ describe("PlayersPage", () => {
     await user.click(within(xgiHeader).getByRole("button"));
     expect(order()).toEqual(["Positive xGI", "Zero xGI", "Missing xGI"]);
     await user.click(within(xgiHeader).getByRole("button"));
+    expect(order()).toEqual(["Zero xGI", "Positive xGI", "Missing xGI"]);
+
+    const xgiPer90Header = screen.getByRole("columnheader", { name: "xGI/90" });
+    await user.click(within(xgiPer90Header).getByRole("button"));
+    expect(order()).toEqual(["Positive xGI", "Zero xGI", "Missing xGI"]);
+    await user.click(within(xgiPer90Header).getByRole("button"));
     expect(order()).toEqual(["Zero xGI", "Positive xGI", "Missing xGI"]);
   });
 

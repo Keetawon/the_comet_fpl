@@ -10,6 +10,7 @@ import {
   aggregateObservedPoints,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
+  expectedGoalInvolvementsPer90,
   latestActualGameweeks,
   latestPlayerActualDetails,
   mergePlayerActualRecords,
@@ -53,6 +54,38 @@ function provisionalActual(
     ...patch,
   };
 }
+
+describe("expectedGoalInvolvementsPer90", () => {
+  const form = aggregatePlayerActuals([
+    actual({ expected_goals: 0.4, expected_assists: 0.2 }),
+  ]);
+
+  it("sums the two published per-90 component rates", () => {
+    expect(expectedGoalInvolvementsPer90(form)).toBeCloseTo(0.6);
+  });
+
+  it("keeps zero measured and fails closed on a missing or non-finite component", () => {
+    expect(
+      expectedGoalInvolvementsPer90({
+        ...form!,
+        expected_goals_per_90: 0,
+        expected_assists_per_90: 0,
+      }),
+    ).toBe(0);
+    expect(
+      expectedGoalInvolvementsPer90({
+        ...form!,
+        expected_assists_per_90: null,
+      }),
+    ).toBeNull();
+    expect(
+      expectedGoalInvolvementsPer90({
+        ...form!,
+        expected_goals_per_90: Number.POSITIVE_INFINITY,
+      }),
+    ).toBeNull();
+  });
+});
 
 describe("aggregatePlayerActuals", () => {
   it("merges every DGW leg and uses measured-signal minutes for per-90 rates", () => {

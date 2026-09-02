@@ -3,6 +3,7 @@
 
 import type { PlayerHorizonIndex } from "@/lib/playerHorizons";
 import { playerHorizon } from "@/lib/playerHorizons";
+import { expectedGoalInvolvementsPer90 } from "@/lib/playerActuals";
 import type { PlayerHorizon, PlayerRecord, WindowLabel } from "@/data/types";
 import { classifyPareto, type ParetoDirection } from "@/lib/pareto";
 
@@ -13,7 +14,7 @@ export type PlayerAnalyticsView =
   | "past_future";
 
 export type HaulThreshold = 6 | 10 | 15;
-export type PastMetric = "points" | "xg_per_90" | "xa_per_90";
+export type PastMetric = "points" | "xg_per_90" | "xa_per_90" | "xgi_per_90";
 
 export interface PlayerAnalyticsConfig {
   runId: string;
@@ -75,6 +76,7 @@ export const PAST_METRIC_LABEL: Record<PastMetric, string> = {
   points: "Observed points under 2026/27 rules",
   xg_per_90: "Observed xG/90",
   xa_per_90: "Observed xA/90",
+  xgi_per_90: "Observed xGI/90",
 };
 
 const FORM_WINDOW_SHORT: Record<WindowLabel, string> = {
@@ -104,7 +106,8 @@ function observedValue(
   if (form == null) return null;
   if (metric === "points") return finiteOrNull(form.points_under_rules_2026_27);
   if (metric === "xg_per_90") return finiteOrNull(form.expected_goals_per_90);
-  return finiteOrNull(form.expected_assists_per_90);
+  if (metric === "xa_per_90") return finiteOrNull(form.expected_assists_per_90);
+  return expectedGoalInvolvementsPer90(form);
 }
 
 function axes(config: PlayerAnalyticsConfig): Pick<PlayerAnalyticsResult, "xAxis" | "yAxis"> {

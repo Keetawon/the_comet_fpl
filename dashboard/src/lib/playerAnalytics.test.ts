@@ -187,6 +187,42 @@ describe("buildPlayerAnalytics", () => {
     );
   });
 
+  it("compares fail-closed derived observed xGI/90 in explanatory mode", () => {
+    const complete = player(1, "Complete", {
+      form: {
+        season: "2025-26",
+        as_at_gw: 38,
+        windows: windows({
+          expected_goals_per_90: 0.456,
+          expected_assists_per_90: 0.123,
+        }),
+      },
+    });
+    const missingXa = player(2, "Missing xA", {
+      form: {
+        season: "2025-26",
+        as_at_gw: 38,
+        windows: windows({
+          expected_goals_per_90: 0.4,
+          expected_assists_per_90: null,
+        }),
+      },
+    });
+    const result = buildPlayerAnalytics(
+      [complete, missingXa],
+      indexPlayerHorizons(horizonRecords),
+      {
+        ...baseConfig,
+        view: "past_future",
+        pastMetric: "xgi_per_90",
+      },
+    );
+
+    expect(result.plotted[0]).toMatchObject({ webName: "Complete", x: 0.579 });
+    expect(result.omitted.map((row) => row.webName)).toEqual(["Missing xA"]);
+    expect(result.xAxis.label).toContain("Observed xGI/90");
+  });
+
   it("omits null axes visibly instead of turning them into zero", () => {
     const result = buildPlayerAnalytics(
       [
