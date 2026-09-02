@@ -197,6 +197,9 @@ describe("NextGwPage", () => {
     expect(screen.queryByRole("columnheader", { name: "Starts" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "CS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "DC" })).not.toBeInTheDocument();
+    for (const name of ["Saves/App", "DC/App", "xGC/App", "Pts/App"]) {
+      expect(screen.queryByRole("columnheader", { name })).not.toBeInTheDocument();
+    }
     expect(screen.getAllByTestId("chip").length).toBeGreaterThan(0);
     // This shared table intentionally keeps its prospective fixture expansion.
     const tableShell = screen

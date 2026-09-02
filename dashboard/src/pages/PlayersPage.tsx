@@ -49,6 +49,10 @@ import {
   aggregateObservedPoints,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
+  averageExpectedGoalsConcededPerAppearance,
+  averageMinutesPerAppearance,
+  averageObservedCountPerAppearance,
+  averageObservedPointsPerAppearance,
   latestActualGameweeks,
   latestPlayerActualDetails,
   mergePlayerActualRecords,
@@ -62,7 +66,6 @@ import {
   compactInsightScope,
   insightFact,
   maxPriceTenthsScope,
-  minAverageMinutesScope,
   minPriceTenthsScope,
   playerPositionScope,
   publishedInsightProvenance,
@@ -379,10 +382,13 @@ export function PlayersPage() {
 
   const rows: PlayerStatRow[] = useMemo(() => {
     if (!filters) return [];
+    const minimumMinutesPerGame =
+      playerFilters.minMinutes === "" ? null : Number(playerFilters.minMinutes);
+    const sharedFilters = { ...playerFilters, minMinutes: "" };
     const wanted = runPlayers.filter(
       (player) =>
         (managerSquad == null || managerSquad.playerCodes.has(player.code)) &&
-        matchesPlayerFilters(player, playerFilters) &&
+        matchesPlayerFilters(player, sharedFilters) &&
         matchesPlayerMultiFilters(player, playerMultiFilters),
     );
     return wanted.map((player) => {
@@ -425,6 +431,8 @@ export function PlayersPage() {
         selectedActualGameweeks,
       );
       const observedPoints = aggregateObservedPoints(selectedActuals);
+      const observedPointsPerAppearance =
+        averageObservedPointsPerAppearance(selectedActuals);
       return {
         // Suppress the shared detail row's retired prior-season form anchor on this page.
         player: { ...player, form: null },
@@ -434,6 +442,29 @@ export function PlayersPage() {
           actualRange == null
             ? null
             : averageBpsPerAppearance(selectedActuals),
+        minutesPerAppearance:
+          actualRange == null ? null : averageMinutesPerAppearance(selectedActuals),
+        savesPerAppearance:
+          actualRange == null
+            ? null
+            : averageObservedCountPerAppearance(selectedActuals, "saves"),
+        defensiveContributionPerAppearance:
+          actualRange == null
+            ? null
+            : averageObservedCountPerAppearance(
+                selectedActuals,
+                "defensive_contribution",
+              ),
+        expectedGoalsConcededPerAppearance:
+          actualRange == null
+            ? null
+            : averageExpectedGoalsConcededPerAppearance(selectedActuals),
+        observedPointsPerAppearance:
+          actualRange == null
+            ? null
+            : observedPointsPerAppearance.pointsPerAppearance,
+        pointsPerAppearanceProvisional:
+          actualRange != null && observedPointsPerAppearance.includesProvisional,
         observedPoints: observedPoints.points,
         actualPointsProvisional: observedPoints.includesProvisional,
         actualDetails: latestPlayerActualDetails(
@@ -446,8 +477,15 @@ export function PlayersPage() {
           actualRange == null
             ? null
             : aggregatePlayerActuals(selectedActuals),
-      };
-    });
+      } satisfies PlayerStatRow;
+    })
+      .filter(
+        ({ minutesPerAppearance }) =>
+          minimumMinutesPerGame == null ||
+          (Number.isFinite(minimumMinutesPerGame) &&
+            minutesPerAppearance != null &&
+            minutesPerAppearance >= minimumMinutesPerGame),
+      );
   }, [
     runPlayers,
     filters,
@@ -659,6 +697,10 @@ export function PlayersPage() {
   const provisionalInsightUnavailableReason = selectedActualsIncludeProvisional
     ? "AI explanation is unavailable while the selected Actual range includes provisional fixtures. Deterministic facts remain available, and prediction monitoring remains finalized-only."
     : undefined;
+  const minutesPerGameInsightUnavailableReason =
+    playerFilters.minMinutes === ""
+      ? undefined
+      : "AI explanation is unavailable while Min min/g is active because that selected-Actual-range metric is not part of the typed public insight contract. Deterministic facts remain available.";
 
   return (
     <div className="flex flex-col gap-3 p-4 lg:p-6">
@@ -719,12 +761,13 @@ export function PlayersPage() {
             venue: filters?.venue,
             min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
             max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
-            min_avg_minutes_l5: minAverageMinutesScope(playerFilters.minMinutes),
             availability: playerFilters.availability,
           }),
           unavailableReason: managerSquad
             ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
-            : provisionalInsightUnavailableReason ?? multiSelectInsightUnavailableReason,
+            : minutesPerGameInsightUnavailableReason ??
+              provisionalInsightUnavailableReason ??
+              multiSelectInsightUnavailableReason,
           localScopeKey: JSON.stringify({
             runId: activeRunId,
             filters,
@@ -841,6 +884,7 @@ export function PlayersPage() {
               onChange={setPlayerFilters}
               teams={teams}
               showFormWindow={false}
+              minutesFilterKind="selected_actual_per_game"
               multiSelect={{
                 players: runPlayers,
                 filters: playerMultiFilters,
@@ -913,9 +957,10 @@ export function PlayersPage() {
             aggregate every exact published season/GW key between the endpoints. Player, position,
             and team selections use OR within each box and AND across boxes; an empty box means all.
             Reset defaults to the latest five ended keys across this season and its immediate predecessor. My
-            squad intersects with every other player filter. Min avg min (L5) remains its separate
-            published anchor. Expanded rows also remain an independent fixed rolling latest-five
-            view and do not follow these Actual endpoints.
+            squad intersects with every other player filter. Min min/g follows these Actual
+            endpoints: it divides observed minutes by games played, excludes zero-minute DNPs, and
+            counts each played DGW leg once. Expanded rows also remain an independent fixed rolling
+            latest-five view and do not follow these Actual endpoints.
           </p>
           {selectedActualsIncludeProvisional && (
             <p

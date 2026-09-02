@@ -372,6 +372,16 @@ describe("PlayersPage", () => {
     expect(
       within(alphaRow!).getByLabelText("includes provisional raw FPL points"),
     ).toHaveTextContent("P");
+    expect(
+      within(alphaRow!).getByTitle(
+        "Observed points per appearance: 5.5; includes raw provisional FPL points that may change",
+      ),
+    ).toHaveTextContent("5.5");
+    expect(
+      within(alphaRow!).getByLabelText(
+        "points per appearance include provisional raw FPL points",
+      ),
+    ).toHaveTextContent("P");
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
     expect(
       screen.getByText(/AI explanation is unavailable while the selected Actual range includes provisional fixtures/),
@@ -732,7 +742,7 @@ describe("PlayersPage", () => {
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     // Overall is genuinely balanced: common, attack, and defense form are all present.
-    for (const name of ["Starts", "G", "xGI", "xG/90", "xA/90", "xGI/90", "CS", "GC", "Saves", "DC", "xGC", "BPS/App"]) {
+    for (const name of ["Starts", "G", "xGI", "xG/90", "xA/90", "xGI/90", "CS", "GC", "Saves/App", "DC/App", "xGC/App", "BPS/App", "Pts/App"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
     let headers = screen.getAllByRole("columnheader").map((header) => header.textContent?.trim());
@@ -765,20 +775,26 @@ describe("PlayersPage", () => {
         "Observed xGI/90 (xG/90 + xA/90): 0.54",
       ),
     ).toHaveTextContent("0.54");
+    expect(headers.slice(headers.indexOf("BPS/App"), headers.indexOf("BPS/App") + 4)).toEqual([
+      "BPS/App",
+      "Pts/App",
+      "Pts",
+      "xP GW1",
+    ]);
 
     await user.click(screen.getByRole("radio", { name: "Defense" }));
     expect(screen.queryByRole("columnheader", { name: "G" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xG/90" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xGI/90" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "xGI" })).not.toBeInTheDocument();
-    for (const name of ["CS", "GC", "Saves", "DC", "xGC", "Bonus", "BPS/App", "Pts"]) {
+    for (const name of ["CS", "GC", "Saves/App", "DC/App", "xGC/App", "Bonus", "BPS/App", "Pts/App", "Pts"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
 
     await user.click(screen.getByRole("radio", { name: "Attack" }));
     expect(screen.queryByRole("columnheader", { name: "CS" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "xGC" })).not.toBeInTheDocument();
-    for (const name of ["G", "A", "xG", "xA", "xGI", "xG/90", "xA/90", "xGI/90", "Bonus", "BPS/App", "Pts"]) {
+    expect(screen.queryByRole("columnheader", { name: "xGC/App" })).not.toBeInTheDocument();
+    for (const name of ["G", "A", "xG", "xA", "xGI", "xG/90", "xA/90", "xGI/90", "Bonus", "BPS/App", "Pts/App", "Pts"]) {
       expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
     }
     headers = screen.getAllByRole("columnheader").map((header) => header.textContent?.trim());
@@ -945,6 +961,167 @@ describe("PlayersPage", () => {
     expect(order()).toEqual(["High total", "High average", "Missing BPS"]);
   });
 
+  it("shows and sorts defensive and points rates over appeared fixture legs", async () => {
+    const user = userEvent.setup();
+    const highAverage = playerWithLastFive(41, "High rate keeper", "GK", {});
+    const highTotal = playerWithLastFive(42, "High total keeper", "GK", {});
+    const missing = playerWithLastFive(43, "Missing rate keeper", "GK", {});
+    const defender = playerWithLastFive(44, "DC defender", "DEF", {});
+    const players = [highAverage, highTotal, missing, defender];
+    const actuals = new Map<number, PlayerActualFixture[]>([
+      [
+        highAverage.code,
+        [
+          actualFromForm({}, {
+            fixture: 991,
+            saves: 6,
+            expected_goals_conceded: 0.4,
+            points_under_rules_2026_27: 9,
+          }),
+          actualFromForm({}, {
+            fixture: 992,
+            minutes: 0,
+            starts: 0,
+            saves: 99,
+            expected_goals_conceded: 99,
+            points_under_rules_2026_27: -1,
+          }),
+        ],
+      ],
+      [
+        highTotal.code,
+        [
+          actualFromForm({}, {
+            fixture: 993,
+            saves: 4,
+            expected_goals_conceded: 2,
+            points_under_rules_2026_27: 6,
+          }),
+          actualFromForm({}, {
+            fixture: 994,
+            saves: 4,
+            expected_goals_conceded: null,
+            points_under_rules_2026_27: 6,
+          }),
+        ],
+      ],
+      [
+        missing.code,
+        [actualFromForm({}, {
+          fixture: 995,
+          saves: null,
+          expected_goals_conceded: null,
+          points_under_rules_2026_27: null,
+        })],
+      ],
+      [
+        defender.code,
+        [
+          actualFromForm({}, {
+            fixture: 996,
+            defensive_contribution: 8,
+            expected_goals_conceded: 0.6,
+            points_under_rules_2026_27: 2,
+          }),
+          actualFromForm({}, {
+            fixture: 997,
+            defensive_contribution: 4,
+            expected_goals_conceded: 1,
+            points_under_rules_2026_27: 2,
+          }),
+        ],
+      ],
+    ]);
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
+      ...actualsData,
+      players: players.map((player) => ({
+        season: player.season,
+        code: player.code,
+        actuals: actuals.get(player.code) ?? [],
+      })),
+    });
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("High rate keeper")).toBeInTheDocument());
+    await user.click(screen.getByRole("radio", { name: "Defense" }));
+
+    const highAverageRow = screen.getByText("High rate keeper").closest("tr")!;
+    expect(within(highAverageRow).getByTitle("Observed Saves/App: 6.0"))
+      .toHaveTextContent("6.0");
+    expect(within(highAverageRow).getByTitle("Observed xGC/App: 0.40"))
+      .toHaveTextContent("0.40");
+    expect(within(highAverageRow).getByTitle("Observed finalized replayed points: 8"))
+      .toHaveTextContent("8");
+    expect(
+      within(highAverageRow).getByTitle(
+        "Observed finalized replayed points per appearance: 9.0",
+      ),
+    ).toHaveTextContent("9.0");
+
+    const highTotalRow = screen.getByText("High total keeper").closest("tr")!;
+    expect(within(highTotalRow).getByTitle("Observed Saves/App: 4.0"))
+      .toHaveTextContent("4.0");
+    expect(within(highTotalRow).getByTitle("Observed xGC/App: 2.00"))
+      .toHaveTextContent("2.00");
+    expect(
+      within(highTotalRow).getByTitle(
+        "Observed finalized replayed points per appearance: 6.0",
+      ),
+    ).toHaveTextContent("6.0");
+
+    const defenderRow = screen.getByText("DC defender").closest("tr")!;
+    expect(within(defenderRow).getByTitle("Observed DC/App: 6.0"))
+      .toHaveTextContent("6.0");
+    const missingRow = screen.getByText("Missing rate keeper").closest("tr")!;
+    expect(
+      within(missingRow).getByTitle(
+        "Saves/App is unavailable because no complete appeared-fixture saves evidence exists",
+      ),
+    ).toHaveTextContent("–");
+    expect(
+      within(missingRow).getByTitle(
+        "Points per appearance are unavailable because no complete appeared-fixture points evidence exists",
+      ),
+    ).toHaveTextContent("–");
+
+    const savesHeader = screen.getByRole("columnheader", { name: "Saves/App" });
+    const table = savesHeader.closest("table")!;
+    const names = [
+      "High rate keeper",
+      "High total keeper",
+      "Missing rate keeper",
+      "DC defender",
+    ];
+    const order = () =>
+      [...table.querySelectorAll("tbody > tr")]
+        .map((row) => names.find((name) => row.textContent?.includes(name)))
+        .filter((name): name is string => name != null);
+
+    await user.click(within(savesHeader).getByRole("button"));
+    expect(order().slice(0, 2)).toEqual(["High rate keeper", "High total keeper"]);
+    expect(new Set(order().slice(-2))).toEqual(new Set(["Missing rate keeper", "DC defender"]));
+    await user.click(within(savesHeader).getByRole("button"));
+    expect(order().slice(0, 2)).toEqual(["High total keeper", "High rate keeper"]);
+    expect(new Set(order().slice(-2))).toEqual(new Set(["Missing rate keeper", "DC defender"]));
+
+    const pointsHeader = screen.getByRole("columnheader", { name: "Pts/App" });
+    await user.click(within(pointsHeader).getByRole("button"));
+    expect(order()).toEqual([
+      "High rate keeper",
+      "High total keeper",
+      "DC defender",
+      "Missing rate keeper",
+    ]);
+    await user.click(within(pointsHeader).getByRole("button"));
+    expect(order()).toEqual([
+      "DC defender",
+      "High total keeper",
+      "High rate keeper",
+      "Missing rate keeper",
+    ]);
+  });
+
   it("distinguishes measured zero, unmeasured, and position-inapplicable defense form", async () => {
     const user = userEvent.setup();
     const players = [
@@ -992,27 +1169,29 @@ describe("PlayersPage", () => {
 
     const nullDefenderRow = screen.getByText("Null Defender").closest("tr")!;
     expect(within(nullDefenderRow).getByTitle("Observed CS: 0")).toHaveTextContent("0");
-    expect(within(nullDefenderRow).getByTitle("Saves is not applicable to DEF")).toHaveTextContent(
+    expect(within(nullDefenderRow).getByTitle("Saves/App is not applicable to DEF")).toHaveTextContent(
       "–",
     );
     expect(
-      within(nullDefenderRow).getByTitle("xGC is unmeasured in this form window"),
+      within(nullDefenderRow).getByTitle(
+        "xGC/App is unavailable because no measured appeared-fixture xGC evidence exists",
+      ),
     ).toHaveTextContent("–");
     const keeperRow = screen.getByText("Keeper").closest("tr")!;
     expect(within(keeperRow).getByTitle("Observed GC: 3")).toHaveTextContent("3");
-    expect(within(keeperRow).getByTitle("Observed Saves: 12")).toHaveTextContent("12");
-    expect(within(keeperRow).getByTitle("Observed xGC: 1.2")).toHaveTextContent("1.2");
-    expect(within(keeperRow).getByTitle("DC is not applicable to GK")).toHaveTextContent("–");
+    expect(within(keeperRow).getByTitle("Observed Saves/App: 12.0")).toHaveTextContent("12.0");
+    expect(within(keeperRow).getByTitle("Observed xGC/App: 1.20")).toHaveTextContent("1.20");
+    expect(within(keeperRow).getByTitle("DC/App is not applicable to GK")).toHaveTextContent("–");
     const midfielderRow = screen.getByText("Midfielder").closest("tr")!;
-    expect(within(midfielderRow).getByTitle("Observed DC: 9")).toHaveTextContent("9");
-    for (const metric of ["GC", "Saves", "xGC"]) {
+    expect(within(midfielderRow).getByTitle("Observed DC/App: 9.0")).toHaveTextContent("9.0");
+    for (const metric of ["GC", "Saves/App", "xGC/App"]) {
       expect(
         within(midfielderRow).getByTitle(`${metric} is not applicable to MID`),
       ).toHaveTextContent("–");
     }
 
     // Undefined/inapplicable values stay last in either sort direction.
-    const xgc = screen.getByRole("columnheader", { name: "xGC" });
+    const xgc = screen.getByRole("columnheader", { name: "xGC/App" });
     const table = xgc.closest("table")!;
     const order = () =>
       [...table.querySelectorAll("tbody > tr")]
@@ -1146,6 +1325,91 @@ describe("PlayersPage", () => {
     expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent("2026-27 GW1");
     expect(screen.getByRole("combobox", { name: "Actual to" })).toHaveTextContent("2026-27 GW2");
     expect(forecastTo).toHaveTextContent("GW5");
+  });
+
+  it("filters minimum minutes per game over played fixtures in the selected Actual range", async () => {
+    const user = userEvent.setup();
+    const source = playersWithActuals[0];
+    const threeAppearances: PlayerRecord = {
+      ...source,
+      code: 31,
+      web_name: "Three appearances",
+      avg_minutes_last_5: 10,
+    };
+    const fiveAppearances: PlayerRecord = {
+      ...source,
+      code: 32,
+      web_name: "Five appearances",
+      avg_minutes_last_5: 90,
+    };
+    const noAppearances: PlayerRecord = {
+      ...source,
+      code: 33,
+      web_name: "No appearances",
+      avg_minutes_last_5: 90,
+    };
+    const actualRows = (
+      player: PlayerRecord,
+      minutes: readonly number[],
+      fixtureBase: number,
+    ) => ({
+      season: player.season,
+      code: player.code,
+      actuals: minutes.map((value, index) =>
+        actualFromForm(
+          {},
+          {
+            gw: index + 1,
+            fixture: fixtureBase + index,
+            minutes: value,
+            starts: value > 0 ? 1 : 0,
+          },
+        ),
+      ),
+    });
+    vi.mocked(loadPlayers).mockResolvedValueOnce({
+      players: [threeAppearances, fiveAppearances, noAppearances],
+      manifest: null,
+    });
+    vi.mocked(loadPlayerActuals).mockResolvedValueOnce({
+      ...actualsData,
+      players: [
+        actualRows(threeAppearances, [90, 90, 90, 0, 0], 3100),
+        actualRows(fiveAppearances, [70, 70, 70, 70, 70], 3200),
+        actualRows(noAppearances, [0, 0, 0, 0, 0], 3300),
+      ],
+    });
+
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Three appearances")).toBeInTheDocument());
+    expect(screen.getByText("Min min/g")).toBeInTheDocument();
+    const minimum = screen.getByRole("spinbutton", {
+      name: "Minimum observed minutes per game played in selected Actual range",
+    });
+
+    await user.type(minimum, "80");
+    await waitFor(() => expect(screen.queryByText("Five appearances")).not.toBeInTheDocument());
+    expect(screen.getByText("Three appearances")).toBeInTheDocument();
+    expect(screen.queryByText("No appearances")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByText("Three appearances").closest("tr")!).getByTitle(
+        "Observed Min/g: 90",
+      ),
+    ).toHaveTextContent("90");
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
+    expect(
+      screen.getByText(/AI explanation is unavailable while Min min\/g is active/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Actual from" }));
+    await user.click(screen.getByRole("option", { name: "2026-27 GW4" }));
+    await waitFor(() => expect(screen.queryByText("Three appearances")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(minimum).toHaveValue(null);
+    expect(screen.getByText("Three appearances")).toBeInTheDocument();
+    expect(screen.getByText("Five appearances")).toBeInTheDocument();
+    expect(screen.getByText("No appearances")).toBeInTheDocument();
   });
 
   it("defaults the main aggregate to five exact cross-season keys without per-player backfill", async () => {

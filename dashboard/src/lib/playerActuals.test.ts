@@ -10,6 +10,10 @@ import {
   aggregateObservedPoints,
   aggregatePlayerActuals,
   averageBpsPerAppearance,
+  averageExpectedGoalsConcededPerAppearance,
+  averageMinutesPerAppearance,
+  averageObservedCountPerAppearance,
+  averageObservedPointsPerAppearance,
   expectedGoalInvolvementsPer90,
   latestActualGameweeks,
   latestPlayerActualDetails,
@@ -177,6 +181,115 @@ describe("aggregatePlayerActuals", () => {
         [actual({ fixture: 20, bps: 40 }), actual({ fixture: 21, bps: null })],
       ),
     ).toBeNull();
+  });
+
+  it("averages minutes over games played, excludes DNPs, and fails closed", () => {
+    expect(
+      averageMinutesPerAppearance([
+        actual({ fixture: 20, minutes: 90 }),
+        actual({ fixture: 21, minutes: 75 }),
+        actual({ fixture: 22, minutes: 45 }),
+        actual({ fixture: 23, minutes: 0, starts: 0 }),
+        actual({ fixture: 24, minutes: 0, starts: 0 }),
+      ]),
+    ).toBe(70);
+    expect(
+      averageMinutesPerAppearance([
+        actual({ fixture: 20, minutes: 90 }),
+        actual({ fixture: 21, minutes: null }),
+      ]),
+    ).toBeNull();
+    expect(averageMinutesPerAppearance([actual({ minutes: Number.NaN })])).toBeNull();
+    expect(averageMinutesPerAppearance([actual({ minutes: -1 })])).toBeNull();
+    expect(averageMinutesPerAppearance([actual({ minutes: 1.5 })])).toBeNull();
+    expect(averageMinutesPerAppearance([actual({ minutes: 0, starts: 0 })])).toBeNull();
+    expect(averageMinutesPerAppearance([])).toBeNull();
+  });
+
+  it("averages complete observed counts over appearances and excludes DNPs", () => {
+    const fixtures = [
+      actual({ fixture: 20, saves: 6, defensive_contribution: 8 }),
+      actual({ fixture: 21, minutes: 60, saves: 3, defensive_contribution: 4 }),
+      actual({ fixture: 22, minutes: 0, starts: 0, saves: 99, defensive_contribution: 99 }),
+    ];
+    expect(averageObservedCountPerAppearance(fixtures, "saves")).toBe(4.5);
+    expect(
+      averageObservedCountPerAppearance(fixtures, "defensive_contribution"),
+    ).toBe(6);
+    expect(
+      averageObservedCountPerAppearance(
+        [actual({ fixture: 20, saves: 6 }), actual({ fixture: 21, saves: null })],
+        "saves",
+      ),
+    ).toBeNull();
+    expect(
+      averageObservedCountPerAppearance(
+        [actual({ fixture: 20, saves: 6 }), actual({ fixture: 21, minutes: 0, saves: null })],
+        "saves",
+      ),
+    ).toBe(6);
+    expect(
+      averageObservedCountPerAppearance([actual({ minutes: Number.NaN })], "saves"),
+    ).toBeNull();
+    expect(
+      averageObservedCountPerAppearance([actual({ minutes: 0, saves: 0 })], "saves"),
+    ).toBeNull();
+  });
+
+  it("averages xGC over measured appearances without zero-filling partial coverage", () => {
+    expect(
+      averageExpectedGoalsConcededPerAppearance([
+        actual({ fixture: 20, expected_goals_conceded: 0.8 }),
+        actual({ fixture: 21, expected_goals_conceded: null }),
+        actual({ fixture: 22, expected_goals_conceded: 1.2 }),
+        actual({ fixture: 23, minutes: 0, expected_goals_conceded: 99 }),
+      ]),
+    ).toBe(1);
+    expect(
+      averageExpectedGoalsConcededPerAppearance([
+        actual({ expected_goals_conceded: null }),
+      ]),
+    ).toBeNull();
+    expect(
+      averageExpectedGoalsConcededPerAppearance([
+        actual({ expected_goals_conceded: Number.POSITIVE_INFINITY }),
+      ]),
+    ).toBeNull();
+  });
+
+  it("averages status-correct points over appeared legs and marks used provisional evidence", () => {
+    const finalized = {
+      ...actual({ fixture: 20, points_under_rules_2026_27: 10 }),
+      outcome_status: "finalized" as const,
+    };
+    const provisional = {
+      ...provisionalActual({ fixture: 21, total_points_as_recorded: 4 }),
+      points_under_rules_2026_27: null,
+      outcome_status: "provisional" as const,
+    };
+    const provisionalDnp = {
+      ...provisionalActual({ fixture: 22, minutes: 0, total_points_as_recorded: -1 }),
+      points_under_rules_2026_27: null,
+      outcome_status: "provisional" as const,
+    };
+
+    expect(
+      averageObservedPointsPerAppearance([finalized, provisional, provisionalDnp]),
+    ).toEqual({ pointsPerAppearance: 7, includesProvisional: true });
+    expect(averageObservedPointsPerAppearance([finalized, provisionalDnp])).toEqual({
+      pointsPerAppearance: 10,
+      includesProvisional: false,
+    });
+    expect(
+      averageObservedPointsPerAppearance([
+        finalized,
+        { ...provisional, total_points_as_recorded: null },
+      ]),
+    ).toEqual({ pointsPerAppearance: null, includesProvisional: true });
+    expect(averageObservedPointsPerAppearance([provisionalDnp])).toEqual({
+      pointsPerAppearance: null,
+      includesProvisional: false,
+    });
   });
 
   it("keeps provisional raw points separate from replayed points and counts zero-minute points", () => {

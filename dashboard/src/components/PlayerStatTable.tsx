@@ -56,6 +56,17 @@ export interface PlayerStatRow {
   gwFromXp?: number | null;
   /** Players-only descriptive BPS average over appeared fixtures between the Actual endpoints. */
   bpsPerAppearance?: number | null;
+  /** Players-only fail-closed minutes average over played fixtures between the Actual endpoints. */
+  minutesPerAppearance?: number | null;
+  /** Players-only goalkeeper saves per appeared fixture between the Actual endpoints. */
+  savesPerAppearance?: number | null;
+  /** Players-only raw defensive-contribution actions per appeared fixture. */
+  defensiveContributionPerAppearance?: number | null;
+  /** Players-only xGC per measured appeared fixture. */
+  expectedGoalsConcededPerAppearance?: number | null;
+  /** Players-only status-aware points productivity over appeared fixtures. */
+  observedPointsPerAppearance?: number | null;
+  pointsPerAppearanceProvisional?: boolean;
   /** Display-only points: finalized replay plus clearly marked raw provisional FPL points. */
   observedPoints?: number | null;
   actualPointsProvisional?: boolean;
@@ -134,9 +145,9 @@ const ATTACK_FORM_COLUMN_IDS = new Set([
 const DEFENSE_FORM_COLUMN_IDS = new Set([
   "form-clean_sheets",
   "form-goals_conceded",
-  "form-saves",
-  "form-defensive_contribution",
-  "form-expected_goals_conceded",
+  "form-saves-per-appearance",
+  "form-defensive-contribution-per-appearance",
+  "form-expected-goals-conceded-per-appearance",
 ]);
 const VIEW_SPECIFIC_FORM_COLUMN_IDS = new Set([
   ...ATTACK_FORM_COLUMN_IDS,
@@ -485,20 +496,59 @@ export function PlayerStatTable({
         );
       },
     });
+    const perAppearanceStat = (
+      id: string,
+      label: string,
+      valueOf: (row: PlayerStatRow) => number | null | undefined,
+      options: {
+        digits?: number;
+        positions: readonly string[];
+        headerTitle: string;
+        unavailableTitle: string;
+      },
+    ): LegacyColumnDef<PlayerStatRow> => ({
+      id,
+      header: () => <span title={options.headerTitle}>{label}</span>,
+      accessorFn: (row) =>
+        options.positions.includes(row.player.position)
+          ? valueOf(row) ?? undefined
+          : undefined,
+      sortUndefined: "last",
+      cell: ({ row }) => {
+        const applicable = options.positions.includes(row.original.player.position);
+        const value = applicable ? valueOf(row.original) : null;
+        const title = !applicable
+          ? `${label} is not applicable to ${row.original.player.position}`
+          : value == null
+            ? options.unavailableTitle
+            : `Observed ${label}: ${fmt(value, options.digits ?? 1)}`;
+        return (
+          <span className="tabular-nums" title={title}>
+            {fmt(value, options.digits ?? 1)}
+          </span>
+        );
+      },
+    });
     const minutesPerGame: LegacyColumnDef<PlayerStatRow> = {
       id: "form-minutes-per-game",
       header: "Min/g",
-      accessorFn: (row) =>
-        row.form?.appearances != null && row.form.appearances > 0 && row.form.minutes != null
+      accessorFn: (row) => {
+        if (row.minutesPerAppearance !== undefined) {
+          return row.minutesPerAppearance ?? undefined;
+        }
+        return row.form?.appearances != null && row.form.appearances > 0 && row.form.minutes != null
           ? row.form.minutes / row.form.appearances
-          : undefined,
+          : undefined;
+      },
       sortUndefined: "last",
       cell: ({ row }) => {
         const f = row.original.form;
         const value =
-          f?.appearances != null && f.appearances > 0 && f.minutes != null
-            ? f.minutes / f.appearances
-            : null;
+          row.original.minutesPerAppearance !== undefined
+            ? row.original.minutesPerAppearance
+            : f?.appearances != null && f.appearances > 0 && f.minutes != null
+              ? f.minutes / f.appearances
+              : null;
         return (
           <span
             className="tabular-nums"
@@ -611,19 +661,45 @@ export function PlayerStatTable({
         positions: ["GK", "DEF"],
         headerTitle: "Observed goals conceded while the player was on the pitch",
       }),
-      formStat("saves", "Saves", {
-        positions: ["GK"],
-        headerTitle: "Observed goalkeeper saves",
-      }),
-      formStat("defensive_contribution", "DC", {
-        positions: ["DEF", "MID", "FWD"],
-        headerTitle: "Observed defensive-contribution count; raw actions, not fantasy points",
-      }),
-      formStat("expected_goals_conceded", "xGC", {
-        digits: 1,
-        positions: ["GK", "DEF"],
-        headerTitle: "Observed expected goals conceded while the player was on the pitch",
-      }),
+      perAppearanceStat(
+        "form-saves-per-appearance",
+        "Saves/App",
+        (row) => row.savesPerAppearance,
+        {
+          digits: 1,
+          positions: ["GK"],
+          headerTitle:
+            "Average observed goalkeeper saves per appearance between the selected Actual Season–GW endpoints; DNPs are excluded and each played DGW leg counts once",
+          unavailableTitle:
+            "Saves/App is unavailable because no complete appeared-fixture saves evidence exists",
+        },
+      ),
+      perAppearanceStat(
+        "form-defensive-contribution-per-appearance",
+        "DC/App",
+        (row) => row.defensiveContributionPerAppearance,
+        {
+          digits: 1,
+          positions: ["DEF", "MID", "FWD"],
+          headerTitle:
+            "Average observed raw defensive-contribution actions per appearance between the selected Actual Season–GW endpoints; this is not fantasy DC points",
+          unavailableTitle:
+            "DC/App is unavailable because no complete appeared-fixture defensive-contribution evidence exists",
+        },
+      ),
+      perAppearanceStat(
+        "form-expected-goals-conceded-per-appearance",
+        "xGC/App",
+        (row) => row.expectedGoalsConcededPerAppearance,
+        {
+          digits: 2,
+          positions: ["GK", "DEF"],
+          headerTitle:
+            "Average observed expected goals conceded per measured appearance between the selected Actual Season–GW endpoints; unmeasured xGC rows are not zero-filled",
+          unavailableTitle:
+            "xGC/App is unavailable because no measured appeared-fixture xGC evidence exists",
+        },
+      ),
     ];
     const bpsPerAppearanceColumn: LegacyColumnDef<PlayerStatRow> = {
       id: "form-bps-per-appearance",
@@ -685,9 +761,47 @@ export function PlayerStatTable({
         );
       },
     };
+    const observedPointsPerAppearanceColumn: LegacyColumnDef<PlayerStatRow> = {
+      id: "form-points-per-appearance",
+      header: () => (
+        <span title="Average observed points per appearance between the selected Actual Season–GW endpoints; finalized legs use replayed 2026/27 points, provisional legs use raw FPL points, DNPs are excluded, and each played DGW leg counts once">
+          Pts/App
+        </span>
+      ),
+      accessorFn: (row) => row.observedPointsPerAppearance ?? undefined,
+      sortUndefined: "last",
+      cell: ({ row }) => {
+        const value = row.original.observedPointsPerAppearance;
+        const provisional = row.original.pointsPerAppearanceProvisional === true;
+        return (
+          <span
+            className="inline-flex items-center gap-1 tabular-nums"
+            title={
+              value == null
+                ? "Points per appearance are unavailable because no complete appeared-fixture points evidence exists"
+                : provisional
+                  ? `Observed points per appearance: ${fmt(value, 1)}; includes raw provisional FPL points that may change`
+                  : `Observed finalized replayed points per appearance: ${fmt(value, 1)}`
+            }
+          >
+            {fmt(value, 1)}
+            {provisional && value != null && (
+              <span
+                aria-label="points per appearance include provisional raw FPL points"
+                className="rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+              >
+                P
+              </span>
+            )}
+          </span>
+        );
+      },
+    };
     const outcomeFormColumns = [
       formStat("bonus", "Bonus"),
       bpsPerAppearanceColumn,
+      // Keep the adjacent Pts total immediately before the contractually fixed xP GW column.
+      observedPointsPerAppearanceColumn,
       observedPointsColumn,
     ];
     const playerFormColumns =

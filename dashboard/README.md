@@ -416,23 +416,32 @@ comparison page and is not a twelfth navigation item.
   remains a dash sorted last. It never applies the availability overlay. A one-GW selection hides
   the otherwise duplicate range-total column.
   The form-column matrix is view-specific: **Overall** = App, Starts, Min/g, G, A, xG, xA,
-  xGI, xG/90, xA/90, CS, GC, Saves, DC, xGC, Bonus, BPS/App, Pts; **Attack** = App, Starts, Min/g, G,
-  A, xG, xA, xGI, xG/90, xA/90, Bonus, BPS/App, Pts; **Defence** = App, Starts, Min/g, CS, GC, Saves,
-  DC, xGC, Bonus, BPS/App, Pts. Position applicability is explicit: CS = GK/DEF/MID, GC and xGC
-  = GK/DEF, Saves = GK, and DC = DEF/MID/FWD. A dash remains a dash for both an inapplicable
+  xGI, xG/90, xA/90, xGI/90, CS, GC, Saves/App, DC/App, xGC/App, Bonus, BPS/App, Pts/App, Pts;
+  **Attack** = App, Starts, Min/g, G, A, xG, xA, xGI, xG/90, xA/90, xGI/90, Bonus, BPS/App,
+  Pts/App, Pts; **Defence** = App, Starts, Min/g, CS, GC, Saves/App, DC/App, xGC/App, Bonus,
+  BPS/App, Pts/App, Pts. Position applicability is explicit: CS = GK/DEF/MID, GC and xGC/App
+  = GK/DEF, Saves/App = GK, and DC/App = DEF/MID/FWD. A dash remains a dash for both an inapplicable
   position and an unmeasured value; the cell tooltip distinguishes the reason. These are observed
   form measures only. xGI is the display-only sum of observed xG + xA and stays unavailable when
-  either component is unavailable; it is not a forecast field. BPS/App is the backward-looking
-  selected-range BPS total divided by appearances: every played DGW leg counts once, DNPs are
-  excluded, and incomplete appeared-fixture BPS evidence stays unavailable. The published BPS
-  value on each normalized actual remains fixture-grain, while the legacy form BPS measure remains
-  a total. Future
+  either component is unavailable; it is not a forecast field. Saves/App and DC/App divide complete
+  appeared-fixture counts by appearances. xGC/App averages only measured-xGC appearances, retaining
+  the source's partial-coverage semantics without zero-filling. BPS/App is the backward-looking
+  selected-range BPS total divided by appearances. Pts/App uses replayed points on finalized
+  appeared legs and raw recorded FPL points on provisional appeared legs; its provisional inputs
+  are marked, and rare zero-minute points remain only in the adjacent Pts total. Every rate excludes
+  DNPs, counts each played DGW leg, and fails closed when its required appeared-fixture evidence is
+  incomplete. The published Saves, DC, xGC, and BPS values on each normalized actual remain
+  fixture-grain, while the legacy form measures remain totals. Future
   player-level saves/DC/GC/xGC forecasts are unavailable and are not
   inferred from club lambdas or clean-sheet probabilities. Filters include a searchable
   multi-select Player box (stable player code), multi-select Position and Team boxes (permanent
-  team code), price range, minimum average minutes (last 5), availability, plus the shared
+  team code), price range, minimum observed minutes per game played, availability, plus the shared
   view/venue/gameweek bar, all inside a distinct Filters panel placed immediately before the
-  scrollable table. Empty identity selections mean all; selections are ORed within each box and
+  scrollable table. The minutes-per-game filter follows the inclusive `Actual from` / `Actual to`
+  range: zero-minute DNPs are excluded from the denominator, every played DGW leg counts once, and
+  missing minute evidence stays unavailable. Activating it keeps deterministic facts available but
+  disables the optional renderer because insight schema v4 has no selected-range minutes-per-game
+  selector. Empty identity selections mean all; selections are ORed within each box and
   ANDed across boxes. Player labels include club and position to disambiguate duplicate names,
   and the option lists always come from the complete active forecast vintage rather than the
   already-filtered rows. A vintage change preserves only player/team selections that still exist,

@@ -443,7 +443,15 @@ a future model quantity. Each normalized actual retains its per-fixture BPS scor
 complete appeared rows for the selected range, then presents BPS/App as that total divided by the
 count of appearances. Double-gameweek legs contribute separately, DNPs do not contribute, and any
 missing BPS on an appeared row makes the display rate unavailable. The legacy form BPS measure
-remains a total, and this descriptive ratio is not a transported field.
+remains a total. The same Players-only reporting layer presents Saves/App and DC/App from complete
+appeared-row counts, while xGC/App divides measured xGC by the matching measured-appearance count
+so partial measurement coverage is not zero-filled. Pts/App averages status-correct points over
+appeared rows only: finalized rows use `points_under_rules_2026_27`, provisional rows use
+`total_points_as_recorded`, and any missing included value makes the rate unavailable. DNPs do not
+enter these productivity rates, every DGW leg counts separately, and provisional points used by
+Pts/App remain explicitly marked. The adjacent Pts total keeps its existing all-selected-row
+semantics, including any rare zero-minute points. These descriptive ratios are not transported
+fields and do not change the JSON schema.
 
 The Players expanded row reads these same normalized actuals, not `players.json.fixtures`. It is
 independent of the main table's selectable Season–GW endpoint range and takes its own fixed

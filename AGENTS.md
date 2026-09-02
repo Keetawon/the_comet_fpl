@@ -284,11 +284,21 @@ reported availability overlay is never applied to this raw xP. The Players profi
 xGI immediately after xA as the display-only sum of the selected Season–GW endpoint range's
 aggregated xG and xA; if either component is unavailable, xGI remains unavailable. It is not a
 transported field, a forecast, or permission to derive future goal involvement in the browser. The Players profile
-displays BPS/App as the selected-range observed BPS total divided by appearances. Each played DGW
-leg counts once, DNPs are excluded, and any missing BPS on an appeared row makes the ratio
-unavailable. Normalized actuals retain fixture-grain BPS, while the selected-range aggregate and
-legacy form BPS measure remain totals. This is backward-looking descriptive arithmetic, not a
-model quantity. A provisional player row keeps the API's mutable points only as
+displays Saves/App, DC/App, and xGC/App instead of their selected-range totals. Saves/App and
+DC/App divide their complete appeared-fixture values by appearances; DC remains raw actions, not
+fantasy DC points. xGC/App divides the measured xGC total by its matching measured appearances so
+partial source coverage is never zero-filled. All three exclude DNPs, count every played DGW leg,
+and remain position-applicable exactly as their former totals. The profile also displays BPS/App as
+the selected-range observed BPS total divided by appearances. Each played DGW leg counts once,
+DNPs are excluded, and any missing BPS on an appeared row makes the ratio unavailable. Normalized
+actuals retain fixture-grain Saves, DC, xGC, and BPS, while the selected-range aggregate and legacy
+form measures remain totals. A sortable Pts/App sits immediately before Pts so the existing
+`Pts` / `xP GW{Forecast From}` adjacency remains unchanged. Pts/App averages only appeared fixture
+legs, uses replayed 2026/27 points for finalized rows and raw recorded FPL points for provisional
+rows, and stays unavailable if any included appeared leg lacks its status-correct points value.
+Rare zero-minute points remain in the adjacent Pts total but do not enter this productivity rate.
+These rates are backward-looking descriptive arithmetic, not model quantities. A provisional
+player row keeps the API's mutable points only as
 `total_points_as_recorded`; a finalized row keeps `points_under_rules_2026_27`. The browser selects
 the correctly named measure by explicit outcome status and never aliases, combines, or replays the
 provisional value. The main table remains bound to its explicit Season–GW endpoint range, but its
@@ -319,13 +329,16 @@ permanent player `code` and multi-select Position and Team controls keyed by the
 permanent `team_code`. Empty selection means all; choices are ORed within a control and ANDed
 across controls and the verified My squad membership. Options always come from the complete active
 forecast vintage, and a vintage change prunes unavailable player/team codes so a hidden stale
-selection cannot empty the table. These controls are page-local: decision routes and Player
-Analytics retain their existing scalar selectors. Insight request schema v4 is unchanged; any
-name selection, multiple Position/Team selection, or selected actual range containing provisional
-evidence makes Players deterministic-only because that scope cannot be represented exactly, while
-an empty or singleton Position/Team selection over finalized evidence retains the exact existing
-scalar renderer scope. Player Analytics defaults to
-the reporting-only Established evidence scope, which excludes forecast-marked cold starts from its
+selection cannot empty the table. These controls are page-local. Players' **Min min/g** filter
+uses the exact selected Actual-from/to fixture rows, divides observed minutes by appearances with
+at least one minute, excludes zero-minute DNPs, counts every played DGW leg, and fails closed on
+missing minute evidence; decision routes and Player Analytics retain the existing forecast-owned
+last-five average-minutes selector. Insight request schema v4 is unchanged; any name selection,
+multiple Position/Team selection, active selected-range Min min/g bound, or selected actual range
+containing provisional evidence makes Players deterministic-only because that scope cannot be
+represented exactly, while an empty or singleton Position/Team selection over finalized evidence
+with no Min min/g bound retains the exact existing scalar renderer scope. Player Analytics defaults
+to the reporting-only Established evidence scope, which excludes forecast-marked cold starts from its
 shortlist/Pareto population; the explicit include control restores them without changing xP or any
 probability. Never infer cold-start status from observations or treat this filter as a model change.
 Any proposed bridge through a player's first three appearances requires a separately named,

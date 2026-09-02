@@ -428,6 +428,16 @@ appearance count. Each played double-gameweek leg is one appearance, DNPs are ex
 BPS on any appeared normalized-actual row makes the displayed ratio unavailable. This reporting
 ratio is not a semantic-contract field or a forecast quantity.
 
+The Players dashboard may likewise derive Saves/App and DC/App from complete appeared-fixture
+values in the exact selected range. xGC/App uses only appeared rows where xGC is measured for both
+its numerator and denominator, preserving the partial-coverage rule below without zero-filling.
+Pts/App uses only appeared legs and the status-correct points measure: replayed
+`points_under_rules_2026_27` when finalized and raw `total_points_as_recorded` when explicitly
+provisional. Missing required values make a rate unavailable, DNPs are excluded, and every DGW leg
+counts separately. The existing displayed Pts total may still contain rare zero-minute points, so
+Pts/App is deliberately an appeared-fixture productivity measure rather than Pts divided blindly
+by App. These are browser-only descriptive ratios, not semantic-fact or forecast fields.
+
 Each anchor is an observed `(season, gw, code)` with a player-fixture row. The rolling windows take
 that player's most recent rostered fixtures ordered by kickoff, with the anchor gameweek's latest
 kickoff as the point-in-time cutoff; double-gameweek legs are retained as two fixture rows, while a

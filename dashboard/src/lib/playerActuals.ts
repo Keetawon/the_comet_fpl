@@ -271,6 +271,127 @@ export function averageBpsPerAppearance(
   return appeared.reduce((total, row) => total + (row.bps ?? 0), 0) / appeared.length;
 }
 
+/**
+ * Observed minutes per game played for an exact selected Actual scope.
+ * Zero-minute DNPs stay out of the denominator, every played fixture leg counts once, and any
+ * missing/invalid minute value makes the result unavailable rather than silently shortening it.
+ */
+export function averageMinutesPerAppearance(
+  actuals: readonly PlayerObservedSourceFixture[],
+): number | null {
+  const minutes: number[] = [];
+  for (const row of actuals) {
+    if (
+      row.minutes == null ||
+      !Number.isFinite(row.minutes) ||
+      !Number.isInteger(row.minutes) ||
+      row.minutes < 0
+    ) {
+      return null;
+    }
+    minutes.push(row.minutes);
+  }
+  const appeared = minutes.filter((value) => value >= 1);
+  if (appeared.length === 0) return null;
+  return appeared.reduce((total, value) => total + value, 0) / appeared.length;
+}
+
+type CompletePerAppearanceStat = "saves" | "defensive_contribution";
+
+function appearedFixtures(
+  actuals: readonly PlayerObservedSourceFixture[],
+): readonly PlayerObservedSourceFixture[] | null {
+  for (const row of actuals) {
+    if (
+      row.minutes == null ||
+      !Number.isFinite(row.minutes) ||
+      !Number.isInteger(row.minutes) ||
+      row.minutes < 0
+    ) {
+      return null;
+    }
+  }
+  return actuals.filter((row) => (row.minutes ?? 0) >= 1);
+}
+
+/**
+ * Per-appearance count from the exact selected Actual fixture rows. Saves and raw defensive
+ * contributions require complete evidence on every appeared leg; a DNP never contributes.
+ */
+export function averageObservedCountPerAppearance(
+  actuals: readonly PlayerObservedSourceFixture[],
+  key: CompletePerAppearanceStat,
+): number | null {
+  const appeared = appearedFixtures(actuals);
+  if (appeared == null || appeared.length === 0) return null;
+  const values = appeared.map((row) => row[key]);
+  if (
+    values.some(
+      (value) => value == null || typeof value !== "number" || !Number.isFinite(value),
+    )
+  ) {
+    return null;
+  }
+  return values.reduce<number>((total, value) => total + (value ?? 0), 0) / appeared.length;
+}
+
+/**
+ * Observed xGC per measured appearance. The source contract intentionally retains partial xGC
+ * coverage, so only appeared rows with measured xGC enter both numerator and denominator.
+ */
+export function averageExpectedGoalsConcededPerAppearance(
+  actuals: readonly PlayerObservedSourceFixture[],
+): number | null {
+  const appeared = appearedFixtures(actuals);
+  if (appeared == null || appeared.length === 0) return null;
+  const measured = appeared
+    .map((row) => row.expected_goals_conceded)
+    .filter((value): value is number => value != null);
+  if (measured.length === 0 || measured.some((value) => !Number.isFinite(value))) {
+    return null;
+  }
+  return measured.reduce((total, value) => total + value, 0) / measured.length;
+}
+
+export interface ObservedPointsPerAppearance {
+  pointsPerAppearance: number | null;
+  includesProvisional: boolean;
+}
+
+/**
+ * Display-only points productivity over appeared fixture legs. Final rows use replayed points,
+ * provisional rows use their mutable raw FPL points, and zero-minute rows are excluded.
+ */
+export function averageObservedPointsPerAppearance(
+  actuals: readonly PlayerObservedSourceFixture[],
+): ObservedPointsPerAppearance {
+  const appeared = appearedFixtures(actuals);
+  if (appeared == null || appeared.length === 0) {
+    return { pointsPerAppearance: null, includesProvisional: false };
+  }
+  const includesProvisional = appeared.some(
+    (row) => row.outcome_status === "provisional",
+  );
+  const values = appeared.map((row) =>
+    row.outcome_status === "provisional"
+      ? row.total_points_as_recorded ?? null
+      : row.points_under_rules_2026_27 ?? null,
+  );
+  if (
+    values.some(
+      (value) => value == null || typeof value !== "number" || !Number.isFinite(value),
+    )
+  ) {
+    return { pointsPerAppearance: null, includesProvisional };
+  }
+  return {
+    pointsPerAppearance:
+      values.reduce<number>((total, value) => total + (value ?? 0), 0) /
+      appeared.length,
+    includesProvisional,
+  };
+}
+
 export interface ObservedPointsTotal {
   points: number | null;
   includesProvisional: boolean;

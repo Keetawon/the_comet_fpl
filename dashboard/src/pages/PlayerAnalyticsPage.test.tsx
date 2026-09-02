@@ -65,6 +65,10 @@ describe("PlayerAnalyticsPage", () => {
     expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     expect(screen.getByText(/exact GW1-5 cumulative endpoint/)).toBeInTheDocument();
+    expect(screen.getByText("Min avg min (L5)")).toBeInTheDocument();
+    expect(
+      screen.getByRole("spinbutton", { name: "Minimum average minutes over the last 5" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("note")).toHaveTextContent(
       /Move up and left.*same price or cheaper/i,
     );

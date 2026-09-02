@@ -21,7 +21,7 @@ export interface PlayerFilters {
   teamCode: string; // "all" | String(team_code)
   minPrice: string; // £m, "" = unbounded
   maxPrice: string; // £m, "" = unbounded
-  minMinutes: string; // avg minutes last 5, "" = unbounded
+  minMinutes: string; // L5 in shared routes; selected-Actual Min/g on Players; "" = unbounded
   availability: "all" | "available" | "flagged";
   formWindow: WindowLabel;
 }
@@ -77,6 +77,8 @@ interface PlayerFiltersBarProps {
   teams: [number, string][];
   /** The form-window select does not apply everywhere (e.g. the plan-builder picker); hide it there. */
   showFormWindow?: boolean;
+  /** Players-table mode follows its explicit observed Actual range; all other routes keep L5. */
+  minutesFilterKind?: "forecast_last_five" | "selected_actual_per_game";
   /** Players-table mode: searchable names plus multi-select position/team dimensions. */
   multiSelect?: {
     players: readonly PlayerRecord[];
@@ -90,6 +92,7 @@ export function PlayerFiltersBar({
   onChange,
   teams,
   showFormWindow = true,
+  minutesFilterKind = "forecast_last_five",
   multiSelect,
 }: PlayerFiltersBarProps) {
   const set = (patch: Partial<PlayerFilters>) => onChange({ ...filters, ...patch });
@@ -210,14 +213,26 @@ export function PlayerFiltersBar({
         />
       </div>
       <div className="flex items-center gap-2">
-        <span>Min avg min (L5)</span>
+        <span
+          title={
+            minutesFilterKind === "selected_actual_per_game"
+              ? "Observed minutes divided by games played in the selected Actual range; zero-minute DNPs are excluded"
+              : undefined
+          }
+        >
+          {minutesFilterKind === "selected_actual_per_game" ? "Min min/g" : "Min avg min (L5)"}
+        </span>
         <Input
           type="number"
           inputMode="numeric"
           min={0}
           step={10}
           placeholder="any"
-          aria-label="Minimum average minutes over the last 5"
+          aria-label={
+            minutesFilterKind === "selected_actual_per_game"
+              ? "Minimum observed minutes per game played in selected Actual range"
+              : "Minimum average minutes over the last 5"
+          }
           className="h-8 w-20"
           value={filters.minMinutes}
           onChange={(e) => set({ minMinutes: e.target.value })}
