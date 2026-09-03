@@ -1,11 +1,11 @@
 {
-  "asset_name": null,
-  "asset_sha256": null,
-  "asset_size_bytes": null,
-  "manifest_content_sha256": null,
-  "release_tag": null,
+  "asset_name": "dashboard-public-data.zip",
+  "asset_sha256": "af323452d320ac355cd3995c1badff4dc12c94f8d66a56a45367b8155f1674ec",
+  "asset_size_bytes": 10933738,
+  "manifest_content_sha256": "5163529a1bdf684ca7a2b375fb19bb934129def01cf40ea3b626ac801918b469",
+  "release_tag": "dashboard-data-5163529a1bdf",
   "repository": "Keetawon/the_comet_fpl",
   "schema": "fpl.dashboard-public-release-pin",
   "schema_version": 1,
-  "status": "unpublished"
+  "status": "published"
 }
