@@ -159,13 +159,40 @@ def _common_keys(blocks: dict[str, list[Prediction]]) -> set[str]:
     return common
 
 
+class ProvenanceError(RuntimeError):
+    """The run cannot be tied to a reproducible code state."""
+
+
+def _require_clean_provenance(*, allow_dirty: bool) -> dict[str, str | bool]:
+    """Refuse to produce a result a later reader cannot reproduce.
+
+    This repository has already lost a candidate to exactly this: Candidate V3's historical
+    development result was invalidated in part because "the runner accepted a dirty worktree",
+    and its number is now void for comparison and kept only as an audit record. A result whose
+    HEAD does not describe the code that produced it is not evidence.
+
+    `allow_dirty` exists for smoke runs and is recorded in the artifact, so a permissive run can
+    never be mistaken for a clean one.
+    """
+    state = _git_state()
+    if not state["clean_worktree"] and not allow_dirty:
+        raise ProvenanceError(
+            "refusing to run against a dirty worktree: the result could not be reproduced "
+            "from its recorded HEAD. Commit or stash first, or pass --allow-dirty for a "
+            "smoke run (which is recorded in the artifact and is not a development record)."
+        )
+    return state
+
+
 def run(
     *,
     db_path: Path | None = None,
     results_dir: Path | None = None,
     limit_folds: int | None = None,
     seasons: list[str] | None = None,
+    allow_dirty: bool = False,
 ) -> dict[str, Any]:
+    provenance = _require_clean_provenance(allow_dirty=allow_dirty)
     contract = load_v2_team_environment_evaluation()
     saves_contract = load_v2_gk_saves_evaluation()
     con = connect(db_path, read_only=True)
@@ -270,7 +297,9 @@ def run(
             "result here can establish real-deadline validity. The prospective default is "
             "unchanged."
         ),
-        "git": _git_state(),
+        "git": provenance,
+        "allow_dirty": allow_dirty,
+        "limit_folds": limit_folds,
         "team_environment": {
             "contract_version": contract.contract_version,
             "provider": contract.population.provider,
@@ -351,6 +380,11 @@ def main(argv: list[str] | None = None) -> int:
         "--limit-folds", type=int, default=None, help="score only the last N folds (smoke runs)"
     )
     parser.add_argument("--season", action="append", default=None)
+    parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="permit a dirty worktree; the result is then a smoke run, not a record",
+    )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
     logging.basicConfig(
@@ -362,6 +396,7 @@ def main(argv: list[str] | None = None) -> int:
         results_dir=args.results,
         limit_folds=args.limit_folds,
         seasons=args.season,
+        allow_dirty=args.allow_dirty,
     )
     team = report["team_environment"]
     print(f"\nTeam environment -- {team['rows_scored']} rows, {team['folds']} folds")
