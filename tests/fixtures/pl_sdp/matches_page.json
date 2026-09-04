@@ -1,0 +1,76 @@
+{
+  "pageInfo": {
+    "page": 0,
+    "numPages": 1,
+    "pageSize": 100,
+    "totalElements": 2
+  },
+  "content": [
+    {
+      "id": 116001,
+      "season": {
+        "id": 719,
+        "label": "2025/26"
+      },
+      "matchweek": 12,
+      "kickoff": {
+        "millis": 1764082800000,
+        "label": "Sat 25 Nov 2025, 15:00"
+      },
+      "status": "COMPLETE",
+      "teams": [
+        {
+          "team": {
+            "id": 1,
+            "name": "Arsenal",
+            "shortName": "ARS"
+          }
+        },
+        {
+          "team": {
+            "id": 4,
+            "name": "Chelsea",
+            "shortName": "CHE"
+          }
+        }
+      ],
+      "score": {
+        "homeScore": 2,
+        "awayScore": 1
+      }
+    },
+    {
+      "id": 116002,
+      "season": {
+        "id": 719,
+        "label": "2025/26"
+      },
+      "matchweek": 12,
+      "kickoff": {
+        "millis": 1764093600000,
+        "label": "Sat 25 Nov 2025, 18:00"
+      },
+      "status": "COMPLETE",
+      "teams": [
+        {
+          "team": {
+            "id": 11,
+            "name": "Everton",
+            "shortName": "EVE"
+          }
+        },
+        {
+          "team": {
+            "id": 21,
+            "name": "Wolves",
+            "shortName": "WOL"
+          }
+        }
+      ],
+      "score": {
+        "homeScore": 0,
+        "awayScore": 0
+      }
+    }
+  ]
+}

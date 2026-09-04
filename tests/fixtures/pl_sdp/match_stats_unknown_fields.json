@@ -1,0 +1,22 @@
+[
+  {
+    "side": "Home",
+    "team": {"id": 1, "name": "Arsenal"},
+    "stats": {
+      "goals": 2,
+      "expected_goals": 1.84,
+      "brand_new_upstream_metric": 42,
+      "another_unmapped_one": 3.5
+    }
+  },
+  {
+    "side": "Away",
+    "team": {"id": 4, "name": "Chelsea"},
+    "stats": {
+      "goals": 1,
+      "expected_goals": 0.97,
+      "brand_new_upstream_metric": 17,
+      "another_unmapped_one": 1.25
+    }
+  }
+]

@@ -1932,6 +1932,164 @@ class SdpMetricDictionary(_Frozen):
         }
 
 
+class V2AblationCandidate(_Frozen):
+    """One rung of the V2 signal ablation ladder."""
+
+    name: str
+    signals: list[str]
+    rationale: str
+
+
+class V2Ablation(_Frozen):
+    minimum_signal_coverage: float
+    weight_step: float
+    candidates: list[V2AblationCandidate]
+
+    @model_validator(mode="after")
+    def _nested_ladder(self) -> V2Ablation:
+        """Each rung must EXTEND the one before it.
+
+        A ladder whose rungs merely differ cannot attribute a lift to a signal, because two
+        rungs could differ in two ways at once. Requiring containment is what makes the
+        ablation an ablation rather than a model bake-off.
+        """
+        names = [candidate.name for candidate in self.candidates]
+        if len(set(names)) != len(names):
+            raise ValueError("ablation candidate names must be unique")
+        for previous, candidate in zip(self.candidates, self.candidates[1:], strict=False):
+            if not set(previous.signals) <= set(candidate.signals):
+                raise ValueError(
+                    f"ablation rung {candidate.name!r} does not extend {previous.name!r}: "
+                    f"{sorted(set(previous.signals) - set(candidate.signals))} was dropped. "
+                    "A non-nested ladder cannot attribute a lift to a signal."
+                )
+        return self
+
+
+class V2Population(_Frozen):
+    grain: str
+    source_table: str
+    provider: str
+    target: str
+    gameweeks: Literal["observed_only"]
+    seasons_from_data: bool
+
+
+class V2WalkForward(_Frozen):
+    fold_unit: Literal["observed_gameweek"]
+    cutoff: str
+    minimum_training_observed_gameweeks: int
+    forbid_random_split: Literal[True]
+    forbid_full_dataset_fitting: Literal[True]
+    minimum_team_matches: int = 3
+    inner_holdout_observed_gameweeks: int = 6
+    minimum_inner_training_observed_gameweeks: int = 10
+
+
+class V2Metrics(_Frozen):
+    primary: str
+    reported: list[str]
+    calibration: Literal["randomised_pit"]
+
+
+class V2Promotion(_Frozen):
+    minimum_relative_log_lift: float
+    maximum_crps_relative_regression: float
+    pit_interval_80_maximum_absolute_error: float
+    require_each_reported_season_to_pass: bool
+    promotion_requires_prospective_window: Literal[True]
+
+
+class V2Amendment(_Frozen):
+    version: str
+    date: date
+    candidates_evaluated_before_amendment: int
+    changed: str
+    reason: str
+
+
+class _V2Contract(_Frozen):
+    """Shared amendment discipline: a version bump must carry its record."""
+
+    contract_version: str
+    phase: str
+    status: Literal["development_only"]
+    amendments: list[V2Amendment] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _amendment_recorded(self) -> Self:
+        if self.contract_version != "1.0" and not any(
+            amendment.version == self.contract_version for amendment in self.amendments
+        ):
+            raise ValueError(
+                f"contract_version {self.contract_version!r} has no matching amendment "
+                "record. Amending a pre-registered contract is only legitimate before a "
+                "candidate exists to bias the choice, and only with the reason recorded."
+            )
+        return self
+
+
+class V2TeamEnvironmentContract(_V2Contract):
+    population: V2Population
+    walk_forward: V2WalkForward
+    ablation: V2Ablation
+    baselines: list[str]
+    comparator_note: str
+    metrics: V2Metrics
+    splits: list[str]
+    promotion: V2Promotion
+
+
+class V2GkSavesCandidate(_Frozen):
+    name: str
+    description: str
+    is_baseline: bool = False
+
+
+class V2GkSavesPopulation(_Frozen):
+    grain: str
+    filter: str
+    target: str
+    require_measured: list[str]
+    seasons_from_data: bool
+    gameweeks: Literal["observed_only"]
+
+
+class V2GkSavesContract(_V2Contract):
+    population: V2GkSavesPopulation
+    walk_forward: V2WalkForward
+    candidates: list[V2GkSavesCandidate]
+    metrics: V2Metrics
+    splits: list[str]
+    promotion: V2Promotion
+
+    @model_validator(mode="after")
+    def _exactly_one_baseline(self) -> V2GkSavesContract:
+        baselines = [candidate for candidate in self.candidates if candidate.is_baseline]
+        if len(baselines) != 1:
+            raise ValueError(
+                f"expected exactly one baseline candidate, found {len(baselines)}; a "
+                "comparison without a declared incumbent has no bar"
+            )
+        return self
+
+
+@functools.cache
+def load_v2_team_environment_evaluation(
+    path: Path | None = None,
+) -> V2TeamEnvironmentContract:
+    return V2TeamEnvironmentContract.model_validate(
+        _read_yaml(path or config_dir() / "v2_team_environment_evaluation.yaml")
+    )
+
+
+@functools.cache
+def load_v2_gk_saves_evaluation(path: Path | None = None) -> V2GkSavesContract:
+    return V2GkSavesContract.model_validate(
+        _read_yaml(path or config_dir() / "v2_gk_saves_evaluation.yaml")
+    )
+
+
 @functools.cache
 def load_sdp_metrics(path: Path | None = None) -> SdpMetricDictionary:
     """Load the SDP metric dictionary named by `sources.pl_sdp.metric_dictionary`."""
