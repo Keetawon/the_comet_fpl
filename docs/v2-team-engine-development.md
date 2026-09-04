@@ -9,6 +9,19 @@ Provider: `fpl_archive` (no SDP payload has ever been captured; see `docs/pl-sdp
 Both contracts declare `promotion_requires_prospective_window`, so no historical result here
 could have promoted anything even had it passed.
 
+## Provenance
+
+Produced at HEAD `ac2fefd` with a **clean worktree**, verified by the runner rather than
+asserted: `dev_v2_team_environment` refuses to run against a dirty worktree, because Phase 1
+Candidate V3's result was invalidated in part because "the runner accepted a dirty worktree"
+and its number is now void for comparison.
+
+An earlier run of the same evaluation was made before that guard existed, and recorded
+`clean_worktree: false`. It was discarded and re-run rather than published. The re-run
+reproduced **every figure in this document to five decimal places** — the six overall model
+scores, all five per-season team-environment lifts, and all five per-season saves lifts — so
+the numbers below carry an independent reproducibility check as well as clean provenance.
+
 ## Harness validation before anything else
 
 The best baseline, `trailing_goals_attack_defence`, scores **1.50030** over 181 folds and 3,640

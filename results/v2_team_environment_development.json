@@ -1,8 +1,9 @@
 {
-  "generated_at": "2026-09-04T13:28:20.114066+00:00",
+  "allow_dirty": false,
+  "generated_at": "2026-09-04T13:55:52.348080+00:00",
   "git": {
-    "clean_worktree": false,
-    "head": "31f7b8142097cff4fc8ee8debfb109e058368ed9"
+    "clean_worktree": true,
+    "head": "ac2fefd9dde2d5e3f7214831176bb9863e6587c8"
   },
   "gk_saves": {
     "baseline": "gk_saves_v1_from_team_conceded",
@@ -233,6 +234,7 @@
     },
     "rows_scored": 3686
   },
+  "limit_folds": null,
   "not_a_promotion": "Both contracts declare promotion_requires_prospective_window. The historical target roster and first-kickoff cutoff are unversioned proxies, so no historical result here can establish real-deadline validity. The prospective default is unchanged.",
   "schema_version": 1,
   "status": "development_only",
