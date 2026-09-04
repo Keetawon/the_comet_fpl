@@ -23,7 +23,7 @@ import json
 import time
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Self
 
 import httpx
@@ -39,6 +39,7 @@ __all__ = [
     "SdpSchemaError",
     "SdpTeamStats",
     "extract_items",
+    "is_completed_scored_match",
     "parse_match_summary",
     "parse_team_stats",
 ]
@@ -65,6 +66,13 @@ _PAGE_INFO_KEYS: Final[tuple[str, ...]] = ("pageInfo", "page", "paging", "pagina
 # Side labels the stats endpoint is documented (by observation of the website) to use.
 _HOME_LABELS: Final[frozenset[str]] = frozenset({"home", "h", "hometeam", "home_team"})
 _AWAY_LABELS: Final[frozenset[str]] = frozenset({"away", "a", "awayteam", "away_team"})
+
+# Result labels observed or historically used by the provider for a completed match. A
+# recognised label is still insufficient without both scores: scheduled 0-0 placeholders must
+# never be treated as results.
+_COMPLETED_RESULT_LABELS: Final[frozenset[str]] = frozenset(
+    {"c", "complete", "completed", "finished", "fulltime", "ft", "normalresult", "played"}
+)
 
 
 class SdpSchemaError(RuntimeError):
@@ -277,6 +285,10 @@ def parse_match_summary(record: Any) -> SdpMatchSummary:
     scores: Mapping[str, Any] = score_node if isinstance(score_node, dict) else record
     home_score = _as_int(_first(scores, "homeScore", "home_score", "homeGoals", "home"))
     away_score = _as_int(_first(scores, "awayScore", "away_score", "awayGoals", "away"))
+    if home_score is None and isinstance(home_node, dict):
+        home_score = _as_int(_first(home_node, "score", "goals", "teamScore"))
+    if away_score is None and isinstance(away_node, dict):
+        away_score = _as_int(_first(away_node, "score", "goals", "teamScore"))
 
     season_node = record.get("season")
     season_id = (
@@ -284,7 +296,12 @@ def parse_match_summary(record: Any) -> SdpMatchSummary:
         if isinstance(season_node, dict)
         else _as_int(_first(record, "season", "seasonId"))
     )
-    status = _first(record, "status", "state", "matchStatus", "phase")
+    # The live payload's `phase` is a numeric competition phase (observed as the string
+    # "1" for completed and scheduled matches), not match completion. `resultType` is the
+    # completion discriminator: completed matches carry `NormalResult`, future matches null.
+    status = _first(record, "status", "state", "matchStatus", "resultType", "result_type")
+    if not isinstance(status, str):
+        status = _first(record, "phase")
     return SdpMatchSummary(
         match_id=match_id,
         season_id=season_id,
@@ -300,6 +317,21 @@ def parse_match_summary(record: Any) -> SdpMatchSummary:
         away_score=away_score,
         status=str(status) if isinstance(status, str) else None,
     )
+
+
+def is_completed_scored_match(summary: SdpMatchSummary, *, now: datetime) -> bool:
+    """Whether a match has a genuine completed result and both scores.
+
+    The live provider exposes ``resultType=NormalResult`` rather than a status/phase. When no
+    result label is available, a scored match is accepted only after the conservative
+    three-hour post-kickoff boundary used by the current-season capture.
+    """
+    if summary.home_score is None or summary.away_score is None:
+        return False
+    if summary.status is not None:
+        label = summary.status.strip().casefold().replace(" ", "").replace("_", "").replace("-", "")
+        return label in _COMPLETED_RESULT_LABELS
+    return summary.kickoff is not None and summary.kickoff + timedelta(hours=3) <= now
 
 
 def _normalise_side(label: Any) -> str:
@@ -533,14 +565,25 @@ class PlSdpClient:
         return self.fetch("seasons", path=path)
 
     def fetch_matches_page(
-        self, *, season_id: int, matchweek: int | None = None, page: int = 0
+        self,
+        *,
+        season_id: int,
+        matchweek: int | None = None,
+        page: int = 0,
+        cursor: str | None = None,
     ) -> RawPayload:
         params: dict[str, object] = {
             "competition": self._config.competition,
             "season": season_id,
-            "page": page,
-            "pageSize": self._config.page_size,
+            "_limit": self._config.page_size,
         }
+        if cursor is not None:
+            params["_next"] = cursor
+        elif page > 0:
+            # Compatibility fallback for the older page-number envelope. The live endpoint
+            # uses the opaque `_next` cursor instead and ignores page/pageSize.
+            params["page"] = page
+            params["pageSize"] = self._config.page_size
         if matchweek is not None:
             params["matchweek"] = matchweek
         return self.fetch("matches", path=self._endpoint("matches"), params=params)
@@ -557,8 +600,12 @@ class PlSdpClient:
         response even when it later proves to be a duplicate.
         """
         seen: set[int] = set()
+        seen_cursors: set[str] = set()
+        cursor: str | None = None
         for page in range(self._config.maximum_pages):
-            raw = self.fetch_matches_page(season_id=season_id, matchweek=matchweek, page=page)
+            raw = self.fetch_matches_page(
+                season_id=season_id, matchweek=matchweek, page=page, cursor=cursor
+            )
             records = extract_items(raw.payload)
             summaries = [parse_match_summary(record) for record in records]
             fresh = {summary.match_id for summary in summaries} - seen
@@ -569,6 +616,25 @@ class PlSdpClient:
             total = _reported_total(raw.payload)
             if total is not None and len(seen) >= total:
                 return
+            pagination = raw.payload.get("pagination") if isinstance(raw.payload, dict) else None
+            if isinstance(pagination, dict) and "_next" in pagination:
+                value = pagination["_next"]
+                if value is None or value == "":
+                    return
+                if isinstance(value, bool) or not isinstance(value, (str, int)):
+                    raise SdpSchemaError(
+                        "pagination._next must be a string, integer, or null; got "
+                        f"{type(value).__name__}"
+                    )
+                next_cursor = str(value)
+                if next_cursor in seen_cursors:
+                    raise ApiResponseError(
+                        f"season {season_id} repeated pagination cursor {next_cursor!r}; "
+                        "refusing an incomplete or looping capture"
+                    )
+                seen_cursors.add(next_cursor)
+                cursor = next_cursor
+                continue
             if len(records) < self._config.page_size:
                 return
         raise ApiResponseError(

@@ -219,6 +219,13 @@ def stage_matches(
             if season_id is None and isinstance(param_season_id, int):
                 season_id = param_season_id
             mapped = season_labels.get(season_id) if season_id is not None else None
+            if landed_season is not None and mapped is not None and landed_season != mapped:
+                failures.append(
+                    f"{identifier}: match {summary.match_id} landed as season "
+                    f"{landed_season!r}, but provider season id {season_id} is configured as "
+                    f"{mapped!r}; skipped rather than choosing either label"
+                )
+                continue
             label = landed_season or mapped
             if label is None:
                 failures.append(
@@ -431,12 +438,51 @@ def _fixture_identities(
         params = list(seasons)
     rows = con.execute(
         f"""
+        WITH archive_fixture AS (
+            SELECT f.season, f.fixture, f.pulse_id, f.kickoff_time,
+                   th.team_code AS home_team_code, ta.team_code AS away_team_code,
+                   f.team_h_score, f.team_a_score
+            FROM stg_fixture AS f
+            LEFT JOIN mart_dim_team AS th
+              ON th.season = f.season AND th.team_id = f.team_h
+            LEFT JOIN mart_dim_team AS ta
+              ON ta.season = f.season AND ta.team_id = f.team_a
+        ), live_ranked AS (
+            SELECT l.season, l.fixture, l.pulse_id, l.kickoff_time,
+                   th.team_code AS home_team_code, ta.team_code AS away_team_code,
+                   f.team_h_score, f.team_a_score,
+                   row_number() OVER (
+                       PARTITION BY l.season, l.fixture
+                       ORDER BY l.known_at DESC, l.capture_id DESC
+                   ) AS version_rank
+            FROM mart_team_fixture_live AS l
+            JOIN stg_live_fixture_version AS f
+              ON f.season = l.season AND f.fixture = l.fixture
+             AND f.capture_id = l.capture_id
+             AND f.team_h = l.team_id
+             AND f.team_a = l.opponent_team_id
+            LEFT JOIN stg_live_team_version AS th
+              ON th.season = l.season AND th.team_id = l.team_id
+             AND th.capture_id = l.capture_id
+            LEFT JOIN stg_live_team_version AS ta
+              ON ta.season = l.season AND ta.team_id = l.opponent_team_id
+             AND ta.capture_id = l.capture_id
+            WHERE l.was_home
+        ), combined AS (
+            SELECT * FROM archive_fixture
+            UNION ALL
+            SELECT l.* EXCLUDE (version_rank)
+            FROM live_ranked AS l
+            WHERE l.version_rank = 1
+              AND NOT EXISTS (
+                  SELECT 1 FROM stg_fixture AS a
+                  WHERE a.season = l.season AND a.fixture = l.fixture
+              )
+        )
         SELECT f.season, f.fixture, f.pulse_id, epoch_us(f.kickoff_time),
-               th.team_code AS home_team_code, ta.team_code AS away_team_code,
+               f.home_team_code, f.away_team_code,
                f.team_h_score, f.team_a_score
-        FROM stg_fixture AS f
-        LEFT JOIN mart_dim_team AS th ON th.season = f.season AND th.team_id = f.team_h
-        LEFT JOIN mart_dim_team AS ta ON ta.season = f.season AND ta.team_id = f.team_a
+        FROM combined AS f
         {predicate}
         ORDER BY f.season, f.fixture
         """,
@@ -446,7 +492,7 @@ def _fixture_identities(
         FixtureIdentity(
             season=str(season),
             fixture=int(fixture),
-            pulse_id=None if pulse_id is None else int(pulse_id),
+            pulse_id=None if pulse_id is None or int(pulse_id) <= 0 else int(pulse_id),
             kickoff_time=_optional_instant(kickoff, name=f"{season} fixture {fixture} kickoff"),
             home_team_code=None if home is None else int(home),
             away_team_code=None if away is None else int(away),
@@ -468,7 +514,7 @@ def _latest_sdp_matches(con: duckdb.DuckDBPyConnection) -> dict[int, dict[str, A
             FROM stg_pl_sdp_match
         )
         SELECT sdp_match_id, season, matchweek, epoch_us(kickoff_time), home_team_name,
-               away_team_name,
+               away_team_name, home_sdp_team_id, away_sdp_team_id,
                home_score, away_score
         FROM ranked WHERE version_rank = 1
         """
@@ -480,8 +526,10 @@ def _latest_sdp_matches(con: duckdb.DuckDBPyConnection) -> dict[int, dict[str, A
             "kickoff_time": _optional_instant(row[3], name=f"sdp match {row[0]} kickoff"),
             "home_team_name": row[4],
             "away_team_name": row[5],
-            "home_score": row[6],
-            "away_score": row[7],
+            "home_sdp_team_id": row[6],
+            "away_sdp_team_id": row[7],
+            "home_score": row[8],
+            "away_score": row[9],
         }
         for row in rows
     }
@@ -527,9 +575,21 @@ def resolve_crosswalk(
     matches = _latest_sdp_matches(con)
     audit = IdentityAudit(fpl_fixtures=len(fixtures), sdp_matches=len(matches))
 
-    con.execute("DELETE FROM stg_pl_sdp_fixture_crosswalk")
+    if seasons:
+        con.execute(
+            f"DELETE FROM stg_pl_sdp_fixture_crosswalk "
+            f"WHERE season IN ({', '.join('?' for _ in seasons)})",
+            list(seasons),
+        )
+    else:
+        con.execute("DELETE FROM stg_pl_sdp_fixture_crosswalk")
     resolved_at = datetime.now(UTC)
-    claimed: dict[int, tuple[str, int]] = {}
+    claimed = {
+        int(match_id): (str(season), int(fixture))
+        for season, fixture, match_id in con.execute(
+            "SELECT season, fixture, sdp_match_id FROM stg_pl_sdp_fixture_crosswalk"
+        ).fetchall()
+    }
 
     by_season_kickoff: dict[str, list[tuple[int, dict[str, Any]]]] = {}
     for match_id, match in matches.items():
@@ -546,34 +606,45 @@ def resolve_crosswalk(
         chosen: int | None = None
         method = ""
 
+        pulse_contradiction: str | None = None
         candidate = matches.get(fixture.pulse_id) if fixture.pulse_id is not None else None
         if candidate is not None:
             audit.pulse_id_exact_matches += 1
             if str(candidate["season"]) != fixture.season:
-                audit.contradictions.append(
+                pulse_contradiction = (
                     f"{fixture.season} fixture {fixture.fixture}: pulse_id {fixture.pulse_id} "
                     f"is an SDP match in season {candidate['season']!r}"
                 )
             elif _kickoffs_agree(fixture.kickoff_time, candidate["kickoff_time"]) is False:
-                audit.contradictions.append(
+                pulse_contradiction = (
                     f"{fixture.season} fixture {fixture.fixture}: pulse_id {fixture.pulse_id} "
                     f"kickoff {candidate['kickoff_time']} disagrees with {fixture.kickoff_time}"
                 )
             elif _scores_agree(fixture, candidate) is False:
-                audit.contradictions.append(
+                pulse_contradiction = (
                     f"{fixture.season} fixture {fixture.fixture}: pulse_id {fixture.pulse_id} "
                     f"score {candidate['home_score']}-{candidate['away_score']} disagrees with "
                     f"{fixture.home_score}-{fixture.away_score}"
                 )
             else:
                 chosen, method = fixture.pulse_id, MATCH_METHOD_PULSE_ID
+            if pulse_contradiction is not None:
+                audit.contradictions.append(pulse_contradiction)
 
-        if chosen is None and fixture.kickoff_time is not None:
+        if chosen is None and pulse_contradiction is None and fixture.kickoff_time is not None:
             pool = [
                 (match_id, match)
                 for match_id, match in by_season_kickoff.get(fixture.season, [])
                 if _kickoffs_agree(fixture.kickoff_time, match["kickoff_time"])
             ]
+            if len(pool) > 1:
+                narrowed = [
+                    (match_id, match)
+                    for match_id, match in pool
+                    if _teams_corroborated(fixture, match, team_name_codes) is True
+                ]
+                if narrowed:
+                    pool = narrowed
             if len(pool) > 1 and fixture.home_score is not None:
                 narrowed = [
                     (match_id, match) for match_id, match in pool if _scores_agree(fixture, match)
@@ -610,6 +681,16 @@ def resolve_crosswalk(
         audit.kickoff_corroborated += int(kickoff_ok is True)
         audit.score_corroborated += int(score_ok is True)
         audit.teams_corroborated += int(teams_ok is True)
+        if teams_ok is False:
+            audit.contradictions.append(
+                f"{fixture.season} fixture {fixture.fixture}: SDP match {chosen} home/away "
+                f"team identities disagree (SDP teamId {match['home_sdp_team_id']!r}/"
+                f"{match['away_sdp_team_id']!r}, FPL permanent team_code "
+                f"{fixture.home_team_code!r}/{fixture.away_team_code!r})"
+            )
+            audit.unmatched_fpl_fixtures += 1
+            season_stats["unmatched"] += 1
+            continue
         if method == MATCH_METHOD_PULSE_ID:
             audit.matched_by_pulse_id += 1
             season_stats["pulse_id"] += 1
@@ -637,7 +718,7 @@ def resolve_crosswalk(
             ],
         )
 
-    audit.unmatched_sdp_matches = len(matches) - len(claimed)
+    audit.unmatched_sdp_matches = len(set(matches) - set(claimed))
     if strict and (audit.ambiguities or audit.contradictions):
         raise SdpIdentityError(
             "fixture identity did not resolve cleanly: "
@@ -655,10 +736,23 @@ def _teams_corroborated(
 ) -> bool | None:
     """Whether both clubs agree, resolved through an explicit name -> team_code map.
 
-    Returns `None` when the question cannot be asked -- no map supplied, or a name absent from
-    it. That is deliberately not `False`: an unmapped club name is missing evidence, and
-    reporting it as a disagreement would make a coverage gap look like a data defect.
+    SDP ``teamId`` equals FPL's permanent ``team_code``. Exact ids take precedence; names are
+    the fallback.
+    Returns `None` when the question cannot be asked. That is deliberately not `False`: missing
+    identity evidence must not be reported as disagreement.
     """
+    home_provider_id = match.get("home_sdp_team_id")
+    away_provider_id = match.get("away_sdp_team_id")
+    if (
+        fixture.home_team_code is not None
+        and fixture.away_team_code is not None
+        and home_provider_id is not None
+        and away_provider_id is not None
+    ):
+        return bool(
+            fixture.home_team_code == int(home_provider_id)
+            and fixture.away_team_code == int(away_provider_id)
+        )
     if team_name_codes is None:
         return None
     home_name, away_name = match.get("home_team_name"), match.get("away_team_name")
@@ -682,7 +776,11 @@ def team_name_code_map(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
     """
     rows = con.execute(
         """
-        SELECT team_name, short_name, team_code FROM mart_dim_team WHERE team_code IS NOT NULL
+        SELECT team_name, short_name, team_code
+        FROM mart_dim_team WHERE team_code IS NOT NULL
+        UNION ALL
+        SELECT team_name, short_name, team_code
+        FROM stg_live_team_version WHERE team_code IS NOT NULL
         """
     ).fetchall()
     seen: dict[str, set[int]] = {}

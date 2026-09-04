@@ -1,11 +1,10 @@
 # Premier League SDP metric dictionary.
 #
 # ============================ READ THIS BEFORE TRUSTING A NAME ============================
-# No SDP payload has been observed from the environment that authored this file: every
-# Pulselive, premierleague.com and fantasy.premierleague.com host is refused by its egress
-# policy. Every `provider_fields` entry below is therefore a CANDIDATE ALIAS LIST, seeded from
-# the Opta/Pulselive metric vocabulary the premierleague.com site has historically used, and
-# every entry carries `verified_semantics: false`.
+# A real SDP match-stats payload was first observed on 2026-09-04. Its exact field names have
+# been added to the candidate alias lists below, while older Opta/Pulselive spellings remain as
+# schema-drift fallbacks. Field presence verifies spelling, not meaning: no full reconciliation
+# has completed, so every provider-backed entry still carries `verified_semantics: false`.
 #
 # This file is safe to be wrong. Three mechanisms make it so:
 #
@@ -77,13 +76,13 @@ metrics:
     description: Goal attempts on target, including those saved and those scored.
     verified_semantics: false
   - local_field: shots_inside_box
-    provider_fields: [att_ibox_target, attIboxTarget, shots_inside_box, att_ibox_goal]
+    provider_fields: [attemptsIbox, attempts_ibox, shots_inside_box]
     type: int
     group: shooting
     description: Goal attempts taken from inside the penalty area.
     verified_semantics: false
   - local_field: shots_outside_box
-    provider_fields: [att_obox_target, attOboxTarget, shots_outside_box]
+    provider_fields: [attemptsObox, attempts_obox, shots_outside_box]
     type: int
     group: shooting
     description: Goal attempts taken from outside the penalty area.
@@ -130,7 +129,7 @@ metrics:
     description: Entries into the attacking third.
     verified_semantics: false
   - local_field: penalty_area_entries
-    provider_fields: [penalty_area_entries, penaltyAreaEntries, box_entries]
+    provider_fields: [penAreaEntries, penalty_area_entries, penaltyAreaEntries, box_entries]
     type: int
     group: territory
     mirror: penalty_area_entries_allowed
@@ -159,16 +158,16 @@ metrics:
     description: Passes completed to a team-mate.
     verified_semantics: false
   - local_field: forward_passes
-    provider_fields: [total_fwd_zone_pass, totalFwdZonePass, forward_passes]
+    provider_fields: [fwdPass, fwd_pass, forward_passes]
     type: int
     group: passing
-    description: Passes played into the forward zone.
+    description: Passes played forward.
     verified_semantics: false
   - local_field: backward_passes
-    provider_fields: [total_back_zone_pass, totalBackZonePass, backward_passes]
+    provider_fields: [backwardPass, backward_pass, backward_passes]
     type: int
     group: passing
-    description: Passes played into the back zone.
+    description: Passes played backward.
     verified_semantics: false
   - local_field: long_passes
     provider_fields: [total_long_balls, totalLongBalls, long_passes]
@@ -197,10 +196,10 @@ metrics:
     description: Crosses finding a team-mate.
     verified_semantics: false
   - local_field: corners
-    provider_fields: [won_corners, wonCorners, corner_taken, corners]
+    provider_fields: [cornerTaken, corner_taken, corners_taken]
     type: int
     group: width
-    description: Corners won by this side.
+    description: Corners taken by this side.
     verified_semantics: false
 
   # ---- defending ------------------------------------------------------------------------

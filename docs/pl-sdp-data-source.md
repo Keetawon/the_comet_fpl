@@ -4,20 +4,20 @@
 premierleague.com. This document records what is known, what is assumed, and what happens when
 an assumption turns out wrong.
 
-## Status: implemented, never captured
+## Status: first real provider evidence observed
 
-**No SDP payload has ever been observed by this repository.** Every Pulselive,
-premierleague.com and fantasy.premierleague.com host is refused by the build environment's
-egress policy (HTTP 403 on CONNECT — a policy denial, not a server error). The adapter, staging
-layer, identity crosswalk, jobs and tests are complete and exercised against vendored payload
-shapes; the `pl_sdp` provider has zero rows.
+On 2026-09-04 an authorized execution environment reached the live provider and received real
+Premier League match-list and match-stats JSON. This proves provider access and the sampled
+response shapes; it does **not** by itself prove a complete capture, historical metric coverage,
+fixture identity, or metric semantics. Those claims still require retained raw payloads plus the
+staging, identity, coverage, and reconciliation reports below.
 
-Capture must therefore run where the provider is reachable. Two places qualify, and both are
-established patterns in this repository:
-
-* the owner's machine, which already runs the deadline runbook;
-* a GitHub Actions workflow, which is how `snapshot.yml` has captured the FPL API daily since
-  2026-07 without depending on any developer machine having egress.
+The configured seasons endpoint returned HTTP 400 with content type
+`application/problem+json` and the provider message `This endpoint is not enabled for API access`.
+That is a provider response, not the earlier HTTP-CONNECT egress-policy denial. The initial
+authoring environment's 403 therefore remains evidence about that environment only, not evidence
+that the provider rejects access generally. The owner machine and the existing GitHub Actions
+workflow remain the supported capture environments.
 
 ## It is not a published API
 
@@ -37,7 +37,7 @@ rather than hoped away:
 
 | logical name | path | used for |
 | --- | --- | --- |
-| `seasons` | `/api/v2/competitions/{competition}/seasons` | season-id discovery (best effort) |
+| `seasons` | `/api/v2/competitions/{competition}/seasons` | configured discovery route; live provider returned HTTP 400 disabled on 2026-09-04 |
 | `matches` | `/api/v2/matches?competition=8&season={id}[&matchweek={gw}]` | the match list |
 | `match` | `/api/v2/matches/{match_id}` | one match's metadata |
 | `match_stats` | `/api/v3/matches/{match_id}/stats` | **the team-side metrics V2 consumes** |
@@ -46,13 +46,40 @@ rather than hoped away:
 
 Competition 8 is the Premier League.
 
-## Season ids are unknown and are refused rather than guessed
+### Real match-list pagination
+
+The live match-list response uses a `data` list plus a `pagination` object. On 2026-09-04:
+
+* `page=0&pageSize=100` returned only 10 rows and
+  `pagination={_limit: 10, _prev: null, _next: ...}`; those legacy page parameters were ignored;
+* `_limit=2` returned match ids `2645195`, `2645198`; repeating the request with the opaque
+  `_next` token returned `2645197`, `2645199`, proving cursor advancement;
+* `_limit=20` returned the 20 completed 2026-27 GW1-2 matches and another `_next` token.
+
+The client must follow `pagination._next`, stop on an absent token or no forward progress, and
+retain every raw page under the existing configured page cap. A single page is not season
+coverage. At this first probe the full 380-match 2026-27 feed had not yet been enumerated.
+
+## Season ids are measured and unmapped labels are refused
 
 The mapping from a season label to the provider's numeric season id is not documented and
-cannot be inferred. `pl_sdp.season_ids` in `config/sources.yaml` starts **empty**, and asking
-for an unmapped season raises with instructions rather than fetching something. Fetching the
-wrong year and labelling it correctly is worse than fetching nothing: it would attach one
-season's football to another season's fixtures, and every downstream check would pass.
+must not be guessed. Direct match-list requests on 2026-09-04 established these mappings from
+records carrying `competitionId = "8"`, competition `Premier League`, and August kickoff dates
+for the named season:
+
+| season label | real SDP season id |
+| --- | ---: |
+| `2021-22` | 2021 |
+| `2022-23` | 2022 |
+| `2023-24` | 2023 |
+| `2024-25` | 2024 |
+| `2025-26` | 2025 |
+| `2026-27` | 2026 |
+
+These values are now recorded in `config/sources.yaml`. Asking for any other season still raises
+instead of fetching something. Fetching the wrong year and labelling it correctly is worse than
+fetching nothing: it would attach one season's football to another season's fixtures, and every
+downstream check could appear internally consistent.
 
 To populate it, where the provider is reachable:
 
@@ -60,14 +87,15 @@ To populate it, where the provider is reachable:
 python -m fpl.jobs.audit_pl_sdp --probe
 ```
 
-It tries the `seasons` endpoint first and falls back to probing candidate ids and inferring the
-label from the earliest kickoff each returns. It prints a YAML block to paste into
-`config/sources.yaml`.
+The probe tries the configured seasons endpoint first. Because that route is currently disabled,
+the confirmed mappings above came from direct match queries and were accepted only after checking
+competition identity and real kickoff dates. Any future discovery fallback must apply the same
+corroboration and must not treat a numeric convention as evidence.
 
 ## Operational sequence
 
 ```
-python -m fpl.jobs.audit_pl_sdp --probe                    # once: discover season ids
+python -m fpl.jobs.audit_pl_sdp --probe                    # only for an unmapped provider season
 python -m fpl.jobs.backfill_pl_sdp --season 2024-25        # historical, per season
 python -m fpl.jobs.audit_pl_sdp --stage                    # stage + measure identity + report
 python -m fpl.jobs.build_db                                # rebuild, including the V2 marts
@@ -118,7 +146,25 @@ information about the sources, and forcing agreement would destroy it.
 
 ## The dictionary is unverified and safe to be wrong
 
-Every entry in `config/pl_sdp_metrics.yaml` carries `verified_semantics: false`, seeded from the
-Opta/Pulselive vocabulary the site has historically used. Promote an entry only when a real
-payload has been inspected **and** the reconciliation report corroborates the value. Until then
-the tall store and the unmapped-field report mean a wrong guess loses nothing.
+The first real match-stats payload exposed these exact field spellings:
+
+* result/shooting: `expectedGoals`, `expectedGoalsOnTarget`, `totalScoringAtt`,
+  `ontargetScoringAtt`, `attemptsIbox`, `attemptsObox`, `bigChanceCreated`,
+  `bigChanceScored`, `bigChanceMissed`;
+* territory/passing/width: `touchesInOppBox`, `finalThirdEntries`, `penAreaEntries`,
+  `possessionPercentage`, `totalPass`, `accuratePass`, `fwdPass`, `backwardPass`, `totalCross`,
+  `accurateCross`, `cornerTaken`;
+* defending/press: `totalTackle`, `wonTackle`, `interception`, `totalClearance`,
+  `outfielderBlock`, `ballRecovery`, `possWonAtt3rd`, `possWonMid3rd`, `possWonDef3rd`, `saves`;
+* duels/discipline: `aerialWon`, `aerialLost`, `duelWon`, `duelLost`, `fkFoulLost`,
+  `totalOffside`, `yellowCard`, `redCard`.
+
+This verifies that those keys occurred, not what they mean or whether they exist in every season.
+Several hypothesised aliases were proven **not** to be synonyms because they coexist with different
+values: `attemptsIbox` versus `attIboxTarget`, `fwdPass` versus `totalFwdZonePass`, and
+`yellowCard` versus `totalYelCard` are examples. The total-attempt/directional-pass measures are
+mapped narrowly; ambiguous alternatives remain unmapped and losslessly retained in the tall store.
+Every provider-backed entry in `config/pl_sdp_metrics.yaml` therefore remains
+`verified_semantics: false`. Promote an entry only when a retained real payload has been inspected
+**and** the reconciliation report corroborates the value. Until then the tall store and the
+unmapped-field report mean a wrong interpretation loses nothing.

@@ -8,6 +8,7 @@ is also the only way these could run at all, since the provider is unreachable f
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from fpl.ingest.pl_sdp import (
     PlSdpClient,
     SdpSchemaError,
     extract_items,
+    is_completed_scored_match,
     parse_match_summary,
     parse_team_stats,
 )
@@ -67,6 +69,49 @@ def test_epoch_millis_and_iso_kickoffs_agree() -> None:
     assert paged.kickoff == bare.kickoff
     assert paged.kickoff is not None
     assert paged.kickoff.tzinfo is not None, "a naive kickoff would defeat the as_of boundary"
+
+
+def test_real_match_shape_parses_nested_scores_and_result_type() -> None:
+    summary = parse_match_summary(
+        {
+            "matchId": "2645195",
+            "competition": "Premier League",
+            "competitionId": "8",
+            "season": "2026",
+            "matchWeek": 1,
+            "kickoff": "2026-08-21 20:00:00",
+            "phase": "1",
+            "resultType": "NormalResult",
+            "homeTeam": {"id": "3", "name": "Arsenal", "score": 3},
+            "awayTeam": {"id": "9", "name": "Coventry City", "score": 0},
+        }
+    )
+
+    assert summary.match_id == 2645195
+    assert summary.season_id == 2026
+    assert summary.matchweek == 1
+    assert summary.kickoff == datetime(2026, 8, 21, 20, tzinfo=UTC)
+    assert (summary.home_team_id, summary.home_team_name, summary.home_score) == (3, "Arsenal", 3)
+    assert (summary.away_team_id, summary.away_team_name, summary.away_score) == (
+        9,
+        "Coventry City",
+        0,
+    )
+    assert summary.status == "NormalResult"
+    assert is_completed_scored_match(summary, now=datetime(2026, 8, 22, tzinfo=UTC))
+
+
+def test_completion_requires_both_scores() -> None:
+    summary = parse_match_summary(
+        {
+            "matchId": "2645195",
+            "kickoff": "2026-08-21 20:00:00",
+            "resultType": "NormalResult",
+            "homeTeam": {"id": "3", "score": 3},
+            "awayTeam": {"id": "9", "score": None},
+        }
+    )
+    assert not is_completed_scored_match(summary, now=datetime(2026, 8, 22, tzinfo=UTC))
 
 
 def test_unknown_envelope_raises_rather_than_returning_empty() -> None:
@@ -268,6 +313,77 @@ def test_pagination_respects_a_declared_total() -> None:
     assert len(pages) == 1
 
 
+def test_live_cursor_pagination_sends_returned_next_token() -> None:
+    cursor = "MjY0NTE5OF9feyJfbGkiOiBbIjIwMjYtMDgtMjIgMTI6MzA6MDAiXX0"
+    requests: list[httpx.Request] = []
+
+    def record(match_id: int, kickoff: str) -> dict[str, Any]:
+        return {
+            "matchId": str(match_id),
+            "season": "2026",
+            "matchWeek": 1,
+            "kickoff": kickoff,
+            "resultType": "NormalResult",
+            "homeTeam": {"id": "3", "name": "Arsenal", "score": 1},
+            "awayTeam": {"id": "9", "name": "Coventry City", "score": 0},
+        }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) == 1:
+            payload = {
+                "pagination": {"_limit": 2, "_prev": None, "_next": cursor},
+                "data": [
+                    record(2645195, "2026-08-21 20:00:00"),
+                    record(2645198, "2026-08-22 12:30:00"),
+                ],
+            }
+        else:
+            payload = {
+                "pagination": {"_limit": 2, "_prev": "previous", "_next": None},
+                "data": [
+                    record(2645197, "2026-08-22 15:00:00"),
+                    record(2645199, "2026-08-22 15:00:00"),
+                ],
+            }
+        return httpx.Response(200, text=json.dumps(payload))
+
+    with _client(handler, page_size=2) as client:
+        pages = list(client.iter_matches(season_id=2026))
+
+    assert [summary.match_id for _, page in pages for summary in page] == [
+        2645195,
+        2645198,
+        2645197,
+        2645199,
+    ]
+    assert dict(requests[0].url.params) == {"competition": "8", "season": "2026", "_limit": "2"}
+    assert dict(requests[1].url.params) == {
+        "competition": "8",
+        "season": "2026",
+        "_limit": "2",
+        "_next": cursor,
+    }
+
+
+def test_repeated_live_cursor_fails_instead_of_looping() -> None:
+    calls = {"count": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["count"] += 1
+        match_id = 2645190 + calls["count"]
+        payload = {
+            "pagination": {"_limit": 1, "_prev": None, "_next": "same-cursor"},
+            "data": [{"matchId": str(match_id)}],
+        }
+        return httpx.Response(200, text=json.dumps(payload))
+
+    with _client(handler, page_size=1, maximum_pages=10) as client:
+        with pytest.raises(ApiResponseError, match="repeated pagination cursor"):
+            list(client.iter_matches(season_id=2026))
+    assert calls["count"] == 2
+
+
 def test_runaway_pagination_is_bounded() -> None:
     """A provider that ignores paging AND returns fresh ids must still terminate."""
     counter = {"next": 0}
@@ -295,12 +411,60 @@ def test_runaway_pagination_is_bounded() -> None:
             list(client.iter_matches(season_id=719))
 
 
-# -- configuration refusals -------------------------------------------------------------
+# -- observed configuration -------------------------------------------------------------
 
 
-def test_unmapped_season_label_is_refused_rather_than_guessed() -> None:
+def test_real_provider_season_ids_are_recorded() -> None:
+    config = load_sources().pl_sdp
+    assert config is not None
+    assert config.season_ids == {
+        "2021-22": 2021,
+        "2022-23": 2022,
+        "2023-24": 2023,
+        "2024-25": 2024,
+        "2025-26": 2025,
+        "2026-27": 2026,
+    }
+
+
+def test_an_unmapped_season_label_is_still_refused_rather_than_guessed() -> None:
     """Fetching the wrong year under a correct-looking label is worse than fetching nothing."""
     config = load_sources().pl_sdp
     assert config is not None
     with pytest.raises(KeyError, match="no pl_sdp season id mapped"):
-        config.season_id("2025-26")
+        config.season_id("2020-21")
+
+
+def test_newly_observed_provider_aliases_map_without_claiming_verified_semantics() -> None:
+    aliases = load_sdp_metrics().alias_index()
+    assert {
+        alias: aliases[alias]
+        for alias in (
+            "attemptsIbox",
+            "attemptsObox",
+            "penAreaEntries",
+            "fwdPass",
+            "backwardPass",
+            "cornerTaken",
+        )
+    } == {
+        "attemptsIbox": "shots_inside_box",
+        "attemptsObox": "shots_outside_box",
+        "penAreaEntries": "penalty_area_entries",
+        "fwdPass": "forward_passes",
+        "backwardPass": "backward_passes",
+        "cornerTaken": "corners",
+    }
+    # These coexist with different-valued total fields in the real payload. They are not
+    # synonyms, so leaving them in the tall store is safer than assigning false semantics.
+    for non_alias in (
+        "attIboxTarget",
+        "attOboxTarget",
+        "totalFwdZonePass",
+        "totalBackZonePass",
+        "wonCorners",
+        "yellowCard",
+        "redCard",
+    ):
+        assert non_alias not in aliases
+    assert all(not metric.verified_semantics for metric in load_sdp_metrics().metrics)

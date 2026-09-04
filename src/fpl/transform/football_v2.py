@@ -242,13 +242,56 @@ def build_team_match_stats_sdp(con: duckdb.DuckDBPyConnection) -> int:
             ) AS version_rank
             FROM stg_pl_sdp_team_match_stats
         ),
-        sided AS (SELECT * FROM latest WHERE version_rank = 1)
+        sided AS (SELECT * FROM latest WHERE version_rank = 1),
+        archive_anchor AS (
+            SELECT t.season, t.gw, t.fixture, t.pulse_id, t.kickoff_time,
+                   t.team_id, dt.team_code, t.opponent_team_id,
+                   dopp.team_code AS opponent_team_code, t.was_home
+            FROM mart_fact_team_match AS t
+            LEFT JOIN mart_dim_team AS dt
+              ON dt.season = t.season AND dt.team_id = t.team_id
+            LEFT JOIN mart_dim_team AS dopp
+              ON dopp.season = t.season AND dopp.team_id = t.opponent_team_id
+        ),
+        live_capture AS (
+            SELECT season, fixture, capture_id, known_at,
+                   row_number() OVER (
+                       PARTITION BY season, fixture ORDER BY known_at DESC, capture_id DESC
+                   ) AS version_rank
+            FROM mart_team_fixture_live
+            GROUP BY season, fixture, capture_id, known_at
+        ),
+        live_anchor AS (
+            SELECT l.season, l.gw, l.fixture, l.pulse_id, l.kickoff_time,
+                   l.team_id, dt.team_code, l.opponent_team_id,
+                   dopp.team_code AS opponent_team_code, l.was_home
+            FROM live_capture AS c
+            JOIN mart_team_fixture_live AS l
+              ON l.season = c.season AND l.fixture = c.fixture
+             AND l.capture_id = c.capture_id
+            LEFT JOIN stg_live_team_version AS dt
+              ON dt.season = l.season AND dt.team_id = l.team_id
+             AND dt.capture_id = l.capture_id
+            LEFT JOIN stg_live_team_version AS dopp
+              ON dopp.season = l.season AND dopp.team_id = l.opponent_team_id
+             AND dopp.capture_id = l.capture_id
+            WHERE c.version_rank = 1 AND l.kickoff_time IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM mart_fact_team_match AS a
+                  WHERE a.season = l.season AND a.fixture = l.fixture
+              )
+        ),
+        anchor AS (
+            SELECT * FROM archive_anchor
+            UNION ALL
+            SELECT * FROM live_anchor
+        )
         SELECT t.season, t.gw, t.fixture, t.pulse_id, x.sdp_match_id, t.kickoff_time,
-               t.team_id, dt.team_code, t.opponent_team_id, dopp.team_code AS opponent_team_code,
+               t.team_id, t.team_code, t.opponent_team_id, t.opponent_team_code,
                t.was_home, '{PROVIDER}' AS provider, st.known_at
                {", " if metric_select else ""}{metric_select}
                {", " if mirror_select else ""}{mirror_select}
-        FROM mart_fact_team_match AS t
+        FROM anchor AS t
         JOIN stg_pl_sdp_fixture_crosswalk AS x
           ON x.season = t.season AND x.fixture = t.fixture
         JOIN sided AS st
@@ -257,9 +300,6 @@ def build_team_match_stats_sdp(con: duckdb.DuckDBPyConnection) -> int:
         LEFT JOIN sided AS opp
           ON opp.sdp_match_id = x.sdp_match_id
          AND opp.side = CASE WHEN t.was_home THEN 'away' ELSE 'home' END
-        LEFT JOIN mart_dim_team AS dt ON dt.season = t.season AND dt.team_id = t.team_id
-        LEFT JOIN mart_dim_team AS dopp
-               ON dopp.season = t.season AND dopp.team_id = t.opponent_team_id
         """
     )
     row = con.execute(

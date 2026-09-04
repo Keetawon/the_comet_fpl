@@ -1,8 +1,8 @@
 """Historical Premier League SDP backfill.
 
     python -m fpl.jobs.backfill_pl_sdp --season 2024-25
-    python -m fpl.jobs.backfill_pl_sdp --all-seasons --stats
-    python -m fpl.jobs.backfill_pl_sdp --season 2024-25 --refresh   # re-fetch, keeping history
+    python -m fpl.jobs.backfill_pl_sdp --all-seasons
+    python -m fpl.jobs.backfill_pl_sdp --season 2026-27 --limit-matches 2
 
 Requires network egress to the provider. Every host in the Pulselive / premierleague.com /
 fantasy.premierleague.com family is refused by some sandboxes' egress policy, in which case
@@ -20,11 +20,12 @@ import argparse
 import logging
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fpl.config import load_sources
 from fpl.ingest.fpl_api import EgressBlockedError
-from fpl.ingest.pl_sdp import PlSdpClient
+from fpl.ingest.pl_sdp import PlSdpClient, SdpMatchSummary, is_completed_scored_match
 from fpl.storage.db import initialise
 from fpl.transform import pl_sdp as sdp_transform
 
@@ -37,6 +38,7 @@ class BackfillReport:
     match_pages: int = 0
     matches_seen: int = 0
     stats_fetched: int = 0
+    stats_skipped: int = 0
     payloads_new: int = 0
     payloads_duplicate: int = 0
     requests: int = 0
@@ -52,6 +54,8 @@ def backfill(
     limit_matches: int | None = None,
 ) -> BackfillReport:
     """Fetch a season's matches, then optionally each match's team stats."""
+    if limit_matches is not None and limit_matches <= 0:
+        raise ValueError("limit_matches must be positive")
     sources = load_sources()
     if sources.pl_sdp is None:
         raise RuntimeError("config/sources.yaml carries no `pl_sdp` block")
@@ -60,6 +64,7 @@ def backfill(
     sdp = client or PlSdpClient(config=sources.pl_sdp)
     report = BackfillReport(seasons=tuple(seasons))
     failures: list[str] = []
+    moment = datetime.now(UTC)
     try:
         con = initialise(db_path)
         try:
@@ -68,20 +73,43 @@ def backfill(
                 # arbitrary season's matches under the wrong name.
                 season_id = sources.pl_sdp.season_id(season)
                 logger.info("season %s -> provider season id %d", season, season_id)
-                match_ids: list[int] = []
+                matches: list[SdpMatchSummary] = []
                 for raw, summaries in sdp.iter_matches(season_id=season_id):
                     _, is_new = sdp_transform.land_payload(con, raw, season=season)
                     report.match_pages += 1
                     report.payloads_new += int(is_new)
                     report.payloads_duplicate += int(not is_new)
-                    match_ids.extend(summary.match_id for summary in summaries)
-                unique_ids = sorted(set(match_ids))
+                    matches.extend(summaries)
+                unique_ids = sorted({summary.match_id for summary in matches})
                 report.matches_seen += len(unique_ids)
                 logger.info("season %s: %d matches", season, len(unique_ids))
 
                 if not fetch_stats:
                     continue
-                selected = unique_ids[:limit_matches] if limit_matches else unique_ids
+                completed_ids = sorted(
+                    {
+                        summary.match_id
+                        for summary in matches
+                        if is_completed_scored_match(summary, now=moment)
+                    }
+                )
+                retained_ids = {
+                    int(row[0])
+                    for row in con.execute(
+                        """
+                        SELECT DISTINCT sdp_match_id
+                        FROM raw_pl_sdp_payload
+                        WHERE provider = ? AND endpoint = 'match_stats' AND season = ?
+                          AND sdp_match_id IS NOT NULL
+                        """,
+                        [sdp_transform.PROVIDER, season],
+                    ).fetchall()
+                }
+                report.stats_skipped += len(set(completed_ids) & retained_ids)
+                pending_ids = [
+                    match_id for match_id in completed_ids if match_id not in retained_ids
+                ]
+                selected = pending_ids[:limit_matches] if limit_matches else pending_ids
                 for index, match_id in enumerate(selected, start=1):
                     try:
                         raw = sdp.fetch_match_stats(match_id)
@@ -153,15 +181,16 @@ def main(argv: list[str] | None = None) -> int:
             "premierleague.com is reachable; nothing was written."
         )
         return 3
-    except KeyError as error:
+    except (KeyError, ValueError) as error:
         logger.error("%s", error)
         return 2
 
     logger.info(
-        "seasons=%s matches=%d stats=%d payloads new=%d duplicate=%d requests=%d",
+        "seasons=%s matches=%d stats=%d skipped=%d payloads new=%d duplicate=%d requests=%d",
         ",".join(report.seasons),
         report.matches_seen,
         report.stats_fetched,
+        report.stats_skipped,
         report.payloads_new,
         report.payloads_duplicate,
         report.requests,

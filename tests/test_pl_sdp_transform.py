@@ -23,6 +23,10 @@ from fpl.transform.pl_sdp import SdpIdentityError
 
 FIXTURES = Path(__file__).parent / "fixtures" / "pl_sdp"
 KICKOFF = datetime(2025, 11, 25, 15, 0, tzinfo=UTC)
+LIVE_SEASON = "2026-27"
+LIVE_FIXTURE = 101
+LIVE_KICKOFF = datetime(2026, 8, 22, 14, 0, tzinfo=UTC)
+LIVE_SDP_SEASON_ID = 800
 
 
 def _fixture(name: str) -> Any:
@@ -87,9 +91,115 @@ def _stage_sdp_match(
     payload = _fixture("matches_page")
     payload["content"][0]["id"] = match_id
     payload["content"][0]["kickoff"] = {"millis": int(kickoff.timestamp() * 1000)}
+    payload["content"][0]["teams"][0]["team"]["id"] = 3
+    payload["content"][0]["teams"][1]["team"]["id"] = 8
     del payload["content"][1]
     sdp.land_payload(connection, _raw("matches", payload, season="2025-26"), season="2025-26")
     sdp.stage_matches(connection, season_labels={719: "2025-26"})
+
+
+def _seed_live_fixture_capture(
+    connection: duckdb.DuckDBPyConnection,
+    *,
+    capture_id: str,
+    known_at: datetime,
+    match_pulse_id: int,
+    kickoff: datetime,
+    home_score: int,
+    away_score: int,
+    home_team_pulse_id: int,
+    away_team_pulse_id: int,
+) -> None:
+    teams = (
+        (1, 3, "Arsenal", "ARS", home_team_pulse_id),
+        (4, 8, "Chelsea", "CHE", away_team_pulse_id),
+    )
+    for team_id, team_code, name, short_name, pulse_id in teams:
+        connection.execute(
+            """
+            INSERT INTO stg_live_team_version (
+                season, team_id, team_code, known_at, capture_id, team_name, short_name, pulse_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                LIVE_SEASON,
+                team_id,
+                team_code,
+                known_at,
+                capture_id,
+                name,
+                short_name,
+                pulse_id,
+            ],
+        )
+    connection.execute(
+        """
+        INSERT INTO stg_live_fixture_version (
+            season, fixture, known_at, capture_id, gw, kickoff_time, team_h, team_a,
+            team_h_score, team_a_score, finished, finished_provisional
+        ) VALUES (?, ?, ?, ?, 1, ?, 1, 4, ?, ?, TRUE, TRUE)
+        """,
+        [
+            LIVE_SEASON,
+            LIVE_FIXTURE,
+            known_at,
+            capture_id,
+            kickoff,
+            home_score,
+            away_score,
+        ],
+    )
+    for team_id, opponent_team_id, was_home in ((1, 4, True), (4, 1, False)):
+        connection.execute(
+            """
+            INSERT INTO mart_team_fixture_live (
+                season, gw, fixture, pulse_id, kickoff_time, team_id, opponent_team_id,
+                was_home, known_at, capture_id
+            ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                LIVE_SEASON,
+                LIVE_FIXTURE,
+                match_pulse_id,
+                kickoff,
+                team_id,
+                opponent_team_id,
+                was_home,
+                known_at,
+                capture_id,
+            ],
+        )
+
+
+def _stage_live_sdp_match(
+    connection: duckdb.DuckDBPyConnection,
+    *,
+    home_team_id: int = 3,
+    away_team_id: int = 8,
+    same_kickoff_distractor: bool = False,
+) -> None:
+    payload = _fixture("matches_page")
+    match = payload["content"][0]
+    match["season"] = {"id": LIVE_SDP_SEASON_ID, "label": "2026/27"}
+    match["matchweek"] = 1
+    match["kickoff"] = {"millis": int(LIVE_KICKOFF.timestamp() * 1000)}
+    match["teams"][0]["team"]["id"] = home_team_id
+    match["teams"][1]["team"]["id"] = away_team_id
+    match["score"] = {"homeScore": 2, "awayScore": 1}
+    if same_kickoff_distractor:
+        distractor = payload["content"][1]
+        distractor["season"] = {"id": LIVE_SDP_SEASON_ID, "label": "2026/27"}
+        distractor["matchweek"] = 1
+        distractor["kickoff"] = {"millis": int(LIVE_KICKOFF.timestamp() * 1000)}
+        distractor["score"] = {"homeScore": 2, "awayScore": 1}
+    else:
+        del payload["content"][1]
+    sdp.land_payload(
+        connection,
+        _raw("matches", payload, season=LIVE_SDP_SEASON_ID),
+        season=LIVE_SEASON,
+    )
+    sdp.stage_matches(connection, season_labels={LIVE_SDP_SEASON_ID: LIVE_SEASON})
 
 
 # -- landing ----------------------------------------------------------------------------
@@ -188,7 +298,123 @@ def test_a_match_with_no_resolvable_season_is_skipped_not_guessed(
     assert any("no resolvable season label" in failure for failure in report.schema_failures)
 
 
+def test_a_landed_season_that_disagrees_with_the_configured_mapping_is_skipped(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    payload = _fixture("matches_page")
+    del payload["content"][1]
+    sdp.land_payload(
+        con,
+        _raw("matches", payload, season=719),
+        season="2024-25",
+    )
+    report = sdp.stage_matches(con, season_labels={719: "2025-26"})
+    assert report.matches_staged == 0
+    assert con.execute("SELECT count(*) FROM stg_pl_sdp_match").fetchone() == (0,)
+    assert any("configured as '2025-26'" in failure for failure in report.schema_failures)
+
+
 # -- identity ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("nonpositive_pulse_id", [0, -1])
+def test_current_season_identity_uses_the_latest_coherent_live_capture(
+    con: duckdb.DuckDBPyConnection,
+    nonpositive_pulse_id: int,
+) -> None:
+    _seed_live_fixture_capture(
+        con,
+        capture_id="older",
+        known_at=LIVE_KICKOFF - timedelta(days=2),
+        match_pulse_id=999001,
+        kickoff=LIVE_KICKOFF - timedelta(days=7),
+        home_score=0,
+        away_score=0,
+        home_team_pulse_id=91,
+        away_team_pulse_id=94,
+    )
+    _seed_live_fixture_capture(
+        con,
+        capture_id="latest",
+        known_at=LIVE_KICKOFF + timedelta(hours=3),
+        match_pulse_id=nonpositive_pulse_id,
+        kickoff=LIVE_KICKOFF,
+        home_score=2,
+        away_score=1,
+        home_team_pulse_id=1,
+        away_team_pulse_id=4,
+    )
+    _stage_live_sdp_match(con)
+
+    audit = sdp.resolve_crosswalk(con, seasons=[LIVE_SEASON])
+    assert audit.fpl_fixtures == 1
+    assert audit.pulse_id_present == 0
+    assert audit.matched_by_pulse_id == 0
+    assert audit.matched_by_identity_fallback == 1
+    assert audit.kickoff_corroborated == 1
+    assert audit.score_corroborated == 1
+    assert audit.teams_corroborated == 1, "SDP teamId matches permanent team_code"
+    row = con.execute(
+        "SELECT season, fixture, sdp_match_id FROM stg_pl_sdp_fixture_crosswalk"
+    ).fetchone()
+    assert row == (LIVE_SEASON, LIVE_FIXTURE, 116001)
+
+
+def test_swapped_provider_team_ids_fail_closed_even_when_names_agree(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    _seed_live_fixture_capture(
+        con,
+        capture_id="latest",
+        known_at=LIVE_KICKOFF + timedelta(hours=3),
+        match_pulse_id=0,
+        kickoff=LIVE_KICKOFF,
+        home_score=2,
+        away_score=1,
+        home_team_pulse_id=8,
+        away_team_pulse_id=3,
+    )
+    _stage_live_sdp_match(con, home_team_id=8, away_team_id=3)
+
+    audit = sdp.resolve_crosswalk(
+        con,
+        seasons=[LIVE_SEASON],
+        team_name_codes=sdp.team_name_code_map(con),
+        strict=False,
+    )
+    assert audit.teams_corroborated == 0
+    assert audit.matched_by_pulse_id == 0
+    assert audit.unmatched_fpl_fixtures == 1
+    assert any(
+        "SDP teamId 8/3, FPL permanent team_code 3/8" in contradiction
+        for contradiction in audit.contradictions
+    )
+    assert con.execute("SELECT count(*) FROM stg_pl_sdp_fixture_crosswalk").fetchone() == (0,)
+
+
+def test_kickoff_fallback_narrows_simultaneous_matches_by_permanent_team_code(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    _seed_live_fixture_capture(
+        con,
+        capture_id="latest",
+        known_at=LIVE_KICKOFF + timedelta(hours=3),
+        match_pulse_id=0,
+        kickoff=LIVE_KICKOFF,
+        home_score=2,
+        away_score=1,
+        home_team_pulse_id=1,
+        away_team_pulse_id=4,
+    )
+    _stage_live_sdp_match(con, same_kickoff_distractor=True)
+
+    audit = sdp.resolve_crosswalk(con, seasons=[LIVE_SEASON])
+
+    assert audit.matched_by_identity_fallback == 1
+    assert audit.ambiguities == []
+    assert con.execute("SELECT sdp_match_id FROM stg_pl_sdp_fixture_crosswalk").fetchone() == (
+        116001,
+    )
 
 
 def test_pulse_id_match_is_measured_and_corroborated(con: duckdb.DuckDBPyConnection) -> None:
@@ -234,6 +460,93 @@ def test_a_contradiction_is_recorded_when_failures_are_allowed(
     audit = sdp.resolve_crosswalk(con, strict=False)
     assert audit.contradictions
     assert "score" in audit.contradictions[0]
+    assert audit.matched_by_pulse_id == 0
+    assert audit.matched_by_identity_fallback == 0
+    assert audit.unmatched_fpl_fixtures == 1
+    assert con.execute("SELECT count(*) FROM stg_pl_sdp_fixture_crosswalk").fetchone() == (0,)
+
+
+@pytest.mark.parametrize(
+    ("fixture_season", "sdp_kickoff", "home_score", "away_score", "kind"),
+    [
+        ("2024-25", KICKOFF, 2, 1, "season"),
+        ("2025-26", KICKOFF + timedelta(days=1), 2, 1, "kickoff"),
+        ("2025-26", KICKOFF, 5, 0, "score"),
+    ],
+)
+def test_a_pulse_id_contradiction_never_maps_through_the_identity_fallback(
+    con: duckdb.DuckDBPyConnection,
+    fixture_season: str,
+    sdp_kickoff: datetime,
+    home_score: int,
+    away_score: int,
+    kind: str,
+) -> None:
+    _seed_fpl_fixture(
+        con,
+        season=fixture_season,
+        home_score=home_score,
+        away_score=away_score,
+    )
+    _stage_sdp_match(con, kickoff=sdp_kickoff)
+    audit = sdp.resolve_crosswalk(con, strict=False)
+    assert any(kind in contradiction for contradiction in audit.contradictions)
+    assert audit.matched_by_pulse_id == 0
+    assert audit.matched_by_identity_fallback == 0
+    assert audit.unmatched_fpl_fixtures == 1
+    assert con.execute("SELECT count(*) FROM stg_pl_sdp_fixture_crosswalk").fetchone() == (0,)
+
+
+def test_a_home_away_team_disagreement_is_a_contradiction_and_is_not_mapped(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    _seed_fpl_fixture(con)
+    payload = _fixture("matches_page")
+    payload["content"][0]["teams"][0]["team"]["name"] = "Chelsea"
+    payload["content"][0]["teams"][1]["team"]["name"] = "Arsenal"
+    del payload["content"][1]
+    sdp.land_payload(con, _raw("matches", payload, season=719), season="2025-26")
+    sdp.stage_matches(con, season_labels={719: "2025-26"})
+
+    audit = sdp.resolve_crosswalk(
+        con,
+        team_name_codes=sdp.team_name_code_map(con),
+        strict=False,
+    )
+    assert any("home/away team identities" in item for item in audit.contradictions)
+    assert audit.matched_by_pulse_id == 0
+    assert audit.unmatched_fpl_fixtures == 1
+    assert con.execute("SELECT count(*) FROM stg_pl_sdp_fixture_crosswalk").fetchone() == (0,)
+
+
+def test_resolving_one_season_preserves_other_seasons_crosswalk_rows(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    _seed_fpl_fixture(con)
+    _stage_sdp_match(con)
+    con.execute(
+        """
+        INSERT INTO stg_pl_sdp_fixture_crosswalk (
+            season, fixture, sdp_match_id, match_method, pulse_id,
+            corroborated_kickoff, corroborated_teams, corroborated_score, resolved_at
+        ) VALUES ('2024-25', 99, 900001, 'pulse_id', 900001, TRUE, TRUE, TRUE, ?)
+        """,
+        [KICKOFF],
+    )
+
+    sdp.resolve_crosswalk(
+        con,
+        seasons=["2025-26"],
+        team_name_codes=sdp.team_name_code_map(con),
+    )
+    rows = con.execute(
+        """
+        SELECT season, fixture, sdp_match_id
+        FROM stg_pl_sdp_fixture_crosswalk
+        ORDER BY season, fixture
+        """
+    ).fetchall()
+    assert rows == [("2024-25", 99, 900001), ("2025-26", 7, 116001)]
 
 
 def test_two_candidates_at_the_same_kickoff_are_ambiguous_not_guessed(

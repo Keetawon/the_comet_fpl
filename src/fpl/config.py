@@ -336,10 +336,10 @@ class DefensiveActionsDump(_Frozen):
 class PlSdpSource(_Frozen):
     """Premier League SDP: the undocumented JSON backend behind premierleague.com.
 
-    Every field here is an assumption until a real payload has been observed. The design
-    consequence is that nothing may be inferred silently: `season_ids` starts empty and an
-    unmapped season label is *refused* rather than fetched under a guessed provider id,
-    because fetching the wrong year and labelling it correctly is worse than fetching nothing.
+    Provider spellings and ids remain evidence-controlled because this is not a published API.
+    Nothing may be inferred silently: an unmapped season label is *refused* rather than fetched
+    under a guessed provider id, because fetching the wrong year and labelling it correctly is
+    worse than fetching nothing.
     """
 
     base_url: str
@@ -363,9 +363,10 @@ class PlSdpSource(_Frozen):
             return self.season_ids[season]
         except KeyError:
             raise KeyError(
-                f"no pl_sdp season id mapped for {season!r}. Run "
-                "`python -m fpl.jobs.audit_pl_sdp --probe` where the provider is reachable "
-                "and record the mapping under `pl_sdp.season_ids` in config/sources.yaml. "
+                f"no pl_sdp season id mapped for {season!r}. Verify the provider id from a real "
+                "Premier League match response, optionally with `python -m "
+                "fpl.jobs.audit_pl_sdp --probe --probe-season-id ID`, and record the corroborated "
+                "mapping under `pl_sdp.season_ids` in config/sources.yaml. "
                 "Guessing a provider season id would silently ingest the wrong season."
             ) from None
 

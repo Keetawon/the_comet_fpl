@@ -238,6 +238,114 @@ def test_the_layer_degrades_rather_than_failing_on_a_legacy_database(
         connection.close()
 
 
+# -- the live SDP provider ---------------------------------------------------------------
+
+
+def test_current_live_fixture_anchors_sdp_team_stats_and_tactical_form(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    """The archive team mart stops at completed seasons; live fixtures must anchor SDP rows."""
+    season = "2026-27"
+    fixture = 201
+    match_id = 2645195
+    capture_id = "live-capture"
+    known_at = datetime(2026, 8, 20, 6, tzinfo=UTC)
+    kickoff = datetime(2026, 8, 21, 20, tzinfo=UTC)
+    stats_known_at = datetime(2026, 8, 22, 1, tzinfo=UTC)
+
+    con.executemany(
+        """
+        INSERT INTO stg_live_team_version (
+            season, team_id, team_code, known_at, capture_id, team_name, short_name, pulse_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (season, 1, 3, known_at, capture_id, "Arsenal", "ARS", 1),
+            (season, 4, 8, known_at, capture_id, "Chelsea", "CHE", 4),
+        ],
+    )
+    con.executemany(
+        """
+        INSERT INTO mart_team_fixture_live (
+            season, gw, fixture, pulse_id, kickoff_time, team_id, opponent_team_id,
+            was_home, known_at, capture_id
+        ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (season, fixture, match_id, kickoff, 1, 4, True, known_at, capture_id),
+            (season, fixture, match_id, kickoff, 4, 1, False, known_at, capture_id),
+        ],
+    )
+    con.execute(
+        """
+        INSERT INTO stg_pl_sdp_fixture_crosswalk (
+            season, fixture, sdp_match_id, match_method, pulse_id,
+            corroborated_kickoff, corroborated_teams, corroborated_score, resolved_at
+        ) VALUES (?, ?, ?, 'pulse_id', ?, TRUE, TRUE, TRUE, ?)
+        """,
+        [season, fixture, match_id, match_id, stats_known_at],
+    )
+    con.executemany(
+        """
+        INSERT INTO stg_pl_sdp_team_match_stats (
+            sdp_match_id, side, payload_id, known_at, sdp_team_id, team_name,
+            stats_json, metric_count, mapped_count, expected_goals, shots, shots_on_target
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 3, 3, ?, ?, ?)
+        """,
+        [
+            (
+                match_id,
+                "home",
+                "stats-home",
+                stats_known_at,
+                1,
+                "Arsenal",
+                '{"expectedGoals": 1.8, "totalScoringAtt": 12, "ontargetScoringAtt": 6}',
+                1.8,
+                12,
+                6,
+            ),
+            (
+                match_id,
+                "away",
+                "stats-away",
+                stats_known_at,
+                4,
+                "Chelsea",
+                '{"expectedGoals": 0.7, "totalScoringAtt": 8, "ontargetScoringAtt": 2}',
+                0.7,
+                8,
+                2,
+            ),
+        ],
+    )
+
+    assert con.execute("SELECT count(*) FROM mart_fact_team_match").fetchone() == (0,)
+    assert football_v2.build_team_match_stats_sdp(con) == 2
+    home = con.execute(
+        """
+        SELECT season, gw, fixture, team_id, team_code, opponent_team_id,
+               opponent_team_code, expected_goals, expected_goals_allowed,
+               shots, shots_on_target
+        FROM mart_fact_team_match_stats_v2
+        WHERE provider = 'pl_sdp' AND was_home
+        """
+    ).fetchone()
+    assert home == (season, 1, fixture, 1, 3, 4, 8, 1.8, 0.7, 12, 6)
+
+    assert football_v2.build_team_tactical_form(con) == 8
+    form = con.execute(
+        """
+        SELECT matches, expected_goals_per_match, shot_accuracy
+        FROM mart_fact_team_tactical_form_v2
+        WHERE season = ? AND team_code = 3 AND provider = 'pl_sdp'
+          AND gw = 1 AND "window" = 'season_to_date'
+        """,
+        [season],
+    ).fetchone()
+    assert form == pytest.approx((1, 1.8, 0.5))
+
+
 # -- tactical form -------------------------------------------------------------------------
 
 

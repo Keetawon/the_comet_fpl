@@ -27,9 +27,10 @@ from pathlib import Path
 from typing import Any
 
 from fpl.config import load_sdp_metrics, load_sources, repo_root
-from fpl.ingest.fpl_api import EgressBlockedError
-from fpl.ingest.pl_sdp import PlSdpClient, extract_items, parse_match_summary
+from fpl.ingest.fpl_api import ApiResponseError, EgressBlockedError
+from fpl.ingest.pl_sdp import PlSdpClient, SdpSchemaError, extract_items, parse_match_summary
 from fpl.storage.db import connect, initialise, table_exists
+from fpl.transform import football_v2
 from fpl.transform import pl_sdp as sdp_transform
 
 logger = logging.getLogger("fpl.audit_pl_sdp")
@@ -38,6 +39,7 @@ RESULTS_DIR = "results"
 IDENTITY_REPORT = "pl_sdp_identity_audit.json"
 COVERAGE_REPORT = "pl_sdp_coverage.json"
 RECONCILIATION_REPORT = "pl_sdp_reconciliation.json"
+METRIC_INVENTORY_REPORT = "pl_sdp_metric_inventory.json"
 
 
 def _write(path: Path, payload: dict[str, Any]) -> None:
@@ -93,22 +95,19 @@ def build_coverage(con: Any) -> dict[str, Any]:
     if not populations:
         return report
 
-    expected = {
-        (str(season),): (int(rows), int(fixtures))
-        for season, rows, fixtures in con.execute(
-            """
-            SELECT season, count(*), count(DISTINCT fixture)
-            FROM mart_fact_team_match GROUP BY season
-            """
-        ).fetchall()
-    }
+    expected_fixtures_by_season: dict[str, int] = {}
+    for fixture in sdp_transform._fixture_identities(con, None):
+        expected_fixtures_by_season[fixture.season] = (
+            expected_fixtures_by_season.get(fixture.season, 0) + 1
+        )
 
     fields = [metric.local_field for metric in dictionary.all_fields()]
     mirrors = list(dictionary.mirror_fields().values())
     columns = [*fields, *mirrors]
     for provider, season, team_rows, fixtures, first_kickoff, last_kickoff in populations:
         provider_block = report["providers"].setdefault(str(provider), {})
-        expected_rows, expected_fixtures = expected.get((str(season),), (0, 0))
+        expected_fixtures = expected_fixtures_by_season.get(str(season), 0)
+        expected_rows = 2 * expected_fixtures
         season_block: dict[str, Any] = {
             "team_rows_available": int(team_rows),
             "team_rows_expected": expected_rows,
@@ -120,7 +119,9 @@ def build_coverage(con: Any) -> dict[str, Any]:
         }
         selects = ", ".join(
             f'count("{column}") AS n_{index}, min("{column}") AS lo_{index}, '
-            f'max("{column}") AS hi_{index}, avg("{column}") AS mu_{index}'
+            f'max("{column}") AS hi_{index}, avg("{column}") AS mu_{index}, '
+            f'min(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END) AS first_{index}, '
+            f'max(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END) AS last_{index}'
             for index, column in enumerate(columns)
         )
         row = con.execute(
@@ -133,16 +134,23 @@ def build_coverage(con: Any) -> dict[str, Any]:
         assert row is not None
         declared = dictionary.by_local_field()
         for index, column in enumerate(columns):
-            non_null, low, high, average = row[index * 4 : index * 4 + 4]
+            non_null, low, high, average, first_measured, last_measured = row[
+                index * 6 : index * 6 + 6
+            ]
             metric = declared.get(column)
             season_block["metrics"][column] = {
                 "non_null": int(non_null),
                 "coverage_pct": (
                     round(100.0 * int(non_null) / int(team_rows), 4) if team_rows else 0.0
                 ),
+                "coverage_pct_expected": (
+                    round(100.0 * int(non_null) / expected_rows, 4) if expected_rows else None
+                ),
                 "min": low,
                 "max": high,
                 "mean": round(float(average), 6) if average is not None else None,
+                "first_measured_kickoff": first_measured,
+                "last_measured_kickoff": last_measured,
                 "group": metric.group if metric is not None else "mirror",
                 "verified_semantics": (metric.verified_semantics if metric is not None else False),
                 "definition": (
@@ -158,6 +166,104 @@ def build_coverage(con: Any) -> dict[str, Any]:
 # --------------------------------------------------------------------------------------
 
 
+def _quantile(values: list[float], probability: float) -> float:
+    """Linear-interpolated quantile for the small audit populations."""
+    if not values:
+        raise ValueError("a quantile requires at least one value")
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * probability
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+def _difference_summary(values: list[float]) -> dict[str, Any]:
+    if not values:
+        return {
+            "rows": 0,
+            "mean": None,
+            "mean_absolute": None,
+            "quantiles": {},
+        }
+    quantiles = {
+        label: round(float(_quantile(values, probability)), 6)
+        for label, probability in (
+            ("p00", 0.0),
+            ("p10", 0.1),
+            ("p25", 0.25),
+            ("p50", 0.5),
+            ("p75", 0.75),
+            ("p90", 0.9),
+            ("p100", 1.0),
+        )
+    }
+    return {
+        "rows": len(values),
+        "mean": round(sum(values) / len(values), 6),
+        "mean_absolute": round(sum(abs(value) for value in values) / len(values), 6),
+        "quantiles": quantiles,
+    }
+
+
+def _score_reconciliation(con: Any) -> dict[str, Any]:
+    if not (
+        table_exists(con, "stg_pl_sdp_fixture_crosswalk") and table_exists(con, "stg_pl_sdp_match")
+    ):
+        return {"rows_compared": 0, "note": "required identity tables are unavailable"}
+    provider_rows = con.execute(
+        """
+        WITH latest_match AS (
+            SELECT * EXCLUDE (ordinal)
+            FROM (
+                SELECT *, row_number() OVER (
+                    PARTITION BY sdp_match_id ORDER BY known_at DESC, payload_id DESC
+                ) AS ordinal
+                FROM stg_pl_sdp_match
+            )
+            WHERE ordinal = 1
+        )
+        SELECT c.season, c.fixture, c.sdp_match_id, m.home_score, m.away_score
+        FROM stg_pl_sdp_fixture_crosswalk AS c
+        JOIN latest_match AS m ON m.sdp_match_id = c.sdp_match_id
+        WHERE m.home_score IS NOT NULL AND m.away_score IS NOT NULL
+        ORDER BY c.season, c.fixture
+        """
+    ).fetchall()
+    fixtures = {
+        (fixture.season, fixture.fixture): fixture
+        for fixture in sdp_transform._fixture_identities(con, None)
+    }
+    rows = [
+        (*row, fixture.home_score, fixture.away_score)
+        for row in provider_rows
+        if (fixture := fixtures.get((str(row[0]), int(row[1])))) is not None
+        and fixture.home_score is not None
+        and fixture.away_score is not None
+    ]
+    mismatches = [
+        {
+            "season": str(season),
+            "fixture": int(fixture),
+            "sdp_match_id": int(match_id),
+            "sdp_score": f"{int(sdp_home)}-{int(sdp_away)}",
+            "fpl_score": f"{int(fpl_home)}-{int(fpl_away)}",
+        }
+        for season, fixture, match_id, sdp_home, sdp_away, fpl_home, fpl_away in rows
+        if (sdp_home, sdp_away) != (fpl_home, fpl_away)
+    ]
+    home_differences = [float(row[3] - row[5]) for row in rows]
+    away_differences = [float(row[4] - row[6]) for row in rows]
+    return {
+        "rows_compared": len(rows),
+        "exact_agreements": len(rows) - len(mismatches),
+        "match_rate": None if not rows else (len(rows) - len(mismatches)) / len(rows),
+        "home_goal_difference": _difference_summary(home_differences),
+        "away_goal_difference": _difference_summary(away_differences),
+        "exceptions": mismatches,
+    }
+
+
 def build_reconciliation(con: Any) -> dict[str, Any]:
     """SDP values against the FPL-derived values of the same quantity, on identical rows.
 
@@ -168,9 +274,10 @@ def build_reconciliation(con: Any) -> dict[str, Any]:
     """
     generated_at = datetime.now(UTC)
     report: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": generated_at,
         "note": "differences are reported, never reconciled away; both values are retained",
+        "score": _score_reconciliation(con),
         "comparisons": [],
         "crosswalk": {},
     }
@@ -194,36 +301,55 @@ def build_reconciliation(con: Any) -> dict[str, Any]:
         ),
     ]
     for label, sdp_column, archive_column in pairs:
-        row = con.execute(
+        rows = con.execute(
             f"""
-            SELECT count(*) AS rows_compared,
-                   avg(s."{sdp_column}") AS sdp_mean,
-                   avg(a."{archive_column}") AS archive_mean,
-                   avg(s."{sdp_column}" - a."{archive_column}") AS mean_difference,
-                   max(abs(s."{sdp_column}" - a."{archive_column}")) AS max_absolute_difference,
-                   sum(CASE WHEN s."{sdp_column}" = a."{archive_column}" THEN 1 ELSE 0 END)
-                       AS exact_agreements
+            SELECT s.season, s.fixture, s.team_id,
+                   s."{sdp_column}", a."{archive_column}",
+                   s."{sdp_column}" - a."{archive_column}" AS difference
             FROM mart_fact_team_match_stats_v2 AS s
             JOIN mart_fact_team_match_stats_v2 AS a
               ON a.season = s.season AND a.fixture = s.fixture AND a.team_id = s.team_id
              AND a.provider = ?
             WHERE s.provider = ? AND s."{sdp_column}" IS NOT NULL
               AND a."{archive_column}" IS NOT NULL
+            ORDER BY s.season, s.fixture, s.team_id
             """,
             [sdp_transform.ARCHIVE_PROVIDER, sdp_transform.PROVIDER],
-        ).fetchone()
-        assert row is not None
+        ).fetchall()
+        differences = [float(row[5]) for row in rows]
+        by_season: dict[str, list[float]] = {}
+        for row in rows:
+            by_season.setdefault(str(row[0]), []).append(float(row[5]))
+        notable = sorted(rows, key=lambda row: abs(float(row[5])), reverse=True)[:10]
         report["comparisons"].append(
             {
                 "label": label,
                 "sdp_column": sdp_column,
                 "archive_column": archive_column,
-                "rows_compared": int(row[0]),
-                "sdp_mean": None if row[1] is None else round(float(row[1]), 6),
-                "archive_mean": None if row[2] is None else round(float(row[2]), 6),
-                "mean_difference": None if row[3] is None else round(float(row[3]), 6),
-                "max_absolute_difference": None if row[4] is None else round(float(row[4]), 6),
-                "exact_agreements": int(row[5] or 0),
+                "rows_compared": len(rows),
+                "sdp_mean": (
+                    None if not rows else round(sum(float(row[3]) for row in rows) / len(rows), 6)
+                ),
+                "archive_mean": (
+                    None if not rows else round(sum(float(row[4]) for row in rows) / len(rows), 6)
+                ),
+                "exact_agreements": sum(row[3] == row[4] for row in rows),
+                "difference": _difference_summary(differences),
+                "by_season": {
+                    season: _difference_summary(season_values)
+                    for season, season_values in sorted(by_season.items())
+                },
+                "largest_absolute_differences": [
+                    {
+                        "season": str(row[0]),
+                        "fixture": int(row[1]),
+                        "team_id": int(row[2]),
+                        "sdp_value": float(row[3]),
+                        "archive_value": float(row[4]),
+                        "difference": float(row[5]),
+                    }
+                    for row in notable
+                ],
             }
         )
 
@@ -250,6 +376,207 @@ def build_reconciliation(con: Any) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------------------
+# Provider-field inventory
+# --------------------------------------------------------------------------------------
+
+
+def build_metric_inventory(con: Any) -> dict[str, Any]:
+    """Enumerate every latest provider field, including unmapped numeric fields."""
+    dictionary = load_sdp_metrics()
+    report: dict[str, Any] = {
+        "schema_version": 1,
+        "generated_at": datetime.now(UTC),
+        "metric_dictionary_version": dictionary.schema_version,
+        "note": (
+            "Observed field names and values are provider evidence. A mapping's semantic "
+            "verification remains controlled by config/pl_sdp_metrics.yaml."
+        ),
+        "provider_fields": [],
+        "unmapped_numeric_fields": [],
+    }
+    if not table_exists(con, "stg_pl_sdp_team_match_metric"):
+        report["warning"] = "stg_pl_sdp_team_match_metric does not exist"
+        return report
+    rows = con.execute(
+        """
+        WITH latest_stats AS (
+            SELECT * EXCLUDE (ordinal)
+            FROM (
+                SELECT *, row_number() OVER (
+                    PARTITION BY sdp_match_id, side
+                    ORDER BY known_at DESC, payload_id DESC
+                ) AS ordinal
+                FROM stg_pl_sdp_team_match_stats
+            )
+            WHERE ordinal = 1
+        ), latest AS (
+            SELECT m.*, s.known_at
+            FROM stg_pl_sdp_team_match_metric AS m
+            JOIN latest_stats AS s
+              ON s.sdp_match_id = m.sdp_match_id AND s.side = m.side
+             AND s.payload_id = m.payload_id
+        )
+        SELECT provider_field, min(local_field) AS local_field,
+               count(*) AS team_sides, count(DISTINCT sdp_match_id) AS matches,
+               count(value_numeric) AS numeric_values, count(value_text) AS text_values,
+               first(value_numeric ORDER BY known_at DESC)
+                   FILTER (WHERE value_numeric IS NOT NULL) AS example_numeric,
+               first(value_text ORDER BY known_at DESC)
+                   FILTER (WHERE value_text IS NOT NULL) AS example_text
+        FROM latest
+        GROUP BY provider_field
+        ORDER BY provider_field
+        """
+    ).fetchall()
+    declared = dictionary.by_local_field()
+    fields: list[dict[str, Any]] = []
+    unmapped: list[dict[str, Any]] = []
+    for (
+        provider_field,
+        local_field,
+        team_sides,
+        matches,
+        numeric_values,
+        text_values,
+        example_numeric,
+        example_text,
+    ) in rows:
+        metric = declared.get(str(local_field)) if local_field is not None else None
+        example_value = example_numeric if example_numeric is not None else example_text
+        field = {
+            "provider_field": str(provider_field),
+            "example_value": example_value,
+            "mapped_local_field": None if local_field is None else str(local_field),
+            "verified_semantics": metric.verified_semantics if metric is not None else False,
+            "reason": metric.description if metric is not None else "no local mapping declared",
+            "evidence": (
+                f"observed on {int(team_sides)} latest team-side rows across "
+                f"{int(matches)} match(es)"
+            ),
+            "notes": (
+                "semantic meaning verified under the metric dictionary contract"
+                if metric is not None and metric.verified_semantics
+                else "field existence is verified; semantic meaning remains unverified"
+            ),
+            "numeric_values": int(numeric_values),
+            "text_values": int(text_values),
+        }
+        fields.append(field)
+        if local_field is None and int(numeric_values) > 0:
+            unmapped.append(
+                {
+                    "provider_field": str(provider_field),
+                    "example_value": example_numeric,
+                    "numeric_values": int(numeric_values),
+                    "matches": int(matches),
+                }
+            )
+    report["provider_fields"] = fields
+    report["unmapped_numeric_fields"] = unmapped
+    report["summary"] = {
+        "provider_fields": len(fields),
+        "mapped_fields": sum(field["mapped_local_field"] is not None for field in fields),
+        "unmapped_numeric_fields": len(unmapped),
+    }
+    return report
+
+
+def build_identity_details(con: Any) -> dict[str, Any]:
+    """Concrete unmatched and agreement rows to accompany aggregate identity counts."""
+    if not (
+        table_exists(con, "stg_fixture")
+        and table_exists(con, "stg_pl_sdp_match")
+        and table_exists(con, "stg_pl_sdp_fixture_crosswalk")
+    ):
+        return {}
+    resolved = con.execute(
+        """
+        SELECT count(*),
+               sum(CASE WHEN match_method = ? THEN 1 ELSE 0 END),
+               sum(CASE WHEN corroborated_kickoff IS TRUE THEN 1 ELSE 0 END),
+               sum(CASE WHEN corroborated_teams IS TRUE THEN 1 ELSE 0 END),
+               sum(CASE WHEN corroborated_score IS TRUE THEN 1 ELSE 0 END)
+        FROM stg_pl_sdp_fixture_crosswalk
+        """,
+        [sdp_transform.MATCH_METHOD_PULSE_ID],
+    ).fetchone()
+    assert resolved is not None
+    resolved_keys = {
+        (str(season), int(fixture))
+        for season, fixture in con.execute(
+            "SELECT season, fixture FROM stg_pl_sdp_fixture_crosswalk"
+        ).fetchall()
+    }
+    unmatched_fpl = [
+        fixture
+        for fixture in sdp_transform._fixture_identities(con, None)
+        if (fixture.season, fixture.fixture) not in resolved_keys
+    ]
+    unmatched_sdp = con.execute(
+        """
+        WITH latest AS (
+            SELECT * EXCLUDE (ordinal)
+            FROM (
+                SELECT *, row_number() OVER (
+                    PARTITION BY sdp_match_id ORDER BY known_at DESC, payload_id DESC
+                ) AS ordinal
+                FROM stg_pl_sdp_match
+            )
+            WHERE ordinal = 1
+        )
+        SELECT m.season, m.sdp_match_id, m.kickoff_time,
+               m.home_team_name, m.away_team_name, m.home_score, m.away_score
+        FROM latest AS m
+        LEFT JOIN stg_pl_sdp_fixture_crosswalk AS c ON c.sdp_match_id = m.sdp_match_id
+        WHERE c.sdp_match_id IS NULL
+        ORDER BY m.season, m.sdp_match_id
+        """
+    ).fetchall()
+    duplicates = con.execute(
+        """
+        SELECT sdp_match_id, count(*)
+        FROM stg_pl_sdp_fixture_crosswalk
+        GROUP BY sdp_match_id HAVING count(*) > 1
+        ORDER BY sdp_match_id
+        """
+    ).fetchall()
+    return {
+        "resolved_fixtures": int(resolved[0]),
+        "valid_pulse_id_resolutions": int(resolved[1] or 0),
+        "kickoff_agreements": int(resolved[2] or 0),
+        "home_away_agreements": int(resolved[3] or 0),
+        "score_agreements": int(resolved[4] or 0),
+        "duplicate_sdp_claims": [
+            {"sdp_match_id": int(match_id), "claims": int(count)} for match_id, count in duplicates
+        ],
+        "unmatched_fpl": [
+            {
+                "season": fixture.season,
+                "fixture": fixture.fixture,
+                "pulse_id": fixture.pulse_id,
+                "kickoff": fixture.kickoff_time,
+            }
+            for fixture in unmatched_fpl
+        ],
+        "unmatched_sdp": [
+            {
+                "season": str(season),
+                "sdp_match_id": int(match_id),
+                "kickoff": kickoff,
+                "home": home,
+                "away": away,
+                "score": (
+                    None
+                    if home_score is None or away_score is None
+                    else f"{int(home_score)}-{int(away_score)}"
+                ),
+            }
+            for season, match_id, kickoff, home, away, home_score, away_score in unmatched_sdp
+        ],
+    }
+
+
+# --------------------------------------------------------------------------------------
 # Season-id probe (the one mode that needs the network)
 # --------------------------------------------------------------------------------------
 
@@ -260,10 +587,10 @@ def probe_season_ids(
     """Discover which provider season id corresponds to which season label.
 
     The mapping is not documented anywhere and this repository refuses to guess it, so the
-    provider is asked. Two routes are tried in order: the configured `seasons` endpoint, and
-    -- if that is absent or unrecognisable -- probing candidate ids and inferring the label
-    from the earliest kickoff a season's matches carry. A season starting in August of year Y
-    is labelled `Y-(Y+1)`, which is the FPL archive's own convention.
+    provider is asked. The configured `seasons` route is tried first. If the provider disables
+    that route, only explicitly supplied or already configured ids are verified against real
+    Premier League match identities. The broad configured numeric range is deliberately never
+    swept: a blocked/disabled route must not become hundreds of guessed requests.
     """
     sources = load_sources()
     if sources.pl_sdp is None:
@@ -273,6 +600,7 @@ def probe_season_ids(
     discovered: dict[str, int] = {}
     notes: list[str] = []
     try:
+        seasons_error: Exception | None = None
         try:
             raw = sdp.fetch_seasons()
             for record in extract_items(raw.payload):
@@ -280,33 +608,83 @@ def probe_season_ids(
                     continue
                 identifier = record.get("id") or record.get("seasonId")
                 label = record.get("label") or record.get("name") or record.get("season")
-                if isinstance(identifier, int) and isinstance(label, str):
-                    discovered[_normalise_season_label(label)] = identifier
+                if isinstance(identifier, bool) or not isinstance(identifier, (int, str)):
+                    continue
+                try:
+                    numeric_identifier = int(identifier)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(label, str):
+                    discovered[_normalise_season_label(label)] = numeric_identifier
             notes.append(f"seasons endpoint returned {len(discovered)} labelled season(s)")
-        except Exception as error:
-            notes.append(f"seasons endpoint unusable ({error}); falling back to id probing")
+        except EgressBlockedError:
+            raise
+        except (ApiResponseError, SdpSchemaError) as error:
+            seasons_error = error
+            notes.append(f"seasons endpoint unusable ({error})")
 
         if not discovered:
-            pool = candidates or list(
-                range(
-                    sources.pl_sdp.probe_season_id_minimum,
-                    sources.pl_sdp.probe_season_id_maximum + 1,
-                )
-            )
+            configured = sorted(set(sources.pl_sdp.season_ids.values()))
+            pool = sorted(set(candidates if candidates is not None else configured))
+            if not pool:
+                raise ApiResponseError(
+                    "seasons endpoint returned no usable catalogue and no explicit/configured "
+                    "season ids are available; refusing to scan the numeric id range"
+                ) from seasons_error
+            configured_labels = {
+                identifier: label for label, identifier in sources.pl_sdp.season_ids.items()
+            }
             for season_id in pool:
-                try:
-                    raw = sdp.fetch_matches_page(season_id=season_id, page=0)
-                    summaries = [
-                        parse_match_summary(record) for record in extract_items(raw.payload)
-                    ]
-                except Exception:
-                    continue
+                raw = sdp.fetch_matches_page(season_id=season_id, page=0)
+                records = extract_items(raw.payload)
+                summaries = [parse_match_summary(record) for record in records]
                 kickoffs = [s.kickoff for s in summaries if s.kickoff is not None]
                 if not kickoffs:
-                    continue
+                    raise ApiResponseError(
+                        f"provider season id {season_id} returned no match kickoff to verify"
+                    )
+                for record in records:
+                    if not isinstance(record, dict):
+                        continue
+                    competition_id = record.get("competitionId")
+                    competition_name = record.get("competition")
+                    if competition_id is not None and str(competition_id) != str(
+                        sources.pl_sdp.competition
+                    ):
+                        raise ApiResponseError(
+                            f"provider season id {season_id} returned competitionId "
+                            f"{competition_id!r}, expected {sources.pl_sdp.competition}"
+                        )
+                    if competition_name is not None and str(competition_name) != "Premier League":
+                        raise ApiResponseError(
+                            f"provider season id {season_id} returned competition "
+                            f"{competition_name!r}, expected 'Premier League'"
+                        )
+                    reported_season = record.get("season")
+                    if reported_season is not None and str(reported_season) != str(season_id):
+                        raise ApiResponseError(
+                            f"provider query season {season_id} returned season {reported_season!r}"
+                        )
                 first = min(kickoffs)
                 start_year = first.year if first.month >= 7 else first.year - 1
-                discovered[f"{start_year}-{str(start_year + 1)[2:]}"] = season_id
+                inferred_label = f"{start_year}-{str(start_year + 1)[2:]}"
+                configured_label = configured_labels.get(season_id)
+                if configured_label is not None and configured_label != inferred_label:
+                    raise ApiResponseError(
+                        f"configured {configured_label} -> {season_id}, but the provider's "
+                        f"earliest returned kickoff implies {inferred_label}"
+                    )
+                if inferred_label in discovered and discovered[inferred_label] != season_id:
+                    raise ApiResponseError(
+                        f"provider ids {discovered[inferred_label]} and {season_id} both imply "
+                        f"season label {inferred_label}; refusing an ambiguous mapping"
+                    )
+                discovered[inferred_label] = season_id
+                sample = summaries[0]
+                notes.append(
+                    f"verified {inferred_label} -> {season_id} from Premier League match "
+                    f"{sample.match_id} at {sample.kickoff}"
+                )
     finally:
         if owned:
             sdp.close()
@@ -335,6 +713,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stage", action="store_true", help="restage from raw before auditing")
     parser.add_argument("--probe", action="store_true", help="discover season ids (needs network)")
     parser.add_argument(
+        "--probe-season-id",
+        action="append",
+        type=int,
+        default=None,
+        help=(
+            "explicit provider season id to verify when its catalogue route is disabled; "
+            "repeatable, and never expanded into a numeric sweep"
+        ),
+    )
+    parser.add_argument(
         "--allow-identity-failures",
         action="store_true",
         help="record ambiguities/contradictions instead of failing closed",
@@ -351,11 +739,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.probe:
         try:
-            discovered = probe_season_ids()
+            discovered = probe_season_ids(candidates=args.probe_season_id)
         except EgressBlockedError as error:
             logger.error("%s", error)
             logger.error("run --probe where premierleague.com is reachable")
             return 3
+        except (ApiResponseError, SdpSchemaError) as error:
+            logger.error("provider season discovery failed: %s", error)
+            return 4
         logger.info("discovered %d season id(s)", len(discovered["season_ids"]))
         print(json.dumps(discovered, indent=2, sort_keys=True))
         print(
@@ -376,23 +767,37 @@ def main(argv: list[str] | None = None) -> int:
                 if sources.pl_sdp
                 else {}
             )
-            match_report = sdp_transform.stage_matches(con, season_labels=labels)
-            stats_report = sdp_transform.stage_team_stats(con)
+            con.execute("BEGIN TRANSACTION")
+            try:
+                match_report = sdp_transform.stage_matches(con, season_labels=labels)
+                stats_report = sdp_transform.stage_team_stats(con)
+                logger.info(
+                    "staged %d match row(s), %d team side(s), %d metric row(s)",
+                    match_report.matches_staged,
+                    stats_report.team_sides_staged,
+                    stats_report.metric_rows_staged,
+                )
+                for failure in (*match_report.schema_failures, *stats_report.schema_failures):
+                    logger.warning("staging: %s", failure)
+                audit = sdp_transform.resolve_crosswalk(
+                    con,
+                    team_name_codes=sdp_transform.team_name_code_map(con),
+                    strict=not args.allow_identity_failures,
+                )
+                football_counts = football_v2.build_all(con)
+            except Exception:
+                con.execute("ROLLBACK")
+                raise
+            else:
+                con.execute("COMMIT")
             logger.info(
-                "staged %d match row(s), %d team side(s), %d metric row(s)",
-                match_report.matches_staged,
-                stats_report.team_sides_staged,
-                stats_report.metric_rows_staged,
-            )
-            for failure in (*match_report.schema_failures, *stats_report.schema_failures):
-                logger.warning("staging: %s", failure)
-            audit = sdp_transform.resolve_crosswalk(
-                con,
-                team_name_codes=sdp_transform.team_name_code_map(con),
-                strict=not args.allow_identity_failures,
+                "rebuilt V2 marts: %d team-match row(s), %d tactical row(s), providers=%s",
+                football_counts.team_match_stats_rows,
+                football_counts.tactical_form_rows,
+                ",".join(football_counts.providers),
             )
             identity = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "generated_at": datetime.now(UTC),
                 "fpl_fixtures": audit.fpl_fixtures,
                 "sdp_matches": audit.sdp_matches,
@@ -403,6 +808,11 @@ def main(argv: list[str] | None = None) -> int:
                 "pulse_id_present": audit.pulse_id_present,
                 "pulse_id_exact_matches": audit.pulse_id_exact_matches,
                 "pulse_id_match_rate": audit.pulse_id_match_rate,
+                "valid_pulse_id_match_rate": (
+                    None
+                    if audit.pulse_id_present == 0
+                    else audit.matched_by_pulse_id / audit.pulse_id_present
+                ),
                 "kickoff_corroborated": audit.kickoff_corroborated,
                 "teams_corroborated": audit.teams_corroborated,
                 "score_corroborated": audit.score_corroborated,
@@ -410,6 +820,9 @@ def main(argv: list[str] | None = None) -> int:
                 "contradictions": audit.contradictions,
                 "by_season": audit.by_season,
                 "unmapped_provider_fields": list(stats_report.unmapped_provider_fields),
+                "details": build_identity_details(con),
+                "v2_mart_rows": football_counts.team_match_stats_rows,
+                "tactical_form_rows": football_counts.tactical_form_rows,
             }
         else:
             identity = {
@@ -420,9 +833,16 @@ def main(argv: list[str] | None = None) -> int:
         _write(results / IDENTITY_REPORT, identity)
         _write(results / COVERAGE_REPORT, build_coverage(con))
         _write(results / RECONCILIATION_REPORT, build_reconciliation(con))
+        _write(results / METRIC_INVENTORY_REPORT, build_metric_inventory(con))
     finally:
         con.close()
-    logger.info("wrote %s, %s, %s", IDENTITY_REPORT, COVERAGE_REPORT, RECONCILIATION_REPORT)
+    logger.info(
+        "wrote %s, %s, %s, %s",
+        IDENTITY_REPORT,
+        COVERAGE_REPORT,
+        RECONCILIATION_REPORT,
+        METRIC_INVENTORY_REPORT,
+    )
     return 0
 
 
