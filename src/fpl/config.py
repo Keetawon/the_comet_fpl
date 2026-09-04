@@ -1989,7 +1989,10 @@ class V2WalkForward(_Frozen):
 class V2Metrics(_Frozen):
     primary: str
     reported: list[str]
-    calibration: Literal["randomised_pit"]
+    # `randomised_pit` for a count target; `reliability_bins` for a binary one. A raw central
+    # interval is never permitted: Phase 1 amendment 1.1 measured that on a count distribution
+    # it exceeds 0.80 by construction and PREFERS biased models.
+    calibration: Literal["randomised_pit", "reliability_bins"]
 
 
 class V2Promotion(_Frozen):
@@ -2072,6 +2075,74 @@ class V2GkSavesContract(_V2Contract):
                 "comparison without a declared incumbent has no bar"
             )
         return self
+
+
+class V2DcPopulation(_Frozen):
+    grain: str
+    positions: list[Position]
+    filter: str
+    target: str
+    require_measured: list[str]
+    seasons_from_data: bool
+    gameweeks: Literal["observed_only"]
+
+    @field_validator("positions")
+    @classmethod
+    def _no_goalkeepers(cls, value: list[Position]) -> list[Position]:
+        """Goalkeepers cannot earn the DC award -- measured maximum count is 0.
+
+        Including them would pad every metric with rows both models trivially score at zero,
+        which flatters whichever model is worse on the population that actually matters.
+        """
+        if Position.GK in value:
+            raise ValueError(
+                "goalkeepers cannot earn the defensive-contribution award and must not be "
+                "in the evaluated population"
+            )
+        return value
+
+
+class V2DcPromotion(_Frozen):
+    minimum_relative_log_lift: float
+    maximum_brier_relative_regression: float
+    require_transferred_slice_to_improve: Literal[True]
+    require_each_reported_season_to_pass: bool
+    promotion_requires_prospective_window: Literal[True]
+
+
+class V2DcLimitations(_Frozen):
+    single_season: str
+    small_transferred_slice: str
+    poisson_shape: str
+    minutes_independence: str
+
+
+class V2DcContract(_V2Contract):
+    population: V2DcPopulation
+    walk_forward: V2WalkForward
+    candidates: list[V2GkSavesCandidate]
+    metrics: V2Metrics
+    splits: list[str]
+    promotion: V2DcPromotion
+    limitations: V2DcLimitations
+
+    @model_validator(mode="after")
+    def _validate(self) -> V2DcContract:
+        baselines = [candidate for candidate in self.candidates if candidate.is_baseline]
+        if len(baselines) != 1:
+            raise ValueError(f"expected exactly one baseline candidate, found {len(baselines)}")
+        if "transferred_player" not in self.splits:
+            raise ValueError(
+                "the transferred-player split is what distinguishes 'V2 is better' from "
+                "'V2 is better BECAUSE the team scale does not travel with the player'; "
+                "only the second is evidence for the architecture"
+            )
+        return self
+
+
+@functools.cache
+def load_v2_dc_evaluation(path: Path | None = None) -> V2DcContract:
+    return V2DcContract.model_validate(_read_yaml(path or config_dir() / "v2_dc_evaluation.yaml"))
 
 
 @functools.cache

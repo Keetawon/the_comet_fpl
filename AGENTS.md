@@ -757,6 +757,13 @@ Also preserve these data contracts:
 - A post-match measurement added to a feature-readable table must be registered in
   `features.pit.OUTCOME_COLUMNS` in the same change. A new column that silently defaults to
   "safe to read from the future" is the leak the point-in-time layer exists to prevent.
+- Never project a bare `TIMESTAMPTZ` into a `fetchall()`/`fetchone()` result. DuckDB converts
+  it through `pytz`, which this project does not depend on (it pins `tzdata` for `zoneinfo`),
+  so such a query passes on a machine that happens to have `pytz` and raises on a clean
+  install. Project `epoch_us(...)` and rebuild the instant in Python. The Arrow path
+  (`to_arrow_table()` into Polars) is unaffected. Found three times now -- BI export, outcome
+  and ledger attachment, and the V2 SDP transform -- and guarded behaviourally by
+  `tests/test_no_pytz_dependency.py`.
 
 ## Repository map and boundaries
 
@@ -1099,6 +1106,23 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   defect from where the shot volume comes from, and neither candidate addressed it. Both models
   also truncate at 10 saves; 5 of 3,846 goalkeeper appearances (0.13%) exceed it, identically for
   both, so the comparison is fair but neither can score an 11-save match.
+- **Defensive-contribution counts are roughly twice as dispersed as a Poisson, and that
+  understates every threshold probability.** Measured over 2025-26 appearances of 60+ minutes,
+  variance/mean is **1.88 (DEF, n=3,026), 2.12 (MID, n=3,265), 1.61 (FWD, n=765)** against a
+  Poisson's 1.0. The consequence is directional and large: at the same mean, a Poisson gives
+  `P(DC >= threshold)` of 0.2180 against an actual **0.2697** for defenders, 0.1019 against
+  **0.1792** for midfielders (a 76% under-statement), and 0.0011 against **0.0118** for
+  forwards. Any model that reaches a DC threshold probability by evaluating a Poisson at a
+  predicted mean will under-predict, worst for midfielders -- which is exactly the slice
+  ordering measured for V2 DC. Estimating the threshold probability directly as a frequency,
+  as `defensive_contribution_v1` does, avoids this entirely at the cost of resolution.
+- **A model can rank far better while scoring worse, and Brier will not tell you which.**
+  V2 DC beats V1 on AUC 0.7755 -> 0.8801 overall (forwards 0.630 -> 0.955) and on Brier by
+  3.5%, while LOSING mean log score by 2.18% -- because it under-predicts by a factor of 2.5
+  (mean predicted 0.0559 against an observed 0.1387). A log score charges `-log(p)` on every
+  event at an understated `p`; a bounded quadratic barely notices; AUC is invariant to any
+  monotone transform and so sees only the ordering. Report all three, and read a disagreement
+  between them as a calibration statement rather than a tie.
 
 ## Priorities for upcoming work
 
@@ -1353,6 +1377,17 @@ active delivery order.
     `results/pl_sdp_reconciliation.json`: coverage-first is a rule, not a preference. Never
     zero-fill an absent historical metric, and promote a `verified_semantics` flag only after a
     real payload has been inspected and reconciled.
+
+12. The V2 defensive-contribution candidate `team_environment_share_dc_threshold_v2` has had
+    its single development evaluation (`docs/v2-dc-development.md`,
+    `results/v2_dc_development.json`) and is **not promoted**: it misses the primary metric by
+    -2.18%. Its pre-registered mechanism test nonetheless PASSES -- the transferred-player
+    slice improves +11.42% log, +12.46% Brier, AUC 0.770 -> 0.923 -- so the failure is located
+    in the Poisson threshold conversion, not in the team-environment allocation. Leave it as
+    committed and **do not swap the count distribution after the fact**: an over-dispersed
+    successor needs its own named candidate and its own amendment, and its dispersion parameter
+    must be fitted inside each fold rather than taken from the measured constant above, which
+    was measured on the evaluation population and would be leakage.
 
 ## Sub-agent coordination and handoff
 

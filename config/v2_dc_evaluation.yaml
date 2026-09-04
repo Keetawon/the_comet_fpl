@@ -1,0 +1,144 @@
+# V2 defensive-contribution evaluation contract.
+#
+# Pre-registered before the candidate is scored. New contract; amends nothing, re-judges
+# nothing, and promotes nothing.
+#
+# THE HYPOTHESIS, STATED BEFORE MEASURING
+#
+# This repository's own measured rule says defensive contribution is a property of the TEAM
+# SYSTEM rather than of the player -- measured team hit rates range 0.333 to 0.146, a 2.3x
+# spread -- and that "a transferred player's DC expectation must be rescaled to the destination
+# club, never carried over".
+#
+# V1 (`defensive_contribution_v1`) estimates P(DC >= threshold) as a shrunk trailing hit rate
+# over the player's OWN appearances. That does exactly what the rule forbids: a midfielder
+# leaving a low-block side for a dominant one keeps a rate earned in a system that gave him
+# roughly twice the defending to do.
+#
+# V2 (`defensive_environment_v2`) splits the two factors: team defensive-action environment x
+# player role share x minutes exposure. The share travels with the player; the scale does not.
+#
+# The prediction that follows, and the reason the transferred slice is a REQUIRED split rather
+# than a nice-to-have: if the rule is right, V2 should beat V1 by more on players who changed
+# club mid-season than on players who did not. A candidate that wins overall but not on the
+# transferred slice has not demonstrated the mechanism it claims.
+
+contract_version: "1.0"
+phase: "v2-defensive-contribution"
+status: development_only
+
+amendments: []
+
+# --------------------------------------------------------------------------------------
+# Population
+# --------------------------------------------------------------------------------------
+population:
+  grain: "player_fixture"
+  # DEF/MID/FWD only. Goalkeepers cannot earn the award -- measured maximum DC count is 0 --
+  # so including them would pad every metric with rows both models trivially score at zero.
+  positions: ["DEF", "MID", "FWD"]
+  # Appearances only. A player who did not play has no DC outcome, and scoring him would
+  # measure team selection rather than the DC model.
+  filter: "minutes > 0"
+  target: "defensive_contribution >= position_threshold"
+  # NULL is unmeasured and never zero. `defensive_contribution` and its raw inputs exist in
+  # exactly ONE archived season (2025-26); every earlier row is NULL, so the evaluable
+  # population is that season alone. This is a coverage fact and is reported, not worked around.
+  require_measured: ["defensive_contribution"]
+  seasons_from_data: true
+  gameweeks: "observed_only"
+
+# --------------------------------------------------------------------------------------
+# Walk-forward
+# --------------------------------------------------------------------------------------
+walk_forward:
+  fold_unit: "observed_gameweek"
+  cutoff: "first_kickoff_of_gameweek"
+  # Higher than the team contract's 8 because DC exists in one season: a fold needs enough
+  # measured DC history for a position prior to mean anything, and there is no earlier season
+  # to borrow it from.
+  minimum_training_observed_gameweeks: 10
+  forbid_random_split: true
+  forbid_full_dataset_fitting: true
+
+# --------------------------------------------------------------------------------------
+# Candidates
+# --------------------------------------------------------------------------------------
+candidates:
+  - name: "trailing_dc_threshold_hit_bernoulli_v1"
+    description: >-
+      The incumbent. Shrunk trailing personal hit rate over the player's DC-measured
+      appearances, shrunk toward the fold-local position hit rate. Re-run here on identical
+      rows rather than compared against a number from a different population.
+    is_baseline: true
+  - name: "team_environment_share_dc_threshold_v2"
+    description: >-
+      Team defensive-action environment x shrunk player role share x minutes exposure, with the
+      environment supplied per fixture so a transferred player is rescaled by construction.
+
+# --------------------------------------------------------------------------------------
+# Metrics
+# --------------------------------------------------------------------------------------
+#
+# The target is binary, so the metrics are the ones proper for a probability: log score
+# (primary) and Brier. Calibration is reported as observed rate against mean predicted
+# probability in bins, and discrimination as AUC.
+#
+# AUC rather than a rank correlation, deliberately. This repository measured that on a binary
+# outcome with a large tie block a Spearman over average ranks read -10.9% where AUC read
+# +2.2%, and recorded that the AUC figure is the correct one.
+metrics:
+  primary: "mean_log_score"
+  reported:
+    - "mean_log_score"
+    - "brier_score"
+    - "auc"
+    - "mean_predicted"
+    - "observed_rate"
+  calibration: "reliability_bins"
+
+# --------------------------------------------------------------------------------------
+# Required splits
+# --------------------------------------------------------------------------------------
+splits:
+  # The mechanism split. Non-negotiable: it is what distinguishes "V2 is better" from "V2 is
+  # better BECAUSE the scale does not travel with the player", and only the second is evidence
+  # for the architecture.
+  - "transferred_player"
+  - "position"
+  - "gameweek_phase"
+
+# --------------------------------------------------------------------------------------
+# Gate
+# --------------------------------------------------------------------------------------
+promotion:
+  minimum_relative_log_lift: 0.01
+  maximum_brier_relative_regression: 0.0
+  # The mechanism requirement, stated before the result exists. A candidate that improves
+  # overall while regressing on transferred players has not shown the mechanism it claims, and
+  # would be improving for some other reason.
+  require_transferred_slice_to_improve: true
+  require_each_reported_season_to_pass: true
+  promotion_requires_prospective_window: true
+
+# --------------------------------------------------------------------------------------
+# Declared limitations, recorded before the run
+# --------------------------------------------------------------------------------------
+limitations:
+  single_season: >-
+    DC exists in 2025-26 only, so there is no cross-season generalisation evidence available
+    from this archive at all, whatever the result.
+  small_transferred_slice: >-
+    Measured 242 transfer stints across five seasons, so roughly 48 in one season, and only
+    the post-transfer appearances of those players are informative. The transferred slice will
+    be small and its confidence interval wide; report the row count beside every figure and do
+    not treat a narrow margin on it as decided.
+  poisson_shape: >-
+    V2 converts an expected DC count into a threshold probability through a Poisson, which
+    understates the probability for a player well below the threshold and overstates it well
+    above, because real defensive actions cluster. Correcting it needs a measured
+    over-dispersion parameter, which one season cannot support.
+  minutes_independence: >-
+    V1 estimates its hit rate over appearances without conditioning on the minutes bin. V2
+    thins linearly by expected minutes exposure. Neither is conditioned on the bin the composer
+    later draws.

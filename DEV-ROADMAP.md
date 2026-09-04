@@ -1313,7 +1313,7 @@ are left as committed.
 | C | point-in-time V2 access, tactical rolling marts | implemented |
 | D | `FixtureEnvironment` contract + multi-signal football engine | implemented |
 | E | GK Saves V2 | implemented, **evaluated, refuted** |
-| F | DC environment V2 | implemented, unevaluated (DC exists in one season) |
+| F | DC environment V2 | implemented, **evaluated**: gate missed, mechanism confirmed |
 | G | composer integration via `component_engine_v2` | implemented |
 | H | V2 prospective football forecast (`prospective_environment_v2`) | implemented |
 | I | optimizer compatibility | free — the composer input type is unchanged |
@@ -1326,7 +1326,14 @@ are left as committed.
 * Team environment: **+0.2867%** against a 1% gate, with 2021-22 regressing **-0.21%**. Failed.
 * GK Saves V2: pooled **+0.168%** log, but per season **+1.37%, +2.28%, -1.10%, -1.24%, -0.27%**.
   Failed, and refuted in the well-informed regime.
-* Neither may be retuned or re-run. `results/v2_team_environment_development.json` is immutable.
+* DC V2: **-2.18%** log against a 1% gate, so it fails -- but its pre-registered mechanism
+  test passes, with the transferred-player slice at **+11.42%** log / **+12.46%** Brier and AUC
+  0.770 -> 0.923. The failure is a calibration defect with a measured cause: DC counts are
+  ~2x over-dispersed relative to a Poisson (variance/mean 1.88 / 2.12 / 1.61 by position), so
+  the Poisson threshold conversion under-predicts, worst for midfielders -- which is V2's worst
+  slice. See `docs/v2-dc-development.md`.
+* None may be retuned or re-run. `results/v2_team_environment_development.json` and
+  `results/v2_dc_development.json` are immutable.
 
 ### Remaining work, in dependency order
 
@@ -1340,7 +1347,13 @@ are left as committed.
 3. **Then, and only then, run ablation rungs C and D.** They are currently bit-identical to rung B
    and are untested, not null. This is the single highest-value remaining experiment: it is the
    only one that can say whether shot volume and territory carry information beyond xG.
-4. **Milestone J** — expose the V2 team profiles (attack/defence quality, dominance, pressing,
+4. **An over-dispersed DC threshold model**, as a separately named candidate with its own
+   amendment. This is the best-evidenced next model experiment in the repository: the
+   allocation is already shown to rank well (AUC +13.5%) and the defect is isolated to the
+   count distribution. The dispersion parameter must be fitted inside each fold -- the measured
+   variance/mean figures in `AGENTS.md` come from the evaluation population and using them
+   directly would be leakage.
+5. **Milestone J** — expose the V2 team profiles (attack/defence quality, dominance, pressing,
    low-block tendency, directness, width, duel profile) through the semantic export and dashboard.
    Deferred deliberately: publishing a tactical profile derived from a provider whose field
    semantics are unverified would put an unbacked claim in front of a user.

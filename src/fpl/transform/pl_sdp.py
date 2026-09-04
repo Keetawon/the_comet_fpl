@@ -54,6 +54,27 @@ class SdpIdentityError(RuntimeError):
     """
 
 
+def _instant(value: object, *, name: str) -> datetime:
+    """Rebuild an aware UTC instant from DuckDB `epoch_us()` microseconds.
+
+    Every query below projects `epoch_us(...)` rather than the TIMESTAMPTZ itself. DuckDB
+    converts a fetched TIMESTAMPTZ into a Python datetime through `pytz`, which this project
+    deliberately does not depend on -- it pins `tzdata` for `zoneinfo` -- so fetching one
+    directly raises ModuleNotFoundError on a clean install. Microseconds carry no timezone
+    name, so no IANA lookup happens at all.
+    """
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SdpSchemaError(f"{name} is not an epoch-microsecond integer: {value!r}")
+    return datetime.fromtimestamp(value / 1_000_000, tz=UTC)
+
+
+def _optional_instant(value: object, *, name: str) -> datetime | None:
+    """As `_instant`, but a genuinely absent timestamp stays absent rather than becoming zero."""
+    return None if value is None else _instant(value, name=name)
+
+
 def payload_id(raw: RawPayload) -> str:
     """Content-addressed identity: same request AND same body -> same id.
 
@@ -170,7 +191,7 @@ def stage_matches(
     """
     rows = con.execute(
         """
-        SELECT payload_id, endpoint, params_json, season, fetched_at, payload
+        SELECT payload_id, endpoint, params_json, season, epoch_us(fetched_at), payload
         FROM raw_pl_sdp_payload
         WHERE endpoint IN ('matches', 'match')
         ORDER BY fetched_at, payload_id
@@ -180,7 +201,8 @@ def stage_matches(
     con.execute("DELETE FROM stg_pl_sdp_match")
     staged = 0
     failures: list[str] = []
-    for identifier, endpoint, params_json, landed_season, fetched_at, payload_text in rows:
+    for identifier, endpoint, params_json, landed_season, fetched_us, payload_text in rows:
+        fetched_at = _instant(fetched_us, name=f"{identifier} fetched_at")
         try:
             payload = json.loads(payload_text)
             single = endpoint == "match" and isinstance(payload, dict)
@@ -250,7 +272,7 @@ def stage_team_stats(con: duckdb.DuckDBPyConnection) -> StagingReport:
 
     rows = con.execute(
         """
-        SELECT payload_id, params_json, sdp_match_id, fetched_at, payload
+        SELECT payload_id, params_json, sdp_match_id, epoch_us(fetched_at), payload
         FROM raw_pl_sdp_payload
         WHERE endpoint = 'match_stats'
         ORDER BY fetched_at, payload_id
@@ -264,7 +286,8 @@ def stage_team_stats(con: duckdb.DuckDBPyConnection) -> StagingReport:
     metric_rows = 0
     unmapped: set[str] = set()
     failures: list[str] = []
-    for identifier, params_json, landed_match_id, fetched_at, payload_text in rows:
+    for identifier, params_json, landed_match_id, fetched_us, payload_text in rows:
+        fetched_at = _instant(fetched_us, name=f"{identifier} fetched_at")
         params = json.loads(params_json) if params_json else {}
         match_id = landed_match_id if landed_match_id is not None else params.get("match_id")
         if not isinstance(match_id, int):
@@ -408,7 +431,7 @@ def _fixture_identities(
         params = list(seasons)
     rows = con.execute(
         f"""
-        SELECT f.season, f.fixture, f.pulse_id, f.kickoff_time,
+        SELECT f.season, f.fixture, f.pulse_id, epoch_us(f.kickoff_time),
                th.team_code AS home_team_code, ta.team_code AS away_team_code,
                f.team_h_score, f.team_a_score
         FROM stg_fixture AS f
@@ -424,7 +447,7 @@ def _fixture_identities(
             season=str(season),
             fixture=int(fixture),
             pulse_id=None if pulse_id is None else int(pulse_id),
-            kickoff_time=kickoff,
+            kickoff_time=_optional_instant(kickoff, name=f"{season} fixture {fixture} kickoff"),
             home_team_code=None if home is None else int(home),
             away_team_code=None if away is None else int(away),
             home_score=None if hs is None else int(hs),
@@ -444,7 +467,8 @@ def _latest_sdp_matches(con: duckdb.DuckDBPyConnection) -> dict[int, dict[str, A
             ) AS version_rank
             FROM stg_pl_sdp_match
         )
-        SELECT sdp_match_id, season, matchweek, kickoff_time, home_team_name, away_team_name,
+        SELECT sdp_match_id, season, matchweek, epoch_us(kickoff_time), home_team_name,
+               away_team_name,
                home_score, away_score
         FROM ranked WHERE version_rank = 1
         """
@@ -453,7 +477,7 @@ def _latest_sdp_matches(con: duckdb.DuckDBPyConnection) -> dict[int, dict[str, A
         int(row[0]): {
             "season": row[1],
             "matchweek": row[2],
-            "kickoff_time": row[3],
+            "kickoff_time": _optional_instant(row[3], name=f"sdp match {row[0]} kickoff"),
             "home_team_name": row[4],
             "away_team_name": row[5],
             "home_score": row[6],
