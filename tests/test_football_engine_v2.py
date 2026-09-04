@@ -517,27 +517,44 @@ def _profiles() -> list[object]:
 
     return [
         PlayerProfile(
-            code=1, position=Position.FWD, team_code=3,
-            minutes=(0.05, 0.10, 0.15, 0.70), attacking_share=0.30, assist_share=0.15,
+            code=1,
+            position=Position.FWD,
+            team_code=3,
+            minutes=(0.05, 0.10, 0.15, 0.70),
+            attacking_share=0.30,
+            assist_share=0.15,
         ),
         PlayerProfile(
-            code=2, position=Position.MID, team_code=3,
-            minutes=(0.20, 0.15, 0.25, 0.40), attacking_share=0.20, assist_share=0.35,
+            code=2,
+            position=Position.MID,
+            team_code=3,
+            minutes=(0.20, 0.15, 0.25, 0.40),
+            attacking_share=0.20,
+            assist_share=0.35,
         ),
         PlayerProfile(
-            code=3, position=Position.DEF, team_code=3,
-            minutes=(0.02, 0.03, 0.10, 0.85), attacking_share=0.05, assist_share=0.10,
+            code=3,
+            position=Position.DEF,
+            team_code=3,
+            minutes=(0.02, 0.03, 0.10, 0.85),
+            attacking_share=0.05,
+            assist_share=0.10,
         ),
         PlayerProfile(
-            code=4, position=Position.GK, team_code=3,
-            minutes=(0.01, 0.00, 0.00, 0.99), attacking_share=0.0, assist_share=0.0,
+            code=4,
+            position=Position.GK,
+            team_code=3,
+            minutes=(0.01, 0.00, 0.00, 0.99),
+            attacking_share=0.0,
+            assist_share=0.0,
         ),
     ]
 
 
 def _environment(rate: float = 1.8, against: float = 1.1) -> FixtureEnvironment:
     home = TeamEnvironment(
-        team_code=3, was_home=True,
+        team_code=3,
+        was_home=True,
         goal_distribution=poisson_pmf(rate),
         expected_goals=sum(i * m for i, m in enumerate(poisson_pmf(rate))),
         expected_goals_against=against,
@@ -545,7 +562,8 @@ def _environment(rate: float = 1.8, against: float = 1.1) -> FixtureEnvironment:
         expected_defensive_actions=120.0,
     )
     away = TeamEnvironment(
-        team_code=8, was_home=False,
+        team_code=8,
+        was_home=False,
         goal_distribution=poisson_pmf(against),
         expected_goals=sum(i * m for i, m in enumerate(poisson_pmf(against))),
         expected_goals_against=rate,
@@ -612,9 +630,13 @@ def test_the_adapter_passes_the_environments_shots_faced_to_the_saves_model() ->
     busy_environment = _environment()
     busy = build_component_distributions(
         FixtureEnvironment(
-            season="2025-26", fixture=1, gw=1, kickoff_time=START,
+            season="2025-26",
+            fixture=1,
+            gw=1,
+            kickoff_time=START,
             home=TeamEnvironment(
-                team_code=3, was_home=True,
+                team_code=3,
+                was_home=True,
                 goal_distribution=busy_environment.home.goal_distribution,
                 expected_goals=busy_environment.home.expected_goals,
                 expected_goals_against=busy_environment.home.expected_goals_against,
@@ -623,7 +645,9 @@ def test_the_adapter_passes_the_environments_shots_faced_to_the_saves_model() ->
             ),
             away=busy_environment.away,
         ),
-        _profiles(), team_code=3, saves_model=saves,
+        _profiles(),
+        team_code=3,
+        saves_model=saves,
     )[4].saves
     assert quiet is not None and busy is not None
     assert sum(i * m for i, m in enumerate(busy)) > sum(i * m for i, m in enumerate(quiet))
@@ -653,3 +677,48 @@ def test_the_adapter_produces_exactly_the_composer_input_type() -> None:
         assert sum(distribution.minutes) == pytest.approx(1.0)
         assert sum(distribution.goals) == pytest.approx(1.0, abs=1e-9)
         assert sum(distribution.assists) == pytest.approx(1.0, abs=1e-9)
+
+
+def test_the_engine_is_deterministic_across_repeat_fits() -> None:
+    """Identical inputs must reproduce identical parameters and distributions."""
+    frame = _frame()
+    reports = []
+    for _ in range(2):
+        engine = MultiSignalTeamEngine()
+        engine.set_prediction_season("2025-26")
+        engine.fit(frame)
+        environment = engine.predict_environment(
+            season="2025-26", fixture=1, home_team_code=3, away_team_code=8
+        )
+        reports.append((engine.parameters.as_report(), environment.home.goal_distribution))
+    assert reports[0] == reports[1]
+
+
+def test_the_engine_is_invariant_to_training_row_order() -> None:
+    """A documented hazard in this repository, guarded rather than assumed.
+
+    Polars `group_by` without `maintain_order=True` partitions across threads, so a float sum
+    is not bit-reproducible -- 16 of 20 repeat aggregations on this archive once disagreed, and
+    the difference reached a reported log score. The engine sorts before fitting; this asserts
+    it, because a row-order-dependent rating would make every evaluation unreproducible.
+    """
+    frame = _frame()
+    shuffled = frame.sample(fraction=1.0, shuffle=True, seed=7)
+
+    def rate(source: pl.DataFrame) -> tuple[float, float | None]:
+        engine = MultiSignalTeamEngine()
+        engine.set_prediction_season("2025-26")
+        engine.fit(source)
+        environment = engine.predict_environment(
+            season="2025-26", fixture=1, home_team_code=3, away_team_code=8
+        )
+        return (
+            environment.home.expected_goals,
+            environment.home.expected_shots_on_target_against,
+        )
+
+    ordered_goals, ordered_shots = rate(frame)
+    shuffled_goals, shuffled_shots = rate(shuffled)
+    assert ordered_goals == pytest.approx(shuffled_goals, abs=1e-9)
+    assert ordered_shots is not None and shuffled_shots is not None
+    assert ordered_shots == pytest.approx(shuffled_shots, abs=1e-9)

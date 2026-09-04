@@ -16,7 +16,13 @@ import pytest
 
 from fpl.config import load_sdp_metrics
 from fpl.features.pit import OUTCOME_COLUMNS, SCHEDULE_COLUMNS, AsOf, FeatureSource, PointInTimeView
-from fpl.storage.db import initialise, sdp_metric_columns, table_columns
+from fpl.storage.db import (
+    FEATURE_READABLE_TABLES,
+    FORBIDDEN_FEATURE_COLUMN_SUBSTRING,
+    initialise,
+    sdp_metric_columns,
+    table_columns,
+)
 from fpl.transform import football_v2
 
 KICKOFF = datetime(2025, 8, 16, 14, 0, tzinfo=UTC)
@@ -329,3 +335,27 @@ def test_tactical_form_is_filtered_on_its_anchor_kickoff(
         )
         assert frame.height == 2
         assert set(frame["gw"].to_list()) == {1}
+
+
+def test_no_feature_readable_v2_column_names_points(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    """R1 restated at the V2 boundary: the feature layer sees components, never points.
+
+    Both V2 marts are feature-readable, so the repository's standing guard has to hold on them
+    too. `bps` is FPL's bonus-point-system score and is deliberately named without the
+    substring, because it is a component of the bonus model rather than a points total.
+    """
+    for table in ("mart_fact_team_match_stats_v2", "mart_fact_team_tactical_form_v2"):
+        offending = [
+            column
+            for column in table_columns(con, table)
+            if FORBIDDEN_FEATURE_COLUMN_SUBSTRING in column
+        ]
+        assert offending == [], f"{table} exposes {offending} to the feature layer"
+
+
+def test_both_v2_marts_are_declared_feature_readable() -> None:
+    """A model that cannot read them is a model that reaches around the capability."""
+    assert "mart_fact_team_match_stats_v2" in FEATURE_READABLE_TABLES
+    assert "mart_fact_team_tactical_form_v2" in FEATURE_READABLE_TABLES
