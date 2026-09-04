@@ -1,0 +1,52 @@
+{
+  "comparisons": [
+    {
+      "archive_column": "expected_goals",
+      "archive_mean": null,
+      "exact_agreements": 0,
+      "label": "expected_goals",
+      "max_absolute_difference": null,
+      "mean_difference": null,
+      "rows_compared": 0,
+      "sdp_column": "expected_goals",
+      "sdp_mean": null
+    },
+    {
+      "archive_column": "goals",
+      "archive_mean": null,
+      "exact_agreements": 0,
+      "label": "goals",
+      "max_absolute_difference": null,
+      "mean_difference": null,
+      "rows_compared": 0,
+      "sdp_column": "goals",
+      "sdp_mean": null
+    },
+    {
+      "archive_column": "shots_on_target_allowed_proxy",
+      "archive_mean": null,
+      "exact_agreements": 0,
+      "label": "shots_on_target_allowed_vs_gk_proxy",
+      "max_absolute_difference": null,
+      "mean_difference": null,
+      "rows_compared": 0,
+      "sdp_column": "shots_on_target_allowed",
+      "sdp_mean": null
+    },
+    {
+      "archive_column": "expected_goals_conceded_measured",
+      "archive_mean": null,
+      "exact_agreements": 0,
+      "label": "expected_goals_allowed_vs_measured_xgc",
+      "max_absolute_difference": null,
+      "mean_difference": null,
+      "rows_compared": 0,
+      "sdp_column": "expected_goals_allowed",
+      "sdp_mean": null
+    }
+  ],
+  "crosswalk": {},
+  "generated_at": "2026-09-04 13:47:20.783474+00:00",
+  "note": "differences are reported, never reconciled away; both values are retained",
+  "schema_version": 1
+}

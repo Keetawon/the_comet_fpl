@@ -1,0 +1,2810 @@
+{
+  "generated_at": "2026-09-04 13:47:20.722829+00:00",
+  "metric_dictionary_version": 1,
+  "note": "coverage_pct is over team-rows present in mart_fact_team_match_stats_v2 for that provider and season. An absent metric is reported absent and is never zero-filled.",
+  "providers": {
+    "fpl_archive": {
+      "2021-22": {
+        "first_kickoff": "2021-08-13 19:00:00+00:00",
+        "fixtures_available": 380,
+        "fixtures_expected": 380,
+        "last_kickoff": "2022-05-22 15:00:00+00:00",
+        "metrics": {
+          "accurate_crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses finding a team-mate.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes completed.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes completed to a team-mate.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "backward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the back zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_created": {
+            "coverage_pct": 0.0,
+            "definition": "Chances Opta classifies as clear scoring opportunities created by this side.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_missed": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances not converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_scored": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "blocks": {
+            "coverage_pct": 0.0,
+            "definition": "Blocks by outfield players, excluding blocked shots on goal.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "bps": {
+            "coverage_pct": 100.0,
+            "definition": "Team total of FPL's own bonus-point-system score. Context for the bonus model.",
+            "group": "result",
+            "max": 393,
+            "mean": 180.213158,
+            "min": 65,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "clearances": {
+            "coverage_pct": 0.0,
+            "definition": "Clearances made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "corners": {
+            "coverage_pct": 0.0,
+            "definition": "Corners won by this side.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses attempted from open play and set pieces.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "defensive_actions": {
+            "coverage_pct": 0.0,
+            "definition": "Team total of the actions FPL's defensive-contribution award counts (tackles, recoveries, and clearances/blocks/interceptions). Measured only where its inputs are -- the FPL archive carries them from 2025-26 only, and NULL before that.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": true
+          },
+          "duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals": {
+            "coverage_pct": 0.0,
+            "definition": "Opta expected goals for this side's shots.",
+            "group": "result",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals_conceded_measured": {
+            "coverage_pct": 0.0,
+            "definition": "Team expected goals conceded as measured by FPL's own per-player xGC (the maximum over the squad, since a player's xGC is the team's during his minutes). Deliberately NOT the same column as expected_goals_allowed, which is the opponent's expected_goals mirrored across the fixture: the two measure the same concept from different sources and are retained separately so their disagreement stays visible.",
+            "group": "result",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": true
+          },
+          "expected_goals_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Post-shot expected goals -- xG conditioned on shot placement, defined only over shots on target. Measures finishing and keeper workload rather than chance creation.",
+            "group": "result",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the attacking third.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "forward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the forward zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "fouls": {
+            "coverage_pct": 0.0,
+            "definition": "Fouls conceded.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "goals": {
+            "coverage_pct": 100.0,
+            "definition": "Goals scored by this side, excluding own goals credited to the opponent.",
+            "group": "result",
+            "max": 7,
+            "mean": 1.409211,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "goals_allowed": {
+            "coverage_pct": 100.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 7,
+            "mean": 1.409211,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "interceptions": {
+            "coverage_pct": 0.0,
+            "definition": "Interceptions made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "offsides": {
+            "coverage_pct": 0.0,
+            "definition": "Offsides called against this side.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "passes": {
+            "coverage_pct": 0.0,
+            "definition": "Total passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession": {
+            "coverage_pct": 0.0,
+            "definition": "Share of possession, 0-100. Stored as a percent, never a fraction: the two sides of a match must sum to ~100, which is the coverage report's consistency check.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_attacking_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the attacking third -- the high-press signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_defensive_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the defensive third -- the low-block signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_middle_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the middle third.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "recoveries": {
+            "coverage_pct": 0.0,
+            "definition": "Loose-ball recoveries.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "red_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Red cards received, including second yellows.",
+            "group": "discipline",
+            "max": 2,
+            "mean": 0.056579,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "saves": {
+            "coverage_pct": 100.0,
+            "definition": "Goalkeeper saves made by this side.",
+            "group": "defending",
+            "max": 10,
+            "mean": 2.952632,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "shots": {
+            "coverage_pct": 0.0,
+            "definition": "Total goal attempts, on and off target, including blocked.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_blocked": {
+            "coverage_pct": 0.0,
+            "definition": "This side's goal attempts blocked by an opposition outfield player.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_inside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from inside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts on target, including those saved and those scored.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed_proxy": {
+            "coverage_pct": 100.0,
+            "definition": "On-target shots faced, derived as sum(saves + goals_conceded) over the club's goalkeeper appearances in the fixture. A measurement of the same quantity as shots_on_target_allowed, by a different route and with different failure modes.",
+            "group": "shooting",
+            "max": 15,
+            "mean": 4.361842,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "shots_outside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from outside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles attempted.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles_won": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles that regained or dispossessed.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_opposition_box": {
+            "coverage_pct": 0.0,
+            "definition": "Touches by this side inside the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_own_box_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "yellow_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Yellow cards received.",
+            "group": "discipline",
+            "max": 6,
+            "mean": 1.705263,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          }
+        },
+        "team_rows_available": 760,
+        "team_rows_expected": 760
+      },
+      "2022-23": {
+        "first_kickoff": "2022-08-05 19:00:00+00:00",
+        "fixtures_available": 380,
+        "fixtures_expected": 380,
+        "last_kickoff": "2023-05-28 15:30:00+00:00",
+        "metrics": {
+          "accurate_crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses finding a team-mate.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes completed.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes completed to a team-mate.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "backward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the back zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_created": {
+            "coverage_pct": 0.0,
+            "definition": "Chances Opta classifies as clear scoring opportunities created by this side.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_missed": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances not converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_scored": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "blocks": {
+            "coverage_pct": 0.0,
+            "definition": "Blocks by outfield players, excluding blocked shots on goal.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "bps": {
+            "coverage_pct": 100.0,
+            "definition": "Team total of FPL's own bonus-point-system score. Context for the bonus model.",
+            "group": "result",
+            "max": 422,
+            "mean": 180.446053,
+            "min": 64,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "clearances": {
+            "coverage_pct": 0.0,
+            "definition": "Clearances made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "corners": {
+            "coverage_pct": 0.0,
+            "definition": "Corners won by this side.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses attempted from open play and set pieces.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "defensive_actions": {
+            "coverage_pct": 0.0,
+            "definition": "Team total of the actions FPL's defensive-contribution award counts (tackles, recoveries, and clearances/blocks/interceptions). Measured only where its inputs are -- the FPL archive carries them from 2025-26 only, and NULL before that.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": true
+          },
+          "duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals": {
+            "coverage_pct": 64.2105,
+            "definition": "Opta expected goals for this side's shots.",
+            "group": "result",
+            "max": 5.16,
+            "mean": 1.499075,
+            "min": 0.02,
+            "non_null": 488,
+            "verified_semantics": false
+          },
+          "expected_goals_allowed": {
+            "coverage_pct": 64.2105,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 5.16,
+            "mean": 1.499075,
+            "min": 0.02,
+            "non_null": 488,
+            "verified_semantics": false
+          },
+          "expected_goals_conceded_measured": {
+            "coverage_pct": 64.2105,
+            "definition": "Team expected goals conceded as measured by FPL's own per-player xGC (the maximum over the squad, since a player's xGC is the team's during his minutes). Deliberately NOT the same column as expected_goals_allowed, which is the opponent's expected_goals mirrored across the fixture: the two measure the same concept from different sources and are retained separately so their disagreement stays visible.",
+            "group": "result",
+            "max": 5.13,
+            "mean": 1.502241,
+            "min": 0.02,
+            "non_null": 488,
+            "verified_semantics": true
+          },
+          "expected_goals_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Post-shot expected goals -- xG conditioned on shot placement, defined only over shots on target. Measures finishing and keeper workload rather than chance creation.",
+            "group": "result",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the attacking third.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "forward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the forward zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "fouls": {
+            "coverage_pct": 0.0,
+            "definition": "Fouls conceded.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "goals": {
+            "coverage_pct": 100.0,
+            "definition": "Goals scored by this side, excluding own goals credited to the opponent.",
+            "group": "result",
+            "max": 9,
+            "mean": 1.426316,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "goals_allowed": {
+            "coverage_pct": 100.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 9,
+            "mean": 1.426316,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "interceptions": {
+            "coverage_pct": 0.0,
+            "definition": "Interceptions made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "offsides": {
+            "coverage_pct": 0.0,
+            "definition": "Offsides called against this side.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "passes": {
+            "coverage_pct": 0.0,
+            "definition": "Total passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession": {
+            "coverage_pct": 0.0,
+            "definition": "Share of possession, 0-100. Stored as a percent, never a fraction: the two sides of a match must sum to ~100, which is the coverage report's consistency check.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_attacking_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the attacking third -- the high-press signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_defensive_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the defensive third -- the low-block signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_middle_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the middle third.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "recoveries": {
+            "coverage_pct": 0.0,
+            "definition": "Loose-ball recoveries.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "red_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Red cards received, including second yellows.",
+            "group": "discipline",
+            "max": 2,
+            "mean": 0.039474,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "saves": {
+            "coverage_pct": 100.0,
+            "definition": "Goalkeeper saves made by this side.",
+            "group": "defending",
+            "max": 11,
+            "mean": 2.928947,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "shots": {
+            "coverage_pct": 0.0,
+            "definition": "Total goal attempts, on and off target, including blocked.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_blocked": {
+            "coverage_pct": 0.0,
+            "definition": "This side's goal attempts blocked by an opposition outfield player.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_inside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from inside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts on target, including those saved and those scored.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed_proxy": {
+            "coverage_pct": 100.0,
+            "definition": "On-target shots faced, derived as sum(saves + goals_conceded) over the club's goalkeeper appearances in the fixture. A measurement of the same quantity as shots_on_target_allowed, by a different route and with different failure modes.",
+            "group": "shooting",
+            "max": 14,
+            "mean": 4.355263,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "shots_outside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from outside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles attempted.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles_won": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles that regained or dispossessed.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_opposition_box": {
+            "coverage_pct": 0.0,
+            "definition": "Touches by this side inside the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_own_box_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "yellow_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Yellow cards received.",
+            "group": "discipline",
+            "max": 7,
+            "mean": 1.801316,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          }
+        },
+        "team_rows_available": 760,
+        "team_rows_expected": 760
+      },
+      "2023-24": {
+        "first_kickoff": "2023-08-11 19:00:00+00:00",
+        "fixtures_available": 380,
+        "fixtures_expected": 380,
+        "last_kickoff": "2024-05-19 15:00:00+00:00",
+        "metrics": {
+          "accurate_crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses finding a team-mate.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes completed.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes completed to a team-mate.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "backward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the back zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_created": {
+            "coverage_pct": 0.0,
+            "definition": "Chances Opta classifies as clear scoring opportunities created by this side.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_missed": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances not converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_scored": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "blocks": {
+            "coverage_pct": 0.0,
+            "definition": "Blocks by outfield players, excluding blocked shots on goal.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "bps": {
+            "coverage_pct": 100.0,
+            "definition": "Team total of FPL's own bonus-point-system score. Context for the bonus model.",
+            "group": "result",
+            "max": 454,
+            "mean": 182.996053,
+            "min": 70,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "clearances": {
+            "coverage_pct": 0.0,
+            "definition": "Clearances made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "corners": {
+            "coverage_pct": 0.0,
+            "definition": "Corners won by this side.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses attempted from open play and set pieces.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "defensive_actions": {
+            "coverage_pct": 0.0,
+            "definition": "Team total of the actions FPL's defensive-contribution award counts (tackles, recoveries, and clearances/blocks/interceptions). Measured only where its inputs are -- the FPL archive carries them from 2025-26 only, and NULL before that.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": true
+          },
+          "duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals": {
+            "coverage_pct": 100.0,
+            "definition": "Opta expected goals for this side's shots.",
+            "group": "result",
+            "max": 7.720000000000001,
+            "mean": 1.576947,
+            "min": 0.03,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "expected_goals_allowed": {
+            "coverage_pct": 100.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 7.720000000000001,
+            "mean": 1.576947,
+            "min": 0.03,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "expected_goals_conceded_measured": {
+            "coverage_pct": 100.0,
+            "definition": "Team expected goals conceded as measured by FPL's own per-player xGC (the maximum over the squad, since a player's xGC is the team's during his minutes). Deliberately NOT the same column as expected_goals_allowed, which is the opponent's expected_goals mirrored across the fixture: the two measure the same concept from different sources and are retained separately so their disagreement stays visible.",
+            "group": "result",
+            "max": 9.84,
+            "mean": 1.633487,
+            "min": 0.03,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "expected_goals_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Post-shot expected goals -- xG conditioned on shot placement, defined only over shots on target. Measures finishing and keeper workload rather than chance creation.",
+            "group": "result",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the attacking third.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "forward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the forward zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "fouls": {
+            "coverage_pct": 0.0,
+            "definition": "Fouls conceded.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "goals": {
+            "coverage_pct": 100.0,
+            "definition": "Goals scored by this side, excluding own goals credited to the opponent.",
+            "group": "result",
+            "max": 8,
+            "mean": 1.639474,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "goals_allowed": {
+            "coverage_pct": 100.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 8,
+            "mean": 1.639474,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "interceptions": {
+            "coverage_pct": 0.0,
+            "definition": "Interceptions made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "offsides": {
+            "coverage_pct": 0.0,
+            "definition": "Offsides called against this side.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "passes": {
+            "coverage_pct": 0.0,
+            "definition": "Total passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession": {
+            "coverage_pct": 0.0,
+            "definition": "Share of possession, 0-100. Stored as a percent, never a fraction: the two sides of a match must sum to ~100, which is the coverage report's consistency check.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_attacking_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the attacking third -- the high-press signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_defensive_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the defensive third -- the low-block signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_middle_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the middle third.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "recoveries": {
+            "coverage_pct": 0.0,
+            "definition": "Loose-ball recoveries.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "red_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Red cards received, including second yellows.",
+            "group": "discipline",
+            "max": 2,
+            "mean": 0.076316,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "saves": {
+            "coverage_pct": 100.0,
+            "definition": "Goalkeeper saves made by this side.",
+            "group": "defending",
+            "max": 12,
+            "mean": 3.284211,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "shots": {
+            "coverage_pct": 0.0,
+            "definition": "Total goal attempts, on and off target, including blocked.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_blocked": {
+            "coverage_pct": 0.0,
+            "definition": "This side's goal attempts blocked by an opposition outfield player.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_inside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from inside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts on target, including those saved and those scored.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed_proxy": {
+            "coverage_pct": 100.0,
+            "definition": "On-target shots faced, derived as sum(saves + goals_conceded) over the club's goalkeeper appearances in the fixture. A measurement of the same quantity as shots_on_target_allowed, by a different route and with different failure modes.",
+            "group": "shooting",
+            "max": 15,
+            "mean": 4.923684,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "shots_outside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from outside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles attempted.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles_won": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles that regained or dispossessed.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_opposition_box": {
+            "coverage_pct": 0.0,
+            "definition": "Touches by this side inside the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_own_box_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "yellow_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Yellow cards received.",
+            "group": "discipline",
+            "max": 7,
+            "mean": 2.097368,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          }
+        },
+        "team_rows_available": 760,
+        "team_rows_expected": 760
+      },
+      "2024-25": {
+        "first_kickoff": "2024-08-16 19:00:00+00:00",
+        "fixtures_available": 380,
+        "fixtures_expected": 380,
+        "last_kickoff": "2025-05-25 15:00:00+00:00",
+        "metrics": {
+          "accurate_crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses finding a team-mate.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes completed.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes completed to a team-mate.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "backward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the back zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_created": {
+            "coverage_pct": 0.0,
+            "definition": "Chances Opta classifies as clear scoring opportunities created by this side.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_missed": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances not converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_scored": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "blocks": {
+            "coverage_pct": 0.0,
+            "definition": "Blocks by outfield players, excluding blocked shots on goal.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "bps": {
+            "coverage_pct": 100.0,
+            "definition": "Team total of FPL's own bonus-point-system score. Context for the bonus model.",
+            "group": "result",
+            "max": 444,
+            "mean": 170.478947,
+            "min": -32,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "clearances": {
+            "coverage_pct": 0.0,
+            "definition": "Clearances made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "corners": {
+            "coverage_pct": 0.0,
+            "definition": "Corners won by this side.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses attempted from open play and set pieces.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "defensive_actions": {
+            "coverage_pct": 0.0,
+            "definition": "Team total of the actions FPL's defensive-contribution award counts (tackles, recoveries, and clearances/blocks/interceptions). Measured only where its inputs are -- the FPL archive carries them from 2025-26 only, and NULL before that.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": true
+          },
+          "duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals": {
+            "coverage_pct": 100.0,
+            "definition": "Opta expected goals for this side's shots.",
+            "group": "result",
+            "max": 5.51,
+            "mean": 1.448303,
+            "min": 0.04,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "expected_goals_allowed": {
+            "coverage_pct": 100.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 5.51,
+            "mean": 1.448303,
+            "min": 0.04,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "expected_goals_conceded_measured": {
+            "coverage_pct": 100.0,
+            "definition": "Team expected goals conceded as measured by FPL's own per-player xGC (the maximum over the squad, since a player's xGC is the team's during his minutes). Deliberately NOT the same column as expected_goals_allowed, which is the opponent's expected_goals mirrored across the fixture: the two measure the same concept from different sources and are retained separately so their disagreement stays visible.",
+            "group": "result",
+            "max": 5.43,
+            "mean": 1.436789,
+            "min": 0.04,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "expected_goals_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Post-shot expected goals -- xG conditioned on shot placement, defined only over shots on target. Measures finishing and keeper workload rather than chance creation.",
+            "group": "result",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the attacking third.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "forward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the forward zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "fouls": {
+            "coverage_pct": 0.0,
+            "definition": "Fouls conceded.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "goals": {
+            "coverage_pct": 100.0,
+            "definition": "Goals scored by this side, excluding own goals credited to the opponent.",
+            "group": "result",
+            "max": 7,
+            "mean": 1.467105,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "goals_allowed": {
+            "coverage_pct": 100.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 7,
+            "mean": 1.467105,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "interceptions": {
+            "coverage_pct": 0.0,
+            "definition": "Interceptions made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "offsides": {
+            "coverage_pct": 0.0,
+            "definition": "Offsides called against this side.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "passes": {
+            "coverage_pct": 0.0,
+            "definition": "Total passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession": {
+            "coverage_pct": 0.0,
+            "definition": "Share of possession, 0-100. Stored as a percent, never a fraction: the two sides of a match must sum to ~100, which is the coverage report's consistency check.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_attacking_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the attacking third -- the high-press signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_defensive_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the defensive third -- the low-block signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_middle_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the middle third.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "recoveries": {
+            "coverage_pct": 0.0,
+            "definition": "Loose-ball recoveries.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "red_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Red cards received, including second yellows.",
+            "group": "discipline",
+            "max": 2,
+            "mean": 0.068421,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "saves": {
+            "coverage_pct": 100.0,
+            "definition": "Goalkeeper saves made by this side.",
+            "group": "defending",
+            "max": 13,
+            "mean": 3.078947,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "shots": {
+            "coverage_pct": 0.0,
+            "definition": "Total goal attempts, on and off target, including blocked.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_blocked": {
+            "coverage_pct": 0.0,
+            "definition": "This side's goal attempts blocked by an opposition outfield player.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_inside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from inside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts on target, including those saved and those scored.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed_proxy": {
+            "coverage_pct": 100.0,
+            "definition": "On-target shots faced, derived as sum(saves + goals_conceded) over the club's goalkeeper appearances in the fixture. A measurement of the same quantity as shots_on_target_allowed, by a different route and with different failure modes.",
+            "group": "shooting",
+            "max": 17,
+            "mean": 4.548684,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "shots_outside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from outside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles attempted.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles_won": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles that regained or dispossessed.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_opposition_box": {
+            "coverage_pct": 0.0,
+            "definition": "Touches by this side inside the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_own_box_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "yellow_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Yellow cards received.",
+            "group": "discipline",
+            "max": 8,
+            "mean": 2.035526,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          }
+        },
+        "team_rows_available": 760,
+        "team_rows_expected": 760
+      },
+      "2025-26": {
+        "first_kickoff": "2025-08-15 19:00:00+00:00",
+        "fixtures_available": 380,
+        "fixtures_expected": 380,
+        "last_kickoff": "2026-05-24 15:00:00+00:00",
+        "metrics": {
+          "accurate_crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses finding a team-mate.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes completed.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "accurate_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes completed to a team-mate.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "aerial_duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "backward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the back zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_created": {
+            "coverage_pct": 0.0,
+            "definition": "Chances Opta classifies as clear scoring opportunities created by this side.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_missed": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances not converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "big_chances_scored": {
+            "coverage_pct": 0.0,
+            "definition": "Big chances converted.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "blocks": {
+            "coverage_pct": 0.0,
+            "definition": "Blocks by outfield players, excluding blocked shots on goal.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "bps": {
+            "coverage_pct": 100.0,
+            "definition": "Team total of FPL's own bonus-point-system score. Context for the bonus model.",
+            "group": "result",
+            "max": 355,
+            "mean": 177.205263,
+            "min": 13,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "clearances": {
+            "coverage_pct": 0.0,
+            "definition": "Clearances made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "corners": {
+            "coverage_pct": 0.0,
+            "definition": "Corners won by this side.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "crosses": {
+            "coverage_pct": 0.0,
+            "definition": "Crosses attempted from open play and set pieces.",
+            "group": "width",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "defensive_actions": {
+            "coverage_pct": 100.0,
+            "definition": "Team total of the actions FPL's defensive-contribution award counts (tackles, recoveries, and clearances/blocks/interceptions). Measured only where its inputs are -- the FPL archive carries them from 2025-26 only, and NULL before that.",
+            "group": "defending",
+            "max": 149,
+            "mean": 102.2,
+            "min": 59,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "duels_lost": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels lost.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "duels_won": {
+            "coverage_pct": 0.0,
+            "definition": "Ground and aerial duels won.",
+            "group": "duels",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals": {
+            "coverage_pct": 100.0,
+            "definition": "Opta expected goals for this side's shots.",
+            "group": "result",
+            "max": 4.56,
+            "mean": 1.405697,
+            "min": 0.06,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "expected_goals_allowed": {
+            "coverage_pct": 100.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 4.56,
+            "mean": 1.405697,
+            "min": 0.06,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "expected_goals_conceded_measured": {
+            "coverage_pct": 100.0,
+            "definition": "Team expected goals conceded as measured by FPL's own per-player xGC (the maximum over the squad, since a player's xGC is the team's during his minutes). Deliberately NOT the same column as expected_goals_allowed, which is the opponent's expected_goals mirrored across the fixture: the two measure the same concept from different sources and are retained separately so their disagreement stays visible.",
+            "group": "result",
+            "max": 4.57,
+            "mean": 1.39525,
+            "min": 0.06,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "expected_goals_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Post-shot expected goals -- xG conditioned on shot placement, defined only over shots on target. Measures finishing and keeper workload rather than chance creation.",
+            "group": "result",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "expected_goals_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the attacking third.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "final_third_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "forward_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Passes played into the forward zone.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "fouls": {
+            "coverage_pct": 0.0,
+            "definition": "Fouls conceded.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "goals": {
+            "coverage_pct": 100.0,
+            "definition": "Goals scored by this side, excluding own goals credited to the opponent.",
+            "group": "result",
+            "max": 5,
+            "mean": 1.375,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "goals_allowed": {
+            "coverage_pct": 100.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": 5,
+            "mean": 1.375,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "interceptions": {
+            "coverage_pct": 0.0,
+            "definition": "Interceptions made.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "long_passes": {
+            "coverage_pct": 0.0,
+            "definition": "Long passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "offsides": {
+            "coverage_pct": 0.0,
+            "definition": "Offsides called against this side.",
+            "group": "discipline",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "passes": {
+            "coverage_pct": 0.0,
+            "definition": "Total passes attempted.",
+            "group": "passing",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries": {
+            "coverage_pct": 0.0,
+            "definition": "Entries into the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "penalty_area_entries_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession": {
+            "coverage_pct": 0.0,
+            "definition": "Share of possession, 0-100. Stored as a percent, never a fraction: the two sides of a match must sum to ~100, which is the coverage report's consistency check.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_attacking_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the attacking third -- the high-press signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_defensive_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the defensive third -- the low-block signal.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "possession_won_middle_third": {
+            "coverage_pct": 0.0,
+            "definition": "Possession regained in the middle third.",
+            "group": "press",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "recoveries": {
+            "coverage_pct": 0.0,
+            "definition": "Loose-ball recoveries.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "red_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Red cards received, including second yellows.",
+            "group": "discipline",
+            "max": 2,
+            "mean": 0.057895,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "saves": {
+            "coverage_pct": 100.0,
+            "definition": "Goalkeeper saves made by this side.",
+            "group": "defending",
+            "max": 10,
+            "mean": 2.781579,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          },
+          "shots": {
+            "coverage_pct": 0.0,
+            "definition": "Total goal attempts, on and off target, including blocked.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_blocked": {
+            "coverage_pct": 0.0,
+            "definition": "This side's goal attempts blocked by an opposition outfield player.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_inside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from inside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts on target, including those saved and those scored.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "shots_on_target_allowed_proxy": {
+            "coverage_pct": 100.0,
+            "definition": "On-target shots faced, derived as sum(saves + goals_conceded) over the club's goalkeeper appearances in the fixture. A measurement of the same quantity as shots_on_target_allowed, by a different route and with different failure modes.",
+            "group": "shooting",
+            "max": 12,
+            "mean": 4.159211,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": true
+          },
+          "shots_outside_box": {
+            "coverage_pct": 0.0,
+            "definition": "Goal attempts taken from outside the penalty area.",
+            "group": "shooting",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles attempted.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "tackles_won": {
+            "coverage_pct": 0.0,
+            "definition": "Tackles that regained or dispossessed.",
+            "group": "defending",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_opposition_box": {
+            "coverage_pct": 0.0,
+            "definition": "Touches by this side inside the opposition penalty area.",
+            "group": "territory",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "touches_in_own_box_allowed": {
+            "coverage_pct": 0.0,
+            "definition": "opponent mirror of a metric",
+            "group": "mirror",
+            "max": null,
+            "mean": null,
+            "min": null,
+            "non_null": 0,
+            "verified_semantics": false
+          },
+          "yellow_cards": {
+            "coverage_pct": 100.0,
+            "definition": "Yellow cards received.",
+            "group": "discipline",
+            "max": 6,
+            "mean": 1.871053,
+            "min": 0,
+            "non_null": 760,
+            "verified_semantics": false
+          }
+        },
+        "team_rows_available": 760,
+        "team_rows_expected": 760
+      }
+    }
+  },
+  "schema_version": 1
+}

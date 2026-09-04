@@ -31,11 +31,11 @@ Everything here is pure: frames in, ratings and environments out. No database ha
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import product
-from typing import Final
+from typing import Any, Final
 
 import polars as pl
 
@@ -443,15 +443,7 @@ class MultiSignalTeamEngine:
                     prior_matches=prior,
                     rate_floor=self._rate_floor,
                 )
-                score = self._holdout_log_score(
-                    holdout,
-                    lambda row, r=ratings: r.rate(
-                        int(row["team_code"]),
-                        int(row["opponent_team_code"]),
-                        bool(row["was_home"]),
-                        minimum_matches=self._minimum_team_matches,
-                    ),
-                )
+                score = self._holdout_log_score(holdout, self._single_signal_rate(ratings))
                 if score < best_score:
                     best, best_score = (half_life, prior), score
         return best
@@ -519,10 +511,7 @@ class MultiSignalTeamEngine:
         best_score = math.inf
         for point in simplex_grid(len(available), step=self._weight_step):
             weights = dict(zip(available, point, strict=True))
-            score = self._holdout_log_score(
-                holdout,
-                lambda row, w=weights, f=inner_fits: self._blended_rate(row, w, f),
-            )
+            score = self._holdout_log_score(holdout, self._blended_rate_of(weights, inner_fits))
             if score < best_score:
                 best_weights, best_score = weights, score
         return best_weights
@@ -557,17 +546,45 @@ class MultiSignalTeamEngine:
             return self._rate_floor
         return max(total / total_weight, self._rate_floor)
 
+    def _single_signal_rate(self, ratings: TeamRatings) -> Callable[[Mapping[str, Any]], float]:
+        """A rate function over one fitted rating system, bound for holdout scoring."""
+
+        def rate(row: Mapping[str, Any]) -> float:
+            return ratings.rate(
+                int(row["team_code"]),
+                int(row["opponent_team_code"]),
+                bool(row["was_home"]),
+                minimum_matches=self._minimum_team_matches,
+            )
+
+        return rate
+
+    def _blended_rate_of(
+        self, weights: Mapping[str, float], fitted: Mapping[str, FittedSignal]
+    ) -> Callable[[Mapping[str, Any]], float]:
+        """A rate function over a candidate weight vector, bound for holdout scoring."""
+
+        def rate(row: Mapping[str, Any]) -> float:
+            return self._blended_rate(row, weights, fitted)
+
+        return rate
+
     @staticmethod
-    def _holdout_log_score(holdout: pl.DataFrame, rate_of: object) -> float:
-        """Mean Poisson negative log score of a rate function over holdout rows."""
-        callable_rate = rate_of  # typed loosely: it is always a local lambda
+    def _holdout_log_score(
+        holdout: pl.DataFrame, rate_of: Callable[[Mapping[str, Any]], float]
+    ) -> float:
+        """Mean Poisson negative log score of a rate function over holdout rows.
+
+        A row with an unmeasured outcome is skipped, not scored as zero: a fold whose holdout
+        carries no goals must not silently select the hyperparameters that predict zero best.
+        """
         total = 0.0
         count = 0
         for row in holdout.iter_rows(named=True):
             goals = row.get("goals")
             if goals is None:
                 continue
-            rate = callable_rate(row)  # type: ignore[operator]
+            rate = rate_of(row)
             masses = poisson_pmf(float(rate))
             index = min(max(int(goals), 0), len(masses) - 1)
             total -= math.log(max(masses[index], 1e-12))
