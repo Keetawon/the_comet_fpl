@@ -580,6 +580,109 @@ player/team monitoring and deterministic/optional evidence-bound insight summari
 development-only. P2.5 in `DEV-ROADMAP.md` owns any later post-deadline work; this implementation
 does not authorize a model-default change or reinterpretation of a frozen evaluation.
 
+## V2: the football-first prediction engine (2026-09-04)
+
+V2 is an architectural addition, not a replacement. **V1 is untouched**: no model, config,
+frozen result, candidate document, ledger row or prospective default changed, and no frozen
+evaluation was re-run, amended or re-judged. V2 is development-only and nothing in it is
+promoted.
+
+`docs/v2-architecture.md` is the authoritative description. In outline:
+
+```
+Premier League / FPL data -> football data layer -> football engine -> fixture environment
+    -> FPL component engine -> full points distribution -> decision / optimizer
+```
+
+The contract between the football half and the FPL half is `FixtureEnvironment`
+(`src/fpl/artifacts/fixture_environment.py`). Components receive it; they never query a table.
+Because `models/component_engine_v2.py` produces the composer's existing
+`ComponentDistributions`, the composer, the prospective artifact contract and the optimizer are
+unchanged — V2 plugs in at a boundary that was already in the right place.
+
+### The football data layer is provider-agnostic, and that is the design point
+
+`mart_fact_team_match_stats_v2` is *the team-match football fact* at one club x one fixture,
+carrying a `provider` column — it is **not** "the SDP table". Two providers share the grain:
+
+* **`fpl_archive`** — derived from marts already in this repository. Available for every season,
+  so V2 is runnable and evaluable with no external capture.
+* **`pl_sdp`** — the Premier League SDP backend. Richer, but network-dependent, and **it has
+  never been captured**: every Pulselive / premierleague.com / fantasy.premierleague.com host is
+  refused by the authoring environment's egress policy. Every provider field name in
+  `config/pl_sdp_metrics.yaml` therefore carries `verified_semantics: false` and is an alias
+  list rather than a single name.
+
+Sharing one grain makes reconciliation structural rather than a script, and where two providers
+measure the same concept by different routes **both values are kept in separate columns** —
+`expected_goals_allowed` (the opponent's xG mirrored) and `expected_goals_conceded_measured`
+(FPL's per-player xGC) are the standing example. A metric a provider does not carry is NULL.
+
+Metric columns on the V2 tables are generated from `config/pl_sdp_metrics.yaml` by
+`storage.db.ensure_sdp_metric_columns`, exactly as ruleset target columns are generated from the
+scoring configs: adding a metric is a config change, never a schema migration. Unmapped provider
+fields land in the tall store `stg_pl_sdp_team_match_metric` and are reported by
+`jobs.audit_pl_sdp`, so a wrong guess in the dictionary is lossless rather than destructive.
+
+### Identity is measured, never assumed
+
+Whether `stg_fixture.pulse_id` equals the SDP `matchId` is a question, and
+`jobs.audit_pl_sdp --stage` answers it into `results/pl_sdp_identity_audit.json`. Resolution is
+pulse_id first (corroborated on season, kickoff within 3h, and score), then a deterministic
+fallback on season and kickoff narrowed by score and used only when exactly one candidate
+remains. Ambiguity, contradiction, and one SDP match claimed by two fixtures all fail closed.
+Club names corroborate a match already made; they never make one, and a name resolving to two
+clubs across seasons is dropped rather than picked. `pulse_id_match_rate` is `None`, not `0.0`,
+when no fixture carried a pulse_id.
+
+### V2 evaluation results: both candidates failed, and are left as committed
+
+`config/v2_team_environment_evaluation.yaml` and `config/v2_gk_saves_evaluation.yaml` were
+pre-registered before any candidate ran. Both declare
+`promotion_requires_prospective_window`, so no historical result could promote anything.
+Full record: `docs/v2-team-engine-development.md`; result:
+`results/v2_team_environment_development.json`.
+
+**Harness validation.** The incumbent `trailing_goals_attack_defence` scores **1.50030** over
+181 folds and 3,640 predictions under the V2 harness, against the frozen Phase 1 record of
+**1.5003 over 181 folds and 3,640 predictions**. The harness reproduces the incumbent to five
+decimal places, which is what makes the comparisons below about models rather than about a new
+harness.
+
+**Team environment: not promoted, fails its gate.** Best rung (`goals + xG`) scores 1.49599, a
+**+0.2867%** lift against a 1% bar, and **2021-22 regresses -0.2108%**, so it fails the
+per-season non-regression rule as well. Rungs C and D are bit-identical to B because their
+signals exist only in the uncaptured `pl_sdp` provider: the upper ablation ladder is
+**untested, not null**, and nothing here says whether shot volume or territory helps. The
+inner-holdout xG weight rises monotonically with coverage (0 folds fitted in 2021-22; 6 folds
+in 2022-23 at a selected weight of **0.000**; then 0.362 / 0.579 / 0.645), so the pooled figure
+averages over two seasons in which the candidate could not differ from its own floor.
+
+**GK saves V2: not promoted, and the hypothesis is refuted in the regime that matters.** The
+candidate replaced V1's identity — in which shots on target faced is a deterministic function of
+goals conceded — with a directly predicted shots-faced quantity. Pooled it improves log score
++0.168% and CRPS +0.63%, and **the per-season split inverts that**: +1.37% (2021-22) and +2.28%
+(2022-23), then **-1.10%, -1.24%, -0.27%** once the engine's goal rate carries xG. The crossover
+is exactly the xG-coverage boundary. Both candidates are left as committed and are **not
+retuned**.
+
+### V2 job surface
+
+```
+python -m fpl.jobs.audit_pl_sdp --probe              # discover provider season ids (network)
+python -m fpl.jobs.backfill_pl_sdp --season 2024-25  # historical capture (network)
+python -m fpl.jobs.capture_pl_sdp --lookback-days 5  # incremental capture (network)
+python -m fpl.jobs.audit_pl_sdp --stage              # stage + identity/coverage/reconciliation
+python -m fpl.jobs.build_db                          # rebuild, including the V2 marts
+python -m fpl.validate.dev_v2_team_environment --results results/
+python -m fpl.jobs.prospective_environment_v2 --gw-from 1 --gw-to 5
+```
+
+`.github/workflows/pl-sdp-capture.yml` is the durable capture path, mirroring `snapshot.yml`
+(curl/gzip/jq only, no Python) so a refactor cannot stop a capture. It is disabled by default
+because `pl_sdp.season_ids` starts empty and this repository refuses to guess a provider season
+id — fetching the wrong year under a correct-looking label is worse than fetching nothing.
+
 ## Non-negotiable correctness rules
 
 Preserve the R1-R6 rules in `README.md` and their tests.
@@ -641,11 +744,26 @@ Also preserve these data contracts:
 - Event time and knowledge time are different. `kickoff_time` prevents use of future match
   outcomes, but schedules, postponements, availability, and API fields must also be versioned
   by `known_at`/`captured_at` before they are safe for walk-forward backtests.
+- A provider metric this repository has never observed is an ASSUMPTION. Keep its provider
+  field names as alias lists carrying `verified_semantics: false`, retain every unmapped field
+  in the tall metric store, and promote a name to verified only after a real payload has been
+  inspected AND reconciled against an independent source.
+- Two providers measuring the same concept by different routes get two columns. Never fill one
+  from the other, and never reconcile a disagreement away -- the disagreement is information
+  about the sources.
+- Fixture identity across data sources is measured, not assumed. Corroborate on enough
+  dimensions to be deterministic, fail closed on ambiguity or contradiction, and never
+  fuzzy-match: a wrong fuzzy match is indistinguishable from a right one.
+- A post-match measurement added to a feature-readable table must be registered in
+  `features.pit.OUTCOME_COLUMNS` in the same change. A new column that silently defaults to
+  "safe to read from the future" is the leak the point-in-time layer exists to prevent.
 
 ## Repository map and boundaries
 
 - `config/`: sources, scoring rules, and declarative data-quality policy.
-- `src/fpl/ingest/`: external archive/API boundaries and raw payload handling.
+- `src/fpl/ingest/`: external archive/API boundaries and raw payload handling, including
+  `pl_sdp` (the Premier League SDP client: raw-preserving, schema-drift tolerant, loud on an
+  envelope it cannot interpret).
 - `src/fpl/storage/`: DuckDB connection policy, schema, and append-only prediction ledger.
 - `src/fpl/transform/`: raw-to-staging crosswalks, validation, facts, and targets.
 - `src/fpl/features/`: point-in-time-safe read API and, later, feature construction.
@@ -653,6 +771,9 @@ Also preserve these data contracts:
   It reads outcomes, which the feature layer may not -- scoring a prediction needs the label.
 - `src/fpl/models/`: scoring, the Stage A team-goals models, Stage B minutes candidates, and
   Stage C attacking-goals baselines/probes.
+  V2 adds `football_engine_v2` (one attack/defence rating system per football signal),
+  `gk_saves_v2`, `defensive_environment_v2`, and `component_engine_v2` (the adapter onto the
+  unchanged composer input).
 - `src/fpl/artifacts/`: stable, typed prospective-points and optimizer-decision transport contracts.
 - `src/fpl/optimize/`: Stage E squad, lineup, captain, and bounded transfer planning.
 - `src/fpl/jobs/`: thin orchestration/CLI entry points.
@@ -946,6 +1067,38 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   derived by a consumer from per-gameweek values. Cost is not a reason to avoid it: convolving all
   599 players over five cumulative horizons takes **0.16 s** in pure Python, and the resulting
   payload is 305 KB of JSON (about 76 KB gzipped) against 819 KB for the raw distributions.
+- **Team shots on target faced is measurable from the archive, and its implied save rate
+  corroborates the league constant.** Summing `saves + goals_conceded` over a club's goalkeeper
+  appearances in a fixture gives a measured team-level shots-on-target-allowed with **100%
+  coverage in all five seasons** (mean 4.16 to 4.92 per team-match, sd ~2.4). Its implied league
+  save rate is **0.6726 pooled** (0.667 to 0.677 per season) against the independently measured
+  67.3% +/- 0.4pp -- so the proxy's semantics are corroborated rather than assumed. This is what
+  makes a saves upgrade evaluable with no external data at all.
+- **A realised correlation between two outcomes is NOT an upper bound on the predictable
+  relationship between them, and this repository has now been caught by that twice.**
+  `corr(team shots on target allowed, goals allowed)` is **0.621** over 3,800 team-matches, which
+  looks like V1's saves identity (which implicitly assumes 1.0) discarding 61% of the variance.
+  Measured on 2025-26's 767 goalkeeper appearances, that variance is almost entirely
+  unpredictable: `corr(V1 implied shots faced, actual)` is **0.310**, `corr(V2 directly predicted
+  shots faced, actual)` is **0.279** -- V1's rearrangement of its own goal rate is the BETTER
+  predictor -- and the two predictions agree with each other at **0.764**, far more than either
+  agrees with reality. Both carry under half the spread of the outcome (sd 1.14 and 0.93 against
+  2.16). Compare the Stage A recency audit, where a level correction that fixed the level almost
+  exactly was worth -0.01%. Do not re-open a modelling question on a realised statistic alone;
+  measure the PREDICTIONS against each other and against the outcome first.
+- **The V2 blend learns to distrust a signal it cannot see, and the fold record proves it.**
+  Across 181 folds the inner-holdout weight on xG rises monotonically with coverage: xG cleared
+  the coverage floor in 0 of 30 folds in 2021-22, 6 of 37 in 2022-23 -- where the holdout chose a
+  weight of exactly **0.000** -- then all 38 folds in each later season at mean weights 0.362,
+  0.579 and 0.645. A candidate whose signal is absent in early seasons is therefore identical to
+  its own floor there, so its pooled lift averages over seasons in which it could not differ.
+  **Fourth pooled-figure trap in this repository**, after xG coverage, home advantage and the
+  Stage A Poisson zero: always split by season before discussing a number.
+- **Goalkeeper saves distributions are under-dispersed in both V1 and V2**, at PIT-80 coverage
+  0.7604 and 0.7626 against a nominal 0.80 over 3,686 goalkeeper appearances. That is a separate
+  defect from where the shot volume comes from, and neither candidate addressed it. Both models
+  also truncate at 10 saves; 5 of 3,846 goalkeeper appearances (0.13%) exceed it, identically for
+  both, so the comparison is fair but neither can score an 11-save match.
 
 ## Priorities for upcoming work
 
@@ -1184,6 +1337,22 @@ active delivery order.
    selected forecast. Label it as non-vintage-aligned reporting context and show each row's
    `(season, as_at_gw)` anchor; never describe it as state known at the forecast `as_of` or use it
    as point-in-time model evidence.
+
+10. The V2 football-first architecture is implemented **development-only** and promotes nothing.
+    `trailing_goals_attack_defence` remains the Stage A model and `gk_saves_v1` remains the
+    composer's saves component. Both V2 candidates failed their pre-registered gates and are left
+    as committed: **do not retune either**, and do not re-run or re-judge
+    `results/v2_team_environment_development.json`. A successor needs its own named policy and
+    its own amendment, not a post-hoc tweak. The V2 team engine is deliberately NOT wired into
+    `jobs/prospective_points_v1.py`; `jobs/prospective_environment_v2.py` produces the football
+    forecast for analysis instead, so no decision path consumes an ungated candidate.
+11. The `pl_sdp` provider has never been captured, so the upper half of the ablation ladder
+    (shots on target, box touches) is **untested rather than refuted**. Before fitting anything
+    on an SDP metric, run `jobs.audit_pl_sdp --stage` and read
+    `results/pl_sdp_coverage.json`, `results/pl_sdp_identity_audit.json` and
+    `results/pl_sdp_reconciliation.json`: coverage-first is a rule, not a preference. Never
+    zero-fill an absent historical metric, and promote a `verified_semantics` flag only after a
+    real payload has been inspected and reconciled.
 
 ## Sub-agent coordination and handoff
 

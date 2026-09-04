@@ -1294,6 +1294,64 @@ Only after the ordered dashboard program above, unless an operational blocker re
 These were not GW1 blockers. The post-deadline implementation remains separate and changes no
 frozen forecast or evaluation.
 
+## P3: V2 — the football-first prediction engine
+
+Status: Milestones A-I implemented development-only, 2026-09-04. Milestone J deferred.
+Authoritative description: `docs/v2-architecture.md`. This section is delivery sequencing;
+`AGENTS.md` owns the correctness and model-history record.
+
+**P3 does not displace P0 or P2.5, and it changes no default.** V1 is untouched, no frozen
+evaluation was re-run or re-judged, and both V2 candidates failed their pre-registered gates and
+are left as committed.
+
+### Delivered
+
+| milestone | content | state |
+| --- | --- | --- |
+| A | SDP source, raw capture, measured fixture-identity audit | implemented |
+| B | typed staging, provider-tagged V2 team-match mart, coverage reporting | implemented |
+| C | point-in-time V2 access, tactical rolling marts | implemented |
+| D | `FixtureEnvironment` contract + multi-signal football engine | implemented |
+| E | GK Saves V2 | implemented, **evaluated, refuted** |
+| F | DC environment V2 | implemented, unevaluated (DC exists in one season) |
+| G | composer integration via `component_engine_v2` | implemented |
+| H | V2 prospective football forecast (`prospective_environment_v2`) | implemented |
+| I | optimizer compatibility | free — the composer input type is unchanged |
+| J | dashboard / analytics exposure of V2 team profiles | **not started** |
+
+### Measured outcome, and what it forbids
+
+* Harness validation: the incumbent scores **1.50030** under the V2 harness against Phase 1's
+  frozen **1.5003**, on 181 folds and 3,640 predictions in both.
+* Team environment: **+0.2867%** against a 1% gate, with 2021-22 regressing **-0.21%**. Failed.
+* GK Saves V2: pooled **+0.168%** log, but per season **+1.37%, +2.28%, -1.10%, -1.24%, -0.27%**.
+  Failed, and refuted in the well-informed regime.
+* Neither may be retuned or re-run. `results/v2_team_environment_development.json` is immutable.
+
+### Remaining work, in dependency order
+
+1. **Capture SDP where egress exists.** Nothing above tested a single SDP metric, because the
+   provider has never been reachable. Run `python -m fpl.jobs.audit_pl_sdp --probe` on the owner's
+   machine or via `.github/workflows/pl-sdp-capture.yml`, record `pl_sdp.season_ids`, backfill,
+   then `--stage`. **Read the three coverage-first reports before fitting anything.**
+2. **Verify the metric dictionary against a real payload.** Every provider field name currently
+   carries `verified_semantics: false`. Promote only what the reconciliation corroborates; extend
+   the dictionary from `unmapped_provider_fields` rather than guessing again.
+3. **Then, and only then, run ablation rungs C and D.** They are currently bit-identical to rung B
+   and are untested, not null. This is the single highest-value remaining experiment: it is the
+   only one that can say whether shot volume and territory carry information beyond xG.
+4. **Milestone J** — expose the V2 team profiles (attack/defence quality, dominance, pressing,
+   low-block tendency, directness, width, duel profile) through the semantic export and dashboard.
+   Deferred deliberately: publishing a tactical profile derived from a provider whose field
+   semantics are unverified would put an unbacked claim in front of a user.
+
+### Explicitly out of scope until a gate is cleared
+
+Wiring V2 into `jobs/prospective_points_v1.py`, changing the prospective default, or presenting a
+V2 number as a recommendation. `jobs/prospective_environment_v2.py` exists precisely so the
+football forecast is available for analysis without any decision path consuming an ungated
+candidate.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:

@@ -12,6 +12,22 @@ different answers:
 
 A single `xP` answers only the first.
 
+**V2 (2026-09-04): a football-first prediction engine is implemented development-only, alongside
+V1 rather than instead of it.** V1 is untouched — no model, config, frozen result, candidate
+document, ledger row or prospective default changed. V2 inserts the layer V1 never had: it models
+the football match environment first (`Premier League / FPL data -> football data layer -> football
+engine -> fixture environment -> FPL component engine -> full points distribution -> decision`),
+with `FixtureEnvironment` as the contract between the two halves. Because the V2 component engine
+produces the composer's existing input type, the composer, artifact contract and optimizer are
+unchanged. **Both V2 candidates failed their pre-registered gates and are left as committed**: the
+team environment reached +0.2867% against a 1% bar with a 2021-22 regression, and GK Saves V2 —
+which replaced V1's identity treating shots faced as a deterministic function of goals conceded —
+is refuted in the regime that matters, winning the two pre-xG seasons and losing every season after
+them. See `docs/v2-architecture.md` and `docs/v2-team-engine-development.md`. The Premier League SDP
+source is fully implemented but **has never been captured**, because every Pulselive /
+premierleague.com / fantasy.premierleague.com host is refused by the authoring environment's egress
+policy; the `fpl_archive` provider supplies the V2 football fact for every season meanwhile.
+
 **Current status: the data foundation, development-only forward pipeline through Stage E,
 append-only forecast/outcome ledgers, BI semantic contract version 6, ten established dashboard
 files at schema version 9 plus two provisional preview files at schema version 1, atomic static
@@ -226,6 +242,24 @@ src/fpl/
   jobs/       build/load/snapshot plus prospective forecast and optimiser entry points
 tests/
 .github/workflows/               -- CI plus daily and finalized-history R5 capture
+```
+
+V2 adds, without disturbing any of the above:
+
+```
+config/pl_sdp_metrics.yaml            the football metric dictionary (alias lists, unverified)
+config/v2_*_evaluation.yaml           pre-registered V2 contracts
+src/fpl/ingest/pl_sdp.py              Premier League SDP client
+src/fpl/transform/pl_sdp.py           landing, staging, measured fixture crosswalk
+src/fpl/transform/football_v2.py      the provider-tagged team-match football fact + tactical form
+src/fpl/artifacts/fixture_environment.py   the football <-> fantasy contract
+src/fpl/models/football_engine_v2.py       one rating system per football signal
+src/fpl/models/gk_saves_v2.py              saves from predicted shots faced
+src/fpl/models/defensive_environment_v2.py DC as a team environment x role share
+src/fpl/models/component_engine_v2.py      adapter onto the UNCHANGED composer input
+src/fpl/validate/v2_environment_harness.py walk-forward harness
+src/fpl/validate/dev_v2_team_environment.py the development runner
+src/fpl/jobs/{backfill,capture,audit}_pl_sdp.py, prospective_environment_v2.py
 ```
 
 ## Storage layers

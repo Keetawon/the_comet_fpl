@@ -1,0 +1,178 @@
+name: Premier League SDP capture (V2 football layer)
+
+# The V2 football data layer's durable execution path.
+#
+# The SDP backend is unreachable from several development sandboxes -- their egress policy
+# refuses every Pulselive / premierleague.com host with a 403 on CONNECT. This workflow is how
+# capture happens anyway, and it deliberately mirrors `snapshot.yml`: curl, gzip and jq only,
+# no Python and no dependency on this repository's package, so a refactor or a broken lockfile
+# cannot stop a capture. It commits raw payloads; loading and staging them into DuckDB stays an
+# explicit operator action, exactly as it is for the FPL snapshots.
+#
+# It is DISABLED by default. `pl_sdp.season_ids` in config/sources.yaml starts empty because the
+# provider's season-id mapping is not documented and this repository refuses to guess it, so
+# there is nothing to fetch until an operator runs
+# `python -m fpl.jobs.audit_pl_sdp --probe` where the provider is reachable and records the
+# mapping. Enable the schedule once `season_id` below is set to a real value.
+
+on:
+  workflow_dispatch:
+    inputs:
+      season_id:
+        description: "Provider season id (from `audit_pl_sdp --probe`)"
+        required: true
+        type: string
+      season_label:
+        description: "Season label, e.g. 2026-27"
+        required: true
+        type: string
+      max_matches:
+        description: "Cap on stats fetches this run"
+        required: false
+        default: "40"
+        type: string
+
+permissions:
+  contents: write
+
+# Shares the FPL snapshot group: two capture jobs must never race on the same commit.
+concurrency:
+  group: api-snapshot
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Fetch match list and completed-match stats
+        id: fetch
+        env:
+          SDP: https://sdp-prem-prod.premier-league-prod.pulselive.com
+          COMPETITION: "8"
+          SEASON_ID: ${{ inputs.season_id }}
+          SEASON_LABEL: ${{ inputs.season_label }}
+          MAX_MATCHES: ${{ inputs.max_matches }}
+        run: |
+          set -euo pipefail
+
+          # Untrusted workflow inputs reach the shell only through `env`, never through `${{ }}`
+          # interpolation, and are validated before use. `${{ }}` is substituted into the script
+          # text before the shell parses it, so an input could otherwise close a quote and run
+          # arbitrary commands with `contents: write` on the default branch.
+          case "${SEASON_ID}" in
+            ''|*[!0-9]*) echo "::error::season_id must be numeric"; exit 1 ;;
+          esac
+          case "${SEASON_LABEL}" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9]) ;;
+            *) echo "::error::season_label must look like 2026-27"; exit 1 ;;
+          esac
+          case "${MAX_MATCHES}" in
+            ''|*[!0-9]*) echo "::error::max_matches must be numeric"; exit 1 ;;
+          esac
+
+          STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          STAMP_DIR="$(date -u +%Y-%m-%dT%H%M%SZ)"
+          DIR="snapshots/pl-sdp/${SEASON_LABEL}/${STAMP_DIR}"
+          mkdir -p "${DIR}/stats"
+          echo "dir=${DIR}"     >> "$GITHUB_OUTPUT"
+          echo "stamp=${STAMP}" >> "$GITHUB_OUTPUT"
+
+          # ~1 request / 1.5s. This is someone else's website backend, not a public API.
+          fetch() {
+            local url="$1" out="$2" min_bytes="${3:-32}" code
+            code="$(curl -sS --fail --show-error \
+                         --retry 3 --retry-delay 5 --retry-connrefused \
+                         --max-time 60 \
+                         -H 'Accept: application/json' \
+                         -H 'User-Agent: the-comet-fpl v2 football capture (+github actions)' \
+                         -w '%{http_code}' -o "${out}" "${url}")" || return 1
+            [ "${code}" = "200" ] || { echo "::error::HTTP ${code} for ${url}"; return 1; }
+            [ -s "${out}" ] || { echo "::error::empty body for ${url}"; return 1; }
+            jq -e . "${out}" > /dev/null 2>&1 || { echo "::error::non-JSON body for ${url}"; return 1; }
+            local bytes; bytes="$(wc -c < "${out}")"
+            if [ "${bytes}" -lt "${min_bytes}" ]; then
+              echo "::error::${url} returned ${bytes} bytes, implausibly small"; return 1
+            fi
+            sleep 1.5
+          }
+
+          fetch "${SDP}/api/v2/matches?competition=${COMPETITION}&season=${SEASON_ID}&page=0&pageSize=100" \
+                "${DIR}/matches.json" 128
+
+          # Accept either a bare list or an object carrying the list, without assuming which:
+          # the envelope shape is undocumented and has to be probed, not presumed.
+          MATCH_IDS="$(jq -r '
+            (if type == "array" then . else (.matches // .content // .data // .items // []) end)
+            | map(select((.status // "") | ascii_downcase | test("complete|finished|full")))
+            | map(.id // .matchId) | map(select(. != null)) | .[]
+          ' "${DIR}/matches.json" | head -n "${MAX_MATCHES}")"
+
+          COUNT=0
+          for MATCH_ID in ${MATCH_IDS}; do
+            case "${MATCH_ID}" in ''|*[!0-9]*) continue ;; esac
+            if fetch "${SDP}/api/v3/matches/${MATCH_ID}/stats" "${DIR}/stats/${MATCH_ID}.json" 64; then
+              COUNT=$((COUNT + 1))
+            else
+              echo "::warning::no stats for match ${MATCH_ID}; a gap is recorded, not fatal"
+              rm -f "${DIR}/stats/${MATCH_ID}.json"
+            fi
+          done
+          echo "captured ${COUNT} match stats payload(s)"
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+
+          if [ "${COUNT}" -eq 0 ]; then
+            echo "::notice::no completed matches captured; nothing to commit"
+          fi
+
+          gzip -9 "${DIR}/matches.json"
+          if compgen -G "${DIR}/stats/*.json" > /dev/null; then
+            gzip -9 "${DIR}"/stats/*.json
+          fi
+          ( cd "${DIR}" && find . -name '*.json.gz' -print0 | sort -z \
+              | xargs -0 sha256sum > SHA256SUMS )
+
+          jq -n \
+            --arg captured_at "${STAMP}" \
+            --arg season "${SEASON_LABEL}" \
+            --arg provider "pl_sdp" \
+            --argjson season_id "${SEASON_ID}" \
+            --argjson stats_payloads "${COUNT}" \
+            '{schema_version:"1", provider:$provider, captured_at:$captured_at,
+              season:$season, sdp_season_id:$season_id, stats_payloads:$stats_payloads,
+              note:"raw provider payloads; load and stage with fpl.jobs.audit_pl_sdp --stage"}' \
+            > "${DIR}/manifest.json"
+          ls -l "${DIR}"
+
+      - name: Commit capture
+        env:
+          CAPTURE_DIR: ${{ steps.fetch.outputs.dir }}
+          CAPTURE_STAMP: ${{ steps.fetch.outputs.stamp }}
+          CAPTURE_COUNT: ${{ steps.fetch.outputs.count }}
+        run: |
+          set -euo pipefail
+          case "${CAPTURE_DIR}" in
+            snapshots/pl-sdp/[0-9][0-9][0-9][0-9]-[0-9][0-9]/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z) ;;
+            *) echo "::error::refusing to commit unexpected path: ${CAPTURE_DIR}"; exit 1 ;;
+          esac
+          [ -s "${CAPTURE_DIR}/matches.json.gz" ] || {
+            echo "::error::match list missing; refusing to commit"; exit 1; }
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${CAPTURE_DIR}"
+          if git diff --cached --quiet; then
+            echo "nothing new to commit"
+            exit 0
+          fi
+          git commit -m "sdp: ${CAPTURE_STAMP} (${CAPTURE_COUNT} match stats payload(s))"
+          for attempt in 1 2 3 4; do
+            if git push; then echo "pushed on attempt ${attempt}"; exit 0; fi
+            sleep $((2 ** attempt))
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          done
+          echo "::error::could not push the capture after 4 attempts"
+          exit 1
