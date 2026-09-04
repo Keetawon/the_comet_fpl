@@ -171,6 +171,12 @@ def test_feature_source_permits_exactly_the_component_tables() -> None:
             "mart_fact_player_fixture_live",
             "mart_team_fixture_live",
             "stg_live_player_version",
+            # V2 football layer. Feature-readable because a team-strength model must read it;
+            # safe because every post-match column on both tables is registered in
+            # OUTCOME_COLUMNS, which test_every_v2_metric_column_is_an_outcome pins against
+            # the metric dictionary.
+            "mart_fact_team_match_stats_v2",
+            "mart_fact_team_tactical_form_v2",
         }
         for table in source.readable_tables():
             source._check_table(table)  # must not raise

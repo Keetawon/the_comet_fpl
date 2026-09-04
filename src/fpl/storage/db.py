@@ -41,6 +41,12 @@ FEATURE_READABLE_TABLES: Final[frozenset[str]] = frozenset(
         # this stg_ table is safe for the feature layer, and fpl.features.pit guards its
         # projection with assert_no_outcome_columns.
         "stg_live_player_version",
+        # V2 football data layer. Both are component/observation tables carrying no points
+        # column of any kind; every post-match metric column on them is registered in
+        # features.pit.OUTCOME_COLUMNS, so PointInTimeView hard-filters them on
+        # `kickoff_time < as_of` and `schedule()` cannot project them.
+        "mart_fact_team_match_stats_v2",
+        "mart_fact_team_tactical_form_v2",
     }
 )
 
@@ -140,6 +146,87 @@ def record_build_metadata(con: duckdb.DuckDBPyConnection, key: str, value: str) 
     )
 
 
+# --------------------------------------------------------------------------------------
+# V2 football metric columns
+# --------------------------------------------------------------------------------------
+
+# The three tables whose metric columns are a function of the metric dictionary rather than
+# of static DDL, and the suffix each uses. `None` means the metric's own name is the column.
+_SDP_METRIC_TABLES: Final[tuple[tuple[str, str | None, bool], ...]] = (
+    # (table, column suffix, include derived opponent mirrors)
+    ("stg_pl_sdp_team_match_stats", None, False),
+    ("mart_fact_team_match_stats_v2", None, True),
+    ("mart_fact_team_tactical_form_v2", "_per_match", True),
+)
+
+# Column type per declared metric type. A percent is a DOUBLE on a 0-100 scale, never a
+# fraction: the two sides of a match must sum to ~100 for the consistency check to mean
+# anything, and silently normalising to 0-1 in one place and not another is how that check
+# starts passing on wrong data.
+_SDP_COLUMN_TYPES: Final[dict[str, str]] = {
+    "int": "INTEGER",
+    "float": "DOUBLE",
+    "percent": "DOUBLE",
+}
+
+# A rolling mean of an integer count is not an integer.
+_SDP_AGGREGATE_TYPE: Final[str] = "DOUBLE"
+
+
+def _validate_identifier(name: str) -> str:
+    """Reject anything that is not a plain identifier before it reaches DDL.
+
+    The names come from a repository config file rather than from user input, but a column
+    name is interpolated into SQL and there is no bind parameter for an identifier, so this
+    is checked rather than trusted.
+    """
+    if not name or not name.replace("_", "").isalnum() or name[0].isdigit():
+        raise ValueError(f"refusing to create unsafe column name: {name!r}")
+    return name
+
+
+def sdp_metric_columns(
+    *, suffix: str | None = None, include_mirrors: bool = True
+) -> dict[str, str]:
+    """Column name -> SQL type for every metric (and mirror) in the dictionary."""
+    from fpl.config import load_sdp_metrics
+
+    dictionary = load_sdp_metrics()
+    columns: dict[str, str] = {}
+    for metric in dictionary.all_fields():
+        base = _SDP_COLUMN_TYPES[str(metric.type)]
+        column_type = _SDP_AGGREGATE_TYPE if suffix else base
+        columns[_validate_identifier(f"{metric.local_field}{suffix or ''}")] = column_type
+        if include_mirrors and metric.mirror is not None:
+            columns[_validate_identifier(f"{metric.mirror}{suffix or ''}")] = column_type
+    return columns
+
+
+def ensure_sdp_metric_columns(con: duckdb.DuckDBPyConnection) -> dict[str, list[str]]:
+    """Add every dictionary-declared metric column to the V2 tables. Idempotent.
+
+    The column set is a function of `config/pl_sdp_metrics.yaml` (R2's principle applied to a
+    second config), so it cannot live in static DDL: adding a metric must be a config change,
+    and that change must bring its columns. Existing rows receive NULL, which is correct --
+    the metric was not measured for them, and NULL is not zero.
+    """
+    added: dict[str, list[str]] = {}
+    for table, suffix, mirrors in _SDP_METRIC_TABLES:
+        if not table_exists(con, table):
+            continue
+        existing = set(table_columns(con, table))
+        new_columns: list[str] = []
+        for column, column_type in sdp_metric_columns(
+            suffix=suffix, include_mirrors=mirrors
+        ).items():
+            if column not in existing:
+                con.execute(f'ALTER TABLE {table} ADD COLUMN "{column}" {column_type}')
+                new_columns.append(column)
+        if new_columns:
+            added[table] = new_columns
+    return added
+
+
 def initialise(db_path: Path | str | None = None) -> duckdb.DuckDBPyConnection:
     """Open a connection with the schema applied and ruleset columns present."""
     from fpl.config import available_rulesets
@@ -147,4 +234,5 @@ def initialise(db_path: Path | str | None = None) -> duckdb.DuckDBPyConnection:
     con = connect(db_path)
     apply_schema(con)
     ensure_ruleset_columns(con, available_rulesets())
+    ensure_sdp_metric_columns(con)
     return con

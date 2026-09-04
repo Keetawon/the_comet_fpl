@@ -602,6 +602,171 @@ CREATE TABLE IF NOT EXISTS mart_target_completeness (
 );
 
 -- ====================================================================================
+-- V2 football data layer (see docs/v2-architecture.md)
+-- ====================================================================================
+--
+-- Metric COLUMNS on the three metric-bearing tables below are NOT declared here. They are a
+-- function of `config/pl_sdp_metrics.yaml` and are added idempotently by
+-- storage.db.ensure_sdp_metric_columns(), exactly as the ruleset target columns are added
+-- from the scoring configs. Declaring them statically would mean a metric-dictionary change
+-- needed a schema migration, which is precisely the coupling an undocumented upstream makes
+-- unaffordable.
+
+-- RAW: exactly what the provider sent, append-only.
+--
+-- `payload_id` is content-addressed over (provider, endpoint, params, body hash), so:
+--   * re-fetching unchanged data is an idempotent no-op -- the same row is re-derived;
+--   * a provider RESTATEMENT lands as a NEW row rather than overwriting the original, which
+--     is what makes `known_at` meaningful downstream. A statistic corrected three days after
+--     a match must not retroactively change what was knowable on match night.
+CREATE TABLE IF NOT EXISTS raw_pl_sdp_payload (
+    payload_id   VARCHAR PRIMARY KEY,
+    provider     VARCHAR NOT NULL,
+    endpoint     VARCHAR NOT NULL,
+    request_path VARCHAR NOT NULL,
+    params_json  VARCHAR NOT NULL,
+    season       VARCHAR,
+    sdp_match_id BIGINT,
+    fetched_at   TIMESTAMPTZ NOT NULL,
+    status_code  INTEGER NOT NULL,
+    payload      JSON NOT NULL,
+    sha256       VARCHAR NOT NULL,
+    byte_count   BIGINT NOT NULL
+);
+
+-- STAGING: typed match identity, versioned by the capture that produced it.
+CREATE TABLE IF NOT EXISTS stg_pl_sdp_match (
+    sdp_match_id     BIGINT NOT NULL,
+    payload_id       VARCHAR NOT NULL,
+    known_at         TIMESTAMPTZ NOT NULL,
+    season           VARCHAR NOT NULL,
+    sdp_season_id    INTEGER,
+    matchweek        INTEGER,
+    kickoff_time     TIMESTAMPTZ,
+    home_team_name   VARCHAR,
+    away_team_name   VARCHAR,
+    home_sdp_team_id INTEGER,
+    away_sdp_team_id INTEGER,
+    home_score       INTEGER,
+    away_score       INTEGER,
+    status           VARCHAR,
+    PRIMARY KEY (sdp_match_id, payload_id)
+);
+
+-- STAGING: one team side per match. Typed metric columns are generated; `stats_json` keeps
+-- the provider's mapping verbatim beside them so nothing depends on the dictionary being
+-- complete.
+CREATE TABLE IF NOT EXISTS stg_pl_sdp_team_match_stats (
+    sdp_match_id  BIGINT NOT NULL,
+    side          VARCHAR NOT NULL,
+    payload_id    VARCHAR NOT NULL,
+    known_at      TIMESTAMPTZ NOT NULL,
+    sdp_team_id   INTEGER,
+    team_name     VARCHAR,
+    stats_json    JSON NOT NULL,
+    metric_count  INTEGER NOT NULL,
+    mapped_count  INTEGER NOT NULL,
+    PRIMARY KEY (sdp_match_id, side, payload_id)
+);
+
+-- STAGING: the tall metric store. Every provider field of every payload lands here whether
+-- or not the dictionary claims it -- `local_field` is NULL for an unmapped field, and
+-- `jobs.audit_pl_sdp` reports those so the dictionary can be extended by configuration.
+-- This is what makes a wrong guess in the dictionary lossless rather than destructive.
+CREATE TABLE IF NOT EXISTS stg_pl_sdp_team_match_metric (
+    sdp_match_id   BIGINT NOT NULL,
+    side           VARCHAR NOT NULL,
+    payload_id     VARCHAR NOT NULL,
+    provider_field VARCHAR NOT NULL,
+    local_field    VARCHAR,
+    value_numeric  DOUBLE,
+    value_text     VARCHAR,
+    PRIMARY KEY (sdp_match_id, side, payload_id, provider_field)
+);
+
+-- STAGING: the measured identity bridge between FPL fixtures and SDP matches.
+--
+-- Whether `pulse_id == sdp_match_id` is a QUESTION, not an assumption; this table records the
+-- answer per fixture together with how it was reached and what corroborated it. The UNIQUE
+-- constraint on sdp_match_id is load-bearing: one provider match must never be attributed to
+-- two FPL fixtures, which is exactly what a silent fuzzy match would produce.
+CREATE TABLE IF NOT EXISTS stg_pl_sdp_fixture_crosswalk (
+    season                VARCHAR NOT NULL,
+    fixture               INTEGER NOT NULL,
+    sdp_match_id          BIGINT NOT NULL UNIQUE,
+    match_method          VARCHAR NOT NULL,
+    pulse_id              INTEGER,
+    corroborated_kickoff  BOOLEAN,
+    corroborated_teams    BOOLEAN,
+    corroborated_score    BOOLEAN,
+    resolved_at           TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (season, fixture)
+);
+
+-- MART: the V2 football fact. One club x one fixture x one provider.
+--
+-- `provider` is the point of the table. `fpl_archive` rows are derived from data already in
+-- this repository and exist for every season; `pl_sdp` rows require a network capture. Both
+-- occupy the same grain so they can be compared rather than merged, and a metric a provider
+-- does not carry stays NULL rather than being filled from the other.
+CREATE TABLE IF NOT EXISTS mart_fact_team_match_stats_v2 (
+    season             VARCHAR NOT NULL,
+    gw                 INTEGER,
+    fixture            INTEGER NOT NULL,
+    pulse_id           INTEGER,
+    sdp_match_id       BIGINT,
+    kickoff_time       TIMESTAMPTZ NOT NULL,
+    team_id            INTEGER NOT NULL,
+    team_code          INTEGER,
+    opponent_team_id   INTEGER NOT NULL,
+    opponent_team_code INTEGER,
+    was_home           BOOLEAN NOT NULL,
+    provider           VARCHAR NOT NULL,
+    known_at           TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (season, fixture, team_id, provider)
+);
+
+-- MART: descriptive rolling team state, keyed on the cross-season club identity.
+--
+-- Raw rolling means are generated per metric with a `_per_match` suffix. The derived indices
+-- declared below are RATIOS of those, and are named so the two can never be confused. They
+-- are descriptive interpretations of play style, not objective truth and not model outputs;
+-- `docs/v2-team-engine-design.md` records that an index only earns its way into a model by
+-- improving a proper score.
+--
+-- Anchoring mirrors mart_fact_team_form exactly: observed gameweeks only, window ends at the
+-- anchor gameweek inclusive, cutoff is the anchor gameweek's latest kickoff, both legs of a
+-- double gameweek counted, no fabricated blank-gameweek row.
+CREATE TABLE IF NOT EXISTS mart_fact_team_tactical_form_v2 (
+    season                VARCHAR NOT NULL,
+    gw                    INTEGER NOT NULL,
+    team_code             INTEGER NOT NULL,
+    provider              VARCHAR NOT NULL,
+    -- Quoted because `window` is a DuckDB reserved word; kept as the name anyway so this
+    -- table's window vocabulary matches mart_fact_player_form and mart_fact_team_form.
+    "window"              VARCHAR NOT NULL,
+    as_at_kickoff         TIMESTAMPTZ NOT NULL,
+    matches               INTEGER NOT NULL,
+    -- derived ratio indices; NULL whenever an input is unmeasured or a denominator is zero
+    shot_accuracy         DOUBLE,
+    shot_quality          DOUBLE,
+    finishing_quality     DOUBLE,
+    pass_accuracy         DOUBLE,
+    forward_pass_ratio    DOUBLE,
+    long_pass_ratio       DOUBLE,
+    cross_accuracy        DOUBLE,
+    tackle_success_rate   DOUBLE,
+    duel_win_rate         DOUBLE,
+    aerial_win_rate       DOUBLE,
+    high_press_share      DOUBLE,
+    low_block_share       DOUBLE,
+    defensive_volume      DOUBLE,
+    territorial_dominance DOUBLE,
+    PRIMARY KEY (season, gw, team_code, provider, "window"),
+    CHECK ("window" IN ('last_3', 'last_5', 'last_10', 'season_to_date'))
+);
+
+-- ====================================================================================
 -- Additive migrations for databases cloned by the failure-atomic archive rebuild
 -- ====================================================================================
 -- `CREATE TABLE IF NOT EXISTS` does not evolve a table that already exists. Full rebuilds

@@ -57,6 +57,98 @@ class AsOf:
             )
 
 
+# --------------------------------------------------------------------------------------
+# V2 football layer outcome columns
+# --------------------------------------------------------------------------------------
+
+# Post-match football measurements on mart_fact_team_match_stats_v2 (raw metric and its
+# opponent mirror) and their rolling counterparts on mart_fact_team_tactical_form_v2. Both
+# marts are feature-readable, so every column that could not be known before kickoff has to be
+# named here for `observed_*` to filter it and for `schedule()` to be unable to project it.
+_V2_METRIC_COLUMNS: Final[tuple[str, ...]] = (
+    "accurate_crosses",
+    "accurate_long_passes",
+    "accurate_passes",
+    "aerial_duels_lost",
+    "aerial_duels_won",
+    "backward_passes",
+    "big_chances_allowed",
+    "big_chances_created",
+    "big_chances_missed",
+    "big_chances_scored",
+    "blocks",
+    "bps",
+    "clearances",
+    "corners",
+    "crosses",
+    "defensive_actions",
+    "duels_lost",
+    "duels_won",
+    "expected_goals",
+    "expected_goals_allowed",
+    "expected_goals_conceded_measured",
+    "expected_goals_on_target",
+    "expected_goals_on_target_allowed",
+    "final_third_entries",
+    "final_third_entries_allowed",
+    "forward_passes",
+    "fouls",
+    "goals",
+    "goals_allowed",
+    "interceptions",
+    "long_passes",
+    "offsides",
+    "passes",
+    "penalty_area_entries",
+    "penalty_area_entries_allowed",
+    "possession",
+    "possession_won_attacking_third",
+    "possession_won_defensive_third",
+    "possession_won_middle_third",
+    "recoveries",
+    "red_cards",
+    "saves",
+    "shots",
+    "shots_allowed",
+    "shots_blocked",
+    "shots_inside_box",
+    "shots_on_target",
+    "shots_on_target_allowed",
+    "shots_on_target_allowed_proxy",
+    "shots_outside_box",
+    "tackles",
+    "tackles_won",
+    "touches_in_opposition_box",
+    "touches_in_own_box_allowed",
+    "yellow_cards",
+)
+
+_V2_DERIVED_INDEX_COLUMNS: Final[tuple[str, ...]] = (
+    "shot_accuracy",
+    "shot_quality",
+    "finishing_quality",
+    "pass_accuracy",
+    "forward_pass_ratio",
+    "long_pass_ratio",
+    "cross_accuracy",
+    "tackle_success_rate",
+    "duel_win_rate",
+    "aerial_win_rate",
+    "high_press_share",
+    "low_block_share",
+    "defensive_volume",
+    "territorial_dominance",
+)
+
+_V2_OUTCOME_COLUMNS: Final[tuple[str, ...]] = (
+    *_V2_METRIC_COLUMNS,
+    *(f"{column}_per_match" for column in _V2_METRIC_COLUMNS),
+    *_V2_DERIVED_INDEX_COLUMNS,
+    "matches",
+    "as_at_kickoff",
+)
+
+
 # Only knowable after kickoff. Never available for a fixture at or after `as_of`.
 OUTCOME_COLUMNS: Final[frozenset[str]] = frozenset(
     {
@@ -95,6 +187,14 @@ OUTCOME_COLUMNS: Final[frozenset[str]] = frozenset(
         "selected",
         "transfers_in",
         "transfers_out",
+        # V2 football layer. Every one of these is a post-match measurement of what happened
+        # on the pitch, so a fixture at or after `as_of` must not expose them. They are listed
+        # explicitly rather than derived from the metric dictionary at import time so that
+        # adding a metric to the dictionary WITHOUT registering it here fails the
+        # `test_every_v2_metric_column_is_an_outcome` test -- a new post-match column that
+        # silently defaulted to "safe to read from the future" is precisely the leak this
+        # module exists to prevent.
+        *_V2_OUTCOME_COLUMNS,
     }
 )
 
@@ -321,6 +421,53 @@ class PointInTimeView:
             seasons=seasons,
         )
 
+    def observed_team_football(
+        self,
+        *,
+        team_codes: Sequence[int] | None = None,
+        seasons: Sequence[str] | None = None,
+        providers: Sequence[str] | None = None,
+        columns: Sequence[str] | None = None,
+    ) -> pl.DataFrame:
+        """V2 football metric rows with `kickoff_time < as_of`.
+
+        Keyed on `team_code`, not `team_id`: this is the table a cross-season rating system
+        reads, and `team_id` is reassigned every year.
+        """
+        return self._observed(
+            "mart_fact_team_match_stats_v2",
+            columns=columns,
+            entity_column="team_code",
+            entity_values=team_codes,
+            seasons=seasons,
+            extra_in=(("provider", providers),),
+        )
+
+    def observed_team_tactical_form(
+        self,
+        *,
+        team_codes: Sequence[int] | None = None,
+        seasons: Sequence[str] | None = None,
+        providers: Sequence[str] | None = None,
+        windows: Sequence[str] | None = None,
+        columns: Sequence[str] | None = None,
+    ) -> pl.DataFrame:
+        """Rolling descriptive team state whose anchor kickoff is strictly before `as_of`.
+
+        The boundary is `as_at_kickoff`, the anchor gameweek's latest kickoff, because that is
+        the instant the whole window became knowable. Filtering on anything earlier would let a
+        window that includes the anchor match be read before that match was played.
+        """
+        return self._observed(
+            "mart_fact_team_tactical_form_v2",
+            columns=columns,
+            entity_column="team_code",
+            entity_values=team_codes,
+            seasons=seasons,
+            time_column="as_at_kickoff",
+            extra_in=(("provider", providers), ("window", windows)),
+        )
+
     def _observed(
         self,
         table: str,
@@ -329,6 +476,8 @@ class PointInTimeView:
         entity_column: str,
         entity_values: Sequence[int] | None,
         seasons: Sequence[str] | None,
+        time_column: str = "kickoff_time",
+        extra_in: Sequence[tuple[str, Sequence[object] | None]] = (),
     ) -> pl.DataFrame:
         selected = list(columns) if columns is not None else self._source._columns(table)
         predicates: list[str] = []
@@ -350,8 +499,17 @@ class PointInTimeView:
             else:
                 predicates.append("FALSE")
 
+        for column, values in extra_in:
+            if values is None:
+                continue
+            if values:
+                predicates.append(f'"{column}" IN ({", ".join("?" for _ in values)})')
+                params.extend(values)
+            else:
+                predicates.append("FALSE")
+
         # ...and the point-in-time boundary last, appended here and nowhere else.
-        predicates.append("kickoff_time < ?")
+        predicates.append(f'"{time_column}" < ?')
         params.append(self._as_of.ts)
 
         archive = self._source._select(

@@ -63,3 +63,50 @@ defensive_actions_dump:
     pulled_with: "soccerdata (FBref match logs: defense + misc) -- see recipe"
     # ISO date the operator pulled it; null until a dump is actually committed.
     pulled_on: null
+
+# --------------------------------------------------------------------------------------
+# Premier League SDP (V2 football data layer).
+#
+# The JSON backend behind premierleague.com. It is undocumented private infrastructure, not
+# a published API, so every value below is an assumption until `fpl.jobs.audit_pl_sdp` has
+# observed a real payload and written results/pl_sdp_identity_audit.json.
+#
+# Consequences that are designed for rather than hoped away:
+#   * response envelopes may be a bare list or a paged container -- the client tries an
+#     ordered list of container keys and raises rather than guessing;
+#   * `season` is a numeric provider id whose mapping to a season label is NOT known here.
+#     `season_ids` starts empty; `fpl.jobs.audit_pl_sdp --probe` discovers it and prints the
+#     block to paste back. An unmapped season fails closed instead of fetching the wrong year;
+#   * additive field changes are tolerated (the tall metric store keeps everything);
+#     incompatible ones fail visibly.
+#
+# Pacing is deliberately slower than the FPL client: this is someone else's website backend.
+pl_sdp:
+  base_url: "https://sdp-prem-prod.premier-league-prod.pulselive.com"
+  competition: 8
+  endpoints:
+    seasons: "/api/v2/competitions/{competition}/seasons"
+    matches: "/api/v2/matches"
+    match: "/api/v2/matches/{match_id}"
+    match_stats: "/api/v3/matches/{match_id}/stats"
+    match_lineups: "/api/v3/matches/{match_id}/lineups"
+    match_events: "/api/v1/matches/{match_id}/events"
+  # Season label -> provider season id. Empty until an audit/probe run fills it in; an
+  # unmapped label is refused rather than guessed.
+  season_ids: {}
+  # Candidate provider season ids a probe run sweeps when `season_ids` has no entry.
+  probe_season_id_minimum: 1
+  probe_season_id_maximum: 800
+  # ~1 request per 1.5s. Conservative on purpose.
+  min_request_interval_seconds: 1.5
+  timeout_seconds: 30.0
+  max_retries: 4
+  retry_backoff_base_seconds: 2.0
+  # Pagination. `page_size` is sent as the provider's page-size parameter when the endpoint
+  # accepts one; `maximum_pages` bounds a runaway loop if the provider ignores paging.
+  page_size: 100
+  maximum_pages: 40
+  # A stats payload smaller than this is treated as an error, not as an empty match.
+  minimum_payload_bytes: 32
+  # Metric dictionary, relative to config/.
+  metric_dictionary: "pl_sdp_metrics.yaml"

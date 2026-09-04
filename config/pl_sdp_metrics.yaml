@@ -1,0 +1,369 @@
+# Premier League SDP metric dictionary.
+#
+# ============================ READ THIS BEFORE TRUSTING A NAME ============================
+# No SDP payload has been observed from the environment that authored this file: every
+# Pulselive, premierleague.com and fantasy.premierleague.com host is refused by its egress
+# policy. Every `provider_fields` entry below is therefore a CANDIDATE ALIAS LIST, seeded from
+# the Opta/Pulselive metric vocabulary the premierleague.com site has historically used, and
+# every entry carries `verified_semantics: false`.
+#
+# This file is safe to be wrong. Three mechanisms make it so:
+#
+#   1. `stg_pl_sdp_team_match_metric` is a TALL store keyed on the provider's own field name.
+#      Every field in every payload lands there whether or not it appears below, so a wrong
+#      guess loses no data.
+#   2. `fpl.jobs.audit_pl_sdp` reports `unmapped_provider_fields` -- the fields observed in real
+#      payloads that no entry claims -- and `unmatched_local_fields`, the entries that never
+#      matched. Extending this file is then a config change, not a migration.
+#   3. Two aliases of the same local field appearing in one payload with DIFFERENT values fails
+#      closed. A silently-picked-first-match on a genuine ambiguity is exactly the class of
+#      defect this repository has paid for before.
+#
+# Promote `verified_semantics` to true only when a real payload has been inspected AND the
+# value has been reconciled against an independent source (results/pl_sdp_reconciliation.json).
+# ==========================================================================================
+#
+# Fields:
+#   local_field         canonical name used in stg/mart. Stable; downstream code binds to it.
+#   provider_fields     accepted provider key names, in preference order.
+#   type                int | float | percent   (percent is stored as a 0-100 float, never 0-1)
+#   group               metric family, used by the coverage report and the tactical form marts.
+#   mirror              local_field of the opponent-facing value derived by pairing both sides
+#                       of the same match. Omitted where no valid semantic mirror exists.
+#   description         what the value means. Prose, for the coverage report and humans.
+#   verified_semantics  false until observed AND reconciled.
+
+schema_version: 1
+
+metrics:
+  # ---- result / quality -----------------------------------------------------------------
+  - local_field: goals
+    provider_fields: [goals, goal, total_goals]
+    type: int
+    group: result
+    mirror: goals_allowed
+    description: Goals scored by this side, excluding own goals credited to the opponent.
+    verified_semantics: false
+  - local_field: expected_goals
+    provider_fields: [expected_goals, expectedGoals, xg, expected_goals_total]
+    type: float
+    group: result
+    mirror: expected_goals_allowed
+    description: Opta expected goals for this side's shots.
+    verified_semantics: false
+  - local_field: expected_goals_on_target
+    provider_fields: [expected_goals_on_target, expectedGoalsOnTarget, xgot, expected_goals_ontarget]
+    type: float
+    group: result
+    mirror: expected_goals_on_target_allowed
+    description: >-
+      Post-shot expected goals -- xG conditioned on shot placement, defined only over shots on
+      target. Measures finishing and keeper workload rather than chance creation.
+    verified_semantics: false
+
+  # ---- shooting -------------------------------------------------------------------------
+  - local_field: shots
+    provider_fields: [total_scoring_att, totalScoringAtt, shots, total_shots]
+    type: int
+    group: shooting
+    mirror: shots_allowed
+    description: Total goal attempts, on and off target, including blocked.
+    verified_semantics: false
+  - local_field: shots_on_target
+    provider_fields: [ontarget_scoring_att, ontargetScoringAtt, shots_on_target, shots_on_goal]
+    type: int
+    group: shooting
+    mirror: shots_on_target_allowed
+    description: Goal attempts on target, including those saved and those scored.
+    verified_semantics: false
+  - local_field: shots_inside_box
+    provider_fields: [att_ibox_target, attIboxTarget, shots_inside_box, att_ibox_goal]
+    type: int
+    group: shooting
+    description: Goal attempts taken from inside the penalty area.
+    verified_semantics: false
+  - local_field: shots_outside_box
+    provider_fields: [att_obox_target, attOboxTarget, shots_outside_box]
+    type: int
+    group: shooting
+    description: Goal attempts taken from outside the penalty area.
+    verified_semantics: false
+  - local_field: shots_blocked
+    provider_fields: [blocked_scoring_att, blockedScoringAtt, shots_blocked]
+    type: int
+    group: shooting
+    description: This side's goal attempts blocked by an opposition outfield player.
+    verified_semantics: false
+  - local_field: big_chances_created
+    provider_fields: [big_chance_created, bigChanceCreated, big_chances_created]
+    type: int
+    group: shooting
+    mirror: big_chances_allowed
+    description: Chances Opta classifies as clear scoring opportunities created by this side.
+    verified_semantics: false
+  - local_field: big_chances_scored
+    provider_fields: [big_chance_scored, bigChanceScored, big_chances_scored]
+    type: int
+    group: shooting
+    description: Big chances converted.
+    verified_semantics: false
+  - local_field: big_chances_missed
+    provider_fields: [big_chance_missed, bigChanceMissed, big_chances_missed]
+    type: int
+    group: shooting
+    description: Big chances not converted.
+    verified_semantics: false
+
+  # ---- territory ------------------------------------------------------------------------
+  - local_field: touches_in_opposition_box
+    provider_fields: [touches_in_opp_box, touchesInOppBox, touches_in_opposition_box]
+    type: int
+    group: territory
+    mirror: touches_in_own_box_allowed
+    description: Touches by this side inside the opposition penalty area.
+    verified_semantics: false
+  - local_field: final_third_entries
+    provider_fields: [final_third_entries, finalThirdEntries, total_final_third_passes]
+    type: int
+    group: territory
+    mirror: final_third_entries_allowed
+    description: Entries into the attacking third.
+    verified_semantics: false
+  - local_field: penalty_area_entries
+    provider_fields: [penalty_area_entries, penaltyAreaEntries, box_entries]
+    type: int
+    group: territory
+    mirror: penalty_area_entries_allowed
+    description: Entries into the opposition penalty area.
+    verified_semantics: false
+  - local_field: possession
+    provider_fields: [possession_percentage, possessionPercentage, possession]
+    type: percent
+    group: territory
+    description: >-
+      Share of possession, 0-100. Stored as a percent, never a fraction: the two sides of a
+      match must sum to ~100, which is the coverage report's consistency check.
+    verified_semantics: false
+
+  # ---- passing --------------------------------------------------------------------------
+  - local_field: passes
+    provider_fields: [total_pass, totalPass, passes]
+    type: int
+    group: passing
+    description: Total passes attempted.
+    verified_semantics: false
+  - local_field: accurate_passes
+    provider_fields: [accurate_pass, accuratePass, accurate_passes]
+    type: int
+    group: passing
+    description: Passes completed to a team-mate.
+    verified_semantics: false
+  - local_field: forward_passes
+    provider_fields: [total_fwd_zone_pass, totalFwdZonePass, forward_passes]
+    type: int
+    group: passing
+    description: Passes played into the forward zone.
+    verified_semantics: false
+  - local_field: backward_passes
+    provider_fields: [total_back_zone_pass, totalBackZonePass, backward_passes]
+    type: int
+    group: passing
+    description: Passes played into the back zone.
+    verified_semantics: false
+  - local_field: long_passes
+    provider_fields: [total_long_balls, totalLongBalls, long_passes]
+    type: int
+    group: passing
+    description: Long passes attempted.
+    verified_semantics: false
+  - local_field: accurate_long_passes
+    provider_fields: [accurate_long_balls, accurateLongBalls, accurate_long_passes]
+    type: int
+    group: passing
+    description: Long passes completed.
+    verified_semantics: false
+
+  # ---- width ----------------------------------------------------------------------------
+  - local_field: crosses
+    provider_fields: [total_cross, totalCross, crosses]
+    type: int
+    group: width
+    description: Crosses attempted from open play and set pieces.
+    verified_semantics: false
+  - local_field: accurate_crosses
+    provider_fields: [accurate_cross, accurateCross, accurate_crosses]
+    type: int
+    group: width
+    description: Crosses finding a team-mate.
+    verified_semantics: false
+  - local_field: corners
+    provider_fields: [won_corners, wonCorners, corner_taken, corners]
+    type: int
+    group: width
+    description: Corners won by this side.
+    verified_semantics: false
+
+  # ---- defending ------------------------------------------------------------------------
+  - local_field: tackles
+    provider_fields: [total_tackle, totalTackle, tackles]
+    type: int
+    group: defending
+    description: Tackles attempted.
+    verified_semantics: false
+  - local_field: tackles_won
+    provider_fields: [won_tackle, wonTackle, tackles_won]
+    type: int
+    group: defending
+    description: Tackles that regained or dispossessed.
+    verified_semantics: false
+  - local_field: interceptions
+    provider_fields: [interception, interceptions, total_interception]
+    type: int
+    group: defending
+    description: Interceptions made.
+    verified_semantics: false
+  - local_field: clearances
+    provider_fields: [total_clearance, totalClearance, clearances]
+    type: int
+    group: defending
+    description: Clearances made.
+    verified_semantics: false
+  - local_field: blocks
+    provider_fields: [outfielder_block, outfielderBlock, blocks, blocked_pass]
+    type: int
+    group: defending
+    description: Blocks by outfield players, excluding blocked shots on goal.
+    verified_semantics: false
+  - local_field: recoveries
+    provider_fields: [ball_recovery, ballRecovery, recoveries]
+    type: int
+    group: defending
+    description: Loose-ball recoveries.
+    verified_semantics: false
+  - local_field: saves
+    provider_fields: [saves, total_saves, save]
+    type: int
+    group: defending
+    description: Goalkeeper saves made by this side.
+    verified_semantics: false
+
+  # ---- press / regain -------------------------------------------------------------------
+  - local_field: possession_won_attacking_third
+    provider_fields: [poss_won_att_3rd, possWonAtt3rd, possession_won_attacking_third]
+    type: int
+    group: press
+    description: Possession regained in the attacking third -- the high-press signal.
+    verified_semantics: false
+  - local_field: possession_won_middle_third
+    provider_fields: [poss_won_mid_3rd, possWonMid3rd, possession_won_middle_third]
+    type: int
+    group: press
+    description: Possession regained in the middle third.
+    verified_semantics: false
+  - local_field: possession_won_defensive_third
+    provider_fields: [poss_won_def_3rd, possWonDef3rd, possession_won_defensive_third]
+    type: int
+    group: press
+    description: Possession regained in the defensive third -- the low-block signal.
+    verified_semantics: false
+
+  # ---- duels ----------------------------------------------------------------------------
+  - local_field: duels_won
+    provider_fields: [duel_won, duelWon, duels_won]
+    type: int
+    group: duels
+    description: Ground and aerial duels won.
+    verified_semantics: false
+  - local_field: duels_lost
+    provider_fields: [duel_lost, duelLost, duels_lost]
+    type: int
+    group: duels
+    description: Ground and aerial duels lost.
+    verified_semantics: false
+  - local_field: aerial_duels_won
+    provider_fields: [aerial_won, aerialWon, aerial_duels_won]
+    type: int
+    group: duels
+    description: Aerial duels won.
+    verified_semantics: false
+  - local_field: aerial_duels_lost
+    provider_fields: [aerial_lost, aerialLost, aerial_duels_lost]
+    type: int
+    group: duels
+    description: Aerial duels lost.
+    verified_semantics: false
+
+  # ---- discipline -----------------------------------------------------------------------
+  - local_field: fouls
+    provider_fields: [fk_foul_lost, fkFoulLost, fouls, total_fouls_conceded]
+    type: int
+    group: discipline
+    description: Fouls conceded.
+    verified_semantics: false
+  - local_field: yellow_cards
+    provider_fields: [total_yel_card, totalYelCard, yellow_cards]
+    type: int
+    group: discipline
+    description: Yellow cards received.
+    verified_semantics: false
+  - local_field: red_cards
+    provider_fields: [total_red_card, totalRedCard, red_cards]
+    type: int
+    group: discipline
+    description: Red cards received, including second yellows.
+    verified_semantics: false
+  - local_field: offsides
+    provider_fields: [total_offside, totalOffside, offsides]
+    type: int
+    group: discipline
+    description: Offsides called against this side.
+    verified_semantics: false
+
+# ==========================================================================================
+# Derived metrics.
+#
+# Not provider fields. These are computed locally and share the same mart columns, so they
+# are declared here rather than in a second place -- a column that exists must have exactly
+# one documented meaning regardless of which provider filled it.
+#
+# `shots_on_target_allowed_proxy` is the one that matters most today. For a goalkeeper
+# appearance the FPL archive records `saves` and `goals_conceded`, and their sum is the count
+# of on-target shots that keeper dealt with. Summed over a club's goalkeeper rows in a fixture
+# it is a MEASURED team-level shots-on-target-allowed, available from 2021-22 -- which is what
+# makes GK Saves V2 evaluable before any SDP byte is captured. It is deliberately a separate
+# column from `shots_on_target_allowed`: the proxy misses on-target shots faced while no
+# recorded keeper was on the pitch, and conflating a proxy with a direct measurement is how an
+# unverifiable number becomes a permanent record.
+# ==========================================================================================
+derived_metrics:
+  - local_field: shots_on_target_allowed_proxy
+    type: int
+    group: shooting
+    description: >-
+      On-target shots faced, derived as sum(saves + goals_conceded) over the club's goalkeeper
+      appearances in the fixture. A measurement of the same quantity as
+      shots_on_target_allowed, by a different route and with different failure modes.
+    verified_semantics: true
+  - local_field: expected_goals_conceded_measured
+    type: float
+    group: result
+    description: >-
+      Team expected goals conceded as measured by FPL's own per-player xGC (the maximum over
+      the squad, since a player's xGC is the team's during his minutes). Deliberately NOT the
+      same column as expected_goals_allowed, which is the opponent's expected_goals mirrored
+      across the fixture: the two measure the same concept from different sources and are
+      retained separately so their disagreement stays visible.
+    verified_semantics: true
+  - local_field: defensive_actions
+    type: int
+    group: defending
+    description: >-
+      Team total of the actions FPL's defensive-contribution award counts (tackles,
+      recoveries, and clearances/blocks/interceptions). Measured only where its inputs are --
+      the FPL archive carries them from 2025-26 only, and NULL before that.
+    verified_semantics: true
+  - local_field: bps
+    type: int
+    group: result
+    description: Team total of FPL's own bonus-point-system score. Context for the bonus model.
+    verified_semantics: true

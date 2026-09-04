@@ -11,6 +11,7 @@ from __future__ import annotations
 import functools
 import hashlib
 from datetime import date, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self
 from urllib.parse import urlparse
@@ -332,6 +333,43 @@ class DefensiveActionsDump(_Frozen):
     provenance: DefensiveActionsDumpProvenance
 
 
+class PlSdpSource(_Frozen):
+    """Premier League SDP: the undocumented JSON backend behind premierleague.com.
+
+    Every field here is an assumption until a real payload has been observed. The design
+    consequence is that nothing may be inferred silently: `season_ids` starts empty and an
+    unmapped season label is *refused* rather than fetched under a guessed provider id,
+    because fetching the wrong year and labelling it correctly is worse than fetching nothing.
+    """
+
+    base_url: str
+    competition: int
+    endpoints: dict[str, str]
+    season_ids: dict[Season, int] = Field(default_factory=dict)
+    probe_season_id_minimum: int = 1
+    probe_season_id_maximum: int = 800
+    min_request_interval_seconds: float = 1.5
+    timeout_seconds: float = 30.0
+    max_retries: int = 4
+    retry_backoff_base_seconds: float = 2.0
+    page_size: int = 100
+    maximum_pages: int = 40
+    minimum_payload_bytes: int = 32
+    metric_dictionary: str = "pl_sdp_metrics.yaml"
+
+    def season_id(self, season: Season) -> int:
+        """Provider season id for a season label, or a diagnostic refusal."""
+        try:
+            return self.season_ids[season]
+        except KeyError:
+            raise KeyError(
+                f"no pl_sdp season id mapped for {season!r}. Run "
+                "`python -m fpl.jobs.audit_pl_sdp --probe` where the provider is reachable "
+                "and record the mapping under `pl_sdp.season_ids` in config/sources.yaml. "
+                "Guessing a provider season id would silently ingest the wrong season."
+            ) from None
+
+
 class SourcesConfig(_Frozen):
     archive: ArchiveSource
     live_api: LiveApiSource
@@ -339,6 +377,8 @@ class SourcesConfig(_Frozen):
     paths: Paths
     # Optional until a B-path dump is committed. Absent => the backfill job needs --csv.
     defensive_actions_dump: DefensiveActionsDump | None = None
+    # Optional so an older config still loads; absent means the V2 SDP path is unconfigured.
+    pl_sdp: PlSdpSource | None = None
 
 
 # --------------------------------------------------------------------------------------
@@ -1783,6 +1823,123 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     if not isinstance(loaded, dict):
         raise ValueError(f"{path} did not parse to a mapping")
     return loaded
+
+
+class SdpMetricType(StrEnum):
+    """How a provider value is interpreted at the staging boundary."""
+
+    INT = "int"
+    FLOAT = "float"
+    # Stored 0-100, never 0-1. Both sides of a match must sum to ~100, which is checkable.
+    PERCENT = "percent"
+
+
+class SdpMetric(_Frozen):
+    """One entry of the SDP metric dictionary.
+
+    `provider_fields` is an ALIAS LIST rather than a single name because no payload has been
+    observed: the upstream may use Opta's snake_case vocabulary, a camelCase rendering, or
+    something else entirely. Two aliases of the same metric appearing in one payload with
+    different values is an ambiguity and fails closed -- picking the first match on a genuine
+    disagreement is how a wrong number becomes a permanent record.
+    """
+
+    local_field: str
+    provider_fields: list[str]
+    type: SdpMetricType
+    group: str
+    description: str
+    verified_semantics: bool
+    mirror: str | None = None
+
+    @field_validator("provider_fields")
+    @classmethod
+    def _at_least_one_alias(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("provider_fields must name at least one candidate provider key")
+        return value
+
+
+class SdpDerivedMetric(_Frozen):
+    """A metric computed locally rather than sent by the provider.
+
+    Shares the mart columns with provider metrics because a column must mean one thing
+    regardless of which provider filled it. `provider_fields` is absent by construction: a
+    derived metric that could also arrive from the provider would be two measurements of one
+    concept, and this repository keeps those in separate columns.
+    """
+
+    local_field: str
+    type: SdpMetricType
+    group: str
+    description: str
+    verified_semantics: bool
+    mirror: str | None = None
+
+
+class SdpMetricDictionary(_Frozen):
+    schema_version: int
+    metrics: list[SdpMetric]
+    derived_metrics: list[SdpDerivedMetric] = Field(default_factory=list)
+
+    def all_fields(self) -> list[SdpMetric | SdpDerivedMetric]:
+        """Provider and derived metrics together, in declaration order."""
+        return [*self.metrics, *self.derived_metrics]
+
+    @model_validator(mode="after")
+    def _validate(self) -> SdpMetricDictionary:
+        names = [metric.local_field for metric in self.all_fields()]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"duplicate local_field(s) in the metric dictionary: {duplicates}")
+        known = set(names)
+        # A mirror names the opponent-facing column this metric produces. It is deliberately
+        # NOT required to be a metric in its own right -- `shots_allowed` is derived by pairing
+        # the two sides, it is never a field the provider sends -- but it must not collide with
+        # a real metric name, which would make one column mean two things.
+        for metric in self.all_fields():
+            if metric.mirror is not None and metric.mirror in known:
+                raise ValueError(
+                    f"{metric.local_field}.mirror={metric.mirror!r} collides with a declared "
+                    "metric; a mirror column is derived, not sourced"
+                )
+        aliases: dict[str, str] = {}
+        for metric in self.metrics:
+            for alias in metric.provider_fields:
+                if alias in aliases and aliases[alias] != metric.local_field:
+                    raise ValueError(
+                        f"provider field {alias!r} is claimed by both {aliases[alias]!r} and "
+                        f"{metric.local_field!r}; one provider key cannot feed two metrics"
+                    )
+                aliases[alias] = metric.local_field
+        return self
+
+    def by_local_field(self) -> dict[str, SdpMetric | SdpDerivedMetric]:
+        return {metric.local_field: metric for metric in self.all_fields()}
+
+    def alias_index(self) -> dict[str, str]:
+        """provider field name -> local_field. Every alias of every metric."""
+        return {
+            alias: metric.local_field for metric in self.metrics for alias in metric.provider_fields
+        }
+
+    def mirror_fields(self) -> dict[str, str]:
+        """local_field -> the opponent-facing column derived from it."""
+        return {
+            metric.local_field: metric.mirror
+            for metric in self.all_fields()
+            if metric.mirror is not None
+        }
+
+
+@functools.cache
+def load_sdp_metrics(path: Path | None = None) -> SdpMetricDictionary:
+    """Load the SDP metric dictionary named by `sources.pl_sdp.metric_dictionary`."""
+    if path is None:
+        sources = load_sources()
+        name = sources.pl_sdp.metric_dictionary if sources.pl_sdp else "pl_sdp_metrics.yaml"
+        path = config_dir() / name
+    return SdpMetricDictionary.model_validate(_read_yaml(path))
 
 
 @functools.cache
