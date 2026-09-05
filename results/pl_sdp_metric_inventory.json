@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-05 07:44:24.755067+00:00",
+  "generated_at": "2026-09-05 11:06:42.984274+00:00",
   "metric_dictionary_version": 1,
   "note": "Observed field names and values are provider evidence. A mapping's semantic verification remains controlled by config/pl_sdp_metrics.yaml.",
   "provider_fields": [

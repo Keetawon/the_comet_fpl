@@ -117,13 +117,13 @@ lineups endpoint is used, crosses on FPL `code` via `opta_code`, never `element_
 ## Point-in-time
 
 The V2 marts are added to `FEATURE_READABLE_TABLES` and every post-match metric column is added to
-`OUTCOME_COLUMNS`, so `PointInTimeView.observed_*` hard-filters them on `kickoff_time < as_of` and
-`schedule()` cannot project them. Raw and staged provider revisions preserve `known_at`, but the
-current `mart_fact_team_match_stats_v2` selects the latest SDP version and the evaluation harness's
-`load_team_frame` neither reads nor filters `known_at`. The existing kickoff-time guards therefore
-protect prospective feature access, but do **not** yet make a September 2026 historical SDP
-backfill valid inside earlier walk-forward folds. A version-preserving as-of mart/reader is required
-before such an evaluation.
+`OUTCOME_COLUMNS`, so `PointInTimeView.observed_*` hard-filters them on `kickoff_time < as_of` and,
+whenever present, `known_at <= as_of`; `schedule()` cannot project them. Tactical rows carry the
+maximum source `known_at` in their rolling window. The latest-value team-match mart cannot recover
+an older provider version after a restatement, so an early read fails closed rather than falling
+back. The evaluation harness separately rejects `provider='pl_sdp'`. These guards prevent leakage,
+but do **not** make a September 2026 historical backfill valid inside earlier walk-forward folds. A
+version-preserving as-of mart/reader is required before such an evaluation.
 
 ## Football engine
 
@@ -179,7 +179,7 @@ and a contract version that cannot be bumped without an amendment record.
 | --- | --- | --- |
 | A | SDP source, raw capture, identity audit | implemented |
 | B | typed staging, V2 team-match mart, coverage report | implemented |
-| C | kickoff-safe V2 access and rolling marts; SDP version-as-of evaluation | partial / pending |
+| C | kickoff/knowledge-time-safe V2 access; SDP version-as-of evaluation | guards implemented / reader pending |
 | D | `FixtureEnvironment` + V2 football engine | implemented |
 | E | GK saves V2 | implemented |
 | F | V2 team-coupled components (DC environment) | implemented |
@@ -196,8 +196,8 @@ and a contract version that cannot be bumped without an amendment record.
   corroborated by the reconciliation report are marked semantically verified. Unmatched or
   unverified fields remain losslessly retained in the tall metric store.
 * All existing measured V2 results remain from `fpl_archive`. Historical SDP payloads were first
-  known in September 2026, and the current tactical mart does not preserve an as-of provider
-  version for historical folds. Using those rows directly would restate history, so a genuine SOT
-  or territory walk-forward evaluation remains unlicensed until an additive point-in-time contract
-  and version-preserving reader exist.
+  known in September 2026. Immediate feature reads now filter provider knowledge time and the
+  historical evaluation loader rejects SDP, but no version-preserving provider reader exists for
+  old folds. A genuine SOT or territory walk-forward evaluation therefore remains unlicensed until
+  an additive point-in-time contract and version-preserving reader exist.
 * V2 is development-only. It has not been promoted, and the prospective default is unchanged.

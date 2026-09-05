@@ -19,8 +19,10 @@ The configured seasons endpoint returned HTTP 400 with content type
 `application/problem+json` and the provider message `This endpoint is not enabled for API access`.
 That is a provider response, not the earlier HTTP-CONNECT egress-policy denial. The initial
 authoring environment's 403 therefore remains evidence about that environment only, not evidence
-that the provider rejects access generally. The owner machine and the existing GitHub Actions
-workflow remain the supported capture environments.
+that the provider rejects access generally. The owner machine is the environment proven to capture
+this source. The branch's GitHub Actions workflow is statically valid against the real
+cursor/result envelopes, but cannot be dispatched while the workflow is absent from the default
+branch.
 
 ## It is not a published API
 
@@ -124,7 +126,8 @@ every ambiguity and contradiction found.
 
 Resolution order per fixture:
 
-1. `pulse_id == sdp_match_id`, then corroborated on season, kickoff (±3h), score, and teams;
+1. `pulse_id == sdp_match_id`, then corroborated on season, kickoff (within 300 seconds), score,
+   and teams;
 2. otherwise candidates by season and kickoff, narrowed by teams and then score when multiple;
 3. accept only one candidate whose Home/Away teams corroborate; anything else fails closed.
 
@@ -138,7 +141,10 @@ The full real audit answered the hypothesis: **FPL `pulse_id` is not SDP `matchI
 match count was 0 of 1,900 pulse-bearing historical fixtures (0%). All 2,280 fixtures instead
 resolved uniquely through the deterministic season/kickoff/team fallback; every kickoff and
 home/away identity corroborated, with zero ambiguity, contradiction, duplicate claim, or unmatched
-fixture. The fallback is therefore required data plumbing, not a temporary exception.
+fixture. Identity-audit schema 4 further records 2,280/2,280 exact kickoff matches and a maximum
+absolute difference of zero seconds. SDP's naive local kickoff plus `Europe/London` timezone and
+`BST`/`GMT` abbreviation is converted to UTC before this comparison. The fallback is therefore
+required data plumbing, not a temporary exception.
 
 ## Reconciliation, not reconciling away
 

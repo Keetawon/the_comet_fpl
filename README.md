@@ -331,7 +331,8 @@ table. Four runtime layers plus two static ones:
 1. `AsOf` rejects naive datetimes, so timezone cannot silently move the boundary.
 2. No caller SQL; column names are validated against a per-table allowlist.
 3. `observed_*` appends `kickoff_time < as_of` itself, after any caller filters.
-4. Live facts and schedules additionally select only versions with `known_at <= as_of`.
+4. Any readable fact carrying `known_at` additionally enforces `known_at <= as_of`; versioned live
+   facts and schedules select the latest eligible version.
 5. `schedule()` may return future rows but projects only pre-kickoff columns — a future
    outcome is absent, not merely filtered.
 6. An **AST scan** fails any module in `features/` that imports duckdb, calls `.execute(`,

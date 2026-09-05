@@ -1310,7 +1310,7 @@ are left as committed.
 | --- | --- | --- |
 | A | SDP source, raw capture, measured fixture-identity audit | implemented |
 | B | typed staging, provider-tagged V2 team-match mart, coverage reporting | implemented |
-| C | kickoff-safe V2 access/rolling marts; SDP version-as-of evaluation | partial / pending |
+| C | kickoff/knowledge-time-safe V2 access; SDP version-as-of evaluation | guards implemented / reader pending |
 | D | `FixtureEnvironment` contract + multi-signal football engine | implemented |
 | E | GK Saves V2 | implemented, **evaluated, refuted** |
 | F | DC environment V2 | implemented, **evaluated**: gate missed, mechanism confirmed |
@@ -1347,10 +1347,12 @@ are left as committed.
    goals, xG, and SOT cleared the independent-reconciliation rule. Missing provider values remain
    NULL and are never inferred as zero.
 3. **Implement a version-preserving, as-of SDP evaluation reader before any ablation.** Historical
-   payloads were first captured in September 2026, while `mart_fact_team_match_stats_v2` retains
-   only the latest SDP version and `load_team_frame` does not enforce provider `known_at`. A direct
-   rerun would restate history. After an additive contract closes that gap, create new candidate
-   identities for SOT and then territory; never overwrite or silently rerun frozen rungs C/D.
+   payloads were first captured in September 2026. `PointInTimeView` now filters every readable
+   `known_at` column, tactical windows carry their maximum source knowledge time, and
+   `load_team_frame` rejects `pl_sdp`, so current paths fail closed. The latest-value mart still
+   cannot supply the older provider version appropriate to a historical fold. After an additive
+   contract closes that gap, create new candidate identities for SOT and then territory; never
+   overwrite or silently rerun frozen rungs C/D.
 4. **An over-dispersed DC threshold model**, as a separately named candidate with its own
    amendment. This is the best-evidenced next model experiment in the repository: the
    allocation is already shown to rank well (AUC +13.5%) and the defect is isolated to the

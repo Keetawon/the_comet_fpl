@@ -661,8 +661,225 @@
       "teams_corroborated": 2280
     }
   },
-  "generated_at": "2026-09-05 07:44:24.633917+00:00",
+  "generated_at": "2026-09-05 11:06:42.802249+00:00",
   "note": "differences are reported, never reconciled away; both values are retained",
+  "provider_internal_comparisons": [
+    {
+      "attacking_provider_field": "expectedGoalsOnTarget",
+      "by_season": {
+        "2021-22": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 4
+        },
+        "2022-23": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 2
+        },
+        "2023-24": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 6
+        },
+        "2024-25": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 328
+        },
+        "2025-26": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 743
+        },
+        "2026-27": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 39
+        }
+      },
+      "definition_source": "https://www.statsperform.com/insights/introducing-expected-goals-on-target-xgot/",
+      "definition_summary": "Post-shot expected goals evaluates the chance that an on-target attempt becomes a goal from its observed placement.",
+      "difference": {
+        "mean": 0.0,
+        "mean_absolute": 0.0,
+        "quantiles": {
+          "p00": 0.0,
+          "p10": 0.0,
+          "p100": 0.0,
+          "p25": 0.0,
+          "p50": 0.0,
+          "p75": 0.0,
+          "p90": 0.0
+        },
+        "rows": 1122
+      },
+      "evidence_type": "provider_internal_semantic_mirror",
+      "exact_agreements": 1122,
+      "exact_match_rate": 1.0,
+      "independent_source": false,
+      "label": "expected_goals_on_target_vs_opponent_conceded",
+      "largest_absolute_differences": [
+        {
+          "attacking_xgot": 0.7596,
+          "difference": 0.0,
+          "fixture": 135,
+          "opponent_xgot_conceded": 0.7596,
+          "sdp_match_id": 2210405,
+          "season": "2021-22",
+          "side": "away",
+          "team_id": 6
+        },
+        {
+          "attacking_xgot": 1.3171,
+          "difference": 0.0,
+          "fixture": 135,
+          "opponent_xgot_conceded": 1.3171,
+          "sdp_match_id": 2210405,
+          "season": "2021-22",
+          "side": "home",
+          "team_id": 18
+        },
+        {
+          "attacking_xgot": 0.6054,
+          "difference": 0.0,
+          "fixture": 376,
+          "opponent_xgot_conceded": 0.6054,
+          "sdp_match_id": 2210646,
+          "season": "2021-22",
+          "side": "home",
+          "team_id": 7
+        },
+        {
+          "attacking_xgot": 0.2494,
+          "difference": 0.0,
+          "fixture": 376,
+          "opponent_xgot_conceded": 0.2494,
+          "sdp_match_id": 2210646,
+          "season": "2021-22",
+          "side": "away",
+          "team_id": 13
+        },
+        {
+          "attacking_xgot": 1.0387,
+          "difference": 0.0,
+          "fixture": 104,
+          "opponent_xgot_conceded": 1.0387,
+          "sdp_match_id": 2292913,
+          "season": "2022-23",
+          "side": "away",
+          "team_id": 1
+        },
+        {
+          "attacking_xgot": 1.2964,
+          "difference": 0.0,
+          "fixture": 104,
+          "opponent_xgot_conceded": 1.2964,
+          "sdp_match_id": 2292913,
+          "season": "2022-23",
+          "side": "home",
+          "team_id": 11
+        },
+        {
+          "attacking_xgot": 0.1989,
+          "difference": 0.0,
+          "fixture": 138,
+          "opponent_xgot_conceded": 0.1989,
+          "sdp_match_id": 2367675,
+          "season": "2023-24",
+          "side": "away",
+          "team_id": 14
+        },
+        {
+          "attacking_xgot": 2.0817,
+          "difference": 0.0,
+          "fixture": 138,
+          "opponent_xgot_conceded": 2.0817,
+          "sdp_match_id": 2367675,
+          "season": "2023-24",
+          "side": "home",
+          "team_id": 15
+        },
+        {
+          "attacking_xgot": 0.1342,
+          "difference": 0.0,
+          "fixture": 168,
+          "opponent_xgot_conceded": 0.1342,
+          "sdp_match_id": 2367705,
+          "season": "2023-24",
+          "side": "away",
+          "team_id": 10
+        },
+        {
+          "attacking_xgot": 3.6303,
+          "difference": 0.0,
+          "fixture": 168,
+          "opponent_xgot_conceded": 3.6303,
+          "sdp_match_id": 2367705,
+          "season": "2023-24",
+          "side": "home",
+          "team_id": 15
+        }
+      ],
+      "note": "Same-provider internal consistency, not an independent-source accuracy check; both raw values remain retained in the tall metric store.",
+      "opponent_conceded_provider_field": "expectedGoalsOnTargetConceded",
+      "rows_compared": 1122
+    }
+  ],
   "sanity_checks": {
     "checks": {
       "accurate_crosses_le_crosses": {
@@ -815,7 +1032,7 @@
     "team_rows": 3842,
     "total_violations": 0
   },
-  "schema_version": 3,
+  "schema_version": 4,
   "score": {
     "away_goal_difference": {
       "mean": 0.0,

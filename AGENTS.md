@@ -630,8 +630,9 @@ fields land in the tall store `stg_pl_sdp_team_match_metric` and are reported by
 
 Whether `stg_fixture.pulse_id` equals the SDP `matchId` is a question, and
 `jobs.audit_pl_sdp --stage` answers it into `results/pl_sdp_identity_audit.json`. Resolution is
-pulse_id first (corroborated on season, kickoff within 3h, score, and teams), then a deterministic
-fallback on season and kickoff, narrowing multiple candidates by teams and then score. A selected
+pulse_id first (corroborated on season, kickoff within 300 seconds, score, and teams), then a
+deterministic fallback on season and kickoff, narrowing multiple candidates by teams and then
+score. A selected
 candidate's Home/Away teams are always corroborated. Ambiguity, contradiction, and one SDP match
 claimed by two fixtures all fail closed.
 Club names corroborate a match already made; they never make one, and a name resolving to two
@@ -640,9 +641,10 @@ when no fixture carried a pulse_id.
 
 The real audit measured `pulse_id == matchId` at **0/1,900 (0%)**. All 2,280 fixtures instead
 resolved one-to-one by season and kickoff, narrowing multiple candidates by teams and then score,
-and always corroborating Home/Away team codes before accepting a match. There was zero ambiguity,
-contradiction, duplicate claim, or unmatched fixture. That fallback is required plumbing, not a
-temporary bridge.
+and always corroborating Home/Away team codes before accepting a match. All 2,280 reconciled
+kickoffs are now exactly equal after resolving SDP's `Europe/London` wall time to UTC; the maximum
+absolute delta is zero seconds. There was zero ambiguity, contradiction, duplicate claim, or
+unmatched fixture. That fallback is required plumbing, not a temporary bridge.
 
 ### V2 evaluation results: both candidates failed, and are left as committed
 
@@ -687,10 +689,12 @@ python -m fpl.validate.dev_v2_team_environment --results results/
 python -m fpl.jobs.prospective_environment_v2 --gw-from 1 --gw-to 5
 ```
 
-`.github/workflows/pl-sdp-capture.yml` is the durable capture path, mirroring `snapshot.yml`
-(curl/gzip/jq only, no Python) so a Python refactor cannot stop a capture. The six configured
-season ids are now live-verified; the workflow was not needed for the first capture because local
-provider access succeeded. Any new season still requires evidence rather than a guessed id.
+`.github/workflows/pl-sdp-capture.yml` is a durable raw-inspection path, mirroring `snapshot.yml`
+(curl/gzip/jq only, no Python) so a Python refactor cannot stop a capture. It is statically valid
+against the observed cursor/result envelopes, but cannot be dispatched until the workflow exists
+on the default branch, and no checksum-validating importer for its packages exists yet. The six
+configured season ids are live-verified; the first capture used direct local provider access. Any
+new season still requires evidence rather than a guessed id.
 
 ## Non-negotiable correctness rules
 
@@ -1381,12 +1385,14 @@ active delivery order.
     forecast for analysis instead, so no decision path consumes an ungated candidate.
 11. Real `pl_sdp` data now exists, but the upper half of the frozen ablation ladder (shots on
     target, box touches) remains **untested rather than refuted**. The historical payloads were
-    first known in September 2026; the current latest-value mart/evaluation reader cannot enforce
-    provider `known_at`, so feeding the backfill into old folds would restate history. Before any
-    SDP model experiment, read `docs/pl-sdp-real-provider-validation-2026-09-05.md` plus the four
-    `results/pl_sdp_*.json` reports, implement a version-preserving as-of reader, and pre-register
-    a new additive candidate identity. Never zero-fill an absent historical metric, silently rerun
-    immutable C/D artifacts, or promote semantics without independent reconciliation.
+    first known in September 2026. Immediate `PointInTimeView` reads now enforce
+    `known_at <= as_of`, tactical windows carry their maximum source `known_at`, and the historical
+    evaluation loader rejects `pl_sdp`; these guards fail closed instead of leaking. A
+    version-preserving historical fold reader still does not exist. Before any SDP model
+    experiment, read `docs/pl-sdp-real-provider-validation-2026-09-05.md` plus the four
+    `results/pl_sdp_*.json` reports, implement that reader, and pre-register a new additive
+    candidate identity. Never zero-fill an absent historical metric, silently rerun immutable C/D
+    artifacts, or promote semantics without independent reconciliation.
 
 12. The V2 defensive-contribution candidate `team_environment_share_dc_threshold_v2` has had
     its single development evaluation (`docs/v2-dc-development.md`,

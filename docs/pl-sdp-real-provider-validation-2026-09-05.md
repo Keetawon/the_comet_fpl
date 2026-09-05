@@ -10,7 +10,10 @@ additive to the frozen V2 development results. No model was rerun, retuned, prom
 ## Access and capture provenance
 
 The operator observed the owner machine reach
-`https://sdp-prem-prod.premier-league-prod.pulselive.com` directly. GitHub Actions was not used.
+`https://sdp-prem-prod.premier-league-prod.pulselive.com` directly. GitHub Actions was not used for
+the capture. The branch workflow is now statically valid against the observed cursor/result
+envelopes, but GitHub will not dispatch it while that workflow is absent from the repository's
+default branch.
 
 | Probe | Result |
 | --- | --- |
@@ -27,10 +30,15 @@ and bounded retry policy. One match-stat
 request initially returned 504; the idempotent resume fetched it successfully without replacing any
 retained payload. A second resume also captured one newly completed current-season match.
 
-The exact content-addressed raw store contains 1,946 payloads: 25 match-list pages and 1,921 match
-stats payloads. Recomputed byte counts and SHA-256 values matched every retained stats payload.
+The exact content-addressed raw store contains 1,946 payloads and 14,151,148 raw bytes: 25
+match-list pages and 1,921 match stats payloads. Recomputed byte counts and SHA-256 values matched
+every retained payload.
 Every stats payload parsed as exactly two distinct Home/Away sides with a numeric metric set; the
 structural-failure count was zero.
+
+That raw database is an operator-local, Git-ignored artifact. The workflow capture packages do not
+yet have a repository importer that verifies their checksum manifests before landing them, so this
+session proves exact local retention, not a durable branch-hosted raw snapshot.
 
 ## Confirmed season identifiers
 
@@ -55,15 +63,18 @@ The hypothesized identity is false:
 FPL fixture pulse_id == SDP matchId: 0 / 1,900 (0.0%)
 ```
 
-All 2,280 FPL fixtures and all 2,280 SDP matches nevertheless resolved one-to-one. The fallback
-selects candidates by season and kickoff, narrows multiple candidates by teams and then score, and
-always corroborates Home/Away team codes before acceptance. The real SDP `teamId` equals the FPL
-permanent `team_code`; it is not the season-scoped FPL team id.
+All 2,280 FPL fixtures and all 2,280 SDP matches nevertheless resolved one-to-one. Identity-audit
+schema 4 uses a 300-second maximum kickoff tolerance. The fallback selects candidates by season
+and kickoff, narrows multiple candidates by teams and then score, and always corroborates Home/Away
+team codes before acceptance. The real SDP `teamId` equals the FPL permanent `team_code`; it is not
+the season-scoped FPL team id.
 
 | Check | Result |
 | --- | ---: |
 | fallback mappings | 2,280 |
 | kickoff corroborated | 2,280 |
+| kickoff exactly equal | 2,280 / 2,280 |
+| maximum absolute kickoff difference | 0 seconds |
 | Home/Away clubs corroborated | 2,280 |
 | scores corroborated where both sources had a score | 1,920 / 1,920 |
 | ambiguities | 0 |
@@ -82,7 +93,8 @@ source timing, not an identity contradiction.
 
 Sample match `2645195` is competition `8` / Premier League, provider season `2026`, 2026-27 GW1,
 Arsenal (`teamId=3`, Home) 3-0 Coventry City (`teamId=9`, Away), kickoff
-2026-08-21 20:00 UTC, status `NormalResult`. Its match-stats response is 7,245 bytes with SHA-256
+2026-08-21 20:00 `Europe/London` (`BST`), which is 2026-08-21 19:00 UTC, status `NormalResult`.
+Its match-stats response is 7,245 bytes with SHA-256
 `014597c8a4a7f7f54781dc08e2ba1a8c1eb76f2888020b977100c9f0aeead2da`. The Home side has
 180 provider fields, Away 158, with 193 in their union. Both sides map 40 fields. Examples:
 
@@ -128,6 +140,11 @@ independent numeric source has yet met the dictionary contract. Supporting defin
 [Premier League stats clarification](https://www.premierleague.com/en/stats/clarification),
 [Opta event definitions](https://www.statsperform.com/opta-event-definitions/), and
 [Stats Perform xGOT definition](https://www.statsperform.com/insights/introducing-expected-goals-on-target-xgot/).
+
+For xGOT specifically, `expectedGoalsOnTarget` exactly mirrors the opposing side's
+`expectedGoalsOnTargetConceded` on all 1,122 comparable sides. That is useful provider-internal
+consistency evidence, but it is not an independent source, so xGOT deliberately remains
+`verified_semantics: false`.
 
 ## Historical coverage
 
@@ -197,17 +214,19 @@ crosses <= crosses; and tackles won <= tackles.
 Every provider match in the V2 fact has exactly two team rows. There are no side, crosswalk-key,
 duplicate-claim, or Home/Away violations. Counts printed by the build (7,642 V2 rows and 29,400
 tactical rows) include both `fpl_archive` and `pl_sdp`; they must not be reported as SDP-only.
+After the rebuild, every tactical row carries the maximum source `known_at` in its rolling window;
+the NULL `known_at` count is zero.
 
 ## Verification gate
 
 | Gate | Result |
 | --- | --- |
-| SDP/config/no-pytz focused pytest | 96 passed |
-| full pytest | 2,079 passed, 4 skipped, 14 failed |
+| SDP/PIT/no-pytz focused pytest | 118 passed |
+| full pytest | 2,093 passed, 4 skipped, 14 failed |
 | Ruff check, `src tests` | passed |
 | Ruff format check, `src tests` | failed: 219 files already formatted; 11 unrelated pre-existing files would be reformatted |
 | strict mypy, `src` | passed, 133 source files |
-| GitHub capture workflow | not used; local provider access succeeded |
+| GitHub capture workflow | actionlint 1.7.12: 0 errors; both shell blocks parse; dispatch unavailable because the workflow is absent from the default branch |
 
 The full repository gate is therefore **not green in this environment**. All 14 pytest failures
 have the same unrelated Windows `WinError 1314` cause in BI export tests
@@ -222,11 +241,13 @@ the first full run was corrected to use the live provider's permanent team-code 
 **Can we now genuinely test territory/box touches? NO.**
 
 Raw signal coverage is now real: SOT and box touches begin in 2021-22. The first season with
-complete goals+xG+box touches and high-coverage SOT is 2025-26. But every historical SDP payload was first captured
-in September 2026. The latest-value team-match mart and `load_team_frame` evaluation reader do not
-preserve/filter a provider version by `known_at`; using the backfill in old folds would silently
-give those folds future capture knowledge. Historical goal omission also makes a provider-goals
-target outcome-dependent before 2025-26.
+complete goals+xG+box touches and high-coverage SOT is 2025-26. But every historical SDP payload
+was first captured in September 2026. Immediate reads through `PointInTimeView` now filter
+`known_at <= as_of`, tactical rows carry their rolling-window maximum `known_at`, and the existing
+evaluation harness deliberately rejects `provider='pl_sdp'`. A version-preserving historical fold
+reader still does not exist; using the latest-value backfill in old folds would silently give those
+folds future capture knowledge. Historical goal omission also makes a provider-goals target
+outcome-dependent before 2025-26.
 
 The earliest high-coverage joint raw-signal season is **2025-26**. The earliest possible honest
 prospective season is **2026-27 after the 2026-09-05 capture**; the outcome horizon and sample size

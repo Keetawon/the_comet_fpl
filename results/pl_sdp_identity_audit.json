@@ -4,36 +4,48 @@
     "2021-22": {
       "fallback": 380,
       "fixtures": 380,
+      "kickoff_corroborated": 380,
+      "kickoff_exact_matches": 380,
       "pulse_id": 0,
       "unmatched": 0
     },
     "2022-23": {
       "fallback": 380,
       "fixtures": 380,
+      "kickoff_corroborated": 380,
+      "kickoff_exact_matches": 380,
       "pulse_id": 0,
       "unmatched": 0
     },
     "2023-24": {
       "fallback": 380,
       "fixtures": 380,
+      "kickoff_corroborated": 380,
+      "kickoff_exact_matches": 380,
       "pulse_id": 0,
       "unmatched": 0
     },
     "2024-25": {
       "fallback": 380,
       "fixtures": 380,
+      "kickoff_corroborated": 380,
+      "kickoff_exact_matches": 380,
       "pulse_id": 0,
       "unmatched": 0
     },
     "2025-26": {
       "fallback": 380,
       "fixtures": 380,
+      "kickoff_corroborated": 380,
+      "kickoff_exact_matches": 380,
       "pulse_id": 0,
       "unmatched": 0
     },
     "2026-27": {
       "fallback": 380,
       "fixtures": 380,
+      "kickoff_corroborated": 380,
+      "kickoff_exact_matches": 380,
       "pulse_id": 0,
       "unmatched": 0
     }
@@ -50,14 +62,17 @@
     "valid_pulse_id_resolutions": 0
   },
   "fpl_fixtures": 2280,
-  "generated_at": "2026-09-05 06:06:59.743096+00:00",
+  "generated_at": "2026-09-05 11:06:42.504200+00:00",
   "kickoff_corroborated": 2280,
+  "kickoff_exact_matches": 2280,
+  "kickoff_max_abs_difference_seconds": 0.0,
+  "kickoff_tolerance_seconds": 300,
   "matched_by_identity_fallback": 2280,
   "matched_by_pulse_id": 0,
   "pulse_id_exact_matches": 0,
   "pulse_id_match_rate": 0.0,
   "pulse_id_present": 1900,
-  "schema_version": 3,
+  "schema_version": 4,
   "score_corroborated": 1920,
   "sdp_matches": 2280,
   "staging": {

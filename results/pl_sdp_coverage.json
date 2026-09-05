@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-05 07:44:24.460563+00:00",
+  "generated_at": "2026-09-05 11:06:42.619111+00:00",
   "metric_dictionary_version": 1,
   "note": "coverage_pct is over landed team rows. coverage_pct_expected_all is over every scheduled FPL fixture; coverage_pct_expected_capturable is over scored fixtures marked finished/provisional or at least three hours past kickoff. An absent metric is reported absent and is never zero-filled.",
   "providers": {
