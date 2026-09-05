@@ -1396,6 +1396,16 @@ active delivery order.
     `known_at <= as_of`. See `docs/v2-real-sot-development.md`. Never rerun or reinterpret this
     result, zero-fill absent SOT, or describe retrospective evidence as historical deadline proof.
 
+    Owner-authorized additive follow-up (2026-09-06): the coverage-only omitted-SOT audit
+    corroborates 42 scored-season zeros (37 concordant accounting/FPL-proxy cases plus five
+    explicit match reports). This does not change the raw NULL rule. Only the separate
+    validation-only `shots_on_target_corroborated` column may carry these version-pinned
+    interpretations; unresolved omissions and explicit NULLs remain NULL. The new candidate
+    `retrospective_corroborated_zero_sot_team_environment_v2` is preregistered in
+    `docs/v2-corroborated-zero-sot-design.md`, with the original estimator/control/grid unchanged.
+    Run its formal outer evaluation once from a clean committed worktree; preserve both frozen
+    prior results. No team averages, territory, inner-selection changes or prospective wiring.
+
 12. The V2 defensive-contribution candidate `team_environment_share_dc_threshold_v2` has had
     its single development evaluation (`docs/v2-dc-development.md`,
     `results/v2_dc_development.json`) and is **not promoted**: it misses the primary metric by

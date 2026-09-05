@@ -1355,6 +1355,13 @@ are left as committed.
    misses the 1% gate, and regresses slightly in two seasons; CRPS improves 0.0833% and PIT-80 is
    unchanged. Do not preregister territory/box touches on this evidence. Accumulate strict-
    prospective SOT instead. See `docs/v2-real-sot-development.md`.
+   Owner-authorized 2026-09-06 follow-up first audits the missing SOT semantics. That coverage-only
+   audit resolves all 42 scored-season omissions with corroborating evidence, never raw zero-fill
+   or team averages. Execute only the separately preregistered
+   `retrospective_corroborated_zero_sot_team_environment_v2` after implementation/tests are
+   committed cleanly. Its unchanged goals+xG control, grid and one-run protocol isolate the
+   interpreted zeros; see `docs/v2-corroborated-zero-sot-design.md`. The first result stays frozen,
+   and this session does not authorize DC, territory, promotion or prospective changes.
 4. **An over-dispersed DC threshold model**, as a separately named candidate with its own
    amendment. This is the best-evidenced next model experiment in the repository: the
    allocation is already shown to rank well (AUC +13.5%) and the defect is isolated to the

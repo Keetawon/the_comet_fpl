@@ -36,6 +36,12 @@ two of three seasons. `RetrospectiveBackfillView` remains validation-only and pr
 September 2026 capture time; production PIT, forecasts, dashboards, and optimizer still require
 `known_at <= as_of`. See `docs/v2-real-sot-development.md`.
 
+An owner-authorized missing-SOT audit now corroborates all 42 omissions in the scored seasons
+without replacing raw NULLs or imputing team averages. A separately named SOT-only successor is
+preregistered in `docs/v2-corroborated-zero-sot-design.md`: it uses a validation-only interpreted
+column, the unchanged estimator/control/grid, and one new clean-provenance development run.
+The first result and every prospective default remain frozen.
+
 **Current status: the data foundation, development-only forward pipeline through Stage E,
 append-only forecast/outcome ledgers, BI semantic contract version 6, ten established dashboard
 files at schema version 9 plus two provisional preview files at schema version 1, atomic static
