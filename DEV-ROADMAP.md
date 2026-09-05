@@ -1362,6 +1362,12 @@ are left as committed.
    committed cleanly. Its unchanged goals+xG control, grid and one-run protocol isolate the
    interpreted zeros; see `docs/v2-corroborated-zero-sot-design.md`. The first result stays frozen,
    and this session does not authorize DC, territory, promotion or prospective changes.
+   This successor is now complete and **INCONCLUSIVE**: +0.0612% log lift over the unchanged
+   goals+xG control on the same 2,280 rows / 114 folds, with a small 2024-25 regression.
+   CRPS improves 0.1298%; PIT-80 improves slightly; the 1% gate still fails. Preserve its new
+   result and all prior evidence. The next recommendation is a separately authorized
+   weekly-inner-selection comparison on goals+xG, not a territory expansion; see
+   `docs/v2-corroborated-zero-sot-development.md`. No second candidate was implemented.
 4. **An over-dispersed DC threshold model**, as a separately named candidate with its own
    amendment. This is the best-evidenced next model experiment in the repository: the
    allocation is already shown to rank well (AUC +13.5%) and the defect is isolated to the

@@ -1406,6 +1406,16 @@ active delivery order.
     Run its formal outer evaluation once from a clean committed worktree; preserve both frozen
     prior results. No team averages, territory, inner-selection changes or prospective wiring.
 
+    The successor has now completed that one clean run at `59b53e0`: **INCONCLUSIVE**, not
+    promoted. Mean log score is 1.488525 versus the identical goals+xG control's 1.489436:
+    +0.0612% lift, short of 1%, with a small 2024-25 regression. CRPS improves 0.1298% and
+    overall PIT-80 absolute error improves slightly. Zero SOT weight is selected in 65/114
+    folds. Its new result retains all 6,840 PMFs across 2,280 team-sides; no source values or
+    prior artifacts changed. Preserve `results/v2_corroborated_zero_sot_development.json`
+    and its preregistration without rerunning or retuning. See the matching development doc.
+    Territory remains unjustified; a weekly-inner-selection hypothesis for unchanged goals+xG
+    needs its own future authorization and candidate, and is not implemented here.
+
 12. The V2 defensive-contribution candidate `team_environment_share_dc_threshold_v2` has had
     its single development evaluation (`docs/v2-dc-development.md`,
     `results/v2_dc_development.json`) and is **not promoted**: it misses the primary metric by

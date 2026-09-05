@@ -42,6 +42,12 @@ preregistered in `docs/v2-corroborated-zero-sot-design.md`: it uses a validation
 column, the unchanged estimator/control/grid, and one new clean-provenance development run.
 The first result and every prospective default remain frozen.
 
+That successor has now completed its single clean run: **INCONCLUSIVE**, with only **0.0612%**
+log-score lift over goals+xG (1.488525 versus 1.489436), below the unchanged 1% bar and with a
+small 2024-25 regression. CRPS improves 0.1298%; overall PIT-80 improves slightly. Raw values,
+the old results and all live models remain unchanged. See
+`docs/v2-corroborated-zero-sot-development.md`; no territory candidate is licensed by this result.
+
 **Current status: the data foundation, development-only forward pipeline through Stage E,
 append-only forecast/outcome ledgers, BI semantic contract version 6, ten established dashboard
 files at schema version 9 plus two provisional preview files at schema version 1, atomic static
