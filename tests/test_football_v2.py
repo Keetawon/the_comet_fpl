@@ -25,6 +25,7 @@ from fpl.storage.db import (
 )
 from fpl.transform import football_v2
 from fpl.transform.pl_sdp import SdpIdentityError
+from fpl.validate.v2_environment_harness import load_team_frame
 
 KICKOFF = datetime(2025, 8, 16, 14, 0, tzinfo=UTC)
 
@@ -619,6 +620,58 @@ def test_tactical_form_is_filtered_on_its_anchor_kickoff(
         )
         assert frame.height == 2
         assert set(frame["gw"].to_list()) == {1}
+
+
+def test_observed_football_excludes_provider_rows_not_known_at_as_of(
+    tmp_path: Path, con: duckdb.DuckDBPyConnection
+) -> None:
+    _seed(con, matches=1)
+    football_v2.build_team_match_stats_archive(con)
+    cutoff = KICKOFF + timedelta(days=1)
+    con.execute(
+        "UPDATE mart_fact_team_match_stats_v2 SET known_at = ?",
+        [cutoff + timedelta(seconds=1)],
+    )
+    path = tmp_path / "v2.duckdb"
+    con.close()
+    with FeatureSource.open(path) as source:
+        view = PointInTimeView(source, AsOf(cutoff))
+        assert view.observed_team_football(columns=["fixture"]).is_empty()
+
+
+def test_tactical_form_known_at_is_the_latest_capture_in_its_window(
+    tmp_path: Path, con: duckdb.DuckDBPyConnection
+) -> None:
+    _seed(con, matches=2)
+    football_v2.build_team_match_stats_archive(con)
+    revision_known_at = KICKOFF + timedelta(days=30)
+    con.execute(
+        "UPDATE mart_fact_team_match_stats_v2 SET known_at = ? WHERE fixture = 100",
+        [revision_known_at],
+    )
+    football_v2.build_team_tactical_form(con)
+    row = con.execute(
+        """
+        SELECT epoch_us(known_at) FROM mart_fact_team_tactical_form_v2
+        WHERE provider = 'fpl_archive' AND team_code = 3 AND gw = 2 AND "window" = 'last_3'
+        """
+    ).fetchone()
+    assert row == (int(revision_known_at.timestamp() * 1_000_000),)
+
+    cutoff = KICKOFF + timedelta(days=14)
+    path = tmp_path / "v2.duckdb"
+    con.close()
+    with FeatureSource.open(path) as source:
+        view = PointInTimeView(source, AsOf(cutoff))
+        frame = view.observed_team_tactical_form(team_codes=[3], windows=["last_3"], columns=["gw"])
+        assert frame.is_empty()
+
+
+def test_historical_sdp_evaluation_reader_fails_closed(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    with pytest.raises(RuntimeError, match="version-preserving provider-known-at fold reader"):
+        load_team_frame(con, provider="pl_sdp")
 
 
 def test_no_feature_readable_v2_column_names_points(

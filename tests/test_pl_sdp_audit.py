@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from fpl.config import load_sdp_metrics
 from fpl.jobs import audit_pl_sdp
 from fpl.jobs.audit_pl_sdp import (
     _difference_summary,
@@ -97,6 +98,94 @@ def test_metric_inventory_keeps_unmapped_numeric_fields_with_examples() -> None:
     assert fallback["mapped_local_field"] == "expected_goals"
     assert fallback["verified_semantics"] is False
     assert fallback["notes"] == "unverified fallback alias; verified live key is expectedGoals"
+
+
+def test_xgot_live_key_and_provider_internal_opponent_mirror_are_corroborated() -> None:
+    metric = load_sdp_metrics().by_local_field()["expected_goals_on_target"]
+    assert metric.provider_fields[0] == "expectedGoalsOnTarget"
+    assert metric.verified_semantics is False
+
+    con = initialise(":memory:")
+    try:
+        con.executemany(
+            """
+            INSERT INTO mart_fact_team_match_stats_v2 (
+                season,gw,fixture,sdp_match_id,kickoff_time,team_id,opponent_team_id,
+                was_home,provider,known_at
+            ) VALUES ('2026-27',1,101,9001,?,?,?,?, 'pl_sdp',?)
+            """,
+            [
+                (KICKOFF, 1, 2, True, KNOWN_AT),
+                (KICKOFF, 2, 1, False, KNOWN_AT),
+            ],
+        )
+        con.executemany(
+            """
+            INSERT INTO stg_pl_sdp_team_match_stats (
+                sdp_match_id,side,payload_id,known_at,stats_json,metric_count,mapped_count
+            ) VALUES (9001,?,?,?,'{}',2,1)
+            """,
+            [("home", "home-payload", KNOWN_AT), ("away", "away-payload", KNOWN_AT)],
+        )
+        con.executemany(
+            """
+            INSERT INTO stg_pl_sdp_team_match_metric (
+                sdp_match_id,side,payload_id,provider_field,local_field,value_numeric
+            ) VALUES (9001,?,?,?,?,?)
+            """,
+            [
+                (
+                    "home",
+                    "home-payload",
+                    "expectedGoalsOnTarget",
+                    "expected_goals_on_target",
+                    1.25,
+                ),
+                (
+                    "home",
+                    "home-payload",
+                    "expectedGoalsOnTargetConceded",
+                    None,
+                    0.5,
+                ),
+                (
+                    "away",
+                    "away-payload",
+                    "expectedGoalsOnTarget",
+                    "expected_goals_on_target",
+                    0.6,
+                ),
+                (
+                    "away",
+                    "away-payload",
+                    "expectedGoalsOnTargetConceded",
+                    None,
+                    1.25,
+                ),
+            ],
+        )
+        report = build_reconciliation(con)
+    finally:
+        con.close()
+
+    assert report["schema_version"] == 4
+    comparison = report["provider_internal_comparisons"][0]
+    assert comparison["evidence_type"] == "provider_internal_semantic_mirror"
+    assert comparison["independent_source"] is False
+    assert comparison["rows_compared"] == 2
+    assert comparison["exact_agreements"] == 1
+    assert comparison["exact_match_rate"] == 0.5
+    assert comparison["difference"]["mean"] == 0.05
+    assert comparison["largest_absolute_differences"][0] == {
+        "season": "2026-27",
+        "fixture": 101,
+        "team_id": 2,
+        "sdp_match_id": 9001,
+        "side": "away",
+        "attacking_xgot": 0.6,
+        "opponent_xgot_conceded": 0.5,
+        "difference": pytest.approx(0.1),
+    }
 
 
 def test_score_and_identity_reports_enumerate_real_exceptions() -> None:

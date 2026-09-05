@@ -42,10 +42,9 @@ ARCHIVE_PROVIDER: Final[str] = "fpl_archive"
 MATCH_METHOD_PULSE_ID: Final[str] = "pulse_id"
 MATCH_METHOD_IDENTITY: Final[str] = "identity_fallback"
 
-# Kickoff agreement tolerance for corroboration, in seconds. Providers disagree by minutes on
-# a rescheduled fixture without either being wrong; a whole-day slack would let two different
-# matches corroborate each other, which is the failure this guards.
-KICKOFF_TOLERANCE_SECONDS: Final[float] = 3 * 60 * 60
+# Kickoff agreement tolerance for corroboration, in seconds. Small publication differences are
+# harmless; anything beyond five minutes must not silently identify a different match.
+KICKOFF_TOLERANCE_SECONDS: Final[float] = 5 * 60
 
 
 class SdpIdentityError(RuntimeError):
@@ -495,6 +494,8 @@ class IdentityAudit:
     pulse_id_present: int = 0
     pulse_id_exact_matches: int = 0
     kickoff_corroborated: int = 0
+    kickoff_exact_matches: int = 0
+    kickoff_max_abs_difference_seconds: float | None = None
     teams_corroborated: int = 0
     score_corroborated: int = 0
     ambiguities: list[str] = field(default_factory=list)
@@ -620,10 +621,15 @@ def _latest_sdp_matches(con: duckdb.DuckDBPyConnection) -> dict[int, dict[str, A
     }
 
 
-def _kickoffs_agree(left: datetime | None, right: datetime | None) -> bool | None:
+def _kickoff_delta_seconds(left: datetime | None, right: datetime | None) -> float | None:
     if left is None or right is None:
         return None
-    return abs((left - right).total_seconds()) <= KICKOFF_TOLERANCE_SECONDS
+    return abs((left - right).total_seconds())
+
+
+def _kickoffs_agree(left: datetime | None, right: datetime | None) -> bool | None:
+    delta = _kickoff_delta_seconds(left, right)
+    return None if delta is None else delta <= KICKOFF_TOLERANCE_SECONDS
 
 
 def _scores_agree(fixture: FixtureIdentity, match: Mapping[str, Any]) -> bool | None:
@@ -682,7 +688,15 @@ def resolve_crosswalk(
 
     for fixture in fixtures:
         season_stats = audit.by_season.setdefault(
-            fixture.season, {"fixtures": 0, "pulse_id": 0, "fallback": 0, "unmatched": 0}
+            fixture.season,
+            {
+                "fixtures": 0,
+                "pulse_id": 0,
+                "fallback": 0,
+                "unmatched": 0,
+                "kickoff_corroborated": 0,
+                "kickoff_exact_matches": 0,
+            },
         )
         season_stats["fixtures"] += 1
         if fixture.pulse_id is not None:
@@ -761,9 +775,18 @@ def resolve_crosswalk(
 
         match = matches[chosen]
         kickoff_ok = _kickoffs_agree(fixture.kickoff_time, match["kickoff_time"])
+        kickoff_delta = _kickoff_delta_seconds(fixture.kickoff_time, match["kickoff_time"])
         score_ok = _scores_agree(fixture, match)
         teams_ok = _teams_corroborated(fixture, match, team_name_codes)
         audit.kickoff_corroborated += int(kickoff_ok is True)
+        season_stats["kickoff_corroborated"] += int(kickoff_ok is True)
+        if kickoff_delta is not None:
+            audit.kickoff_exact_matches += int(kickoff_delta == 0)
+            season_stats["kickoff_exact_matches"] += int(kickoff_delta == 0)
+            audit.kickoff_max_abs_difference_seconds = max(
+                audit.kickoff_max_abs_difference_seconds or 0.0,
+                kickoff_delta,
+            )
         audit.score_corroborated += int(score_ok is True)
         audit.teams_corroborated += int(teams_ok is True)
         if teams_ok is False:

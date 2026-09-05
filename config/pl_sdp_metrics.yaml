@@ -4,8 +4,10 @@
 # A real SDP match-stats payload was first observed on 2026-09-04. Its exact field names have
 # been added to the candidate alias lists below, while older Opta/Pulselive spellings remain as
 # schema-drift fallbacks. Field presence verifies spelling, not meaning. The 2026-09-05 full
-# reconciliation independently corroborated only goals, expected goals, and shots on target;
-# all other provider-backed entries remain `verified_semantics: false`.
+# reconciliation independently corroborated only goals, expected goals, and shots on target. The
+# live `expectedGoalsOnTarget` field has an official definition and exact same-provider opponent
+# mirror, but that is not independent evidence; it and all other provider-backed entries remain
+# `verified_semantics: false`.
 #
 # This file is safe to be wrong. Three mechanisms make it so:
 #
@@ -54,7 +56,7 @@ metrics:
     description: Opta expected goals for this side's shots.
     verified_semantics: true
   - local_field: expected_goals_on_target
-    provider_fields: [expected_goals_on_target, expectedGoalsOnTarget, xgot, expected_goals_ontarget]
+    provider_fields: [expectedGoalsOnTarget, expected_goals_on_target, xgot, expected_goals_ontarget]
     type: float
     group: result
     mirror: expected_goals_on_target_allowed

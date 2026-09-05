@@ -571,6 +571,112 @@ def _score_reconciliation(con: Any) -> dict[str, Any]:
     }
 
 
+def _xgot_opponent_mirror_reconciliation(con: Any) -> dict[str, Any]:
+    """Corroborate the live xGOT key against the opponent-facing provider key."""
+    definition_source = (
+        "https://www.statsperform.com/insights/introducing-expected-goals-on-target-xgot/"
+    )
+    base: dict[str, Any] = {
+        "label": "expected_goals_on_target_vs_opponent_conceded",
+        "evidence_type": "provider_internal_semantic_mirror",
+        "independent_source": False,
+        "attacking_provider_field": "expectedGoalsOnTarget",
+        "opponent_conceded_provider_field": "expectedGoalsOnTargetConceded",
+        "definition_source": definition_source,
+        "definition_summary": (
+            "Post-shot expected goals evaluates the chance that an on-target attempt becomes a "
+            "goal from its observed placement."
+        ),
+        "note": (
+            "Same-provider internal consistency, not an independent-source accuracy check; "
+            "both raw values remain retained in the tall metric store."
+        ),
+    }
+    if not (
+        table_exists(con, "stg_pl_sdp_team_match_stats")
+        and table_exists(con, "stg_pl_sdp_team_match_metric")
+        and table_exists(con, "mart_fact_team_match_stats_v2")
+    ):
+        return {
+            **base,
+            "rows_compared": 0,
+            "exact_agreements": 0,
+            "exact_match_rate": None,
+            "difference": _difference_summary([]),
+            "by_season": {},
+            "largest_absolute_differences": [],
+        }
+
+    rows = con.execute(
+        """
+        WITH latest_stats AS (
+            SELECT * EXCLUDE (ordinal)
+            FROM (
+                SELECT *, row_number() OVER (
+                    PARTITION BY sdp_match_id, side
+                    ORDER BY known_at DESC, payload_id DESC
+                ) AS ordinal
+                FROM stg_pl_sdp_team_match_stats
+            )
+            WHERE ordinal = 1
+        ), latest_metric AS (
+            SELECT metric.*
+            FROM stg_pl_sdp_team_match_metric AS metric
+            JOIN latest_stats AS stats
+              ON stats.sdp_match_id = metric.sdp_match_id
+             AND stats.side = metric.side
+             AND stats.payload_id = metric.payload_id
+        )
+        SELECT mart.season, mart.fixture, mart.team_id, attacking.sdp_match_id,
+               attacking.side, attacking.value_numeric, conceded.value_numeric,
+               attacking.value_numeric - conceded.value_numeric AS difference
+        FROM latest_metric AS attacking
+        JOIN latest_metric AS conceded
+          ON conceded.sdp_match_id = attacking.sdp_match_id
+         AND conceded.side = CASE attacking.side WHEN 'home' THEN 'away' ELSE 'home' END
+         AND conceded.provider_field = 'expectedGoalsOnTargetConceded'
+        JOIN mart_fact_team_match_stats_v2 AS mart
+          ON mart.provider = ? AND mart.sdp_match_id = attacking.sdp_match_id
+         AND mart.was_home = (attacking.side = 'home')
+        WHERE attacking.provider_field = 'expectedGoalsOnTarget'
+          AND attacking.value_numeric IS NOT NULL
+          AND conceded.value_numeric IS NOT NULL
+        ORDER BY mart.season, mart.fixture, mart.team_id
+        """,
+        [sdp_transform.PROVIDER],
+    ).fetchall()
+    differences = [float(row[7]) for row in rows]
+    by_season: dict[str, list[float]] = {}
+    for row in rows:
+        by_season.setdefault(str(row[0]), []).append(float(row[7]))
+    notable = sorted(rows, key=lambda row: abs(float(row[7])), reverse=True)[:10]
+    exact_agreements = sum(row[5] == row[6] for row in rows)
+    return {
+        **base,
+        "rows_compared": len(rows),
+        "exact_agreements": exact_agreements,
+        "exact_match_rate": None if not rows else exact_agreements / len(rows),
+        "difference": _difference_summary(differences),
+        "by_season": {
+            season: _difference_summary(season_values)
+            for season, season_values in sorted(by_season.items())
+        },
+        "largest_absolute_differences": [
+            {
+                "season": str(row[0]),
+                "fixture": int(row[1]),
+                "team_id": int(row[2]),
+                "sdp_match_id": int(row[3]),
+                "side": str(row[4]),
+                "attacking_xgot": float(row[5]),
+                "opponent_xgot_conceded": float(row[6]),
+                "difference": float(row[7]),
+            }
+            for row in notable
+        ],
+    }
+
+
 def build_reconciliation(con: Any) -> dict[str, Any]:
     """SDP values against the FPL-derived values of the same quantity, on identical rows.
 
@@ -581,11 +687,12 @@ def build_reconciliation(con: Any) -> dict[str, Any]:
     """
     generated_at = datetime.now(UTC)
     report: dict[str, Any] = {
-        "schema_version": 3,
+        "schema_version": 4,
         "generated_at": generated_at,
         "note": "differences are reported, never reconciled away; both values are retained",
         "score": _score_reconciliation(con),
         "comparisons": [],
+        "provider_internal_comparisons": [_xgot_opponent_mirror_reconciliation(con)],
         "crosswalk": {},
         "sanity_checks": _sanity_checks(con),
     }
@@ -1196,7 +1303,7 @@ def main(argv: list[str] | None = None) -> int:
                 ",".join(football_counts.providers),
             )
             identity = {
-                "schema_version": 3,
+                "schema_version": 4,
                 "generated_at": datetime.now(UTC),
                 "fpl_fixtures": audit.fpl_fixtures,
                 "sdp_matches": audit.sdp_matches,
@@ -1213,6 +1320,9 @@ def main(argv: list[str] | None = None) -> int:
                     else audit.matched_by_pulse_id / audit.pulse_id_present
                 ),
                 "kickoff_corroborated": audit.kickoff_corroborated,
+                "kickoff_tolerance_seconds": sdp_transform.KICKOFF_TOLERANCE_SECONDS,
+                "kickoff_exact_matches": audit.kickoff_exact_matches,
+                "kickoff_max_abs_difference_seconds": (audit.kickoff_max_abs_difference_seconds),
                 "teams_corroborated": audit.teams_corroborated,
                 "score_corroborated": audit.score_corroborated,
                 "ambiguities": audit.ambiguities,

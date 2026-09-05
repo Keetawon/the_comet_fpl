@@ -746,6 +746,7 @@ CREATE TABLE IF NOT EXISTS mart_fact_team_tactical_form_v2 (
     -- table's window vocabulary matches mart_fact_player_form and mart_fact_team_form.
     "window"              VARCHAR NOT NULL,
     as_at_kickoff         TIMESTAMPTZ NOT NULL,
+    known_at              TIMESTAMPTZ NOT NULL,
     matches               INTEGER NOT NULL,
     -- derived ratio indices; NULL whenever an input is unmeasured or a denominator is zero
     shot_accuracy         DOUBLE,
@@ -774,6 +775,8 @@ CREATE TABLE IF NOT EXISTS mart_fact_team_tactical_form_v2 (
 -- means additive schema changes must also upgrade that clone before any layer is rebuilt.
 -- Existing rows receive NULL: these fields were unmeasured or not materialized in the old schema
 -- and must never be backfilled as zero. Rebuilding their owning layer derives measured values.
+ALTER TABLE mart_fact_team_tactical_form_v2
+    ADD COLUMN IF NOT EXISTS known_at TIMESTAMPTZ;
 ALTER TABLE stg_player_fixture
     ADD COLUMN IF NOT EXISTS threat DOUBLE;
 ALTER TABLE stg_player_fixture

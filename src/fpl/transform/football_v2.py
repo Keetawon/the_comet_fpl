@@ -465,6 +465,7 @@ def build_team_tactical_form(con: duckdb.DuckDBPyConnection) -> int:
             "provider",
             '"window"',
             "as_at_kickoff",
+            "known_at",
             "matches",
             *[f'"{name}_per_match"' for name in metrics],
             *[f'"{column}"' for column, _, _ in derived],
@@ -474,6 +475,7 @@ def build_team_tactical_form(con: duckdb.DuckDBPyConnection) -> int:
             INSERT INTO mart_fact_team_tactical_form_v2 ({", ".join(columns)})
             WITH rolled AS (
                 SELECT season, gw, team_code, provider, kickoff_time,
+                       max(known_at) OVER w AS known_at,
                        count(*) OVER w AS matches
                        {", " if averages else ""}{averages}
                        {", " if derived_select else ""}{derived_select}
@@ -492,7 +494,7 @@ def build_team_tactical_form(con: duckdb.DuckDBPyConnection) -> int:
                 ) AS leg_rank
                 FROM rolled
             )
-            SELECT season, gw, team_code, provider, '{window_name}', kickoff_time, matches
+            SELECT season, gw, team_code, provider, '{window_name}', kickoff_time, known_at, matches
                    {", " if metrics else ""}
                    {", ".join(f'"{name}_per_match"' for name in metrics)}
                    {", " if derived else ""}

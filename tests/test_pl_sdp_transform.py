@@ -424,6 +424,9 @@ def test_pulse_id_match_is_measured_and_corroborated(con: duckdb.DuckDBPyConnect
     assert audit.matched_by_pulse_id == 1
     assert audit.pulse_id_match_rate == 1.0
     assert audit.kickoff_corroborated == 1
+    assert audit.kickoff_exact_matches == 1
+    assert audit.kickoff_max_abs_difference_seconds == 0.0
+    assert audit.by_season["2025-26"]["kickoff_exact_matches"] == 1
     assert audit.teams_corroborated == 1
     assert audit.score_corroborated == 1
     row = con.execute(
@@ -582,13 +585,28 @@ def test_one_sdp_match_cannot_be_claimed_by_two_fixtures(
         sdp.resolve_crosswalk(con)
 
 
-def test_a_kickoff_a_day_out_is_not_corroborated(con: duckdb.DuckDBPyConnection) -> None:
-    """Slack wide enough to span a day would let two different matches corroborate."""
+def test_five_minute_kickoff_difference_is_measured_and_corroborated(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
     _seed_fpl_fixture(con, pulse_id=None)
-    _stage_sdp_match(con, kickoff=KICKOFF + timedelta(days=1))
+    _stage_sdp_match(con, kickoff=KICKOFF + timedelta(minutes=5))
+    audit = sdp.resolve_crosswalk(con)
+    assert audit.matched_by_identity_fallback == 1
+    assert audit.kickoff_corroborated == 1
+    assert audit.kickoff_exact_matches == 0
+    assert audit.kickoff_max_abs_difference_seconds == 300.0
+    assert audit.by_season["2025-26"]["kickoff_exact_matches"] == 0
+
+
+def test_a_kickoff_beyond_five_minutes_is_not_corroborated(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    _seed_fpl_fixture(con, pulse_id=None)
+    _stage_sdp_match(con, kickoff=KICKOFF + timedelta(minutes=5, seconds=1))
     audit = sdp.resolve_crosswalk(con, strict=False)
     assert audit.matched_by_identity_fallback == 0
     assert audit.unmatched_fpl_fixtures == 1
+    assert audit.kickoff_max_abs_difference_seconds is None
 
 
 def test_team_name_map_drops_a_name_used_by_two_clubs(con: duckdb.DuckDBPyConnection) -> None:

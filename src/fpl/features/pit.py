@@ -479,7 +479,8 @@ class PointInTimeView:
         time_column: str = "kickoff_time",
         extra_in: Sequence[tuple[str, Sequence[object] | None]] = (),
     ) -> pl.DataFrame:
-        selected = list(columns) if columns is not None else self._source._columns(table)
+        available = self._source._columns(table)
+        selected = list(columns) if columns is not None else available
         predicates: list[str] = []
         params: list[object] = []
 
@@ -507,6 +508,12 @@ class PointInTimeView:
                 params.extend(values)
             else:
                 predicates.append("FALSE")
+
+        # A completed fixture is not evidence that a later provider capture was already
+        # knowable. Versioned observation tables therefore carry both time boundaries.
+        if "known_at" in available:
+            predicates.append('"known_at" <= ?')
+            params.append(self._as_of.ts)
 
         # ...and the point-in-time boundary last, appended here and nowhere else.
         predicates.append(f'"{time_column}" < ?')

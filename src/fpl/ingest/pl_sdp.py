@@ -25,6 +25,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Self
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
@@ -220,22 +221,66 @@ def _as_int(value: Any) -> int | None:
     return None
 
 
-def _as_datetime(value: Any) -> datetime | None:
-    """Parse an ISO-8601 string or an epoch-millisecond integer to an aware UTC instant.
+def _local_datetime_as_utc(
+    value: datetime, *, timezone_name: Any, timezone_abbreviation: Any
+) -> datetime:
+    """Resolve one provider wall time without guessing across a DST transition."""
+    if not isinstance(timezone_name, str) or not timezone_name.strip():
+        raise SdpSchemaError(
+            f"naive kickoff {value!s} carries no usable IANA timezone; refusing to assume UTC"
+        )
+    name = timezone_name.strip()
+    try:
+        zone = ZoneInfo(name)
+    except (ValueError, ZoneInfoNotFoundError) as error:
+        raise SdpSchemaError(f"unknown kickoff timezone {name!r}") from error
 
-    A naive result is stamped UTC rather than left naive: this repository's point-in-time
-    boundary refuses naive datetimes, so a naive kickoff would be a latent leakage error.
-    """
+    abbreviation: str | None = None
+    if timezone_abbreviation is not None:
+        if not isinstance(timezone_abbreviation, str) or not timezone_abbreviation.strip():
+            raise SdpSchemaError(f"invalid kickoff timezone abbreviation {timezone_abbreviation!r}")
+        abbreviation = timezone_abbreviation.strip()
+
+    candidates: dict[datetime, str | None] = {}
+    for fold in (0, 1):
+        local = value.replace(tzinfo=zone, fold=fold)
+        instant = local.astimezone(UTC)
+        round_trip = instant.astimezone(zone)
+        if round_trip.replace(tzinfo=None) == value:
+            candidates[instant] = round_trip.tzname()
+    if not candidates:
+        raise SdpSchemaError(f"nonexistent local kickoff {value!s} in timezone {name!r}")
+    if abbreviation is not None:
+        candidates = {
+            instant: actual for instant, actual in candidates.items() if actual == abbreviation
+        }
+        if not candidates:
+            raise SdpSchemaError(
+                f"kickoff timezone abbreviation {abbreviation!r} disagrees with {name!r} "
+                f"at {value!s}"
+            )
+    if len(candidates) != 1:
+        raise SdpSchemaError(
+            f"ambiguous local kickoff {value!s} in timezone {name!r}; "
+            "a matching timezone abbreviation is required"
+        )
+    return next(iter(candidates))
+
+
+def _as_datetime(
+    value: Any, *, timezone_name: Any = None, timezone_abbreviation: Any = None
+) -> datetime | None:
+    """Parse an ISO/epoch instant or resolve a provider-local wall time to UTC."""
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=UTC)
-    if isinstance(value, int) and not isinstance(value, bool):
+        parsed = value
+    elif isinstance(value, int) and not isinstance(value, bool):
         # Milliseconds since epoch is the Pulselive-family convention. Seconds would place
         # every Premier League match in 1970, so the discriminator is unambiguous.
         seconds = value / 1000.0 if abs(value) > 10_000_000_000 else float(value)
         return datetime.fromtimestamp(seconds, tz=UTC)
-    if isinstance(value, str):
+    elif isinstance(value, str):
         text = value.strip().replace("Z", "+00:00")
         if not text:
             return None
@@ -243,10 +288,21 @@ def _as_datetime(value: Any) -> datetime | None:
             parsed = datetime.fromisoformat(text)
         except ValueError:
             return None
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
-    if isinstance(value, dict):
-        return _as_datetime(_first(value, "millis", "utcDate", "date", "label"))
-    return None
+    elif isinstance(value, dict):
+        return _as_datetime(
+            _first(value, "millis", "utcDate", "date", "label"),
+            timezone_name=timezone_name,
+            timezone_abbreviation=timezone_abbreviation,
+        )
+    elif not isinstance(value, datetime):
+        return None
+    if parsed.tzinfo is not None and parsed.utcoffset() is not None:
+        return parsed.astimezone(UTC)
+    return _local_datetime_as_utc(
+        parsed,
+        timezone_name=timezone_name,
+        timezone_abbreviation=timezone_abbreviation,
+    )
 
 
 def _team_identity(node: Any) -> tuple[int | None, str | None]:
@@ -307,7 +363,9 @@ def parse_match_summary(record: Any) -> SdpMatchSummary:
         season_id=season_id,
         matchweek=_as_int(_first(record, "matchweek", "matchWeek", "gameweek", "round")),
         kickoff=_as_datetime(
-            _first(record, "kickoff", "kickoffTime", "kickoff_time", "utcDate", "date")
+            _first(record, "kickoff", "kickoffTime", "kickoff_time", "utcDate", "date"),
+            timezone_name=_first(record, "kickoffTimezoneString", "kickoff_timezone_string"),
+            timezone_abbreviation=_first(record, "kickoffTimezone", "kickoff_timezone"),
         ),
         home_team_name=home_name,
         away_team_name=away_name,

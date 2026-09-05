@@ -30,6 +30,7 @@ import polars as pl
 from fpl.models.football_engine_v2 import MultiSignalTeamEngine, SignalSpec
 from fpl.models.gk_saves_v1 import GkSavesHistoryRow, GkSavesV1
 from fpl.models.gk_saves_v2 import GkSavesV2
+from fpl.transform.pl_sdp import PROVIDER as SDP_PROVIDER
 from fpl.types import Position
 from fpl.validate.metrics import Distribution, crps, log_score, poisson_pmf, randomised_pit
 
@@ -154,6 +155,11 @@ def load_team_frame(
     con: duckdb.DuckDBPyConnection, *, provider: str, seasons: Sequence[str] | None = None
 ) -> pl.DataFrame:
     """Team-match rows for one provider, keyed on the cross-season club identity."""
+    if provider == SDP_PROVIDER:
+        raise RuntimeError(
+            "load_team_frame refuses historical pl_sdp rows until a version-preserving "
+            "provider-known-at fold reader exists"
+        )
     predicate = ""
     params: list[object] = [provider]
     if seasons:

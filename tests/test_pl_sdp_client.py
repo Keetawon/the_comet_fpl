@@ -67,6 +67,7 @@ def test_epoch_millis_and_iso_kickoffs_agree() -> None:
     paged = parse_match_summary(extract_items(_fixture("matches_page"))[0])
     bare = parse_match_summary(extract_items(_fixture("matches_bare_list"))[0])
     assert paged.kickoff == bare.kickoff
+    assert paged.kickoff == datetime(2025, 11, 25, 15, tzinfo=UTC)
     assert paged.kickoff is not None
     assert paged.kickoff.tzinfo is not None, "a naive kickoff would defeat the as_of boundary"
 
@@ -80,6 +81,8 @@ def test_real_match_shape_parses_nested_scores_and_result_type() -> None:
             "season": "2026",
             "matchWeek": 1,
             "kickoff": "2026-08-21 20:00:00",
+            "kickoffTimezone": "BST",
+            "kickoffTimezoneString": "Europe/London",
             "phase": "1",
             "resultType": "NormalResult",
             "homeTeam": {"id": "3", "name": "Arsenal", "score": 3},
@@ -90,7 +93,7 @@ def test_real_match_shape_parses_nested_scores_and_result_type() -> None:
     assert summary.match_id == 2645195
     assert summary.season_id == 2026
     assert summary.matchweek == 1
-    assert summary.kickoff == datetime(2026, 8, 21, 20, tzinfo=UTC)
+    assert summary.kickoff == datetime(2026, 8, 21, 19, tzinfo=UTC)
     assert (summary.home_team_id, summary.home_team_name, summary.home_score) == (3, "Arsenal", 3)
     assert (summary.away_team_id, summary.away_team_name, summary.away_score) == (
         9,
@@ -106,12 +109,90 @@ def test_completion_requires_both_scores() -> None:
         {
             "matchId": "2645195",
             "kickoff": "2026-08-21 20:00:00",
+            "kickoffTimezone": "BST",
+            "kickoffTimezoneString": "Europe/London",
             "resultType": "NormalResult",
             "homeTeam": {"id": "3", "score": 3},
             "awayTeam": {"id": "9", "score": None},
         }
     )
     assert not is_completed_scored_match(summary, now=datetime(2026, 8, 22, tzinfo=UTC))
+
+
+def test_real_winter_kickoff_uses_gmt() -> None:
+    summary = parse_match_summary(
+        {
+            "matchId": "2645300",
+            "kickoff": "2026-12-19 15:00:00",
+            "kickoffTimezone": "GMT",
+            "kickoffTimezoneString": "Europe/London",
+        }
+    )
+    assert summary.kickoff == datetime(2026, 12, 19, 15, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("abbreviation", "expected"),
+    [
+        ("BST", datetime(2026, 10, 25, 0, 30, tzinfo=UTC)),
+        ("GMT", datetime(2026, 10, 25, 1, 30, tzinfo=UTC)),
+    ],
+)
+def test_dst_overlap_uses_provider_abbreviation(abbreviation: str, expected: datetime) -> None:
+    summary = parse_match_summary(
+        {
+            "matchId": "2645300",
+            "kickoff": "2026-10-25 01:30:00",
+            "kickoffTimezone": abbreviation,
+            "kickoffTimezoneString": "Europe/London",
+        }
+    )
+    assert summary.kickoff == expected
+
+
+@pytest.mark.parametrize(
+    ("record", "message"),
+    [
+        (
+            {
+                "kickoff": "2026-10-25 01:30:00",
+                "kickoffTimezoneString": "Europe/London",
+            },
+            "ambiguous local kickoff",
+        ),
+        (
+            {
+                "kickoff": "2026-03-29 01:30:00",
+                "kickoffTimezone": "GMT",
+                "kickoffTimezoneString": "Europe/London",
+            },
+            "nonexistent local kickoff",
+        ),
+        (
+            {
+                "kickoff": "2026-08-21 20:00:00",
+                "kickoffTimezone": "BST",
+                "kickoffTimezoneString": "Not/A_Zone",
+            },
+            "unknown kickoff timezone",
+        ),
+        (
+            {
+                "kickoff": "2026-08-21 20:00:00",
+                "kickoffTimezone": "GMT",
+                "kickoffTimezoneString": "Europe/London",
+            },
+            "timezone abbreviation.*disagrees",
+        ),
+        (
+            {"kickoff": "2026-08-21 20:00:00"},
+            "carries no usable IANA timezone",
+        ),
+    ],
+)
+def test_naive_provider_kickoff_fails_closed(record: dict[str, str], message: str) -> None:
+    with pytest.raises(SdpSchemaError, match=message):
+        parse_match_summary({"matchId": "2645300", **record})
 
 
 def test_unknown_envelope_raises_rather_than_returning_empty() -> None:
@@ -323,6 +404,8 @@ def test_live_cursor_pagination_sends_returned_next_token() -> None:
             "season": "2026",
             "matchWeek": 1,
             "kickoff": kickoff,
+            "kickoffTimezone": "BST",
+            "kickoffTimezoneString": "Europe/London",
             "resultType": "NormalResult",
             "homeTeam": {"id": "3", "name": "Arsenal", "score": 1},
             "awayTeam": {"id": "9", "name": "Coventry City", "score": 0},

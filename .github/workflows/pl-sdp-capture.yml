@@ -6,14 +6,12 @@ name: Premier League SDP capture (V2 football layer)
 # refuses every Pulselive / premierleague.com host with a 403 on CONNECT. This workflow is how
 # capture happens anyway, and it deliberately mirrors `snapshot.yml`: curl, gzip and jq only,
 # no Python and no dependency on this repository's package, so a refactor or a broken lockfile
-# cannot stop a capture. It commits raw payloads; loading and staging them into DuckDB stays an
-# explicit operator action, exactly as it is for the FPL snapshots.
+# cannot stop a capture. It commits raw payloads for durable inspection. The Python capture jobs
+# land directly into DuckDB; a checksum-validating importer for these workflow packages is not yet
+# implemented, so this workflow must not claim that `audit_pl_sdp --stage` imports them.
 #
-# It is DISABLED by default. `pl_sdp.season_ids` in config/sources.yaml starts empty because the
-# provider's season-id mapping is not documented and this repository refuses to guess it, so
-# there is nothing to fetch until an operator runs
-# `python -m fpl.jobs.audit_pl_sdp --probe` where the provider is reachable and records the
-# mapping. Enable the schedule once `season_id` below is set to a real value.
+# It is manual-only. Pass one of the provider season ids already verified in
+# `config/sources.yaml`; no schedule is declared here.
 
 on:
   workflow_dispatch:
@@ -59,10 +57,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Untrusted workflow inputs reach the shell only through `env`, never through `${{ }}`
-          # interpolation, and are validated before use. `${{ }}` is substituted into the script
-          # text before the shell parses it, so an input could otherwise close a quote and run
-          # arbitrary commands with `contents: write` on the default branch.
+          # Untrusted workflow inputs reach the shell only through `env`, never through direct
+          # GitHub expression interpolation, and are validated before use. Expressions are
+          # substituted into the script text before the shell parses it, so an input could
+          # otherwise close a quote and run arbitrary commands with `contents: write`.
           case "${SEASON_ID}" in
             ''|*[!0-9]*) echo "::error::season_id must be numeric"; exit 1 ;;
           esac
@@ -100,21 +98,65 @@ jobs:
             sleep 1.5
           }
 
-          fetch "${SDP}/api/v2/matches?competition=${COMPETITION}&season=${SEASON_ID}&page=0&pageSize=100" \
-                "${DIR}/matches.json" 128
+          MATCH_IDS_FILE="${DIR}/.match-ids"
+          SEEN_CURSORS_FILE="${DIR}/.seen-cursors"
+          : > "${MATCH_IDS_FILE}"
+          : > "${SEEN_CURSORS_FILE}"
+          PAGE=0
+          NEXT_CURSOR=""
+          while [ "${PAGE}" -lt 40 ]; do
+            if [ "${PAGE}" -eq 0 ]; then
+              MATCH_FILE="${DIR}/matches.json"
+              MATCH_URL="${SDP}/api/v2/matches?competition=${COMPETITION}&season=${SEASON_ID}&_limit=100"
+            else
+              ENCODED_CURSOR="$(jq -nr --arg cursor "${NEXT_CURSOR}" '$cursor | @uri')"
+              MATCH_FILE="${DIR}/matches-page-$(printf '%03d' "$((PAGE + 1))").json"
+              MATCH_URL="${SDP}/api/v2/matches?competition=${COMPETITION}&season=${SEASON_ID}&_limit=100&_next=${ENCODED_CURSOR}"
+            fi
+            fetch "${MATCH_URL}" "${MATCH_FILE}" 128
 
-          # Accept either a bare list or an object carrying the list, without assuming which:
-          # the envelope shape is undocumented and has to be probed, not presumed.
-          MATCH_IDS="$(jq -r '
-            (if type == "array" then . else (.matches // .content // .data // .items // []) end)
-            | map(select((.status // "") | ascii_downcase | test("complete|finished|full")))
-            | map(.id // .matchId) | map(select(. != null)) | .[]
-          ' "${DIR}/matches.json" | head -n "${MAX_MATCHES}")"
+            # Accept either a bare list or an object carrying the list. Live completed matches
+            # use resultType=NormalResult; the status aliases retain compatibility with old pages.
+            jq -r '
+              (if type == "array" then . else (.matches // .content // .data // .items // []) end)
+              | map(select(
+                  (.resultType // "") == "NormalResult"
+                  or ((.status // "") | tostring | ascii_downcase | test("complete|finished|full"))
+                ))
+              | map(.id // .matchId) | map(select(. != null)) | .[]
+            ' "${MATCH_FILE}" >> "${MATCH_IDS_FILE}"
+
+            NEXT_CURSOR="$(jq -er '
+              if type == "object" and (.pagination? | type == "object")
+              then (.pagination._next // "") else "" end
+              | if type == "string" or type == "number" then tostring
+                else error("pagination._next must be scalar or null") end
+            ' "${MATCH_FILE}")"
+            PAGE=$((PAGE + 1))
+            if [ -z "${NEXT_CURSOR}" ]; then
+              break
+            fi
+            if grep -Fqx -- "${NEXT_CURSOR}" "${SEEN_CURSORS_FILE}"; then
+              echo "::error::repeated pagination cursor; refusing an incomplete capture"
+              exit 1
+            fi
+            printf '%s\n' "${NEXT_CURSOR}" >> "${SEEN_CURSORS_FILE}"
+          done
+          if [ -n "${NEXT_CURSOR}" ]; then
+            echo "::error::match pagination did not terminate within 40 pages"
+            exit 1
+          fi
+          MATCH_PAGES="${PAGE}"
+          MATCH_IDS="$(awk -v limit="${MAX_MATCHES}" '
+            !seen[$0]++ && count < limit { print; count++ }
+          ' "${MATCH_IDS_FILE}")"
+          rm "${MATCH_IDS_FILE}" "${SEEN_CURSORS_FILE}"
 
           COUNT=0
           for MATCH_ID in ${MATCH_IDS}; do
             case "${MATCH_ID}" in ''|*[!0-9]*) continue ;; esac
-            if fetch "${SDP}/api/v3/matches/${MATCH_ID}/stats" "${DIR}/stats/${MATCH_ID}.json" 64; then
+            if fetch "${SDP}/api/v3/matches/${MATCH_ID}/stats?match_id=${MATCH_ID}" \
+                     "${DIR}/stats/${MATCH_ID}.json" 64; then
               COUNT=$((COUNT + 1))
             else
               echo "::warning::no stats for match ${MATCH_ID}; a gap is recorded, not fatal"
@@ -128,7 +170,7 @@ jobs:
             echo "::notice::no completed matches captured; nothing to commit"
           fi
 
-          gzip -9 "${DIR}/matches.json"
+          gzip -9 "${DIR}"/matches*.json
           if compgen -G "${DIR}/stats/*.json" > /dev/null; then
             gzip -9 "${DIR}"/stats/*.json
           fi
@@ -140,10 +182,12 @@ jobs:
             --arg season "${SEASON_LABEL}" \
             --arg provider "pl_sdp" \
             --argjson season_id "${SEASON_ID}" \
+            --argjson match_pages "${MATCH_PAGES}" \
             --argjson stats_payloads "${COUNT}" \
             '{schema_version:"1", provider:$provider, captured_at:$captured_at,
-              season:$season, sdp_season_id:$season_id, stats_payloads:$stats_payloads,
-              note:"raw provider payloads; load and stage with fpl.jobs.audit_pl_sdp --stage"}' \
+              season:$season, sdp_season_id:$season_id, match_pages:$match_pages,
+              stats_payloads:$stats_payloads,
+              note:"raw provider payloads retained for inspection; checksum-validating snapshot import is not yet implemented"}' \
             > "${DIR}/manifest.json"
           ls -l "${DIR}"
 

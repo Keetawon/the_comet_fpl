@@ -43,17 +43,19 @@ def test_capture_uses_no_python() -> None:
         assert forbidden not in executable, f"{forbidden!r} would couple capture to the package"
 
 
-def test_capture_is_manual_until_a_season_id_is_recorded() -> None:
-    """`pl_sdp.season_ids` starts empty and this repository refuses to guess one."""
+def test_capture_is_manual_only() -> None:
+    """The workflow requires an explicitly selected, already-verified season mapping."""
     workflow = _workflow("pl-sdp-capture.yml")
     assert "workflow_dispatch:" in workflow
     assert "schedule:" not in workflow
+    assert "checksum-validating snapshot import is not yet implemented" in workflow
 
 
 def test_untrusted_inputs_are_validated_and_never_interpolated_into_the_script() -> None:
     """`${{ }}` is substituted before the shell parses, so an input could close a quote."""
     workflow = _workflow("pl-sdp-capture.yml")
     body = workflow.split("run: |", 1)[1]
+    assert "${{ }}" not in body, "an empty GitHub expression makes the workflow invalid"
     assert "${{ inputs." not in body, "inputs must reach the shell through `env`, not `${{ }}`"
     assert 'case "${SEASON_ID}" in' in workflow
     assert 'case "${SEASON_LABEL}" in' in workflow
@@ -85,6 +87,19 @@ def test_capture_probes_the_envelope_rather_than_assuming_it() -> None:
     workflow = _workflow("pl-sdp-capture.yml")
     assert 'if type == "array"' in workflow
     assert ".matches // .content // .data // .items" in workflow
+
+
+def test_capture_follows_the_live_cursor_and_recognises_completed_results() -> None:
+    """The live endpoint ignores page/pageSize and marks results with resultType."""
+    workflow = _workflow("pl-sdp-capture.yml")
+    assert "page=0&pageSize=100" not in workflow
+    assert "&_limit=100" in workflow
+    assert ".pagination._next" in workflow
+    assert "&_next=${ENCODED_CURSOR}" in workflow
+    assert "repeated pagination cursor" in workflow
+    assert '(.resultType // "") == "NormalResult"' in workflow
+    assert 'gzip -9 "${DIR}"/matches*.json' in workflow
+    assert "/stats?match_id=${MATCH_ID}" in workflow
 
 
 def test_capture_records_a_manifest_and_checksums() -> None:
