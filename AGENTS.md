@@ -1383,19 +1383,18 @@ active delivery order.
     its own amendment, not a post-hoc tweak. The V2 team engine is deliberately NOT wired into
     `jobs/prospective_points_v1.py`; `jobs/prospective_environment_v2.py` produces the football
     forecast for analysis instead, so no decision path consumes an ungated candidate.
-11. Real `pl_sdp` data now exists, but the upper half of the frozen ablation ladder remains
-    **untested rather than refuted**. The first isolated successor is pre-registered, not yet
-    outer-scored: `retrospective_real_sot_team_environment_v1` adds only the exact verified
-    `ontargetScoringAtt` field to an otherwise identical goals+xG control. Its performance-blind 95%
-    joint-coverage rule selected 2023-24 through 2025-26, all 2,280 target team-sides. The separate
-    validation-only `RetrospectiveBackfillView` selects the earliest successful complete payload,
-    retains its original September 2026 `known_at` and content identity, and applies
-    `source_match_kickoff < prediction_as_of` per fold. It is not a mode of `PointInTimeView`.
+11. Real `pl_sdp` data now exists. The first isolated successor
+    `retrospective_real_sot_team_environment_v1` has completed its single clean outer evaluation
+    and is **INCONCLUSIVE**, not promoted: on 2,280 team-sides / 114 folds, REAL SOT improves mean
+    log score only 0.0374% beyond the exact goals+xG control (1.489436 to 1.488879), versus the
+    frozen 1% bar. CRPS improves 0.0833% and PIT-80 is unchanged, but log score regresses slightly
+    in 2024-25 and 2025-26. Zero SOT weight was selected in 72/114 folds; the main effect is mild
+    prediction shrinkage. The result does not justify a territory/box-touch rung. The separate
+    validation-only `RetrospectiveBackfillView` retains original September 2026 capture identities
+    and applies `source_match_kickoff < prediction_as_of`; it is not a mode of `PointInTimeView`.
     Production, prospective, dashboard, optimizer, and promotion evidence continue to require
-    `known_at <= as_of`; the historical `pl_sdp` mart loader remains fail-closed. See
-    `docs/v2-retrospective-backfill-policy.md` and `docs/v2-real-sot-design.md`. Never zero-fill an
-    absent SOT value, use another SDP metric in this candidate, silently rerun immutable C/D
-    artifacts, or describe any retrospective result as promotion evidence.
+    `known_at <= as_of`. See `docs/v2-real-sot-development.md`. Never rerun or reinterpret this
+    result, zero-fill absent SOT, or describe retrospective evidence as historical deadline proof.
 
 12. The V2 defensive-contribution candidate `team_environment_share_dc_threshold_v2` has had
     its single development evaluation (`docs/v2-dc-development.md`,
