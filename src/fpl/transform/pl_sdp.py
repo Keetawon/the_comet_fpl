@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from typing import Any, Final
 
 import duckdb
+import polars as pl
 
 from fpl.config import SdpMetricType, load_sdp_metrics
 from fpl.ingest.pl_sdp import (
@@ -349,6 +350,7 @@ def stage_team_stats(con: duckdb.DuckDBPyConnection) -> StagingReport:
 
     sides_staged = 0
     metric_rows = 0
+    metric_values: list[tuple[int, str, str, str, str | None, float | None, str | None]] = []
     unmapped: set[str] = set()
     failures: list[str] = []
     for identifier, params_json, landed_match_id, fetched_us, payload_text in rows:
@@ -379,14 +381,8 @@ def stage_team_stats(con: duckdb.DuckDBPyConnection) -> StagingReport:
                     )
                 else:
                     resolved[local] = numeric
-                con.execute(
-                    """
-                    INSERT OR REPLACE INTO stg_pl_sdp_team_match_metric (
-                        sdp_match_id, side, payload_id, provider_field, local_field,
-                        value_numeric, value_text
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    [match_id, side.side, identifier, provider_field, local, numeric, text],
+                metric_values.append(
+                    (match_id, side.side, identifier, provider_field, local, numeric, text)
                 )
                 metric_rows += 1
 
@@ -426,6 +422,37 @@ def stage_team_stats(con: duckdb.DuckDBPyConnection) -> StagingReport:
                 parameters,
             )
             sides_staged += 1
+
+    if metric_values:
+        metric_frame = pl.DataFrame(
+            metric_values,
+            schema={
+                "sdp_match_id": pl.Int64,
+                "side": pl.String,
+                "payload_id": pl.String,
+                "provider_field": pl.String,
+                "local_field": pl.String,
+                "value_numeric": pl.Float64,
+                "value_text": pl.String,
+            },
+            orient="row",
+        )
+        relation = "_pl_sdp_team_match_metric_batch"
+        con.register(relation, metric_frame)
+        try:
+            con.execute(
+                f"""
+                INSERT INTO stg_pl_sdp_team_match_metric (
+                    sdp_match_id, side, payload_id, provider_field, local_field,
+                    value_numeric, value_text
+                )
+                SELECT sdp_match_id, side, payload_id, provider_field, local_field,
+                       value_numeric, value_text
+                FROM {relation}
+                """
+            )
+        finally:
+            con.unregister(relation)
 
     return StagingReport(
         payloads_read=len(rows),
