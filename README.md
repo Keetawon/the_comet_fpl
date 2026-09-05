@@ -29,6 +29,14 @@ and an exact measured fixture crosswalk now populate the V2 football fact alongs
 `fpl_archive`. This new evidence does not reinterpret the frozen V2 evaluations or license a
 historical point-in-time rerun; see `docs/pl-sdp-real-provider-validation-2026-09-05.md`.
 
+The first isolated real-SOT successor is now pre-registered, but has not yet been outer-scored.
+`RetrospectiveBackfillView` is a validation-only capability that keeps the original September 2026
+capture time while allowing only completed matches before each historical fold. Its coverage-only
+audit selected 2023-24 through 2025-26 at the frozen 95% joint goals/archive-xG/SDP-SOT threshold
+(2,280 target team-sides). Production `PointInTimeView`, prospective forecasts, dashboards, and the
+optimizer still require `known_at <= as_of` and cannot import this evidence class. See
+`docs/v2-retrospective-backfill-policy.md` and `docs/v2-real-sot-design.md`.
+
 **Current status: the data foundation, development-only forward pipeline through Stage E,
 append-only forecast/outcome ledgers, BI semantic contract version 6, ten established dashboard
 files at schema version 9 plus two provisional preview files at schema version 1, atomic static

@@ -1310,7 +1310,7 @@ are left as committed.
 | --- | --- | --- |
 | A | SDP source, raw capture, measured fixture-identity audit | implemented |
 | B | typed staging, provider-tagged V2 team-match mart, coverage reporting | implemented |
-| C | kickoff/knowledge-time-safe V2 access; SDP version-as-of evaluation | guards implemented / reader pending |
+| C | strict V2 access + separately bounded retrospective SDP evaluation | implemented / SOT outer run pending |
 | D | `FixtureEnvironment` contract + multi-signal football engine | implemented |
 | E | GK Saves V2 | implemented, **evaluated, refuted** |
 | F | DC environment V2 | implemented, **evaluated**: gate missed, mechanism confirmed |
@@ -1346,13 +1346,15 @@ are left as committed.
    enumerated; 42 are mapped and 203 unmapped numeric fields remain losslessly available. Only
    goals, xG, and SOT cleared the independent-reconciliation rule. Missing provider values remain
    NULL and are never inferred as zero.
-3. **Implement a version-preserving, as-of SDP evaluation reader before any ablation.** Historical
-   payloads were first captured in September 2026. `PointInTimeView` now filters every readable
-   `known_at` column, tactical windows carry their maximum source knowledge time, and
-   `load_team_frame` rejects `pl_sdp`, so current paths fail closed. The latest-value mart still
-   cannot supply the older provider version appropriate to a historical fold. After an additive
-   contract closes that gap, create new candidate identities for SOT and then territory; never
-   overwrite or silently rerun frozen rungs C/D.
+3. **The retrospective evidence boundary and SOT-only preregistration are implemented.** Historical
+   payloads were first captured in September 2026, so strict `PointInTimeView` and the existing
+   `pl_sdp` mart loader remain fail-closed. The separate validation-only reader selects the earliest
+   successful complete payload per match, retains its real `known_at`/content identity, and enforces
+   event time at each fold. A performance-blind 95% joint-coverage rule selected 2023-24 through
+   2025-26 (2,280 target team-sides). The next action is the single clean outer evaluation of
+   `retrospective_real_sot_team_environment_v1` against its exact goals+xG control. Territory remains
+   forbidden until that result is interpreted. See `docs/v2-retrospective-backfill-policy.md` and
+   `docs/v2-real-sot-design.md`.
 4. **An over-dispersed DC threshold model**, as a separately named candidate with its own
    amendment. This is the best-evidenced next model experiment in the repository: the
    allocation is already shown to rank well (AUC +13.5%) and the defect is isolated to the

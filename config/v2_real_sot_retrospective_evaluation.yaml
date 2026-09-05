@@ -1,0 +1,122 @@
+# Real-SDP shots-on-target retrospective development contract.
+#
+# This is additive evidence. It does not amend or reinterpret the frozen V2 C rung, and it
+# cannot promote a model: the historical SDP captures were first known in September 2026.
+
+contract_version: "1.0"
+phase: "v2-real-sot-retrospective"
+status: development_only
+evidence_class: retrospective_backfill_development
+
+source:
+  # Outcomes and xG remain on the existing archive definition. The only new model input is
+  # the independently corroborated raw Premier League SDP SOT field.
+  target_provider: fpl_archive
+  target_field: goals
+  xg_provider: fpl_archive
+  xg_field: expected_goals
+  sot_provider: pl_sdp
+  sot_local_field: shots_on_target
+  sot_provider_field: ontargetScoringAtt
+  version_selection: earliest_successful_complete_match_stats_payload_by_fetched_at_then_payload_id
+  version_order: fetched_at_ascending_then_payload_id
+  preserve_original_known_at: true
+  later_capture_known_at_permitted: true
+  metric_whitelist: [shots_on_target]
+
+population:
+  grain: team_fixture
+  gameweeks: observed_only
+  # Training may use any archive season whose match kicked off before the fold cutoff. Only
+  # seasons selected by the coverage-only audit are scored.
+  training_seasons: all_prior_archive_seasons_before_as_of
+  scoring_population: all_goal_observed_team_sides_in_eligible_seasons
+  minimum_joint_season_coverage: 0.95
+  minimum_eligible_seasons: 2
+  eligible_seasons: [2023-24, 2024-25, 2025-26]
+  coverage_report: results/v2_real_sot_retrospective_coverage.json
+
+walk_forward:
+  fold_unit: observed_gameweek
+  cutoff: first_kickoff_of_observed_gameweek
+  training_window: expanding
+  history_event_time: "kickoff_time < prediction_as_of"
+  minimum_training_observed_gameweeks: 8
+  minimum_team_matches: 3
+  inner_holdout_observed_gameweeks: 6
+  minimum_inner_training_observed_gameweeks: 10
+  same_gameweek_batch_isolation: true
+  target_match_observations_forbidden: true
+  future_match_observations_forbidden: true
+  forbid_random_split: true
+  forbid_full_dataset_fitting: true
+
+baseline: trailing_goals_attack_defence
+
+control:
+  name: retrospective_goals_xg_control_v1
+  signals: [goals, expected_goals]
+
+candidate:
+  name: retrospective_real_sot_team_environment_v1
+  signals: [goals, expected_goals, shots_on_target]
+
+engine:
+  estimator: multisignal_team_environment_v1
+  half_life_days: [40.0, 80.0, 160.0, 320.0, 640.0, null]
+  prior_matches: [2.0, 4.0, 8.0, 16.0, 32.0]
+  weight_step: 0.25
+  minimum_signal_coverage: 0.25
+  promoted_attack_prior: 0.719
+  promoted_defence_prior: 1.309
+  rate_floor: 0.05
+  maximum_goals: 10
+  signal_scaling: fold_local_mean_goals_over_jointly_measured_signal_mean
+  fallback: drop_unavailable_sot_and_renormalise_remaining_weights
+
+metrics:
+  primary: mean_log_score
+  reported:
+    - mean_log_score
+    - crps
+    - rps
+    - pit_interval_80_coverage
+    - mean_absolute_error
+    - mean_error
+    - mean_poisson_deviance
+    - mean_predictive_variance
+    - spearman_within_gameweek
+    - predicted_rate_mean
+    - predicted_rate_standard_deviation
+  calibration: randomised_pit
+
+development_gate:
+  compare_against: retrospective_goals_xg_control_v1
+  comparison_population: same_eligible_predictions
+  minimum_relative_log_lift: 0.01
+  maximum_crps_relative_regression: 0.0
+  pit_interval_80_maximum_absolute_error: 0.05
+  require_no_season_log_score_regression: true
+  require_zero_event_time_leakage: true
+  promotion_requires_strict_prospective_confirmation: true
+
+reporting:
+  slices:
+    - season
+    - venue
+    - promoted_status
+    - early_season
+    - sot_history_length
+    - cold_start
+  early_season_observed_gameweeks: 6
+  sot_history_bins: ["0", "1-2", "3-5", "6+"]
+
+provenance:
+  require_clean_worktree: true
+  revalidate_before_emit: true
+  coverage_report_sha256: true
+  database_sha256: true
+  source_sha256: true
+  sdp_version_manifest_fields: [capture_id, known_at, payload_sha256]
+
+random_seed: 20260904

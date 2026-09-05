@@ -1,0 +1,80 @@
+{
+  "audit_type": "coverage_only_no_candidate_scoring",
+  "canonical_captures": 1900,
+  "capture_manifest": {
+    "fields": [
+      "capture_id",
+      "known_at",
+      "payload_sha256"
+    ],
+    "path": "results/v2_real_sot_capture_manifest.json",
+    "sha256": "084137d2e03babbf9d8361e49be0f23ba19ae3baed34c5d9d0605264ea37057f"
+  },
+  "eligible_seasons": [
+    "2023-24",
+    "2024-25",
+    "2025-26"
+  ],
+  "evidence_class": "retrospective_backfill_development",
+  "generated_at": "2026-09-05T13:57:24.458310+00:00",
+  "known_at_rewritten": false,
+  "metric": {
+    "local_field": "shots_on_target",
+    "provider": "pl_sdp",
+    "provider_field": "ontargetScoringAtt"
+  },
+  "minimum_eligible_seasons": 2,
+  "minimum_joint_season_coverage": 0.95,
+  "retrospective_team_rows": 3800,
+  "rows_captured_after_event": 3800,
+  "schema_version": 1,
+  "seasons": {
+    "2021-22": {
+      "archive_expected_goals_non_null": 0,
+      "completed_team_fixture_rows": 760,
+      "eligible": false,
+      "joint_coverage": 0.0,
+      "joint_non_null": 0,
+      "retrospective_sdp_sot_non_null": 739,
+      "target_goals_non_null": 760
+    },
+    "2022-23": {
+      "archive_expected_goals_non_null": 488,
+      "completed_team_fixture_rows": 760,
+      "eligible": false,
+      "joint_coverage": 0.62105263,
+      "joint_non_null": 472,
+      "retrospective_sdp_sot_non_null": 738,
+      "target_goals_non_null": 760
+    },
+    "2023-24": {
+      "archive_expected_goals_non_null": 760,
+      "completed_team_fixture_rows": 760,
+      "eligible": true,
+      "joint_coverage": 0.99210526,
+      "joint_non_null": 754,
+      "retrospective_sdp_sot_non_null": 754,
+      "target_goals_non_null": 760
+    },
+    "2024-25": {
+      "archive_expected_goals_non_null": 760,
+      "completed_team_fixture_rows": 760,
+      "eligible": true,
+      "joint_coverage": 0.97368421,
+      "joint_non_null": 740,
+      "retrospective_sdp_sot_non_null": 740,
+      "target_goals_non_null": 760
+    },
+    "2025-26": {
+      "archive_expected_goals_non_null": 760,
+      "completed_team_fixture_rows": 760,
+      "eligible": true,
+      "joint_coverage": 0.97894737,
+      "joint_non_null": 744,
+      "retrospective_sdp_sot_non_null": 744,
+      "target_goals_non_null": 760
+    }
+  },
+  "target_rows_in_eligible_seasons": 2280,
+  "version_selection": "earliest_successful_complete_match_stats_payload_by_fetched_at_then_payload_id"
+}

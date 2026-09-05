@@ -2044,6 +2044,220 @@ class V2TeamEnvironmentContract(_V2Contract):
     promotion: V2Promotion
 
 
+class V2RealSotSourcePolicy(_Frozen):
+    """The sole later-captured provider input licensed by this experiment."""
+
+    target_provider: Literal["fpl_archive"]
+    target_field: Literal["goals"]
+    xg_provider: Literal["fpl_archive"]
+    xg_field: Literal["expected_goals"]
+    sot_provider: Literal["pl_sdp"]
+    sot_local_field: Literal["shots_on_target"]
+    sot_provider_field: Literal["ontargetScoringAtt"]
+    version_selection: Literal[
+        "earliest_successful_complete_match_stats_payload_by_fetched_at_then_payload_id"
+    ]
+    version_order: Literal["fetched_at_ascending_then_payload_id"]
+    preserve_original_known_at: Literal[True]
+    later_capture_known_at_permitted: Literal[True]
+    metric_whitelist: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def _sot_only(self) -> Self:
+        if self.metric_whitelist != ("shots_on_target",):
+            raise ValueError("the retrospective experiment licenses shots_on_target only")
+        return self
+
+
+class V2RealSotPopulation(_Frozen):
+    grain: Literal["team_fixture"]
+    gameweeks: Literal["observed_only"]
+    training_seasons: Literal["all_prior_archive_seasons_before_as_of"]
+    scoring_population: Literal["all_goal_observed_team_sides_in_eligible_seasons"]
+    minimum_joint_season_coverage: float = Field(ge=0.95, le=1.0)
+    minimum_eligible_seasons: int = Field(ge=2)
+    eligible_seasons: tuple[Season, ...] = Field(min_length=2)
+    coverage_report: Literal["results/v2_real_sot_retrospective_coverage.json"]
+
+    @model_validator(mode="after")
+    def _coverage_selected_population(self) -> Self:
+        if self.minimum_joint_season_coverage != 0.95:
+            raise ValueError("the pre-registered joint-season coverage threshold is exactly 0.95")
+        if self.minimum_eligible_seasons != 2:
+            raise ValueError("the pre-registered minimum is exactly two eligible seasons")
+        if len(self.eligible_seasons) < self.minimum_eligible_seasons:
+            raise ValueError("fewer than two coverage-eligible seasons cannot support this test")
+        if len(set(self.eligible_seasons)) != len(self.eligible_seasons):
+            raise ValueError("eligible seasons must be unique")
+        if self.eligible_seasons != tuple(sorted(self.eligible_seasons)):
+            raise ValueError("eligible seasons must be chronological")
+        return self
+
+
+class V2RealSotWalkForward(_Frozen):
+    fold_unit: Literal["observed_gameweek"]
+    cutoff: Literal["first_kickoff_of_observed_gameweek"]
+    training_window: Literal["expanding"]
+    history_event_time: Literal["kickoff_time < prediction_as_of"]
+    minimum_training_observed_gameweeks: Literal[8]
+    minimum_team_matches: Literal[3]
+    inner_holdout_observed_gameweeks: Literal[6]
+    minimum_inner_training_observed_gameweeks: Literal[10]
+    same_gameweek_batch_isolation: Literal[True]
+    target_match_observations_forbidden: Literal[True]
+    future_match_observations_forbidden: Literal[True]
+    forbid_random_split: Literal[True]
+    forbid_full_dataset_fitting: Literal[True]
+
+    @model_validator(mode="after")
+    def _inner_history_is_long_enough(self) -> Self:
+        if self.minimum_inner_training_observed_gameweeks < self.inner_holdout_observed_gameweeks:
+            raise ValueError("inner training history cannot be shorter than the holdout")
+        return self
+
+
+class V2RealSotControl(_Frozen):
+    name: Literal["retrospective_goals_xg_control_v1"]
+    signals: tuple[str, ...]
+
+
+class V2RealSotCandidate(_Frozen):
+    name: Literal["retrospective_real_sot_team_environment_v1"]
+    signals: tuple[str, ...]
+
+
+class V2RealSotEngine(_Frozen):
+    estimator: Literal["multisignal_team_environment_v1"]
+    half_life_days: tuple[float | None, ...] = Field(min_length=1)
+    prior_matches: tuple[float, ...] = Field(min_length=1)
+    weight_step: float = Field(gt=0.0, le=1.0)
+    minimum_signal_coverage: float = Field(gt=0.0, le=1.0)
+    promoted_attack_prior: float = Field(gt=0.0)
+    promoted_defence_prior: float = Field(gt=0.0)
+    rate_floor: float = Field(gt=0.0)
+    maximum_goals: int = Field(ge=1)
+    signal_scaling: Literal["fold_local_mean_goals_over_jointly_measured_signal_mean"]
+    fallback: Literal["drop_unavailable_sot_and_renormalise_remaining_weights"]
+
+    @model_validator(mode="after")
+    def _existing_v2_search_space(self) -> Self:
+        expected_half_lives = (40.0, 80.0, 160.0, 320.0, 640.0, None)
+        expected_priors = (2.0, 4.0, 8.0, 16.0, 32.0)
+        if self.half_life_days != expected_half_lives:
+            raise ValueError("half-life grid must remain the existing V2 grid")
+        if self.prior_matches != expected_priors:
+            raise ValueError("prior-match grid must remain the existing V2 grid")
+        if self.weight_step != 0.25 or self.minimum_signal_coverage != 0.25:
+            raise ValueError("V2 weight and signal-coverage settings are frozen at 0.25")
+        if self.promoted_attack_prior != 0.719 or self.promoted_defence_prior != 1.309:
+            raise ValueError("promoted priors must remain the existing V2 values")
+        if self.rate_floor != 0.05 or self.maximum_goals != 10:
+            raise ValueError("V2 rate floor and goal support are frozen at 0.05 and 10")
+        return self
+
+
+class V2RealSotMetrics(_Frozen):
+    primary: Literal["mean_log_score"]
+    reported: tuple[str, ...]
+    calibration: Literal["randomised_pit"]
+
+
+class V2RealSotDevelopmentGate(_Frozen):
+    compare_against: Literal["retrospective_goals_xg_control_v1"]
+    comparison_population: Literal["same_eligible_predictions"]
+    minimum_relative_log_lift: float = Field(ge=0.0)
+    maximum_crps_relative_regression: float = Field(ge=0.0)
+    pit_interval_80_maximum_absolute_error: float = Field(ge=0.0, le=1.0)
+    require_no_season_log_score_regression: Literal[True]
+    require_zero_event_time_leakage: Literal[True]
+    promotion_requires_strict_prospective_confirmation: Literal[True]
+
+
+class V2RealSotReporting(_Frozen):
+    slices: tuple[str, ...]
+    early_season_observed_gameweeks: Literal[6]
+    sot_history_bins: tuple[str, ...]
+
+
+class V2RealSotProvenance(_Frozen):
+    require_clean_worktree: Literal[True]
+    revalidate_before_emit: Literal[True]
+    coverage_report_sha256: Literal[True]
+    database_sha256: Literal[True]
+    source_sha256: Literal[True]
+    sdp_version_manifest_fields: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def _required_version_identity(self) -> Self:
+        if self.sdp_version_manifest_fields != ("capture_id", "known_at", "payload_sha256"):
+            raise ValueError("SDP provenance must retain capture_id, known_at and payload_sha256")
+        return self
+
+
+class V2RealSotRetrospectiveContract(_Frozen):
+    """SOT-only retrospective experiment; never valid as prospective evidence."""
+
+    contract_version: Literal["1.0"]
+    phase: Literal["v2-real-sot-retrospective"]
+    status: Literal["development_only"]
+    evidence_class: Literal["retrospective_backfill_development"]
+    source: V2RealSotSourcePolicy
+    population: V2RealSotPopulation
+    walk_forward: V2RealSotWalkForward
+    baseline: Literal["trailing_goals_attack_defence"]
+    control: V2RealSotControl
+    candidate: V2RealSotCandidate
+    engine: V2RealSotEngine
+    metrics: V2RealSotMetrics
+    development_gate: V2RealSotDevelopmentGate
+    reporting: V2RealSotReporting
+    provenance: V2RealSotProvenance
+    random_seed: Literal[20260904]
+
+    @model_validator(mode="after")
+    def _isolated_sot_hypothesis(self) -> Self:
+        if self.population.eligible_seasons != ("2023-24", "2024-25", "2025-26"):
+            raise ValueError("the coverage-selected scoring seasons are frozen")
+        if self.control.signals != ("goals", "expected_goals"):
+            raise ValueError("the control must contain exactly goals and existing archive xG")
+        if self.candidate.signals != (*self.control.signals, "shots_on_target"):
+            raise ValueError("the candidate must differ from the control only by shots_on_target")
+        required_metrics = {
+            "mean_log_score",
+            "crps",
+            "rps",
+            "pit_interval_80_coverage",
+            "mean_absolute_error",
+            "mean_error",
+            "mean_poisson_deviance",
+            "mean_predictive_variance",
+            "spearman_within_gameweek",
+            "predicted_rate_mean",
+            "predicted_rate_standard_deviation",
+        }
+        if set(self.metrics.reported) != required_metrics:
+            raise ValueError("the retrospective SOT metric suite is frozen")
+        required_slices = {
+            "season",
+            "venue",
+            "promoted_status",
+            "early_season",
+            "sot_history_length",
+            "cold_start",
+        }
+        if set(self.reporting.slices) != required_slices:
+            raise ValueError("the retrospective SOT reporting slices are frozen")
+        if self.reporting.sot_history_bins != ("0", "1-2", "3-5", "6+"):
+            raise ValueError("the SOT history bins are frozen")
+        if self.development_gate.minimum_relative_log_lift != 0.01:
+            raise ValueError("the candidate-vs-control log-score bar is frozen at 1%")
+        if self.development_gate.maximum_crps_relative_regression != 0.0:
+            raise ValueError("CRPS regression is not permitted")
+        if self.development_gate.pit_interval_80_maximum_absolute_error != 0.05:
+            raise ValueError("the PIT-80 absolute-error tolerance is frozen at 0.05")
+        return self
+
+
 class V2GkSavesCandidate(_Frozen):
     name: str
     description: str
@@ -2152,6 +2366,15 @@ def load_v2_team_environment_evaluation(
 ) -> V2TeamEnvironmentContract:
     return V2TeamEnvironmentContract.model_validate(
         _read_yaml(path or config_dir() / "v2_team_environment_evaluation.yaml")
+    )
+
+
+@functools.cache
+def load_v2_real_sot_retrospective_evaluation(
+    path: Path | None = None,
+) -> V2RealSotRetrospectiveContract:
+    return V2RealSotRetrospectiveContract.model_validate(
+        _read_yaml(path or config_dir() / "v2_real_sot_retrospective_evaluation.yaml")
     )
 
 
