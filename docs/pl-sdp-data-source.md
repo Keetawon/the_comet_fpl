@@ -4,13 +4,16 @@
 premierleague.com. This document records what is known, what is assumed, and what happens when
 an assumption turns out wrong.
 
-## Status: first real provider evidence observed
+## Status: first full real-provider capture validated
 
-On 2026-09-04 an authorized execution environment reached the live provider and received real
-Premier League match-list and match-stats JSON. This proves provider access and the sampled
-response shapes; it does **not** by itself prove a complete capture, historical metric coverage,
-fixture identity, or metric semantics. Those claims still require retained raw payloads plus the
-staging, identity, coverage, and reconciliation reports below.
+On 2026-09-05 the owner machine completed the first real capture and audit of five historical
+seasons plus current completed matches. It retained 1,921 match-stat payloads (3,842 team sides),
+staged 598,137 provider-field values, reconciled
+all 2,280 scheduled fixtures without ambiguity, and populated the V2 marts under provider
+`pl_sdp`. Exact evidence is recorded in
+`docs/pl-sdp-real-provider-validation-2026-09-05.md` and the four `results/pl_sdp_*.json`
+artifacts. This validates the data integration; it does not retroactively license a point-in-time
+model evaluation from payloads first captured in September 2026.
 
 The configured seasons endpoint returned HTTP 400 with content type
 `application/problem+json` and the provider message `This endpoint is not enabled for API access`.
@@ -56,9 +59,9 @@ The live match-list response uses a `data` list plus a `pagination` object. On 2
   `_next` token returned `2645197`, `2645199`, proving cursor advancement;
 * `_limit=20` returned the 20 completed 2026-27 GW1-2 matches and another `_next` token.
 
-The client must follow `pagination._next`, stop on an absent token or no forward progress, and
-retain every raw page under the existing configured page cap. A single page is not season
-coverage. At this first probe the full 380-match 2026-27 feed had not yet been enumerated.
+The client follows `pagination._next`, stops on an absent token or no forward progress, and retains
+every raw page under the configured page cap. The completed capture enumerated all 380 scheduled
+matches in each configured season rather than treating one page as season coverage.
 
 ## Season ids are measured and unmapped labels are refused
 
@@ -121,16 +124,21 @@ every ambiguity and contradiction found.
 
 Resolution order per fixture:
 
-1. `pulse_id == sdp_match_id`, then corroborated on season, kickoff (±3h) and score;
-2. otherwise a deterministic fallback on season and kickoff, narrowed by score, used **only**
-   when exactly one candidate remains;
-3. anything else fails closed.
+1. `pulse_id == sdp_match_id`, then corroborated on season, kickoff (±3h), score, and teams;
+2. otherwise candidates by season and kickoff, narrowed by teams and then score when multiple;
+3. accept only one candidate whose Home/Away teams corroborate; anything else fails closed.
 
 `pulse_id_match_rate` is `None`, not `0.0`, when no fixture carried a `pulse_id` — "the
 question could not be asked" is a different finding from "the answer is no". Club names are
-used only to corroborate a match already made by other means, never to make one: a name map
+used only to narrow/corroborate a season-and-kickoff candidate, never as fuzzy identity: a name map
 where one label resolves to two clubs across seasons drops that label rather than picking. A
 fuzzy match that is wrong is indistinguishable from one that is right.
+
+The full real audit answered the hypothesis: **FPL `pulse_id` is not SDP `matchId`**. The exact
+match count was 0 of 1,900 pulse-bearing historical fixtures (0%). All 2,280 fixtures instead
+resolved uniquely through the deterministic season/kickoff/team fallback; every kickoff and
+home/away identity corroborated, with zero ambiguity, contradiction, duplicate claim, or unmatched
+fixture. The fallback is therefore required data plumbing, not a temporary exception.
 
 ## Reconciliation, not reconciling away
 
@@ -144,7 +152,7 @@ measure by different routes:
 Where they disagree, **both values are retained in separate columns**. The disagreement is
 information about the sources, and forcing agreement would destroy it.
 
-## The dictionary is unverified and safe to be wrong
+## The dictionary is verified conservatively and safe to be wrong
 
 The first real match-stats payload exposed these exact field spellings:
 
@@ -164,7 +172,9 @@ Several hypothesised aliases were proven **not** to be synonyms because they coe
 values: `attemptsIbox` versus `attIboxTarget`, `fwdPass` versus `totalFwdZonePass`, and
 `yellowCard` versus `totalYelCard` are examples. The total-attempt/directional-pass measures are
 mapped narrowly; ambiguous alternatives remain unmapped and losslessly retained in the tall store.
-Every provider-backed entry in `config/pl_sdp_metrics.yaml` therefore remains
-`verified_semantics: false`. Promote an entry only when a retained real payload has been inspected
-**and** the reconciliation report corroborates the value. Until then the tall store and the
-unmapped-field report mean a wrong interpretation loses nothing.
+The full audit observed 246 provider fields: 42 mapped, 203 unmapped numeric, and one unmapped
+nonnumeric field. Only `goals`, `expectedGoals`, and `ontargetScoringAtt` currently satisfy the
+dictionary's independent-reconciliation rule and carry `verified_semantics: true`. Other core
+fields are present and often pass strong football invariants, but remain semantically unverified
+in config until independent evidence exists. The tall store and exhaustive metric-inventory report
+mean a future mapping correction loses no provider value.

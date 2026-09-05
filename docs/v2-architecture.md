@@ -65,8 +65,9 @@ Two providers ship:
 
 Consequences that matter:
 
-1. **V2 is runnable and evaluable today**, before any SDP byte is captured. The football engine
-   is signal-agnostic: a signal absent from the data simply does not participate.
+1. **V2 does not require SDP to run.** The football engine is signal-agnostic: a signal absent
+   from a selected provider simply does not participate. This is how the frozen archive-only
+   evaluation ran before any SDP byte was captured.
 2. **Reconciliation is structural, not a script.** Two providers on the same grain make
    "SDP xG vs summed player xG" a query, and disagreement is retained rather than reconciled away.
 3. **Nothing is zero-filled.** A metric a provider does not carry is NULL, and NULL means
@@ -90,7 +91,7 @@ stg_pl_sdp_team_match_metric  tall store: (sdp_match_id, side, provider_field) -
 stg_pl_sdp_fixture_crosswalk  sdp_match_id <-> (season, fixture), with the match method and evidence
         v
 mart_fact_team_match_stats_v2      one club x one fixture x provider; typed metrics + opponent mirrors
-mart_fact_team_tactical_form_v2    point-in-time rolling windows per team_code (3/5/10/season)
+mart_fact_team_tactical_form_v2    rolling windows per team_code (3/5/10/season), latest SDP version
 ```
 
 The hybrid staging schema (typed columns + raw JSON + tall metric rows) is the answer to an
@@ -105,7 +106,8 @@ its semantics are recorded in `config/pl_sdp_metrics.yaml`.
 `results/pl_sdp_identity_audit.json`. Resolution order:
 
 1. exact `pulse_id == sdp_match_id`, then corroborated on season, kickoff date, and both clubs;
-2. otherwise a deterministic fallback on `(season, kickoff date, home team_code, away team_code)`;
+2. otherwise candidates by season and kickoff, narrowed by teams and then score when multiple;
+   the selected candidate's Home/Away team codes are always corroborated before acceptance;
 3. ambiguity, contradiction, or a corroboration failure **fails closed** and is reported. There is
    no fuzzy name matching anywhere.
 
@@ -116,9 +118,12 @@ lineups endpoint is used, crosses on FPL `code` via `opta_code`, never `element_
 
 The V2 marts are added to `FEATURE_READABLE_TABLES` and every post-match metric column is added to
 `OUTCOME_COLUMNS`, so `PointInTimeView.observed_*` hard-filters them on `kickoff_time < as_of` and
-`schedule()` cannot project them. Provider revisions carry `known_at`, so a restatement published
-after a prediction cannot reach back into it. The existing truncation-equivalence and static AST
-tests extend to cover the new tables.
+`schedule()` cannot project them. Raw and staged provider revisions preserve `known_at`, but the
+current `mart_fact_team_match_stats_v2` selects the latest SDP version and the evaluation harness's
+`load_team_frame` neither reads nor filters `known_at`. The existing kickoff-time guards therefore
+protect prospective feature access, but do **not** yet make a September 2026 historical SDP
+backfill valid inside earlier walk-forward folds. A version-preserving as-of mart/reader is required
+before such an evaluation.
 
 ## Football engine
 
@@ -174,7 +179,7 @@ and a contract version that cannot be bumped without an amendment record.
 | --- | --- | --- |
 | A | SDP source, raw capture, identity audit | implemented |
 | B | typed staging, V2 team-match mart, coverage report | implemented |
-| C | point-in-time V2 access, tactical rolling marts | implemented |
+| C | kickoff-safe V2 access and rolling marts; SDP version-as-of evaluation | partial / pending |
 | D | `FixtureEnvironment` + V2 football engine | implemented |
 | E | GK saves V2 | implemented |
 | F | V2 team-coupled components (DC environment) | implemented |
@@ -185,11 +190,14 @@ and a contract version that cannot be bumped without an amendment record.
 
 ## Known limitations
 
-* No SDP payload has been observed from this build environment (every Pulselive/PL/FPL host is
-  refused by its egress policy). Every provider field name in `config/pl_sdp_metrics.yaml` is
-  therefore **unverified**, carries `verified_semantics: false`, and is an alias list rather than
-  a single name. The tall metric store means an unmatched upstream name is retained, not lost, and
-  `audit_pl_sdp` reports it. No V2 claim depends on an SDP field being named correctly.
-* The `pl_sdp` provider consequently has zero coverage until a capture runs where egress exists.
-  All measured V2 results in this repository are from the `fpl_archive` provider.
+* The owner machine completed the first real SDP capture on 2026-09-05. It observed 246 provider
+  fields and populated `pl_sdp` with 1,921 matches / 3,842 team sides; see
+  `docs/pl-sdp-real-provider-validation-2026-09-05.md`. Only the three mappings independently
+  corroborated by the reconciliation report are marked semantically verified. Unmatched or
+  unverified fields remain losslessly retained in the tall metric store.
+* All existing measured V2 results remain from `fpl_archive`. Historical SDP payloads were first
+  known in September 2026, and the current tactical mart does not preserve an as-of provider
+  version for historical folds. Using those rows directly would restate history, so a genuine SOT
+  or territory walk-forward evaluation remains unlicensed until an additive point-in-time contract
+  and version-preserving reader exist.
 * V2 is development-only. It has not been promoted, and the prospective default is unchanged.

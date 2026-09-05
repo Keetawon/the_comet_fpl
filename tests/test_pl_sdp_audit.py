@@ -65,6 +65,7 @@ def test_metric_inventory_keeps_unmapped_numeric_fields_with_examples() -> None:
             """,
             [
                 (1, "home", "p1", "expectedGoals", "expected_goals", 1.25, None),
+                (1, "away", "p1", "expected_goals", "expected_goals", 0.75, None),
                 (1, "away", "p1", "newProviderCount", None, 7.0, None),
             ],
         )
@@ -73,8 +74,8 @@ def test_metric_inventory_keeps_unmapped_numeric_fields_with_examples() -> None:
         con.close()
 
     assert report["summary"] == {
-        "provider_fields": 2,
-        "mapped_fields": 1,
+        "provider_fields": 3,
+        "mapped_fields": 2,
         "unmapped_numeric_fields": 1,
     }
     assert report["unmapped_numeric_fields"] == [
@@ -89,7 +90,13 @@ def test_metric_inventory_keeps_unmapped_numeric_fields_with_examples() -> None:
         field for field in report["provider_fields"] if field["provider_field"] == "expectedGoals"
     )
     assert mapped["mapped_local_field"] == "expected_goals"
-    assert mapped["verified_semantics"] is False
+    assert mapped["verified_semantics"] is True
+    fallback = next(
+        field for field in report["provider_fields"] if field["provider_field"] == "expected_goals"
+    )
+    assert fallback["mapped_local_field"] == "expected_goals"
+    assert fallback["verified_semantics"] is False
+    assert fallback["notes"] == "unverified fallback alias; verified live key is expectedGoals"
 
 
 def test_score_and_identity_reports_enumerate_real_exceptions() -> None:

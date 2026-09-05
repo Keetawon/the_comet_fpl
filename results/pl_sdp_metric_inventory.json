@@ -1,0 +1,3939 @@
+{
+  "generated_at": "2026-09-05 07:44:24.755067+00:00",
+  "metric_dictionary_version": 1,
+  "note": "Observed field names and values are provider evidence. A mapping's semantic verification remains controlled by config/pl_sdp_metrics.yaml.",
+  "provider_fields": [
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 217.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "accurateBackZonePass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 12.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "accurateChippedPass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2693 latest team-side rows across 1788 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2693,
+      "provider_field": "accurateCornersIntobox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3738 latest team-side rows across 1919 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": "accurate_crosses",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3738,
+      "provider_field": "accurateCross",
+      "reason": "Crosses finding a team-mate.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3535 latest team-side rows across 1911 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3535,
+      "provider_field": "accurateCrossNocorner",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2662 latest team-side rows across 1718 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2662,
+      "provider_field": "accurateFlickOn",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1144 latest team-side rows across 992 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1144,
+      "provider_field": "accurateFreekickCross",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 248.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "accurateFwdZonePass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3790 latest team-side rows across 1920 match(es)",
+      "example_value": 9.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3790,
+      "provider_field": "accurateGoalKicks",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1502 latest team-side rows across 1180 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1502,
+      "provider_field": "accurateKeeperSweeper",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3748 latest team-side rows across 1919 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3748,
+      "provider_field": "accurateKeeperThrows",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3512 latest team-side rows across 1896 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3512,
+      "provider_field": "accurateLaunches",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3718 latest team-side rows across 1919 match(es)",
+      "example_value": 12.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3718,
+      "provider_field": "accurateLayoffs",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 29.0,
+      "mapped_local_field": "accurate_long_passes",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "accurateLongBalls",
+      "reason": "Long passes completed.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 462.0,
+      "mapped_local_field": "accurate_passes",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "accuratePass",
+      "reason": "Passes completed to a team-mate.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 885 latest team-side rows across 786 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 885,
+      "provider_field": "accuratePullBack",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1822 latest team-side rows across 1405 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1822,
+      "provider_field": "accurateThroughBall",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 5.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "accurateThrows",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 7.0,
+      "mapped_local_field": "aerial_duels_lost",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "aerialLost",
+      "reason": "Aerial duels lost.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 13.0,
+      "mapped_local_field": "aerial_duels_won",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "aerialWon",
+      "reason": "Aerial duels won.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3824 latest team-side rows across 1921 match(es)",
+      "example_value": 7.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3824,
+      "provider_field": "attAssistOpenplay",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2547 latest team-side rows across 1704 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2547,
+      "provider_field": "attAssistSetplay",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3750 latest team-side rows across 1921 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3750,
+      "provider_field": "attBxCentre",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2643 latest team-side rows across 1751 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2643,
+      "provider_field": "attBxLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2570 latest team-side rows across 1719 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2570,
+      "provider_field": "attBxRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 909 latest team-side rows across 797 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 909,
+      "provider_field": "attCmissHigh",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 230 latest team-side rows across 225 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 230,
+      "provider_field": "attCmissHighLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 273 latest team-side rows across 267 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 273,
+      "provider_field": "attCmissHighRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1350 latest team-side rows across 1123 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1350,
+      "provider_field": "attCmissLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1462 latest team-side rows across 1197 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1462,
+      "provider_field": "attCmissRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3121 latest team-side rows across 1880 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3121,
+      "provider_field": "attCorner",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1709 latest team-side rows across 1336 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1709,
+      "provider_field": "attFastbreak",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 876 latest team-side rows across 468 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 876,
+      "provider_field": "attFreekickGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 424 latest team-side rows across 405 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 424,
+      "provider_field": "attFreekickMiss",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 59 latest team-side rows across 58 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 59,
+      "provider_field": "attFreekickPost",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 338 latest team-side rows across 322 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 338,
+      "provider_field": "attFreekickTarget",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1225 latest team-side rows across 1038 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1225,
+      "provider_field": "attFreekickTotal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1090 latest team-side rows across 675 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1090,
+      "provider_field": "attGoalHighCentre",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1169 latest team-side rows across 739 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1169,
+      "provider_field": "attGoalHighLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1145 latest team-side rows across 715 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1145,
+      "provider_field": "attGoalHighRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1517 latest team-side rows across 1042 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1517,
+      "provider_field": "attGoalLowCentre",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1884 latest team-side rows across 1303 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1884,
+      "provider_field": "attGoalLowLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1785 latest team-side rows across 1231 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1785,
+      "provider_field": "attGoalLowRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1440 latest team-side rows across 963 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1440,
+      "provider_field": "attHdGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2522 latest team-side rows across 1715 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2522,
+      "provider_field": "attHdMiss",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 224 latest team-side rows across 213 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 224,
+      "provider_field": "attHdPost",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1517 latest team-side rows across 1230 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1517,
+      "provider_field": "attHdTarget",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3313 latest team-side rows across 1891 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3313,
+      "provider_field": "attHdTotal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3235 latest team-side rows across 1891 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3235,
+      "provider_field": "attIboxBlocked",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2943 latest team-side rows across 1802 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2943,
+      "provider_field": "attIboxGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3551 latest team-side rows across 1916 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3551,
+      "provider_field": "attIboxMiss",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 200 latest team-side rows across 195 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 200,
+      "provider_field": "attIboxOwnGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 652 latest team-side rows across 587 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 652,
+      "provider_field": "attIboxPost",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3291 latest team-side rows across 1885 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3291,
+      "provider_field": "attIboxTarget",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1903 latest team-side rows across 1327 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1903,
+      "provider_field": "attLfGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2356 latest team-side rows across 1644 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2356,
+      "provider_field": "attLfTarget",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3687 latest team-side rows across 1919 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3687,
+      "provider_field": "attLfTotal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 189 latest team-side rows across 182 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 189,
+      "provider_field": "attLgCentre",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 19 latest team-side rows across 19 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 19,
+      "provider_field": "attLgLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 19 latest team-side rows across 18 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 19,
+      "provider_field": "attLgRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2463 latest team-side rows across 1713 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2463,
+      "provider_field": "attMissHigh",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1319 latest team-side rows across 1105 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1319,
+      "provider_field": "attMissHighLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1456 latest team-side rows across 1180 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1456,
+      "provider_field": "attMissHighRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2709 latest team-side rows across 1771 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2709,
+      "provider_field": "attMissLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2668 latest team-side rows across 1771 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2668,
+      "provider_field": "attMissRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2800 latest team-side rows across 1816 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2800,
+      "provider_field": "attOboxBlocked",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1330 latest team-side rows across 876 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1330,
+      "provider_field": "attOboxGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3012 latest team-side rows across 1853 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3012,
+      "provider_field": "attOboxMiss",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2 latest team-side rows across 2 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2,
+      "provider_field": "attOboxOwnGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 247 latest team-side rows across 245 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 247,
+      "provider_field": "attOboxPost",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2308 latest team-side rows across 1617 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2308,
+      "provider_field": "attOboxTarget",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 839 latest team-side rows across 431 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 839,
+      "provider_field": "attObpGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3702 latest team-side rows across 1921 match(es)",
+      "example_value": 5.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3702,
+      "provider_field": "attObxCentre",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 61 latest team-side rows across 60 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 61,
+      "provider_field": "attObxLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 56 latest team-side rows across 55 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 56,
+      "provider_field": "attObxRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 113 latest team-side rows across 112 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 113,
+      "provider_field": "attObxdLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 61 latest team-side rows across 61 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 61,
+      "provider_field": "attObxdRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 703 latest team-side rows across 643 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 703,
+      "provider_field": "attOneOnOne",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3833 latest team-side rows across 1921 match(es)",
+      "example_value": 8.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3833,
+      "provider_field": "attOpenplay",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1117 latest team-side rows across 697 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1117,
+      "provider_field": "attPenGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 13 latest team-side rows across 13 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 13,
+      "provider_field": "attPenMiss",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 10 latest team-side rows across 10 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 10,
+      "provider_field": "attPenPost",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 61 latest team-side rows across 61 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 61,
+      "provider_field": "attPenTarget",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 378 latest team-side rows across 358 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 378,
+      "provider_field": "attPostHigh",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 293 latest team-side rows across 278 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 293,
+      "provider_field": "attPostLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 264 latest team-side rows across 253 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 264,
+      "provider_field": "attPostRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2331 latest team-side rows across 1572 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2331,
+      "provider_field": "attRfGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2967 latest team-side rows across 1831 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2967,
+      "provider_field": "attRfTarget",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3811 latest team-side rows across 1921 match(es)",
+      "example_value": 7.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3811,
+      "provider_field": "attRfTotal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1890 latest team-side rows across 1439 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1890,
+      "provider_field": "attSetpiece",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1215 latest team-side rows across 1029 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1215,
+      "provider_field": "attSvHighCentre",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 616 latest team-side rows across 567 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 616,
+      "provider_field": "attSvHighLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 565 latest team-side rows across 532 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 565,
+      "provider_field": "attSvHighRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2561 latest team-side rows across 1715 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2561,
+      "provider_field": "attSvLowCentre",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1830 latest team-side rows across 1432 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1830,
+      "provider_field": "attSvLowLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1694 latest team-side rows across 1336 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1694,
+      "provider_field": "attSvLowRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3829 latest team-side rows across 1921 match(es)",
+      "example_value": 7.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3829,
+      "provider_field": "attemptedTackleFoul",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3833 latest team-side rows across 1921 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3833,
+      "provider_field": "attemptsConcededIbox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3723 latest team-side rows across 1921 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3723,
+      "provider_field": "attemptsConcededObox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3833 latest team-side rows across 1921 match(es)",
+      "example_value": 5.0,
+      "mapped_local_field": "shots_inside_box",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3833,
+      "provider_field": "attemptsIbox",
+      "reason": "Goal attempts taken from inside the penalty area.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3723 latest team-side rows across 1921 match(es)",
+      "example_value": 5.0,
+      "mapped_local_field": "shots_outside_box",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3723,
+      "provider_field": "attemptsObox",
+      "reason": "Goal attempts taken from outside the penalty area.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 90.0,
+      "mapped_local_field": "backward_passes",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "backwardPass",
+      "reason": "Passes played backward.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 50.0,
+      "mapped_local_field": "recoveries",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "ballRecovery",
+      "reason": "Loose-ball recoveries.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2978 latest team-side rows across 1832 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": "big_chances_created",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2978,
+      "provider_field": "bigChanceCreated",
+      "reason": "Chances Opta classifies as clear scoring opportunities created by this side.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2678 latest team-side rows across 1757 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": "big_chances_missed",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2678,
+      "provider_field": "bigChanceMissed",
+      "reason": "Big chances not converted.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2165 latest team-side rows across 1587 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": "big_chances_scored",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2165,
+      "provider_field": "bigChanceScored",
+      "reason": "Big chances converted.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2724 latest team-side rows across 1768 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2724,
+      "provider_field": "blockedCross",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3837 latest team-side rows across 1921 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3837,
+      "provider_field": "blockedPass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3604 latest team-side rows across 1915 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": "shots_blocked",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3604,
+      "provider_field": "blockedScoringAtt",
+      "reason": "This side's goal attempts blocked by an opposition outfield player.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3828 latest team-side rows across 1921 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3828,
+      "provider_field": "challengeLost",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 959 latest team-side rows across 860 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 959,
+      "provider_field": "cleanSheet",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 452 latest team-side rows across 429 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 452,
+      "provider_field": "clearanceOffLine",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 699 latest team-side rows across 628 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 699,
+      "provider_field": "contentiousDecision",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3759 latest team-side rows across 1921 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": "corners",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3759,
+      "provider_field": "cornerTaken",
+      "reason": "Corners taken by this side.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3810 latest team-side rows across 1921 match(es)",
+      "example_value": 6.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3810,
+      "provider_field": "crosses18yard",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3656 latest team-side rows across 1920 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3656,
+      "provider_field": "crosses18yardplus",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1245 latest team-side rows across 806 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1245,
+      "provider_field": "defenderGoals",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3840 latest team-side rows across 1921 match(es)",
+      "example_value": 11.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3840,
+      "provider_field": "dispossessed",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2834 latest team-side rows across 1808 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2834,
+      "provider_field": "divingSave",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 40.0,
+      "mapped_local_field": "duels_lost",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "duelLost",
+      "reason": "Ground and aerial duels lost.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 46.0,
+      "mapped_local_field": "duels_won",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "duelWon",
+      "reason": "Ground and aerial duels won.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2724 latest team-side rows across 1768 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2724,
+      "provider_field": "effectiveBlockedCross",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 21.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "effectiveClearance",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3836 latest team-side rows across 1921 match(es)",
+      "example_value": 8.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3836,
+      "provider_field": "effectiveHeadClearance",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 623 latest team-side rows across 588 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 623,
+      "provider_field": "errorLeadToGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1186 latest team-side rows across 971 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1186,
+      "provider_field": "errorLeadToShot",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1158 latest team-side rows across 579 match(es)",
+      "example_value": 0.776563,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1158,
+      "provider_field": "expectedAssists",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1158 latest team-side rows across 579 match(es)",
+      "example_value": 0.6609,
+      "mapped_local_field": "expected_goals",
+      "notes": "semantic meaning verified under the metric dictionary contract",
+      "numeric_values": 1158,
+      "provider_field": "expectedGoals",
+      "reason": "Opta expected goals for this side's shots.",
+      "text_values": 0,
+      "verified_semantics": true
+    },
+    {
+      "evidence": "observed on 346 latest team-side rows across 295 match(es)",
+      "example_value": 0.0651,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 346,
+      "provider_field": "expectedGoalsFreekick",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1122 latest team-side rows across 577 match(es)",
+      "example_value": 1.7489,
+      "mapped_local_field": "expected_goals_on_target",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1122,
+      "provider_field": "expectedGoalsOnTarget",
+      "reason": "Post-shot expected goals -- xG conditioned on shot placement, defined only over shots on target. Measures finishing and keeper workload rather than chance creation.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1127 latest team-side rows across 579 match(es)",
+      "example_value": 0.7016,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1127,
+      "provider_field": "expectedGoalsOnTargetConceded",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": "{\"playerId\":\"97032\"}",
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 0,
+      "provider_field": "fastestPlayer",
+      "reason": "no local mapping declared",
+      "text_values": 3842,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1518 latest team-side rows across 759 match(es)",
+      "example_value": 30.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1518,
+      "provider_field": "fiftyFifty",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 65.0,
+      "mapped_local_field": "final_third_entries",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "finalThirdEntries",
+      "reason": "Entries into the attacking third.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 13.0,
+      "mapped_local_field": "fouls",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "fkFoulLost",
+      "reason": "Fouls conceded.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 6.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "fkFoulWon",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1568 latest team-side rows across 1259 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1568,
+      "provider_field": "forwardGoals",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 152 latest team-side rows across 131 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 152,
+      "provider_field": "foulThrowIn",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3246 latest team-side rows across 1895 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3246,
+      "provider_field": "fouledFinalThird",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2674 latest team-side rows across 1728 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2674,
+      "provider_field": "freekickCross",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1225 latest team-side rows across 1038 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1225,
+      "provider_field": "freekickTotal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 151.0,
+      "mapped_local_field": "forward_passes",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "fwdPass",
+      "reason": "Passes played forward.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2376 latest team-side rows across 1668 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2376,
+      "provider_field": "goalAssist",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 372 latest team-side rows across 358 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 372,
+      "provider_field": "goalAssistDeadball",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2040 latest team-side rows across 1521 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2040,
+      "provider_field": "goalAssistIntentional",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2052 latest team-side rows across 1539 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2052,
+      "provider_field": "goalAssistOpenplay",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 701 latest team-side rows across 648 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 701,
+      "provider_field": "goalAssistSetplay",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 397 latest team-side rows across 383 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 397,
+      "provider_field": "goalFastbreak",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3834 latest team-side rows across 1921 match(es)",
+      "example_value": 11.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3834,
+      "provider_field": "goalKicks",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3094 latest team-side rows across 1849 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": "goals",
+      "notes": "semantic meaning verified under the metric dictionary contract",
+      "numeric_values": 3094,
+      "provider_field": "goals",
+      "reason": "Goals scored by this side, excluding own goals credited to the opponent.",
+      "text_values": 0,
+      "verified_semantics": true
+    },
+    {
+      "evidence": "observed on 3094 latest team-side rows across 1849 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3094,
+      "provider_field": "goalsConceded",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2943 latest team-side rows across 1802 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2943,
+      "provider_field": "goalsConcededIbox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1330 latest team-side rows across 876 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1330,
+      "provider_field": "goalsConcededObox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2677 latest team-side rows across 1731 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2677,
+      "provider_field": "goalsOpenplay",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1975 latest team-side rows across 1472 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1975,
+      "provider_field": "goodHighClaim",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1157 latest team-side rows across 965 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1157,
+      "provider_field": "handBall",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3836 latest team-side rows across 1921 match(es)",
+      "example_value": 8.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3836,
+      "provider_field": "headClearance",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1115 latest team-side rows across 945 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1115,
+      "provider_field": "hitWoodwork",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3839 latest team-side rows across 1921 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": "interceptions",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3839,
+      "provider_field": "interception",
+      "reason": "Interceptions made.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3839 latest team-side rows across 1921 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3839,
+      "provider_field": "interceptionWon",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2296 latest team-side rows across 1624 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2296,
+      "provider_field": "interceptionsInBox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 816 latest team-side rows across 408 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 816,
+      "provider_field": "keeperGoals",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3752 latest team-side rows across 1919 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3752,
+      "provider_field": "keeperThrows",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 135.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "leftsidePass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 68.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "longPassOwnToOpp",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 46.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "longPassOwnToOppSuccess",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3759 latest team-side rows across 1921 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3759,
+      "provider_field": "lostCorners",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1964 latest team-side rows across 1356 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1964,
+      "provider_field": "midfielderGoals",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3668 latest team-side rows across 1920 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3668,
+      "provider_field": "offtargetAttAssist",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3800 latest team-side rows across 1921 match(es)",
+      "example_value": 9.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3800,
+      "provider_field": "ontargetAttAssist",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3754 latest team-side rows across 1921 match(es)",
+      "example_value": 7.0,
+      "mapped_local_field": "shots_on_target",
+      "notes": "semantic meaning verified under the metric dictionary contract",
+      "numeric_values": 3754,
+      "provider_field": "ontargetScoringAtt",
+      "reason": "Goal attempts on target, including those saved and those scored.",
+      "text_values": 0,
+      "verified_semantics": true
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 497.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "openPlayPass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3606 latest team-side rows across 1916 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": "blocks",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3606,
+      "provider_field": "outfielderBlock",
+      "reason": "Blocks by outfield players, excluding blocked shots on goal.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2503 latest team-side rows across 1670 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2503,
+      "provider_field": "overrun",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 969 latest team-side rows across 557 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 969,
+      "provider_field": "ownGoals",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 75.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "passesLeft",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 60.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "passesRight",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 22.0,
+      "mapped_local_field": "penalty_area_entries",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "penAreaEntries",
+      "reason": "Entries into the opposition penalty area.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 381 latest team-side rows across 361 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 381,
+      "provider_field": "penGoalsConceded",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 473 latest team-side rows across 441 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 473,
+      "provider_field": "penaltyConceded",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 458 latest team-side rows across 428 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 458,
+      "provider_field": "penaltyFaced",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 61 latest team-side rows across 61 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 61,
+      "provider_field": "penaltySave",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 473 latest team-side rows across 441 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 473,
+      "provider_field": "penaltyWon",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 127.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "possLostAll",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 127.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "possLostCtrl",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3717 latest team-side rows across 1919 match(es)",
+      "example_value": 7.0,
+      "mapped_local_field": "possession_won_attacking_third",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3717,
+      "provider_field": "possWonAtt3rd",
+      "reason": "Possession regained in the attacking third -- the high-press signal.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 14.0,
+      "mapped_local_field": "possession_won_defensive_third",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "possWonDef3rd",
+      "reason": "Possession regained in the defensive third -- the low-block signal.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 16.0,
+      "mapped_local_field": "possession_won_middle_third",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "possWonMid3rd",
+      "reason": "Possession regained in the middle third.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 54.9,
+      "mapped_local_field": "possession",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "possessionPercentage",
+      "reason": "Share of possession, 0-100. Stored as a percent, never a fraction: the two sides of a match must sum to ~100, which is the coverage report's consistency check.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 848 latest team-side rows across 753 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 848,
+      "provider_field": "postScoringAtt",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 693 latest team-side rows across 634 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 693,
+      "provider_field": "ptsDroppedWinningPos",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 693 latest team-side rows across 634 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 693,
+      "provider_field": "ptsGainedLosingPos",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1351 latest team-side rows across 1121 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1351,
+      "provider_field": "punches",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 14.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "putThrough",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "redCard",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1 latest team-side rows across 1 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1,
+      "provider_field": "rescindedRedCard",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 147.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "rightsidePass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3291 latest team-side rows across 1885 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3291,
+      "provider_field": "savedIbox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2308 latest team-side rows across 1617 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2308,
+      "provider_field": "savedObox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3579 latest team-side rows across 1912 match(es)",
+      "example_value": 5.0,
+      "mapped_local_field": "saves",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3579,
+      "provider_field": "saves",
+      "reason": "Goalkeeper saves made by this side.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 102 latest team-side rows across 100 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 102,
+      "provider_field": "secondYellow",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1700 latest team-side rows across 1315 match(es)",
+      "example_value": 2.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1700,
+      "provider_field": "shieldBallOop",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1709 latest team-side rows across 1336 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1709,
+      "provider_field": "shotFastbreak",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3764 latest team-side rows across 1921 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3764,
+      "provider_field": "shotOffTarget",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1206 latest team-side rows across 1023 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1206,
+      "provider_field": "sixYardBlock",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1176 latest team-side rows across 733 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1176,
+      "provider_field": "subsGoals",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3829 latest team-side rows across 1921 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3829,
+      "provider_field": "subsMade",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1518 latest team-side rows across 759 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1518,
+      "provider_field": "successfulFiftyFifty",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 108.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "successfulFinalThirdPasses",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 442.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "successfulOpenPlayPass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3835 latest team-side rows across 1921 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3835,
+      "provider_field": "successfulPutThrough",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3840 latest team-side rows across 1921 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3840,
+      "provider_field": "totalAttAssist",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 232.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalBackZonePass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 30.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalChippedPass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 21.0,
+      "mapped_local_field": "clearances",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalClearance",
+      "reason": "Clearances made.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 18.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalContest",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3704 latest team-side rows across 1921 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3704,
+      "provider_field": "totalCornersIntobox",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 11.0,
+      "mapped_local_field": "crosses",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalCross",
+      "reason": "Crosses attempted from open play and set pieces.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 8.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalCrossNocorner",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1216 latest team-side rows across 608 match(es)",
+      "example_value": 100873.87,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1216,
+      "provider_field": "totalDistance",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1709 latest team-side rows across 1336 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1709,
+      "provider_field": "totalFastbreak",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 141.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalFinalThirdPasses",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3681 latest team-side rows across 1918 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3681,
+      "provider_field": "totalFlickOn",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 302.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalFwdZonePass",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2137 latest team-side rows across 1556 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2137,
+      "provider_field": "totalHighClaim",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1547 latest team-side rows across 1202 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1547,
+      "provider_field": "totalKeeperSweeper",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3837 latest team-side rows across 1921 match(es)",
+      "example_value": 8.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3837,
+      "provider_field": "totalLaunches",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3757 latest team-side rows across 1919 match(es)",
+      "example_value": 12.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3757,
+      "provider_field": "totalLayoffs",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 56.0,
+      "mapped_local_field": "long_passes",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalLongBalls",
+      "reason": "Long passes attempted.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2994 latest team-side rows across 1825 match(es)",
+      "example_value": 4.0,
+      "mapped_local_field": "offsides",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2994,
+      "provider_field": "totalOffside",
+      "reason": "Offsides called against this side.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 523.0,
+      "mapped_local_field": "passes",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalPass",
+      "reason": "Total passes attempted.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 1872 latest team-side rows across 1434 match(es)",
+      "example_value": 1.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 1872,
+      "provider_field": "totalPullBack",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": "red_cards",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalRedCard",
+      "reason": "Red cards received, including second yellows.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": "shots",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalScoringAtt",
+      "reason": "Total goal attempts, on and off target, including blocked.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 16.0,
+      "mapped_local_field": "tackles",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalTackle",
+      "reason": "Tackles attempted.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 2728 latest team-side rows across 1746 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 2728,
+      "provider_field": "totalThroughBall",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 10.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalThrows",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": "yellow_cards",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "totalYelCard",
+      "reason": "Yellow cards received.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 719.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "touches",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3841 latest team-side rows across 1921 match(es)",
+      "example_value": 20.0,
+      "mapped_local_field": "touches_in_opposition_box",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3841,
+      "provider_field": "touchesInOppBox",
+      "reason": "Touches by this side inside the opposition penalty area.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 28.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "unsuccessfulTouch",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 816 latest team-side rows across 408 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 816,
+      "provider_field": "winningGoal",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3828 latest team-side rows across 1921 match(es)",
+      "example_value": 11.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3828,
+      "provider_field": "wonContest",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3759 latest team-side rows across 1921 match(es)",
+      "example_value": 3.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3759,
+      "provider_field": "wonCorners",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3841 latest team-side rows across 1921 match(es)",
+      "example_value": 12.0,
+      "mapped_local_field": "tackles_won",
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3841,
+      "provider_field": "wonTackle",
+      "reason": "Tackles that regained or dispossessed.",
+      "text_values": 0,
+      "verified_semantics": false
+    },
+    {
+      "evidence": "observed on 3842 latest team-side rows across 1921 match(es)",
+      "example_value": 0.0,
+      "mapped_local_field": null,
+      "notes": "field existence is verified; semantic meaning remains unverified",
+      "numeric_values": 3842,
+      "provider_field": "yellowCard",
+      "reason": "no local mapping declared",
+      "text_values": 0,
+      "verified_semantics": false
+    }
+  ],
+  "schema_version": 1,
+  "summary": {
+    "mapped_fields": 42,
+    "provider_fields": 246,
+    "unmapped_numeric_fields": 203
+  },
+  "unmapped_numeric_fields": [
+    {
+      "example_value": 217.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "accurateBackZonePass"
+    },
+    {
+      "example_value": 12.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "accurateChippedPass"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1788,
+      "numeric_values": 2693,
+      "provider_field": "accurateCornersIntobox"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1911,
+      "numeric_values": 3535,
+      "provider_field": "accurateCrossNocorner"
+    },
+    {
+      "example_value": 3.0,
+      "matches": 1718,
+      "numeric_values": 2662,
+      "provider_field": "accurateFlickOn"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 992,
+      "numeric_values": 1144,
+      "provider_field": "accurateFreekickCross"
+    },
+    {
+      "example_value": 248.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "accurateFwdZonePass"
+    },
+    {
+      "example_value": 9.0,
+      "matches": 1920,
+      "numeric_values": 3790,
+      "provider_field": "accurateGoalKicks"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1180,
+      "numeric_values": 1502,
+      "provider_field": "accurateKeeperSweeper"
+    },
+    {
+      "example_value": 10.0,
+      "matches": 1919,
+      "numeric_values": 3748,
+      "provider_field": "accurateKeeperThrows"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1896,
+      "numeric_values": 3512,
+      "provider_field": "accurateLaunches"
+    },
+    {
+      "example_value": 12.0,
+      "matches": 1919,
+      "numeric_values": 3718,
+      "provider_field": "accurateLayoffs"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 786,
+      "numeric_values": 885,
+      "provider_field": "accuratePullBack"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1405,
+      "numeric_values": 1822,
+      "provider_field": "accurateThroughBall"
+    },
+    {
+      "example_value": 5.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "accurateThrows"
+    },
+    {
+      "example_value": 7.0,
+      "matches": 1921,
+      "numeric_values": 3824,
+      "provider_field": "attAssistOpenplay"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1704,
+      "numeric_values": 2547,
+      "provider_field": "attAssistSetplay"
+    },
+    {
+      "example_value": 3.0,
+      "matches": 1921,
+      "numeric_values": 3750,
+      "provider_field": "attBxCentre"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1751,
+      "numeric_values": 2643,
+      "provider_field": "attBxLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1719,
+      "numeric_values": 2570,
+      "provider_field": "attBxRight"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 797,
+      "numeric_values": 909,
+      "provider_field": "attCmissHigh"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 225,
+      "numeric_values": 230,
+      "provider_field": "attCmissHighLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 267,
+      "numeric_values": 273,
+      "provider_field": "attCmissHighRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1123,
+      "numeric_values": 1350,
+      "provider_field": "attCmissLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1197,
+      "numeric_values": 1462,
+      "provider_field": "attCmissRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1880,
+      "numeric_values": 3121,
+      "provider_field": "attCorner"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1336,
+      "numeric_values": 1709,
+      "provider_field": "attFastbreak"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 468,
+      "numeric_values": 876,
+      "provider_field": "attFreekickGoal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 405,
+      "numeric_values": 424,
+      "provider_field": "attFreekickMiss"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 58,
+      "numeric_values": 59,
+      "provider_field": "attFreekickPost"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 322,
+      "numeric_values": 338,
+      "provider_field": "attFreekickTarget"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1038,
+      "numeric_values": 1225,
+      "provider_field": "attFreekickTotal"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 675,
+      "numeric_values": 1090,
+      "provider_field": "attGoalHighCentre"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 739,
+      "numeric_values": 1169,
+      "provider_field": "attGoalHighLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 715,
+      "numeric_values": 1145,
+      "provider_field": "attGoalHighRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1042,
+      "numeric_values": 1517,
+      "provider_field": "attGoalLowCentre"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 1303,
+      "numeric_values": 1884,
+      "provider_field": "attGoalLowLeft"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 1231,
+      "numeric_values": 1785,
+      "provider_field": "attGoalLowRight"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 963,
+      "numeric_values": 1440,
+      "provider_field": "attHdGoal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1715,
+      "numeric_values": 2522,
+      "provider_field": "attHdMiss"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 213,
+      "numeric_values": 224,
+      "provider_field": "attHdPost"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1230,
+      "numeric_values": 1517,
+      "provider_field": "attHdTarget"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1891,
+      "numeric_values": 3313,
+      "provider_field": "attHdTotal"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1891,
+      "numeric_values": 3235,
+      "provider_field": "attIboxBlocked"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1802,
+      "numeric_values": 2943,
+      "provider_field": "attIboxGoal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1916,
+      "numeric_values": 3551,
+      "provider_field": "attIboxMiss"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 195,
+      "numeric_values": 200,
+      "provider_field": "attIboxOwnGoal"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 587,
+      "numeric_values": 652,
+      "provider_field": "attIboxPost"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1885,
+      "numeric_values": 3291,
+      "provider_field": "attIboxTarget"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1327,
+      "numeric_values": 1903,
+      "provider_field": "attLfGoal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1644,
+      "numeric_values": 2356,
+      "provider_field": "attLfTarget"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1919,
+      "numeric_values": 3687,
+      "provider_field": "attLfTotal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 182,
+      "numeric_values": 189,
+      "provider_field": "attLgCentre"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 19,
+      "numeric_values": 19,
+      "provider_field": "attLgLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 18,
+      "numeric_values": 19,
+      "provider_field": "attLgRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1713,
+      "numeric_values": 2463,
+      "provider_field": "attMissHigh"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1105,
+      "numeric_values": 1319,
+      "provider_field": "attMissHighLeft"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1180,
+      "numeric_values": 1456,
+      "provider_field": "attMissHighRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1771,
+      "numeric_values": 2709,
+      "provider_field": "attMissLeft"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1771,
+      "numeric_values": 2668,
+      "provider_field": "attMissRight"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1816,
+      "numeric_values": 2800,
+      "provider_field": "attOboxBlocked"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 876,
+      "numeric_values": 1330,
+      "provider_field": "attOboxGoal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1853,
+      "numeric_values": 3012,
+      "provider_field": "attOboxMiss"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 2,
+      "numeric_values": 2,
+      "provider_field": "attOboxOwnGoal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 245,
+      "numeric_values": 247,
+      "provider_field": "attOboxPost"
+    },
+    {
+      "example_value": 4.0,
+      "matches": 1617,
+      "numeric_values": 2308,
+      "provider_field": "attOboxTarget"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 431,
+      "numeric_values": 839,
+      "provider_field": "attObpGoal"
+    },
+    {
+      "example_value": 5.0,
+      "matches": 1921,
+      "numeric_values": 3702,
+      "provider_field": "attObxCentre"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 60,
+      "numeric_values": 61,
+      "provider_field": "attObxLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 55,
+      "numeric_values": 56,
+      "provider_field": "attObxRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 112,
+      "numeric_values": 113,
+      "provider_field": "attObxdLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 61,
+      "numeric_values": 61,
+      "provider_field": "attObxdRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 643,
+      "numeric_values": 703,
+      "provider_field": "attOneOnOne"
+    },
+    {
+      "example_value": 8.0,
+      "matches": 1921,
+      "numeric_values": 3833,
+      "provider_field": "attOpenplay"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 697,
+      "numeric_values": 1117,
+      "provider_field": "attPenGoal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 13,
+      "numeric_values": 13,
+      "provider_field": "attPenMiss"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 10,
+      "numeric_values": 10,
+      "provider_field": "attPenPost"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 61,
+      "numeric_values": 61,
+      "provider_field": "attPenTarget"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 358,
+      "numeric_values": 378,
+      "provider_field": "attPostHigh"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 278,
+      "numeric_values": 293,
+      "provider_field": "attPostLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 253,
+      "numeric_values": 264,
+      "provider_field": "attPostRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1572,
+      "numeric_values": 2331,
+      "provider_field": "attRfGoal"
+    },
+    {
+      "example_value": 4.0,
+      "matches": 1831,
+      "numeric_values": 2967,
+      "provider_field": "attRfTarget"
+    },
+    {
+      "example_value": 7.0,
+      "matches": 1921,
+      "numeric_values": 3811,
+      "provider_field": "attRfTotal"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1439,
+      "numeric_values": 1890,
+      "provider_field": "attSetpiece"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1029,
+      "numeric_values": 1215,
+      "provider_field": "attSvHighCentre"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 567,
+      "numeric_values": 616,
+      "provider_field": "attSvHighLeft"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 532,
+      "numeric_values": 565,
+      "provider_field": "attSvHighRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1715,
+      "numeric_values": 2561,
+      "provider_field": "attSvLowCentre"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1432,
+      "numeric_values": 1830,
+      "provider_field": "attSvLowLeft"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1336,
+      "numeric_values": 1694,
+      "provider_field": "attSvLowRight"
+    },
+    {
+      "example_value": 7.0,
+      "matches": 1921,
+      "numeric_values": 3829,
+      "provider_field": "attemptedTackleFoul"
+    },
+    {
+      "example_value": 4.0,
+      "matches": 1921,
+      "numeric_values": 3833,
+      "provider_field": "attemptsConcededIbox"
+    },
+    {
+      "example_value": 10.0,
+      "matches": 1921,
+      "numeric_values": 3723,
+      "provider_field": "attemptsConcededObox"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1768,
+      "numeric_values": 2724,
+      "provider_field": "blockedCross"
+    },
+    {
+      "example_value": 10.0,
+      "matches": 1921,
+      "numeric_values": 3837,
+      "provider_field": "blockedPass"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1921,
+      "numeric_values": 3828,
+      "provider_field": "challengeLost"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 860,
+      "numeric_values": 959,
+      "provider_field": "cleanSheet"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 429,
+      "numeric_values": 452,
+      "provider_field": "clearanceOffLine"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 628,
+      "numeric_values": 699,
+      "provider_field": "contentiousDecision"
+    },
+    {
+      "example_value": 6.0,
+      "matches": 1921,
+      "numeric_values": 3810,
+      "provider_field": "crosses18yard"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1920,
+      "numeric_values": 3656,
+      "provider_field": "crosses18yardplus"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 806,
+      "numeric_values": 1245,
+      "provider_field": "defenderGoals"
+    },
+    {
+      "example_value": 11.0,
+      "matches": 1921,
+      "numeric_values": 3840,
+      "provider_field": "dispossessed"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1808,
+      "numeric_values": 2834,
+      "provider_field": "divingSave"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1768,
+      "numeric_values": 2724,
+      "provider_field": "effectiveBlockedCross"
+    },
+    {
+      "example_value": 21.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "effectiveClearance"
+    },
+    {
+      "example_value": 8.0,
+      "matches": 1921,
+      "numeric_values": 3836,
+      "provider_field": "effectiveHeadClearance"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 588,
+      "numeric_values": 623,
+      "provider_field": "errorLeadToGoal"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 971,
+      "numeric_values": 1186,
+      "provider_field": "errorLeadToShot"
+    },
+    {
+      "example_value": 0.776563,
+      "matches": 579,
+      "numeric_values": 1158,
+      "provider_field": "expectedAssists"
+    },
+    {
+      "example_value": 0.0651,
+      "matches": 295,
+      "numeric_values": 346,
+      "provider_field": "expectedGoalsFreekick"
+    },
+    {
+      "example_value": 0.7016,
+      "matches": 579,
+      "numeric_values": 1127,
+      "provider_field": "expectedGoalsOnTargetConceded"
+    },
+    {
+      "example_value": 30.0,
+      "matches": 759,
+      "numeric_values": 1518,
+      "provider_field": "fiftyFifty"
+    },
+    {
+      "example_value": 6.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "fkFoulWon"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1259,
+      "numeric_values": 1568,
+      "provider_field": "forwardGoals"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 131,
+      "numeric_values": 152,
+      "provider_field": "foulThrowIn"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1895,
+      "numeric_values": 3246,
+      "provider_field": "fouledFinalThird"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1728,
+      "numeric_values": 2674,
+      "provider_field": "freekickCross"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1038,
+      "numeric_values": 1225,
+      "provider_field": "freekickTotal"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1668,
+      "numeric_values": 2376,
+      "provider_field": "goalAssist"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 358,
+      "numeric_values": 372,
+      "provider_field": "goalAssistDeadball"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1521,
+      "numeric_values": 2040,
+      "provider_field": "goalAssistIntentional"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1539,
+      "numeric_values": 2052,
+      "provider_field": "goalAssistOpenplay"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 648,
+      "numeric_values": 701,
+      "provider_field": "goalAssistSetplay"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 383,
+      "numeric_values": 397,
+      "provider_field": "goalFastbreak"
+    },
+    {
+      "example_value": 11.0,
+      "matches": 1921,
+      "numeric_values": 3834,
+      "provider_field": "goalKicks"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 1849,
+      "numeric_values": 3094,
+      "provider_field": "goalsConceded"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 1802,
+      "numeric_values": 2943,
+      "provider_field": "goalsConcededIbox"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 876,
+      "numeric_values": 1330,
+      "provider_field": "goalsConcededObox"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1731,
+      "numeric_values": 2677,
+      "provider_field": "goalsOpenplay"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1472,
+      "numeric_values": 1975,
+      "provider_field": "goodHighClaim"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 965,
+      "numeric_values": 1157,
+      "provider_field": "handBall"
+    },
+    {
+      "example_value": 8.0,
+      "matches": 1921,
+      "numeric_values": 3836,
+      "provider_field": "headClearance"
+    },
+    {
+      "example_value": 3.0,
+      "matches": 945,
+      "numeric_values": 1115,
+      "provider_field": "hitWoodwork"
+    },
+    {
+      "example_value": 4.0,
+      "matches": 1921,
+      "numeric_values": 3839,
+      "provider_field": "interceptionWon"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1624,
+      "numeric_values": 2296,
+      "provider_field": "interceptionsInBox"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 408,
+      "numeric_values": 816,
+      "provider_field": "keeperGoals"
+    },
+    {
+      "example_value": 10.0,
+      "matches": 1919,
+      "numeric_values": 3752,
+      "provider_field": "keeperThrows"
+    },
+    {
+      "example_value": 135.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "leftsidePass"
+    },
+    {
+      "example_value": 68.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "longPassOwnToOpp"
+    },
+    {
+      "example_value": 46.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "longPassOwnToOppSuccess"
+    },
+    {
+      "example_value": 4.0,
+      "matches": 1921,
+      "numeric_values": 3759,
+      "provider_field": "lostCorners"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 1356,
+      "numeric_values": 1964,
+      "provider_field": "midfielderGoals"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1920,
+      "numeric_values": 3668,
+      "provider_field": "offtargetAttAssist"
+    },
+    {
+      "example_value": 9.0,
+      "matches": 1921,
+      "numeric_values": 3800,
+      "provider_field": "ontargetAttAssist"
+    },
+    {
+      "example_value": 497.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "openPlayPass"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1670,
+      "numeric_values": 2503,
+      "provider_field": "overrun"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 557,
+      "numeric_values": 969,
+      "provider_field": "ownGoals"
+    },
+    {
+      "example_value": 75.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "passesLeft"
+    },
+    {
+      "example_value": 60.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "passesRight"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 361,
+      "numeric_values": 381,
+      "provider_field": "penGoalsConceded"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 441,
+      "numeric_values": 473,
+      "provider_field": "penaltyConceded"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 428,
+      "numeric_values": 458,
+      "provider_field": "penaltyFaced"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 61,
+      "numeric_values": 61,
+      "provider_field": "penaltySave"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 441,
+      "numeric_values": 473,
+      "provider_field": "penaltyWon"
+    },
+    {
+      "example_value": 127.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "possLostAll"
+    },
+    {
+      "example_value": 127.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "possLostCtrl"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 753,
+      "numeric_values": 848,
+      "provider_field": "postScoringAtt"
+    },
+    {
+      "example_value": 3.0,
+      "matches": 634,
+      "numeric_values": 693,
+      "provider_field": "ptsDroppedWinningPos"
+    },
+    {
+      "example_value": 3.0,
+      "matches": 634,
+      "numeric_values": 693,
+      "provider_field": "ptsGainedLosingPos"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1121,
+      "numeric_values": 1351,
+      "provider_field": "punches"
+    },
+    {
+      "example_value": 14.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "putThrough"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "redCard"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1,
+      "numeric_values": 1,
+      "provider_field": "rescindedRedCard"
+    },
+    {
+      "example_value": 147.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "rightsidePass"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1885,
+      "numeric_values": 3291,
+      "provider_field": "savedIbox"
+    },
+    {
+      "example_value": 4.0,
+      "matches": 1617,
+      "numeric_values": 2308,
+      "provider_field": "savedObox"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 100,
+      "numeric_values": 102,
+      "provider_field": "secondYellow"
+    },
+    {
+      "example_value": 2.0,
+      "matches": 1315,
+      "numeric_values": 1700,
+      "provider_field": "shieldBallOop"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1336,
+      "numeric_values": 1709,
+      "provider_field": "shotFastbreak"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1921,
+      "numeric_values": 3764,
+      "provider_field": "shotOffTarget"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1023,
+      "numeric_values": 1206,
+      "provider_field": "sixYardBlock"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 733,
+      "numeric_values": 1176,
+      "provider_field": "subsGoals"
+    },
+    {
+      "example_value": 4.0,
+      "matches": 1921,
+      "numeric_values": 3829,
+      "provider_field": "subsMade"
+    },
+    {
+      "example_value": 10.0,
+      "matches": 759,
+      "numeric_values": 1518,
+      "provider_field": "successfulFiftyFifty"
+    },
+    {
+      "example_value": 108.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "successfulFinalThirdPasses"
+    },
+    {
+      "example_value": 442.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "successfulOpenPlayPass"
+    },
+    {
+      "example_value": 10.0,
+      "matches": 1921,
+      "numeric_values": 3835,
+      "provider_field": "successfulPutThrough"
+    },
+    {
+      "example_value": 10.0,
+      "matches": 1921,
+      "numeric_values": 3840,
+      "provider_field": "totalAttAssist"
+    },
+    {
+      "example_value": 232.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "totalBackZonePass"
+    },
+    {
+      "example_value": 30.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "totalChippedPass"
+    },
+    {
+      "example_value": 18.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "totalContest"
+    },
+    {
+      "example_value": 3.0,
+      "matches": 1921,
+      "numeric_values": 3704,
+      "provider_field": "totalCornersIntobox"
+    },
+    {
+      "example_value": 8.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "totalCrossNocorner"
+    },
+    {
+      "example_value": 100873.87,
+      "matches": 608,
+      "numeric_values": 1216,
+      "provider_field": "totalDistance"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1336,
+      "numeric_values": 1709,
+      "provider_field": "totalFastbreak"
+    },
+    {
+      "example_value": 141.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "totalFinalThirdPasses"
+    },
+    {
+      "example_value": 4.0,
+      "matches": 1918,
+      "numeric_values": 3681,
+      "provider_field": "totalFlickOn"
+    },
+    {
+      "example_value": 302.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "totalFwdZonePass"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1556,
+      "numeric_values": 2137,
+      "provider_field": "totalHighClaim"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1202,
+      "numeric_values": 1547,
+      "provider_field": "totalKeeperSweeper"
+    },
+    {
+      "example_value": 8.0,
+      "matches": 1921,
+      "numeric_values": 3837,
+      "provider_field": "totalLaunches"
+    },
+    {
+      "example_value": 12.0,
+      "matches": 1919,
+      "numeric_values": 3757,
+      "provider_field": "totalLayoffs"
+    },
+    {
+      "example_value": 1.0,
+      "matches": 1434,
+      "numeric_values": 1872,
+      "provider_field": "totalPullBack"
+    },
+    {
+      "example_value": 3.0,
+      "matches": 1746,
+      "numeric_values": 2728,
+      "provider_field": "totalThroughBall"
+    },
+    {
+      "example_value": 10.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "totalThrows"
+    },
+    {
+      "example_value": 719.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "touches"
+    },
+    {
+      "example_value": 28.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "unsuccessfulTouch"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 408,
+      "numeric_values": 816,
+      "provider_field": "winningGoal"
+    },
+    {
+      "example_value": 11.0,
+      "matches": 1921,
+      "numeric_values": 3828,
+      "provider_field": "wonContest"
+    },
+    {
+      "example_value": 3.0,
+      "matches": 1921,
+      "numeric_values": 3759,
+      "provider_field": "wonCorners"
+    },
+    {
+      "example_value": 0.0,
+      "matches": 1921,
+      "numeric_values": 3842,
+      "provider_field": "yellowCard"
+    }
+  ]
+}

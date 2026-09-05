@@ -3,8 +3,9 @@
 # ============================ READ THIS BEFORE TRUSTING A NAME ============================
 # A real SDP match-stats payload was first observed on 2026-09-04. Its exact field names have
 # been added to the candidate alias lists below, while older Opta/Pulselive spellings remain as
-# schema-drift fallbacks. Field presence verifies spelling, not meaning: no full reconciliation
-# has completed, so every provider-backed entry still carries `verified_semantics: false`.
+# schema-drift fallbacks. Field presence verifies spelling, not meaning. The 2026-09-05 full
+# reconciliation independently corroborated only goals, expected goals, and shots on target;
+# all other provider-backed entries remain `verified_semantics: false`.
 #
 # This file is safe to be wrong. Three mechanisms make it so:
 #
@@ -24,13 +25,15 @@
 #
 # Fields:
 #   local_field         canonical name used in stg/mart. Stable; downstream code binds to it.
-#   provider_fields     accepted provider key names, in preference order.
+#   provider_fields     accepted provider key names. For a verified metric the first name is the
+#                       independently corroborated live key; later names are unverified fallbacks.
 #   type                int | float | percent   (percent is stored as a 0-100 float, never 0-1)
 #   group               metric family, used by the coverage report and the tactical form marts.
 #   mirror              local_field of the opponent-facing value derived by pairing both sides
 #                       of the same match. Omitted where no valid semantic mirror exists.
 #   description         what the value means. Prose, for the coverage report and humans.
-#   verified_semantics  false until observed AND reconciled.
+#   verified_semantics  false until the first provider field is observed AND reconciled. It does
+#                       not verify later fallback aliases; the inventory reports those separately.
 
 schema_version: 1
 
@@ -42,14 +45,14 @@ metrics:
     group: result
     mirror: goals_allowed
     description: Goals scored by this side, excluding own goals credited to the opponent.
-    verified_semantics: false
+    verified_semantics: true
   - local_field: expected_goals
-    provider_fields: [expected_goals, expectedGoals, xg, expected_goals_total]
+    provider_fields: [expectedGoals, expected_goals, xg, expected_goals_total]
     type: float
     group: result
     mirror: expected_goals_allowed
     description: Opta expected goals for this side's shots.
-    verified_semantics: false
+    verified_semantics: true
   - local_field: expected_goals_on_target
     provider_fields: [expected_goals_on_target, expectedGoalsOnTarget, xgot, expected_goals_ontarget]
     type: float
@@ -69,12 +72,12 @@ metrics:
     description: Total goal attempts, on and off target, including blocked.
     verified_semantics: false
   - local_field: shots_on_target
-    provider_fields: [ontarget_scoring_att, ontargetScoringAtt, shots_on_target, shots_on_goal]
+    provider_fields: [ontargetScoringAtt, ontarget_scoring_att, shots_on_target, shots_on_goal]
     type: int
     group: shooting
     mirror: shots_on_target_allowed
     description: Goal attempts on target, including those saved and those scored.
-    verified_semantics: false
+    verified_semantics: true
   - local_field: shots_inside_box
     provider_fields: [attemptsIbox, attempts_ibox, shots_inside_box]
     type: int

@@ -19,6 +19,7 @@ it cannot interpret rather than guessing. Each file pins one of those cases:
 | `match_stats_unknown_fields.json` | fields absent from the metric dictionary -- must be RETAINED |
 | `matches_unknown_envelope.json` | an unrecognised envelope -- must raise, not return empty |
 
-When a real capture becomes available, replace these with genuine payloads, re-run
-`python -m fpl.jobs.audit_pl_sdp --stage`, and promote `verified_semantics` in
-`config/pl_sdp_metrics.yaml` only for the fields the reconciliation report corroborates.
+These small vendored shapes remain deterministic offline fixtures, not provider evidence. The real
+capture is retained content-addressed in the local raw store and summarized in
+`docs/pl-sdp-real-provider-validation-2026-09-05.md`. Promote `verified_semantics` only for fields
+the independent reconciliation report corroborates.

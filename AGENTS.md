@@ -607,11 +607,13 @@ carrying a `provider` column — it is **not** "the SDP table". Two providers sh
 
 * **`fpl_archive`** — derived from marts already in this repository. Available for every season,
   so V2 is runnable and evaluable with no external capture.
-* **`pl_sdp`** — the Premier League SDP backend. Richer, but network-dependent, and **it has
-  never been captured**: every Pulselive / premierleague.com / fantasy.premierleague.com host is
-  refused by the authoring environment's egress policy. Every provider field name in
-  `config/pl_sdp_metrics.yaml` therefore carries `verified_semantics: false` and is an alias
-  list rather than a single name.
+* **`pl_sdp`** — the Premier League SDP backend. The owner machine completed the first real
+  capture of five historical seasons plus current completed matches on 2026-09-05: 1,921
+  match-stat payloads / 3,842 team sides now populate the provider fact. The exhaustive inventory
+  observed 246 fields; only goals, xG, and SOT currently
+  satisfy the independent-reconciliation rule for `verified_semantics: true`. See
+  `docs/pl-sdp-real-provider-validation-2026-09-05.md`. The source remains network-dependent, and
+  every unverified or unmapped value stays losslessly available rather than guessed.
 
 Sharing one grain makes reconciliation structural rather than a script, and where two providers
 measure the same concept by different routes **both values are kept in separate columns** —
@@ -628,12 +630,19 @@ fields land in the tall store `stg_pl_sdp_team_match_metric` and are reported by
 
 Whether `stg_fixture.pulse_id` equals the SDP `matchId` is a question, and
 `jobs.audit_pl_sdp --stage` answers it into `results/pl_sdp_identity_audit.json`. Resolution is
-pulse_id first (corroborated on season, kickoff within 3h, and score), then a deterministic
-fallback on season and kickoff narrowed by score and used only when exactly one candidate
-remains. Ambiguity, contradiction, and one SDP match claimed by two fixtures all fail closed.
+pulse_id first (corroborated on season, kickoff within 3h, score, and teams), then a deterministic
+fallback on season and kickoff, narrowing multiple candidates by teams and then score. A selected
+candidate's Home/Away teams are always corroborated. Ambiguity, contradiction, and one SDP match
+claimed by two fixtures all fail closed.
 Club names corroborate a match already made; they never make one, and a name resolving to two
 clubs across seasons is dropped rather than picked. `pulse_id_match_rate` is `None`, not `0.0`,
 when no fixture carried a pulse_id.
+
+The real audit measured `pulse_id == matchId` at **0/1,900 (0%)**. All 2,280 fixtures instead
+resolved one-to-one by season and kickoff, narrowing multiple candidates by teams and then score,
+and always corroborating Home/Away team codes before accepting a match. There was zero ambiguity,
+contradiction, duplicate claim, or unmatched fixture. That fallback is required plumbing, not a
+temporary bridge.
 
 ### V2 evaluation results: both candidates failed, and are left as committed
 
@@ -651,8 +660,8 @@ harness.
 
 **Team environment: not promoted, fails its gate.** Best rung (`goals + xG`) scores 1.49599, a
 **+0.2867%** lift against a 1% bar, and **2021-22 regresses -0.2108%**, so it fails the
-per-season non-regression rule as well. Rungs C and D are bit-identical to B because their
-signals exist only in the uncaptured `pl_sdp` provider: the upper ablation ladder is
+per-season non-regression rule as well. Rungs C and D are bit-identical to B because `pl_sdp`
+was uncaptured at that frozen evaluation's knowledge time: the upper ablation ladder is
 **untested, not null**, and nothing here says whether shot volume or territory helps. The
 inner-holdout xG weight rises monotonically with coverage (0 folds fitted in 2021-22; 6 folds
 in 2022-23 at a selected weight of **0.000**; then 0.362 / 0.579 / 0.645), so the pooled figure
@@ -679,9 +688,9 @@ python -m fpl.jobs.prospective_environment_v2 --gw-from 1 --gw-to 5
 ```
 
 `.github/workflows/pl-sdp-capture.yml` is the durable capture path, mirroring `snapshot.yml`
-(curl/gzip/jq only, no Python) so a refactor cannot stop a capture. It is disabled by default
-because `pl_sdp.season_ids` starts empty and this repository refuses to guess a provider season
-id — fetching the wrong year under a correct-looking label is worse than fetching nothing.
+(curl/gzip/jq only, no Python) so a Python refactor cannot stop a capture. The six configured
+season ids are now live-verified; the workflow was not needed for the first capture because local
+provider access succeeded. Any new season still requires evidence rather than a guessed id.
 
 ## Non-negotiable correctness rules
 
@@ -1370,13 +1379,14 @@ active delivery order.
     its own amendment, not a post-hoc tweak. The V2 team engine is deliberately NOT wired into
     `jobs/prospective_points_v1.py`; `jobs/prospective_environment_v2.py` produces the football
     forecast for analysis instead, so no decision path consumes an ungated candidate.
-11. The `pl_sdp` provider has never been captured, so the upper half of the ablation ladder
-    (shots on target, box touches) is **untested rather than refuted**. Before fitting anything
-    on an SDP metric, run `jobs.audit_pl_sdp --stage` and read
-    `results/pl_sdp_coverage.json`, `results/pl_sdp_identity_audit.json` and
-    `results/pl_sdp_reconciliation.json`: coverage-first is a rule, not a preference. Never
-    zero-fill an absent historical metric, and promote a `verified_semantics` flag only after a
-    real payload has been inspected and reconciled.
+11. Real `pl_sdp` data now exists, but the upper half of the frozen ablation ladder (shots on
+    target, box touches) remains **untested rather than refuted**. The historical payloads were
+    first known in September 2026; the current latest-value mart/evaluation reader cannot enforce
+    provider `known_at`, so feeding the backfill into old folds would restate history. Before any
+    SDP model experiment, read `docs/pl-sdp-real-provider-validation-2026-09-05.md` plus the four
+    `results/pl_sdp_*.json` reports, implement a version-preserving as-of reader, and pre-register
+    a new additive candidate identity. Never zero-fill an absent historical metric, silently rerun
+    immutable C/D artifacts, or promote semantics without independent reconciliation.
 
 12. The V2 defensive-contribution candidate `team_environment_share_dc_threshold_v2` has had
     its single development evaluation (`docs/v2-dc-development.md`,

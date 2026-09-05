@@ -435,7 +435,7 @@ def test_an_unmapped_season_label_is_still_refused_rather_than_guessed() -> None
         config.season_id("2020-21")
 
 
-def test_newly_observed_provider_aliases_map_without_claiming_verified_semantics() -> None:
+def test_newly_observed_provider_aliases_map_conservatively() -> None:
     aliases = load_sdp_metrics().alias_index()
     assert {
         alias: aliases[alias]
@@ -467,4 +467,15 @@ def test_newly_observed_provider_aliases_map_without_claiming_verified_semantics
         "redCard",
     ):
         assert non_alias not in aliases
-    assert all(not metric.verified_semantics for metric in load_sdp_metrics().metrics)
+    metrics = load_sdp_metrics().by_local_field()
+    assert all(
+        not metrics[field].verified_semantics
+        for field in (
+            "shots_inside_box",
+            "shots_outside_box",
+            "penalty_area_entries",
+            "forward_passes",
+            "backward_passes",
+            "corners",
+        )
+    )

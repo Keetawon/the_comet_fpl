@@ -3,11 +3,17 @@
 Run date: 2026-09-04
 Contracts: `config/v2_team_environment_evaluation.yaml` 1.0, `config/v2_gk_saves_evaluation.yaml` 1.0
 Result: `results/v2_team_environment_development.json`
-Provider: `fpl_archive` (no SDP payload has ever been captured; see `docs/pl-sdp-data-source.md`)
+Provider at evaluation time: `fpl_archive` (no SDP payload had yet been captured)
 
 **Status: development-only. Neither candidate is promoted, and neither cleared its gate.**
 Both contracts declare `promotion_requires_prospective_window`, so no historical result here
 could have promoted anything even had it passed.
+
+**Postscript, 2026-09-05:** real SDP data now exists, but nothing below was rerun or reinterpreted.
+The historical backfill was first known in September 2026, so feeding it into the old folds without
+an as-of provider-version contract would violate point-in-time evaluation conditions. The capture
+evidence and the work still required before a genuine SOT/territory ablation are recorded in
+`docs/pl-sdp-real-provider-validation-2026-09-05.md`.
 
 ## Provenance
 
@@ -49,9 +55,9 @@ Per-season lift of rung B over the incumbent: 2021-22 **−0.21%**, 2022-23 +0.0
 
 **Rungs C and D are bit-identical to rung B, and that is the coverage constraint, not a null
 result.** `shots_on_target` and `touches_in_opposition_box` exist only in the `pl_sdp` provider,
-which has never been captured, so those rungs have no additional signal to add. The upper half
-of the ablation ladder is declared and implemented but **untested**. Nothing here says anything
-about whether shot volume or territory helps.
+which had not been captured for this frozen run, so those rungs had no additional signal to add.
+The upper half of the ablation ladder is declared and implemented but **untested**. Nothing here
+says anything about whether shot volume or territory helps.
 
 ### What the blend actually learned
 
@@ -124,7 +130,8 @@ worth −0.01%.
 
 ## Limitations
 
-* No SDP data exists, so rungs C and D are untested and the `pl_sdp` provider has zero coverage.
+* At this evaluation's frozen knowledge time no SDP data existed, so rungs C and D remain untested.
+  The later 2026-09-05 capture does not retroactively change that result.
 * Both saves models truncate the distribution at 10 saves. Five of 3,846 goalkeeper appearances
   (0.13%) exceed it. Both are truncated identically, so the comparison is fair, but neither
   model can score an 11-save match correctly.

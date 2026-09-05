@@ -23,10 +23,11 @@ unchanged. **Both V2 candidates failed their pre-registered gates and are left a
 team environment reached +0.2867% against a 1% bar with a 2021-22 regression, and GK Saves V2 —
 which replaced V1's identity treating shots faced as a deterministic function of goals conceded —
 is refuted in the regime that matters, winning the two pre-xG seasons and losing every season after
-them. See `docs/v2-architecture.md` and `docs/v2-team-engine-development.md`. The Premier League SDP
-source is fully implemented but **has never been captured**, because every Pulselive /
-premierleague.com / fantasy.premierleague.com host is refused by the authoring environment's egress
-policy; the `fpl_archive` provider supplies the V2 football fact for every season meanwhile.
+them. See `docs/v2-architecture.md` and `docs/v2-team-engine-development.md`. The first real Premier
+League SDP capture was validated on 2026-09-05: six configured seasons, 1,921 match-stat payloads,
+and an exact measured fixture crosswalk now populate the V2 football fact alongside
+`fpl_archive`. This new evidence does not reinterpret the frozen V2 evaluations or license a
+historical point-in-time rerun; see `docs/pl-sdp-real-provider-validation-2026-09-05.md`.
 
 **Current status: the data foundation, development-only forward pipeline through Stage E,
 append-only forecast/outcome ledgers, BI semantic contract version 6, ten established dashboard
@@ -247,7 +248,7 @@ tests/
 V2 adds, without disturbing any of the above:
 
 ```
-config/pl_sdp_metrics.yaml            the football metric dictionary (alias lists, unverified)
+config/pl_sdp_metrics.yaml            football metric dictionary (exact verified keys + fallbacks)
 config/v2_*_evaluation.yaml           pre-registered V2 contracts
 src/fpl/ingest/pl_sdp.py              Premier League SDP client
 src/fpl/transform/pl_sdp.py           landing, staging, measured fixture crosswalk

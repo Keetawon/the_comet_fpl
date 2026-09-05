@@ -1838,11 +1838,11 @@ class SdpMetricType(StrEnum):
 class SdpMetric(_Frozen):
     """One entry of the SDP metric dictionary.
 
-    `provider_fields` is an ALIAS LIST rather than a single name because no payload has been
-    observed: the upstream may use Opta's snake_case vocabulary, a camelCase rendering, or
-    something else entirely. Two aliases of the same metric appearing in one payload with
-    different values is an ambiguity and fails closed -- picking the first match on a genuine
-    disagreement is how a wrong number becomes a permanent record.
+    `provider_fields` is an ALIAS LIST because upstream spelling can drift. For a metric with
+    verified semantics, the first entry is the independently corroborated live field; later
+    entries remain unverified fallbacks. Two aliases appearing in one payload with different
+    values is an ambiguity and fails closed -- picking one on a genuine disagreement is how a
+    wrong number becomes a permanent record.
     """
 
     local_field: str

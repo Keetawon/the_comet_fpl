@@ -1310,7 +1310,7 @@ are left as committed.
 | --- | --- | --- |
 | A | SDP source, raw capture, measured fixture-identity audit | implemented |
 | B | typed staging, provider-tagged V2 team-match mart, coverage reporting | implemented |
-| C | point-in-time V2 access, tactical rolling marts | implemented |
+| C | kickoff-safe V2 access/rolling marts; SDP version-as-of evaluation | partial / pending |
 | D | `FixtureEnvironment` contract + multi-signal football engine | implemented |
 | E | GK Saves V2 | implemented, **evaluated, refuted** |
 | F | DC environment V2 | implemented, **evaluated**: gate missed, mechanism confirmed |
@@ -1337,16 +1337,20 @@ are left as committed.
 
 ### Remaining work, in dependency order
 
-1. **Capture SDP where egress exists.** Nothing above tested a single SDP metric, because the
-   provider has never been reachable. Run `python -m fpl.jobs.audit_pl_sdp --probe` on the owner's
-   machine or via `.github/workflows/pl-sdp-capture.yml`, record `pl_sdp.season_ids`, backfill,
-   then `--stage`. **Read the three coverage-first reports before fitting anything.**
-2. **Verify the metric dictionary against a real payload.** Every provider field name currently
-   carries `verified_semantics: false`. Promote only what the reconciliation corroborates; extend
-   the dictionary from `unmapped_provider_fields` rather than guessing again.
-3. **Then, and only then, run ablation rungs C and D.** They are currently bit-identical to rung B
-   and are untested, not null. This is the single highest-value remaining experiment: it is the
-   only one that can say whether shot volume and territory carry information beyond xG.
+1. **Real SDP capture and provider validation completed, 2026-09-05.** The owner machine retained
+   1,921 match-stat payloads across six confirmed seasons, reconciled all 2,280 fixtures, and
+   populated the V2 marts. FPL `pulse_id == SDP matchId` was measured at 0/1,900; the exact
+   season/kickoff/team fallback resolved every fixture without ambiguity. See
+   `docs/pl-sdp-real-provider-validation-2026-09-05.md` and the four coverage-first reports.
+2. **Metric inventory and conservative semantics audit completed.** All 246 observed fields are
+   enumerated; 42 are mapped and 203 unmapped numeric fields remain losslessly available. Only
+   goals, xG, and SOT cleared the independent-reconciliation rule. Missing provider values remain
+   NULL and are never inferred as zero.
+3. **Implement a version-preserving, as-of SDP evaluation reader before any ablation.** Historical
+   payloads were first captured in September 2026, while `mart_fact_team_match_stats_v2` retains
+   only the latest SDP version and `load_team_frame` does not enforce provider `known_at`. A direct
+   rerun would restate history. After an additive contract closes that gap, create new candidate
+   identities for SOT and then territory; never overwrite or silently rerun frozen rungs C/D.
 4. **An over-dispersed DC threshold model**, as a separately named candidate with its own
    amendment. This is the best-evidenced next model experiment in the repository: the
    allocation is already shown to rank well (AUC +13.5%) and the defect is isolated to the

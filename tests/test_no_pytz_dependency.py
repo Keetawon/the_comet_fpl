@@ -152,8 +152,8 @@ def test_sdp_staging_and_crosswalk_work_without_pytz(tmp_path: Path, without_pyt
                 "matchweek": 12,
                 "kickoff": {"millis": int(KICKOFF.timestamp() * 1000)},
                 "teams": [
-                    {"team": {"id": 1, "name": "Arsenal"}},
-                    {"team": {"id": 4, "name": "Chelsea"}},
+                    {"team": {"id": 3, "name": "Arsenal"}},
+                    {"team": {"id": 8, "name": "Chelsea"}},
                 ],
                 "score": {"homeScore": 2, "awayScore": 1},
             }

@@ -2,51 +2,852 @@
   "comparisons": [
     {
       "archive_column": "expected_goals",
-      "archive_mean": null,
-      "exact_agreements": 0,
+      "archive_mean": 1.399539,
+      "by_season": {
+        "2023-24": {
+          "mean": -0.082917,
+          "mean_absolute": 0.124117,
+          "quantiles": {
+            "p00": -0.446,
+            "p10": -0.29455,
+            "p100": 0.1236,
+            "p25": -0.111125,
+            "p50": -0.01265,
+            "p75": -0.00755,
+            "p90": 0.05845
+          },
+          "rows": 6
+        },
+        "2024-25": {
+          "mean": -0.012028,
+          "mean_absolute": 0.031485,
+          "quantiles": {
+            "p00": -0.4963,
+            "p10": -0.05308,
+            "p100": 0.3257,
+            "p25": -0.0103,
+            "p50": -0.00325,
+            "p75": 0.00355,
+            "p90": 0.0121
+          },
+          "rows": 340
+        },
+        "2025-26": {
+          "mean": -0.007836,
+          "mean_absolute": 0.032798,
+          "quantiles": {
+            "p00": -1.023,
+            "p10": -0.0424,
+            "p100": 0.7096,
+            "p25": -0.0094,
+            "p50": -0.0012,
+            "p75": 0.0055,
+            "p90": 0.01323
+          },
+          "rows": 760
+        }
+      },
+      "difference": {
+        "mean": -0.009532,
+        "mean_absolute": 0.03289,
+        "quantiles": {
+          "p00": -1.023,
+          "p10": -0.04555,
+          "p100": 0.7096,
+          "p25": -0.01,
+          "p50": -0.0021,
+          "p75": 0.0049,
+          "p90": 0.0131
+        },
+        "rows": 1106
+      },
+      "exact_agreements": 5,
       "label": "expected_goals",
-      "max_absolute_difference": null,
-      "mean_difference": null,
-      "rows_compared": 0,
+      "largest_absolute_differences": [
+        {
+          "archive_value": 3.54,
+          "difference": -1.0230000000000001,
+          "fixture": 181,
+          "sdp_value": 2.517,
+          "season": "2025-26",
+          "team_id": 2
+        },
+        {
+          "archive_value": 1.8499999999999999,
+          "difference": 0.7096000000000002,
+          "fixture": 290,
+          "sdp_value": 2.5596,
+          "season": "2025-26",
+          "team_id": 12
+        },
+        {
+          "archive_value": 3.25,
+          "difference": -0.5495999999999999,
+          "fixture": 233,
+          "sdp_value": 2.7004,
+          "season": "2025-26",
+          "team_id": 7
+        },
+        {
+          "archive_value": 1.59,
+          "difference": -0.5021,
+          "fixture": 289,
+          "sdp_value": 1.0879,
+          "season": "2025-26",
+          "team_id": 18
+        },
+        {
+          "archive_value": 1.7800000000000002,
+          "difference": -0.4963000000000002,
+          "fixture": 372,
+          "sdp_value": 1.2837,
+          "season": "2024-25",
+          "team_id": 9
+        },
+        {
+          "archive_value": 1.53,
+          "difference": 0.4690000000000001,
+          "fixture": 127,
+          "sdp_value": 1.999,
+          "season": "2025-26",
+          "team_id": 6
+        },
+        {
+          "archive_value": 1.2000000000000004,
+          "difference": 0.4562999999999997,
+          "fixture": 59,
+          "sdp_value": 1.6563,
+          "season": "2025-26",
+          "team_id": 17
+        },
+        {
+          "archive_value": 1.72,
+          "difference": -0.44809999999999994,
+          "fixture": 365,
+          "sdp_value": 1.2719,
+          "season": "2025-26",
+          "team_id": 18
+        },
+        {
+          "archive_value": 3.96,
+          "difference": -0.4460000000000002,
+          "fixture": 168,
+          "sdp_value": 3.514,
+          "season": "2023-24",
+          "team_id": 15
+        },
+        {
+          "archive_value": 2.2600000000000002,
+          "difference": -0.4146000000000003,
+          "fixture": 362,
+          "sdp_value": 1.8454,
+          "season": "2025-26",
+          "team_id": 2
+        }
+      ],
+      "rows_compared": 1106,
       "sdp_column": "expected_goals",
-      "sdp_mean": null
+      "sdp_mean": 1.390007
     },
     {
       "archive_column": "goals",
-      "archive_mean": null,
-      "exact_agreements": 0,
+      "archive_mean": 1.822084,
+      "by_season": {
+        "2021-22": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 549
+        },
+        "2022-23": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 553
+        },
+        "2023-24": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 604
+        },
+        "2024-25": {
+          "mean": 0.001706,
+          "mean_absolute": 0.001706,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 1.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 586
+        },
+        "2025-26": {
+          "mean": 0.0,
+          "mean_absolute": 0.0,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 760
+        }
+      },
+      "difference": {
+        "mean": 0.000328,
+        "mean_absolute": 0.000328,
+        "quantiles": {
+          "p00": 0.0,
+          "p10": 0.0,
+          "p100": 1.0,
+          "p25": 0.0,
+          "p50": 0.0,
+          "p75": 0.0,
+          "p90": 0.0
+        },
+        "rows": 3052
+      },
+      "exact_agreements": 3051,
       "label": "goals",
-      "max_absolute_difference": null,
-      "mean_difference": null,
-      "rows_compared": 0,
+      "largest_absolute_differences": [
+        {
+          "archive_value": 0.0,
+          "difference": 1.0,
+          "fixture": 365,
+          "sdp_value": 1.0,
+          "season": "2024-25",
+          "team_id": 14
+        },
+        {
+          "archive_value": 2.0,
+          "difference": 0.0,
+          "fixture": 1,
+          "sdp_value": 2.0,
+          "season": "2021-22",
+          "team_id": 3
+        },
+        {
+          "archive_value": 2.0,
+          "difference": 0.0,
+          "fixture": 2,
+          "sdp_value": 2.0,
+          "season": "2021-22",
+          "team_id": 4
+        },
+        {
+          "archive_value": 1.0,
+          "difference": 0.0,
+          "fixture": 2,
+          "sdp_value": 1.0,
+          "season": "2021-22",
+          "team_id": 5
+        },
+        {
+          "archive_value": 3.0,
+          "difference": 0.0,
+          "fixture": 3,
+          "sdp_value": 3.0,
+          "season": "2021-22",
+          "team_id": 6
+        },
+        {
+          "archive_value": 3.0,
+          "difference": 0.0,
+          "fixture": 4,
+          "sdp_value": 3.0,
+          "season": "2021-22",
+          "team_id": 8
+        },
+        {
+          "archive_value": 1.0,
+          "difference": 0.0,
+          "fixture": 4,
+          "sdp_value": 1.0,
+          "season": "2021-22",
+          "team_id": 16
+        },
+        {
+          "archive_value": 1.0,
+          "difference": 0.0,
+          "fixture": 5,
+          "sdp_value": 1.0,
+          "season": "2021-22",
+          "team_id": 9
+        },
+        {
+          "archive_value": 1.0,
+          "difference": 0.0,
+          "fixture": 6,
+          "sdp_value": 1.0,
+          "season": "2021-22",
+          "team_id": 10
+        },
+        {
+          "archive_value": 5.0,
+          "difference": 0.0,
+          "fixture": 6,
+          "sdp_value": 5.0,
+          "season": "2021-22",
+          "team_id": 13
+        }
+      ],
+      "rows_compared": 3052,
       "sdp_column": "goals",
-      "sdp_mean": null
+      "sdp_mean": 1.822412
     },
     {
       "archive_column": "shots_on_target_allowed_proxy",
-      "archive_mean": null,
-      "exact_agreements": 0,
+      "archive_mean": 4.570929,
+      "by_season": {
+        "2021-22": {
+          "mean": 0.052774,
+          "mean_absolute": 0.182679,
+          "quantiles": {
+            "p00": -2.0,
+            "p10": 0.0,
+            "p100": 2.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 1.0
+          },
+          "rows": 739
+        },
+        "2022-23": {
+          "mean": 0.051491,
+          "mean_absolute": 0.203252,
+          "quantiles": {
+            "p00": -2.0,
+            "p10": 0.0,
+            "p100": 2.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 1.0
+          },
+          "rows": 738
+        },
+        "2023-24": {
+          "mean": 0.023873,
+          "mean_absolute": 0.233422,
+          "quantiles": {
+            "p00": -2.0,
+            "p10": 0.0,
+            "p100": 3.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 1.0
+          },
+          "rows": 754
+        },
+        "2024-25": {
+          "mean": 0.009459,
+          "mean_absolute": 0.212162,
+          "quantiles": {
+            "p00": -2.0,
+            "p10": 0.0,
+            "p100": 2.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 1.0
+          },
+          "rows": 740
+        },
+        "2025-26": {
+          "mean": 0.032258,
+          "mean_absolute": 0.225806,
+          "quantiles": {
+            "p00": -2.0,
+            "p10": 0.0,
+            "p100": 2.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 1.0
+          },
+          "rows": 744
+        }
+      },
+      "difference": {
+        "mean": 0.033917,
+        "mean_absolute": 0.211575,
+        "quantiles": {
+          "p00": -2.0,
+          "p10": 0.0,
+          "p100": 3.0,
+          "p25": 0.0,
+          "p50": 0.0,
+          "p75": 0.0,
+          "p90": 1.0
+        },
+        "rows": 3715
+      },
+      "exact_agreements": 2985,
       "label": "shots_on_target_allowed_vs_gk_proxy",
-      "max_absolute_difference": null,
-      "mean_difference": null,
-      "rows_compared": 0,
+      "largest_absolute_differences": [
+        {
+          "archive_value": 3.0,
+          "difference": 3.0,
+          "fixture": 287,
+          "sdp_value": 6.0,
+          "season": "2023-24",
+          "team_id": 12
+        },
+        {
+          "archive_value": 6.0,
+          "difference": 2.0,
+          "fixture": 2,
+          "sdp_value": 8.0,
+          "season": "2021-22",
+          "team_id": 5
+        },
+        {
+          "archive_value": 6.0,
+          "difference": 2.0,
+          "fixture": 7,
+          "sdp_value": 8.0,
+          "season": "2021-22",
+          "team_id": 15
+        },
+        {
+          "archive_value": 12.0,
+          "difference": 2.0,
+          "fixture": 83,
+          "sdp_value": 14.0,
+          "season": "2021-22",
+          "team_id": 4
+        },
+        {
+          "archive_value": 7.0,
+          "difference": -2.0,
+          "fixture": 108,
+          "sdp_value": 5.0,
+          "season": "2021-22",
+          "team_id": 13
+        },
+        {
+          "archive_value": 8.0,
+          "difference": 2.0,
+          "fixture": 166,
+          "sdp_value": 10.0,
+          "season": "2021-22",
+          "team_id": 9
+        },
+        {
+          "archive_value": 6.0,
+          "difference": 2.0,
+          "fixture": 329,
+          "sdp_value": 8.0,
+          "season": "2021-22",
+          "team_id": 5
+        },
+        {
+          "archive_value": 5.0,
+          "difference": 2.0,
+          "fixture": 14,
+          "sdp_value": 7.0,
+          "season": "2022-23",
+          "team_id": 15
+        },
+        {
+          "archive_value": 4.0,
+          "difference": 2.0,
+          "fixture": 39,
+          "sdp_value": 6.0,
+          "season": "2022-23",
+          "team_id": 17
+        },
+        {
+          "archive_value": 5.0,
+          "difference": -2.0,
+          "fixture": 47,
+          "sdp_value": 3.0,
+          "season": "2022-23",
+          "team_id": 19
+        }
+      ],
+      "rows_compared": 3715,
       "sdp_column": "shots_on_target_allowed",
-      "sdp_mean": null
+      "sdp_mean": 4.604845
     },
     {
       "archive_column": "expected_goals_conceded_measured",
-      "archive_mean": null,
-      "exact_agreements": 0,
+      "archive_mean": 1.392179,
+      "by_season": {
+        "2023-24": {
+          "mean": -0.722917,
+          "mean_absolute": 0.765217,
+          "quantiles": {
+            "p00": -4.306,
+            "p10": -2.22955,
+            "p100": 0.1236,
+            "p25": -0.116125,
+            "p50": -0.00265,
+            "p75": 0.00245,
+            "p90": 0.06345
+          },
+          "rows": 6
+        },
+        "2024-25": {
+          "mean": -0.000145,
+          "mean_absolute": 0.022769,
+          "quantiles": {
+            "p00": -0.4563,
+            "p10": -0.00508,
+            "p100": 0.51292,
+            "p25": -0.0032,
+            "p50": 5e-05,
+            "p75": 0.0029,
+            "p90": 0.0048
+          },
+          "rows": 340
+        },
+        "2025-26": {
+          "mean": 0.002612,
+          "mean_absolute": 0.021298,
+          "quantiles": {
+            "p00": -0.4921,
+            "p10": -0.0047,
+            "p100": 0.7296,
+            "p25": -0.0029,
+            "p50": 0.0002,
+            "p75": 0.0032,
+            "p90": 0.0049
+          },
+          "rows": 760
+        }
+      },
+      "difference": {
+        "mean": -0.002172,
+        "mean_absolute": 0.025786,
+        "quantiles": {
+          "p00": -4.306,
+          "p10": -0.0048,
+          "p100": 0.7296,
+          "p25": -0.003,
+          "p50": 0.0001,
+          "p75": 0.0031,
+          "p90": 0.0049
+        },
+        "rows": 1106
+      },
+      "exact_agreements": 11,
       "label": "expected_goals_allowed_vs_measured_xgc",
-      "max_absolute_difference": null,
-      "mean_difference": null,
-      "rows_compared": 0,
+      "largest_absolute_differences": [
+        {
+          "archive_value": 7.82,
+          "difference": -4.306000000000001,
+          "fixture": 168,
+          "sdp_value": 3.514,
+          "season": "2023-24",
+          "team_id": 10
+        },
+        {
+          "archive_value": 1.83,
+          "difference": 0.7296,
+          "fixture": 290,
+          "sdp_value": 2.5596,
+          "season": "2025-26",
+          "team_id": 20
+        },
+        {
+          "archive_value": 1.33,
+          "difference": 0.5129199999999998,
+          "fixture": 266,
+          "sdp_value": 1.84292,
+          "season": "2024-25",
+          "team_id": 11
+        },
+        {
+          "archive_value": 1.58,
+          "difference": -0.4921,
+          "fixture": 289,
+          "sdp_value": 1.0879,
+          "season": "2025-26",
+          "team_id": 8
+        },
+        {
+          "archive_value": 1.53,
+          "difference": 0.4690000000000001,
+          "fixture": 127,
+          "sdp_value": 1.999,
+          "season": "2025-26",
+          "team_id": 16
+        },
+        {
+          "archive_value": 1.19,
+          "difference": 0.46630000000000016,
+          "fixture": 59,
+          "sdp_value": 1.6563,
+          "season": "2025-26",
+          "team_id": 16
+        },
+        {
+          "archive_value": 1.74,
+          "difference": -0.45629999999999993,
+          "fixture": 372,
+          "sdp_value": 1.2837,
+          "season": "2024-25",
+          "team_id": 13
+        },
+        {
+          "archive_value": 1.72,
+          "difference": -0.44809999999999994,
+          "fixture": 365,
+          "sdp_value": 1.2719,
+          "season": "2025-26",
+          "team_id": 7
+        },
+        {
+          "archive_value": 2.18,
+          "difference": -0.39290000000000025,
+          "fixture": 259,
+          "sdp_value": 1.7871,
+          "season": "2024-25",
+          "team_id": 15
+        },
+        {
+          "archive_value": 1.65,
+          "difference": -0.36239999999999983,
+          "fixture": 338,
+          "sdp_value": 1.2876,
+          "season": "2024-25",
+          "team_id": 16
+        }
+      ],
+      "rows_compared": 1106,
       "sdp_column": "expected_goals_allowed",
-      "sdp_mean": null
+      "sdp_mean": 1.390007
     }
   ],
-  "crosswalk": {},
-  "generated_at": "2026-09-04 13:47:20.783474+00:00",
+  "crosswalk": {
+    "identity_fallback": {
+      "fixtures": 2280,
+      "kickoff_corroborated": 2280,
+      "score_corroborated": 1920,
+      "teams_corroborated": 2280
+    }
+  },
+  "generated_at": "2026-09-05 07:44:24.633917+00:00",
   "note": "differences are reported, never reconciled away; both values are retained",
-  "schema_version": 1
+  "sanity_checks": {
+    "checks": {
+      "accurate_crosses_le_crosses": {
+        "available": true,
+        "required_fields": [
+          "accurate_crosses",
+          "crosses"
+        ],
+        "rows_checked": 3738,
+        "violation_count": 0,
+        "violations": []
+      },
+      "accurate_passes_le_passes": {
+        "available": true,
+        "required_fields": [
+          "accurate_passes",
+          "passes"
+        ],
+        "rows_checked": 3842,
+        "violation_count": 0,
+        "violations": []
+      },
+      "exactly_two_team_sides": {
+        "available": true,
+        "required_fields": [
+          "season",
+          "fixture",
+          "was_home"
+        ],
+        "rows_checked": 1921,
+        "violation_count": 0,
+        "violations": []
+      },
+      "no_negative_count_metrics": {
+        "available": true,
+        "required_fields": [
+          "accurate_crosses",
+          "accurate_long_passes",
+          "accurate_passes",
+          "aerial_duels_lost",
+          "aerial_duels_won",
+          "backward_passes",
+          "big_chances_created",
+          "big_chances_missed",
+          "big_chances_scored",
+          "blocks",
+          "clearances",
+          "corners",
+          "crosses",
+          "duels_lost",
+          "duels_won",
+          "final_third_entries",
+          "forward_passes",
+          "fouls",
+          "goals",
+          "interceptions",
+          "long_passes",
+          "offsides",
+          "passes",
+          "penalty_area_entries",
+          "possession_won_attacking_third",
+          "possession_won_defensive_third",
+          "possession_won_middle_third",
+          "recoveries",
+          "red_cards",
+          "saves",
+          "shots",
+          "shots_blocked",
+          "shots_inside_box",
+          "shots_on_target",
+          "shots_outside_box",
+          "tackles",
+          "tackles_won",
+          "touches_in_opposition_box",
+          "yellow_cards"
+        ],
+        "rows_checked": 3842,
+        "violation_count": 0,
+        "violations": []
+      },
+      "possession_in_zero_to_100": {
+        "available": true,
+        "required_fields": [
+          "possession"
+        ],
+        "rows_checked": 3842,
+        "violation_count": 0,
+        "violations": []
+      },
+      "shots_inside_plus_outside_approximately_shots": {
+        "available": true,
+        "difference": {
+          "mean": 0.000539,
+          "mean_absolute": 0.000539,
+          "quantiles": {
+            "p00": 0.0,
+            "p10": 0.0,
+            "p100": 1.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0
+          },
+          "rows": 3714
+        },
+        "exact_agreements": 3712,
+        "required_fields": [
+          "shots_inside_box",
+          "shots_outside_box",
+          "shots"
+        ],
+        "rows_checked": 3714,
+        "tolerance": 1.0,
+        "violation_count": 0,
+        "violations": []
+      },
+      "shots_on_target_le_shots": {
+        "available": true,
+        "required_fields": [
+          "shots_on_target",
+          "shots"
+        ],
+        "rows_checked": 3754,
+        "violation_count": 0,
+        "violations": []
+      },
+      "tackles_won_le_tackles": {
+        "available": true,
+        "required_fields": [
+          "tackles_won",
+          "tackles"
+        ],
+        "rows_checked": 3841,
+        "violation_count": 0,
+        "violations": []
+      },
+      "two_side_possession_sums_to_100": {
+        "available": true,
+        "required_fields": [
+          "possession",
+          "was_home"
+        ],
+        "rows_checked": 1921,
+        "tolerance": 0.2,
+        "violation_count": 0,
+        "violations": []
+      }
+    },
+    "status": "pass",
+    "team_rows": 3842,
+    "total_violations": 0
+  },
+  "schema_version": 3,
+  "score": {
+    "away_goal_difference": {
+      "mean": 0.0,
+      "mean_absolute": 0.0,
+      "quantiles": {
+        "p00": 0.0,
+        "p10": 0.0,
+        "p100": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p90": 0.0
+      },
+      "rows": 1920
+    },
+    "exact_agreements": 1920,
+    "exceptions": [],
+    "home_goal_difference": {
+      "mean": 0.0,
+      "mean_absolute": 0.0,
+      "quantiles": {
+        "p00": 0.0,
+        "p10": 0.0,
+        "p100": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p90": 0.0
+      },
+      "rows": 1920
+    },
+    "match_rate": 1.0,
+    "rows_compared": 1920
+  }
 }

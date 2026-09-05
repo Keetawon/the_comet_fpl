@@ -736,7 +736,7 @@ def build_metric_inventory(con: Any) -> dict[str, Any]:
         ORDER BY provider_field
         """
     ).fetchall()
-    declared = dictionary.by_local_field()
+    declared = {metric.local_field: metric for metric in dictionary.metrics}
     fields: list[dict[str, Any]] = []
     unmapped: list[dict[str, Any]] = []
     for (
@@ -751,11 +751,16 @@ def build_metric_inventory(con: Any) -> dict[str, Any]:
     ) in rows:
         metric = declared.get(str(local_field)) if local_field is not None else None
         example_value = example_numeric if example_numeric is not None else example_text
+        verified_semantics = bool(
+            metric is not None
+            and metric.verified_semantics
+            and str(provider_field) == metric.provider_fields[0]
+        )
         field = {
             "provider_field": str(provider_field),
             "example_value": example_value,
             "mapped_local_field": None if local_field is None else str(local_field),
-            "verified_semantics": metric.verified_semantics if metric is not None else False,
+            "verified_semantics": verified_semantics,
             "reason": metric.description if metric is not None else "no local mapping declared",
             "evidence": (
                 f"observed on {int(team_sides)} latest team-side rows across "
@@ -763,8 +768,12 @@ def build_metric_inventory(con: Any) -> dict[str, Any]:
             ),
             "notes": (
                 "semantic meaning verified under the metric dictionary contract"
-                if metric is not None and metric.verified_semantics
-                else "field existence is verified; semantic meaning remains unverified"
+                if verified_semantics
+                else (
+                    f"unverified fallback alias; verified live key is {metric.provider_fields[0]}"
+                    if metric is not None and metric.verified_semantics
+                    else "field existence is verified; semantic meaning remains unverified"
+                )
             ),
             "numeric_values": int(numeric_values),
             "text_values": int(text_values),

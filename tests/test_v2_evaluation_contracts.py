@@ -126,14 +126,12 @@ def test_results_must_be_split_before_they_are_discussed() -> None:
 # -- the metric dictionary ---------------------------------------------------------------
 
 
-def test_every_provider_field_name_is_declared_unverified() -> None:
-    """No SDP payload was observable when this dictionary was written.
-
-    Promoting `verified_semantics` requires an observed payload AND a reconciliation, so a
-    provider field silently marked verified would be an unbacked claim.
-    """
-    for metric in load_sdp_metrics().metrics:
-        assert metric.verified_semantics is False, metric.local_field
+def test_only_independently_reconciled_provider_fields_are_verified() -> None:
+    """The real capture licenses exactly the three independently compared semantics."""
+    verified = {
+        metric.local_field for metric in load_sdp_metrics().metrics if metric.verified_semantics
+    }
+    assert verified == {"goals", "expected_goals", "shots_on_target"}
 
 
 def test_derived_metrics_may_be_verified_because_this_repository_computes_them() -> None:
