@@ -21,15 +21,17 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fpl.config import load_sdp_metrics, load_sources, repo_root
+from fpl.config import SdpMetricType, load_sdp_metrics, load_sources, repo_root
 from fpl.ingest.fpl_api import ApiResponseError, EgressBlockedError
 from fpl.ingest.pl_sdp import PlSdpClient, SdpSchemaError, extract_items, parse_match_summary
-from fpl.storage.db import connect, initialise, table_exists
+from fpl.storage.db import connect, initialise, table_columns, table_exists
 from fpl.transform import football_v2
 from fpl.transform import pl_sdp as sdp_transform
 
@@ -46,15 +48,66 @@ def _write(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # allow_nan=False: a NaN in a coverage report would serialise as invalid JSON that most
     # parsers silently accept, and an unreadable number must fail here rather than downstream.
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False, default=str) + "\n",
-        encoding="utf-8",
-    )
+    content = (
+        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False, default=str) + "\n"
+    ).encode()
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", prefix=f".{path.name}.", suffix=".tmp", dir=path.parent, delete=False
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 # --------------------------------------------------------------------------------------
 # Coverage
 # --------------------------------------------------------------------------------------
+
+
+def _expected_fixture_populations(con: Any, *, as_of: datetime) -> dict[str, tuple[int, int]]:
+    """Season -> (all scheduled fixtures, completed/capturable fixtures)."""
+    rows = con.execute(
+        """
+        WITH archive AS (
+            SELECT season, fixture, kickoff_time, team_h_score, team_a_score,
+                   finished, FALSE AS finished_provisional
+            FROM stg_fixture
+        ), live_ranked AS (
+            SELECT season, fixture, kickoff_time, team_h_score, team_a_score,
+                   finished, finished_provisional,
+                   row_number() OVER (
+                       PARTITION BY season, fixture ORDER BY known_at DESC, capture_id DESC
+                   ) AS ordinal
+            FROM stg_live_fixture_version
+        ), combined AS (
+            SELECT * FROM archive
+            UNION ALL
+            SELECT l.* EXCLUDE (ordinal) FROM live_ranked AS l
+            WHERE ordinal = 1 AND NOT EXISTS (
+                SELECT 1 FROM archive AS a
+                WHERE a.season = l.season AND a.fixture = l.fixture
+            )
+        )
+        SELECT season, count(*), count(*) FILTER (
+            WHERE team_h_score IS NOT NULL AND team_a_score IS NOT NULL
+              AND (
+                  finished IS TRUE OR finished_provisional IS TRUE
+                  OR kickoff_time + INTERVAL '3 hours' <= ?
+              )
+        )
+        FROM combined GROUP BY season ORDER BY season
+        """,
+        [as_of],
+    ).fetchall()
+    return {str(season): (int(all_), int(capturable)) for season, all_, capturable in rows}
 
 
 def build_coverage(con: Any) -> dict[str, Any]:
@@ -67,97 +120,129 @@ def build_coverage(con: Any) -> dict[str, Any]:
     dictionary = load_sdp_metrics()
     generated_at = datetime.now(UTC)
     report: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": generated_at,
         "metric_dictionary_version": dictionary.schema_version,
         "note": (
-            "coverage_pct is over team-rows present in mart_fact_team_match_stats_v2 for that "
-            "provider and season. An absent metric is reported absent and is never zero-filled."
+            "coverage_pct is over landed team rows. coverage_pct_expected_all is over every "
+            "scheduled FPL fixture; coverage_pct_expected_capturable is over scored fixtures "
+            "marked finished/provisional or at least three hours past kickoff. An absent metric "
+            "is reported absent and is never zero-filled."
         ),
         "providers": {},
     }
-    if not table_exists(con, "mart_fact_team_match_stats_v2"):
-        report["providers"] = {}
+    mart_exists = table_exists(con, "mart_fact_team_match_stats_v2")
+    if not mart_exists:
         report["warning"] = "mart_fact_team_match_stats_v2 does not exist; nothing to report"
-        return report
 
-    populations = con.execute(
-        """
-        SELECT provider, season,
-               count(*) AS team_rows,
-               count(DISTINCT fixture) AS fixtures,
-               min(kickoff_time) AS first_kickoff,
-               max(kickoff_time) AS last_kickoff
-        FROM mart_fact_team_match_stats_v2
-        GROUP BY provider, season ORDER BY provider, season
-        """
-    ).fetchall()
-    if not populations:
-        return report
-
-    expected_fixtures_by_season: dict[str, int] = {}
-    for fixture in sdp_transform._fixture_identities(con, None):
-        expected_fixtures_by_season[fixture.season] = (
-            expected_fixtures_by_season.get(fixture.season, 0) + 1
-        )
+    populations = (
+        con.execute(
+            """
+            SELECT provider, season, count(*), count(DISTINCT fixture),
+                   min(kickoff_time), max(kickoff_time)
+            FROM mart_fact_team_match_stats_v2
+            GROUP BY provider, season ORDER BY provider, season
+            """
+        ).fetchall()
+        if mart_exists
+        else []
+    )
+    population_by_key = {
+        (str(provider), str(season)): (team_rows, fixtures, first_kickoff, last_kickoff)
+        for provider, season, team_rows, fixtures, first_kickoff, last_kickoff in populations
+    }
+    expected_by_season = _expected_fixture_populations(con, as_of=generated_at)
+    sources = load_sources()
+    provider_seasons: dict[str, set[str]] = {
+        sdp_transform.ARCHIVE_PROVIDER: set(sources.archive.seasons)
+    }
+    if sources.pl_sdp is not None:
+        provider_seasons[sdp_transform.PROVIDER] = set(sources.pl_sdp.season_ids)
+    for provider, season in population_by_key:
+        provider_seasons.setdefault(provider, set()).add(season)
 
     fields = [metric.local_field for metric in dictionary.all_fields()]
     mirrors = list(dictionary.mirror_fields().values())
     columns = [*fields, *mirrors]
-    for provider, season, team_rows, fixtures, first_kickoff, last_kickoff in populations:
-        provider_block = report["providers"].setdefault(str(provider), {})
-        expected_fixtures = expected_fixtures_by_season.get(str(season), 0)
-        expected_rows = 2 * expected_fixtures
-        season_block: dict[str, Any] = {
-            "team_rows_available": int(team_rows),
-            "team_rows_expected": expected_rows,
-            "fixtures_available": int(fixtures),
-            "fixtures_expected": expected_fixtures,
-            "first_kickoff": first_kickoff,
-            "last_kickoff": last_kickoff,
-            "metrics": {},
-        }
-        selects = ", ".join(
-            f'count("{column}") AS n_{index}, min("{column}") AS lo_{index}, '
-            f'max("{column}") AS hi_{index}, avg("{column}") AS mu_{index}, '
-            f'min(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END) AS first_{index}, '
-            f'max(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END) AS last_{index}'
-            for index, column in enumerate(columns)
-        )
-        row = con.execute(
-            f"""
-            SELECT {selects} FROM mart_fact_team_match_stats_v2
-            WHERE provider = ? AND season = ?
-            """,
-            [provider, season],
-        ).fetchone()
-        assert row is not None
-        declared = dictionary.by_local_field()
-        for index, column in enumerate(columns):
-            non_null, low, high, average, first_measured, last_measured = row[
-                index * 6 : index * 6 + 6
-            ]
-            metric = declared.get(column)
-            season_block["metrics"][column] = {
-                "non_null": int(non_null),
-                "coverage_pct": (
-                    round(100.0 * int(non_null) / int(team_rows), 4) if team_rows else 0.0
-                ),
-                "coverage_pct_expected": (
-                    round(100.0 * int(non_null) / expected_rows, 4) if expected_rows else None
-                ),
-                "min": low,
-                "max": high,
-                "mean": round(float(average), 6) if average is not None else None,
-                "first_measured_kickoff": first_measured,
-                "last_measured_kickoff": last_measured,
-                "group": metric.group if metric is not None else "mirror",
-                "verified_semantics": (metric.verified_semantics if metric is not None else False),
-                "definition": (
-                    metric.description if metric is not None else "opponent mirror of a metric"
-                ),
+    selects = ", ".join(
+        f'count("{column}"), min("{column}"), max("{column}"), avg("{column}"), '
+        f'min(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END), '
+        f'max(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END)'
+        for column in columns
+    )
+    declared = dictionary.by_local_field()
+    for provider, seasons in sorted(provider_seasons.items()):
+        provider_block: dict[str, Any] = {}
+        report["providers"][provider] = provider_block
+        for season in sorted(seasons):
+            team_rows, fixtures, first_kickoff, last_kickoff = population_by_key.get(
+                (provider, season), (0, 0, None, None)
+            )
+            expected_all, expected_capturable = expected_by_season.get(season, (0, 0))
+            expected_rows_all = 2 * expected_all
+            expected_rows_capturable = 2 * expected_capturable
+            season_block: dict[str, Any] = {
+                "team_rows_available": int(team_rows),
+                "team_rows_expected": expected_rows_all,
+                "team_rows_expected_all": expected_rows_all,
+                "team_rows_expected_capturable": expected_rows_capturable,
+                "fixtures_available": int(fixtures),
+                "fixtures_expected": expected_all,
+                "fixtures_expected_all": expected_all,
+                "fixtures_expected_capturable": expected_capturable,
+                "first_kickoff": first_kickoff,
+                "last_kickoff": last_kickoff,
+                "metrics": {},
             }
-        provider_block[str(season)] = season_block
+            row = (
+                con.execute(
+                    f"""
+                    SELECT {selects} FROM mart_fact_team_match_stats_v2
+                    WHERE provider = ? AND season = ?
+                    """,
+                    [provider, season],
+                ).fetchone()
+                if mart_exists
+                else tuple(value for _ in columns for value in (0, None, None, None, None, None))
+            )
+            assert row is not None
+            for index, column in enumerate(columns):
+                non_null, low, high, average, first_measured, last_measured = row[
+                    index * 6 : index * 6 + 6
+                ]
+                non_null_count = int(non_null or 0)
+                metric = declared.get(column)
+                expected_all_pct = (
+                    round(100.0 * non_null_count / expected_rows_all, 4)
+                    if expected_rows_all
+                    else None
+                )
+                season_block["metrics"][column] = {
+                    "non_null": non_null_count,
+                    "coverage_pct": (
+                        round(100.0 * non_null_count / int(team_rows), 4) if team_rows else 0.0
+                    ),
+                    "coverage_pct_expected": expected_all_pct,
+                    "coverage_pct_expected_all": expected_all_pct,
+                    "coverage_pct_expected_capturable": (
+                        round(100.0 * non_null_count / expected_rows_capturable, 4)
+                        if expected_rows_capturable
+                        else None
+                    ),
+                    "min": low,
+                    "max": high,
+                    "mean": round(float(average), 6) if average is not None else None,
+                    "first_measured_kickoff": first_measured,
+                    "last_measured_kickoff": last_measured,
+                    "group": metric.group if metric is not None else "mirror",
+                    "verified_semantics": (
+                        metric.verified_semantics if metric is not None else False
+                    ),
+                    "definition": (
+                        metric.description if metric is not None else "opponent mirror of a metric"
+                    ),
+                }
+            provider_block[season] = season_block
     return report
 
 
@@ -203,6 +288,228 @@ def _difference_summary(values: list[float]) -> dict[str, Any]:
         "mean": round(sum(values) / len(values), 6),
         "mean_absolute": round(sum(abs(value) for value in values) / len(values), 6),
         "quantiles": quantiles,
+    }
+
+
+def _sanity_checks(con: Any) -> dict[str, Any]:
+    """Row-level football identities over the latest `pl_sdp` mart rows."""
+    if not table_exists(con, "mart_fact_team_match_stats_v2"):
+        return {
+            "status": "not_run",
+            "team_rows": 0,
+            "total_violations": 0,
+            "checks": {},
+            "note": "mart_fact_team_match_stats_v2 does not exist",
+        }
+
+    available = set(table_columns(con, "mart_fact_team_match_stats_v2"))
+    dictionary = load_sdp_metrics()
+    count_fields = sorted(
+        metric.local_field
+        for metric in dictionary.metrics
+        if metric.type is SdpMetricType.INT and metric.local_field in available
+    )
+    checked_fields = sorted(
+        set(count_fields)
+        | {
+            "shots",
+            "shots_on_target",
+            "shots_inside_box",
+            "shots_outside_box",
+            "possession",
+            "passes",
+            "accurate_passes",
+            "crosses",
+            "accurate_crosses",
+            "tackles",
+            "tackles_won",
+        }
+    )
+    checked_fields = [field for field in checked_fields if field in available]
+    identity_fields = ["season", "fixture", "sdp_match_id", "team_id", "was_home"]
+    selected = [*identity_fields, *checked_fields]
+    raw_rows = con.execute(
+        f"""
+        SELECT {", ".join(f'"{column}"' for column in selected)}
+        FROM mart_fact_team_match_stats_v2
+        WHERE provider = ?
+        ORDER BY season, fixture, was_home DESC, team_id
+        """,
+        [sdp_transform.PROVIDER],
+    ).fetchall()
+    rows = [dict(zip(selected, row, strict=True)) for row in raw_rows]
+    checks: dict[str, dict[str, Any]] = {}
+
+    def identity(row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "season": str(row["season"]),
+            "fixture": int(row["fixture"]),
+            "sdp_match_id": None if row["sdp_match_id"] is None else int(row["sdp_match_id"]),
+            "team_id": int(row["team_id"]),
+            "side": "home" if row["was_home"] else "away",
+        }
+
+    def pair_check(name: str, left: str, right: str) -> None:
+        required = [left, right]
+        if not set(required) <= available:
+            checks[name] = {
+                "available": False,
+                "required_fields": required,
+                "rows_checked": 0,
+                "violation_count": 0,
+                "violations": [],
+            }
+            return
+        measured = [row for row in rows if all(row[field] is not None for field in required)]
+        violations = [
+            {**identity(row), left: float(row[left]), right: float(row[right])}
+            for row in measured
+            if float(row[left]) > float(row[right])
+        ]
+        checks[name] = {
+            "available": True,
+            "required_fields": required,
+            "rows_checked": len(measured),
+            "violation_count": len(violations),
+            "violations": violations,
+        }
+
+    pair_check("shots_on_target_le_shots", "shots_on_target", "shots")
+    pair_check("accurate_passes_le_passes", "accurate_passes", "passes")
+    pair_check("accurate_crosses_le_crosses", "accurate_crosses", "crosses")
+    pair_check("tackles_won_le_tackles", "tackles_won", "tackles")
+
+    shot_fields = ["shots_inside_box", "shots_outside_box", "shots"]
+    if set(shot_fields) <= available:
+        measured = [row for row in rows if all(row[field] is not None for field in shot_fields)]
+        differences = [
+            float(row["shots_inside_box"] + row["shots_outside_box"] - row["shots"])
+            for row in measured
+        ]
+        violations = [
+            {
+                **identity(row),
+                **{field: float(row[field]) for field in shot_fields},
+                "difference": difference,
+            }
+            for row, difference in zip(measured, differences, strict=True)
+            if abs(difference) > 1.0
+        ]
+        checks["shots_inside_plus_outside_approximately_shots"] = {
+            "available": True,
+            "required_fields": shot_fields,
+            "tolerance": 1.0,
+            "rows_checked": len(measured),
+            "exact_agreements": sum(difference == 0 for difference in differences),
+            "difference": _difference_summary(differences),
+            "violation_count": len(violations),
+            "violations": violations,
+        }
+    else:
+        checks["shots_inside_plus_outside_approximately_shots"] = {
+            "available": False,
+            "required_fields": shot_fields,
+            "rows_checked": 0,
+            "violation_count": 0,
+            "violations": [],
+        }
+
+    possession_rows = [row for row in rows if row.get("possession") is not None]
+    possession_violations = [
+        {**identity(row), "possession": float(row["possession"])}
+        for row in possession_rows
+        if not 0.0 <= float(row["possession"]) <= 100.0
+    ]
+    checks["possession_in_zero_to_100"] = {
+        "available": "possession" in available,
+        "required_fields": ["possession"],
+        "rows_checked": len(possession_rows),
+        "violation_count": len(possession_violations),
+        "violations": possession_violations,
+    }
+
+    by_match: dict[tuple[str, int, int | None], list[dict[str, Any]]] = {}
+    for row in rows:
+        key = (
+            str(row["season"]),
+            int(row["fixture"]),
+            None if row["sdp_match_id"] is None else int(row["sdp_match_id"]),
+        )
+        by_match.setdefault(key, []).append(row)
+    side_violations = [
+        {
+            "season": key[0],
+            "fixture": key[1],
+            "sdp_match_id": key[2],
+            "team_rows": len(group),
+            "sides": ["home" if row["was_home"] else "away" for row in group],
+        }
+        for key, group in sorted(by_match.items())
+        if len(group) != 2 or {bool(row["was_home"]) for row in group} != {False, True}
+    ]
+    checks["exactly_two_team_sides"] = {
+        "available": True,
+        "required_fields": ["season", "fixture", "was_home"],
+        "rows_checked": len(by_match),
+        "violation_count": len(side_violations),
+        "violations": side_violations,
+    }
+
+    possession_pairs = [
+        (key, group)
+        for key, group in sorted(by_match.items())
+        if len(group) == 2 and all(row.get("possession") is not None for row in group)
+    ]
+    possession_sum_violations = []
+    for key, group in possession_pairs:
+        total = sum(float(row["possession"]) for row in group)
+        if abs(total - 100.0) > 0.2:
+            possession_sum_violations.append(
+                {
+                    "season": key[0],
+                    "fixture": key[1],
+                    "sdp_match_id": key[2],
+                    "home": next(float(row["possession"]) for row in group if row["was_home"]),
+                    "away": next(float(row["possession"]) for row in group if not row["was_home"]),
+                    "sum": total,
+                    "difference_from_100": total - 100.0,
+                }
+            )
+    checks["two_side_possession_sums_to_100"] = {
+        "available": "possession" in available,
+        "required_fields": ["possession", "was_home"],
+        "tolerance": 0.2,
+        "rows_checked": len(possession_pairs),
+        "violation_count": len(possession_sum_violations),
+        "violations": possession_sum_violations,
+    }
+
+    measured_count_rows = [
+        row for row in rows if any(row.get(field) is not None for field in count_fields)
+    ]
+    negative_violations = []
+    for row in measured_count_rows:
+        negatives = {
+            field: float(row[field])
+            for field in count_fields
+            if row.get(field) is not None and float(row[field]) < 0
+        }
+        if negatives:
+            negative_violations.append({**identity(row), "negative_fields": negatives})
+    checks["no_negative_count_metrics"] = {
+        "available": bool(count_fields),
+        "required_fields": count_fields,
+        "rows_checked": len(measured_count_rows),
+        "violation_count": len(negative_violations),
+        "violations": negative_violations,
+    }
+
+    total_violations = sum(int(check["violation_count"]) for check in checks.values())
+    return {
+        "status": "pass" if total_violations == 0 else "violations_found",
+        "team_rows": len(rows),
+        "total_violations": total_violations,
+        "checks": checks,
     }
 
 
@@ -274,12 +581,13 @@ def build_reconciliation(con: Any) -> dict[str, Any]:
     """
     generated_at = datetime.now(UTC)
     report: dict[str, Any] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "generated_at": generated_at,
         "note": "differences are reported, never reconciled away; both values are retained",
         "score": _score_reconciliation(con),
         "comparisons": [],
         "crosswalk": {},
+        "sanity_checks": _sanity_checks(con),
     }
     if not table_exists(con, "mart_fact_team_match_stats_v2"):
         report["warning"] = "mart_fact_team_match_stats_v2 does not exist"
@@ -479,6 +787,88 @@ def build_metric_inventory(con: Any) -> dict[str, Any]:
         "unmapped_numeric_fields": len(unmapped),
     }
     return report
+
+
+def _staging_evidence(
+    con: Any,
+    *,
+    match_report: sdp_transform.StagingReport,
+    stats_report: sdp_transform.StagingReport,
+) -> dict[str, Any]:
+    """Persist staging failures plus physical and logical row counts."""
+    raw = {
+        "payload_versions": 0,
+        "match_payload_versions": 0,
+        "stats_payload_versions": 0,
+        "distinct_stats_matches": 0,
+    }
+    if table_exists(con, "raw_pl_sdp_payload"):
+        row = con.execute(
+            """
+            SELECT count(*),
+                   count(*) FILTER (WHERE endpoint IN ('matches', 'match')),
+                   count(*) FILTER (WHERE endpoint = 'match_stats'),
+                   count(DISTINCT sdp_match_id) FILTER (WHERE endpoint = 'match_stats')
+            FROM raw_pl_sdp_payload WHERE provider = ?
+            """,
+            [sdp_transform.PROVIDER],
+        ).fetchone()
+        assert row is not None
+        raw = {
+            "payload_versions": int(row[0]),
+            "match_payload_versions": int(row[1]),
+            "stats_payload_versions": int(row[2]),
+            "distinct_stats_matches": int(row[3]),
+        }
+
+    staging = {
+        "match_version_rows": 0,
+        "distinct_matches": 0,
+        "team_side_version_rows": 0,
+        "distinct_match_sides": 0,
+        "metric_version_rows": 0,
+        "crosswalk_rows": 0,
+    }
+    if table_exists(con, "stg_pl_sdp_match"):
+        row = con.execute(
+            "SELECT count(*), count(DISTINCT sdp_match_id) FROM stg_pl_sdp_match"
+        ).fetchone()
+        assert row is not None
+        staging["match_version_rows"], staging["distinct_matches"] = map(int, row)
+    if table_exists(con, "stg_pl_sdp_team_match_stats"):
+        physical = con.execute("SELECT count(*) FROM stg_pl_sdp_team_match_stats").fetchone()
+        logical = con.execute(
+            """
+            SELECT count(*) FROM (
+                SELECT DISTINCT sdp_match_id, side FROM stg_pl_sdp_team_match_stats
+            )
+            """
+        ).fetchone()
+        assert physical is not None
+        assert logical is not None
+        staging["team_side_version_rows"] = int(physical[0])
+        staging["distinct_match_sides"] = int(logical[0])
+    if table_exists(con, "stg_pl_sdp_team_match_metric"):
+        row = con.execute("SELECT count(*) FROM stg_pl_sdp_team_match_metric").fetchone()
+        staging["metric_version_rows"] = int(row[0]) if row else 0
+    if table_exists(con, "stg_pl_sdp_fixture_crosswalk"):
+        row = con.execute("SELECT count(*) FROM stg_pl_sdp_fixture_crosswalk").fetchone()
+        staging["crosswalk_rows"] = int(row[0]) if row else 0
+
+    return {
+        "match": {
+            "payloads_read": match_report.payloads_read,
+            "matches_staged": match_report.matches_staged,
+            "schema_failures": list(match_report.schema_failures),
+        },
+        "stats": {
+            "payloads_read": stats_report.payloads_read,
+            "team_sides_staged": stats_report.team_sides_staged,
+            "metric_rows_staged": stats_report.metric_rows_staged,
+            "schema_failures": list(stats_report.schema_failures),
+        },
+        "row_counts": {"raw": raw, "staging": staging},
+    }
 
 
 def build_identity_details(con: Any) -> dict[str, Any]:
@@ -797,7 +1187,7 @@ def main(argv: list[str] | None = None) -> int:
                 ",".join(football_counts.providers),
             )
             identity = {
-                "schema_version": 2,
+                "schema_version": 3,
                 "generated_at": datetime.now(UTC),
                 "fpl_fixtures": audit.fpl_fixtures,
                 "sdp_matches": audit.sdp_matches,
@@ -821,6 +1211,9 @@ def main(argv: list[str] | None = None) -> int:
                 "by_season": audit.by_season,
                 "unmapped_provider_fields": list(stats_report.unmapped_provider_fields),
                 "details": build_identity_details(con),
+                "staging": _staging_evidence(
+                    con, match_report=match_report, stats_report=stats_report
+                ),
                 "v2_mart_rows": football_counts.team_match_stats_rows,
                 "tactical_form_rows": football_counts.tactical_form_rows,
             }
@@ -830,7 +1223,13 @@ def main(argv: list[str] | None = None) -> int:
                 "generated_at": datetime.now(UTC),
                 "note": "run with --stage to recompute identity from raw payloads",
             }
-        _write(results / IDENTITY_REPORT, identity)
+        identity_path = results / IDENTITY_REPORT
+        if args.stage or not identity_path.exists():
+            _write(identity_path, identity)
+        else:
+            logger.info(
+                "preserved existing detailed %s; run --stage to replace it", IDENTITY_REPORT
+            )
         _write(results / COVERAGE_REPORT, build_coverage(con))
         _write(results / RECONCILIATION_REPORT, build_reconciliation(con))
         _write(results / METRIC_INVENTORY_REPORT, build_metric_inventory(con))

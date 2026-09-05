@@ -88,8 +88,8 @@ class SdpSchemaError(RuntimeError):
 class RawPayload:
     """One fetched response, as it arrived.
 
-    `text` is the undecoded body. `payload` is its parse, retained only so a caller does not
-    parse twice; the pair is guaranteed consistent because both are produced here.
+    `text` is the response body decoded explicitly as UTF-8. `payload` is its parse, retained
+    only so a caller does not parse twice; `sha256` and `byte_count` describe the source bytes.
     """
 
     endpoint: str
@@ -149,8 +149,8 @@ class SdpTeamStats:
     stats: Mapping[str, Any]
 
 
-def _sha256(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+def _sha256(content: bytes) -> str:
+    return hashlib.sha256(content).hexdigest()
 
 
 def extract_items(
@@ -501,13 +501,19 @@ class PlSdpClient:
                 last_error = error
             else:
                 if response.status_code == 200:
-                    text = response.text
-                    if len(text.encode("utf-8")) < self._config.minimum_payload_bytes:
+                    content = response.content
+                    if len(content) < self._config.minimum_payload_bytes:
                         raise ApiResponseError(
-                            f"{url} returned {len(text)} bytes, below the "
+                            f"{url} returned {len(content)} bytes, below the "
                             f"{self._config.minimum_payload_bytes}-byte floor; treating an "
                             "implausibly small body as a failure rather than as empty data"
                         )
+                    try:
+                        text = content.decode("utf-8")
+                    except UnicodeDecodeError as error:
+                        raise ApiResponseError(
+                            f"{url} returned a body that is not valid UTF-8: {error}"
+                        ) from error
                     try:
                         parsed = json.loads(text)
                     except json.JSONDecodeError as error:
@@ -519,8 +525,8 @@ class PlSdpClient:
                         fetched_at=datetime.now(UTC),
                         status_code=response.status_code,
                         text=text,
-                        sha256=_sha256(text),
-                        byte_count=len(text.encode("utf-8")),
+                        sha256=_sha256(content),
+                        byte_count=len(content),
                         payload=parsed,
                     )
                 if response.status_code in _EGRESS_BLOCKED_STATUSES:

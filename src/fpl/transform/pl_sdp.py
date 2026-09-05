@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -126,6 +127,63 @@ def land_payload(
         ],
     )
     return identifier, True
+
+
+def retained_complete_stats_ids(con: duckdb.DuckDBPyConnection, *, season: str) -> set[int]:
+    """Return matches whose latest retained stats body is usable on both sides.
+
+    A raw row alone is not proof of a complete capture: the provider can return an error
+    envelope, one side, or empty stats while still answering with JSON. Only the latest body
+    for this provider and season can suppress a retry, and each side must carry at least one
+    finite numeric metric.
+    """
+    rows = con.execute(
+        """
+        WITH ranked AS (
+            SELECT sdp_match_id, CAST(payload AS VARCHAR) AS payload,
+                   row_number() OVER (
+                       PARTITION BY sdp_match_id
+                       ORDER BY fetched_at DESC, payload_id DESC
+                   ) AS version_rank
+            FROM raw_pl_sdp_payload
+            WHERE provider = ? AND endpoint = 'match_stats' AND season = ?
+              AND sdp_match_id IS NOT NULL
+        )
+        SELECT sdp_match_id, payload
+        FROM ranked
+        WHERE version_rank = 1
+        ORDER BY sdp_match_id
+        """,
+        [PROVIDER, season],
+    ).fetchall()
+
+    complete: set[int] = set()
+    for match_id, payload_text in rows:
+        try:
+            sides = parse_team_stats(json.loads(payload_text), match_id=int(match_id))
+        except (SdpSchemaError, json.JSONDecodeError, TypeError):
+            continue
+        team_ids = [side.team_id for side in sides]
+        if (
+            all(team_id is not None for team_id in team_ids)
+            and len(set(team_ids)) == 2
+            and all(
+                any(_is_numeric_metric(value) for value in side.stats.values()) for side in sides
+            )
+        ):
+            complete.add(int(match_id))
+    return complete
+
+
+def _is_numeric_metric(value: object) -> bool:
+    if isinstance(value, bool) or value is None:
+        return False
+    if not isinstance(value, int | float | str):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
 
 
 # --------------------------------------------------------------------------------------

@@ -24,6 +24,7 @@ from fpl.storage.db import (
     table_columns,
 )
 from fpl.transform import football_v2
+from fpl.transform.pl_sdp import SdpIdentityError
 
 KICKOFF = datetime(2025, 8, 16, 14, 0, tzinfo=UTC)
 
@@ -298,7 +299,7 @@ def test_current_live_fixture_anchors_sdp_team_stats_and_tactical_form(
                 "home",
                 "stats-home",
                 stats_known_at,
-                1,
+                3,
                 "Arsenal",
                 '{"expectedGoals": 1.8, "totalScoringAtt": 12, "ontargetScoringAtt": 6}',
                 1.8,
@@ -310,7 +311,7 @@ def test_current_live_fixture_anchors_sdp_team_stats_and_tactical_form(
                 "away",
                 "stats-away",
                 stats_known_at,
-                4,
+                8,
                 "Chelsea",
                 '{"expectedGoals": 0.7, "totalScoringAtt": 8, "ontargetScoringAtt": 2}',
                 0.7,
@@ -344,6 +345,76 @@ def test_current_live_fixture_anchors_sdp_team_stats_and_tactical_form(
         [season],
     ).fetchone()
     assert form == pytest.approx((1, 1.8, 0.5))
+
+
+@pytest.mark.parametrize(("home_stats_team_id", "away_stats_team_id"), [(8, 3), (None, 8)])
+def test_sdp_mart_fails_closed_on_swapped_or_missing_stats_team_id(
+    con: duckdb.DuckDBPyConnection,
+    home_stats_team_id: int | None,
+    away_stats_team_id: int,
+) -> None:
+    _seed(con, matches=1)
+    match_id = 2645195
+    con.execute(
+        """
+        INSERT INTO stg_pl_sdp_fixture_crosswalk (
+            season, fixture, sdp_match_id, match_method, pulse_id,
+            corroborated_kickoff, corroborated_teams, corroborated_score, resolved_at
+        ) VALUES ('2025-26', 100, ?, 'identity_fallback', NULL, TRUE, TRUE, TRUE, ?)
+        """,
+        [match_id, KICKOFF],
+    )
+    con.executemany(
+        """
+        INSERT INTO stg_pl_sdp_team_match_stats (
+            sdp_match_id, side, payload_id, known_at, sdp_team_id,
+            stats_json, metric_count, mapped_count
+        ) VALUES (?, ?, ?, ?, ?, '{}', 0, 0)
+        """,
+        [
+            (match_id, "home", "stats-home", KICKOFF, home_stats_team_id),
+            (match_id, "away", "stats-away", KICKOFF, away_stats_team_id),
+        ],
+    )
+
+    with pytest.raises(SdpIdentityError, match="stats teamId"):
+        football_v2.build_team_match_stats_sdp(con)
+
+    assert con.execute(
+        "SELECT count(*) FROM mart_fact_team_match_stats_v2 WHERE provider = 'pl_sdp'"
+    ).fetchone() == (0,)
+
+
+def test_sdp_mart_fails_closed_when_a_resolved_match_has_only_one_stats_side(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    _seed(con, matches=1)
+    match_id = 2645195
+    con.execute(
+        """
+        INSERT INTO stg_pl_sdp_fixture_crosswalk (
+            season, fixture, sdp_match_id, match_method, pulse_id,
+            corroborated_kickoff, corroborated_teams, corroborated_score, resolved_at
+        ) VALUES ('2025-26', 100, ?, 'identity_fallback', NULL, TRUE, TRUE, TRUE, ?)
+        """,
+        [match_id, KICKOFF],
+    )
+    con.execute(
+        """
+        INSERT INTO stg_pl_sdp_team_match_stats (
+            sdp_match_id, side, payload_id, known_at, sdp_team_id,
+            stats_json, metric_count, mapped_count
+        ) VALUES (?, 'home', 'stats-home', ?, 3, '{}', 0, 0)
+        """,
+        [match_id, KICKOFF],
+    )
+
+    with pytest.raises(SdpIdentityError, match="would emit 1 team rows across 1 sides"):
+        football_v2.build_team_match_stats_sdp(con)
+
+    assert con.execute(
+        "SELECT count(*) FROM mart_fact_team_match_stats_v2 WHERE provider = 'pl_sdp'"
+    ).fetchone() == (0,)
 
 
 # -- tactical form -------------------------------------------------------------------------
@@ -405,6 +476,111 @@ def test_a_derived_index_is_null_when_its_inputs_are_unmeasured(
         """
     ).fetchone()
     assert row == (None, None)
+
+
+def _seed_incomplete_tactical_inputs(con: duckdb.DuckDBPyConnection) -> None:
+    con.executemany(
+        """
+        INSERT INTO mart_fact_team_match_stats_v2 (
+            season, gw, fixture, sdp_match_id, kickoff_time,
+            team_id, team_code, opponent_team_id, opponent_team_code, was_home,
+            provider, known_at, shots, shots_on_target,
+            tackles, interceptions, clearances, blocks, recoveries
+        ) VALUES (
+            '2025-26', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pl_sdp', ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        """,
+        [
+            (1, 100, 900100, KICKOFF, 1, 3, 4, 8, True, KICKOFF, 10, 5, 2, 3, 4, 5, 6),
+            (1, 100, 900100, KICKOFF, 4, 8, 1, 3, False, KICKOFF, 8, 2, 2, 2, 2, 2, 2),
+            (
+                2,
+                101,
+                900101,
+                KICKOFF + timedelta(days=7),
+                1,
+                3,
+                4,
+                8,
+                False,
+                KICKOFF + timedelta(days=7),
+                20,
+                None,
+                100,
+                None,
+                100,
+                100,
+                100,
+            ),
+            (
+                2,
+                101,
+                900101,
+                KICKOFF + timedelta(days=7),
+                4,
+                8,
+                1,
+                3,
+                True,
+                KICKOFF + timedelta(days=7),
+                7,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+            ),
+        ],
+    )
+
+
+def test_ratio_excludes_a_match_with_an_unmeasured_numerator(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    _seed_incomplete_tactical_inputs(con)
+    football_v2.build_team_tactical_form(con)
+
+    raw = con.execute(
+        """
+        SELECT shots, shots_on_target FROM mart_fact_team_match_stats_v2
+        WHERE provider = 'pl_sdp' AND fixture = 101 AND team_code = 3
+        """
+    ).fetchone()
+    ratio = con.execute(
+        """
+        SELECT shot_accuracy FROM mart_fact_team_tactical_form_v2
+        WHERE provider = 'pl_sdp' AND team_code = 3 AND gw = 2
+          AND "window" = 'season_to_date'
+        """
+    ).fetchone()
+
+    assert raw == (20, None)
+    assert ratio == pytest.approx((0.5,))
+
+
+def test_composite_index_excludes_an_incomplete_match_from_its_exposure(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    _seed_incomplete_tactical_inputs(con)
+    football_v2.build_team_tactical_form(con)
+
+    raw = con.execute(
+        """
+        SELECT tackles, interceptions FROM mart_fact_team_match_stats_v2
+        WHERE provider = 'pl_sdp' AND fixture = 101 AND team_code = 3
+        """
+    ).fetchone()
+    index = con.execute(
+        """
+        SELECT defensive_volume FROM mart_fact_team_tactical_form_v2
+        WHERE provider = 'pl_sdp' AND team_code = 3 AND gw = 2
+          AND "window" = 'season_to_date'
+        """
+    ).fetchone()
+
+    assert raw == (100, None)
+    assert index == pytest.approx((20.0,))
 
 
 # -- point-in-time -------------------------------------------------------------------------

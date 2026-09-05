@@ -28,7 +28,7 @@ import duckdb
 
 from fpl.config import load_sdp_metrics
 from fpl.storage.db import table_columns, table_exists
-from fpl.transform.pl_sdp import ARCHIVE_PROVIDER, PROVIDER
+from fpl.transform.pl_sdp import ARCHIVE_PROVIDER, PROVIDER, SdpIdentityError
 
 # Rolling windows, matching mart_fact_player_form / mart_fact_team_form exactly so a reader
 # does not have to learn a second window vocabulary.
@@ -213,7 +213,6 @@ def build_team_match_stats_sdp(con: duckdb.DuckDBPyConnection) -> int:
     mirrors = dictionary.mirror_fields()
     mirrored = [name for name in metrics if mirrors.get(name) in mart_columns]
 
-    con.execute("DELETE FROM mart_fact_team_match_stats_v2 WHERE provider = ?", [PROVIDER])
     columns = [
         "season",
         "gw",
@@ -233,9 +232,7 @@ def build_team_match_stats_sdp(con: duckdb.DuckDBPyConnection) -> int:
     ]
     metric_select = ", ".join(f'st."{name}"' for name in metrics)
     mirror_select = ", ".join(f'opp."{name}" AS "{mirrors[name]}"' for name in mirrored)
-    con.execute(
-        f"""
-        INSERT INTO mart_fact_team_match_stats_v2 ({", ".join(f'"{c}"' for c in columns)})
+    source_ctes = """
         WITH latest AS (
             SELECT *, row_number() OVER (
                 PARTITION BY sdp_match_id, side ORDER BY known_at DESC, payload_id DESC
@@ -286,6 +283,61 @@ def build_team_match_stats_sdp(con: duckdb.DuckDBPyConnection) -> int:
             UNION ALL
             SELECT * FROM live_anchor
         )
+    """
+    incomplete = con.execute(
+        f"""
+        {source_ctes}
+        SELECT x.season, x.fixture, x.sdp_match_id,
+               count(st.side) AS team_rows, count(DISTINCT st.side) AS sides
+        FROM stg_pl_sdp_fixture_crosswalk AS x
+        JOIN (SELECT DISTINCT sdp_match_id FROM sided) AS captured
+          ON captured.sdp_match_id = x.sdp_match_id
+        LEFT JOIN anchor AS t
+          ON t.season = x.season AND t.fixture = x.fixture
+        LEFT JOIN sided AS st
+          ON st.sdp_match_id = x.sdp_match_id
+         AND st.side = CASE WHEN t.was_home THEN 'home' ELSE 'away' END
+        GROUP BY x.season, x.fixture, x.sdp_match_id
+        HAVING count(st.side) <> 2 OR count(DISTINCT st.side) <> 2
+        ORDER BY x.season, x.fixture
+        LIMIT 1
+        """
+    ).fetchone()
+    if incomplete is not None:
+        season, fixture, match_id, team_rows, sides = incomplete
+        raise SdpIdentityError(
+            f"{season} fixture {fixture}: SDP match {match_id} would emit {team_rows} "
+            f"team rows across {sides} sides; expected exactly home and away"
+        )
+
+    mismatch = con.execute(
+        f"""
+        {source_ctes}
+        SELECT t.season, t.fixture, x.sdp_match_id, st.side, st.sdp_team_id, t.team_code
+        FROM anchor AS t
+        JOIN stg_pl_sdp_fixture_crosswalk AS x
+          ON x.season = t.season AND x.fixture = t.fixture
+        JOIN sided AS st
+          ON st.sdp_match_id = x.sdp_match_id
+         AND st.side = CASE WHEN t.was_home THEN 'home' ELSE 'away' END
+        WHERE st.sdp_team_id IS NULL OR t.team_code IS NULL
+           OR st.sdp_team_id <> t.team_code
+        ORDER BY t.season, t.fixture, st.side
+        LIMIT 1
+        """
+    ).fetchone()
+    if mismatch is not None:
+        season, fixture, match_id, side, stats_team_id, team_code = mismatch
+        raise SdpIdentityError(
+            f"{season} fixture {fixture}: SDP match {match_id} {side} stats teamId "
+            f"{stats_team_id!r} disagrees with FPL permanent team_code {team_code!r}"
+        )
+
+    con.execute("DELETE FROM mart_fact_team_match_stats_v2 WHERE provider = ?", [PROVIDER])
+    con.execute(
+        f"""
+        INSERT INTO mart_fact_team_match_stats_v2 ({", ".join(f'"{c}"' for c in columns)})
+        {source_ctes}
         SELECT t.season, t.gw, t.fixture, t.pulse_id, x.sdp_match_id, t.kickoff_time,
                t.team_id, t.team_code, t.opponent_team_id, t.opponent_team_code,
                t.was_home, '{PROVIDER}' AS provider, st.known_at
@@ -314,10 +366,11 @@ def build_team_match_stats_sdp(con: duckdb.DuckDBPyConnection) -> int:
 
 # Derived ratio indices: (column, numerator expression, denominator expression).
 #
-# Every one is NULL when an input is unmeasured or the denominator is zero. These are
-# DESCRIPTIVE interpretations of style, not model quantities and not objective truth -- an
-# index earns its way into a model only by improving a proper score, which is what
-# config/v2_team_environment_evaluation.yaml is for.
+# Each ratio uses only matches where every numerator and denominator component is measured;
+# an incomplete match contributes to neither side of the ratio. The result is NULL when there
+# are no complete inputs or the complete-input denominator is zero. These are DESCRIPTIVE
+# interpretations of style, not model quantities and not objective truth -- an index earns its
+# way into a model only by improving a proper score, which is what the evaluation config is for.
 _DERIVED_INDICES: Final[tuple[tuple[str, str, str], ...]] = (
     ("shot_accuracy", "shots_on_target", "shots"),
     ("shot_quality", "expected_goals", "shots"),
@@ -402,9 +455,7 @@ def build_team_tactical_form(con: duckdb.DuckDBPyConnection) -> int:
         )
         averages = ", ".join(f'avg("{name}") OVER w AS "{name}_per_match"' for name in metrics)
         derived_select = ", ".join(
-            f"CASE WHEN sum({denominator}) OVER w > 0 "
-            f"THEN sum({numerator}) OVER w / CAST(sum({denominator}) OVER w AS DOUBLE) "
-            f'ELSE NULL END AS "{column}"'
+            _complete_derived_index_sql(column, numerator, denominator)
             for column, numerator, denominator in derived
         )
         columns = [
@@ -464,6 +515,17 @@ def _referenced_columns(expression: str) -> set[str]:
         for token in expression.replace("+", " ").replace("-", " ").replace("*", " ").split()
     }
     return {token for token in tokens if token and not token.isdigit()}
+
+
+def _complete_derived_index_sql(column: str, numerator: str, denominator: str) -> str:
+    inputs = sorted(_referenced_columns(numerator) | _referenced_columns(denominator))
+    complete = " AND ".join(f'"{name}" IS NOT NULL' for name in inputs)
+    numerator_sum = f"sum({numerator}) FILTER (WHERE {complete}) OVER w"
+    denominator_sum = f"sum({denominator}) FILTER (WHERE {complete}) OVER w"
+    return (
+        f"CASE WHEN {denominator_sum} > 0 THEN {numerator_sum} "
+        f'/ CAST({denominator_sum} AS DOUBLE) ELSE NULL END AS "{column}"'
+    )
 
 
 # Tables and columns the archive provider derives from. The V2 layer is OPTIONAL: a rebuild

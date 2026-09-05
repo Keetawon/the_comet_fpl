@@ -3,6 +3,7 @@
     python -m fpl.jobs.backfill_pl_sdp --season 2024-25
     python -m fpl.jobs.backfill_pl_sdp --all-seasons
     python -m fpl.jobs.backfill_pl_sdp --season 2026-27 --limit-matches 2
+    python -m fpl.jobs.backfill_pl_sdp --season 2026-27 --refresh-stats
 
 Requires network egress to the provider. Every host in the Pulselive / premierleague.com /
 fantasy.premierleague.com family is refused by some sandboxes' egress policy, in which case
@@ -52,6 +53,7 @@ def backfill(
     fetch_stats: bool = True,
     client: PlSdpClient | None = None,
     limit_matches: int | None = None,
+    refresh_stats: bool = False,
 ) -> BackfillReport:
     """Fetch a season's matches, then optionally each match's team stats."""
     if limit_matches is not None and limit_matches <= 0:
@@ -93,18 +95,11 @@ def backfill(
                         if is_completed_scored_match(summary, now=moment)
                     }
                 )
-                retained_ids = {
-                    int(row[0])
-                    for row in con.execute(
-                        """
-                        SELECT DISTINCT sdp_match_id
-                        FROM raw_pl_sdp_payload
-                        WHERE provider = ? AND endpoint = 'match_stats' AND season = ?
-                          AND sdp_match_id IS NOT NULL
-                        """,
-                        [sdp_transform.PROVIDER, season],
-                    ).fetchall()
-                }
+                retained_ids = (
+                    set()
+                    if refresh_stats
+                    else sdp_transform.retained_complete_stats_ids(con, season=season)
+                )
                 report.stats_skipped += len(set(completed_ids) & retained_ids)
                 pending_ids = [
                     match_id for match_id in completed_ids if match_id not in retained_ids
@@ -147,6 +142,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--limit-matches", type=int, default=None, help="cap stats fetches per season (smoke runs)"
     )
+    parser.add_argument(
+        "--refresh-stats",
+        action="store_true",
+        help="refetch completed-match stats so provider restatements can be retained",
+    )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
 
@@ -173,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
             db_path=args.db,
             fetch_stats=not args.no_stats,
             limit_matches=args.limit_matches,
+            refresh_stats=args.refresh_stats,
         )
     except EgressBlockedError as error:
         logger.error("%s", error)

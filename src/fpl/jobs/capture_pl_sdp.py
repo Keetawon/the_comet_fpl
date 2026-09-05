@@ -2,6 +2,7 @@
 
     python -m fpl.jobs.capture_pl_sdp
     python -m fpl.jobs.capture_pl_sdp --season 2026-27 --lookback-days 5
+    python -m fpl.jobs.capture_pl_sdp --season 2026-27 --refresh-stats
 
 The operational counterpart to `backfill_pl_sdp`: run it after matches complete. It fetches
 the current season's match list, then stats for matches that have finished and whose stats are
@@ -55,6 +56,7 @@ def capture(
     limit_matches: int | None = None,
     client: PlSdpClient | None = None,
     now: datetime | None = None,
+    refresh_stats: bool = False,
 ) -> CaptureReport:
     if limit_matches is not None and limit_matches <= 0:
         raise ValueError("limit_matches must be positive")
@@ -73,15 +75,11 @@ def capture(
     try:
         con = initialise(db_path)
         try:
-            captured = {
-                int(row[0])
-                for row in con.execute(
-                    """
-                    SELECT DISTINCT sdp_match_id FROM raw_pl_sdp_payload
-                    WHERE endpoint = 'match_stats' AND sdp_match_id IS NOT NULL
-                    """
-                ).fetchall()
-            }
+            captured = (
+                set()
+                if refresh_stats
+                else sdp_transform.retained_complete_stats_ids(con, season=resolved_season)
+            )
             summaries: list[SdpMatchSummary] = []
             for raw, page in sdp.iter_matches(season_id=season_id):
                 _, is_new = sdp_transform.land_payload(con, raw, season=resolved_season)
@@ -141,6 +139,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--limit-matches", type=int, default=None, help="cap new completed-match stats fetches"
     )
+    parser.add_argument(
+        "--refresh-stats",
+        action="store_true",
+        help="refetch completed-match stats so provider restatements can be retained",
+    )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
 
@@ -154,6 +157,7 @@ def main(argv: list[str] | None = None) -> int:
             db_path=args.db,
             lookback_days=args.lookback_days,
             limit_matches=args.limit_matches,
+            refresh_stats=args.refresh_stats,
         )
     except EgressBlockedError as error:
         logger.error("%s", error)
