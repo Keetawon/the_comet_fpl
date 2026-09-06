@@ -1386,6 +1386,23 @@ V2 number as a recommendation. `jobs/prospective_environment_v2.py` exists preci
 football forecast is available for analysis without any decision path consuming an ungated
 candidate.
 
+## Weekly inner-selection procedural amendment (2026-09-06)
+
+Owner authorization now permits one narrow goals+xG selection-schedule experiment before the
+deferred next-model directions above. Source inspection confirms a frozen six-GW inner holdout
+fit versus weekly outer refits. The separate validation-only selector retains staged search,
+signals, grids, priors, population and Poisson outputs; no SDP/SOT feature is licensed here.
+See `docs/v2-weekly-inner-selection-diagnostic.md` and
+`docs/v2-weekly-inner-selection-design.md`.
+
+Delivery order: finish offline implementation/tests and preregistration; commit cleanly; reproduce
+the unchanged control including all fixture PMFs and fold settings; reserve the one-run claim;
+score `retrospective_goals_xg_weekly_inner_selection_v1` once; retain failed or passed development
+evidence without tuning; document and push only to the V2 branch. The new 1% gate is against the
+exact goals+xG control, not trailing goals. Keep frozen results and prospective defaults unchanged.
+Normal snapshot-only main synchronization is authorized for this branch; no rebase or merge back
+to main. Existing Windows symlink/format failures must remain separately reported, not called green.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:

@@ -1427,6 +1427,23 @@ active delivery order.
     must be fitted inside each fold rather than taken from the measured constant above, which
     was measured on the evaluation population and would be leakage.
 
+## Owner-authorized weekly inner-selection experiment (2026-09-06)
+
+The source-confirmed inner/outer mismatch is now isolated in an additive preregistration:
+`retrospective_goals_xg_weekly_inner_selection_v1`, against the unchanged
+`retrospective_goals_xg_control_v1`. Read `docs/v2-weekly-inner-selection-design.md` and its
+diagnostic note. The separate validation-only selector changes **only the inner refit schedule**;
+goals still select decay/prior before goals+xG select blend weights. Existing grids, outer-season
+promoted priors, archive xG, output, population and frozen engine remain unchanged. No SOT or
+other SDP feature enters this candidate. Strict prospective paths and all prior results stay frozen.
+
+Commit implementation/tests/preregistration cleanly before formal scoring. The runner must first
+reproduce all unchanged-control PMFs, identities, parameters and scores on 2,280 team-sides /
+114 folds, then reserve its one-run claim before evaluating the candidate exactly once. Retain
+fixture PMFs, paired GW-clustered uncertainty and selection diagnostics. This is retrospective
+archive development, never automatic promotion. A failed control check forbids candidate scoring;
+an interrupted claimed candidate must not be silently restarted. No second experiment is authorized.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.
