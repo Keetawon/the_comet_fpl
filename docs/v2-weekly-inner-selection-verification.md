@@ -95,3 +95,13 @@ clean provenance and fail-closed one-run orchestration. No real candidate is sco
 Independent review confirmed the single-change boundary and control-before-candidate
 ordering. Its reporting suggestion was implemented before scoring: retained inner batches
 now contain measured event-time and target-GW-overlap counts, checked before publication.
+
+## Post-run read-only reconciliation
+
+The single formal evaluation finished at clean preregistration commit `507c3d2`; no model was
+retuned or run again. An independent reader recomputed **264 overall/slice/fold metric blocks**
+from **4,560 retained PMFs**, verified **2,280 unique sides / 1,140 reciprocal fixtures / 114 GWs**
+and all targets against the read-only archive, reconciled parameter distributions/transitions/
+entropies, **1,368 inner-stage batch guards**, paired losses and the row-weighted GW-cluster SE,
+and checked every recorded source/config/database/frozen-result/claim hash. **31,265 checks,
+zero discrepancies.** The result and its preregistration remain unchanged.

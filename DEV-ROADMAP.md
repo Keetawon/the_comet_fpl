@@ -1403,6 +1403,14 @@ exact goals+xG control, not trailing goals. Keep frozen results and prospective 
 Normal snapshot-only main synchronization is authorized for this branch; no rebase or merge back
 to main. Existing Windows symlink/format failures must remain separately reported, not called green.
 
+This amendment is now **complete, INCONCLUSIVE, development-only**: one clean run at `507c3d2`,
+2,280 team-sides / 114 folds, +0.1870% log lift against the exactly reproduced goals+xG control,
+short of 1%; all three full seasons and CRPS improve. Early aggregate improves, but early
+2025-26 regresses. Retain full fixture PMFs, measured inner/outer guards and parameter diagnostics
+in `results/v2_weekly_inner_selection_development.json`; see the matching development doc.
+No retuning or promotion. The single next recommendation is a separately authorized SOT
+incremental experiment on the frozen weekly-inner control, not territory or automatic deployment.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:

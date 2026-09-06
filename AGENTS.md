@@ -1444,6 +1444,16 @@ fixture PMFs, paired GW-clustered uncertainty and selection diagnostics. This is
 archive development, never automatic promotion. A failed control check forbids candidate scoring;
 an interrupted claimed candidate must not be silently restarted. No second experiment is authorized.
 
+The one formal run is now complete at clean `507c3d2`: **INCONCLUSIVE**. Mean log score
+1.486650879 versus the reproduced control's 1.489436133 is **+0.1870%**, below 1%; CRPS improves
+0.3667% and all three full seasons improve. Early GW1-6 improves 0.5199% overall but regresses
+in 2025-26. Aggregate PIT-80 moves slightly farther from 80% (80.83%→81.10%), still within the
+frozen guardrail. Parameter switching eases only modestly; xG weight zero falls 25→12/114 folds.
+Preserve `results/v2_weekly_inner_selection_development.json` and the matching development doc
+without rerunning or retuning. The sole next recommendation is a separately authorized,
+separately preregistered SOT incremental test against the frozen weekly-inner control; no such
+candidate is implemented or licensed by this result, and nothing is promoted.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.
