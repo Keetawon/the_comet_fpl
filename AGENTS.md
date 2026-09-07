@@ -1644,3 +1644,24 @@ freeze implementation before bounded collection, use exact Opta/FPL identity onl
 nominal durations separately, and validate them before a workload/role model can consume them.
 `docs/football-development-incumbent-audit.md` records exact defaults and inherited limitations;
 historically best research candidates are not substitutes for current comparator behavior.
+
+### Retained chance result and downstream hard blockers (2026-09-07)
+
+`retrospective_chance_creation_team_environment_v1` was scored ONCE at clean
+`6529e71a85e45d276759ec3a5d9824382f5a5431`, after its separately documented pre-fit metadata
+serialization correction. All3,800 incumbent PMFs reproduce exactly;2,280sides/114folds across
+2023-24..2025-26 give NLL1.490035478 vs1.496896051 (+0.4583%) and CS Brier0.169951345
+vs0.171251344 (+0.7591%). Both1% gates fail, as does the2025-26CS seasonal guardrail:
+**INCONCLUSIVE**, development-only, immutable and not retuned. Independent117,195 arithmetic/
+provenance checks pass; strict prospective/default/optimizer behavior stays unchanged.
+See `docs/v2-chance-creation-development.md` and the full retained result/independent audit.
+
+The independent competitive pilot captured13matches/39HTTP200responses but only12/13interpret
+under its frozen contract: League Cup2603048 has12Millwall starters/two goalkeepers in the raw
+roster versus11in formation. Do not silently discard a player or lower the coverage gate. Valid
+PL subset121played durations agrees within1minute, but this does not license the failed match
+or a workload/role mart. A second hard blocker affects exact historical current-default player
+comparison:821price-sensitive cold rows lack proven deadline `now_cost`/complete registry;
+all51retained snapshot captures are2026-27. Archive `value` is not an authorized substitute.
+Phases C–J are not evaluated; do not invent results or call the whole program complete.
+`docs/football-program-blocked-2026-09-07.md` records dependencies, actual tests and evidence.

@@ -811,3 +811,10 @@ derived participation before any workload/role use. Each new model has a separat
 none replaces current forecasts, optimizer inputs or dashboard defaults. See the
 [incumbent audit](docs/football-development-incumbent-audit.md) for the exact comparator paths and
 limitations; frozen tactical numeric1 and every earlier evaluation remain unchanged.
+
+The [single chance-creation run](docs/v2-chance-creation-development.md) is now retained:
+NLL+0.4583%,clean-sheet Brier+0.7591%, **INCONCLUSIVE** against both1% gates. Defaults remain
+unchanged. The [participation pilot](docs/competitive-participation-pilot-development.md)
+captured13matches but found one contradictory lineup, and historical exact-current player
+comparison lacks deadline price-registry evidence. The [program handoff](docs/football-program-blocked-2026-09-07.md)
+records these hard blockers: later player/component/full-points phases are not claimed complete.

@@ -6,3 +6,7 @@ results/v2_chance_target_audit.json -text whitespace=cr-at-eol
 results/v2_chance_creation_development.json -text whitespace=cr-at-eol
 config/v2_chance_creation_evaluation.yaml -text whitespace=cr-at-eol
 config/competitive_participation_pilot.yaml -text whitespace=cr-at-eol
+results/competitive_participation_pilot_development.json -text whitespace=cr-at-eol
+results/competitive_participation_pilot_independent_audit.json -text whitespace=cr-at-eol
+results/football_program_prerequisite_audit_20260907.json -text whitespace=cr-at-eol
+results/v2_chance_creation_independent_audit.json -text whitespace=cr-at-eol

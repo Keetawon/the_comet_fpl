@@ -1546,3 +1546,19 @@ Each formal phase freezes its own contract before scoring; no retuning, false gr
 gates or automatic promotion. A hard identity/PIT/comparator/data blocker stops the affected
 dependent chain and is reported with retained evidence, not filled by guesses. No candidate has
 been evaluated as part of this new program at the time of its first preregistration.
+
+### Retained execution / hard stop — 2026-09-07
+
+Phase A completed ONCE, `retrospective_chance_creation_team_environment_v1`: **INCONCLUSIVE**,
+NLL lift+0.4583%,CS Brier+0.7591%, below both1% gates; early-season and2025-26CS weaknesses
+remain. Exact incumbent PMFs reproduce with difference0; independent117,195 checks/zero failures.
+Leave this result and every prior result frozen. Incumbent team behavior remains installed.
+
+Phase B collection completed13matches/39HTTP200requests; valid interpretation12/13 fails the
+fixed100% pilot gate because Palace–Millwall2603048 lists two Millwall starting keepers.
+Validated PL subset counts must not conceal that contradiction. No workload/role mart is licensed.
+Historical current-default minutes/full-points reproduction also lacks exact deadline registries
+for821price-sensitive cold rows; do not silently use archive prices or exclude the affected rows.
+These are hard prerequisite blockers, not model gate failures. C–J remain unrun; no production
+promotion, synthesis, schedule, main merge-back or PR. See
+`docs/football-program-blocked-2026-09-07.md` for the bounded completed work and evidence needed next.
