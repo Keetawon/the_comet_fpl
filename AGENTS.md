@@ -1765,3 +1765,28 @@ not challenger fits. Neither new candidate has a formal result at this commit.
 The coverage-only full-points population is fixed to measured 2025-26 targets before
 G/H scoring; see `docs/full-player-pmf-population-audit.md`. Older missing DC remains
 NULL. All historical price-proxy and prospective restrictions remain intact.
+
+The OOS-shot GK-saves successor has now run ONCE from clean `f0c52fe`:2,313keeper
+appearances/114GWs, NLL2.019983491→1.975058197(+2.22404%), CRPS+4.20264%, all three
+seasonal1%/calibration guards pass. **SUPPORTED for development synthesis only**;
+independent175,108checks reconcile its full probabilities and evidence. See
+`docs/player-saves-opportunity-development.md`. No current saves default changes.
+Unknown source SOT remains NULL, and original later capture times remain retrospective.
+The synthesis must project saved parameters onto every GK roster row without using
+actual appearance. Other components still require their own full gates.
+
+The separately preregistered DC successor also ran ONCE from clean `f0c52fe`:
+7,859measured outfield appearances/28folds, NLL.342467929→.330258420(+3.56515%).
+Its307past-witnessed transfer rows regress1.53959%, failing the fixed guardrail:
+**INCONCLUSIVE**, keep current DC in synthesis/defaults. Independent7,358,810checks
+pass. Dispersion adds only0.39407%against the same-input Poisson diagnostic, with
+uncertainty including zero. Never choose that diagnostic posthoc. See
+`docs/v2-dc-predicted-environment-development.md`.
+
+The final separate workload-minutes and goals/assists opportunity registrations now
+pin the retained complete reference, OOS transition-role forecasts and explicit
+821-row archive-price proxy boundary. See `docs/player-workload-minutes-evaluation-v1-preregistration.md`
+and `docs/player-opportunity-design.md`. None has been formally fitted at this
+preregistration commit. Both Stage B and Stage C retain181required folds, versus
+114nominal/38new-source folds available; no full-gate/synthesis acceptance is possible
+from these scoped runs. Do not hide that shortfall using all-fallback historical rows.

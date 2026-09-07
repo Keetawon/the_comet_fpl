@@ -163,3 +163,82 @@ synthesis or replace a default. Final runner configs must state this before scor
 
 Offline synthetic tests establish formulas, invariants and exact control fallback only.
 They do not supply a real-data result, model promotion, or an exception to the full gate.
+
+## Formal registration and reference reproduction
+
+`config/player_opportunity_evaluation.yaml` freezes both identities before either is
+scored; `dev_player_opportunity --component goals|assists` gives each a separate
+exclusive Git-common claim and new external write-once result directory. Neither
+shares the other's claim or changes its signal based on the other's result. Seed is
+202627; there is no parameter search or tie-selection rule because the hierarchy is
+fixed closed-form. No interrupted or disappointing formal candidate is retried.
+
+The retained CURRENT reference cache was generated cleanly from
+`f0c52fe1e5546dd21e8f37b75bb8022c2d9c8bae`. Its manifest SHA256 is
+`c76bb1936b332b05bd8e3970af3dbd5b3e95c428d1005783c59d82b88d8f04b9`;
+the additive exact copy is `results/current_component_proxy_cache_manifest.json`.
+All 114 fold hashes and complete typed `FixturePlayer`/BPS inputs independently
+revalidate; they retain 86,755 rows, all 821 direct price proxies and unchanged
+default component distributions. Reading this cache never refits minutes, CURRENT
+components or upstream roles. The original transition-role result remains pinned to
+SHA256 `c330d44a227ff6ff10cce1d5813f582d48dadfa181816c9333d6389358940809`.
+
+Before claiming/fitting either candidate, validate every CURRENT target identity,
+minute PMF, source/target coverage and conditional Poisson equation at zero numerical
+tolerance against the retained raw allocated rate and unchanged team cap. An uncoupled
+team-scale fallback is explicitly counted as exact cached evidence, not an independently
+re-estimated rate. CURRENT marginals apply the unchanged appearance mixture exactly
+once. The two original required Stage C baseline implementations are additionally
+refitted on the same prior-event/whole-GW history and scored on identical rows. Their
+legacy history convention is not silently changed to the candidate's additional
+six-hour conservative completion margin.
+
+The prior-label audit also found zero missing goals and zero missing assists in all
+138,707 measured-minutes archive rows (2021-22 through 2025-26). The required-baseline
+constructors retain their original harness's `COALESCE(label,0)` convention, but no
+such replacement is exercised on this pinned source. This never applies to xG/xA:
+missing historical signal remains missing. The control-reproduction report records
+the all-archive missing-label count before claiming the candidate.
+
+Every fixture-player record retains four scored PMFs (CURRENT, both required baselines,
+candidate), original and candidate conditional PMFs, current four-bin minutes, target
+and source cutoffs, frozen selector/price lineage, prequential role metadata and separate
+observed labels. Role-forecast-present includes a cold pooled forecast; it does not
+claim observed recent-role support. Whether a role was actually usable is separately
+visible in the candidate's role probabilities and exact fallback reason. Per-fold
+records retain all hierarchy sufficient statistics, source hash, bin means and
+player windows. Completed batches are fsynced and hashed; a failure retains the claim,
+traceback and all finished batches. No resume or allow-dirty switch exists.
+
+The primary diagnostic comparison is CURRENT. Also retain the unchanged required
+baseline gate: at least 1% mean-log lift, no RPS/Brier regression against the best value
+of each metric, PIT-80 error at most 0.05 and no full-season log regression against
+either CURRENT or the best required baseline. Full eligibility still requires 181
+folds and remains INELIGIBLE here. A scoped numeric pass cannot enter synthesis.
+
+Report overall, season, position, venue, GW1–6/GW7+, cold/established, direct and
+propagated-team price proxy, role-forecast presence and applied/fallback slices.
+Retain NLL, RPS, Brier-any, PIT/reliability, prediction mean/error/MAE/SD and paired
+player-fixture losses with GW-clustered standard errors (not serial-dependence-adjusted).
+Intermediate signal diagnostics compare posterior xG/xA per minute times expected
+minutes with measured target xG/xA; the original measured per-appearance signal times
+CURRENT P(play) is a plainly labelled persistence proxy. Neither is an independent
+team-xG forecast, and these diagnostics cannot select features or change the model.
+
+Before completed publication revalidate clean HEAD/config/source/database, all original
+external minute/component/role receipts and every completed output fold hash. Preserve
+the original database and all frozen prior results. Run-time UTC, input hashes, exact
+row/fold counts and separately claimed candidate identity remain in each result.
+
+## Bounded execution cost
+
+Each independently claimed component performs exactly 114 fixed closed-form hierarchy
+fits and two unchanged cheap required-baseline fits per outer fold. There is no inner
+selection, numerical optimizer, hyperparameter grid, upstream refit or Monte-Carlo
+draw. With at most 138,707 retained archive rows, the straightforward hierarchy scan
+and original-source hashing visit at most 15,812,598 rows per candidate; actual prefix
+sizes are smaller. Hashing preserves complete original OOS context and is deliberately
+included in the cost, not omitted to speed a formal run. Typed external caches are
+validated before and after. Expect minutes rather than a new model-search program;
+no real-candidate timing is claimed before its sole authorized run. Progress logs and
+completed checkpoints identify each of the 114 bounded batches.

@@ -76,7 +76,7 @@ from fpl.validate.player_workload_minutes import (
 from fpl.validate.retrospective_minutes_proxy import NAME as CONTROL_NAME
 
 CONFIG = "config/player_workload_minutes_evaluation.yaml"
-CONFIG_SHA256 = "UNREGISTERED"
+CONFIG_SHA256 = "6d483e21d2a55015b75d7378551fe80fb2fa0d7c1a36b02babe182cfe7ac97ba"
 COVERAGE_SHA256 = "770206f0c151694501cc06b95631b554b172b956e8cfe10363481f474f3cf982"
 ARCHIVE_SHA256 = "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8"
 BRANCH = "claude/comet-fpl-v2-architecture-mqrj8f"
@@ -176,6 +176,31 @@ def _plain(value: Any) -> Any:
     return value
 
 
+def cache_fingerprints(paths: dict[str, Path]) -> dict[str, str]:
+    """Bind every external fold on both preflight AND postflight, not just manifests."""
+    result = {}
+    for key in ("minutes_manifest_sha256", "role_result_sha256"):
+        manifest_path = paths[key].resolve()
+        directory = manifest_path.parent
+        payload = json.loads(manifest_path.read_bytes())
+        seen = set()
+        for entry in payload["folds"]:
+            path = directory / entry["file"]
+            if path.is_symlink() or path.resolve().parent != directory or path.name in seen:
+                raise ValueError("external workload upstream fold path/duplicate differs")
+            seen.add(path.name)
+            digest = file_sha256(path)
+            if digest != entry["sha256"]:
+                raise ValueError("external workload upstream fold hash changed")
+            result[str(path.resolve())] = digest
+        if key == "role_result_sha256":
+            source_path = directory / "source_versions.json"
+            if source_path.is_symlink():
+                raise ValueError("role upstream source ledger cannot be a symlink")
+            result[str(source_path)] = file_sha256(source_path)
+    return result
+
+
 def snapshot(root: Path, paths: dict[str, Path]) -> dict[str, Any]:
     head = git_clean_head(root)
     branch = subprocess.check_output(
@@ -192,6 +217,7 @@ def snapshot(root: Path, paths: dict[str, Path]) -> dict[str, Any]:
             and Path(str(path) + ".wal").exists()
         ):
             raise ValueError("formal workload database has unresolved WAL")
+    external_cache = cache_fingerprints(paths)
     files = sorted(
         {
             *root.glob("src/**/*.py"),
@@ -201,6 +227,7 @@ def snapshot(root: Path, paths: dict[str, Path]) -> dict[str, Any]:
             *root.glob("docs/*.md"),
             root / "AGENTS.md",
             root / "DEV-ROADMAP.md",
+            root / "README.md",
         }
     )
     return {
@@ -212,6 +239,7 @@ def snapshot(root: Path, paths: dict[str, Path]) -> dict[str, Any]:
         "config_sha256": CONFIG_SHA256,
         "source_sha256": {p.relative_to(root).as_posix(): file_sha256(p) for p in files},
         "input_sha256": {str(p.resolve()): file_sha256(p) for p in paths.values()},
+        "external_cache_sha256": external_cache,
         "seed": 202627,
         "known_at_rewritten": False,
         "historical_deadline_validity": False,
@@ -563,7 +591,6 @@ def run(
             "candidate": NAME,
             "evidence_class": EVIDENCE_CLASS,
             "started_at_utc": started,
-            "finished_at_utc": datetime.now(UTC).isoformat(),
             "provenance": provenance,
             "claim": str(claim),
             "comparator_reproduction": reproduction,
@@ -574,6 +601,7 @@ def run(
         }
         if snapshot(root, paths) != provenance:
             raise ValueError("formal workload source/HEAD/database changed during run")
+        result["finished_at_utc"] = datetime.now(UTC).isoformat()
         publish_json(output / "result.json", result)
         return result
     except BaseException as error:

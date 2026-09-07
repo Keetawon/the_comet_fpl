@@ -1647,3 +1647,26 @@ symlink-privilege failures remain environmental evidence, not a green full gate.
 An additional external-cache postflight corruption test raises its focused subset
 from31to32passing tests; the postflight rechecks every minutes-fold hash before
 publishing a completed current-component reference. Global Ruff/mypy still pass.
+
+GK-saves H is independently retained SUPPORTED for development synthesis only:
++2.22404%NLL and+4.20264%CRPS, with all three seasonal guards passing. This does not
+authorize any default/promotion change; see `docs/player-saves-opportunity-development.md`.
+The shared current-component reference is complete from the same clean `f0c52fe`:
+114folds/86,755rows/821direct proxies, no minutes refit or challenger fit or points draws.
+Workload minutes and the two independent opportunity contracts can now proceed once
+their final preregistrations/tests are cleanly committed. Full Stage B/C181-fold
+eligibility remains unmet even if a scoped numeric result improves.
+
+DC G is retained INCONCLUSIVE after7,358,810independent checks: overall NLL+3.56515%
+but transfer NLL-1.53959%; keep CURRENT, not the posthoc Poisson diagnostic. See
+`docs/v2-dc-predicted-environment-development.md`. Next run the separately registered
+workload-minutes and two opportunity identities once from this clean preregistration.
+Fixed coverage/runtime receipts and all source hashes precede scoring. Each must
+retain its114-versus181full-gate ineligibility and all821price-proxy rows. No source
+metric or current default is changed by these development-only evaluations.
+
+Final D/E preregistration gate:208focused tests pass, zero failures/skips(46.76s),
+including actual-type synthetic end-to-end runners and shared baseline components;
+global Ruff and strict mypy185source files pass, changed4Python files pass format.
+Unfinished synthesis drafts are preserved externally during these clean formal runs.
+Known pre-existing full-format and Windows symlink limitations are unchanged.
