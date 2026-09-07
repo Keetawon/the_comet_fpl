@@ -22,6 +22,10 @@ Design and its **documented Stage-D-v1 limitations** (see
   held at zero (their own future components); the realised label still includes them, a documented
   gap. FPL scoring is additive across independent components, so v2 adds saves and DC as two extra
   draws on top of the unchanged five-dimensional base rather than enlarging the lookup table.
+* **Optional disciplinary development extension.** An explicitly supplied conditional scored-card
+  PMF adds loaded-rule card points after the minutes gate, using a separate seeded stream. With
+  it absent (all current defaults), the preceding frozen behaviour is exactly unchanged. No card
+  BPS correction or change to the existing bonus residual is implied by this optional component.
 * **v1 is reproduced bit-for-bit when saves and DC are absent.** When ``components.saves is None``
   and ``components.dc_hit_probability == 0.0`` the composer draws the same four uniforms in the same
   order and returns the identical pmf; the two extra uniforms are drawn only when a component is on.
@@ -43,11 +47,15 @@ from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from random import Random
+from typing import TYPE_CHECKING
 
 from fpl.config import BpsRules, ScoringRules
 from fpl.models.bps_bonus import PlayerRow, exact_bps
 from fpl.models.scoring import calculate_points
 from fpl.types import PlayerMatchStats, Position
+
+if TYPE_CHECKING:
+    from fpl.models.disciplinary_development import ConditionalDisciplinary
 
 # A probability distribution over an ordered discrete support, as a tuple of masses. Mirrors
 # ``fpl.validate.metrics.Distribution`` without importing it (this module stays model-only).
@@ -172,6 +180,8 @@ class ComponentDistributions:
     team_goals_conceded: Distribution
     saves: Distribution | None = None
     dc_hit_probability: float = 0.0
+    # Optional development-only FPL-scored outcomes; current prospective jobs leave this absent.
+    disciplinary: ConditionalDisciplinary | None = None
 
 
 def conditional_rate(unconditional: float, p_play: float, *, cap: float) -> float:
@@ -292,6 +302,12 @@ class PointsLookup:
         conceded = min(conceded, self._max_count)
         return self._table[(position, bin_index, goals, assists, conceded)]
 
+    def disciplinary_points(self, scored_state: int) -> int:
+        """One audited scored outcome, not independent physical yellow/red counts."""
+        if type(scored_state) is not int or scored_state not in (0, 1, 2):
+            raise ValueError("unsupported FPL-scored disciplinary state")
+        return (0, self._rules.yellow_cards, self._rules.red_cards)[scored_state]
+
 
 def _conceded_cumulative_by_bin(
     team_conceded: Sequence[float], exposure: Sequence[float] | None, bins: int
@@ -379,6 +395,13 @@ def compose_points_distribution(
         components.team_goals_conceded, conceded_exposure, len(components.minutes)
     )
     saves_cumulative = _cumulative(components.saves) if components.saves is not None else None
+    card_cumulative = (
+        [_cumulative(row) for row in components.disciplinary.by_minutes_bin]
+        if components.disciplinary is not None
+        else None
+    )
+    # An independent stream preserves every incumbent component draw even with cards enabled.
+    card_generator = Random(f"fpl-disciplinary-v1:{seed}") if card_cumulative else None
 
     position = components.position
     dc_probability = components.dc_hit_probability
@@ -392,6 +415,7 @@ def compose_points_distribution(
         u_goals = generator.random()
         u_assists = generator.random()
         u_conceded = generator.random()
+        u_card = card_generator.random() if card_generator is not None else None
         if extended:
             u_saves = generator.random()
             u_dc = generator.random()
@@ -411,6 +435,10 @@ def compose_points_distribution(
                     total += saves // extra.saves_unit
                 if position in extra.dc_positions and u_dc < dc_probability:
                     total += extra.dc_points
+            if card_cumulative is not None and u_card is not None:
+                total += lookup.disciplinary_points(
+                    _sample_index(card_cumulative[bin_index], u_card)
+                )
 
         index = total if total > 0 else 0
         if index > max_points:
@@ -605,6 +633,18 @@ def compose_fixture_full_points(
     saves_cumulative = [
         _cumulative(p.components.saves) if p.components.saves is not None else None for p in ordered
     ]
+    card_cumulative = [
+        [_cumulative(row) for row in p.components.disciplinary.by_minutes_bin]
+        if p.components.disciplinary is not None
+        else None
+        for p in ordered
+    ]
+    card_generators = [
+        Random(f"fpl-disciplinary-v1:{fixture_seed}:{p.code}")
+        if p.components.disciplinary is not None
+        else None
+        for p in ordered
+    ]
 
     counts = [[0] * (max_points + 1) for _ in ordered]
     bonus_sum = [0] * count
@@ -622,6 +662,8 @@ def compose_fixture_full_points(
             u_goals = generator.random()
             u_assists = generator.random()
             u_conceded = generator.random()
+            card_generator = card_generators[i]
+            u_card = card_generator.random() if card_generator is not None else None
             if extended[i]:
                 u_saves = generator.random()
                 u_dc = generator.random()
@@ -643,6 +685,12 @@ def compose_fixture_full_points(
                     base += saves // extra.saves_unit
                 if position in extra.dc_positions and u_dc < dc_probability[i]:
                     base += extra.dc_points
+            cumulative_cards = card_cumulative[i]
+            if cumulative_cards is not None and u_card is not None:
+                base += points_lookup.disciplinary_points(
+                    _sample_index(cumulative_cards[bin_index], u_card)
+                )
+            # Existing BPS residual already contains unmodelled card BPS; do not penalise twice.
             non_bonus[i] = base
             appeared[i] = True
             bps_draw = round(

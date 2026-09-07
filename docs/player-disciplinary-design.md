@@ -71,6 +71,12 @@ claim is made. All rows, cold/established, per-season, position, venue, early/la
 observed-exposure diagnostics are frozen before scoring. Excluding the 821 rows is strictly
 diagnostic and never changes the nominated population or selected model.
 
+Before any formal scoring, the final contract additionally freezes the shared conservative
+six-hour completion exclusion: a source kickoff plus six hours must be strictly before the
+cutoff. This is not an invented final-whistle timestamp. It prevents an overlapping postponed
+prior-GW fixture from supplying a completed card label while it might still be in progress.
+Both the position comparator and candidate use the same guarded historical population.
+
 One deterministic candidate, no grid or inner tuning: at most 114 inexpensive count-summary
 fits. Both the exact zero-card incumbent and position-only informative control use the same
 minutes PMFs. The additional control uses precisely the candidate's fitted position hazards
@@ -88,7 +94,7 @@ minutes-cache manifest/independent reproduction, Git clean HEAD and all frozen e
 reproduce controls, reserve an exclusive claim, score once, and retain full three-state
 PMFs and conditional-bin distributions. A failed result is not retried or retuned.
 
-## Composer boundary (implementation still pending)
+## Optional composer boundary
 
 Any optional disciplinary component must be absent by default and prove bit-exact legacy
 composition with it disabled. Extra card draws must use a separate deterministic RNG stream
@@ -97,3 +103,10 @@ card outcome to an appeared player's total before final support clamping. Existi
 residuals already absorb unmodelled card effects; do not add a second card BPS penalty or
 begin a new BPS study. The unchanged conceded-exposure approximation does not model continued
 post-dismissal conceded penalties. These are declared limits, not silently changed contracts.
+
+The optional field now defaults to `None`; no prospective caller supplies it. Synthetic
+golden PMFs were captured before the edit at clean `71c11bf29e29ff1b`, original composer
+source SHA256 `00106a60ebbfa7e03d52c07bc99a2de76ffbae4a59b1bc64a1e706fbcd140b11`.
+Disabled and exact-none components reproduce both composer paths bit-for-bit. Enabled
+cards use an independent per-fixture/player stream and do not alter any incumbent component
+or bonus draw. These are offline regression checks, not historical model scoring.

@@ -99,6 +99,17 @@ def test_nonappearance_exact_none_and_appearance_not_double_gated() -> None:
     assert marginal == (0.5 + 0.5 * played[0], 0.5 * played[1], 0.5 * played[2])
 
 
+def test_prior_gw_within_completion_margin_does_not_supply_outcome() -> None:
+    prior = [row()]
+    for hours in (1, 6):
+        overlap = row(fixture=7, kickoff=NOW - timedelta(hours=hours))
+        assert fit([*prior, overlap]).predict(100, Position.DEF) == (
+            fit(prior).predict(100, Position.DEF)
+        )
+    after_margin = row(fixture=7, kickoff=NOW - timedelta(hours=6, seconds=1))
+    assert fit([*prior, after_margin]).maximum_source_kickoff == after_margin.kickoff
+
+
 def test_bench_card_label_retained_but_not_trained_as_zero_exposure() -> None:
     original = row(minutes=0)
     model = fit([row(), replace(original, fixture=2)])

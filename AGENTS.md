@@ -1711,3 +1711,12 @@ new bounded disciplinary design must not erase them or draw independent physical
 events. No new player candidate has been formally scored. Preserve original Stage B AND Stage C
 goals/assists minimum181-fold requirements;114fold development results cannot be declared eligible
 for the passed-successor synthesis rule by adding all-fallback folds or lowering the threshold.
+
+The first clean operational competitive staging cycle is retained from `71c11bf`:
+574whole versions,21,036roster rows,1,161raw receipts in a new database copy.
+Independent32,015checks find no integrity/identity contradiction, but only342/380PL matches
+interpret under V2 and role coverage is7,524/8,360starters(90%), below95%. No role formal run
+is licensed yet. Preserve failed interpretations and four stoppage-clipping duration
+outliers; a separately corroborated interpretation amendment must not rewrite V2.
+See `docs/competitive-workload-staging-v2-development.md`. Source/default databases and
+frozen model results remain unchanged; optional cards remain absent in default callers.

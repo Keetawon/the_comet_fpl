@@ -1597,3 +1597,10 @@ audit broad-role/workload coverage, then finish each separate formal runner/prer
 Card source semantics and a restrained disciplinary algorithm are designed but unscored.
 Both Stage B and Stage C goals/assists retain their181-fold eligibility requirement; the smaller
 historical program does not meet it and must not automatically accept those successors.
+
+Clean operational staging is complete and independently audited:574retained versions,
+21,036roster rows,1,161raw receipts;32,015checks with zero integrity failures. V2 role coverage
+is90% of all8,360FPL starters, so no role experiment runs yet. Next resolve only independently
+corroborated interpretation aliases in a new version, preserving this snapshot, unknown
+actors and duration outliers. See `docs/competitive-workload-staging-v2-development.md`.
+No new player candidate has been scored.

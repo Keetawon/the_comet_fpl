@@ -1,0 +1,1372 @@
+{
+  "audit": "competitive_straight_red_source_audit_v1",
+  "capture_report_sha256": "d24f10c864fcfd7ff22433f34df163c35fe399a54a9f54d1f9ee6a5796ade47c",
+  "card_type_counts": [
+    {
+      "competition_id": 1,
+      "events": 1,
+      "provider_type": "SecondYellow"
+    },
+    {
+      "competition_id": 1,
+      "events": 3,
+      "provider_type": "StraightRed"
+    },
+    {
+      "competition_id": 1,
+      "events": 171,
+      "provider_type": "Yellow"
+    },
+    {
+      "competition_id": 2,
+      "events": 3,
+      "provider_type": "SecondYellow"
+    },
+    {
+      "competition_id": 2,
+      "events": 1,
+      "provider_type": "StraightRed"
+    },
+    {
+      "competition_id": 2,
+      "events": 124,
+      "provider_type": "Yellow"
+    },
+    {
+      "competition_id": 5,
+      "events": 4,
+      "provider_type": "SecondYellow"
+    },
+    {
+      "competition_id": 5,
+      "events": 7,
+      "provider_type": "StraightRed"
+    },
+    {
+      "competition_id": 5,
+      "events": 250,
+      "provider_type": "Yellow"
+    },
+    {
+      "competition_id": 6,
+      "events": 2,
+      "provider_type": "StraightRed"
+    },
+    {
+      "competition_id": 6,
+      "events": 103,
+      "provider_type": "Yellow"
+    },
+    {
+      "competition_id": 8,
+      "events": 15,
+      "provider_type": "SecondYellow"
+    },
+    {
+      "competition_id": 8,
+      "events": 32,
+      "provider_type": "StraightRed"
+    },
+    {
+      "competition_id": 8,
+      "events": 1488,
+      "provider_type": "Yellow"
+    },
+    {
+      "competition_id": 1125,
+      "events": 2,
+      "provider_type": "SecondYellow"
+    },
+    {
+      "competition_id": 1125,
+      "events": 2,
+      "provider_type": "StraightRed"
+    },
+    {
+      "competition_id": 1125,
+      "events": 63,
+      "provider_type": "Yellow"
+    }
+  ],
+  "created_at_utc": "2026-09-07T09:22:39.242760+00:00",
+  "database_read_only": true,
+  "events": [
+    {
+      "away": "Newcastle United",
+      "competition_id": 8,
+      "fpl_code": 199798,
+      "fpl_fixture": 2,
+      "fpl_record": {
+        "minutes": 65,
+        "red_cards": 1,
+        "team_code": 7,
+        "web_name": "Konsa",
+        "yellow_cards": 0
+      },
+      "home": "Aston Villa",
+      "match_id": 2561896,
+      "provider_team_id": 7,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "199798",
+        "time": "66",
+        "timestamp": "20250816T135221+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-08-16 12:30:00",
+      "source_capture_known_at": "2026-09-07T08:28:23.081720+00:00",
+      "source_events_sha256": "bd4d66faf58de62bf26645cd6a6881ddeca03162a04e2b5f03d56a44da586c99"
+    },
+    {
+      "away": "Wolverhampton Wanderers",
+      "competition_id": 8,
+      "fpl_code": 510362,
+      "fpl_fixture": 12,
+      "fpl_record": {
+        "minutes": 48,
+        "red_cards": 1,
+        "team_code": 39,
+        "web_name": "Toti",
+        "yellow_cards": 0
+      },
+      "home": "Bournemouth",
+      "match_id": 2561905,
+      "provider_team_id": 39,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "510362",
+        "time": "49",
+        "timestamp": "20250823T160919+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-08-23 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:28:56.107787+00:00",
+      "source_events_sha256": "c49fd4b9f2a91d8ef923bd238db32332bfdd623d75837f9986d5c7fbeaff97a8"
+    },
+    {
+      "away": "Liverpool",
+      "competition_id": 8,
+      "fpl_code": 232826,
+      "fpl_fixture": 19,
+      "fpl_record": {
+        "minutes": 47,
+        "red_cards": 1,
+        "team_code": 4,
+        "web_name": "Gordon",
+        "yellow_cards": 0
+      },
+      "home": "Newcastle United",
+      "match_id": 2561913,
+      "provider_team_id": 4,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "232826",
+        "time": "48",
+        "timestamp": "20250825T204737+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-08-25 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:29:17.109778+00:00",
+      "source_events_sha256": "9cd1dad64826c8d338e2c7db9d65fc16ea429cf8ec74ae586a944db2fbe2f2e6"
+    },
+    {
+      "away": "Tottenham Hotspur",
+      "competition_id": 8,
+      "fpl_code": 215439,
+      "fpl_fixture": 40,
+      "fpl_record": {
+        "minutes": 53,
+        "red_cards": 1,
+        "team_code": 21,
+        "web_name": "Souček",
+        "yellow_cards": 0
+      },
+      "home": "West Ham United",
+      "match_id": 2561934,
+      "provider_team_id": 21,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "215439",
+        "time": "54",
+        "timestamp": "20250913T184254+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-09-13 17:30:00",
+      "source_capture_known_at": "2026-09-07T08:30:29.092766+00:00",
+      "source_events_sha256": "199a7bfddc7a38119f43a48aa056a3294a7d099cf3bc14240ad29e1c8edb3281"
+    },
+    {
+      "away": "Chelsea",
+      "competition_id": 8,
+      "fpl_code": 215059,
+      "fpl_fixture": 47,
+      "fpl_record": {
+        "minutes": 4,
+        "red_cards": 1,
+        "team_code": 8,
+        "web_name": "Sánchez",
+        "yellow_cards": 0
+      },
+      "home": "Manchester United",
+      "match_id": 2561941,
+      "provider_team_id": 8,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "215059",
+        "time": "5",
+        "timestamp": "20250920T173412+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-09-20 17:30:00",
+      "source_capture_known_at": "2026-09-07T08:31:14.211558+00:00",
+      "source_events_sha256": "ae96da20fecf99116d3276c300fd375d224d96b612f2ed0ff753c295a7da1d5a"
+    },
+    {
+      "away": "Aston Villa",
+      "competition_id": 8,
+      "fpl_code": 434399,
+      "fpl_fixture": 48,
+      "fpl_record": {
+        "minutes": 32,
+        "red_cards": 1,
+        "team_code": 56,
+        "web_name": "Reinildo",
+        "yellow_cards": 0
+      },
+      "home": "Sunderland",
+      "match_id": 2561942,
+      "provider_team_id": 56,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "434399",
+        "time": "33",
+        "timestamp": "20250921T143310+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-09-21 14:00:00",
+      "source_capture_known_at": "2026-09-07T08:31:23.364454+00:00",
+      "source_events_sha256": "488d2e7776b0f9916890af3c45e8bb35143012a91e5d71c8c93159e9578cfad6"
+    },
+    {
+      "away": "Brighton and Hove Albion",
+      "competition_id": 8,
+      "fpl_code": 180736,
+      "fpl_fixture": 53,
+      "fpl_record": {
+        "minutes": 52,
+        "red_cards": 1,
+        "team_code": 8,
+        "web_name": "Chalobah",
+        "yellow_cards": 0
+      },
+      "home": "Chelsea",
+      "match_id": 2561947,
+      "provider_team_id": 8,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "180736",
+        "time": "53",
+        "timestamp": "20250927T161048+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-09-27 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:32:02.230662+00:00",
+      "source_events_sha256": "e5864ff03b7fbe268d0327e38b08353fbf9fed6532525cb2d2c09ff4c83688c0"
+    },
+    {
+      "away": "Brighton and Hove Albion",
+      "competition_id": 8,
+      "fpl_code": null,
+      "fpl_fixture": 70,
+      "fpl_record": null,
+      "home": "Wolverhampton Wanderers",
+      "match_id": 2561964,
+      "provider_team_id": 39,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": null,
+        "time": "20",
+        "timestamp": "20251005T142014+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-10-05 14:00:00",
+      "source_capture_known_at": "2026-09-07T08:33:02.270357+00:00",
+      "source_events_sha256": "33db7b55417407844045cb3c7fc04c9cc1191857fadf2690b0d7afba732bb802"
+    },
+    {
+      "away": "Wolverhampton Wanderers",
+      "competition_id": 8,
+      "fpl_code": 516939,
+      "fpl_fixture": 94,
+      "fpl_record": {
+        "minutes": 35,
+        "red_cards": 1,
+        "team_code": 39,
+        "web_name": "Agbadou",
+        "yellow_cards": 0
+      },
+      "home": "Fulham",
+      "match_id": 2561988,
+      "provider_team_id": 39,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "516939",
+        "time": "36",
+        "timestamp": "20251101T153636+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-11-01 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:35:05.426418+00:00",
+      "source_events_sha256": "23f45acd3304b104f1c7077a9a838a26d644f4302a29527de3719325c0d0203f"
+    },
+    {
+      "away": "Everton",
+      "competition_id": 8,
+      "fpl_code": 80801,
+      "fpl_fixture": 118,
+      "fpl_record": {
+        "minutes": 12,
+        "red_cards": 1,
+        "team_code": 11,
+        "web_name": "Gana",
+        "yellow_cards": 0
+      },
+      "home": "Manchester United",
+      "match_id": 2562012,
+      "provider_team_id": 11,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "80801",
+        "time": "13",
+        "timestamp": "20251124T201340+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-11-24 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:36:50.514877+00:00",
+      "source_events_sha256": "eebc56fe59dca07c13b6b9e7d681358a4f86341a99eeb259a12768e821fa4de2"
+    },
+    {
+      "away": "Arsenal",
+      "competition_id": 8,
+      "fpl_code": 486672,
+      "fpl_fixture": 123,
+      "fpl_record": {
+        "minutes": 37,
+        "red_cards": 1,
+        "team_code": 8,
+        "web_name": "Caicedo",
+        "yellow_cards": 0
+      },
+      "home": "Chelsea",
+      "match_id": 2562017,
+      "provider_team_id": 8,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "486672",
+        "time": "38",
+        "timestamp": "20251130T170818+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-11-30 16:30:00",
+      "source_capture_known_at": "2026-09-07T08:37:47.461615+00:00",
+      "source_events_sha256": "fc41174aeb96f64089540df018e5015fe4a813f07474702e1ba22ee7349c5c1f"
+    },
+    {
+      "away": "Bournemouth",
+      "competition_id": 8,
+      "fpl_code": 155408,
+      "fpl_fixture": 128,
+      "fpl_record": {
+        "minutes": 45,
+        "red_cards": 1,
+        "team_code": 91,
+        "web_name": "Cook",
+        "yellow_cards": 0
+      },
+      "home": "Sunderland",
+      "match_id": 2562022,
+      "provider_team_id": 91,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "155408",
+        "time": "96",
+        "timestamp": "20251129T170018+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-11-29 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:37:26.452275+00:00",
+      "source_events_sha256": "7640b5395dd08f5f1c1cefe9d524d8d12d53c3dfcde7e3074b754b2811670c9a"
+    },
+    {
+      "away": "Sunderland",
+      "competition_id": 8,
+      "fpl_code": 167512,
+      "fpl_fixture": 147,
+      "fpl_record": {
+        "minutes": 3,
+        "red_cards": 1,
+        "team_code": 56,
+        "web_name": "O'Nien",
+        "yellow_cards": 0
+      },
+      "home": "Manchester City",
+      "match_id": 2562041,
+      "provider_team_id": 56,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "167512",
+        "time": "95",
+        "timestamp": "20251206T165435+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-12-06 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:38:29.541446+00:00",
+      "source_events_sha256": "79360dd23ae641d73cd0bc05907a9794fc6972949042c3500641953d385971c0"
+    },
+    {
+      "away": "Burnley",
+      "competition_id": 8,
+      "fpl_code": 549329,
+      "fpl_fixture": 148,
+      "fpl_record": {
+        "minutes": 42,
+        "red_cards": 1,
+        "team_code": 90,
+        "web_name": "Lucas Pires",
+        "yellow_cards": 0
+      },
+      "home": "Newcastle United",
+      "match_id": 2562042,
+      "provider_team_id": 90,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "549329",
+        "time": "43",
+        "timestamp": "20251206T154244+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-12-06 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:38:32.531478+00:00",
+      "source_events_sha256": "343aa8553352788a0a3808fa961338b0f5cbcb4a165127bb0b76346f97dbde1d"
+    },
+    {
+      "away": "Liverpool",
+      "competition_id": 8,
+      "fpl_code": 493362,
+      "fpl_fixture": 169,
+      "fpl_record": {
+        "minutes": 32,
+        "red_cards": 1,
+        "team_code": 6,
+        "web_name": "Xavi",
+        "yellow_cards": 0
+      },
+      "home": "Tottenham Hotspur",
+      "match_id": 2562063,
+      "provider_team_id": 6,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "493362",
+        "time": "33",
+        "timestamp": "20251220T180238+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-12-20 17:30:00",
+      "source_capture_known_at": "2026-09-07T08:40:14.570061+00:00",
+      "source_events_sha256": "b7ae6a6cb5003bfa0c66cbb3634052576cadbfd922446f789dbfff7a05061b91"
+    },
+    {
+      "away": "Wolverhampton Wanderers",
+      "competition_id": 8,
+      "fpl_code": 106611,
+      "fpl_fixture": 206,
+      "fpl_record": {
+        "minutes": 82,
+        "red_cards": 1,
+        "team_code": 11,
+        "web_name": "Keane",
+        "yellow_cards": 0
+      },
+      "home": "Everton",
+      "match_id": 2562100,
+      "provider_team_id": 11,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "106611",
+        "time": "83",
+        "timestamp": "20260107T210946+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-01-07 19:30:00",
+      "source_capture_known_at": "2026-09-07T08:42:14.646014+00:00",
+      "source_events_sha256": "5c9344d8b75fe0bd2b382ec5385b2e7e212e88ef1dcf8130084dd06bb1bdfaf4"
+    },
+    {
+      "away": "Chelsea",
+      "competition_id": 8,
+      "fpl_code": 179268,
+      "fpl_fixture": 207,
+      "fpl_record": {
+        "minutes": 21,
+        "red_cards": 1,
+        "team_code": 8,
+        "web_name": "Cucurella",
+        "yellow_cards": 0
+      },
+      "home": "Fulham",
+      "match_id": 2562101,
+      "provider_team_id": 8,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "179268",
+        "time": "22",
+        "timestamp": "20260107T195205+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-01-07 19:30:00",
+      "source_capture_known_at": "2026-09-07T08:42:17.681141+00:00",
+      "source_events_sha256": "3cc3a7b0b8d9f00f00159220e6d78e537ae6a3ff5a81371f9976c4e921f11e2d"
+    },
+    {
+      "away": "Brentford",
+      "competition_id": 8,
+      "fpl_code": 513418,
+      "fpl_fixture": 231,
+      "fpl_record": {
+        "minutes": 41,
+        "red_cards": 1,
+        "team_code": 94,
+        "web_name": "Schade",
+        "yellow_cards": 0
+      },
+      "home": "Aston Villa",
+      "match_id": 2562125,
+      "provider_team_id": 94,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "513418",
+        "time": "42",
+        "timestamp": "20260201T144312+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-01 14:00:00",
+      "source_capture_known_at": "2026-09-07T08:45:29.735903+00:00",
+      "source_events_sha256": "08ba22f04f68ba8dcab8e9be35af445f158a5e577c69cc23cfe50eba92cf2b94"
+    },
+    {
+      "away": "West Ham United",
+      "competition_id": 8,
+      "fpl_code": 462116,
+      "fpl_fixture": 233,
+      "fpl_record": {
+        "minutes": 90,
+        "red_cards": 1,
+        "team_code": 21,
+        "web_name": "Todibo",
+        "yellow_cards": 0
+      },
+      "home": "Chelsea",
+      "match_id": 2562127,
+      "provider_team_id": 21,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "462116",
+        "time": "101",
+        "timestamp": "20260131T193210+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-01-31 17:30:00",
+      "source_capture_known_at": "2026-09-07T08:45:23.733503+00:00",
+      "source_events_sha256": "8033a289e26773e4a449dd19cc55230598c37bd0f962410e8ec5c395c673abf8"
+    },
+    {
+      "away": "Crystal Palace",
+      "competition_id": 8,
+      "fpl_code": 215136,
+      "fpl_fixture": 237,
+      "fpl_record": {
+        "minutes": 44,
+        "red_cards": 1,
+        "team_code": 17,
+        "web_name": "N.Williams",
+        "yellow_cards": 0
+      },
+      "home": "Nottingham Forest",
+      "match_id": 2562131,
+      "provider_team_id": 17,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "215136",
+        "time": "45",
+        "timestamp": "20260201T144512+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-01 14:00:00",
+      "source_capture_known_at": "2026-09-07T08:45:35.725391+00:00",
+      "source_events_sha256": "9190cd2d3f8491a768defb7ab9c87e8cc5d6494d94ae07a8afa5d134b4a643f7"
+    },
+    {
+      "away": "Manchester City",
+      "competition_id": 8,
+      "fpl_code": 424876,
+      "fpl_fixture": 247,
+      "fpl_record": {
+        "minutes": 90,
+        "red_cards": 1,
+        "team_code": 14,
+        "web_name": "Szoboszlai",
+        "yellow_cards": 0
+      },
+      "home": "Liverpool",
+      "match_id": 2562141,
+      "provider_team_id": 14,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "424876",
+        "time": "103",
+        "timestamp": "20260208T183038+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-08 16:30:00",
+      "source_capture_known_at": "2026-09-07T08:46:17.772305+00:00",
+      "source_events_sha256": "1de6e97c67a89d2a409257660b0e68ca15cd05c81c5db8a4132260b22ede6ba2"
+    },
+    {
+      "away": "Tottenham Hotspur",
+      "competition_id": 8,
+      "fpl_code": 221632,
+      "fpl_fixture": 248,
+      "fpl_record": {
+        "minutes": 28,
+        "red_cards": 1,
+        "team_code": 6,
+        "web_name": "Romero",
+        "yellow_cards": 0
+      },
+      "home": "Manchester United",
+      "match_id": 2562142,
+      "provider_team_id": 6,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "221632",
+        "time": "29",
+        "timestamp": "20260207T125900+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-07 12:30:00",
+      "source_capture_known_at": "2026-09-07T08:45:53.744207+00:00",
+      "source_events_sha256": "18ae733cfb4470baeda0abf2109069a9fb627927dd08d367b610587c581a9d4d"
+    },
+    {
+      "away": "Bournemouth",
+      "competition_id": 8,
+      "fpl_code": 512462,
+      "fpl_fixture": 255,
+      "fpl_record": {
+        "minutes": 68,
+        "red_cards": 1,
+        "team_code": 11,
+        "web_name": "O'Brien",
+        "yellow_cards": 0
+      },
+      "home": "Everton",
+      "match_id": 2562149,
+      "provider_team_id": 11,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "512462",
+        "time": "69",
+        "timestamp": "20260210T205838+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-10 19:30:00",
+      "source_capture_known_at": "2026-09-07T08:46:23.790105+00:00",
+      "source_events_sha256": "03cf4eca324f040c1a6797d2b3f7ce139c65f1b80dfd50ff3699d60255cc093d"
+    },
+    {
+      "away": "Manchester City",
+      "competition_id": 8,
+      "fpl_code": null,
+      "fpl_fixture": 276,
+      "fpl_record": null,
+      "home": "Leeds United",
+      "match_id": 2562170,
+      "provider_team_id": 2,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": null,
+        "time": "97",
+        "timestamp": "20260228T192551+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-28 17:30:00",
+      "source_capture_known_at": "2026-09-07T08:48:32.853709+00:00",
+      "source_events_sha256": "61d9220fda690159841049af1ce24f0bacdf62811c5e1a536d5eb73d784cccc6"
+    },
+    {
+      "away": "Crystal Palace",
+      "competition_id": 8,
+      "fpl_code": 437499,
+      "fpl_fixture": 278,
+      "fpl_record": {
+        "minutes": 55,
+        "red_cards": 1,
+        "team_code": 31,
+        "web_name": "Lacroix",
+        "yellow_cards": 0
+      },
+      "home": "Manchester United",
+      "match_id": 2562172,
+      "provider_team_id": 31,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "437499",
+        "time": "56",
+        "timestamp": "20260301T151506+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-03-01 14:00:00",
+      "source_capture_known_at": "2026-09-07T08:48:41.850092+00:00",
+      "source_events_sha256": "30508d83defcadbeff4546dd33fc7269f8f2cab89744be4f76f91de4169ff2c4"
+    },
+    {
+      "away": "Crystal Palace",
+      "competition_id": 8,
+      "fpl_code": 491279,
+      "fpl_fixture": 289,
+      "fpl_record": {
+        "minutes": 37,
+        "red_cards": 1,
+        "team_code": 6,
+        "web_name": "Van de Ven",
+        "yellow_cards": 0
+      },
+      "home": "Tottenham Hotspur",
+      "match_id": 2562183,
+      "provider_team_id": 6,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "491279",
+        "time": "38",
+        "timestamp": "20260305T203747+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-03-05 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:49:14.850185+00:00",
+      "source_events_sha256": "8cc378b1f02e31cd66df84d01b8d8a4bdc1b43a6b2f4b6cf199cbdea40b6647f"
+    },
+    {
+      "away": "Manchester United",
+      "competition_id": 8,
+      "fpl_code": 95658,
+      "fpl_fixture": 302,
+      "fpl_record": {
+        "minutes": 77,
+        "red_cards": 1,
+        "team_code": 1,
+        "web_name": "Maguire",
+        "yellow_cards": 0
+      },
+      "home": "Bournemouth",
+      "match_id": 2562195,
+      "provider_team_id": 1,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "95658",
+        "time": "78",
+        "timestamp": "20260320T213510+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-03-20 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:51:05.901943+00:00",
+      "source_events_sha256": "e199a9c98dc9986966cbcf90d96d74215da082f01576a89865ac75082797206b"
+    },
+    {
+      "away": "Burnley",
+      "competition_id": 8,
+      "fpl_code": 167887,
+      "fpl_fixture": 305,
+      "fpl_record": {
+        "minutes": 90,
+        "red_cards": 1,
+        "team_code": 90,
+        "web_name": "Laurent",
+        "yellow_cards": 0
+      },
+      "home": "Fulham",
+      "match_id": 2562199,
+      "provider_team_id": 90,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "167887",
+        "time": "93",
+        "timestamp": "20260321T165242+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-03-21 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:51:11.908565+00:00",
+      "source_events_sha256": "1954deba0f5f5f48119a703832fe5f8e03e7e5556dc5a3499c5d16591f5c4738"
+    },
+    {
+      "away": "Leeds United",
+      "competition_id": 8,
+      "fpl_code": 221820,
+      "fpl_fixture": 317,
+      "fpl_record": {
+        "minutes": 55,
+        "red_cards": 1,
+        "team_code": 1,
+        "web_name": "Martinez",
+        "yellow_cards": 0
+      },
+      "home": "Manchester United",
+      "match_id": 2562211,
+      "provider_team_id": 1,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "221820",
+        "time": "56",
+        "timestamp": "20260413T211318+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-04-13 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:52:26.991632+00:00",
+      "source_events_sha256": "5e6ccefcf3c89acced785df8fad557f4f59144694018f99faea3bc7c0a6a95f4"
+    },
+    {
+      "away": "Sunderland",
+      "competition_id": 8,
+      "fpl_code": 223827,
+      "fpl_fixture": 350,
+      "fpl_record": {
+        "minutes": 23,
+        "red_cards": 1,
+        "team_code": 56,
+        "web_name": "Ballard",
+        "yellow_cards": 0
+      },
+      "home": "Wolverhampton Wanderers",
+      "match_id": 2562244,
+      "provider_team_id": 56,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "223827",
+        "time": "24",
+        "timestamp": "20260502T152350+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-05-02 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:54:09.042061+00:00",
+      "source_events_sha256": "575f47b69cf9d67fd21173f47f9e138994f63b3a76fc54ae696a479466059740"
+    },
+    {
+      "away": "Bournemouth",
+      "competition_id": 8,
+      "fpl_code": 174874,
+      "fpl_fixture": 354,
+      "fpl_record": {
+        "minutes": 51,
+        "red_cards": 1,
+        "team_code": 54,
+        "web_name": "Andersen",
+        "yellow_cards": 0
+      },
+      "home": "Fulham",
+      "match_id": 2562248,
+      "provider_team_id": 54,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "174874",
+        "time": "52",
+        "timestamp": "20260509T155139+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-05-09 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:54:45.034438+00:00",
+      "source_events_sha256": "01208fe8ccd89028847f0b4b3e116e5ce4cd0edc584dbc8eb60502e8adc191b4"
+    },
+    {
+      "away": "Bournemouth",
+      "competition_id": 8,
+      "fpl_code": 158499,
+      "fpl_fixture": 354,
+      "fpl_record": {
+        "minutes": 41,
+        "red_cards": 1,
+        "team_code": 91,
+        "web_name": "Christie",
+        "yellow_cards": 0
+      },
+      "home": "Fulham",
+      "match_id": 2562248,
+      "provider_team_id": 91,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "158499",
+        "time": "41",
+        "timestamp": "20260509T154105+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-05-09 15:00:00",
+      "source_capture_known_at": "2026-09-07T08:54:45.034438+00:00",
+      "source_events_sha256": "01208fe8ccd89028847f0b4b3e116e5ce4cd0edc584dbc8eb60502e8adc191b4"
+    },
+    {
+      "away": "Atlético de Madrid",
+      "competition_id": 5,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Liverpool",
+      "match_id": 2601799,
+      "provider_team_id": 175,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": null,
+        "time": "93",
+        "timestamp": "20250917T215351+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-09-17 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:30:50.120095+00:00",
+      "source_events_sha256": "f7d5392774eaa8f7f1a097b1d6bba27f28cfbe21f2352e42617a7432e7fc5bf6"
+    },
+    {
+      "away": "Napoli",
+      "competition_id": 5,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Manchester City",
+      "match_id": 2601804,
+      "provider_team_id": 459,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "93661",
+        "time": "21",
+        "timestamp": "20250918T202044+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-09-18 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:30:56.151415+00:00",
+      "source_events_sha256": "930acb8eddb88a4a5bd8d84e0da8e2957a207cf0ed04ffe4a01a2fe195c5be32"
+    },
+    {
+      "away": "Ajax",
+      "competition_id": 5,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Chelsea",
+      "match_id": 2601838,
+      "provider_team_id": 215,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "441278",
+        "time": "17",
+        "timestamp": "20251022T201638+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-10-22 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:33:50.403258+00:00",
+      "source_events_sha256": "90b2933ab5b3f31aaca14d05c44ae509065f4c43222755a9630d5441691586b4"
+    },
+    {
+      "away": "København",
+      "competition_id": 5,
+      "fpl_code": 242898,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Tottenham Hotspur",
+      "match_id": 2601851,
+      "provider_team_id": 6,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "242898",
+        "time": "57",
+        "timestamp": "20251104T211412+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-11-04 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:35:32.475109+00:00",
+      "source_events_sha256": "b54774cdf0f9939929559f9737b0413b9cce6f027c7d5a5fb8d9b318546899d1"
+    },
+    {
+      "away": "Tottenham Hotspur",
+      "competition_id": 5,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Paris Saint-Germain",
+      "match_id": 2601877,
+      "provider_team_id": 149,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "174888",
+        "time": "93",
+        "timestamp": "20251126T215320+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-11-26 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:37:08.450867+00:00",
+      "source_events_sha256": "64867b9b99d88d8d075a1754a122272efa548467809e2b310df363eb2297c715"
+    },
+    {
+      "away": "Borussia Dortmund",
+      "competition_id": 5,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Tottenham Hotspur",
+      "match_id": 2601904,
+      "provider_team_id": 157,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "521052",
+        "time": "26",
+        "timestamp": "20260120T202556+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-01-20 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:44:02.790537+00:00",
+      "source_events_sha256": "539bbc2d5ead573546093679366ca81c72ffe062d82f7045752fd54f7ebccae3"
+    },
+    {
+      "away": "Nottingham Forest",
+      "competition_id": 6,
+      "fpl_code": 215379,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Sporting Braga",
+      "match_id": 2602075,
+      "provider_team_id": 17,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "215379",
+        "time": "94",
+        "timestamp": "20260122T215328+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-01-22 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:44:17.818133+00:00",
+      "source_events_sha256": "6d818ad620239a7edc4935b14810cfd8dc8923066a3d8461dfd30916c928ed55"
+    },
+    {
+      "away": "KuPS",
+      "competition_id": 1125,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Crystal Palace",
+      "match_id": 2602298,
+      "provider_team_id": 2711,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "455371",
+        "time": "73",
+        "timestamp": "20251218T213121+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-12-18 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:39:56.579961+00:00",
+      "source_events_sha256": "45e19b310e72611dfb0be04f330bb863a31573fba0df30badd042335c4728822"
+    },
+    {
+      "away": "Crystal Palace",
+      "competition_id": 2,
+      "fpl_code": 611926,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Liverpool",
+      "match_id": 2606488,
+      "provider_team_id": 14,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "611926",
+        "time": "79",
+        "timestamp": "20251029T212520+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-10-29 19:45:00",
+      "source_capture_known_at": "2026-09-07T08:34:44.378831+00:00",
+      "source_events_sha256": "2161f7aee8a95d105b9857b4185883404f3bc9fc4ee5763f360cbbc5d207334c"
+    },
+    {
+      "away": "West Ham United",
+      "competition_id": 1,
+      "fpl_code": 490142,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Burton Albion",
+      "match_id": 2621260,
+      "provider_team_id": 21,
+      "raw_card": {
+        "period": "ExtraFirstHalf",
+        "playerId": "490142",
+        "time": "101",
+        "timestamp": "20260214T142739+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-14 12:15:00",
+      "source_capture_known_at": "2026-09-07T08:46:53.819284+00:00",
+      "source_events_sha256": "156855b3892dd10648089c1bb60449c18f5ac3678787518cd039b3128a69b31e"
+    },
+    {
+      "away": "Newcastle United",
+      "competition_id": 1,
+      "fpl_code": 72147,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Aston Villa",
+      "match_id": 2621264,
+      "provider_team_id": 7,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "72147",
+        "time": "46",
+        "timestamp": "20260214T183107+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-14 17:45:00",
+      "source_capture_known_at": "2026-09-07T08:47:02.825730+00:00",
+      "source_events_sha256": "cb2dd89fd94e067035cb6727b4fd67c3efedf116b9f9ae26551214047c86dd93"
+    },
+    {
+      "away": "Chelsea",
+      "competition_id": 1,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Wrexham",
+      "match_id": 2627559,
+      "provider_team_id": 109,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": "154040",
+        "time": "93",
+        "timestamp": "20260307T193833+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-03-07 17:45:00",
+      "source_capture_known_at": "2026-09-07T08:49:23.853018+00:00",
+      "source_events_sha256": "a4c52d2e014fda86fe6da5c969f642f9bcfe6b731d00574421de36826bac3b75"
+    },
+    {
+      "away": "Real Madrid",
+      "competition_id": 5,
+      "fpl_code": 165809,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Manchester City",
+      "match_id": 2628854,
+      "provider_team_id": 43,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "165809",
+        "time": "20",
+        "timestamp": "20260317T202017+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-03-17 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:50:44.951668+00:00",
+      "source_events_sha256": "7ec4ebeff4238170362ab1e7f841c98a7d4eb2f8c7823057227a0839989df4c9"
+    },
+    {
+      "away": "Crystal Palace",
+      "competition_id": 1125,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "AEK Larnaca",
+      "match_id": 2629009,
+      "provider_team_id": 3014,
+      "raw_card": {
+        "period": "ExtraSecondHalf",
+        "playerId": "433891",
+        "time": "124",
+        "timestamp": "20260319T201957+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-03-19 17:45:00",
+      "source_capture_known_at": "2026-09-07T08:50:59.904501+00:00",
+      "source_events_sha256": "6653b171e6d350e759fe22973e8cd19f3a5e7b8a57683a8f85df3815c5a325f1"
+    },
+    {
+      "away": "FC Porto",
+      "competition_id": 6,
+      "fpl_code": null,
+      "fpl_fixture": null,
+      "fpl_record": null,
+      "home": "Nottingham Forest",
+      "match_id": 2629040,
+      "provider_team_id": 201,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": "171771",
+        "time": "8",
+        "timestamp": "20260416T200900+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-04-16 20:00:00",
+      "source_capture_known_at": "2026-09-07T08:52:35.974099+00:00",
+      "source_events_sha256": "764d155ca7b8e08d0ffc90e2c7a23b995cc10d950346d82d7d0beb361b6d168f"
+    }
+  ],
+  "evidence_class": "retrospective_provider_semantics_development",
+  "git_head": "71c11bff29e29ff1bdc827720a9ab51cf21ac560",
+  "licensed_interpretation": "Exact provider StraightRed is corroborated as a dismissal category; reuse existing Red state transitions without changing raw type or nominal duration definition.",
+  "limitations": [
+    "FPL red_cards corroborates dismissal, not an independently published taxonomy of straight versus second-yellow cards.",
+    "Null playerId remains unknown; never infer coach, staff, bench, or dismissed player identity.",
+    "Non-PL same-enum reuse is an explicitly documented same-provider development interpretation, not a separate FPL overlap validation.",
+    "Alias repair may expose additional defects; recovered whole-match count is not assumed."
+  ],
+  "model_fitting": false,
+  "network_requests": false,
+  "normalization_or_parser_v3_run": false,
+  "pl_exact_identified_events": 30,
+  "pl_exact_identified_events_with_fpl_red_card": 30,
+  "pl_straight_red_events": 32,
+  "pl_straight_red_matches": 31,
+  "pl_unattributed_events": [
+    {
+      "away": "Brighton and Hove Albion",
+      "competition_id": 8,
+      "fpl_code": null,
+      "fpl_fixture": 70,
+      "fpl_record": null,
+      "home": "Wolverhampton Wanderers",
+      "match_id": 2561964,
+      "provider_team_id": 39,
+      "raw_card": {
+        "period": "FirstHalf",
+        "playerId": null,
+        "time": "20",
+        "timestamp": "20251005T142014+0100",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2025-10-05 14:00:00",
+      "source_capture_known_at": "2026-09-07T08:33:02.270357+00:00",
+      "source_events_sha256": "33db7b55417407844045cb3c7fc04c9cc1191857fadf2690b0d7afba732bb802"
+    },
+    {
+      "away": "Manchester City",
+      "competition_id": 8,
+      "fpl_code": null,
+      "fpl_fixture": 276,
+      "fpl_record": null,
+      "home": "Leeds United",
+      "match_id": 2562170,
+      "provider_team_id": 2,
+      "raw_card": {
+        "period": "SecondHalf",
+        "playerId": null,
+        "time": "97",
+        "timestamp": "20260228T192551+0000",
+        "type": "StraightRed"
+      },
+      "raw_kickoff": "2026-02-28 17:30:00",
+      "source_capture_known_at": "2026-09-07T08:48:32.853709+00:00",
+      "source_events_sha256": "61d9220fda690159841049af1ce24f0bacdf62811c5e1a536d5eb73d784cccc6"
+    }
+  ],
+  "raw_input_sha256": {
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561896.json": "5d4bfe94af0383f9d2a216b9bdb1f0eff3300f95daaf44b7dc1eb8143940f08e",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561905.json": "1935d83ebafce39d2c0337d7427b61a079cd3eca915df4a88d728fc83f0cb380",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561913.json": "2895fa04a9d6ba5a82bf4b1a56720152a8fa113fc9c6a1cd33faa2ac632a8529",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561934.json": "7acb3c5d4fdc229ab58d2f00bb9c4948a15664668ad79f2d85665d5a81d43e25",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561941.json": "1de191fabaeb300ede6ed59fcb7e01c0d17fbe49c4e8bcc15bbe915ee437a999",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561942.json": "698bf125f47f3b346134bc56397a1d549798738c371a8ae84c61ff3361dbf0f8",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561947.json": "6349d55c88a1ce5f512956fa9d32e04eeafd3843629e3888d4bb44dd9214a680",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561964.json": "63c2b3fc6570be3b95bbf91ba5c99e1093dcbaf4b103ad5e03c66382e9ac2037",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2561988.json": "74eb9193fdefb1d0d9884e48d74cec45606b31b8acdc1c2b89b4041f2fc857f6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562012.json": "a82b6a55965f6918e5d30aec6cabf0306c8ae2f1480849c09f971963517e2e10",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562017.json": "24f395431bf756fd56242cdcc601331f3cd82afa9c0022281c5504f8639768f3",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562022.json": "70419b4c4516908c4f9f49b98ba9fb8be7213e89058e1baadb41fe5d00ce156d",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562041.json": "921066c37e5b1b40d8ee16a6bbbb2482ef3c96023e6e603ba1beffab7d97bd7b",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562042.json": "135377f594ac8f6818511b805b069f981b4f11ae7e60a34f17ecda7aa2ab89b1",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562063.json": "668670852eb46fd4626e7d1c9d55b9ba4e875f3149204f16dd6d22419857d7bb",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562100.json": "a3285abad189eca6e4d6861e1aff1f88a423d3de865a5b25aceac08942b393f8",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562101.json": "2b4031ed3955dbf8dc27a91bd386f63d4bbe733b6794e458cf629fe8190d3599",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562125.json": "f3c609a32d079d73f17c408f31d51aa86f9dfcd4c8d63fb23b04c407c33a12c6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562127.json": "5f0b6afcdccaa20452c9addc80251b6794c4018b8ab066e48fc5e68cf90caa0e",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562131.json": "7e17e3f68f8b9dc63cd9a826988de56c748ddb663ebf924d877d92ebf779ef1f",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562141.json": "ad7037bdcb29314f040b15b25a91923956f4df40d33ca836ff10c776e8dc58d6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562142.json": "c16f5145b95b5fb3cde9264bc0988edf4f01911f08555220eda68b393c3cccd5",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562149.json": "28b4d3a0002ca72a7be2a21fba2b7305818414f2a6de7507c50305c175e3a36e",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562170.json": "83685aa1810cf1b7c01dea9ae9783d13ad0be4902cc1dc1dd0a762cc0bca3271",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562172.json": "c276a04506d3c846b2702697c100f44307ed5c7af80391d76cba030325c9f044",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562183.json": "6ad07630e425a1391c9e3be20df95695f1271b0ed7879448e43c6f1c02bc274c",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562195.json": "370be9580b98e321ceeed6ee6742df10545d4549b570ce4d0fe9f2cae230888c",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562199.json": "dadfd5945bd39aaa1ab5aeb816a7f9f053680dc10eb13cd61cc1d5c91482e5e6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562211.json": "ed98c7a74286f6c8b2e6d264cc9e67a063eaa0f97c12d7b4058fa8c59e70d6d6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562244.json": "33ae9017d5c8b47d2175a292519e3111de8e168a8a7ef454f89e2f8dd089d8ff",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2562248.json": "1e5f634d29c00052bcf3da66aec3f028cd89be3bda108ae7f8c87003eac11af6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2601799.json": "e3b5d3fc22eb8664ed5e718fd673c1eb82f629992f6c4755f7aee49300277fe3",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2601804.json": "c077225a2bd3bf1ad665665d2ef7fe85244a84f4172e6579d7a34402a1323b05",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2601838.json": "7dfee104e0d449032ebf77ad319e3cbf953234718ac8014ab91ee0995a72d4aa",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2601851.json": "092e45ef078208113191c62266f81422c4f6d23cfb988299758b1b02ed4deb5b",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2601877.json": "8229c960deab3d41df2fcece7c14b08a7832eca159c9554a1bf41582e8a98c3e",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2601904.json": "ef0be40a52b8fcadc01c00a5b7887d284ccc91a282544061de800bdeb1eb6237",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2602075.json": "85acd3c384e36b9d942aeac02e5c161ee1493c8461817249cc0b2fdbd247dd87",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2602298.json": "ba1a45844cdc0a168533e78aef21d8a280132a309674745c2d4817fe92a2a217",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2606488.json": "fb96ab99a5c2b5330771d3891e2f307cefd7fe4f98aadd406490360f11dfaf83",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2621260.json": "a5bca0da5778afe4993bafb1677a20503df4b4b38698b620ac4d5aae01274790",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2621264.json": "76c43be722f950f9c07e6b2c4386748a9000f839d74b0a2b24fa6c88881618a1",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2627559.json": "5dbe7257867f7b0029bd32e0dd5ff2709cc364640d9af1f320199e916a190d24",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2628854.json": "9c00ef1ec15c6f6143df6182029b9bd37892d157d5ff2b62dc10c3925576bbad",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2629009.json": "9d6a74b9e6ef1dc2be4b860fb57109d2f0e29392d0689ca3bf0c99e3627770bb",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\capture-2629040.json": "3aefb266cf151d24b2cc95c9d3d057696b6dacf20973d8a6eebbed8e3f77e9d8",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0004-bd4d66faf58de62bf26645cd6a6881ddeca03162a04e2b5f03d56a44da586c99.raw": "bd4d66faf58de62bf26645cd6a6881ddeca03162a04e2b5f03d56a44da586c99",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0026-c49fd4b9f2a91d8ef923bd238db32332bfdd623d75837f9986d5c7fbeaff97a8.raw": "c49fd4b9f2a91d8ef923bd238db32332bfdd623d75837f9986d5c7fbeaff97a8",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0040-9cd1dad64826c8d338e2c7db9d65fc16ea429cf8ec74ae586a944db2fbe2f2e6.raw": "9cd1dad64826c8d338e2c7db9d65fc16ea429cf8ec74ae586a944db2fbe2f2e6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0088-199a7bfddc7a38119f43a48aa056a3294a7d099cf3bc14240ad29e1c8edb3281.raw": "199a7bfddc7a38119f43a48aa056a3294a7d099cf3bc14240ad29e1c8edb3281",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0102-f7d5392774eaa8f7f1a097b1d6bba27f28cfbe21f2352e42617a7432e7fc5bf6.raw": "f7d5392774eaa8f7f1a097b1d6bba27f28cfbe21f2352e42617a7432e7fc5bf6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0106-930acb8eddb88a4a5bd8d84e0da8e2957a207cf0ed04ffe4a01a2fe195c5be32.raw": "930acb8eddb88a4a5bd8d84e0da8e2957a207cf0ed04ffe4a01a2fe195c5be32",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0118-ae96da20fecf99116d3276c300fd375d224d96b612f2ed0ff753c295a7da1d5a.raw": "ae96da20fecf99116d3276c300fd375d224d96b612f2ed0ff753c295a7da1d5a",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0124-488d2e7776b0f9916890af3c45e8bb35143012a91e5d71c8c93159e9578cfad6.raw": "488d2e7776b0f9916890af3c45e8bb35143012a91e5d71c8c93159e9578cfad6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0150-e5864ff03b7fbe268d0327e38b08353fbf9fed6532525cb2d2c09ff4c83688c0.raw": "e5864ff03b7fbe268d0327e38b08353fbf9fed6532525cb2d2c09ff4c83688c0",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0190-33db7b55417407844045cb3c7fc04c9cc1191857fadf2690b0d7afba732bb802.raw": "33db7b55417407844045cb3c7fc04c9cc1191857fadf2690b0d7afba732bb802",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0222-90b2933ab5b3f31aaca14d05c44ae509065f4c43222755a9630d5441691586b4.raw": "90b2933ab5b3f31aaca14d05c44ae509065f4c43222755a9630d5441691586b4",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0258-2161f7aee8a95d105b9857b4185883404f3bc9fc4ee5763f360cbbc5d207334c.raw": "2161f7aee8a95d105b9857b4185883404f3bc9fc4ee5763f360cbbc5d207334c",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0272-23f45acd3304b104f1c7077a9a838a26d644f4302a29527de3719325c0d0203f.raw": "23f45acd3304b104f1c7077a9a838a26d644f4302a29527de3719325c0d0203f",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0290-b54774cdf0f9939929559f9737b0413b9cce6f027c7d5a5fb8d9b318546899d1.raw": "b54774cdf0f9939929559f9737b0413b9cce6f027c7d5a5fb8d9b318546899d1",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0342-eebc56fe59dca07c13b6b9e7d681358a4f86341a99eeb259a12768e821fa4de2.raw": "eebc56fe59dca07c13b6b9e7d681358a4f86341a99eeb259a12768e821fa4de2",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0354-64867b9b99d88d8d075a1754a122272efa548467809e2b310df363eb2297c715.raw": "64867b9b99d88d8d075a1754a122272efa548467809e2b310df363eb2297c715",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0366-7640b5395dd08f5f1c1cefe9d524d8d12d53c3dfcde7e3074b754b2811670c9a.raw": "7640b5395dd08f5f1c1cefe9d524d8d12d53c3dfcde7e3074b754b2811670c9a",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0380-fc41174aeb96f64089540df018e5015fe4a813f07474702e1ba22ee7349c5c1f.raw": "fc41174aeb96f64089540df018e5015fe4a813f07474702e1ba22ee7349c5c1f",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0408-79360dd23ae641d73cd0bc05907a9794fc6972949042c3500641953d385971c0.raw": "79360dd23ae641d73cd0bc05907a9794fc6972949042c3500641953d385971c0",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0410-343aa8553352788a0a3808fa961338b0f5cbcb4a165127bb0b76346f97dbde1d.raw": "343aa8553352788a0a3808fa961338b0f5cbcb4a165127bb0b76346f97dbde1d",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0466-45e19b310e72611dfb0be04f330bb863a31573fba0df30badd042335c4728822.raw": "45e19b310e72611dfb0be04f330bb863a31573fba0df30badd042335c4728822",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0478-b7ae6a6cb5003bfa0c66cbb3634052576cadbfd922446f789dbfff7a05061b91.raw": "b7ae6a6cb5003bfa0c66cbb3634052576cadbfd922446f789dbfff7a05061b91",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0558-5c9344d8b75fe0bd2b382ec5385b2e7e212e88ef1dcf8130084dd06bb1bdfaf4.raw": "5c9344d8b75fe0bd2b382ec5385b2e7e212e88ef1dcf8130084dd06bb1bdfaf4",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0560-3cc3a7b0b8d9f00f00159220e6d78e537ae6a3ff5a81371f9976c4e921f11e2d.raw": "3cc3a7b0b8d9f00f00159220e6d78e537ae6a3ff5a81371f9976c4e921f11e2d",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0630-539bbc2d5ead573546093679366ca81c72ffe062d82f7045752fd54f7ebccae3.raw": "539bbc2d5ead573546093679366ca81c72ffe062d82f7045752fd54f7ebccae3",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0640-6d818ad620239a7edc4935b14810cfd8dc8923066a3d8461dfd30916c928ed55.raw": "6d818ad620239a7edc4935b14810cfd8dc8923066a3d8461dfd30916c928ed55",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0684-8033a289e26773e4a449dd19cc55230598c37bd0f962410e8ec5c395c673abf8.raw": "8033a289e26773e4a449dd19cc55230598c37bd0f962410e8ec5c395c673abf8",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0688-08ba22f04f68ba8dcab8e9be35af445f158a5e577c69cc23cfe50eba92cf2b94.raw": "08ba22f04f68ba8dcab8e9be35af445f158a5e577c69cc23cfe50eba92cf2b94",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0692-9190cd2d3f8491a768defb7ab9c87e8cc5d6494d94ae07a8afa5d134b4a643f7.raw": "9190cd2d3f8491a768defb7ab9c87e8cc5d6494d94ae07a8afa5d134b4a643f7",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0704-18ae733cfb4470baeda0abf2109069a9fb627927dd08d367b610587c581a9d4d.raw": "18ae733cfb4470baeda0abf2109069a9fb627927dd08d367b610587c581a9d4d",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0720-1de6e97c67a89d2a409257660b0e68ca15cd05c81c5db8a4132260b22ede6ba2.raw": "1de6e97c67a89d2a409257660b0e68ca15cd05c81c5db8a4132260b22ede6ba2",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0724-03cf4eca324f040c1a6797d2b3f7ce139c65f1b80dfd50ff3699d60255cc093d.raw": "03cf4eca324f040c1a6797d2b3f7ce139c65f1b80dfd50ff3699d60255cc093d",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0744-156855b3892dd10648089c1bb60449c18f5ac3678787518cd039b3128a69b31e.raw": "156855b3892dd10648089c1bb60449c18f5ac3678787518cd039b3128a69b31e",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0750-cb2dd89fd94e067035cb6727b4fd67c3efedf116b9f9ae26551214047c86dd93.raw": "cb2dd89fd94e067035cb6727b4fd67c3efedf116b9f9ae26551214047c86dd93",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0810-61d9220fda690159841049af1ce24f0bacdf62811c5e1a536d5eb73d784cccc6.raw": "61d9220fda690159841049af1ce24f0bacdf62811c5e1a536d5eb73d784cccc6",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0816-30508d83defcadbeff4546dd33fc7269f8f2cab89744be4f76f91de4169ff2c4.raw": "30508d83defcadbeff4546dd33fc7269f8f2cab89744be4f76f91de4169ff2c4",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0838-8cc378b1f02e31cd66df84d01b8d8a4bdc1b43a6b2f4b6cf199cbdea40b6647f.raw": "8cc378b1f02e31cd66df84d01b8d8a4bdc1b43a6b2f4b6cf199cbdea40b6647f",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0844-a4c52d2e014fda86fe6da5c969f642f9bcfe6b731d00574421de36826bac3b75.raw": "a4c52d2e014fda86fe6da5c969f642f9bcfe6b731d00574421de36826bac3b75",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0898-7ec4ebeff4238170362ab1e7f841c98a7d4eb2f8c7823057227a0839989df4c9.raw": "7ec4ebeff4238170362ab1e7f841c98a7d4eb2f8c7823057227a0839989df4c9",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0908-6653b171e6d350e759fe22973e8cd19f3a5e7b8a57683a8f85df3815c5a325f1.raw": "6653b171e6d350e759fe22973e8cd19f3a5e7b8a57683a8f85df3815c5a325f1",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0912-e199a9c98dc9986966cbcf90d96d74215da082f01576a89865ac75082797206b.raw": "e199a9c98dc9986966cbcf90d96d74215da082f01576a89865ac75082797206b",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0916-1954deba0f5f5f48119a703832fe5f8e03e7e5556dc5a3499c5d16591f5c4738.raw": "1954deba0f5f5f48119a703832fe5f8e03e7e5556dc5a3499c5d16591f5c4738",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0966-5e6ccefcf3c89acced785df8fad557f4f59144694018f99faea3bc7c0a6a95f4.raw": "5e6ccefcf3c89acced785df8fad557f4f59144694018f99faea3bc7c0a6a95f4",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-0972-764d155ca7b8e08d0ffc90e2c7a23b995cc10d950346d82d7d0beb361b6d168f.raw": "764d155ca7b8e08d0ffc90e2c7a23b995cc10d950346d82d7d0beb361b6d168f",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-1034-575f47b69cf9d67fd21173f47f9e138994f63b3a76fc54ae696a479466059740.raw": "575f47b69cf9d67fd21173f47f9e138994f63b3a76fc54ae696a479466059740",
+    "D:\\Personal\\fpl-operations\\verification\\competitive-workload-2025-20260907T083100Z\\responses\\response-1058-01208fe8ccd89028847f0b4b3e116e5ce4cd0edc584dbc8eb60502e8adc191b4.raw": "01208fe8ccd89028847f0b4b3e116e5ce4cd0edc584dbc8eb60502e8adc191b4"
+  },
+  "source_database": "D:\\Personal\\workspace\\the_comet_fpl\\.worktrees\\sdp_test\\data\\fpl.duckdb",
+  "source_database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "straight_red_events": 47,
+  "straight_red_matches": 46,
+  "worktree_clean": false
+}

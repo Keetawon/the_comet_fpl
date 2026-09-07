@@ -11,7 +11,7 @@ import math
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Final
 
 from fpl.config import ScoringRules
@@ -152,7 +152,10 @@ class ExposurePooledDisciplinary:
         for row in history:
             _aware(row.kickoff)
         for row in sorted(history, key=lambda r: (r.kickoff, r.season, r.fixture, r.code)):
-            if row.kickoff >= as_of or (row.season, row.gw) == excluded_target_gw:
+            if (
+                row.kickoff + timedelta(hours=6) >= as_of
+                or (row.season, row.gw) == excluded_target_gw
+            ):
                 continue
             identity = row.season, row.fixture, row.code
             if identity in seen:
