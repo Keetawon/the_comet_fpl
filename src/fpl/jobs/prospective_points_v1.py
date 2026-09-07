@@ -2072,7 +2072,9 @@ def predict_prospective_points(
 
     repo_path = repo or repo_root()
     if environment_provenance is not None:
-        environment_provenance["gk_saves_shadow"] = gk_shadow_rows
+        environment_provenance["gk_saves_shadow"] = sorted(
+            gk_shadow_rows, key=lambda row: (row["fixture"], row["code"])
+        )
         selectors = {d["fixture"]: d["selector"] for d in environment_provenance["decisions"]}
         environment_provenance["selector_counts_player_fixture_predictions"] = dict(
             sorted(Counter(selectors[row.fixture] for row in records).items())

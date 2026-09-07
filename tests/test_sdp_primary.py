@@ -228,9 +228,9 @@ def test_real_points_pipeline_primary_fallback_shadow_and_disabled(monkeypatch):
 
     fixture = {**_fixture(501, 1, 2), "kickoff_time": (CUTOFF + timedelta(days=1)).isoformat()}
     con = _basic_db(
-        players=[_player(11, 1001, 1, 1), _player(12, 1002, 4, 2)],
+        players=[_player(11, 1001, 1, 1), _player(12, 1002, 4, 2), _player(13, 1003, 1, 2)],
         fixtures=[fixture],
-        history=[(1001, "GK", 1, 2, True), (1002, "FWD", 2, 1, False)],
+        history=[(1001, "GK", 1, 2, True), (1002, "FWD", 2, 1, False), (1003, "GK", 2, 1, False)],
     )
     rows = [
         SdpStateRow(
@@ -281,8 +281,17 @@ def test_real_points_pipeline_primary_fallback_shadow_and_disabled(monkeypatch):
         assert provenance["decisions"][0]["selector"] == "SDP_PRIMARY"
         assert provenance["gk_saves_shadow"][0]["mode"] == "shadow_only"
         assert provenance["gk_saves_shadow"][0]["conditional_saves_pmf"] is not None
+        from fpl.features.pit import PointInTimeView
+
+        original_registry = PointInTimeView.player_registry
+        monkeypatch.setattr(
+            PointInTimeView,
+            "player_registry",
+            lambda self, *a, **k: original_registry(self, *a, **k).reverse(),
+        )
         repeated = predict_prospective_points(con, **kwargs)
         assert repeated.records == primary.records
+        assert repeated.football_environment_provenance == primary.football_environment_provenance
         fail = predict_prospective_points(
             con, **kwargs, sdp_refresh_failure="synthetic HTTP failure"
         )
