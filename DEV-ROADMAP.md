@@ -1430,6 +1430,20 @@ in `results/v2_weekly_inner_selection_development.json`; see the matching develo
 No retuning or promotion. The single next recommendation is a separately authorized SOT
 incremental experiment on the frozen weekly-inner control, not territory or automatic deployment.
 
+## Weekly-inner SOT incremental follow-up (2026-09-07)
+
+Owner-authorized after revision-PIT/local daily verification. Follow
+`docs/v2-weekly-sot-design.md`: retain archive goals+xG and the exact weekly-inner control,
+add only SOT with the frozen corroborated-zero interpretation. No territory or new model
+family. Use the original hash-pinned historical database read-only, not the daily writer DB.
+
+Delivery: commit infrastructure; finish additive implementation/tests/preregistration;
+commit cleanly; reproduce weekly control at 1e-12; reserve new-name one-run claim; evaluate
+once; retain result and read-only diagnostics. >=1% relative log lift and existing guards
+remain the predeclared development bar. A miss keeps existing defaults; a pass still needs
+prospective confirmation and separate authorization. Do not delete new-source evidence.
+Local commits only, no push, merge/main changes, prior-result rewrite or second experiment.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:

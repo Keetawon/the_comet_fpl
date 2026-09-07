@@ -610,6 +610,15 @@ promoted; see
 
 ---
 
+## Development-only weekly-inner SOT follow-up
+
+The owner authorized one new incremental SOT test against the frozen weekly-inner goals+xG
+control. The [preregistration](docs/v2-weekly-sot-design.md) keeps goals/xG, population,
+weekly selection and grids unchanged, and reuses the verified historical SOT interpretation.
+Formal evaluation requires clean committed provenance and exact control reproduction first.
+Below 1% relative log-score lift, keep existing defaults; even a pass is not promotion.
+The daily operational database/raw collection remains separate from this frozen research DB.
+
 ## The Stage A bar
 
 ```bash

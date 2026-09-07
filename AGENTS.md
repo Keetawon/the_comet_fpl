@@ -1481,6 +1481,24 @@ own research question, comparisons, evidence regime and suitable decision criter
 outer scoring, with clean committed provenance. Production use remains a separate explicit
 decision. Do not rerun historical candidates or infer promotion from this authorization.
 
+## Owner-authorized weekly-inner SOT increment (2026-09-07)
+
+The owner now authorizes ONE separately named follow-up:
+`retrospective_goals_xg_sot_weekly_inner_selection_v1`, compared to the exact frozen
+weekly-inner goals+xG candidate as control. Read `docs/v2-weekly-sot-design.md` and
+`config/v2_weekly_sot_evaluation.yaml`. Add only historical SDP SOT under the unchanged
+corroborated-zero/earliest-complete-payload policy; archive goals/xG, weekly selection,
+grids and scored population remain fixed. Do not rerun the previous formal candidates.
+
+Infrastructure is committed first; commit implementation/tests/preregistration before a
+clean formal run. Reproduce the weekly control's PMFs/parameters/scores before reserving
+the new durable one-run claim. Retain >=1% relative log lift plus inherited guardrails;
+below that bar keep the existing model/defaults. Even a pass is retrospective development
+only, requiring separate prospective evidence and promotion authority. Prediction spread
+is diagnostic, not accuracy. Keep collecting raw SDP regardless of this experiment's result.
+Local additive commits are authorized; no push, main sync/merge, rebase, PR, second
+experiment, or production/optimizer/default change in this task.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.
