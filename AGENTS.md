@@ -1507,6 +1507,39 @@ but pooled reciprocal zero-goal/clean-sheet Brier worsens 0.079366% and rate SD 
 note without retuning/rerunning. Existing defaults remain unchanged; this result does not
 justify territory or discarding SDP captures. Continue strict-prospective collection.
 
+## Owner-authorized structural Tactical Matchup V1 (2026-09-07)
+
+This new authorization supersedes the prior session's no-push/no-next-experiment scope,
+not any old scientific result. Preserve local weekly-SOT commit `462e46c`; the snapshot-only
+main change was normally merged at `9e861de`. No rebase, main promotion, PR or default change.
+
+Read the three new tactical design documents and `config/v2_tactical_matchup_evaluation.yaml`.
+The exact primary incumbent is CURRENT prospective `TrailingGoalsAttackDefence`: expanding
+archive recorded goals, six-match league shrinkage, neutral missing-team ratios, Poisson0..10.
+It is not the weekly goals+xG research model, and despite its name it has no recency decay.
+The separate development candidate forecasts five continuous recent-state deltas, then fits
+a regularized tactical matchup log-rate correction around that incumbent. No player/DC work.
+
+The coverage-only audit licenses exactly six provider keys/five dimensions; provider-labelled
+semantics are not globally upgraded to independently verified. Earliest complete whole-payload
+versions and original known_at are retained in a new validation-only capability. Raw NULL stays
+NULL; explicit recent-state pooling is a model estimate, not imputation of provider data.
+Strict prospective/PIT/optimizer/dashboard capabilities and defaults remain unchanged.
+The >=95% paired-field coverage rule selected2023-24/2025-26 before fitting:1520sides/76folds.
+The nonconsecutive coverage-selected population limits generalization. Do not add excluded
+seasons or dimensions after seeing goal results.
+
+Commit implementation/tests/preregistration cleanly, reproduce the incumbent against retained
+PMFs AND its actual prospective adapter, then reserve ONE durable candidate claim and evaluate
+once. All goal-layer style predictions must be sequential event-time out-of-sample; whole GW
+batches remain isolated, including delayed legs. Retain full PMFs, source/version provenance,
+selected strengths/scalers, style/persistence diagnostics, paired goal/CS loss and guard checks.
+Two explicitly preregistered diagnostic arms share the selected penalty; they cannot replace
+the named candidate or obtain an independent promotion verdict. Both >=1% goal-log lift and
+>=1% CS-Brier lift plus frozen guardrails are required for SUPPORTED, still development-only.
+Do not tune/restart after a claimed result. The separate competitive-workload audit is data-only
+and cannot feed this model. Push completed additive evidence only to the V2 branch.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.

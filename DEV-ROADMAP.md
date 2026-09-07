@@ -1450,6 +1450,24 @@ and `docs/v2-weekly-sot-development.md`. No promotion or territory expansion; ke
 defaults and the already-installed strict-prospective data/revision collection. No new
 candidate may be inferred from this result.
 
+## Structural Tactical Matchup V1 (owner-authorized 2026-09-07)
+
+One new architecture, not another signal ladder. Preserve the weekly-SOT result and incumbent
+defaults. `v2-tactical-state-design.md`, `v2-next-match-style-forecaster-design.md` and
+`v2-tactical-matchup-design.md` freeze continuous last-five recency-weighted state, explicit
+pooling, opponent/venue delta forecasts and a sequential-OOS Poisson offset correction.
+Coverage-only paired95% rule selects2023-24/2025-26,1520sides/76folds. Exact CURRENT prospective
+trailing-goals incumbent is primary; both goal log and reciprocal CS Brier require1% lift.
+No retrospective result is production evidence. No player role, DC or default changes.
+
+Delivery order: metric audit -> source/state/stacking tests -> clean preregistration commit ->
+incumbent reproduction -> durable one-run claim -> single outer experiment -> read-only
+diagnostics and honest verdict -> additive result/docs commit -> push same V2 branch.
+Do not rerun a disappointing or interrupted claimed candidate. Two fixed diagnostic-only
+arms are not a candidate search. Keep original databases and previous artifacts byte-frozen.
+Competitive cup/Europe workload exploration is separate data-only evidence; direct minutes
+and cross-provider player identity need a later validated ingestion contract.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:

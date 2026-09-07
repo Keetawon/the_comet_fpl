@@ -1,0 +1,3 @@
+# Preserve exact bytes for new hash-pinned tactical evidence across Windows checkouts.
+results/v2_tactical_metric_audit.json -text whitespace=cr-at-eol
+results/v2_tactical_matchup_development.json -text whitespace=cr-at-eol
