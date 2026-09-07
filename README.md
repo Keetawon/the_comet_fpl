@@ -765,6 +765,15 @@ permission to widen the grid. Full result and caveats in
 [`docs/phase1-candidate-v3-development.md`](docs/phase1-candidate-v3-development.md). The
 trailing-goals baseline remains the Stage A model.
 
+### Tactical Matchup numerical-only continuation (2026-09-07)
+
+The owner authorized one separately preregistered numerical-method amendment after Tactical
+V1's incomplete execution. The same tactical hypothesis, incumbent, features, population,
+Poisson family and dual 1% materiality gates remain frozen; the old failure is not rerun or
+rewritten. [Amendment policy](docs/v2-tactical-numerical-amendment.md) specifies the separate
+solver, strict clean-provenance one-run guard and durable diagnostics. Development only;
+prospective, optimizer and dashboard defaults remain unchanged.
+
 ### Candidate V4: leakage-safe successor, development-only result, not promoted
 
 `dynamic_team_goals_v4` is pre-registered (contract amendment 1.5) as the leakage-safe structural

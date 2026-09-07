@@ -13,7 +13,8 @@ import json
 import logging
 import math
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Literal
@@ -40,6 +41,7 @@ RECENT_DIAGNOSTIC = "recent_state_only_no_interactions"
 PREDICTED_DIAGNOSTIC = "predicted_state_no_interactions"
 type Vector = tuple[float | None, ...]
 type GoalKind = Literal["goal_x", "recent_x", "predicted_x"]
+type GoalFitter = Callable[[list[list[float]], list[int], list[float], float], PoissonOffsetModel]
 
 
 def observation_key(row: TacticalObservation) -> str:
@@ -163,19 +165,28 @@ def _goal_fit(
     incumbent: dict[str, tuple[float, Distribution]],
     penalty: float,
     kind: GoalKind,
+    *,
+    goal_fitter: GoalFitter = fit_poisson_offset,
+    context: str = "",
 ) -> tuple[PoissonOffsetModel | None, dict[str, Any]]:
     rows = [record for record in prior if getattr(record, kind) is not None]
     x: list[list[float]] = [getattr(record, kind) for record in rows]
-    model = (
-        fit_poisson_offset(
-            x,
-            [record.observation.goals for record in rows],
-            [incumbent[observation_key(record.observation)][0] for record in rows],
-            penalty,
+    goals = [record.observation.goals for record in rows]
+    rates = [incumbent[observation_key(record.observation)][0] for record in rows]
+    model = None
+    if len(rows) >= MINIMUM_FIT_ROWS:
+        fit_identity = hashlib.sha256(
+            json.dumps([x, goals, rates, penalty], separators=(",", ":")).encode()
+        ).hexdigest()
+        fit_context = (
+            f"{context} kind={kind} penalty={penalty} rows={len(rows)} input_sha256={fit_identity}"
         )
-        if len(rows) >= MINIMUM_FIT_ROWS
-        else None
-    )
+        logger.info("Tactical goal fit: %s", fit_context)
+        try:
+            model = goal_fitter(x, goals, rates, penalty)
+        except Exception as error:
+            error.add_note(fit_context)
+            raise
     if model is not None and not model.converged:
         raise ValueError(f"Poisson tactical correction did not converge: {kind}, penalty={penalty}")
     return model, {
@@ -308,6 +319,9 @@ def run_tactical_walk_forward(
     observations: list[TacticalObservation],
     incumbent: dict[str, tuple[float, Distribution]],
     eligible_seasons: tuple[str, ...],
+    *,
+    goal_fitter: GoalFitter = fit_poisson_offset,
+    checkpoint: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run one pure prequential pass, with no scoring-derived feature decisions."""
     _validate(observations, incumbent)
@@ -343,13 +357,14 @@ def run_tactical_walk_forward(
         if event_violations or gameweek_violations or stacking_violations:
             raise ValueError("event, target GW, or in-sample stacking entered tactical history")
         logger.info("Tactical prequential GW %s/%s: %s GW%s", index, len(ordered), season, gw)
+        fit_context = f"season={season} gw={gw} cutoff={cutoff.isoformat()}"
         style_models, style_diagnostics = _style_fits(prior)
         goal_models: dict[float, PoissonOffsetModel | None] = {}
         goal_diagnostics: dict[str, Any] = {}
         for penalty in PENALTIES[1:]:
             assert penalty is not None
             goal_models[penalty], goal_diagnostics[str(penalty)] = _goal_fit(
-                prior, incumbent, penalty, "goal_x"
+                prior, incumbent, penalty, "goal_x", goal_fitter=goal_fitter, context=fit_context
             )
         chosen, selection = _selection(prior)
         diagnostic_models: dict[str, PoissonOffsetModel | None] = {}
@@ -361,7 +376,7 @@ def run_tactical_walk_forward(
             )
             for name, kind in diagnostic_kinds:
                 diagnostic_models[name], diagnostic_fits[name] = _goal_fit(
-                    prior, incumbent, chosen, kind
+                    prior, incumbent, chosen, kind, goal_fitter=goal_fitter, context=fit_context
                 )
         fit_time_violations = _fit_time_violations(
             [*style_diagnostics.values(), *goal_diagnostics.values(), *diagnostic_fits.values()],
@@ -555,6 +570,9 @@ def run_tactical_walk_forward(
         # Absorb only after ALL predictions in the batch; delayed legs are still filtered
         # on their actual kickoff before they can contribute to any subsequent fit.
         history.extend(pending.values())
+        if checkpoint is not None:
+            # A logging consumer cannot mutate predictions or the next batch's training state.
+            checkpoint(deepcopy({"fold": report, "rows": [r.row for r in pending.values()]}))
     return {
         "rows": outer_rows,
         "folds": folds,

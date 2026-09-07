@@ -252,7 +252,7 @@ def test_style_standardized_mse_uses_retained_prior_only_scale():
 def test_both_materiality_gates_and_style_hypothesis_are_required(
     monkeypatch, log_lift, cs_lift, style_lift, verdict
 ):
-    def scores(rows, *, seed):
+    def scores(rows, *, seed, candidate=runner.CANDIDATE):
         return {
             arm: {
                 "mean_log_score": 1 - (log_lift if arm == "candidate" else 0),

@@ -1557,6 +1557,18 @@ frozen results and defaults remain unchanged. See `docs/v2-tactical-matchup-deve
 and the verification record for the exact failure, source hashes and non-green environmental
 gate items. Successful provider/coverage evidence is not successful model evidence.
 
+## Tactical numerical amendment (owner-authorized continuation, 2026-09-07)
+
+After the retained V1 failure, the owner explicitly authorized the recommended numerical-only
+amendment. `retrospective_tactical_matchup_team_environment_v1_numeric1` inherits the original
+hash-pinned statistical contract unchanged. Only cancellation-safe objective differences and
+gradient-plus-undamped-step convergence checks change; the old solver/result/claim remain.
+See `docs/v2-tactical-numerical-amendment.md`. Preserve both 1% gates, dimensions, population,
+distribution and defaults. Commit clean preregistration and tests before its single claimed run;
+reproduce the exact incumbent first. Retain full-batch diagnostics and failure state if needed,
+never resume or selectively score incomplete checkpoints. This authorization is not permission
+to restart the original identity, add features, retune after scoring, or promote any model.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.

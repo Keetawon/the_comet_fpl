@@ -258,7 +258,9 @@ def _mean(values: Sequence[float]) -> float:
     return math.fsum(values) / len(values) if values else 0.0
 
 
-def _clustered(deltas: Sequence[float], rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _clustered(
+    deltas: Sequence[float], rows: Sequence[Mapping[str, Any]], *, candidate: str = CANDIDATE
+) -> dict[str, Any]:
     groups: dict[str, list[float]] = {}
     for delta, row in zip(deltas, rows, strict=True):
         groups.setdefault(f"{row['season']}:{row['gw']}", []).append(delta)
@@ -278,7 +280,7 @@ def _clustered(deltas: Sequence[float], rows: Sequence[Mapping[str, Any]]) -> di
         "gw_clustered_standard_error": se,
         "clusters": count,
         "normal_95_interval": [mean - 1.96 * se, mean + 1.96 * se] if se is not None else None,
-        "negative_favours": CANDIDATE,
+        "negative_favours": candidate,
         "serial_dependence_adjusted": False,
     }
 
@@ -298,9 +300,13 @@ def _predictions(rows: Sequence[Mapping[str, Any]], arm: str) -> list[Prediction
     ]
 
 
-def _score_rows(rows: Sequence[Mapping[str, Any]], *, seed: int) -> dict[str, Any]:
+def _score_rows(
+    rows: Sequence[Mapping[str, Any]], *, seed: int, candidate: str = CANDIDATE
+) -> dict[str, Any]:
     blocks: dict[str, Any] = {}
     for arm, name in MODEL_LABELS.items():
+        if arm == "candidate":
+            name = candidate
         block = scoring._score_block(name, _predictions(rows, arm), seed=seed)
         probabilities = [float(row["clean_sheet_probabilities"][arm]) for row in rows]
         outcomes = [int(row["goals_allowed"] == 0) for row in rows]
@@ -458,11 +464,13 @@ def attach_reciprocal_and_slices(
                 raise ValueError("candidate distribution mass differs from one")
 
 
-def score_experiment(run: dict[str, Any], contract: TacticalContract) -> dict[str, Any]:
+def score_experiment(
+    run: dict[str, Any], contract: TacticalContract, *, candidate: str = CANDIDATE
+) -> dict[str, Any]:
     rows = run["rows"]
     if len(rows) != contract.expected_rows or len(run["folds"]) != contract.expected_folds:
         raise ValueError("candidate population differs from preregistration")
-    overall = _score_rows(rows, seed=contract.seed)
+    overall = _score_rows(rows, seed=contract.seed, candidate=candidate)
     slices: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         labels = [
@@ -476,7 +484,10 @@ def score_experiment(run: dict[str, Any], contract: TacticalContract) -> dict[st
         ]
         for label in labels:
             slices.setdefault(label, []).append(row)
-    by_slice = {k: _score_rows(v, seed=contract.seed) for k, v in sorted(slices.items())}
+    by_slice = {
+        k: _score_rows(v, seed=contract.seed, candidate=candidate)
+        for k, v in sorted(slices.items())
+    }
     styles = _styles(rows)
     old, new = overall["incumbent"], overall["candidate"]
     log_lift = _lift(old["mean_log_score"], new["mean_log_score"])
@@ -524,7 +535,7 @@ def score_experiment(run: dict[str, Any], contract: TacticalContract) -> dict[st
         rate_changes.append(means["candidate"] - means["incumbent"])
     return {
         "schema_version": 1,
-        "candidate": CANDIDATE,
+        "candidate": candidate,
         "incumbent": INCUMBENT,
         "evidence_class": contract.evidence_class,
         "development_only": True,
@@ -541,9 +552,11 @@ def score_experiment(run: dict[str, Any], contract: TacticalContract) -> dict[st
         "style_forecast_by_slice": {k: _styles(v) for k, v in sorted(slices.items())},
         "relative_goal_log_lift": log_lift,
         "relative_clean_sheet_brier_lift": cs_lift,
-        "paired_log_uncertainty": _clustered(log_deltas, rows),
-        "paired_cs_uncertainty": _clustered(cs_deltas, rows),
-        "by_gameweek": {k: _score_rows(v, seed=contract.seed) for k, v in per_gw.items()},
+        "paired_log_uncertainty": _clustered(log_deltas, rows, candidate=candidate),
+        "paired_cs_uncertainty": _clustered(cs_deltas, rows, candidate=candidate),
+        "by_gameweek": {
+            k: _score_rows(v, seed=contract.seed, candidate=candidate) for k, v in per_gw.items()
+        },
         "selected_penalties": dict(Counter(str(f["chosen_penalty"]) for f in run["folds"])),
         "mean_absolute_rate_change": _mean([abs(x) for x in rate_changes]),
         "mean_signed_rate_change": _mean(rate_changes),

@@ -1478,6 +1478,17 @@ failure-state diagnostics and regression tests BEFORE any newly preregistered ex
 No such amendment/fix/re-execution is implemented here. Full evidence and environmental
 test failures: `docs/v2-tactical-matchup-development.md`, `docs/v2-tactical-matchup-verification.md`.
 
+## Tactical numerical amendment (authorized continuation, 2026-09-07)
+
+The owner's continuation now licenses ONE separately named numerical-only amendment of the
+same tactical hypothesis, not a restart of the consumed V1 attempt. Freeze inherited source/
+config/failure hashes and unchanged statistical pins; implement stable objective-difference
+arithmetic, final-gradient/undamped-step checks, rich fit context and complete-GW checkpoints.
+See `docs/v2-tactical-numerical-amendment.md`. Complete synthetic and integration tests, commit
+cleanly, reproduce incumbent, reserve the new claim, run ONCE, retain success or failure, then
+document and push additive V2 commits. No automatic retry, new features, gate/default changes
+or production promotion. The previous failure report remains immutable prior evidence.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:
