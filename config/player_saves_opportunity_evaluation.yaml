@@ -1,0 +1,53 @@
+candidate: retrospective_oos_shot_opportunity_gk_saves_v1
+evidence_class: retrospective_backfill_development
+promotion_permitted: false
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+upstream: results/v2_chance_creation_development.json
+upstream_sha256: f4cc595384102112ba2c41f118396d4176a6f7000a6f3c1753b5edf1a1ae952f
+coverage_report: results/player_saves_opportunity_coverage.json
+coverage_sha256: 1287970afc12eab0c37b734e4bd1584fae5490a7d786acf2f637297e035309c6
+eligible_seasons: [2023-24, 2024-25, 2025-26]
+rows: 2313
+folds: 114
+rows_by_season: [776, 770, 767]
+target_identity_sha256: d88d3f4a6ba9537a900df9989ca27c251c9e3ee0464067dd8604634adf89832f
+target: recorded_saves_conditional_on_recorded_appearance
+require_measured: [minutes, saves, goals_conceded]
+comparator: gk_saves_poisson_from_team_conceded_v1
+current_minutes_reference: retrospective_current_minutes_proxy_v1
+current_minutes_proxy_rows_full_reference: 821
+minutes_used_to_predict_saves: false
+preserve_current_conditional_full_match_rate: true
+minimum_training_gameweeks: 8
+minimum_joint_shots_sot_season_coverage: 0.95
+minimum_prior_measured_shot_sides: 160
+precision: sum_prior_measured_sot_over_sum_same_version_measured_shots
+precision_pool: league_only
+save_fraction: unchanged_fold_local_GkSavesV1
+formula: frozen_oos_opponent_shots_times_pooled_precision_times_incumbent_save_fraction
+distribution: poisson_0_through_9_plus_10_overflow
+fallback: exact_incumbent_pmf
+missing_source: remains_null_no_inferred_zero_or_average_fill
+source_version_policy: earliest_successful_complete_match_stats_payload_by_fetched_at_then_payload_id
+provider_fields: [totalScoringAtt, ontargetScoringAtt]
+whole_target_gw_excluded: true
+source_kickoff_completion_margin_hours: 6
+capture_time_validity: retrospective_only_original_known_at_preserved
+cutoff: complete_target_gw_first_kickoff_proxy
+seed: 20260907
+grid: none
+role_or_keeper_skill_model: none
+primary_metric: mean_log_score
+minimum_relative_log_lift: 0.01
+maximum_crps_relative_regression: 0.0
+pit80_maximum_absolute_error: 0.05
+require_each_reported_season_one_percent_lift: true
+require_each_reported_season_crps_and_pit_pass: true
+slices: [season, home_away, GW1_6_GW7_plus, cold_established, price_proxy_non_proxy, predicted_sot_below4_or_at_least4]
+proxy_exclusion: diagnostic_only_same_nominated_population
+diagnostics: [sot_rmse_vs_incumbent_implied_sot, rps_crps, pit80, mae, mean_error, predicted_rate_sd, within_gw_spearman, gw_clustered_paired_loss]
+comparator_check: all_3800_team_pmfs_vs_retained_and_current_prospective_plus_exact_saves_direct_vs_factory
+formal_runs: 1
+claim_scope: shared_git_common_directory
+clean_worktree_required: true
+write_once_results: true

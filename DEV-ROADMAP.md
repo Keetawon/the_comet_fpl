@@ -1622,3 +1622,28 @@ Broad-role V1 final coverage-only preregistration is now frozen in
 once from the clean registration commit, independently verify its retained probabilities and
 only then consume the event-time OOS role cache in separately registered player experiments.
 The newly tested one-GW workload memoization changes no observed-reader semantics.
+
+The single broad-role result is now independently retained:primary gate passes, while
+matched persistence beats the transition candidate. See `docs/player-role-development.md`;
+retain both findings and the preregistered transition OOS covariate without posthoc switching.
+Proceed with independently registered workload-minutes, player opportunity, DC and saves
+experiments; existing181-fold Stage B/C eligibility and all production defaults stay fixed.
+
+Next execute the separately preregistered predicted-environment Gamma-Poisson DC
+and OOS-shot-opportunity GK-saves candidates once from a clean commit, alongside a
+write-once unchanged current-component reference cache. Independently audit each
+retained result before downstream acceptance. Workload/minutes and role-conditioned
+opportunity runners remain separately unregistered until their complete contracts
+and tests are committed. Full-points coverage has already fixed the final synthesis
+cohort to 2025-26 only (29,747 rows/38 folds); absent older DC cannot become zero.
+See `docs/full-player-pmf-population-audit.md`. This is no permission to alter gates,
+switch role arms, rerun Phase A, or change any default.
+
+Pre-run integration gate:847 focused program/PIT/composer tests pass with zero
+failures or skips (69.33s); global Ruff passes, strict mypy passes184source files,
+and all16new Python files pass format. The full-format check still reports11
+pre-existing unrelated files (451formatted); the earlier broader-suite14Windows
+symlink-privilege failures remain environmental evidence, not a green full gate.
+An additional external-cache postflight corruption test raises its focused subset
+from31to32passing tests; the postflight rechecks every minutes-fold hash before
+publishing a completed current-component reference. Global Ruff/mypy still pass.

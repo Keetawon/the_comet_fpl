@@ -1745,3 +1745,23 @@ or substitute role. The matched recent-state persistence diagnostic must accompa
 claims. No role formal result exists at this preregistration commit. Focused140tests pass;
 global Ruff and changed-file format/strict mypy pass. Historical Windows/full-format failures
 remain documented separately, not relabelled as a green full gate.
+
+Broad-role V1 has now run ONCE from clean `9e1b34d`:29,747OOS predictions/8,162labels,
+38GWs. Its fixed primary gate is SUPPORTED_FOR_DEVELOPMENT (+33.43494%NLL vs smoothed
+last role), but transition NLL.480621 is13.84953% worse than matched EWMA persistence
+.422155. Transition attribution is NOT supported; do not switch to the diagnostic arm
+after scoring. Independent4,192,346checks pass. See `docs/player-role-development.md`.
+The original four broad labels mean hypothetical starting role, not actual next XI or
+substitute role. No production/default promotion follows.
+
+DC and GK-saves successors now have separate pre-score contracts in
+`docs/dc-predicted-environment-v1-design.md` and
+`docs/player-saves-opportunity-design.md`. The DC successor predicts its environment
+and exposure from prior evidence; the old DC V2 oracle-environment figures are
+qualified additively in `docs/v2-dc-evidence-qualification.md`, never rewritten.
+GK saves consumes only retained event-time OOS shot forecasts, not a rerun of Phase A.
+The write-once current-component reference shares unchanged baseline arithmetic,
+not challenger fits. Neither new candidate has a formal result at this commit.
+The coverage-only full-points population is fixed to measured 2025-26 targets before
+G/H scoring; see `docs/full-player-pmf-population-audit.md`. Older missing DC remains
+NULL. All historical price-proxy and prospective restrictions remain intact.
