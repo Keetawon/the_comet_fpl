@@ -774,6 +774,11 @@ rewritten. [Amendment policy](docs/v2-tactical-numerical-amendment.md) specifies
 solver, strict clean-provenance one-run guard and durable diagnostics. Development only;
 prospective, optimizer and dashboard defaults remain unchanged.
 
+The single clean amended run is now complete: **INCONCLUSIVE**, goal log-score improvement
+**0.274885%**, clean-sheet Brier improvement **0.483597%**, both below the 1% bars. Style forecasts
+improve but goal/CS value remains too small to replace the incumbent. [Full retained result
+and interpretation](docs/v2-tactical-numeric-development.md); no promotion or old-result rewrite.
+
 ### Candidate V4: leakage-safe successor, development-only result, not promoted
 
 `dynamic_team_goals_v4` is pre-registered (contract amendment 1.5) as the leakage-safe structural

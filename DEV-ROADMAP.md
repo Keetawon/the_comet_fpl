@@ -1489,6 +1489,14 @@ cleanly, reproduce incumbent, reserve the new claim, run ONCE, retain success or
 document and push additive V2 commits. No automatic retry, new features, gate/default changes
 or production promotion. The previous failure report remains immutable prior evidence.
 
+Completed once at clean `e76a54b`, **INCONCLUSIVE**: +0.274885% goal-NLL lift and
++0.483597% CS-Brier lift over the exact incumbent, both below 1%. 1,520 sides/76 folds,
+zero temporal violations, 636 converged fits, 58,268 independent checks pass. Retain full PMFs,
+189 historical checkpoints, original failure and all prior results; keep incumbent/defaults.
+No tactical expansion or rerun. `docs/v2-tactical-numeric-development.md` records performance,
+uncertainty, weak interaction value and the recommendation for ONE future shot-creation-to-goals
+model with pooled conversion, requiring its own authorization and preregistration.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:

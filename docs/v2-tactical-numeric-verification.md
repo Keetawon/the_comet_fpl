@@ -98,3 +98,11 @@ Research database hash remains
 the root database remains
 `b886977a4603a9c8b6dea2e0ed6652d2b4864a71fc707b54201ac8fb1656f2ce`.
 No prior result/config, original solver, prospective/PIT source or default was modified.
+
+## Post-run read-only confirmation
+
+The same ten-file new/affected partition was run together after successful publication:
+**259 passed in 58.90 seconds**, `postrun-tests.log`, with no source/config/test changes
+after the clean evaluation commit. Independent arithmetic/provenance checks on the retained
+result passed 58,268 assertions; all 636 actual offset fits meet the numerical policy.
+These are verification of the one stored result, not a second model evaluation.

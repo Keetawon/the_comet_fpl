@@ -1569,6 +1569,16 @@ reproduce the exact incumbent first. Retain full-batch diagnostics and failure s
 never resume or selectively score incomplete checkpoints. This authorization is not permission
 to restart the original identity, add features, retune after scoring, or promote any model.
 
+Completed ONCE at clean `e76a54b`: **INCONCLUSIVE**, 1,520 sides/76 folds. Goal NLL
+1.493490819 vs incumbent 1.497607513 (+0.274885%); CS Brier .169203463 vs .170025703
+(+0.483597%). Both miss 1%; both seasons improve, but early-season CS regresses and paired
+GW-clustered intervals include zero. All five style MSEs improve; precision has no useful
+rank correlation and the three matchup interactions add no material goal-score value.
+All 636 numerical fits converge; 58,268 independent checks find zero violations. Preserve
+`results/v2_tactical_numeric_development.json` and its consumed claim, no rerun or promotion.
+See `docs/v2-tactical-numeric-development.md` and verification record. A two-stage shot-creation
+to goals model is only a next-direction recommendation, not authorized implementation here.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.
