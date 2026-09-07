@@ -818,3 +818,9 @@ unchanged. The [participation pilot](docs/competitive-participation-pilot-develo
 captured13matches but found one contradictory lineup, and historical exact-current player
 comparison lacks deadline price-registry evidence. The [program handoff](docs/football-program-blocked-2026-09-07.md)
 records these hard blockers: later player/component/full-points phases are not claimed complete.
+
+The owner's subsequent [evidence amendment](docs/football-program-evidence-amendment-2026-09-07.md)
+licenses an explicitly labelled archive-price proxy for the 821 historical cold-start rows,
+plus independent lineup-source resolution and a new participation interpretation boundary.
+The original pilot and Phase A result remain frozen. Dependent player research may continue
+only under separate clean, single-run development contracts; production defaults do not change.

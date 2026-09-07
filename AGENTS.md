@@ -1665,3 +1665,24 @@ comparison:821price-sensitive cold rows lack proven deadline `now_cost`/complete
 all51retained snapshot captures are2026-27. Archive `value` is not an authorized substitute.
 Phases C–J are not evaluated; do not invent results or call the whole program complete.
 `docs/football-program-blocked-2026-09-07.md` records dependencies, actual tests and evidence.
+
+### Subsequent owner evidence amendment (2026-09-07)
+
+The owner now licenses a NEW explicitly retrospective archive-price proxy implementation of
+the current prospective minutes selector for the original821price-sensitive cold rows
+(742without history,79with ineligible club/season history). This supersedes only the preceding
+prohibition on that substitute for new, separately preregistered DEVELOPMENT comparisons.
+It is not true deadline price, prospective knowledge or exact historical default evidence.
+Established paths must not consult it. Control/candidate use identical proxy inputs; retain
+all/proxy/non-proxy/cold/established slices and a predeclared diagnostic proxy exclusion.
+Downstream coupled allocations/bonus must track propagated dependence separately.
+
+The owner also authorizes additive independent source resolution and a NEW participation
+interpretation contract. Preserve the failed original pilot, raw roster labels and all player
+records. Only corroborated general rules may resolve a formation/roster disagreement; unresolved
+fixtures make affected workload windows unavailable, never zero. They do not block independent
+complete windows. Continue the authorized player research phases only after these boundaries and
+coverage are verified. Every candidate still requires clean preregistration, comparator checks,
+one exclusive formal run, immutable results and independent verification. Phase A stays frozen
+INCONCLUSIVE; no production/default/optimizer changes. See
+`docs/football-program-evidence-amendment-2026-09-07.md`.

@@ -1562,3 +1562,17 @@ for821price-sensitive cold rows; do not silently use archive prices or exclude t
 These are hard prerequisite blockers, not model gate failures. C–J remain unrun; no production
 promotion, synthesis, schedule, main merge-back or PR. See
 `docs/football-program-blocked-2026-09-07.md` for the bounded completed work and evidence needed next.
+
+### Subsequent owner evidence amendment — 2026-09-07
+
+The owner now explicitly authorizes the separately named retrospective price-proxy comparator
+and additive independent lineup-source resolution. The preceding hard-stop record and both
+frozen results remain accurate as dated evidence. See
+`docs/football-program-evidence-amendment-2026-09-07.md` for the new boundary.
+
+Continue data capture/interpretation and workload coverage first; then separately preregister
+each dependent player experiment. Archive fixture prices are licensed only for missing
+price-sensitive cold-start inputs, with matched candidate/control inputs and proxy sensitivity
+slices. An unresolved competitive fixture makes affected workload windows unavailable, not zero,
+and does not invalidate independently complete windows. No new model has yet been scored under
+this amendment. Phase A remains INCONCLUSIVE and the incumbent remains unchanged.

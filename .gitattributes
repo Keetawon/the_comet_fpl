@@ -10,3 +10,7 @@ results/competitive_participation_pilot_development.json -text whitespace=cr-at-
 results/competitive_participation_pilot_independent_audit.json -text whitespace=cr-at-eol
 results/football_program_prerequisite_audit_20260907.json -text whitespace=cr-at-eol
 results/v2_chance_creation_independent_audit.json -text whitespace=cr-at-eol
+config/retrospective_current_minutes_proxy_v1.yaml -text whitespace=cr-at-eol
+config/competitive_participation_v2.yaml -text whitespace=cr-at-eol
+config/competitive_workload_capture.yaml -text whitespace=cr-at-eol
+config/retrospective_minutes_control_cache.yaml -text whitespace=cr-at-eol

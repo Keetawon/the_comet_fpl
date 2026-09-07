@@ -1,0 +1,47 @@
+contract_version: "1.0"
+comparator: retrospective_current_minutes_proxy_v1
+evidence_class: retrospective_archive_price_proxy_development
+promotion_permitted: false
+formal_model_runs_authorized_by_this_contract: 0
+base_revision: ba24f23ce712214ac26db438b0356d729bdbc69c
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+eligible_seasons: ["2023-24", "2024-25", "2025-26"]
+source: mart_fact_player_fixture.value
+source_grain: [season, code, fixture]
+units: fpl_price_integer_tenths
+proxy_scope: missing_price_evidence_for_price_sensitive_cold_start_only
+cap_witness_scope: established_same_club_same_position_teammates_only
+prefer_actual_deadline_known_price: true
+known_at_rewritten: false
+missing_archive_value: fail_closed_not_api_null_or_imputation
+explicit_archive_zero: preserve_existing_price_helper_noop
+same_gw_price_policy: all_required_player_legs_must_agree_retain_every_row
+ambiguous_price_club_or_position: fail_closed_no_arbitrary_leg_selection
+historical_roster: unchanged_declared_archive_target_roster_proxy
+cutoff: unchanged_first_eligible_kickoff_of_complete_target_gw_proxy
+current_club: unchanged_season_qualified_fixture_team_code
+v3_history: unchanged_all_event_time_prior_rows_not_current_club_filtered
+trailing_history: unchanged_current_prospective_frontier_or_current_club_rule
+appearance: unchanged_seasonal_current_default
+minimum_recent_override_rows: 3
+minimum_established_prior_rows: 10
+established_prior_appearance_threshold: 0.70
+parameters_changed: []
+both_comparison_arms: identical_proxy_roster_prices_and_prior_evidence
+required_slices: [all, proxy_dependent, non_proxy_dependent, cold_start, established]
+non_proxy_exclusion: diagnostic_only_never_replaces_nominal_population
+readiness_audit:
+  target_rows: {"2023-24": 29725, "2024-25": 27283, "2025-26": 29747}
+  cold_price_sensitive_rows: {"2023-24": 327, "2024-25": 224, "2025-26": 270}
+  no_prior_archive_history_rows: {"2023-24": 302, "2024-25": 201, "2025-26": 239}
+  stale_former_club_only_rows: {"2023-24": 25, "2024-25": 23, "2025-26": 31}
+  cold_player_gameweeks: {"2023-24": 317, "2024-25": 222, "2025-26": 269}
+  ambiguous_or_missing_required_price_rows: {"2023-24": 0, "2024-25": 0, "2025-26": 0}
+  scope: coverage_only_no_fitting_or_performance_selection
+unchanged_source_sha256:
+  src/fpl/validate/points_harness.py: 2bc72fa73ab5f7573e64a434ed75b706ba74ef8f6b5a8d5796f93a6910ffb81c
+  src/fpl/jobs/prospective_points_v1.py: 36d0bfc5e482a9c55e4524ce5d1993b22d3ba1bef0712e32eeb7b7169a3beb35
+  src/fpl/models/price_starter_prior.py: 2cf5fc05c253c6ed1dc9e3ab522eee2415a8f5dffabb739635a9eddd988af616
+  src/fpl/models/minutes_shrinkage.py: 634a3b2f03db1c8e73517b558f236ffed47ad28f5b14e09518d97ee31b78d52c
+  src/fpl/models/minutes_v3.py: b169a7fa90d6eb9af0fec313349688f6801c4f227ced87604c3f71093c819e3e
+  src/fpl/validate/prospective_incumbent_adapter.py: 8047c111dc1b4af1552e4c15f3eaa31a14b32f4122c7c4f725be42e789c80b40
