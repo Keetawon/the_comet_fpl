@@ -1527,3 +1527,22 @@ Report changed files, tests and exact results, output schemas with one sample re
 constants for any non-trivial policy, unresolved assumptions, generated run IDs/hashes, and the
 chosen GW1 squad/lineup/captain when the final run is authorized. Commit and push only when the
 owner explicitly requests it.
+
+## Additive authorized football-process program — 2026-09-07
+
+The owner has now explicitly authorized sequential research commits/pushes on the V2 branch,
+without promotion, main merge-back or a PR. Earlier frozen delivery and research records stand.
+
+1. Preregister and score ONE chance-volume × chance-quality × pooled-conversion candidate against
+   exact prospective trailing goals. Coverage-only record `results/v2_chance_target_audit.json`
+   qualifies three full seasons /2280sides/114folds. See `docs/v2-chance-creation-design.md`.
+2. Independently validate the bounded competitive-participation pilot before workload/role use.
+3. Only with reliable identities/participation, develop observed/predicted role separation and
+   separately preregister minutes, player opportunity, cards, DC and GK successors.
+4. Compose development-only passed successors, otherwise exact incumbents, then preregister a
+   single full-player PMF comparison on a genuinely reproducible common population.
+
+Each formal phase freezes its own contract before scoring; no retuning, false green unavailable
+gates or automatic promotion. A hard identity/PIT/comparator/data blocker stops the affected
+dependent chain and is reported with retained evidence, not filled by guesses. No candidate has
+been evaluated as part of this new program at the time of its first preregistration.

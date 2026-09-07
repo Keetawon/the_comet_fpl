@@ -2,3 +2,7 @@
 results/v2_tactical_metric_audit.json -text whitespace=cr-at-eol
 results/v2_tactical_matchup_development.json -text whitespace=cr-at-eol
 results/v2_tactical_numeric_development.json -text whitespace=cr-at-eol
+results/v2_chance_target_audit.json -text whitespace=cr-at-eol
+results/v2_chance_creation_development.json -text whitespace=cr-at-eol
+config/v2_chance_creation_evaluation.yaml -text whitespace=cr-at-eol
+config/competitive_participation_pilot.yaml -text whitespace=cr-at-eol

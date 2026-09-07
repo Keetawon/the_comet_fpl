@@ -1,0 +1,93 @@
+contract_version: '1.0'
+pilot: competitive_participation_arsenal_palace_v1
+purpose: data_access_identity_and_participation_validation_only
+evidence_class: retrospective_backfill_development
+season: '2025-26'
+provider_season_id: 2025
+kickoff_from_utc: '2025-09-13T00:00:00Z'
+kickoff_before_utc: '2025-10-06T00:00:00Z'
+clubs:
+  - {team_code: 3, provider_team_id: 3, name: Arsenal}
+  - {team_code: 31, provider_team_id: 31, name: Crystal Palace}
+competitions:
+  - {provider_competition_id: 8, name: Premier League}
+  - {provider_competition_id: 1, name: FA Cup}
+  - {provider_competition_id: 2, name: League Cup}
+  - {provider_competition_id: 5, name: UEFA Champions League}
+  - {provider_competition_id: 6, name: UEFA Europa League}
+  - {provider_competition_id: 1125, name: UEFA Conference League}
+expected_pl_match_ids:
+  - 2561926
+  - 2561929
+  - 2561943
+  - 2561936
+  - 2561948
+  - 2561952
+  - 2561956
+  - 2561960
+retained_european_anchor_match_ids: [2601789, 2602203]
+minimum_pl_matches: 8
+maximum_selected_matches: 24
+maximum_distinct_provider_requests: 100
+discovery: verified_filters_or_sequential_pages_with_explicit_window_completeness
+network_policy: inherit_config_sources_pl_sdp_bounded_sequential_policy
+payload_scope: match_lists_and_selected_match_lineups_events_only
+identity_policy: exact_season_scoped_fpl_opta_anchor_no_name_fallback
+fpl_opta_anchor: 'p{provider_player_id}'
+team_membership: provider_fixture_side_corroborated_by_prior_fpl_fixture_fact
+version_policy: first_successful_valid_payload_per_endpoint_in_this_pilot
+version_bundle_known_at: maximum_of_match_lineup_events_and_identity_known_at
+retain_all_received_versions: true
+rewrite_known_at: false
+completion_policy: full_time_with_known_result_type_and_reciprocal_scores
+allowed_completed_result_types: [NormalResult, PenaltyShootout]
+duration_definition: nominal_period_clock_intervals_v1_not_fpl_minutes
+period_start_minutes:
+  FirstHalf: 0
+  SecondHalf: 45
+  ExtraFirstHalf: 90
+  ExtraSecondHalf: 105
+period_end_minutes:
+  FirstHalf: 45
+  SecondHalf: 90
+  ExtraFirstHalf: 105
+  ExtraSecondHalf: 120
+event_order: aware_timestamp_then_atomic_simultaneous_actor_validation
+required_event_timestamp_bounds: kickoff_inclusive_through_capture_inclusive
+displayed_minute_parser: unsigned_decimal_integer_only
+stoppage_time_policy: clip_to_own_period_endpoint_retain_raw_value
+extra_time_policy: full_time_clock_at_least_120_and_explicit_extra_time_event_period
+regulation_end_policy: full_time_clock_90_to_119_and_no_extra_time_event_period
+late_substitution_policy: appeared_true_even_when_nominal_duration_zero
+field_dismissal_card_types: [Red, SecondYellow]
+bench_cards: retain_separately_never_infer_field_participation
+unknown_dismissal_actor: side_durations_unavailable
+unknown_required_time_identity_status_or_duplicate: fail_closed_retain_diagnostic
+missing_policy: null_not_zero_no_average_filling
+future_workload_eligibility: verified_match_end_or_completed_capture_before_cutoff
+exact_rest_hours_without_verified_end_timestamp: unavailable
+strict_prospective_known_at_guard: unchanged
+validation:
+  minimum_match_list_completeness: 1.0
+  minimum_selected_lineup_capture_coverage: 1.0
+  minimum_selected_events_capture_coverage: 1.0
+  minimum_selected_club_roster_exact_identity_coverage: 1.0
+  minimum_pl_starter_agreement: 1.0
+  minimum_pl_appearance_agreement: 1.0
+  duration_population: selected_club_pl_union_of_sdp_appeared_and_fpl_minutes_positive
+  minimum_pl_duration_measured_coverage: 1.0
+  duration_absolute_tolerance_minutes: 2.0
+  minimum_pl_duration_within_tolerance: 0.95
+  maximum_pl_duration_mean_absolute_error_minutes: 1.0
+  maximum_unresolved_required_identity_or_status_rows: 0
+  maximum_raw_hash_failures: 0
+  require_all_missing_and_inconsistent_rows: true
+  report_all_non_pl_duration_unknowns: true
+freeze_config_and_implementation_before_collection: true
+require_clean_worktree_before_collection: true
+write_once_timestamped_reports: true
+write_database_default: false
+model_fitting_permitted: false
+forecasting_permitted: false
+role_inference_permitted: false
+production_promotion_permitted: false

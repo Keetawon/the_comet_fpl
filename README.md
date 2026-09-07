@@ -800,3 +800,14 @@ the corrected batch candidate V2, and the trailing-goals baseline remains Stage 
 and caveats in
 [`docs/phase1-candidate-v4-development.md`](docs/phase1-candidate-v4-development.md). Design and
 the frozen grid in [`docs/phase1-candidate-v4-design.md`](docs/phase1-candidate-v4-design.md).
+
+### Football-process research program (development only, 2026-09-07)
+
+The new [chance-creation preregistration](docs/v2-chance-creation-design.md) separates shot volume,
+chance quality and strongly pooled conversion, reusing frozen OOS tactical forecasts. Its
+coverage-only audit qualifies 2023-24 through2025-26. The independent
+[competitive-participation pilot](docs/competitive-participation-pilot.md) validates identities and
+derived participation before any workload/role use. Each new model has a separate one-run contract;
+none replaces current forecasts, optimizer inputs or dashboard defaults. See the
+[incumbent audit](docs/football-development-incumbent-audit.md) for the exact comparator paths and
+limitations; frozen tactical numeric1 and every earlier evaluation remain unchanged.

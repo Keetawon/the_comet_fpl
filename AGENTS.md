@@ -1624,3 +1624,23 @@ Installed general-purpose skills that complement them are:
 - `github:gh-fix-ci` when diagnosing or repairing failing GitHub Actions checks after CI exists.
 
 Skills do not override the repository invariants, offline-test policy, or explicit user scope.
+
+## Authorized football-process development program (2026-09-07)
+
+The owner authorizes additive, development-only chance creation, competitive participation,
+role/workload, component and full-points research. Each formal candidate still requires its own
+clean preregistration, exact CURRENT prospective comparator reproduction, one exclusive run claim,
+immutable result and independent verification. Passing successor else incumbent is the predeclared
+DEVELOPMENT synthesis rule; it never promotes or changes prospective/default/optimizer consumers.
+The completed tactical numeric1 result remains INCONCLUSIVE and immutable. Do not rerun it.
+
+Phase A preregistration: `docs/v2-chance-creation-design.md` and
+`config/v2_chance_creation_evaluation.yaml`. Coverage-only audit selects 2023-24 through2025-26,
+each760/760 paired goals+existing archive xG+SDP attempts. Frozen OOS style predictions feed separate
+regularized volume and quality means, then heavily pooled league conversion, same Poisson Goal/CS
+family. Dual1% Goal NLL and CS-Brier gates remain. No result exists at registration.
+Independent Phase B pilot contract: `docs/competitive-participation-pilot.md` and its config;
+freeze implementation before bounded collection, use exact Opta/FPL identity only, label derived
+nominal durations separately, and validate them before a workload/role model can consume them.
+`docs/football-development-incumbent-audit.md` records exact defaults and inherited limitations;
+historically best research candidates are not substitutes for current comparator behavior.
