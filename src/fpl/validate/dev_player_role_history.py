@@ -20,10 +20,11 @@ from typing import Any
 import yaml
 
 from fpl.config import repo_root
-from fpl.ingest.pl_sdp import is_completed_scored_match, parse_match_summary
+from fpl.ingest.pl_sdp import parse_match_summary
 from fpl.jobs.competitive_participation_pilot import file_sha256, git_clean_head, publish_json
 from fpl.storage.competitive_workload import identity, semantic_identity
 from fpl.storage.db import connect
+from fpl.transform.competitive_participation_v2 import RESULT_TYPES
 from fpl.validate.development_program_provenance import reserve_program_claim
 from fpl.validate.metrics import PROBABILITY_FLOOR, log_score
 from fpl.validate.player_role_history import (
@@ -38,7 +39,7 @@ from fpl.validate.player_role_history import (
 )
 
 CONFIG = "config/player_role_history_evaluation.yaml"
-CONFIG_SHA256 = "UNREGISTERED_PENDING_V3_COVERAGE"
+CONFIG_SHA256 = "03ef03ab8d9724f9239c4517fa193d81cfb4179c975f7ad7506f14d4cb0827f3"
 ALGORITHM_CONFIG = "config/player_role_history_v1.yaml"
 ALGORITHM_SOURCE = "src/fpl/validate/player_role_history.py"
 INTERPRETATION_ID = "competitive_participation_straight_red_v3"
@@ -61,6 +62,7 @@ FIXED_POLICY: dict[str, Any] = {
     "minutes_cache_source_database_sha256": ORIGINAL_CACHE_DATABASE_SHA256,
     "minimum_starting_label_coverage": 0.95,
     "interpretation_id": INTERPRETATION_ID,
+    "provider_completion": "FullTime_and_competitive_RESULT_TYPES_and_nonnegative_scores",
     "version_policy": VERSION_POLICY,
     "cutoff": "complete_target_gw_first_kickoff_proxy",
     "completion_margin_hours": 6,
@@ -244,6 +246,22 @@ def _cache_roster(
     return targets, metadata, files
 
 
+def _completed(record: dict[str, Any]) -> bool:
+    """Use the audited competitive finality contract, not PL-only result labels."""
+    raw = record["raw_match"]
+    summary = parse_match_summary(raw)
+    return (
+        raw.get("period") == "FullTime"
+        and raw.get("resultType") in RESULT_TYPES
+        and summary.kickoff is not None
+        and summary.kickoff < _time(record["capture_known_at"])
+        and summary.home_score is not None
+        and summary.away_score is not None
+        and summary.home_score >= 0
+        and summary.away_score >= 0
+    )
+
+
 def select_versions(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Select by original capture, never by correctness or retrospective score."""
     selected: dict[tuple[str, int, int], dict[str, Any]] = {}
@@ -257,9 +275,7 @@ def select_versions(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             raise ValueError("retained interpretation semantic hash differs")
         if record["capture_complete"] is not True:
             continue
-        if not is_completed_scored_match(
-            parse_match_summary(record["raw_match"]), now=_time(record["capture_known_at"])
-        ):
+        if not _completed(record):
             continue
         key = record["season"], record["competition_id"], record["match_id"]
         selected.setdefault(key, record)
@@ -384,9 +400,7 @@ def build_inputs(database: Path, minutes_manifest: Path) -> RoleInputs:
                 measured[key] = record, row
                 if key in by_key and by_key[key]["team_code"] != row["team_code"]:
                     raise ValueError("role fixture club contradiction")
-            if not record["interpretation_valid"] or not is_completed_scored_match(
-                summary, now=_time(record["capture_known_at"])
-            ):
+            if not record["interpretation_valid"] or not _completed(record):
                 ignored["invalid_or_unfinished_membership_row"] += 1
                 continue
             history.append(

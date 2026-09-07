@@ -1604,3 +1604,21 @@ is90% of all8,360FPL starters, so no role experiment runs yet. Next resolve only
 corroborated interpretation aliases in a new version, preserving this snapshot, unknown
 actors and duration outliers. See `docs/competitive-workload-staging-v2-development.md`.
 No new player candidate has been scored.
+
+Subsequently, clean V3 restaging recovers43valid matches, retains every old/raw version and
+raises PL role coverage to97.63%. Finalize the competitive finality filter and new coverage
+snapshot before the role preregistration; preserve the initial scaffold's incomplete source
+selection audit. See `docs/competitive-workload-staging-v3-development.md`.
+
+Phase F's single independent disciplinary run is retained **INCONCLUSIVE**: joint log+1.1415%
+vs informative position control, but both red-card guardrails fail. No retune, yellow-only
+selection or activation; synthesis retains incumbent disciplinary behavior. Independent
+5,214,137checks pass. See `docs/player-disciplinary-development.md`. Continue the other
+authorized phases with separate clean preregistrations, not this frozen card candidate.
+
+Broad-role V1 final coverage-only preregistration is now frozen in
+`docs/player-role-evaluation-v1-preregistration.md`:38whole-GW batches,29,747forecast rows,
+8,162measured starter labels,574completed competitive source bundles. Next run this candidate
+once from the clean registration commit, independently verify its retained probabilities and
+only then consume the event-time OOS role cache in separately registered player experiments.
+The newly tested one-GW workload memoization changes no observed-reader semantics.

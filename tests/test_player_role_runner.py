@@ -18,6 +18,13 @@ from fpl.storage.competitive_workload import semantic_identity
 from fpl.validate import dev_player_role_history as runner
 
 
+def test_actual_preregistered_config_loads_without_numeric_yaml_type_drift():
+    root = Path(__file__).resolve().parents[1]
+    contract = runner.load_contract(root, root / runner.CONFIG)
+    assert contract["policy"] == runner.FIXED_POLICY
+    assert type(contract["policy"]["log_probability_floor"]) is float
+
+
 def record(fixture: int = 1) -> dict[str, Any]:
     kickoff = datetime(2025, 8, 1 + fixture * 7, tzinfo=UTC).isoformat()
     rows = []
@@ -53,6 +60,7 @@ def record(fixture: int = 1) -> dict[str, Any]:
             "matchId": 1000 + fixture,
             "kickoff": kickoff,
             "resultType": "NormalResult",
+            "period": "FullTime",
             "homeTeam": {"id": 3, "score": 1},
             "awayTeam": {"id": 7, "score": 0},
         },
@@ -299,6 +307,38 @@ def test_unfinished_earliest_bundle_does_not_block_first_complete_final_capture(
     later["capture_known_at"] = "2026-09-08T00:00:00+00:00"
     later["semantic_sha256"] = semantic_identity(later)
     assert runner.select_versions([first, later]) == [later]
+
+
+@pytest.mark.parametrize(
+    "result_type", ["NormalResult", "PenaltyShootout", "Aggregate", "AfterExtraTime"]
+)
+def test_competitive_finality_retains_all_four_already_audited_result_types(
+    result_type: str,
+) -> None:
+    source = record()
+    source["raw_match"]["resultType"] = result_type
+    source["semantic_sha256"] = semantic_identity(source)
+    assert runner.select_versions([source]) == [source]
+
+
+@pytest.mark.parametrize(
+    "defect",
+    ["unfinished_period", "unknown_result", "missing_score", "negative_score", "future_kickoff"],
+)
+def test_competitive_finality_remains_fail_closed(defect: str) -> None:
+    source = record()
+    if defect == "unfinished_period":
+        source["raw_match"]["period"] = "SecondHalf"
+    elif defect == "unknown_result":
+        source["raw_match"]["resultType"] = "Unknown"
+    elif defect == "missing_score":
+        source["raw_match"]["awayTeam"]["score"] = None
+    elif defect == "negative_score":
+        source["raw_match"]["awayTeam"]["score"] = -1
+    else:
+        source["raw_match"]["kickoff"] = source["capture_known_at"]
+    source["semantic_sha256"] = semantic_identity(source)
+    assert runner.select_versions([source]) == []
 
 
 def test_clean_branch_refuses_dirty_and_wrong_branch(

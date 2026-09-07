@@ -1720,3 +1720,28 @@ is licensed yet. Preserve failed interpretations and four stoppage-clipping dura
 outliers; a separately corroborated interpretation amendment must not rewrite V2.
 See `docs/competitive-workload-staging-v2-development.md`. Source/default databases and
 frozen model results remain unchanged; optional cards remain absent in default callers.
+
+V3 competitive restaging now preserves all V2/raw data and recovers43matches:558/574valid,
+including371/380PL. Independent25,677checks pass; broad-role labels cover8,162/8,360FPL
+starters(97.63%). A pre-score role-scaffold finality fix must retain completed competitive
+extra-time/shootout/aggregate history before final registration; its initial535-version
+coverage report remains frozen. See `docs/competitive-workload-staging-v3-development.md`.
+
+The independent disciplinary candidate has now run ONCE from clean `54d9ffe` on114folds/
+86,755rows/821price-proxy rows. Joint NLL0.183069516 vs position-control0.185183364(+1.1415%),
+yellow log+1.2163%, but red log and red Brier regress: **INCONCLUSIVE**, not synthesis-eligible.
+Do not retune red pooling or select yellow alone. Independent5,214,137checks reconcile every
+PMF, score, source and gate; see `docs/player-disciplinary-development.md`. The optional card
+component remains absent from defaults and the passed-successor synthesis rule keeps incumbent
+disciplinary behavior. This does not stop independent authorized workload/role/attack/DC/saves
+research. Retrospective price/roster caveats and original181-fold Stage B/C minima remain.
+
+The broad starting-role transition candidate now has its final coverage-only preregistration:
+`docs/player-role-evaluation-v1-preregistration.md`. The corrected competitive finality boundary
+retains574source bundles/19,320history rows and unchanged8,162/8,360starter labels. All29,747
+2025-26roster rows receive separately retrospective OOS predictions; only measured starters are
+scored. This predicts broad role conditional on a hypothetical start, not starting probability
+or substitute role. The matched recent-state persistence diagnostic must accompany transition
+claims. No role formal result exists at this preregistration commit. Focused140tests pass;
+global Ruff and changed-file format/strict mypy pass. Historical Windows/full-format failures
+remain documented separately, not relabelled as a green full gate.
