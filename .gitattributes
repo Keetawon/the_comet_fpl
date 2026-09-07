@@ -61,3 +61,5 @@ results/player_opportunity_assists_development.json -text whitespace=cr-at-eol
 results/player_opportunity_goals_independent_audit.json -text whitespace=cr-at-eol
 results/player_opportunity_assists_independent_audit.json -text whitespace=cr-at-eol
 config/player_points_synthesis_evaluation.yaml -text whitespace=cr-at-eol
+results/player_points_synthesis_development.json -text whitespace=cr-at-eol
+results/player_points_synthesis_independent_audit.json -text whitespace=cr-at-eol

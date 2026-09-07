@@ -1818,3 +1818,24 @@ joint BPS/bonus remain incumbent. The nominated fully measured cohort is2025-26,
 remains. Keep signed targets and disclose inherited0..34proper-score coarsening.
 Reproduce every incumbent fixture PMF before the single clean shared claim.
 This is development-only, with no component refits or production promotion.
+
+Additive final synthesis result (2026-09-07): the registered H-only full-points
+candidate ran ONCE from clean `e716ec1`, after all 380 fixture controls reproduced
+at zero tolerance. On 29,747 rows / 38 GWs, NLL 1.088996402 -> 1.088375224 improves
+only 0.0570413%, and CRPS 0.669071035 -> 0.669132236 regresses slightly. Five of
+seven gates pass: **INCONCLUSIVE**, no default replacement or retuning. Independent
+4,297,806 checks pass with zero failures; all 3,427 GK projections include DNPs,
+not just H's appeared score population. Full distributions/source hashes and
+signed/coarsened targets are retained; the original 821-row registry gap and
+270 direct proxy rows here remain explicit. See `docs/full-player-pmf-development.md`
+and `docs/football-program-completion-2026-09-07.md`.
+
+The authorized program is complete within its documented evidence boundaries.
+Only H saves passed a full component gate; that saves-count result does not imply
+the final points synthesis passed. Keep all production/prospective/optimizer
+defaults. D/E retain 114-versus-181-fold ineligibility, F/G retain failed guards,
+and C's transition model still loses the stronger matched persistence diagnostic.
+The corrected broader partition passes 3,572 tests / four skips, excluding the
+known Windows symlink suite; eleven unrelated global-format failures remain.
+Do not describe the entire repository gate as all green. No subsequent experiment
+or shadow schedule is activated by this retained-result documentation.

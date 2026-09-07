@@ -1705,3 +1705,31 @@ Data-only preflight passes728,434checks and the corrected focused gate180tests;
 Ruff/mypy189sources pass. Retain known broader format/Windows limitations, the
 initial order-dependent test failure and its deterministic test-only correction.
 No formal full-points result exists at this preregistration commit.
+
+### 2026-09-07: full authorized development program retained
+
+The separately claimed H-only points synthesis completed ONCE from clean
+`e716ec1`; every incumbent fixture reproduced before the claim. NLL improves
+0.0570413% (1.088996402 -> 1.088375224), below the 1% bar; CRPS slightly regresses.
+Verdict **INCONCLUSIVE**. Independent 4,297,806 checks reconcile all 29,747 rows,
+38 GWs, 380 fixtures, source/claim hashes and saved GK projections without model
+fits or Monte Carlo replay. See `docs/full-player-pmf-development.md` and the
+complete phase-by-phase `docs/football-program-completion-2026-09-07.md`.
+
+The preregistered mechanical synthesis accepted only H saves. All other components
+remain incumbent, including D/E's unchanged full-gate ineligibility at 114/181
+folds. Retain original 821 price-proxy-dependent rows (270 in synthesis), known
+historical/participation gaps, legacy signed-score support limits and all frozen
+failed results. The final pipeline is NOT promoted and no next experiment is run.
+
+Corrected broad Python partition: 3,572 passed / four skipped / zero failures
+(417.82s), excluding `tests/test_bi_export.py` with its inherited Windows privilege
+failures. Focused gate: 180 passed. Ruff and strict mypy (189 files) pass; changed
+Python formatting passes, but eleven unrelated pre-existing formatting failures
+remain. Preserve the initial order-dependent test failure and test-only fix as
+evidence, not an undocumented full-green claim. No UI/default behavior changed.
+
+The single recommended next direction is prospective shadow validation of the
+accepted GK-saves opportunity chain and its points consequences, while preserving
+the incumbent. This is a recommendation only, not an activated schedule or a
+license to retune any completed candidate.

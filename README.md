@@ -843,3 +843,11 @@ retained. Their full gates remain ineligible at114/181folds. The separately
 keeps those incumbents and tests only the full-gate-passed GK-saves replacement.
 This remains retrospective development with an explicit historical-price proxy,
 not a default change or historical deadline-reproduction claim.
+
+The [complete authorized program](docs/football-program-completion-2026-09-07.md)
+is now retained. Its [single final points synthesis](docs/full-player-pmf-development.md)
+improves NLL only **0.0570%** and slightly worsens CRPS: **INCONCLUSIVE**. Only the
+GK-saves component passed its full development gate; this is not a full-pipeline
+or production promotion. Every default remains unchanged, and the original
+historical-price proxy, participation, coverage and signed-score limitations stay
+explicit. No previous frozen experiment was retuned or rerun.
