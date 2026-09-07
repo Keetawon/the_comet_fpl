@@ -619,6 +619,10 @@ Formal evaluation requires clean committed provenance and exact control reproduc
 Below 1% relative log-score lift, keep existing defaults; even a pass is not promotion.
 The daily operational database/raw collection remains separate from this frozen research DB.
 
+The single run is complete: **INCONCLUSIVE**, only **+0.066134%** log-score lift and a small
+2024-25 regression. Pooled clean-sheet Brier worsens slightly; existing defaults stay.
+See the [development result](docs/v2-weekly-sot-development.md). Do not rerun or retune it.
+
 ## The Stage A bar
 
 ```bash

@@ -1444,6 +1444,12 @@ remain the predeclared development bar. A miss keeps existing defaults; a pass s
 prospective confirmation and separate authorization. Do not delete new-source evidence.
 Local commits only, no push, merge/main changes, prior-result rewrite or second experiment.
 
+Completed once at clean `fd514cf`: **INCONCLUSIVE**, +0.066134% log lift over exactly
+reproduced weekly goals+xG, missing 1% and regressing in 2024-25. Preserve the new result
+and `docs/v2-weekly-sot-development.md`. No promotion or territory expansion; keep existing
+defaults and the already-installed strict-prospective data/revision collection. No new
+candidate may be inferred from this result.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:

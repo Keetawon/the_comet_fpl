@@ -1499,6 +1499,14 @@ is diagnostic, not accuracy. Keep collecting raw SDP regardless of this experime
 Local additive commits are authorized; no push, main sync/merge, rebase, PR, second
 experiment, or production/optimizer/default change in this task.
 
+The one formal run is now complete at clean `fd514cf`: **INCONCLUSIVE**. Weekly control
+reproduces exactly (zero PMF difference); SOT log score 1.485667700 versus 1.486650879 is
+only **+0.066134%**, below 1%, with a small 2024-25 regression. CRPS improves 0.140509%,
+but pooled reciprocal zero-goal/clean-sheet Brier worsens 0.079366% and rate SD contracts
+2.6314%. Retain the result at `results/v2_weekly_sot_development.json` and its development
+note without retuning/rerunning. Existing defaults remain unchanged; this result does not
+justify territory or discarding SDP captures. Continue strict-prospective collection.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.
