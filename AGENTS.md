@@ -1540,6 +1540,23 @@ the named candidate or obtain an independent promotion verdict. Both >=1% goal-l
 Do not tune/restart after a claimed result. The separate competitive-workload audit is data-only
 and cannot feed this model. Push completed additive evidence only to the V2 branch.
 
+### Tactical V1 retained execution failure (2026-09-07)
+
+The one authorized attempt at clean preregistration SHA `672a36d` is consumed. Incumbent
+reproduction passed: 1520 sides/76 folds, exact PMFs against reference AND current prospective
+adapter (max difference0). The tactical pass failed at historical123/189,2024-25GW10 with
+`ValueError: Poisson Newton backtracking failed to find a safe descent step`. No complete
+candidate scoring, style diagnostics or PMF publication exists. Verdict **INCONCLUSIVE due
+to incomplete execution**, not a measured failure of the1% bars or scientific refutation.
+The fixed result path contains an explicitly tagged execution-failure record, not normal
+runner output; retain it and the original local claim to block accidental reruns.
+Do not repair/restart this candidate under its consumed authorization. Any renewed execution
+needs a separate explicit numerical/provenance amendment, tests and preregistration; no new
+football features or changed gate are inferred. Original database, strict prospective paths,
+frozen results and defaults remain unchanged. See `docs/v2-tactical-matchup-development.md`
+and the verification record for the exact failure, source hashes and non-green environmental
+gate items. Successful provider/coverage evidence is not successful model evidence.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.

@@ -77,3 +77,24 @@ tests, source lint and strict typing are green. No environmental failure is sile
 
 Two new tactical JSON evidence paths have byte-preserving Git attributes so Windows automatic
 newline conversion cannot change their committed fingerprints. Prior artifacts are untouched.
+
+## Sole attempted formal execution and independent failure check
+
+The run at clean SHA `672a36d9d6fc446bb7492eb89eebd63f15bee860` exited1 during historical
+batch123/189 (2024-25GW10), after exact incumbent reproduction. See the development report;
+this is not a successful model evaluation. `formal-once.log` SHA256:
+`319534fd65bbb7803042b898a3663948de23ff672b67f2d38f84f120a6c93bca`.
+
+Independent read-only `independent-failure-verification.json` (external log directory)
+confirmed one claim/start, no normal publication, unchanged implementation/config/database,
+18 preserved prior result artifacts, exact incumbent NLL/CRPS and reciprocal CS arithmetic.
+It checked absence BEFORE the additive execution-failure marker was written. Current
+handoff docs were correctly reported as dirty; this was not relabelled successful runner
+postflight. The unchanged local claim SHA256 is
+`ef89aa2b510d35ea34fadc18db18999e22ba366c322dbc9f76c73d8f3a6c1733`.
+
+No real-data replay or solver fix followed. The fixed result path now contains an explicit
+incomplete execution-failure record, with null candidate metrics, so the existing write-once
+guard also blocks fresh-checkout restarts. Its JSON, source/config/log fingerprints and local
+paths were checked without invoking the formal runner again. No successful prediction,
+stacking-trace reconciliation or paired uncertainty is claimed for the interrupted candidate.

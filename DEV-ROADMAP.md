@@ -1468,6 +1468,16 @@ arms are not a candidate search. Keep original databases and previous artifacts 
 Competitive cup/Europe workload exploration is separate data-only evidence; direct minutes
 and cross-provider player identity need a later validated ingestion contract.
 
+Retained attempt outcome: **INCONCLUSIVE / incomplete numerical execution**, not scored
+underperformance. Preregistration/evaluation `672a36d`; incumbent1520/76 exact reproduction
+passed, then Poisson backtracking failed at historical2024-25GW10 (123/189). No complete
+tactical result exists. Preserve the explicitly tagged failure artifact and local claim;
+do not restart, retune or infer promotion. The only recommended model direction is a
+separately authorized numerical-method amendment for the same tactical hypothesis, with
+failure-state diagnostics and regression tests BEFORE any newly preregistered execution.
+No such amendment/fix/re-execution is implemented here. Full evidence and environmental
+test failures: `docs/v2-tactical-matchup-development.md`, `docs/v2-tactical-matchup-verification.md`.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:
