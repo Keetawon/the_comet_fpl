@@ -77,10 +77,10 @@ def _optional_instant(value: object, *, name: str) -> datetime | None:
 
 
 def payload_id(raw: RawPayload) -> str:
-    """Content-addressed identity: same request AND same body -> same id.
+    """Base content identity: same request AND same body -> same id.
 
-    Deliberately includes the body hash, so re-fetching unchanged data is idempotent while a
-    provider restatement lands as a distinct row alongside the original.
+    Landing preserves this identity for a body's first observation. A later reversion to
+    already-seen bytes gets a capture-event identity while retaining the same body SHA256.
     """
     material = "|".join([PROVIDER, raw.endpoint, raw.path, raw.params_json(), raw.sha256])
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
@@ -95,15 +95,56 @@ def land_payload(
 ) -> tuple[str, bool]:
     """Append one provider response. Returns `(payload_id, is_new)`.
 
-    Idempotent by construction: an identical body for an identical request re-derives the same
-    `payload_id` and is not written twice.
+    Consecutive unchanged responses and exact historical reimports are idempotent. A body
+    transition A -> B -> A is three observations, not two content blobs: the returning A
+    gets a deterministic capture-event id and its actual new knowledge time. No old row or
+    content hash changes. New observations must arrive in capture-time order for their
+    request stream; ambiguous equal-time or unrepresented older changes fail closed.
     """
     identifier = payload_id(raw)
+    retained = con.execute(
+        """
+        SELECT payload_id, sha256, epoch_us(fetched_at)
+        FROM raw_pl_sdp_payload
+        WHERE provider = ? AND endpoint = ? AND request_path = ? AND params_json = ?
+          AND season IS NOT DISTINCT FROM ? AND sdp_match_id IS NOT DISTINCT FROM ?
+        ORDER BY fetched_at DESC, payload_id DESC
+        """,
+        [PROVIDER, raw.endpoint, raw.path, raw.params_json(), season, sdp_match_id],
+    ).fetchall()
+    for previous_id, previous_sha, previous_epoch in retained:
+        if (
+            previous_sha == raw.sha256
+            and _instant(previous_epoch, name="fetched_at") == raw.fetched_at
+        ):
+            return str(previous_id), False
+    if retained:
+        latest_id, latest_sha, latest_epoch = retained[0]
+        latest_time = _instant(latest_epoch, name="fetched_at")
+        if raw.fetched_at <= latest_time:
+            # An old unchanged response need not have its own row. It can be reimported
+            # only when the retained state at that instant corroborates its body.
+            for previous_id, previous_sha, previous_epoch in retained:
+                previous_time = _instant(previous_epoch, name="fetched_at")
+                if previous_time <= raw.fetched_at:
+                    if previous_sha == raw.sha256:
+                        return str(previous_id), False
+                    break
+            raise SdpSchemaError(
+                "SDP capture-time conflict: a changed response must be later than the "
+                "latest retained observation; refusing to guess provider revision order"
+            )
+        if latest_sha == raw.sha256:
+            return str(latest_id), False
+        if any(previous_sha == raw.sha256 for _, previous_sha, _ in retained):
+            material = f"{identifier}|capture|{raw.fetched_at.astimezone(UTC).isoformat()}"
+            identifier = hashlib.sha256(material.encode("utf-8")).hexdigest()
+
     existing = con.execute(
         "SELECT 1 FROM raw_pl_sdp_payload WHERE payload_id = ?", [identifier]
     ).fetchone()
     if existing:
-        return identifier, False
+        raise SdpIdentityError("SDP payload identity already belongs to different capture metadata")
     con.execute(
         """
         INSERT INTO raw_pl_sdp_payload (

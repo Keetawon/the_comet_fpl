@@ -9,6 +9,7 @@ it. So ambiguity and contradiction must fail closed, and these tests construct b
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,7 @@ from typing import Any
 import duckdb
 import pytest
 
-from fpl.ingest.pl_sdp import RawPayload
+from fpl.ingest.pl_sdp import RawPayload, SdpSchemaError
 from fpl.storage.db import initialise
 from fpl.transform import pl_sdp as sdp
 from fpl.transform.pl_sdp import SdpIdentityError
@@ -217,11 +218,106 @@ def test_landing_is_idempotent_for_identical_content(con: duckdb.DuckDBPyConnect
 def test_a_provider_restatement_lands_beside_the_original(con: duckdb.DuckDBPyConnection) -> None:
     """An overwrite would destroy the knowledge time a point-in-time model depends on."""
     original = _fixture("match_stats")
-    sdp.land_payload(con, _raw("match_stats", original, match_id=1), sdp_match_id=1)
+    first = _raw("match_stats", original, match_id=1)
+    sdp.land_payload(con, first, sdp_match_id=1)
     revised = json.loads(json.dumps(original))
     revised[0]["stats"]["expected_goals"] = 1.91
-    sdp.land_payload(con, _raw("match_stats", revised, match_id=1), sdp_match_id=1)
+    second = replace(
+        _raw("match_stats", revised, match_id=1), fetched_at=first.fetched_at + timedelta(hours=1)
+    )
+    sdp.land_payload(con, second, sdp_match_id=1)
     assert con.execute("SELECT count(*) FROM raw_pl_sdp_payload").fetchone() == (2,)
+
+
+@pytest.mark.parametrize("endpoint", ["match_stats", "matches"])
+def test_provider_reversion_retains_a_new_capture_with_original_body_hash(
+    con: duckdb.DuckDBPyConnection,
+    endpoint: str,
+) -> None:
+    payload = _fixture("match_stats" if endpoint == "match_stats" else "matches_page")
+    original = _raw(endpoint, payload, match_id=1)
+    revised_payload = json.loads(json.dumps(payload))
+    if endpoint == "match_stats":
+        revised_payload[0]["stats"]["expected_goals"] = 1.91
+    else:
+        revised_payload["content"][0]["matchweek"] = 13
+    revised = replace(
+        _raw(endpoint, revised_payload, match_id=1),
+        fetched_at=original.fetched_at + timedelta(hours=1),
+    )
+    reverted = replace(original, fetched_at=original.fetched_at + timedelta(hours=2))
+    match_id = 1 if endpoint == "match_stats" else None
+    ids = [
+        sdp.land_payload(con, raw, season="2025-26", sdp_match_id=match_id)
+        for raw in (original, revised, reverted)
+    ]
+    assert all(is_new for _, is_new in ids)
+    assert len({identifier for identifier, _ in ids}) == 3
+    rows = con.execute(
+        "SELECT payload_id, sha256, epoch_us(fetched_at) "
+        "FROM raw_pl_sdp_payload ORDER BY fetched_at"
+    ).fetchall()
+    assert [row[1] for row in rows] == [original.sha256, revised.sha256, original.sha256]
+    assert [row[2] for row in rows] == [
+        int(raw.fetched_at.timestamp() * 1_000_000) for raw in (original, revised, reverted)
+    ]
+    assert rows[0][0] == sdp.payload_id(original)
+    for raw, expected_id in zip(
+        (original, revised, reverted), (item[0] for item in ids), strict=True
+    ):
+        assert sdp.land_payload(con, raw, season="2025-26", sdp_match_id=match_id) == (
+            expected_id,
+            False,
+        )
+    later_unchanged = replace(original, fetched_at=original.fetched_at + timedelta(hours=3))
+    assert sdp.land_payload(con, later_unchanged, season="2025-26", sdp_match_id=match_id) == (
+        ids[2][0],
+        False,
+    )
+    if endpoint == "match_stats":
+        assert sdp.stage_team_stats(con).team_sides_staged == 6
+        values = con.execute(
+            "SELECT expected_goals FROM stg_pl_sdp_team_match_stats "
+            "WHERE side = 'home' ORDER BY known_at"
+        ).fetchall()
+        assert values == [(1.84,), (1.91,), (1.84,)]
+    assert con.execute("SELECT count(*) FROM raw_pl_sdp_payload").fetchone() == (3,)
+
+
+def test_old_unchanged_reimport_is_not_mistaken_for_a_new_reversion(
+    con: duckdb.DuckDBPyConnection,
+) -> None:
+    original = _raw("match_stats", _fixture("match_stats"), match_id=1)
+    identifier, _ = sdp.land_payload(con, original, sdp_match_id=1)
+    unchanged = replace(original, fetched_at=original.fetched_at + timedelta(hours=1))
+    assert sdp.land_payload(con, unchanged, sdp_match_id=1) == (identifier, False)
+    payload = _fixture("match_stats")
+    payload[0]["stats"]["expected_goals"] = 1.91
+    revised = replace(
+        _raw("match_stats", payload, match_id=1),
+        fetched_at=original.fetched_at + timedelta(hours=2),
+    )
+    sdp.land_payload(con, revised, sdp_match_id=1)
+    assert sdp.land_payload(con, unchanged, sdp_match_id=1) == (identifier, False)
+    assert con.execute("SELECT count(*) FROM raw_pl_sdp_payload").fetchone() == (2,)
+
+
+@pytest.mark.parametrize("offset_hours", [0, -1])
+def test_unrepresented_equal_or_older_capture_change_fails_closed(
+    con: duckdb.DuckDBPyConnection,
+    offset_hours: int,
+) -> None:
+    original = _raw("match_stats", _fixture("match_stats"), match_id=1)
+    sdp.land_payload(con, original, sdp_match_id=1)
+    payload = _fixture("match_stats")
+    payload[0]["stats"]["expected_goals"] = 1.91
+    conflict = replace(
+        _raw("match_stats", payload, match_id=1),
+        fetched_at=original.fetched_at + timedelta(hours=offset_hours),
+    )
+    with pytest.raises(SdpSchemaError, match="capture-time conflict"):
+        sdp.land_payload(con, conflict, sdp_match_id=1)
+    assert con.execute("SELECT count(*) FROM raw_pl_sdp_payload").fetchone() == (1,)
 
 
 def test_raw_payload_retains_exact_bytes(con: duckdb.DuckDBPyConnection) -> None:

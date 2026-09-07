@@ -176,6 +176,7 @@ def test_feature_source_permits_exactly_the_component_tables() -> None:
             # OUTCOME_COLUMNS, which test_every_v2_metric_column_is_an_outcome pins against
             # the metric dictionary.
             "mart_fact_team_match_stats_v2",
+            "mart_fact_team_match_stats_v2_version",
             "mart_fact_team_tactical_form_v2",
         }
         for table in source.readable_tables():

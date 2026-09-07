@@ -139,7 +139,7 @@ def build_coverage(con: Any) -> dict[str, Any]:
         con.execute(
             """
             SELECT provider, season, count(*), count(DISTINCT fixture),
-                   min(kickoff_time), max(kickoff_time)
+                   epoch_us(min(kickoff_time)), epoch_us(max(kickoff_time))
             FROM mart_fact_team_match_stats_v2
             GROUP BY provider, season ORDER BY provider, season
             """
@@ -148,7 +148,12 @@ def build_coverage(con: Any) -> dict[str, Any]:
         else []
     )
     population_by_key = {
-        (str(provider), str(season)): (team_rows, fixtures, first_kickoff, last_kickoff)
+        (str(provider), str(season)): (
+            team_rows,
+            fixtures,
+            sdp_transform._optional_instant(first_kickoff, name="first_kickoff"),
+            sdp_transform._optional_instant(last_kickoff, name="last_kickoff"),
+        )
         for provider, season, team_rows, fixtures, first_kickoff, last_kickoff in populations
     }
     expected_by_season = _expected_fixture_populations(con, as_of=generated_at)
@@ -166,8 +171,8 @@ def build_coverage(con: Any) -> dict[str, Any]:
     columns = [*fields, *mirrors]
     selects = ", ".join(
         f'count("{column}"), min("{column}"), max("{column}"), avg("{column}"), '
-        f'min(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END), '
-        f'max(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END)'
+        f'epoch_us(min(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END)), '
+        f'epoch_us(max(CASE WHEN "{column}" IS NOT NULL THEN kickoff_time END))'
         for column in columns
     )
     declared = dictionary.by_local_field()
@@ -232,8 +237,12 @@ def build_coverage(con: Any) -> dict[str, Any]:
                     "min": low,
                     "max": high,
                     "mean": round(float(average), 6) if average is not None else None,
-                    "first_measured_kickoff": first_measured,
-                    "last_measured_kickoff": last_measured,
+                    "first_measured_kickoff": sdp_transform._optional_instant(
+                        first_measured, name="first_measured_kickoff"
+                    ),
+                    "last_measured_kickoff": sdp_transform._optional_instant(
+                        last_measured, name="last_measured_kickoff"
+                    ),
                     "group": metric.group if metric is not None else "mirror",
                     "verified_semantics": (
                         metric.verified_semantics if metric is not None else False
@@ -1030,7 +1039,7 @@ def build_identity_details(con: Any) -> dict[str, Any]:
             )
             WHERE ordinal = 1
         )
-        SELECT m.season, m.sdp_match_id, m.kickoff_time,
+        SELECT m.season, m.sdp_match_id, epoch_us(m.kickoff_time),
                m.home_team_name, m.away_team_name, m.home_score, m.away_score
         FROM latest AS m
         LEFT JOIN stg_pl_sdp_fixture_crosswalk AS c ON c.sdp_match_id = m.sdp_match_id
@@ -1068,7 +1077,7 @@ def build_identity_details(con: Any) -> dict[str, Any]:
             {
                 "season": str(season),
                 "sdp_match_id": int(match_id),
-                "kickoff": kickoff,
+                "kickoff": sdp_transform._optional_instant(kickoff, name="unmatched SDP kickoff"),
                 "home": home,
                 "away": away,
                 "score": (

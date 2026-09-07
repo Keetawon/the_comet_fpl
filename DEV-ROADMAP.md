@@ -19,6 +19,25 @@ evidence-bound insight summaries. Its implementation and automated gates are com
 responsive in-browser visual verification remains pending where recorded in P2.5. No model default
 or frozen evaluation changed. P2.5 owns any later post-deadline work.
 
+## Owner-authorized data prerequisites (2026-09-06)
+
+Before the next new model experiment, complete and verify revision-stable strict football PIT
+and durable local daily capture. Keep latest-only reporting facts separate from retained
+stats/metadata versions; tactical PIT must select one eligible revision per fixture BEFORE
+rolling. Exact old-cutoff frames must survive revision capture/rebuild, with new cutoffs
+seeing the correction. Include late metadata changes, missing metadata, NULL and A→B→A.
+
+`jobs.daily_pl_sdp` supplies explicit operational paths, single-writer exclusion, consistent
+backups, missing-current-season and seven-day-revision passes, staging, and actual PIT/freshness
+checks. Raw-only mode remains available during migration. The local registration helper
+uses persistent Python/storage; schedules do not imply a default dashboard/optimizer switch.
+Runbook and measured regression: `docs/pl-sdp-revision-pit-and-local-daily.md`.
+
+New model development is owner-authorized after these prerequisites and does not require an
+earlier model to clear 1%. Preserve all old experiments/gates. Before a NEW outer evaluation,
+separately name/preregister its hypothesis, comparison, evidence regime and suitable gate,
+then establish clean committed provenance. No automatic promotion or historical rerun.
+
 ## Owner goals
 
 1. Produce an auditable, legal GW1 squad, starting XI, captain, vice-captain, and bench before the

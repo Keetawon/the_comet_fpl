@@ -140,11 +140,35 @@ def test_later_known_history_is_retrospective_only(con: duckdb.DuckDBPyConnectio
         """,
         [KICKOFF, captured],
     )
+    # A migrated source is necessary to exercise the actual knowledge-time rejection;
+    # a latest-only synthetic row now correctly fails the separate migration guard.
+    con.execute(
+        """
+        INSERT INTO mart_fact_team_match_stats_v2_version (
+            season, gw, fixture, pulse_id, sdp_match_id, kickoff_time, team_id, team_code,
+            opponent_team_id, opponent_team_code, was_home, provider, known_at, capture_id,
+            payload_sha256, source_known_at, metadata_capture_id, metadata_known_at,
+            shots_on_target, shots_on_target_allowed
+        ) SELECT season, gw, fixture, pulse_id, 9001, kickoff_time, team_id, team_code,
+                 opponent_team_id, opponent_team_code, was_home, 'pl_sdp', ?, 'first',
+                 'sha-first', ?, 'archive', kickoff_time,
+                 CASE WHEN was_home THEN 3 ELSE 4 END,
+                 CASE WHEN was_home THEN 4 ELSE 3 END
+          FROM mart_fact_team_match_stats_v2 WHERE provider = 'fpl_archive'
+        """,
+        [captured, captured],
+    )
 
     strict = PointInTimeView(FeatureSource(con), AS_OF).observed_team_football(providers=["pl_sdp"])
     retrospective = RetrospectiveBackfillView(con, AS_OF).observed_real_sot()
 
     assert strict.is_empty()
+    assert (
+        PointInTimeView(FeatureSource(con), AsOf(captured))
+        .observed_team_football(providers=["pl_sdp"])
+        .height
+        == 2
+    )
     assert retrospective.height == 2
     assert retrospective["source_known_at"].min() > AS_OF.ts
     assert retrospective["evidence_class"].unique().to_list() == [EVIDENCE_CLASS]

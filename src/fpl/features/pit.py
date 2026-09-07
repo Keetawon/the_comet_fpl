@@ -369,6 +369,110 @@ class FeatureSource:
         )
         return pl.from_arrow(relation.to_arrow_table())  # type: ignore[return-value]
 
+    def _football_observations_sql(
+        self, as_of: datetime, *, include_sdp: bool
+    ) -> tuple[str, list[object], set[str]]:
+        """Model observations, never the latest-only SDP reporting snapshot.
+
+        Stats and fixture metadata both have to exist at the cutoff. Version selection
+        precedes the event filter, so a known postponement cannot revive an older kickoff.
+        Archive rows keep their explicitly unversioned historical-proxy semantics.
+        """
+        table = "mart_fact_team_match_stats_v2"
+        versions = "mart_fact_team_match_stats_v2_version"
+        columns = self._columns(table)
+        projection = ", ".join(f'"{column}"' for column in columns)
+        metadata = {
+            "capture_id": "NULL::VARCHAR",
+            "payload_sha256": "NULL::VARCHAR",
+            "source_known_at": "known_at",
+            "metadata_capture_id": "NULL::VARCHAR",
+            "metadata_known_at": "known_at",
+        }
+        extra = ", ".join(f'{value} AS "{key}"' for key, value in metadata.items())
+        archive = (
+            f"SELECT {projection}, {extra} FROM {table} "
+            "WHERE provider <> 'pl_sdp' AND known_at <= ?"
+        )
+        params: list[object] = [as_of]
+        has_versions = self._has_table(versions)
+        if include_sdp:
+            # A schema-only upgrade is not an ingestion migration. Refuse eligible legacy
+            # rows with no retained model version instead of silently restoring the old bug.
+            witness = (
+                f"AND NOT EXISTS (SELECT 1 FROM {versions} v WHERE v.season=l.season "
+                "AND v.fixture=l.fixture AND v.team_id=l.team_id AND v.provider=l.provider)"
+                if has_versions
+                else ""
+            )
+            missing = self.__con.execute(
+                f"SELECT 1 FROM {table} l WHERE provider='pl_sdp' {witness} LIMIT 1"
+            ).fetchone()
+            if missing is not None:
+                raise LeakageError(
+                    "SDP revision read model is missing; run audit_pl_sdp --stage on an "
+                    "operational database before reading eligible SDP observations"
+                )
+            if has_versions:
+                fields = ", ".join(f'"{name}"' for name in [*columns, *metadata])
+                archive += f"""
+                    UNION ALL SELECT {fields} FROM (
+                        SELECT *, row_number() OVER (
+                            PARTITION BY season, fixture, team_id, provider
+                            ORDER BY source_known_at DESC, capture_id DESC,
+                                     metadata_known_at DESC, metadata_capture_id DESC
+                        ) AS version_rank
+                        FROM {versions} WHERE known_at <= ?
+                    ) WHERE version_rank=1
+                """
+                params.append(as_of)
+        sql = f"SELECT * FROM ({archive}) WHERE kickoff_time < ?"
+        params.append(as_of)
+        return sql, params, set(columns) | set(metadata)
+
+    def _select_football_known(
+        self,
+        table: str,
+        *,
+        as_of: datetime,
+        columns: Sequence[str],
+        predicates: Sequence[str],
+        params: Sequence[object],
+        include_sdp: bool,
+    ) -> pl.DataFrame:
+        """One eligible revision per match, then (when requested) tactical rolling."""
+        self._check_table(table)
+        source, source_params, available = self._football_observations_sql(
+            as_of, include_sdp=include_sdp
+        )
+        if table == "mart_fact_team_tactical_form_v2":
+            from fpl.transform.football_v2 import WINDOWS, tactical_form_query
+
+            form_columns = set(self._columns(table))
+            forms = " UNION ALL ".join(
+                "("
+                + tactical_form_query(
+                    "SELECT * FROM observations",
+                    mart_columns=available,
+                    form_columns=form_columns,
+                    window_name=window_name,
+                    length=length,
+                )
+                + ")"
+                for window_name, length in WINDOWS
+            )
+            source = f"WITH observations AS ({source}) {forms}"
+            available = form_columns
+        unknown = sorted(set(columns) - available)
+        if unknown:
+            raise ValueError(f"unknown column(s) for {table}: {unknown}")
+        projection = ", ".join(f'"{column}"' for column in columns)
+        where = f"WHERE {' AND '.join(predicates)}" if predicates else ""
+        relation = self.__con.execute(
+            f"SELECT {projection} FROM ({source}) {where}", [*source_params, *params]
+        )
+        return pl.from_arrow(relation.to_arrow_table())  # type: ignore[return-value]
+
 
 class PointInTimeView:
     """The only sanctioned reader of fact tables inside `features/`.
@@ -429,7 +533,7 @@ class PointInTimeView:
         providers: Sequence[str] | None = None,
         columns: Sequence[str] | None = None,
     ) -> pl.DataFrame:
-        """V2 football metric rows with `kickoff_time < as_of`.
+        """Latest eligible V2 football revision with `kickoff_time < as_of`.
 
         Keyed on `team_code`, not `team_id`: this is the table a cross-season rating system
         reads, and `team_id` is reassigned every year.
@@ -518,6 +622,17 @@ class PointInTimeView:
         # ...and the point-in-time boundary last, appended here and nowhere else.
         predicates.append(f'"{time_column}" < ?')
         params.append(self._as_of.ts)
+
+        if table in {"mart_fact_team_match_stats_v2", "mart_fact_team_tactical_form_v2"}:
+            providers = next((values for column, values in extra_in if column == "provider"), None)
+            return self._source._select_football_known(
+                table,
+                as_of=self._as_of.ts,
+                columns=selected,
+                predicates=predicates,
+                params=params,
+                include_sdp=providers is None or "pl_sdp" in providers,
+            )
 
         archive = self._source._select(
             table, columns=selected, predicates=predicates, params=params

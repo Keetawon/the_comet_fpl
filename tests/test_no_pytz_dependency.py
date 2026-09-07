@@ -18,6 +18,10 @@ property, and it keeps working when someone writes the next query.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -45,13 +49,37 @@ def test_the_guard_actually_reproduces_the_failure(without_pytz: None) -> None:
     If DuckDB ever stops needing `pytz`, this fails and the whole file can be retired rather
     than carried forever for a reason nobody remembers.
     """
-    connection = duckdb.connect(":memory:")
+    # DuckDB caches timezone conversion state in its extension. Earlier tests can warm
+    # that cache, making sys.modules blocking alone a vacuous negative control. A fresh
+    # interpreter must still reproduce the missing-dependency failure before conversion.
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """
+import sys
+sys.modules['pytz'] = None
+import duckdb
+connection = duckdb.connect(':memory:')
+try:
+    connection.execute("SET TimeZone='UTC'")
     try:
-        connection.execute("SET TimeZone='UTC'")
-        with pytest.raises(duckdb.InvalidInputException, match="pytz"):
-            connection.execute("SELECT now()::TIMESTAMPTZ").fetchall()
-    finally:
-        connection.close()
+        connection.execute('SELECT now()::TIMESTAMPTZ').fetchall()
+    except duckdb.InvalidInputException as error:
+        assert 'pytz' in str(error), str(error)
+    else:
+        raise AssertionError('TIMESTAMPTZ unexpectedly no longer requires pytz')
+finally:
+    connection.close()
+""",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_epoch_us_needs_no_timezone_database(without_pytz: None) -> None:
@@ -139,9 +167,6 @@ def test_team_outcome_reattachment_works_without_pytz(tmp_path: Path, without_py
 
 def test_sdp_staging_and_crosswalk_work_without_pytz(tmp_path: Path, without_pytz: None) -> None:
     """The V2 SDP path reads capture times and kickoffs on every staging pass."""
-    import hashlib
-    import json
-
     from fpl.ingest.pl_sdp import RawPayload
 
     payload = {
@@ -184,3 +209,76 @@ def test_sdp_staging_and_crosswalk_work_without_pytz(tmp_path: Path, without_pyt
         assert audit.kickoff_corroborated == 1
     finally:
         connection.close()
+
+
+def test_complete_sdp_audit_cli_in_cold_process_needs_no_pytz(tmp_path: Path) -> None:
+    """A fresh supported install must write every real audit report, not only stage rows."""
+    from fpl.ingest.pl_sdp import RawPayload
+
+    from .test_daily_pl_sdp import _land, _official
+
+    database = tmp_path / "operational.duckdb"
+    reports = tmp_path / "audit"
+    _official(database)
+    _land(database)
+    # Exercise the formerly unsafe unmatched-provider timestamp path as well as coverage.
+    payload = {
+        "data": [
+            {
+                "matchId": 7999,
+                "season": 2026,
+                "kickoff": "2026-09-03T14:00:00.123456Z",
+                "homeTeam": {"id": 3, "name": "Arsenal"},
+                "awayTeam": {"id": 9, "name": "Coventry"},
+            }
+        ]
+    }
+    body = json.dumps(payload)
+    raw = RawPayload(
+        endpoint="matches",
+        path="/api/v2/matches",
+        params={"season": 2026},
+        fetched_at=datetime(2026, 9, 6, 18, tzinfo=UTC),
+        status_code=200,
+        text=body,
+        sha256=hashlib.sha256(body.encode()).hexdigest(),
+        byte_count=len(body.encode()),
+        payload=payload,
+    )
+    with initialise(database) as connection:
+        sdp.land_payload(connection, raw, season="2026-27")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys,runpy; sys.modules['pytz']=None; "
+            "sys.argv=['audit_pl_sdp',*sys.argv[1:]]; "
+            "runpy.run_module('fpl.jobs.audit_pl_sdp',run_name='__main__')",
+            "--db",
+            str(database),
+            "--stage",
+            "--results",
+            str(reports),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert {path.name for path in reports.glob("*.json")} == {
+        "pl_sdp_identity_audit.json",
+        "pl_sdp_coverage.json",
+        "pl_sdp_reconciliation.json",
+        "pl_sdp_metric_inventory.json",
+    }
+    coverage = json.loads((reports / "pl_sdp_coverage.json").read_text())
+    season = coverage["providers"]["pl_sdp"]["2026-27"]
+    assert season["first_kickoff"] == "2026-08-22 14:00:00+00:00"
+    assert season["last_kickoff"] == "2026-09-05 14:00:00+00:00"
+    assert season["metrics"]["shots_on_target"]["first_measured_kickoff"] == season["first_kickoff"]
+    assert season["metrics"]["shots_on_target"]["last_measured_kickoff"] == season["last_kickoff"]
+    assert season["metrics"]["expected_goals"]["first_measured_kickoff"] is None
+    identity = json.loads((reports / "pl_sdp_identity_audit.json").read_text())
+    assert identity["details"]["unmatched_sdp"][0]["kickoff"] == "2026-09-03 14:00:00.123456+00:00"

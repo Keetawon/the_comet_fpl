@@ -1454,6 +1454,33 @@ without rerunning or retuning. The sole next recommendation is a separately auth
 separately preregistered SOT incremental test against the frozen weekly-inner control; no such
 candidate is implemented or licensed by this result, and nothing is promoted.
 
+## Revision-safe SDP and local operations (owner-authorized 2026-09-06)
+
+The latest-only reporting fact is NOT a historical version reader. Strict football PIT now
+uses `mart_fact_team_match_stats_v2_version`: retain complete whole-payload SDP revisions and
+complete exact-capture fixture metadata; require both knowledge times <= cutoff, select one
+revision per team-fixture/provider, then enforce event time. Raw/staging capture times remain
+unchanged. An unbuilt version read model fails closed rather than silently using latest rows.
+Tactical model features roll over those cutoff-selected match rows, not over every revision
+or over the latest reporting aggregate. The reporting marts remain latest-only for audit/BI.
+Incomplete later payload/metadata never replaces older valid evidence; incorrect non-NULL
+club identities still fail. A provider A→B→A reversion is a new capture event, while a
+consecutive unchanged response remains idempotent and retains its original knowledge time.
+
+Use `jobs.daily_pl_sdp` only with explicit separate persistent operational `--db` and `--runs`.
+It holds single-writer locks, takes a consistent backup, captures missing current-season stats
+without a lookback limit plus seven-day revisions, stages, and checks freshness/PIT access.
+`--raw-only` explicitly defers staging and is not consumer-ready. Protect original/frozen DBs;
+never route default forecasts or optimizers to the operational copy without owner direction.
+See `docs/pl-sdp-revision-pit-and-local-daily.md` for the regression and runbook.
+
+The owner authorizes developing a NEW model after these data prerequisites are verified.
+Development is not conditional on first beating an existing model by 1%. This does NOT
+change or reinterpret any frozen result/gate: each new named experiment must declare its
+own research question, comparisons, evidence regime and suitable decision criteria BEFORE
+outer scoring, with clean committed provenance. Production use remains a separate explicit
+decision. Do not rerun historical candidates or infer promotion from this authorization.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.

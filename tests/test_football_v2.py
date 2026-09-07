@@ -663,8 +663,16 @@ def test_tactical_form_known_at_is_the_latest_capture_in_its_window(
     con.close()
     with FeatureSource.open(path) as source:
         view = PointInTimeView(source, AsOf(cutoff))
-        frame = view.observed_team_tactical_form(team_codes=[3], windows=["last_3"], columns=["gw"])
-        assert frame.is_empty()
+        frame = view.observed_team_tactical_form(
+            team_codes=[3],
+            windows=["last_3"],
+            columns=["gw", "matches", "goals_per_match", "known_at"],
+        )
+        # The stored reporting window above includes the later-known GW1 observation.
+        # Strict PIT rebuilds the window from eligible facts, so only already-known GW2
+        # contributes. It neither loses GW2 nor exposes GW1's later-known measurement.
+        assert frame.select("gw", "matches", "goals_per_match").rows() == [(2, 1, 1.0)]
+        assert frame["known_at"].to_list() == [KICKOFF + timedelta(days=7)]
 
 
 def test_historical_sdp_evaluation_reader_fails_closed(

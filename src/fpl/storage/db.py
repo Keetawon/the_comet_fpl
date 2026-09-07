@@ -46,6 +46,7 @@ FEATURE_READABLE_TABLES: Final[frozenset[str]] = frozenset(
         # features.pit.OUTCOME_COLUMNS, so PointInTimeView hard-filters them on
         # `kickoff_time < as_of` and `schedule()` cannot project them.
         "mart_fact_team_match_stats_v2",
+        "mart_fact_team_match_stats_v2_version",
         "mart_fact_team_tactical_form_v2",
     }
 )
@@ -156,6 +157,7 @@ _SDP_METRIC_TABLES: Final[tuple[tuple[str, str | None, bool], ...]] = (
     # (table, column suffix, include derived opponent mirrors)
     ("stg_pl_sdp_team_match_stats", None, False),
     ("mart_fact_team_match_stats_v2", None, True),
+    ("mart_fact_team_match_stats_v2_version", None, True),
     ("mart_fact_team_tactical_form_v2", "_per_match", True),
 )
 

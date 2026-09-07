@@ -726,6 +726,31 @@ CREATE TABLE IF NOT EXISTS mart_fact_team_match_stats_v2 (
     PRIMARY KEY (season, fixture, team_id, provider)
 );
 
+-- MODEL READ MODEL: retained SDP payload and fixture-metadata versions. The existing
+-- unversioned fact remains the latest-only reporting/reconciliation surface. A strict reader
+-- first filters known_at, then chooses one payload/metadata pair per team-fixture.
+CREATE TABLE IF NOT EXISTS mart_fact_team_match_stats_v2_version (
+    season             VARCHAR NOT NULL,
+    gw                 INTEGER,
+    fixture            INTEGER NOT NULL,
+    pulse_id           INTEGER,
+    sdp_match_id        BIGINT,
+    kickoff_time       TIMESTAMPTZ NOT NULL,
+    team_id            INTEGER NOT NULL,
+    team_code          INTEGER,
+    opponent_team_id   INTEGER NOT NULL,
+    opponent_team_code INTEGER,
+    was_home           BOOLEAN NOT NULL,
+    provider           VARCHAR NOT NULL,
+    known_at           TIMESTAMPTZ NOT NULL,
+    capture_id         VARCHAR NOT NULL,
+    payload_sha256     VARCHAR,
+    source_known_at    TIMESTAMPTZ NOT NULL,
+    metadata_capture_id VARCHAR NOT NULL,
+    metadata_known_at  TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (season, fixture, team_id, provider, capture_id, metadata_capture_id)
+);
+
 -- MART: descriptive rolling team state, keyed on the cross-season club identity.
 --
 -- Raw rolling means are generated per metric with a `_per_match` suffix. The derived indices

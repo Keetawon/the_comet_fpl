@@ -421,9 +421,44 @@ def build_team_tactical_form(con: duckdb.DuckDBPyConnection) -> int:
     """
     if not table_exists(con, "mart_fact_team_match_stats_v2"):
         return 0
-    dictionary = load_sdp_metrics()
     mart_columns = set(table_columns(con, "mart_fact_team_match_stats_v2"))
     form_columns = set(table_columns(con, "mart_fact_team_tactical_form_v2"))
+    con.execute("DELETE FROM mart_fact_team_tactical_form_v2")
+    total = 0
+    for window_name, length in WINDOWS:
+        query = tactical_form_query(
+            "SELECT * FROM mart_fact_team_match_stats_v2",
+            mart_columns=mart_columns,
+            form_columns=form_columns,
+            window_name=window_name,
+            length=length,
+        )
+        con.execute(f"INSERT INTO mart_fact_team_tactical_form_v2 BY NAME {query}")
+        row = con.execute(
+            'SELECT count(*) FROM mart_fact_team_tactical_form_v2 WHERE "window" = ?',
+            [window_name],
+        ).fetchone()
+        total += int(row[0]) if row else 0
+    return total
+
+
+def tactical_form_query(
+    source_sql: str,
+    *,
+    mart_columns: set[str],
+    form_columns: set[str],
+    window_name: str,
+    length: int | None,
+) -> str:
+    """Shared rolling arithmetic for reporting and cutoff-selected model observations.
+
+    Internal SQL composition only: never caller-provided SQL. A PIT caller must select one
+    eligible version per fixture BEFORE this query, and apply anchor/output filters AFTER it.
+    Reusing the same arithmetic avoids a second definition of tactical form.
+    """
+    if (window_name, length) not in WINDOWS:
+        raise ValueError("unknown tactical window")
+    dictionary = load_sdp_metrics()
     metrics = [
         name
         for name in (
@@ -442,44 +477,24 @@ def build_team_tactical_form(con: duckdb.DuckDBPyConnection) -> int:
         )
     ]
 
-    con.execute("DELETE FROM mart_fact_team_tactical_form_v2")
-    total = 0
-    for window_name, length in WINDOWS:
-        # A rolling mean over the trailing `length` matches, or the season to date. `RANGE`
-        # over the anchor's kickoff rather than `ROWS` so both legs of a double gameweek fall
-        # inside the same anchor rather than one of them being cut off mid-gameweek.
-        frame = (
-            f"ROWS BETWEEN {length - 1} PRECEDING AND CURRENT ROW"
-            if length is not None
-            else "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
-        )
-        averages = ", ".join(f'avg("{name}") OVER w AS "{name}_per_match"' for name in metrics)
-        derived_select = ", ".join(
-            _complete_derived_index_sql(column, numerator, denominator)
-            for column, numerator, denominator in derived
-        )
-        columns = [
-            "season",
-            "gw",
-            "team_code",
-            "provider",
-            '"window"',
-            "as_at_kickoff",
-            "known_at",
-            "matches",
-            *[f'"{name}_per_match"' for name in metrics],
-            *[f'"{column}"' for column, _, _ in derived],
-        ]
-        con.execute(
-            f"""
-            INSERT INTO mart_fact_team_tactical_form_v2 ({", ".join(columns)})
-            WITH rolled AS (
-                SELECT season, gw, team_code, provider, kickoff_time,
+    frame = (
+        f"ROWS BETWEEN {length - 1} PRECEDING AND CURRENT ROW"
+        if length is not None
+        else "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+    )
+    averages = ", ".join(f'avg("{name}") OVER w AS "{name}_per_match"' for name in metrics)
+    derived_select = ", ".join(
+        _complete_derived_index_sql(column, numerator, denominator)
+        for column, numerator, denominator in derived
+    )
+    return f"""
+            WITH source AS ({source_sql}), rolled AS (
+                SELECT season, gw, team_code, provider, kickoff_time, fixture,
                        max(known_at) OVER w AS known_at,
                        count(*) OVER w AS matches
                        {", " if averages else ""}{averages}
                        {", " if derived_select else ""}{derived_select}
-                FROM mart_fact_team_match_stats_v2
+                FROM source
                 WHERE team_code IS NOT NULL AND gw IS NOT NULL
                 WINDOW w AS (
                     PARTITION BY provider, team_code, season
@@ -490,24 +505,18 @@ def build_team_tactical_form(con: duckdb.DuckDBPyConnection) -> int:
             anchored AS (
                 SELECT *, row_number() OVER (
                     PARTITION BY provider, team_code, season, gw
-                    ORDER BY kickoff_time DESC
+                    ORDER BY kickoff_time DESC, fixture DESC
                 ) AS leg_rank
                 FROM rolled
             )
-            SELECT season, gw, team_code, provider, '{window_name}', kickoff_time, known_at, matches
+            SELECT season, gw, team_code, provider, '{window_name}' AS "window",
+                   kickoff_time AS as_at_kickoff, known_at, matches
                    {", " if metrics else ""}
                    {", ".join(f'"{name}_per_match"' for name in metrics)}
                    {", " if derived else ""}
                    {", ".join(f'"{column}"' for column, _, _ in derived)}
             FROM anchored WHERE leg_rank = 1
             """
-        )
-        row = con.execute(
-            'SELECT count(*) FROM mart_fact_team_tactical_form_v2 WHERE "window" = ?',
-            [window_name],
-        ).fetchone()
-        total += int(row[0]) if row else 0
-    return total
 
 
 def _referenced_columns(expression: str) -> set[str]:
@@ -562,6 +571,9 @@ def build_all(con: duckdb.DuckDBPyConnection) -> FootballV2Counts:
         return FootballV2Counts(skipped_reason=blocked)
     archive_rows = build_team_match_stats_archive(con)
     sdp_rows = build_team_match_stats_sdp(con)
+    from fpl.transform.football_versions import build_team_match_versions
+
+    build_team_match_versions(con)
     form_rows = build_team_tactical_form(con)
     providers = tuple(
         str(row[0])

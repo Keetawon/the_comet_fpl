@@ -1,5 +1,14 @@
 # FPL points-prediction system
 
+**Local SDP operations / revision PIT (2026-09-06).** Strict team observations now retain and
+select complete stats and fixture-metadata revisions known at the cutoff; tactical features
+roll over that selected vintage, never over multiple revisions as separate matches. Latest-only
+reporting marts stay separate. The new locked/backed-up `python -m fpl.jobs.daily_pl_sdp`
+requires explicit operational `--db` and `--runs`; `--raw-only` preserves capture while staging
+is deferred. See [the revision-PIT and local daily runbook](docs/pl-sdp-revision-pit-and-local-daily.md).
+No default consumer or frozen model result is changed. The owner permits new model research
+without requiring an earlier 1% win; new evaluation criteria must still be frozen beforehand.
+
 Produces, for every FPL player and gameweek, a **full distribution of fantasy points** —
 not a point estimate — because the three questions a manager actually asks have three
 different answers:
