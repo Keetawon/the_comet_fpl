@@ -1,6 +1,5 @@
 """Synthetic retrospective price amendment; no fitting or real model scoring."""
 
-import hashlib
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -330,6 +329,8 @@ def test_control_candidate_receive_identical_deterministic_proxy_input() -> None
 
 
 def test_contract_pins_and_prospective_import_boundary() -> None:
+    from .frozen_source_checks import assert_minutes_reference_sources
+
     root = Path(__file__).resolve().parents[1]
     contract = yaml.safe_load(
         (root / "config/retrospective_current_minutes_proxy_v1.yaml").read_text()
@@ -339,8 +340,7 @@ def test_contract_pins_and_prospective_import_boundary() -> None:
     assert contract["parameters_changed"] == []
     assert contract["formal_model_runs_authorized_by_this_contract"] == 0
     assert sum(contract["readiness_audit"]["cold_price_sensitive_rows"].values()) == 821
-    for path, expected in contract["unchanged_source_sha256"].items():
-        assert hashlib.sha256((root / path).read_bytes()).hexdigest() == expected
+    assert_minutes_reference_sources(root, contract)
     for directory in ("jobs", "features", "models", "optimize"):
         for source in (root / "src/fpl" / directory).rglob("*.py"):
             assert "retrospective_minutes_proxy" not in source.read_text(encoding="utf-8")

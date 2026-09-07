@@ -1,6 +1,14 @@
 # The Comet FPL V2 — football-first prediction engine
 
-Status: implemented (development-only), 2026-09-04
+Current operational status, 2026-09-07: **Owner-directed architectural adoption. SDP-backed V2 is
+the primary football-environment architecture. Historical experimental verdict remains
+INCONCLUSIVE under its frozen gate. Incumbent retained as operational fallback and prospective
+shadow comparator.** The [additive decision](sdp-primary-architecture-decision-2026-09-07.md)
+supersedes only the earlier operational-default freeze on the V2 branch. It promotes no player
+challenger, performs no fit/evaluation, and changes no frozen report. H GK saves stays shadow-only.
+The following original design history retains its original scope and dated scientific caveats.
+
+Original status: implemented (development-only), 2026-09-04
 Supersedes nothing. V1 remains committed, runnable, and evidentially intact.
 
 ## Why V2 exists

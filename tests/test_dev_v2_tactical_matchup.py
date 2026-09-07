@@ -434,15 +434,33 @@ def test_retrospective_tactical_capability_cannot_supply_production_pit():
 
 def test_production_import_graph_has_no_tactical_development_source():
     modules = {"tactical_state", "tactical_math", "tactical_matchup", "dev_v2_tactical_matchup"}
+    # Owner-directed architectural adoption (2026-09-07): the production adapter may reuse
+    # only these exact pure functions/parameter types. Retrospective readers, observation
+    # constructors, fitting functions and development runners remain forbidden imports.
+    pure_inference = {
+        ("models/sdp_environment.py", "fpl.validate.tactical_state"): {
+            "DIMENSIONS",
+            "current_state",
+        },
+        ("models/sdp_environment.py", "fpl.validate.tactical_math"): {"RidgeModel", "Scaler"},
+        ("models/sdp_environment.py", "fpl.validate.tactical_matchup"): {"_prediction"},
+        ("storage/sdp_runtime.py", "fpl.validate.tactical_state"): {
+            "StateVector",
+            "tactical_values",
+        },
+    }
     root = repo_root() / "src" / "fpl"
     violations = []
-    for package in ("features", "jobs", "models", "optimize", "publish", "insights"):
+    for package in ("features", "jobs", "models", "storage", "optimize", "publish", "insights"):
         for path in (root / package).rglob("*.py"):
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     imports = [alias.name for alias in node.names]
                 elif isinstance(node, ast.ImportFrom):
+                    allowed = pure_inference.get((path.relative_to(root).as_posix(), node.module))
+                    if allowed is not None and {alias.name for alias in node.names} <= allowed:
+                        continue
                     imports = [node.module or "", *(alias.name for alias in node.names)]
                 else:
                     continue

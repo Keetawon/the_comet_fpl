@@ -45,6 +45,7 @@ class CaptureReport:
     stats_fetched: int = 0
     payloads_new: int = 0
     requests: int = 0
+    stats_requested: int = 0
     failures: tuple[str, ...] = ()
 
 
@@ -56,10 +57,15 @@ def capture(
     limit_matches: int | None = None,
     client: PlSdpClient | None = None,
     now: datetime | None = None,
-    refresh_stats: bool = False,
+    refresh_stats: bool | None = None,
 ) -> CaptureReport:
     if limit_matches is not None and limit_matches <= 0:
         raise ValueError("limit_matches must be positive")
+    if lookback_days is not None and lookback_days <= 0:
+        raise ValueError("lookback_days must be positive")
+    # A bounded post-match capture also refreshes provider corrections. Callers doing
+    # an unbounded missing-only pass can still explicitly set refresh_stats=False.
+    refresh_stats = lookback_days is not None if refresh_stats is None else refresh_stats
     sources = load_sources()
     if sources.pl_sdp is None:
         raise RuntimeError("config/sources.yaml carries no `pl_sdp` block")
@@ -86,6 +92,8 @@ def capture(
                 report.payloads_new += int(is_new)
                 summaries.extend(page)
             report.matches_seen = len({summary.match_id for summary in summaries})
+            if report.matches_seen != len(summaries):
+                raise ValueError("duplicate provider match records in capture catalogue")
 
             wanted: list[int] = []
             for summary in sorted(summaries, key=lambda item: item.match_id):
@@ -102,6 +110,7 @@ def capture(
 
             if limit_matches is not None:
                 wanted = wanted[:limit_matches]
+            report.stats_requested = len(wanted)
 
             for match_id in wanted:
                 try:
@@ -142,6 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--refresh-stats",
         action="store_true",
+        default=None,
         help="refetch completed-match stats so provider restatements can be retained",
     )
     parser.add_argument("--quiet", action="store_true")
@@ -181,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     for failure in report.failures:
         logger.warning("capture gap %s", failure)
-    return 0
+    return 1 if report.failures else 0
 
 
 if __name__ == "__main__":

@@ -1,5 +1,14 @@
 # FPL points-prediction system
 
+**Owner-directed architectural adoption (2026-09-07, V2 branch only). SDP-backed V2 is the primary
+football-environment architecture. Historical experimental verdict remains INCONCLUSIVE under
+its frozen gate. Incumbent retained as operational fallback and prospective shadow comparator.**
+This is the explicit operational exception to earlier default-freeze statements below. Player
+challengers are not promoted; H saves remains shadow-only. Daily capture and pre-deadline refresh
+use actual cutoff-known SDP versions with strict health checks and incumbent fallback.
+See the [decision](docs/sdp-primary-architecture-decision-2026-09-07.md) and
+[commands/runbook](docs/sdp-primary-operations.md). No main merge or default-branch change is authorized.
+
 **Local SDP operations / revision PIT (2026-09-06).** Strict team observations now retain and
 select complete stats and fixture-metadata revisions known at the cutoff; tactical features
 roll over that selected vintage, never over multiple revisions as separate matches. Latest-only

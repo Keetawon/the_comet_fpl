@@ -4,6 +4,23 @@ These instructions apply to the entire repository and to every agent or sub-agen
 it. More specific `AGENTS.md` files may add local guidance, but they must not weaken the data
 correctness rules below.
 
+## Owner-directed SDP architectural adoption (2026-09-07, V2 branch only)
+
+**Owner-directed architectural adoption. SDP-backed V2 is the primary football-environment
+architecture. Historical experimental verdict remains INCONCLUSIVE under its frozen gate.
+Incumbent retained as operational fallback and prospective shadow comparator.**
+The owner explicitly authorizes this operational default on
+`claude/comet-fpl-v2-architecture-mqrj8f`; it is the narrow exception to older default-freeze
+language below. Phase A did not clear the old 1% gate. No frozen report, result, gate or claim
+is rejudged. No candidate fitting, retuning or new historical evaluation is authorized here.
+Player minutes/goals/assists/cards/DC/saves scoring remain incumbent; H GK saves stays shadow-only.
+Production uses only actual cutoff-known immutable SDP versions with exact fixture/club/player
+identity and fail-closed core-field health. Missing fields never become zero. Competitive cup
+and European lineups/events supply witnessed workload only, never EPL Tactical State V1 stats.
+No main merge, PR or default-branch change is authorized. The additive decision, exact selector,
+provenance and operations contracts are in
+`docs/sdp-primary-architecture-decision-2026-09-07.md` and `docs/sdp-primary-operations.md`.
+
 ## Mission and current state
 
 This project predicts a full Fantasy Premier League (FPL) points distribution per player and

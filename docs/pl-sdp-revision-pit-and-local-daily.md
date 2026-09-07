@@ -1,5 +1,13 @@
 # Revision-safe SDP observations and durable local capture
 
+Additive 2026-09-07 operational update: the [owner decision](sdp-primary-architecture-decision-2026-09-07.md)
+now selects SDP as the V2 primary with incumbent fallback/shadow. The existing raw/version PIT
+contract below is preserved. Production adds stricter whole-match health and refuses to revive
+an older complete payload when the latest known revision is malformed or incomplete. Daily CLI
+lookback defaults to five days; `--workload` adds competitive lineups/events. The
+[production runbook](sdp-primary-operations.md) adds pre-deadline refresh and configuration.
+The original dated scope below describes the earlier correctness change, not this new adoption.
+
 Owner-authorized correctness/operations change, 2026-09-06. No model fit, evaluation,
 forecast, scoring-rule change, default switch, or reinterpretation of frozen evidence.
 

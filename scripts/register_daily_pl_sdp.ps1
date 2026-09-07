@@ -7,7 +7,8 @@ param(
     [Parameter(Mandatory = $true)][string]$RunRoot,
     [string]$At = '07:00',
     [string]$TaskName = 'The Comet FPL - daily SDP',
-    [switch]$RawOnly
+    [switch]$RawOnly,
+    [switch]$Workload
 )
 $ErrorActionPreference = 'Stop'
 $python = (Resolve-Path -LiteralPath $PythonPath).Path
@@ -23,6 +24,7 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 $clock = [TimeSpan]::ParseExact($At, 'hh\:mm', [Globalization.CultureInfo]::InvariantCulture)
 $arguments = '-m fpl.jobs.daily_pl_sdp --db "{0}" --runs "{1}"' -f $database, $runs
 if ($RawOnly) { $arguments += ' --raw-only' }
+if ($Workload) { $arguments += ' --workload' }
 # pythonw prevents an unwanted console window during an interactive-user scheduled run.
 $pythonw = Join-Path (Split-Path -Parent $python) 'pythonw.exe'
 if (-not (Test-Path -LiteralPath $pythonw -PathType Leaf)) {

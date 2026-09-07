@@ -32,6 +32,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from math import isfinite
 from typing import Final
 
 # The canonical signal names the engine may fit and the environment may carry. Declared here,
@@ -104,10 +105,27 @@ class TeamEnvironment:
     expected_defensive_actions: float | None = None
     cold_start: bool = False
     signal_coverage: Mapping[str, bool] = field(default_factory=dict)
+    # Predicted xG is not the converted goal-PMF mean. Unsupported quantities stay NULL.
+    predicted_xg: float | None = None
+    tactical_context: Mapping[str, float | None] = field(default_factory=dict)
+    opponent_tactical_context: Mapping[str, float | None] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.goal_distribution:
             raise FixtureEnvironmentError("goal_distribution must not be empty")
+        if any(not isfinite(p) or p < 0 or p > 1 for p in self.goal_distribution):
+            raise FixtureEnvironmentError("goal_distribution must contain finite probabilities")
+        for name in self.__dataclass_fields__:
+            if name.startswith("expected_") or name == "predicted_xg":
+                value = getattr(self, name)
+                if value is not None and (not isfinite(value) or value < 0):
+                    raise FixtureEnvironmentError(f"{name} must be finite and nonnegative")
+        if any(
+            v is not None and not isfinite(v)
+            for context in (self.tactical_context, self.opponent_tactical_context)
+            for v in context.values()
+        ):
+            raise FixtureEnvironmentError("tactical context must be finite or unavailable")
         total = sum(self.goal_distribution)
         if abs(total - 1.0) > 1e-6:
             raise FixtureEnvironmentError(
@@ -149,6 +167,7 @@ class FixtureEnvironment:
     away: TeamEnvironment
     rho: float = 0.0
     engine: str = ""
+    provenance: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.home.was_home or self.away.was_home:

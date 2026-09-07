@@ -254,7 +254,15 @@ def _verify_staging(
     }
 
 
-def run(*, database: Path, runs: Path, raw_only: bool = False) -> int:
+def run(
+    *,
+    database: Path,
+    runs: Path,
+    raw_only: bool = False,
+    include_workload: bool = False,
+    lookback_days: int = 7,
+    player_history: bool = False,
+) -> int:
     """One local cycle. Partial raw successes survive a later network or staging failure."""
     database = database.resolve(strict=True)
     if not database.is_file() or database == default_db_path().resolve():
@@ -311,7 +319,11 @@ def run(*, database: Path, runs: Path, raw_only: bool = False) -> int:
             _write(
                 destination / "before.json", inventory(con, season=season, now=datetime.now(UTC))
             )
-            snapshot_status = daily_snapshot.run(db_path=database)
+            snapshot_status = (
+                daily_snapshot.run(db_path=database, include_player_history=True)
+                if player_history
+                else daily_snapshot.run(db_path=database)
+            )
             report["snapshot_exit_code"] = snapshot_status
             if snapshot_status:
                 report["failures"].append(f"official snapshot failed: exit {snapshot_status}")
@@ -320,7 +332,7 @@ def run(*, database: Path, runs: Path, raw_only: bool = False) -> int:
                     db_path=database,
                     season=season,
                     refresh_stats=refresh,
-                    lookback_days=7 if refresh else None,
+                    lookback_days=lookback_days if refresh else None,
                 )
                 report[name] = asdict(captured)
                 report[name]["provider_listing_checked_at"] = datetime.now(UTC)
@@ -354,6 +366,34 @@ def run(*, database: Path, runs: Path, raw_only: bool = False) -> int:
                         report["failures"].append(
                             "staged data failed strict PIT completeness check"
                         )
+                from fpl.storage.sdp_runtime import load_sdp_state
+
+                state = load_sdp_state(con, cutoff=datetime.now(UTC), season=season)
+                current_rows = [r for r in state.rows if r.season == season]
+                report["production_health"] = {
+                    "matches_valid": len(current_rows) // 2,
+                    "latest_completed_match": max(state.expected.values(), default=None),
+                    "latest_valid_sdp_known_at": max(
+                        (r.provenance["known_at"] for r in current_rows), default=None
+                    ),
+                    "global_failure": state.global_failure,
+                    "schema_validation_failures": sum(
+                        reason == "SDP_SCHEMA_FALLBACK" for reason in state.failures.values()
+                    )
+                    + int(state.global_failure == "SDP_SCHEMA_FALLBACK"),
+                    "identity_failures": sum(
+                        reason == "SDP_IDENTITY_FALLBACK" for reason in state.failures.values()
+                    )
+                    + int(state.global_failure == "SDP_IDENTITY_FALLBACK"),
+                    "failures": {str(key): value for key, value in state.failures.items()},
+                    "diagnostics": state.diagnostics,
+                }
+            if include_workload:
+                from fpl.jobs.capture_sdp_workload import capture as capture_workload
+
+                report["workload"] = capture_workload(
+                    database=database, lookback_days=lookback_days
+                )
             con.execute("CHECKPOINT")
         # Windows prevents hashing a writer-open file. No default/source DB is touched.
         with connect(database, read_only=True):
@@ -370,6 +410,40 @@ def run(*, database: Path, runs: Path, raw_only: bool = False) -> int:
         )
         report["exit_code"] = 0 if report["healthy"] else 1
         report["consumer_ready"] = report["healthy"] and report["staging_status"] == "verified"
+        requests = sum(report.get(k, {}).get("stats_requested", 0) for k in ("missing", "revision"))
+        captured = sum(report.get(k, {}).get("stats_fetched", 0) for k in ("missing", "revision"))
+        previous_success = None
+        for path in sorted(runs.resolve().glob("*/report.json"), reverse=True):
+            try:
+                previous = json.loads(path.read_text(encoding="utf-8"))
+                if previous.get("healthy") and previous.get("database") == str(database):
+                    previous_success = datetime.fromisoformat(previous["finished_at"])
+                    break
+            except (OSError, ValueError, KeyError):
+                continue
+        last_success = report["finished_at"] if report["healthy"] else previous_success
+        report["operational_metrics"] = {
+            "capture_success_rate": captured / requests if requests else None,
+            "matches_expected": report.get("freshness", {}).get("expected_completed"),
+            "matches_captured": report.get("freshness", {}).get("retained_complete"),
+            "matches_valid": report.get("production_health", {}).get("matches_valid"),
+            "hours_since_last_successful_capture": (
+                report["finished_at"] - last_success
+            ).total_seconds()
+            / 3600
+            if last_success
+            else None,
+            "latest_sdp_known_at": report.get("freshness", {}).get(
+                "latest_retained_payload_fetched_at"
+            ),
+            "latest_completed_match": report.get("production_health", {}).get(
+                "latest_completed_match"
+            ),
+            "identity_failures": report.get("production_health", {}).get("identity_failures"),
+            "schema_validation_failures": report.get("production_health", {}).get(
+                "schema_validation_failures"
+            ),
+        }
         _write(destination / "report.json", report)
         logging.getLogger().removeHandler(handler)
         handler.close()
@@ -382,9 +456,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", required=True, type=Path)
     parser.add_argument("--runs", required=True, type=Path)
     parser.add_argument("--raw-only", action="store_true")
+    parser.add_argument("--workload", action="store_true")
+    parser.add_argument("--player-history", action="store_true")
+    parser.add_argument("--lookback-days", type=int, default=5)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    return run(database=args.db, runs=args.runs, raw_only=args.raw_only)
+    return run(
+        database=args.db,
+        runs=args.runs,
+        raw_only=args.raw_only,
+        include_workload=args.workload,
+        lookback_days=args.lookback_days,
+        player_history=args.player_history,
+    )
 
 
 if __name__ == "__main__":

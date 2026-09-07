@@ -81,14 +81,15 @@ import logging
 import math
 import subprocess
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import polars as pl
+from duckdb import Error as DuckDBError
 
 from fpl.artifacts.prospective_points import (
     ArtifactFixtureInput,
@@ -110,6 +111,7 @@ from fpl.config import (
     repo_root,
 )
 from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
+from fpl.football_configuration import load_football_environment
 from fpl.ingest.player_registry import selectable_player_registry_sha256
 from fpl.models.attacking_assists_baselines import AssistHistoryRow
 from fpl.models.attacking_baselines import (
@@ -123,7 +125,7 @@ from fpl.models.attacking_v2 import _RosterEntry, mean_trailing_signal, season_s
 from fpl.models.attacking_v3 import allocate_minutes_gated_rates
 from fpl.models.bps_bonus import BpsSimConfig, fit_residual_model
 from fpl.models.defensive_contribution_v1 import DcHistoryRow
-from fpl.models.gk_saves_v1 import GkSavesHistoryRow
+from fpl.models.gk_saves_v1 import GkSavesHistoryRow, GkSavesV1
 from fpl.models.minutes_shrinkage import (
     MINUTES_SHRINKAGE_ALPHA,
     MINUTES_SHRINKAGE_MIN_PRIOR_ROWS,
@@ -1217,6 +1219,8 @@ class ProspectivePointsResult:
     bootstrap_payload_sha256: str
     schedule_capture_ids: tuple[str, ...]
     selectable_player_registry_sha256: str
+    football_environment_provenance: dict[str, Any] | None = None
+    shadow_incumbent: ProspectivePointsResult | None = None
 
 
 def _stage_a_uses_league_average(
@@ -1264,6 +1268,8 @@ def predict_prospective_points(
     max_points: int = DEFAULT_MAX_POINTS_FULL,
     db_path: Path | str | None = None,
     repo: Path | None = None,
+    football_environment_primary: str | None = None,
+    sdp_refresh_failure: str | None = None,
 ) -> ProspectivePointsResult:
     """Compose prospective full-points xP for ``season`` GW ``gw_from``..``gw_to`` at ``as_of``."""
     if gw_to < gw_from:
@@ -1277,6 +1283,16 @@ def predict_prospective_points(
     if assists not in {"coupled", "v1"}:
         raise ValueError(f"assists must be 'coupled' or 'v1', got {assists!r}")
     resolved_suite = suite or default_component_suite()
+    if football_environment_primary not in {None, "sdp_v2", "disabled"}:
+        raise ValueError("football_environment_primary must be sdp_v2 or disabled")
+    environment_config = (
+        load_football_environment() if football_environment_primary != "disabled" else None
+    )
+    use_sdp = (
+        environment_config is not None
+        and (football_environment_primary or environment_config.football_environment_primary)
+        == "sdp_v2"
+    )
 
     # 0. Freshness gate: refuse to emit if the current season's most-recent-completed gameweek is
     #    not captured. Season start is a legitimate cold start and passes.
@@ -1450,6 +1466,89 @@ def predict_prospective_points(
     # history) ran on the 1.0x league-average fallback and is flagged below.
     known_team_codes = stage_a_model.known_team_codes()
     league_conceded_dist = poisson_pmf(max(league_conceded, 1e-6))
+
+    environment_provenance = None
+    if use_sdp:
+        from fpl.models.sdp_environment import FrozenSdpModel, select_environments
+        from fpl.storage.sdp_runtime import SdpHealthError, SdpState, load_sdp_state
+
+        assert environment_config is not None
+        model = None
+        model_failure = None
+        try:
+            state = load_sdp_state(con, cutoff=as_of, season=season)
+        except Exception as error:
+            # SDP is optional operational infrastructure. Incumbent/FPL exceptions outside
+            # this boundary still propagate and must never be hidden by a provider fallback.
+            state = SdpState(global_failure="SDP_SCHEMA_FALLBACK", diagnostics=[str(error)])
+        if sdp_refresh_failure is not None:
+            state.global_failure = "SDP_SOURCE_FALLBACK"
+            state.diagnostics.append(sdp_refresh_failure)
+        try:
+            model = FrozenSdpModel.load(repo or repo_root(), environment_config, as_of)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            model_failure = (
+                error.reason if isinstance(error, SdpHealthError) else "SDP_SCHEMA_FALLBACK"
+            )
+            state.diagnostics.append(str(error))
+        team_scored, environment_provenance = select_environments(
+            state=state,
+            model=model,
+            model_failure=model_failure,
+            cutoff=as_of,
+            season=season,
+            schedule=schedule,
+            team_map=team_map,
+            incumbent=team_scored,
+        )
+        environment_provenance["configuration"] = environment_config.model_dump(mode="json")
+        environment_provenance["fpl_snapshot_known_at"] = bootstrap.known_at.isoformat()
+        environment_provenance["fpl_snapshot_payload_sha256"] = bootstrap.payload_sha256
+        environment_provenance["fpl_snapshot_capture_id"] = bootstrap.capture_id
+        from fpl.features.sdp_workload import workload_features
+        from fpl.storage.sdp_runtime import workload_at
+
+        try:
+            workload_versions = workload_at(con, as_of)
+            environment_provenance["workload"] = [
+                workload_features(workload_versions, code=code, team_code=club, cutoff=as_of)
+                for code, club in sorted(current_club.items())
+            ]
+            environment_provenance["workload_sources"] = [
+                {
+                    k: v[k]
+                    for k in ("version_id", "known_at", "normalization_version", "source_versions")
+                }
+                for v in workload_versions
+            ]
+        except (DuckDBError, ValueError, KeyError, TypeError) as error:
+            environment_provenance["workload_unavailable"] = str(error)
+
+    gk_shadow_parameters = None
+    gk_shadow_rows: list[dict[str, Any]] = []
+    if (
+        environment_config is not None
+        and environment_provenance is not None
+        and environment_config.gk_saves_candidate_mode == "shadow"
+    ):
+        try:
+            shadow_body = (
+                (repo or repo_root()) / environment_config.gk_shadow_parameters
+            ).read_bytes()
+            if (
+                hashlib.sha256(shadow_body).hexdigest()
+                != environment_config.gk_shadow_parameters_sha256
+            ):
+                raise ValueError("GK shadow parameter hash mismatch")
+            candidate_parameters = json.loads(shadow_body)
+            if datetime.fromisoformat(candidate_parameters["known_at"]) <= as_of:
+                gk_shadow_parameters = candidate_parameters
+                environment_provenance["gk_saves_shadow_parameters"] = candidate_parameters
+                environment_provenance["gk_saves_shadow_parameter_sha256"] = (
+                    environment_config.gk_shadow_parameters_sha256
+                )
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            environment_provenance["gk_saves_shadow_unavailable"] = str(error)
 
     # 3b. Team-coupled (V3) goals allocation inputs. The share signal (xG vs threat) is resolved per
     #     season on one scale: `--share-signal auto` uses xG for an xG-era target (default), so a
@@ -1688,6 +1787,43 @@ def predict_prospective_points(
                 conceded_dist = league_conceded_dist
             lambda_conceded = sum(i * mass for i, mass in enumerate(conceded_dist))
             saves_dist = saves_model.predict(position, lambda_conceded)
+            if (
+                gk_shadow_parameters is not None
+                and position == Position.GK
+                and environment_provenance is not None
+                and isinstance(saves_model, GkSavesV1)
+            ):
+                decision = next(
+                    d for d in environment_provenance["decisions"] if d["fixture"] == fixture
+                )
+                predicted_shots = None
+                if decision["selector"] == "SDP_PRIMARY":
+                    opposite = "away" if was_home else "home"
+                    predicted_shots = decision["environment"][opposite]["expected_shots"]
+                shadow_distribution = None
+                if predicted_shots is not None:
+                    # H's unchanged saved pooled-precision chain; it never enters _Pending.
+                    rate = (
+                        predicted_shots
+                        * gk_shadow_parameters["precision"]["fraction"]
+                        * saves_model.save_rate
+                    )
+                    shadow_distribution = goal_poisson_pmf(rate)
+                gk_shadow_rows.append(
+                    {
+                        "code": code,
+                        "fixture": fixture,
+                        "gw": gw,
+                        "team_code": team_code,
+                        "conditional_saves_pmf": shadow_distribution,
+                        "minutes_pmf": minutes_dist,
+                        "incumbent_conditional_saves_pmf": saves_dist,
+                        "save_fraction": saves_model.save_rate,
+                        "predicted_opponent_shots": predicted_shots,
+                        "selector": decision["selector"],
+                        "mode": "shadow_only",
+                    }
+                )
             dc_probability = dc_model.predict(code, position)
             residual_mean = _residual_prediction(
                 residual_model,
@@ -1935,7 +2071,28 @@ def predict_prospective_points(
     )
 
     repo_path = repo or repo_root()
-    return ProspectivePointsResult(
+    if environment_provenance is not None:
+        environment_provenance["gk_saves_shadow"] = gk_shadow_rows
+        selectors = {d["fixture"]: d["selector"] for d in environment_provenance["decisions"]}
+        environment_provenance["selector_counts_player_fixture_predictions"] = dict(
+            sorted(Counter(selectors[row.fixture] for row in records).items())
+        )
+        prior_season = f"{int(season[:4]) - 1}-{int(season[:4]) % 100:02d}"
+        prior_clubs = {
+            row[0]
+            for row in con.execute(
+                "SELECT DISTINCT team_code FROM mart_dim_team "
+                "WHERE season=? AND team_code IS NOT NULL",
+                [prior_season],
+            ).fetchall()
+        }
+        environment_provenance["promoted_team_codes"] = (
+            sorted(set(team_map.values()) - prior_clubs) if len(prior_clubs) == 20 else None
+        )
+        environment_provenance["promoted_slice_definition"] = (
+            "current PL registry absent from complete immediately preceding PL season dimension"
+        )
+    prospective_result = ProspectivePointsResult(
         as_of=as_of,
         season=season,
         gw_from=gw_from,
@@ -1966,7 +2123,9 @@ def predict_prospective_points(
                 if assists == "coupled"
                 else resolved_suite.assists_name
             ),
-            "team_clean_sheet": "trailing_goals_attack_defence",
+            "team_clean_sheet": "sdp_v2_with_incumbent_fallback"
+            if use_sdp
+            else "trailing_goals_attack_defence",
             "saves": resolved_suite.saves_name,
             "defensive_contribution": resolved_suite.dc_name,
             "bonus": "hybrid_bps_bonus_match_simulator (exact_bps + fold-local residual)",
@@ -1987,7 +2146,34 @@ def predict_prospective_points(
             bootstrap.data,
             season=season,
         ),
+        football_environment_provenance=environment_provenance,
     )
+    if (
+        environment_provenance is not None
+        and environment_config is not None
+        and environment_config.shadow_incumbent
+        and environment_provenance["selector_counts_team_predictions"].get("SDP_PRIMARY", 0)
+    ):
+        shadow = predict_prospective_points(
+            con,
+            as_of=as_of,
+            season=season,
+            gw_from=gw_from,
+            gw_to=gw_to,
+            attacking=attacking,
+            appearance=appearance,
+            share_signal=share_signal,
+            assists=assists,
+            suite=resolved_suite,
+            draws=draws,
+            base_seed=base_seed,
+            max_points=max_points,
+            db_path=db_path,
+            repo=repo,
+            football_environment_primary="disabled",
+        )
+        prospective_result = replace(prospective_result, shadow_incumbent=shadow)
+    return prospective_result
 
 
 def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
@@ -2017,6 +2203,11 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             "config_sha256": result.config_sha256,
             "archive_sha256": result.archive_sha256,
             "components": result.component_names,
+            **(
+                {"football_environment": result.football_environment_provenance}
+                if result.football_environment_provenance is not None
+                else {}
+            ),
         },
         "player_totals": [
             {
@@ -2189,6 +2380,16 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
         "share_signal_kind": result.share_signal_kind,
         **{f"component.{name}": value for name, value in result.component_names.items()},
     }
+    if result.football_environment_provenance is not None:
+        # Existing manifest contract carries extensible, immutable component provenance.
+        # Each fixture reason and exact SDP source version is bound to the artifact hash.
+        from fpl.models.sdp_environment import canonical
+
+        component_modes["football_environment.provenance"] = canonical(
+            result.football_environment_provenance
+        )
+        component_modes["football_environment.primary"] = "sdp_v2"
+        component_modes["forecast_role"] = "primary"
     manifest = ForecastArtifactManifest(
         schema_version=2,
         as_of=result.as_of,
@@ -2292,6 +2493,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--draws", type=int, default=DEFAULT_DRAWS)
     parser.add_argument("--top", type=int, default=20)
+    parser.add_argument("--football-environment", choices=("sdp_v2", "disabled"), default=None)
+    parser.add_argument("--sdp-refresh-failure", default=None)
+    parser.add_argument("--refresh-report", type=Path, default=None)
     parser.add_argument(
         "--output",
         type=Path,
@@ -2324,6 +2528,8 @@ def main(argv: list[str] | None = None) -> int:
             draws=args.draws,
             db_path=db_path,
             repo=repo,
+            football_environment_primary=args.football_environment,
+            sdp_refresh_failure=args.sdp_refresh_failure,
         )
     except FreshnessError as exc:
         logger.error(str(exc))
@@ -2331,7 +2537,31 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         con.close()
 
+    if args.refresh_report is not None and result.football_environment_provenance is not None:
+        receipt = args.refresh_report.read_bytes()
+        result.football_environment_provenance["refresh"] = {
+            "report_sha256": hashlib.sha256(receipt).hexdigest(),
+            "report": json.loads(receipt),
+        }
     if args.output is not None:
+        if result.shadow_incumbent is not None:
+            shadow = build_prospective_artifact(result.shadow_incumbent)
+            shadow = replace(
+                shadow,
+                manifest=shadow.manifest.model_copy(
+                    update={
+                        "component_modes": {
+                            **shadow.manifest.component_modes,
+                            "forecast_role": "shadow_incumbent",
+                        }
+                    }
+                ),
+            )
+            shadow_path = args.output.with_name(args.output.stem + ".shadow-incumbent.jsonl")
+            shadow_hash = write_artifact_atomic(shadow_path, shadow)
+            assert result.football_environment_provenance is not None
+            result.football_environment_provenance["shadow_incumbent_artifact_sha256"] = shadow_hash
+            result.football_environment_provenance["shadow_incumbent_file"] = shadow_path.name
         artifact = build_prospective_artifact(result)
         digest = write_artifact_atomic(args.output, artifact)
         logger.info(
@@ -2341,6 +2571,35 @@ def main(argv: list[str] | None = None) -> int:
             digest,
         )
     print(_DISCLAIMER)
+    if result.football_environment_provenance is not None:
+        print(
+            json.dumps(
+                {
+                    k: result.football_environment_provenance[k]
+                    for k in (
+                        "selector_counts_team_predictions",
+                        "selector_counts_player_fixture_predictions",
+                    )
+                },
+                sort_keys=True,
+                default=str,
+                allow_nan=False,
+            )
+        )
+        print(
+            json.dumps(
+                {
+                    "health": {
+                        k: v
+                        for k, v in result.football_environment_provenance["health"].items()
+                        if k != "diagnostics"
+                    }
+                },
+                sort_keys=True,
+                default=str,
+                allow_nan=False,
+            )
+        )
     print()
     print(format_top_table(result, top=args.top))
     return 0

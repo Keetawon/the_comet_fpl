@@ -465,12 +465,13 @@ def test_cache_row_semantics_fail_closed(defect):
 def test_existing_production_source_pins_are_unchanged():
     import yaml
 
+    from .frozen_source_checks import assert_minutes_reference_sources
+
     root = repo_root()
     config = yaml.safe_load(
         (root / "config/retrospective_current_minutes_proxy_v1.yaml").read_bytes()
     )
-    for name, expected in config["unchanged_source_sha256"].items():
-        assert reference.file_sha256(root / name) == expected
+    assert_minutes_reference_sources(root, config)
 
 
 def test_actual_default_still_refuses_completely_empty_minutes_history():

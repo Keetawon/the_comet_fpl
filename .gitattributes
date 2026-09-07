@@ -1,4 +1,10 @@
 # Preserve exact bytes for new hash-pinned tactical evidence across Windows checkouts.
+config/sdp_v2_frozen_parameters.json -text
+config/sdp_gk_shadow_parameters.json -text
+src/fpl/validate/tactical_state.py -text
+src/fpl/validate/tactical_matchup.py -text
+src/fpl/validate/tactical_math.py -text
+src/fpl/validate/chance_creation.py -text
 results/v2_tactical_metric_audit.json -text whitespace=cr-at-eol
 results/v2_tactical_matchup_development.json -text whitespace=cr-at-eol
 results/v2_tactical_numeric_development.json -text whitespace=cr-at-eol

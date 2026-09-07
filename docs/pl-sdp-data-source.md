@@ -1,5 +1,13 @@
 # Premier League SDP as a data source
 
+Production architecture update, 2026-09-07: SDP is the primary football data provider on the V2
+branch under the [owner-directed decision](sdp-primary-architecture-decision-2026-09-07.md).
+Detailed EPL stats pass raw/version/core-field health before primary use; the incumbent remains
+fallback and prospective shadow. Actual capture/metadata times are mandatory, including for
+retrospectively captured archive data used after its real availability. This does not convert
+that archive into historical PIT evidence. See the [production runbook](sdp-primary-operations.md).
+All raw versions and unmapped fields are retained. Core NULLs invalidate a match, never become zero.
+
 `https://sdp-prem-prod.premier-league-prod.pulselive.com` is the JSON backend behind
 premierleague.com. This document records what is known, what is assumed, and what happens when
 an assumption turns out wrong.
@@ -46,10 +54,16 @@ rather than hoped away:
 | `matches` | `/api/v2/matches?competition=8&season={id}[&matchweek={gw}]` | the match list |
 | `match` | `/api/v2/matches/{match_id}` | one match's metadata |
 | `match_stats` | `/api/v3/matches/{match_id}/stats` | **the team-side metrics V2 consumes** |
-| `match_lineups` | `/api/v3/matches/{match_id}/lineups` | declared, not yet consumed |
-| `match_events` | `/api/v1/matches/{match_id}/events` | declared, not yet consumed |
+| `match_lineups` | `/api/v3/matches/{match_id}/lineups` | prospective witnessed competitive exposure |
+| `match_events` | `/api/v1/matches/{match_id}/events` | prospective witnessed competitive exposure |
 
 Competition 8 is the Premier League.
+
+Competitive workload additionally discovers explicit competitions 1 (FA Cup), 2 (League Cup),
+5 (Champions League), 6 (Europa League), and 1125 (Conference League), validating each returned
+competition/season identity. Only their lineups/events enter production workload. Their match
+catalogues are stored as `competitive_matches`, excluded from EPL statistical normalization.
+Cup tactical stats are not requested. Empty or unresolved exposure is unavailable, not rest.
 
 ### Real match-list pagination
 
