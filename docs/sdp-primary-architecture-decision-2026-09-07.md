@@ -9,6 +9,9 @@ This decision is authorized only on `claude/comet-fpl-v2-architecture-mqrj8f`, s
 change is authorized. This additive record overrides earlier operational-default freezes only
 for the football-environment path on this branch. It changes no scientific verdict.
 
+Actual capture, activation, artifact hashes, replay and test evidence are recorded in the
+[operational verification](sdp-primary-architecture-verification-2026-09-07.md).
+
 ## Decision and scientific boundary
 
 Phase A did **not** pass its previous 1% scientific gate. Approximately +0.458% Goal NLL and
