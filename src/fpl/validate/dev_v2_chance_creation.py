@@ -866,7 +866,10 @@ def run(root: Path, db: Path) -> dict[str, Any]:
     snapshot = _snapshot(root, db, contract)
     started = datetime.now(UTC).isoformat()
     with duckdb.connect(str(db), read_only=True) as con:
-        coverage = build_audit(con)
+        # Match the frozen coverage publisher's UTC serialization, not the host timezone.
+        # This session setting never rewrites stored capture instants or the read-only DB.
+        con.execute("SET TimeZone = 'UTC'")
+        coverage = {**build_audit(con), "database_sha256": snapshot["database_sha256"]}
         if _canonical(coverage) != _canonical(
             json.loads((root / contract["coverage_report"]).read_bytes())
         ):

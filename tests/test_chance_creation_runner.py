@@ -342,10 +342,18 @@ def _mock_formal(
     }
     audit = tmp_path / contract["coverage_report"]
     audit.parent.mkdir(parents=True)
-    audit.write_text(json.dumps(coverage))
+    database_sha = runner.scoring.file_sha256(db)
+    audit.write_text(json.dumps({**coverage, "database_sha256": database_sha}))
     events: list[str] = []
     monkeypatch.setattr(runner, "load_contract", lambda _: contract)
-    monkeypatch.setattr(runner, "_snapshot", lambda *_: {"head": "synthetic"})
+    monkeypatch.setattr(
+        runner,
+        "_snapshot",
+        lambda *_: {
+            "head": "synthetic",
+            "database_sha256": database_sha,
+        },
+    )
     monkeypatch.setattr(runner, "build_audit", lambda _: coverage)
     monkeypatch.setattr(runner, "_load_upstream", lambda *_: upstream)
     monkeypatch.setattr(runner, "load_chance_targets", lambda _: targets)
@@ -464,7 +472,10 @@ def test_provenance_change_after_claim_retains_failure(
     def snapshot(*_: Any) -> dict[str, Any]:
         nonlocal calls
         calls += 1
-        return {"head": "changed" if calls >= 3 else "synthetic"}
+        return {
+            "head": "changed" if calls >= 3 else "synthetic",
+            "database_sha256": runner.scoring.file_sha256(db),
+        }
 
     monkeypatch.setattr(runner, "_snapshot", snapshot)
     with pytest.raises(RuntimeError, match="provenance changed"):
@@ -609,3 +620,56 @@ def test_target_mutation_after_fit_is_detected() -> None:
     experiment["history_rows"][0]["observed_archive_xg"] = 9.99
     with pytest.raises(ValueError, match="trusted targets"):
         runner.verify_run(experiment, observations, contract)
+
+
+def test_preflight_restores_frozen_utc_serialization_and_database_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db, events, contract = _mock_formal(tmp_path, monkeypatch)
+    before = runner.scoring.file_sha256(db)
+    connect = duckdb.connect
+
+    def local_connection(*args: Any, **kwargs: Any) -> duckdb.DuckDBPyConnection:
+        con = connect(*args, **kwargs)
+        con.execute("SET TimeZone = 'Asia/Bangkok'")
+        return con
+
+    monkeypatch.setattr(runner.duckdb, "connect", local_connection)
+    frozen = json.loads((tmp_path / contract["coverage_report"]).read_bytes())
+    frozen["captured"] = "2026-09-04T16:58:26.444378+00:00"
+    (tmp_path / contract["coverage_report"]).write_text(json.dumps(frozen))
+
+    def audit(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
+        # Arrow conversion, as in the real capture view, uses the session timezone.
+        captured = (
+            con.execute("SELECT TIMESTAMPTZ '2026-09-04 16:58:26.444378+00' AS captured")
+            .pl()["captured"][0]
+            .isoformat()
+        )
+        assert captured == frozen["captured"]
+        return {key: value for key, value in frozen.items() if key != "database_sha256"} | {
+            "captured": captured,
+        }
+
+    monkeypatch.setattr(runner, "build_audit", audit)
+    result = runner.run(tmp_path, db)
+    assert events == ["reproduce", "claim"]
+    assert result["coverage"] == frozen
+    assert result["coverage"]["database_sha256"] == before
+    assert runner.scoring.file_sha256(db) == before
+
+
+def test_frozen_coverage_database_hash_is_not_ignored(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db, events, contract = _mock_formal(tmp_path, monkeypatch)
+    path = tmp_path / contract["coverage_report"]
+    frozen = json.loads(path.read_bytes())
+    frozen["database_sha256"] = "different-database"
+    path.write_text(json.dumps(frozen))
+    with pytest.raises(ValueError, match="coverage-only"):
+        runner.run(tmp_path, db)
+    assert events == []
+    assert not runner._claim_path(tmp_path).exists()
