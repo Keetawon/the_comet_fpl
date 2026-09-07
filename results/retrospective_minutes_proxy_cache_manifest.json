@@ -1,0 +1,897 @@
+{
+  "completed": true,
+  "counts": {
+    "2023-24": 29725,
+    "2024-25": 27283,
+    "2025-26": 29747,
+    "price_proxy_rows": 821,
+    "rows": 86755
+  },
+  "ended_at_utc": "2026-09-07T08:39:19.889472+00:00",
+  "folds": [
+    {
+      "file": "2023-24-gw01.json",
+      "gw": 1,
+      "rows": 658,
+      "season": "2023-24",
+      "sha256": "159cd437a5b3147ee69d0002df0afdf0ff7af59920586a3ead1588259635aa7d"
+    },
+    {
+      "file": "2023-24-gw02.json",
+      "gw": 2,
+      "rows": 595,
+      "season": "2023-24",
+      "sha256": "3ddbff98e83db6fe97d851ae0962b7f77275aea7b6836bdbdcf1e570490cc680"
+    },
+    {
+      "file": "2023-24-gw03.json",
+      "gw": 3,
+      "rows": 685,
+      "season": "2023-24",
+      "sha256": "8f6d8e12e32163dca81b8f4588eb44363aedf848dbcf61b43aa69089bae90c9c"
+    },
+    {
+      "file": "2023-24-gw04.json",
+      "gw": 4,
+      "rows": 703,
+      "season": "2023-24",
+      "sha256": "37f4c894426260723697607b7e0a129be32e15237f1c7f0bd3b01da77bfa2fa8"
+    },
+    {
+      "file": "2023-24-gw05.json",
+      "gw": 5,
+      "rows": 717,
+      "season": "2023-24",
+      "sha256": "a40fe273cd81a64edf025089e032256327af7d579d4e2b40c250c5577f671281"
+    },
+    {
+      "file": "2023-24-gw06.json",
+      "gw": 6,
+      "rows": 718,
+      "season": "2023-24",
+      "sha256": "a47c93f72954291c8dfc29e2761640cf0e0a86a9f193fc3318c0631f79256cc3"
+    },
+    {
+      "file": "2023-24-gw07.json",
+      "gw": 7,
+      "rows": 804,
+      "season": "2023-24",
+      "sha256": "d4dd11178f486e2a2881ab058ed5199b7c398de9237c5db7e49ec4691c6c8360"
+    },
+    {
+      "file": "2023-24-gw08.json",
+      "gw": 8,
+      "rows": 725,
+      "season": "2023-24",
+      "sha256": "d9cb2763f48fe7ffe0780d6a9ee556ef69e9af1d5e1ad4e5ec7afc1293923380"
+    },
+    {
+      "file": "2023-24-gw09.json",
+      "gw": 9,
+      "rows": 730,
+      "season": "2023-24",
+      "sha256": "979f31624d85828ecdf1a3744e4bb91edbd0e73d45435c11f0529637a99ef8ab"
+    },
+    {
+      "file": "2023-24-gw10.json",
+      "gw": 10,
+      "rows": 731,
+      "season": "2023-24",
+      "sha256": "471fd84b07043976b7eceea1ac48eaa195100addd645e5d8467b325a12a13186"
+    },
+    {
+      "file": "2023-24-gw11.json",
+      "gw": 11,
+      "rows": 733,
+      "season": "2023-24",
+      "sha256": "0da186e0c22836af2ddf5866757f80a3ba526f8d143e85d7aec6ce5b26f4eebd"
+    },
+    {
+      "file": "2023-24-gw12.json",
+      "gw": 12,
+      "rows": 743,
+      "season": "2023-24",
+      "sha256": "0c350b6a5666529d9e7885610e14581c591ab6fc729bf8ad57a42db0d7c30885"
+    },
+    {
+      "file": "2023-24-gw13.json",
+      "gw": 13,
+      "rows": 747,
+      "season": "2023-24",
+      "sha256": "2ee9a00a9f91ed29881f89908b4a4bbf7c3f324676165bddeaf973e4e6de88eb"
+    },
+    {
+      "file": "2023-24-gw14.json",
+      "gw": 14,
+      "rows": 753,
+      "season": "2023-24",
+      "sha256": "e7601e02e5b2e8bd8fc464b4c572e6e10bb2b3b20239d86d178631708e636cda"
+    },
+    {
+      "file": "2023-24-gw15.json",
+      "gw": 15,
+      "rows": 757,
+      "season": "2023-24",
+      "sha256": "b7ee2e913e06159792157a174d0fb2c36c2cc8752d58aa08d2ee4be154192f52"
+    },
+    {
+      "file": "2023-24-gw16.json",
+      "gw": 16,
+      "rows": 758,
+      "season": "2023-24",
+      "sha256": "347b0a9f7333297a32c1c56f84f562f64b89a244e5f9179f4678870ee4784850"
+    },
+    {
+      "file": "2023-24-gw17.json",
+      "gw": 17,
+      "rows": 686,
+      "season": "2023-24",
+      "sha256": "cb8cba208d89b084762d60c2306fe11f290b22c102f176e2374d05fd655f7e9a"
+    },
+    {
+      "file": "2023-24-gw18.json",
+      "gw": 18,
+      "rows": 700,
+      "season": "2023-24",
+      "sha256": "3b515fc1eb508c826049279907c802f42322a3d39ed2d2af9165915c3aae82c9"
+    },
+    {
+      "file": "2023-24-gw19.json",
+      "gw": 19,
+      "rows": 771,
+      "season": "2023-24",
+      "sha256": "39e82f8503440e6c6d40d1db4fa7d1e25561db98b8b910509fc619af4b187843"
+    },
+    {
+      "file": "2023-24-gw20.json",
+      "gw": 20,
+      "rows": 773,
+      "season": "2023-24",
+      "sha256": "8c6ac391f9254d44c4e6b72ac53dd0e3bdae29a0ec599979e285309749fc596c"
+    },
+    {
+      "file": "2023-24-gw21.json",
+      "gw": 21,
+      "rows": 787,
+      "season": "2023-24",
+      "sha256": "52eeb721a3176e13b68aef77438e0d58ab0f2989565a816c586aa03f6f34555a"
+    },
+    {
+      "file": "2023-24-gw22.json",
+      "gw": 22,
+      "rows": 799,
+      "season": "2023-24",
+      "sha256": "f84def723d756a52ca30c4f62a2833411b86e1c267eb12a032d5df6c7ebeed23"
+    },
+    {
+      "file": "2023-24-gw23.json",
+      "gw": 23,
+      "rows": 809,
+      "season": "2023-24",
+      "sha256": "45842a00392e4f941ac1c331461c476cbd8704bb9787836de798ec0bd843e012"
+    },
+    {
+      "file": "2023-24-gw24.json",
+      "gw": 24,
+      "rows": 814,
+      "season": "2023-24",
+      "sha256": "5c9392ceab4a6f9ab060846c53f9a31236480a85c12ebf903bbb5677bba00c70"
+    },
+    {
+      "file": "2023-24-gw25.json",
+      "gw": 25,
+      "rows": 982,
+      "season": "2023-24",
+      "sha256": "312110ff411c229554e18e5a8b9b5174548733ab51c1d768b2bc61709d3ba325"
+    },
+    {
+      "file": "2023-24-gw26.json",
+      "gw": 26,
+      "rows": 649,
+      "season": "2023-24",
+      "sha256": "e06e95898a6993538be7df665f2134f5e1f93f5ea6959f41890ae7674d82b068"
+    },
+    {
+      "file": "2023-24-gw27.json",
+      "gw": 27,
+      "rows": 832,
+      "season": "2023-24",
+      "sha256": "8357f4c125055a67ed09e3b53bb01f786404972ba5438bba2682663a8f49dfcf"
+    },
+    {
+      "file": "2023-24-gw28.json",
+      "gw": 28,
+      "rows": 924,
+      "season": "2023-24",
+      "sha256": "20dae745adfccbb4207ca5aff2c5c9d29f4ddfddfe08c8c20ca8a9b8a5a98eb7"
+    },
+    {
+      "file": "2023-24-gw29.json",
+      "gw": 29,
+      "rows": 344,
+      "season": "2023-24",
+      "sha256": "21d854d5063b9b595242079332d7f6a9c8f05605ebe3b167ff5f1cca42c34263"
+    },
+    {
+      "file": "2023-24-gw30.json",
+      "gw": 30,
+      "rows": 842,
+      "season": "2023-24",
+      "sha256": "7e1d1edecb3b1d8a2a326f1119dcfa1d3b1c3e24e6e5f02cbed3f42725a9de23"
+    },
+    {
+      "file": "2023-24-gw31.json",
+      "gw": 31,
+      "rows": 844,
+      "season": "2023-24",
+      "sha256": "bf014955478037036b8c76bcf33bb4d74a852a3e1983c90d696d878e14b870cf"
+    },
+    {
+      "file": "2023-24-gw32.json",
+      "gw": 32,
+      "rows": 846,
+      "season": "2023-24",
+      "sha256": "e4347687fe90902e4a4a4d375733aa05a668a8c21b73853acb04420f7b8a790a"
+    },
+    {
+      "file": "2023-24-gw33.json",
+      "gw": 33,
+      "rows": 851,
+      "season": "2023-24",
+      "sha256": "29d5df9d8b19a8cf7ca8f3159037392bbee7c82e31a0c0838216ca717405f242"
+    },
+    {
+      "file": "2023-24-gw34.json",
+      "gw": 34,
+      "rows": 1099,
+      "season": "2023-24",
+      "sha256": "79b78cebea49301aaa3ad8ac031211de7dfa2e425b8ea5f3c3dba6fe4b94b7f4"
+    },
+    {
+      "file": "2023-24-gw35.json",
+      "gw": 35,
+      "rows": 960,
+      "season": "2023-24",
+      "sha256": "36cb4f2556b095db6b0380f2a069528a299e3bcef31adf6586787ced4bfe56a0"
+    },
+    {
+      "file": "2023-24-gw36.json",
+      "gw": 36,
+      "rows": 859,
+      "season": "2023-24",
+      "sha256": "5630d210e7d7e040ee765b3781da82c8bdf057c7f3f1c025e9c2b97922bb6a45"
+    },
+    {
+      "file": "2023-24-gw37.json",
+      "gw": 37,
+      "rows": 1132,
+      "season": "2023-24",
+      "sha256": "063391b0116bc2f29eeebacf338a7895b6c54230b22e0f33feb172089e86daeb"
+    },
+    {
+      "file": "2023-24-gw38.json",
+      "gw": 38,
+      "rows": 865,
+      "season": "2023-24",
+      "sha256": "65d3eefe322d146976711b7a15acf5778f583e999aa1e4f5c78b2a41b00d8e9d"
+    },
+    {
+      "file": "2024-25-gw01.json",
+      "gw": 1,
+      "rows": 616,
+      "season": "2024-25",
+      "sha256": "1e5e520ff7d52fe8ed69fd9bed371492c6b73da8ca529a4ab21629d4bd534969"
+    },
+    {
+      "file": "2024-25-gw02.json",
+      "gw": 2,
+      "rows": 627,
+      "season": "2024-25",
+      "sha256": "cd70220a2d3820ce815988d9bd8126e0406b18832f1e3d3746db740559b0afbd"
+    },
+    {
+      "file": "2024-25-gw03.json",
+      "gw": 3,
+      "rows": 648,
+      "season": "2024-25",
+      "sha256": "0d56e7713e16871434eec89be7ee862ce116e3d65007ef7d18d8dd52dd93cc06"
+    },
+    {
+      "file": "2024-25-gw04.json",
+      "gw": 4,
+      "rows": 659,
+      "season": "2024-25",
+      "sha256": "93f9f86fe1e80fe859b69c6e416394600abd42db59d9dac8731d01c7ccdf9597"
+    },
+    {
+      "file": "2024-25-gw05.json",
+      "gw": 5,
+      "rows": 661,
+      "season": "2024-25",
+      "sha256": "2a4a3f188deebafb400ed23a9bbb7a5a8bdb03e8711b57b652705d153687eec3"
+    },
+    {
+      "file": "2024-25-gw06.json",
+      "gw": 6,
+      "rows": 664,
+      "season": "2024-25",
+      "sha256": "041f89e3808f226eeffbc835d03e3ca88f9c9008b88d0d57d2b51d30d3eb198f"
+    },
+    {
+      "file": "2024-25-gw07.json",
+      "gw": 7,
+      "rows": 666,
+      "season": "2024-25",
+      "sha256": "39765fed127adb4bf395bb32389adde5adbab0d84eef27f8081c7ac5e74975fe"
+    },
+    {
+      "file": "2024-25-gw08.json",
+      "gw": 8,
+      "rows": 667,
+      "season": "2024-25",
+      "sha256": "92a1e25b883dab2f37d8d65a7bfc8074f9e00960575dd4c4a155f06e9b51b10d"
+    },
+    {
+      "file": "2024-25-gw09.json",
+      "gw": 9,
+      "rows": 670,
+      "season": "2024-25",
+      "sha256": "f9fc9bdf086ed440e75b54de0522f7bd2552d0482ac20d674740939af66439ad"
+    },
+    {
+      "file": "2024-25-gw10.json",
+      "gw": 10,
+      "rows": 674,
+      "season": "2024-25",
+      "sha256": "d7f671f715325bc6417f9d9a535a784032d2c8e684f97336f57765f8cfaa17ed"
+    },
+    {
+      "file": "2024-25-gw11.json",
+      "gw": 11,
+      "rows": 678,
+      "season": "2024-25",
+      "sha256": "587d80c8badef8d14585e22090bed44ce3e7caa2a9ece2836687fc598225b83c"
+    },
+    {
+      "file": "2024-25-gw12.json",
+      "gw": 12,
+      "rows": 684,
+      "season": "2024-25",
+      "sha256": "5e2a093df586eefc298304242f7d6aed9edb27b6e180c13c7e8364d75e8e40d2"
+    },
+    {
+      "file": "2024-25-gw13.json",
+      "gw": 13,
+      "rows": 690,
+      "season": "2024-25",
+      "sha256": "c6ed2d21b631f5810639a2d3970dc5d12cfac7623bd0f773a481081c2ac68562"
+    },
+    {
+      "file": "2024-25-gw14.json",
+      "gw": 14,
+      "rows": 693,
+      "season": "2024-25",
+      "sha256": "e6e748ffda454a2994c025d75402dad68c3cb91e3768662cbdfdfe623b6cd00c"
+    },
+    {
+      "file": "2024-25-gw15.json",
+      "gw": 15,
+      "rows": 630,
+      "season": "2024-25",
+      "sha256": "df18f49444b346f205b78f03c8abf94b5683b5296bd1a5f6200439d49a03723f"
+    },
+    {
+      "file": "2024-25-gw16.json",
+      "gw": 16,
+      "rows": 701,
+      "season": "2024-25",
+      "sha256": "3758220b0e75d21ae246ec9069d9cea0065770e88c1ee2102e4820db266b2b0d"
+    },
+    {
+      "file": "2024-25-gw17.json",
+      "gw": 17,
+      "rows": 701,
+      "season": "2024-25",
+      "sha256": "ecad2564dbd9cf525476ef9baa9ff1a9a777c2a197e95b2d13e54d22958fe613"
+    },
+    {
+      "file": "2024-25-gw18.json",
+      "gw": 18,
+      "rows": 705,
+      "season": "2024-25",
+      "sha256": "60d68f3f724ca7580867c13890af3a66ff733c80307d14c5a28f8f5855d41ed4"
+    },
+    {
+      "file": "2024-25-gw19.json",
+      "gw": 19,
+      "rows": 709,
+      "season": "2024-25",
+      "sha256": "d84d87d1cabeeeccb375afc7103be22c6c2d1432ca8ced01ecd19c4e5f700325"
+    },
+    {
+      "file": "2024-25-gw20.json",
+      "gw": 20,
+      "rows": 711,
+      "season": "2024-25",
+      "sha256": "11dcebbc684578a53b56181b7ab7ee540eded9a19474adeaf224a5f7981a977f"
+    },
+    {
+      "file": "2024-25-gw21.json",
+      "gw": 21,
+      "rows": 724,
+      "season": "2024-25",
+      "sha256": "2febbf8f94966e6cc938e4640d75790f5692ad9defb1344534eafe50d63a5937"
+    },
+    {
+      "file": "2024-25-gw22.json",
+      "gw": 22,
+      "rows": 729,
+      "season": "2024-25",
+      "sha256": "ad48a9ec633a89c75622d688d6834a9464ae6bcb2665e3775dd4f747083e6e78"
+    },
+    {
+      "file": "2024-25-gw23.json",
+      "gw": 23,
+      "rows": 736,
+      "season": "2024-25",
+      "sha256": "863b000e8947ed61a9abff97a32f8fc9aa63d11e8d4d39ecd67fe2c9ff421ad8"
+    },
+    {
+      "file": "2024-25-gw24.json",
+      "gw": 24,
+      "rows": 809,
+      "season": "2024-25",
+      "sha256": "4137f9b58a6be04c0a16b00b174a534686f0810958f140e997d0095a04cef33d"
+    },
+    {
+      "file": "2024-25-gw25.json",
+      "gw": 25,
+      "rows": 836,
+      "season": "2024-25",
+      "sha256": "bdc87665b125ba739b183e168f0259b8bb61d7a54d782d0a57e15461404917f0"
+    },
+    {
+      "file": "2024-25-gw26.json",
+      "gw": 26,
+      "rows": 763,
+      "season": "2024-25",
+      "sha256": "858a4be75eb982df45eda3dfe649bd71179a6d1adebb72a43a7a7fe8a1db94fb"
+    },
+    {
+      "file": "2024-25-gw27.json",
+      "gw": 27,
+      "rows": 764,
+      "season": "2024-25",
+      "sha256": "96bd63a2223a958d39e49cfbb9a3a3c2fe682fc46e05bfe4c8624ff0f54aaa4d"
+    },
+    {
+      "file": "2024-25-gw28.json",
+      "gw": 28,
+      "rows": 769,
+      "season": "2024-25",
+      "sha256": "bdb5a34c9af3970ff3417db8af22e8ad4bb9049811c2f47a00a7cbcecd6af6f2"
+    },
+    {
+      "file": "2024-25-gw29.json",
+      "gw": 29,
+      "rows": 623,
+      "season": "2024-25",
+      "sha256": "43e2233095688ff24c359a18a1ae3a21812810b28d9daa771d713efad5d38377"
+    },
+    {
+      "file": "2024-25-gw30.json",
+      "gw": 30,
+      "rows": 771,
+      "season": "2024-25",
+      "sha256": "eca123dd0e148bcc122f79c1495c58a6dfafb81d2db79ed8741725fdc8beff15"
+    },
+    {
+      "file": "2024-25-gw31.json",
+      "gw": 31,
+      "rows": 772,
+      "season": "2024-25",
+      "sha256": "40caa946936cefe3613655172fd0f8dfe61c0af4120ae99216319bb77458b486"
+    },
+    {
+      "file": "2024-25-gw32.json",
+      "gw": 32,
+      "rows": 847,
+      "season": "2024-25",
+      "sha256": "147101f569752ef45032a22936010ff5694e8031a584005a61bb26dc5fdf97e6"
+    },
+    {
+      "file": "2024-25-gw33.json",
+      "gw": 33,
+      "rows": 930,
+      "season": "2024-25",
+      "sha256": "9429e0fc775622a7c1786fa360dde6a02f9d4a7fb40b5544e06515b2d1f6d0ee"
+    },
+    {
+      "file": "2024-25-gw34.json",
+      "gw": 34,
+      "rows": 629,
+      "season": "2024-25",
+      "sha256": "787327d89b537a0fada20ba59ccaf9601ae7c6a04485a7baa35554a1aee80f5d"
+    },
+    {
+      "file": "2024-25-gw35.json",
+      "gw": 35,
+      "rows": 781,
+      "season": "2024-25",
+      "sha256": "bebd35c5a8e5093bdbc0d2dd534794cecbfb989aa7f54fe108c58b96408177f5"
+    },
+    {
+      "file": "2024-25-gw36.json",
+      "gw": 36,
+      "rows": 781,
+      "season": "2024-25",
+      "sha256": "96b6192ae38b74f8655d5abe7c58229303d7fd0a092f9cb0078a18bf3f1c7738"
+    },
+    {
+      "file": "2024-25-gw37.json",
+      "gw": 37,
+      "rows": 781,
+      "season": "2024-25",
+      "sha256": "95a450284d87771ca87511cd17c709a5cee7ad1ed21603568f8bc56ae54ecaa2"
+    },
+    {
+      "file": "2024-25-gw38.json",
+      "gw": 38,
+      "rows": 784,
+      "season": "2024-25",
+      "sha256": "9f72ec8691770e42302099417e85a52de8aaf35ae9f465066f96dcd393396317"
+    },
+    {
+      "file": "2025-26-gw01.json",
+      "gw": 1,
+      "rows": 690,
+      "season": "2025-26",
+      "sha256": "500a90a4854c96ac342449720eb7ea7aeb1600540eb4e86aef6d9da8c52519cc"
+    },
+    {
+      "file": "2025-26-gw02.json",
+      "gw": 2,
+      "rows": 705,
+      "season": "2025-26",
+      "sha256": "e87abc5ee11ca183ca64ca44682494a03133aae851d8991299479a8275b7f379"
+    },
+    {
+      "file": "2025-26-gw03.json",
+      "gw": 3,
+      "rows": 712,
+      "season": "2025-26",
+      "sha256": "086f98538725bf3ac29d5db61bb56d06d9b7b2b2770448b671dd233cfea7a0db"
+    },
+    {
+      "file": "2025-26-gw04.json",
+      "gw": 4,
+      "rows": 740,
+      "season": "2025-26",
+      "sha256": "fd921504b216c9dbd38454125edcf94bb34f1f818af48acd0b2923de14bf81d2"
+    },
+    {
+      "file": "2025-26-gw05.json",
+      "gw": 5,
+      "rows": 741,
+      "season": "2025-26",
+      "sha256": "94dd780b802d43734d6bfc08f6e0203bca0957ebb3f1334b10ac5beaa2fbb35f"
+    },
+    {
+      "file": "2025-26-gw06.json",
+      "gw": 6,
+      "rows": 742,
+      "season": "2025-26",
+      "sha256": "e10457c2d7d70246cfd945c3c9ba71ff64a051b7e68a735e1c311e548ccc2b36"
+    },
+    {
+      "file": "2025-26-gw07.json",
+      "gw": 7,
+      "rows": 743,
+      "season": "2025-26",
+      "sha256": "63884cf742e836d036e1710372f3fcaf0ec33207b82295bb70cf5e17fc11cf89"
+    },
+    {
+      "file": "2025-26-gw08.json",
+      "gw": 8,
+      "rows": 745,
+      "season": "2025-26",
+      "sha256": "6df5e6deb5fe77272638511b638c779c2bc5f863bd64994904bf574336ce7b08"
+    },
+    {
+      "file": "2025-26-gw09.json",
+      "gw": 9,
+      "rows": 746,
+      "season": "2025-26",
+      "sha256": "01529a89fc67858567acc54a4af3fb8e10ff5e8cf08df1449911196c753b2b6e"
+    },
+    {
+      "file": "2025-26-gw10.json",
+      "gw": 10,
+      "rows": 747,
+      "season": "2025-26",
+      "sha256": "74f7172437c6e6b9d105aaaa498f49d3ce4e9a2eca4b413a5324662bde4988f7"
+    },
+    {
+      "file": "2025-26-gw11.json",
+      "gw": 11,
+      "rows": 752,
+      "season": "2025-26",
+      "sha256": "6d913b4a78295b340390d19588a0c111a5a63810b75d5042e9b82b3ad71463cf"
+    },
+    {
+      "file": "2025-26-gw12.json",
+      "gw": 12,
+      "rows": 755,
+      "season": "2025-26",
+      "sha256": "f35311049c5c0c1d236995cd060a6d3643072bb5f4e1b1252053e203dce6dd7d"
+    },
+    {
+      "file": "2025-26-gw13.json",
+      "gw": 13,
+      "rows": 755,
+      "season": "2025-26",
+      "sha256": "2b3734715e31caee4f703ae6e2334664910684ef762c0614af46b460dca4e097"
+    },
+    {
+      "file": "2025-26-gw14.json",
+      "gw": 14,
+      "rows": 758,
+      "season": "2025-26",
+      "sha256": "1b3f385d6e3fd6287ffc273abab31b2da37ecb7e7fd5f68158bb58537dc4d198"
+    },
+    {
+      "file": "2025-26-gw15.json",
+      "gw": 15,
+      "rows": 759,
+      "season": "2025-26",
+      "sha256": "616c875a7ad6d0195ee572c6fa7259c58a976dc2c3c63b7da66d16b74a1fcfce"
+    },
+    {
+      "file": "2025-26-gw16.json",
+      "gw": 16,
+      "rows": 760,
+      "season": "2025-26",
+      "sha256": "05367709ad3dd4205b5d9dc68bdb77111689bc893bca558d90692355627dd44e"
+    },
+    {
+      "file": "2025-26-gw17.json",
+      "gw": 17,
+      "rows": 770,
+      "season": "2025-26",
+      "sha256": "1918044f42ee043bc7843dafac9d729f3945252779528527a67f1737496007a4"
+    },
+    {
+      "file": "2025-26-gw18.json",
+      "gw": 18,
+      "rows": 775,
+      "season": "2025-26",
+      "sha256": "96f7412e5868b980641a6c68c9de741cd8c80fe771a9223e9819d630c1a4474d"
+    },
+    {
+      "file": "2025-26-gw19.json",
+      "gw": 19,
+      "rows": 780,
+      "season": "2025-26",
+      "sha256": "79f343f7eae5acad09492ae894966e0fbe41c10630d09a7cbabe118edc630de2"
+    },
+    {
+      "file": "2025-26-gw20.json",
+      "gw": 20,
+      "rows": 790,
+      "season": "2025-26",
+      "sha256": "07ac1e7e1f4b8d38ce7ffa2bcc0e1ba41f237f29b5b8b84940b938ea3354bb58"
+    },
+    {
+      "file": "2025-26-gw21.json",
+      "gw": 21,
+      "rows": 795,
+      "season": "2025-26",
+      "sha256": "7b4b754525d1d25ac7311d87e264e076ca1a74651418d2b39aaabbf49663fbfb"
+    },
+    {
+      "file": "2025-26-gw22.json",
+      "gw": 22,
+      "rows": 799,
+      "season": "2025-26",
+      "sha256": "88de0eecdc862ab88f986d37fb0af94977d528a1461feb7700a2c3e9ed909fc2"
+    },
+    {
+      "file": "2025-26-gw23.json",
+      "gw": 23,
+      "rows": 803,
+      "season": "2025-26",
+      "sha256": "2f5da3521723b3314684259478e6d2c85df00d76f1e955c8d335467a8ca41279"
+    },
+    {
+      "file": "2025-26-gw24.json",
+      "gw": 24,
+      "rows": 811,
+      "season": "2025-26",
+      "sha256": "324efdc5252078ab0bf99ef83c1a398848f7c02f7986c5c1f47262c809de32e7"
+    },
+    {
+      "file": "2025-26-gw25.json",
+      "gw": 25,
+      "rows": 817,
+      "season": "2025-26",
+      "sha256": "781ca9105e81f23e58c028ceebdcdd3c8b7a78a8f936d90ea45b9bee17b1d770"
+    },
+    {
+      "file": "2025-26-gw26.json",
+      "gw": 26,
+      "rows": 896,
+      "season": "2025-26",
+      "sha256": "cbbd31b3c873f33a89409239f8a6f4f9451a5584f85fea1440fab0fac403d0bd"
+    },
+    {
+      "file": "2025-26-gw27.json",
+      "gw": 27,
+      "rows": 818,
+      "season": "2025-26",
+      "sha256": "9d5b69d278629c9fa9ed71154fbc96a1400da9e0e8abafa7f168566d30653fc7"
+    },
+    {
+      "file": "2025-26-gw28.json",
+      "gw": 28,
+      "rows": 819,
+      "season": "2025-26",
+      "sha256": "6df3615568231218efc4b10e3288153423196adfe5e6f3b9e7e1b321cdf23a06"
+    },
+    {
+      "file": "2025-26-gw29.json",
+      "gw": 29,
+      "rows": 820,
+      "season": "2025-26",
+      "sha256": "5d61f90e1fce0618c8290ff2db1acf40cb2f61bf6592c5b4a936a84a538819f5"
+    },
+    {
+      "file": "2025-26-gw30.json",
+      "gw": 30,
+      "rows": 822,
+      "season": "2025-26",
+      "sha256": "7ae55654d294d19f006751686eaf7592155b8779465a660c6210c2cca22167f7"
+    },
+    {
+      "file": "2025-26-gw31.json",
+      "gw": 31,
+      "rows": 664,
+      "season": "2025-26",
+      "sha256": "9c0b53f6754bb32ec2cbcacb27cdd97dffbb980d04cb86743b23d32c6427fb9b"
+    },
+    {
+      "file": "2025-26-gw32.json",
+      "gw": 32,
+      "rows": 826,
+      "season": "2025-26",
+      "sha256": "9b2e08e5404e5168bfea8a2ad46780fdab1c386356f661097fa2a08bcf8a4b09"
+    },
+    {
+      "file": "2025-26-gw33.json",
+      "gw": 33,
+      "rows": 1077,
+      "season": "2025-26",
+      "sha256": "2cdf982b6c4b1ba7d64b84e895f305f7e860eb8f43df42cf636c5f4c49a5e00e"
+    },
+    {
+      "file": "2025-26-gw34.json",
+      "gw": 34,
+      "rows": 582,
+      "season": "2025-26",
+      "sha256": "ad485af07943d8247cd6cbc742c8b8d100fe37cb533941de654681f12a875355"
+    },
+    {
+      "file": "2025-26-gw35.json",
+      "gw": 35,
+      "rows": 832,
+      "season": "2025-26",
+      "sha256": "f0f7c678bbd8e9f94a845ead56f179074dfc7d5ac60f9a5693fe0379f9bd2367"
+    },
+    {
+      "file": "2025-26-gw36.json",
+      "gw": 36,
+      "rows": 920,
+      "season": "2025-26",
+      "sha256": "eae4f2cef8471d7aca63c12f87bc1dba67bc28b3d909c254d87d7634e5c52e1a"
+    },
+    {
+      "file": "2025-26-gw37.json",
+      "gw": 37,
+      "rows": 840,
+      "season": "2025-26",
+      "sha256": "261f5f1838223c86919ffc411c574203aafc413a2e6e5e9fae4276ce89ff7ac2"
+    },
+    {
+      "file": "2025-26-gw38.json",
+      "gw": 38,
+      "rows": 841,
+      "season": "2025-26",
+      "sha256": "86f710cd3790061c70b8f7a348ad96f967e5316085cecd5e5b7da069c5a20844"
+    }
+  ],
+  "provenance": {
+    "branch": "claude/comet-fpl-v2-architecture-mqrj8f",
+    "comparator": "retrospective_current_minutes_proxy_v1",
+    "config": {
+      "clean_end_required": true,
+      "clean_start_required": true,
+      "comparator": "retrospective_current_minutes_proxy_v1",
+      "contract_version": "1.0",
+      "cutoff": "first_observed_gameweek_kickoff_proxy",
+      "database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+      "evidence_class": "retrospective_archive_price_proxy_development",
+      "expected_direct_proxy_rows": 821,
+      "expected_folds": 114,
+      "expected_rows": 86755,
+      "fit_policy": "one_unmodified_incumbent_fit_per_gameweek_shared_across_later_components",
+      "history": "all_prior_nonnull_minutes_actual_kickoff_strictly_before_cutoff",
+      "identity": "retrospective_current_minutes_proxy_cache_v1",
+      "model_candidate_scoring": false,
+      "population": "unchanged_archive_nonnull_minutes_player_fixture_roster_proxy",
+      "prior_results_immutable": true,
+      "promotion_permitted": false,
+      "raw_minutes": "concentration_adaptive_shrinkage_player_minutes_v3",
+      "seasons": [
+        "2023-24",
+        "2024-25",
+        "2025-26"
+      ],
+      "selector": "exact_current_prospective_seasonal_math_with_explicit_cold_price_proxy",
+      "write_once": true
+    },
+    "database_path": "D:\\Personal\\workspace\\the_comet_fpl\\.worktrees\\sdp_test\\data\\fpl.duckdb",
+    "database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+    "evidence_class": "retrospective_archive_price_proxy_development",
+    "frozen_results_sha256": {
+      "results\\competitive_participation_pilot_development.json": "f34b0c978b6de9454bbd1bb52cb2d2faabee6347b8baa16403bca773b56bf411",
+      "results\\competitive_participation_pilot_independent_audit.json": "84568a52959f87151c6419ac6c85985d868179e959edde32453abfd8fe5409a2",
+      "results\\ev_backtest_2025_26_gw29_38.json": "cdfb7f284a31b9b1ee287f12cd830e6c9009af7b23cc7fcdc8e3358c55ff0e5b",
+      "results\\football_program_prerequisite_audit_20260907.json": "4ce06df4d5581c8abd53b1b1e74f15992fde02d161d958493c59d1e5fa3ecf78",
+      "results\\gw1_2026_27_forecast_vs_actual_development.json": "29a42dd2a18bb3e3eb0a488ab5d782e8ab9d90c77623444a4109a8e590d78df0",
+      "results\\newcomer_priors_and_style_audit_development.json": "48d29ae1ae751aeee4cfe7ce1e4982a2f85400ea3fd69483cfe8a2dc1af88af4",
+      "results\\pl_sdp_coverage.json": "205123c7666fdb887a232a40fbf83ae02f1062c85f9be254bc4115f26af44a7d",
+      "results\\pl_sdp_identity_audit.json": "105917e688af2bd1a4e6c8c8a4f0dd9024e23dcc7661bb2f09450bd134d68c74",
+      "results\\pl_sdp_metric_inventory.json": "db00a8a06c6026724d96b3578075c9f175e93c7d37d1c96d2b273fb62cefe7e3",
+      "results\\pl_sdp_reconciliation.json": "f4c0914c5276cc6d58888a5966d598281b059c4a8355518e96a09acaa442e820",
+      "results\\pl_sdp_sot_zero_audit.json": "3d662e09e541e924c218fe4edf1cf7f11289d2d13f4577fb0dc2bf56a596cb4a",
+      "results\\stage_c_assists_candidate_v2_development.json": "a7895ee21fead294381dd5f49845e7e21326c25120ecae106157dd37fe171116",
+      "results\\stage_c_goals_candidate_v4_development.json": "c2f4f1e1780c30a356bb2da78bf0e35a6311bb4fdc51fd01d84645aa7f44e0eb",
+      "results\\v2_chance_creation_development.json": "f4cc595384102112ba2c41f118396d4176a6f7000a6f3c1753b5edf1a1ae952f",
+      "results\\v2_chance_creation_independent_audit.json": "8220902300a2dc75820bbd44565c3f7fa5471fc96bbd16b5a1e141eb35709f0e",
+      "results\\v2_chance_target_audit.json": "7d84bfec69b6e6dac1c95d973a723c7e4dbb218432cf5945d5616cb8664fb163",
+      "results\\v2_corroborated_zero_sot_development.json": "e8d1a5c0fcce42946d3bf8e798f52e208ac79168c2453e4c0840c1be65c009c5",
+      "results\\v2_dc_development.json": "ebae1d1aac84107eea2c443c7262b6a2444622e0ae926c56085dd4447302ac45",
+      "results\\v2_real_sot_capture_manifest.json": "084137d2e03babbf9d8361e49be0f23ba19ae3baed34c5d9d0605264ea37057f",
+      "results\\v2_real_sot_development.json": "32a3332dd92e30b160a632d6ad68ee268cbfd3367a27340e365583c2e9ca7e7d",
+      "results\\v2_real_sot_retrospective_coverage.json": "7b37ce3998f1f252a6b1d7ea7978b1f916f7bf414eb8c942eae87e2bc50c5a6d",
+      "results\\v2_tactical_matchup_development.json": "726e513660045f0e34cce9909d7e8e4ac9c0a3999d8a23630866550159bdd8ed",
+      "results\\v2_tactical_metric_audit.json": "66a7364de7af030361640db56c922e963ebf8e2853ab500e2ca0d124f4ad0f92",
+      "results\\v2_tactical_numeric_development.json": "d52973687d2983c9fc3159365e8dde865ac60a7b1ddb0d0db6e5dc3268efd11c",
+      "results\\v2_team_environment_development.json": "bb80b26f88a01f8aee803b1e0eff61b55cc1712625357d3444dd73b297bad6ac",
+      "results\\v2_weekly_inner_selection_development.json": "79f3a0815271a95cd0e39874aaa20fa89d3b1df0875a5e780c0317a961424d35",
+      "results\\v2_weekly_sot_development.json": "c94cf71a52e926970656733e746d8a0b661c050152647e5de78bde9b0cd8227f"
+    },
+    "git_head": "eea2381c8395af0b136782c515d0e34181cc462c",
+    "historical_deadline_validity": false,
+    "identity": "retrospective_current_minutes_proxy_cache_v1",
+    "new_model_candidate_scoring": false,
+    "source_sha256": {
+      "config/phase2_evaluation.yaml": "5ac5e76610799d870e8efcd86ad83b67978c7682de31234fbbda5291e0576d6a",
+      "config/retrospective_current_minutes_proxy_v1.yaml": "a151d89743a23d057897bd172945ab6ae3fee35ca78f439f6f01bcb6f3e32578",
+      "config/retrospective_minutes_control_cache.yaml": "044a405c03fde988fc6035b97e028fe3f195fec20fae06d8dbad471d1f193cb9",
+      "src/fpl/jobs/prospective_points_v1.py": "36d0bfc5e482a9c55e4524ce5d1993b22d3ba1bef0712e32eeb7b7169a3beb35",
+      "src/fpl/models/minutes_shrinkage.py": "634a3b2f03db1c8e73517b558f236ffed47ad28f5b14e09518d97ee31b78d52c",
+      "src/fpl/models/minutes_v1.py": "53851d4d6faf2ed0bfceb02948f9327393677f115efb55d36433aacc62540dc2",
+      "src/fpl/models/minutes_v2.py": "29bac69462e3db17ed82f909ab72915e9028f940cf68f1d5492f05b0929a3a12",
+      "src/fpl/models/minutes_v3.py": "b169a7fa90d6eb9af0fec313349688f6801c4f227ced87604c3f71093c819e3e",
+      "src/fpl/models/price_starter_prior.py": "2cf5fc05c253c6ed1dc9e3ab522eee2415a8f5dffabb739635a9eddd988af616",
+      "src/fpl/validate/current_minutes_control_cache.py": "56730c874785df6226705be1986ca7e67642042fb0b7190306fff825710bb2cb",
+      "src/fpl/validate/minutes_baselines.py": "5ad2ea2436ab523102ab93b0c34206eb2c237e10e99c6d48b31183e8605f5b4b",
+      "src/fpl/validate/minutes_harness.py": "483432dcec5f94abd5376e8fd6b6100a1e05ddaad8fe69348ba6461a2be072b4",
+      "src/fpl/validate/points_harness.py": "2bc72fa73ab5f7573e64a434ed75b706ba74ef8f6b5a8d5796f93a6910ffb81c",
+      "src/fpl/validate/prospective_incumbent_adapter.py": "8047c111dc1b4af1552e4c15f3eaa31a14b32f4122c7c4f725be42e789c80b40",
+      "src/fpl/validate/retrospective_minutes_proxy.py": "eaa82b3cf219c218243390dfa94fa2f0184943417f1bea33f1518dd2b163d76e"
+    },
+    "started_at_utc": "2026-09-07T08:28:40.525277+00:00",
+    "worktree_clean": true
+  }
+}

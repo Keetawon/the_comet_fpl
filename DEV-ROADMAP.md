@@ -1576,3 +1576,13 @@ price-sensitive cold-start inputs, with matched candidate/control inputs and pro
 slices. An unresolved competitive fixture makes affected workload windows unavailable, not zero,
 and does not invalidate independently complete windows. No new model has yet been scored under
 this amendment. Phase A remains INCONCLUSIVE and the incumbent remains unchanged.
+
+The independently source-resolved V2 participation pilot and shared minutes-proxy reference
+are now retained from clean `eea2381`:13fixtures/266mapped selected-club rows and
+114folds/86,755PMFs/821direct proxy rows respectively. Neither is a new candidate score.
+See `docs/competitive-participation-v2-development.md` and
+`docs/retrospective-minutes-proxy-reference.md`. Raw574-match acquisition is a separate ongoing
+data-only run; no full workload mart is yet claimed. Next: validate its coverage and store
+participation versions in an isolated operational copy, then preregister coarse role/player
+experiments. Unknown registration/rest must remain unknown. Keep the181-fold Stage B eligibility
+shortfall explicit; no metric gate is relaxed and no successor/default has been selected.

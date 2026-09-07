@@ -1686,3 +1686,15 @@ coverage are verified. Every candidate still requires clean preregistration, com
 one exclusive formal run, immutable results and independent verification. Phase A stays frozen
 INCONCLUSIVE; no production/default/optimizer changes. See
 `docs/football-program-evidence-amendment-2026-09-07.md`.
+
+The newly preregistered participation V2 offline pilot now passes its scoped contract:
+13fixtures,26sides,266/266selected-club identities,160/160PL starter/appearance comparisons,
+121duration comparisons at0.231405-minute MAE. The extra Millwall roster record remains NULL;
+global all-roster exposure is not claimed. Preserve both the first supplemental prior-presence
+audit and its policy reconciliation; three missing prior-club witnesses are not contradictions.
+See `docs/competitive-participation-v2-development.md`. The shared retrospective current-minutes
+proxy reference also completed114folds/86,755PMFs/821direct proxy rows from clean `eea2381`,
+without candidate scoring; see `docs/retrospective-minutes-proxy-reference.md`. No new player
+candidate or full-points synthesis result exists yet. Historical membership intervals remain
+unproved, so exact workload/rest cannot be fabricated from stint min/max dates. The original
+Stage B181-fold requirement remains unsatisfied by this smaller reference population.

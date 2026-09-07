@@ -824,3 +824,8 @@ licenses an explicitly labelled archive-price proxy for the 821 historical cold-
 plus independent lineup-source resolution and a new participation interpretation boundary.
 The original pilot and Phase A result remain frozen. Dependent player research may continue
 only under separate clean, single-run development contracts; production defaults do not change.
+
+The [V2 participation pilot](docs/competitive-participation-v2-development.md) now passes its
+scoped interpretation checks, and the [minutes proxy reference](docs/retrospective-minutes-proxy-reference.md)
+retains114folds/86,755PMFs with821direct proxy rows. These are data/comparator prerequisites,
+not new player-model results or production-valid historical forecasts.

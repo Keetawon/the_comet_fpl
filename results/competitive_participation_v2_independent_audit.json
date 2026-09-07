@@ -1,0 +1,57 @@
+{
+  "absent_prior_witnesses": [
+    {
+      "current_pl_fixture_team_corroborated": true,
+      "fpl_code": 448104,
+      "match": 2561926,
+      "prior_fpl_rows": 0,
+      "provider_player_id": 448104,
+      "retained_prior_team_code": null,
+      "team": 3
+    },
+    {
+      "current_pl_fixture_team_corroborated": true,
+      "fpl_code": 651426,
+      "match": 2561929,
+      "prior_fpl_rows": 0,
+      "provider_player_id": 651426,
+      "retained_prior_team_code": null,
+      "team": 31
+    },
+    {
+      "current_pl_fixture_team_corroborated": true,
+      "fpl_code": 660392,
+      "match": 2561929,
+      "prior_fpl_rows": 0,
+      "provider_player_id": 660392,
+      "retained_prior_team_code": null,
+      "team": 31
+    }
+  ],
+  "all_roster_exposure_known": false,
+  "at_utc": "2026-09-07T08:34:14.773142+00:00",
+  "completed": true,
+  "contradictory_observed_prior_teams": 0,
+  "database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "first_audit_preserved_sha256": "ec322e57df3335decbc3a18da504ce32b04b35ba118ebc68c585689559cd64cc",
+  "independent_raw_and_pair_checks": 4157,
+  "model_fits": 0,
+  "network_requests": 0,
+  "other_check_failures": [],
+  "passed_frozen_v2_pilot_contract": true,
+  "policy_distinction": "First independent audit added mandatory prior-season-fixture presence. Frozen validate_results permits absent prior and only rejects an observed contradictory prior team. The three absent priors are independently confirmed, remain NULL, and have exact current PL fixture-team corroboration. No parser, source, threshold or result is changed.",
+  "remaining_unknown": {
+    "appeared": null,
+    "match": 2603048,
+    "nominal_minutes": null,
+    "on_bench": null,
+    "player": 108801,
+    "started": null,
+    "team": 103
+  },
+  "repository_edits": false,
+  "result_sha256": "fb9a9ef9d1a55b4a4c867aacbf7d89e1e880e0a64bd251bb2e318f14192c15ab",
+  "selected_identity_rows": 266,
+  "selected_rows_with_prior_team_witness": 263,
+  "unresolved_exact_player_identities": 0
+}
