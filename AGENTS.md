@@ -1698,3 +1698,16 @@ without candidate scoring; see `docs/retrospective-minutes-proxy-reference.md`. 
 candidate or full-points synthesis result exists yet. Historical membership intervals remain
 unproved, so exact workload/rest cannot be fabricated from stint min/max dates. The original
 Stage B181-fold requirement remains unsatisfied by this smaller reference population.
+
+The bounded competitive acquisition now retains574matches/1,148lineup-event endpoints across
+all20PL clubs and six competitive competitions, including1,122newHTTP200responses; no model
+was fitted. See `docs/competitive-workload-capture-development.md`. New operational staging,
+observed-workload lower bounds, coarse starting-role history and a current-component reference
+are implemented separately from production. Exact player registration/rest remains unproved.
+Do not equate successful raw capture with valid participation or silently bridge missing windows.
+The role algorithm is fixed but still awaits coverage-based formal registration. The card target
+audit finds only FPL-scored none/yellow/red states, including10zero-minute card labels; the
+new bounded disciplinary design must not erase them or draw independent physical yellow/red
+events. No new player candidate has been formally scored. Preserve original Stage B AND Stage C
+goals/assists minimum181-fold requirements;114fold development results cannot be declared eligible
+for the passed-successor synthesis rule by adding all-fallback folds or lowering the threshold.

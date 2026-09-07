@@ -127,6 +127,54 @@ class CompetitiveWorkloadSnapshot:
     promotion_permitted: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class ObservedPlayerIdentity:
+    """Exact identity witness, not a registration or continuous-club-membership claim."""
+
+    code: int
+    provider_player_id: int
+    source_identity: str
+    known_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ObservedParticipationWindow:
+    hours: int
+    nominal_minutes_lower_bound: float | None
+    starts_lower_bound: int | None
+    appearances_lower_bound: int | None
+    midweek_utc_nominal_minutes_lower_bound: float | None
+    midweek_utc_appearances_lower_bound: int | None
+    extra_time_appearances_lower_bound: int | None
+    witnessed_fixtures: tuple[CompetitiveFixtureKey, ...]
+    catalogued_scope_fixtures: tuple[CompetitiveFixtureKey, ...]
+    unusable_scope_fixtures: tuple[CompetitiveFixtureKey, ...]
+    unknown_reasons: tuple[str, ...]
+    completion_time_proxy: bool
+    # The unobserved universe is unknown, not the count of known failed captures.
+    unobserved_player_fixture_count: None = None
+    exact_nominal_minutes: None = None
+    exact_starts: None = None
+    exact_appearances: None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ObservedParticipationSnapshot:
+    code: int
+    as_of: datetime
+    identity: ObservedPlayerIdentity
+    scope_team_codes: frozenset[int]
+    windows: tuple[ObservedParticipationWindow, ...]
+    last_observed_appearance_kickoff_age_hours_upper_bound: float | None
+    selected_versions: tuple[CompetitiveMatchVersion, ...]
+    catalogue_sources: tuple[CatalogueCoverage, ...]
+    excluded_target_gw_fixtures: frozenset[CompetitiveFixtureKey]
+    exact_player_rest_hours: None = None
+    evidence_class: str = "retrospective_observed_participation_lower_bound_development"
+    version_policy: str = VERSION_POLICY
+    promotion_permitted: bool = False
+
+
 def _aware(value: datetime) -> None:
     if value.utcoffset() is None:
         raise ValueError("workload instants must be timezone aware")
@@ -337,6 +385,11 @@ class RetrospectiveCompetitiveWorkloadView:
             ):
                 issues.append(f"fixture_has_event_or_end_at_or_after_cutoff:{key.match_id}")
                 continue
+            if version.verified_end_at is None and fixture.kickoff + timedelta(hours=6) >= cutoff:
+                issues.append(
+                    f"unverified_completion_within_conservative_six_hour_margin:{key.match_id}"
+                )
+                continue
             if version.errors:
                 issues.extend(f"fixture_error:{key.match_id}:{e}" for e in version.errors)
                 continue
@@ -524,4 +577,128 @@ class RetrospectiveCompetitiveWorkloadView:
             tuple(m for m in self.memberships if m.code == code),
             self.catalogue,
             excluded_target_gw_fixtures,
+        )
+
+    def observed_participation_snapshot(
+        self,
+        *,
+        identity: ObservedPlayerIdentity,
+        scope_team_codes: frozenset[int],
+        as_of: datetime,
+        excluded_target_gw_fixtures: frozenset[CompetitiveFixtureKey],
+    ) -> ObservedParticipationSnapshot:
+        """Certified observed congestion only; missing participation is never rested zero.
+
+        Scan the player's exact identity across the declared catalogue, not their current club.
+        Unknown registration and off-scope football prevent exact total/rest claims even when
+        every retained bundle is complete. This does not weaken :meth:`snapshot`.
+        """
+        _aware(as_of)
+        _aware(identity.known_at)
+        if (
+            not identity.source_identity
+            or not scope_team_codes
+            or any(
+                isinstance(v, bool) or not isinstance(v, int) or v <= 0
+                for v in (identity.code, identity.provider_player_id, *scope_team_codes)
+            )
+        ):
+            raise ValueError(
+                "exact player identity witness and explicit positive club scope required"
+            )
+        if any(type(key) is not CompetitiveFixtureKey for key in excluded_target_gw_fixtures):
+            raise ValueError("target-GW exclusions require exact competitive fixture identities")
+        windows: list[ObservedParticipationWindow] = []
+        used: dict[CompetitiveFixtureKey, CompetitiveMatchVersion] = {}
+        latest: datetime | None = None
+        for hours in WINDOW_HOURS:
+            start = as_of - timedelta(hours=hours)
+            selected, expected, issues = self._resolve(
+                [(team, start, as_of) for team in sorted(scope_team_codes)],
+                as_of,
+                excluded_target_gw_fixtures,
+            )
+            issues.extend(
+                (
+                    "continuous_player_membership_unproved",
+                    "off_scope_competitive_participation_unknown",
+                )
+            )
+            observed: list[tuple[CompetitiveMatchVersion, WorkloadObservation]] = []
+            unusable = set(expected) - {v.fixture.key for v in selected}
+            for version in selected:
+                row = next(
+                    (
+                        r
+                        for r in version.observations
+                        if r.provider_player_id == identity.provider_player_id
+                        or r.code == identity.code
+                    ),
+                    None,
+                )
+                if row is None:
+                    # No registration inference from an absent player, including newcomers.
+                    continue
+                if (
+                    row.code != identity.code
+                    or row.provider_player_id != identity.provider_player_id
+                ):
+                    raise ValueError("player observation contradicts the exact identity witness")
+                if row.errors or row.appeared is None:
+                    issues.append(f"player_participation_unknown:{version.fixture.key.match_id}")
+                    unusable.add(version.fixture.key)
+                    continue
+                if row.appeared is not True:
+                    continue
+                observed.append((version, row))
+                used[version.fixture.key] = version
+                latest = max(latest, version.fixture.kickoff) if latest else version.fixture.kickoff
+                if row.nominal_minutes is None:
+                    issues.append(f"player_duration_unknown:{version.fixture.key.match_id}")
+                if row.started is None:
+                    issues.append(f"player_start_unknown:{version.fixture.key.match_id}")
+                if version.extra_time is None:
+                    issues.append(f"fixture_extra_time_unknown:{version.fixture.key.match_id}")
+
+            def nominal(
+                rows: list[tuple[CompetitiveMatchVersion, WorkloadObservation]],
+            ) -> float | None:
+                measured = [r.nominal_minutes for _, r in rows if r.nominal_minutes is not None]
+                return math.fsum(measured) if measured else None
+
+            midweek = [
+                (v, r) for v, r in observed if v.fixture.kickoff.astimezone(UTC).weekday() <= 3
+            ]
+            starts = [int(r.started) for _, r in observed if r.started is not None]
+            extra = [int(v.extra_time) for v, _ in observed if v.extra_time is not None]
+            if not observed:
+                issues.append("no_certified_positive_participation_witness")
+            windows.append(
+                ObservedParticipationWindow(
+                    hours=hours,
+                    nominal_minutes_lower_bound=nominal(observed),
+                    starts_lower_bound=sum(starts) if starts else None,
+                    appearances_lower_bound=len(observed) if observed else None,
+                    midweek_utc_nominal_minutes_lower_bound=nominal(midweek),
+                    midweek_utc_appearances_lower_bound=len(midweek) if midweek else None,
+                    extra_time_appearances_lower_bound=sum(extra) if extra else None,
+                    witnessed_fixtures=tuple(sorted(v.fixture.key for v, _ in observed)),
+                    catalogued_scope_fixtures=expected,
+                    unusable_scope_fixtures=tuple(sorted(unusable)),
+                    unknown_reasons=tuple(sorted(set(issues))),
+                    completion_time_proxy=any(v.verified_end_at is None for v, _ in observed),
+                )
+            )
+        return ObservedParticipationSnapshot(
+            code=identity.code,
+            as_of=as_of,
+            identity=identity,
+            scope_team_codes=scope_team_codes,
+            windows=tuple(windows),
+            last_observed_appearance_kickoff_age_hours_upper_bound=(
+                (as_of - latest).total_seconds() / 3600 if latest else None
+            ),
+            selected_versions=tuple(used[key] for key in sorted(used)),
+            catalogue_sources=self.catalogue,
+            excluded_target_gw_fixtures=excluded_target_gw_fixtures,
         )

@@ -829,3 +829,9 @@ The [V2 participation pilot](docs/competitive-participation-v2-development.md) n
 scoped interpretation checks, and the [minutes proxy reference](docs/retrospective-minutes-proxy-reference.md)
 retains114folds/86,755PMFs with821direct proxy rows. These are data/comparator prerequisites,
 not new player-model results or production-valid historical forecasts.
+
+The [competitive capture](docs/competitive-workload-capture-development.md) now contains574
+matches with both lineup/event payloads. The [current-component reference](docs/development-reference-components.md)
+keeps the historical proxy boundary explicit; [broad-role history](docs/player-role-history-v1-design.md)
+and [disciplinary modelling](docs/player-disciplinary-design.md) are new unscored development
+designs. Source interpretation/coverage and clean formal preregistration remain mandatory.

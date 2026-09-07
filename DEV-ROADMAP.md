@@ -1586,3 +1586,14 @@ data-only run; no full workload mart is yet claimed. Next: validate its coverage
 participation versions in an isolated operational copy, then preregister coarse role/player
 experiments. Unknown registration/rest must remain unknown. Keep the181-fold Stage B eligibility
 shortfall explicit; no metric gate is relaxed and no successor/default has been selected.
+
+Acquisition is now complete:574matches/1,148retained lineup-event endpoints,1,122newHTTP200
+responses. The [capture record](docs/competitive-workload-capture-development.md) pins exact
+source evidence and the new isolated staging boundary. The reference adapter additionally
+matches actual prospective component/composer arithmetic in synthetic tests, while historical
+rows retain explicit archive-roster/price proxies. The independent minutes-selector audit
+reproduces every86,755PMF with zero differences. Next: execute clean operational staging,
+audit broad-role/workload coverage, then finish each separate formal runner/preregistration.
+Card source semantics and a restrained disciplinary algorithm are designed but unscored.
+Both Stage B and Stage C goals/assists retain their181-fold eligibility requirement; the smaller
+historical program does not meet it and must not automatically accept those successors.

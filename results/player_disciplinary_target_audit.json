@@ -1,0 +1,181 @@
+{
+  "counts": {
+    "2021-22:none": 24108,
+    "2021-22:red": 43,
+    "2021-22:rows": 25447,
+    "2021-22:yellow": 1296,
+    "2022-23:none": 25106,
+    "2022-23:red": 30,
+    "2022-23:rows": 26505,
+    "2022-23:yellow": 1369,
+    "2023-24:none": 28073,
+    "2023-24:red": 58,
+    "2023-24:rows": 29725,
+    "2023-24:yellow": 1594,
+    "2024-25:none": 25684,
+    "2024-25:red": 52,
+    "2024-25:rows": 27283,
+    "2024-25:yellow": 1547,
+    "2025-26:none": 28281,
+    "2025-26:red": 44,
+    "2025-26:rows": 29747,
+    "2025-26:yellow": 1422,
+    "none": 131252,
+    "red": 227,
+    "rows": 138707,
+    "yellow": 7228
+  },
+  "database_path": "D:\\Personal\\workspace\\the_comet_fpl\\.worktrees\\sdp_test\\data\\fpl.duckdb",
+  "database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "evidence_class": "historical_recorded_targets_not_deadline_predictions",
+  "git_head": "0113de369175351588b1d014be0d2996d6df92bb",
+  "git_status": " M src/fpl/validate/competitive_workload_view.py\n M tests/test_competitive_workload_view.py\n?? config/competitive_workload_staging.yaml\n?? src/fpl/jobs/audit_disciplinary_targets.py\n?? src/fpl/jobs/stage_competitive_workload.py\n?? src/fpl/models/disciplinary_development.py\n?? src/fpl/storage/competitive_workload.py\n?? src/fpl/validate/development_reference_components.py\n?? src/fpl/validate/player_role_history.py\n?? tests/test_competitive_workload_staging.py\n?? tests/test_development_reference_components.py\n?? tests/test_disciplinary_development.py\n?? tests/test_player_role_history.py\n",
+  "identity": "fpl_scored_disciplinary_target_audit_v1",
+  "model_evaluation": false,
+  "official_source": {
+    "bytes": 179446,
+    "content_type": "text/html;charset=utf-8",
+    "final_url": "https://www.premierleague.com/es/news/4661029",
+    "known_at": "2026-09-07T08:55:37.618092+00:00",
+    "raw_file": "official-rules.raw",
+    "red_includes_yellow_text_present": true,
+    "requested_at": "2026-09-07T08:55:36.630866+00:00",
+    "sha256": "7614a64985ae9fdc6f59d1e12dcd15b1234b96886486d8d73b61eee69a753728",
+    "status": 200,
+    "url": "https://www.premierleague.com/es/news/4661029",
+    "zero_minutes_card_appearance_text_present": true
+  },
+  "physical_second_yellow_identifiable_from_archive": false,
+  "rules_sha256": "953c0eb685f011a465f074f333daa2f07976dd0c2af20e3f53283036a99ccc24",
+  "scoring_constants": {
+    "red": -3,
+    "yellow": -1
+  },
+  "source_sha256": "068eede7b5758398f8088027acbb59756d0a99aa19ed6ce4e6ae34f794667198",
+  "states": [
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "zero_minute_card_rows": [
+    {
+      "code": 469249,
+      "fixture": 300,
+      "gw": 30,
+      "minutes": 0,
+      "position": "MID",
+      "red_cards": 0,
+      "season": "2021-22",
+      "web_name": "Kenneh",
+      "yellow_cards": 1
+    },
+    {
+      "code": 101148,
+      "fixture": 156,
+      "gw": 16,
+      "minutes": 0,
+      "position": "DEF",
+      "red_cards": 0,
+      "season": "2022-23",
+      "web_name": "Lascelles",
+      "yellow_cards": 1
+    },
+    {
+      "code": 101148,
+      "fixture": 181,
+      "gw": 19,
+      "minutes": 0,
+      "position": "DEF",
+      "red_cards": 0,
+      "season": "2022-23",
+      "web_name": "Lascelles",
+      "yellow_cards": 1
+    },
+    {
+      "code": 465351,
+      "fixture": 280,
+      "gw": 28,
+      "minutes": 0,
+      "position": "MID",
+      "red_cards": 1,
+      "season": "2022-23",
+      "web_name": "Matheus",
+      "yellow_cards": 0
+    },
+    {
+      "code": 155529,
+      "fixture": 21,
+      "gw": 3,
+      "minutes": 0,
+      "position": "GK",
+      "red_cards": 0,
+      "season": "2023-24",
+      "web_name": "Rod\u00e1k",
+      "yellow_cards": 1
+    },
+    {
+      "code": 122074,
+      "fixture": 180,
+      "gw": 18,
+      "minutes": 0,
+      "position": "GK",
+      "red_cards": 0,
+      "season": "2023-24",
+      "web_name": "Bettinelli",
+      "yellow_cards": 1
+    },
+    {
+      "code": 116404,
+      "fixture": 268,
+      "gw": 27,
+      "minutes": 0,
+      "position": "DEF",
+      "red_cards": 0,
+      "season": "2023-24",
+      "web_name": "Felipe",
+      "yellow_cards": 1
+    },
+    {
+      "code": 224068,
+      "fixture": 305,
+      "gw": 31,
+      "minutes": 0,
+      "position": "GK",
+      "red_cards": 0,
+      "season": "2023-24",
+      "web_name": "Turner",
+      "yellow_cards": 1
+    },
+    {
+      "code": 88484,
+      "fixture": 80,
+      "gw": 8,
+      "minutes": 0,
+      "position": "MID",
+      "red_cards": 0,
+      "season": "2024-25",
+      "web_name": "Sarabia",
+      "yellow_cards": 1
+    },
+    {
+      "code": 44699,
+      "fixture": 215,
+      "gw": 22,
+      "minutes": 0,
+      "position": "FWD",
+      "red_cards": 0,
+      "season": "2025-26",
+      "web_name": "Barnes",
+      "yellow_cards": 1
+    }
+  ]
+}

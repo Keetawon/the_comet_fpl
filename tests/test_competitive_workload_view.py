@@ -13,6 +13,7 @@ from fpl.validate.competitive_workload_view import (
     CompetitiveFixture,
     CompetitiveFixtureKey,
     CompetitiveMatchVersion,
+    ObservedPlayerIdentity,
     RetrospectiveCompetitiveWorkloadView,
     TrustedMembershipInterval,
     WorkloadObservation,
@@ -22,6 +23,17 @@ AS_OF = datetime(2025, 10, 6, 12, tzinfo=UTC)
 START = AS_OF - timedelta(days=14)
 KNOWN = datetime(2026, 9, 7, tzinfo=UTC)
 INTERPRETATION = "synthetic_frozen_nominal_clock_v2"
+
+
+def _observed(
+    view: RetrospectiveCompetitiveWorkloadView, *, excluded=frozenset(), teams=frozenset({101})
+):
+    return view.observed_participation_snapshot(
+        identity=ObservedPlayerIdentity(1001, 1001, "exact-opta-fixture-witness", KNOWN),
+        scope_team_codes=teams,
+        as_of=AS_OF,
+        excluded_target_gw_fixtures=excluded,
+    )
 
 
 def _fixture(hours: int = 24, match_id: int = 1, team: int = 101) -> CompetitiveFixture:
@@ -99,6 +111,145 @@ def test_hand_computable_windows_midweek_and_rest_are_separate() -> None:
     assert all(w.completion_time_proxy for w in result.windows)
     assert result.evidence_class == EVIDENCE_CLASS and not result.promotion_permitted
     assert result.selected_versions[0].capture_known_at == KNOWN > AS_OF
+
+
+def test_observed_bounds_do_not_need_or_invent_registration() -> None:
+    view = _view(memberships=())
+    strict = _snapshot(view)
+    result = _observed(view)
+    assert strict.windows[0].nominal_minutes is None
+    assert result.windows[0].nominal_minutes_lower_bound == 90
+    assert result.windows[0].appearances_lower_bound == 1
+    assert result.windows[0].exact_nominal_minutes is None
+    assert result.exact_player_rest_hours is None
+    assert result.last_observed_appearance_kickoff_age_hours_upper_bound == 24
+    assert "continuous_player_membership_unproved" in result.windows[0].unknown_reasons
+    assert result.identity.known_at == KNOWN > AS_OF
+    assert result.evidence_class == "retrospective_observed_participation_lower_bound_development"
+
+
+def test_observed_missing_capture_is_a_gap_not_zero_or_destruction_of_good_evidence() -> None:
+    fixtures = (_fixture(24, 1), _fixture(48, 2))
+    result = _observed(_view(fixtures=fixtures, versions=(_version(fixtures[0]),), memberships=()))
+    w = result.windows[0]
+    assert w.nominal_minutes_lower_bound == 90
+    assert w.unusable_scope_fixtures == (fixtures[1].key,)
+    assert len(w.catalogued_scope_fixtures) == 2
+    assert w.unobserved_player_fixture_count is None
+
+
+@pytest.mark.parametrize(
+    "observations", [(), (WorkloadObservation(1001, 1001, 101, 0, False, False),)]
+)
+def test_absence_and_recorded_bench_do_not_claim_rested_zero(observations) -> None:
+    result = _observed(
+        _view(versions=(replace(_version(), observations=observations),), memberships=())
+    )
+    assert result.windows[0].nominal_minutes_lower_bound is None
+    assert result.windows[0].appearances_lower_bound is None
+    assert result.last_observed_appearance_kickoff_age_hours_upper_bound is None
+
+
+@pytest.mark.parametrize("minutes", [None, 0.0])
+def test_positive_zero_duration_appearance_distinct_from_missing_duration(minutes) -> None:
+    v = _version()
+    v = replace(
+        v, observations=(replace(v.observations[0], nominal_minutes=minutes, started=False),)
+    )
+    result = _observed(_view(versions=(v,), memberships=()))
+    assert result.windows[0].appearances_lower_bound == 1
+    assert result.windows[0].nominal_minutes_lower_bound == minutes
+    assert result.windows[0].starts_lower_bound == 0
+
+
+def test_observed_code_global_transfer_not_current_club_filter() -> None:
+    fixtures = (_fixture(24, 1, 101), _fixture(48, 2, 102))
+    result = _observed(
+        _view(fixtures=fixtures, versions=tuple(_version(f) for f in fixtures), memberships=()),
+        teams=frozenset({101, 102}),
+    )
+    assert result.windows[0].nominal_minutes_lower_bound == 180
+    assert result.windows[0].appearances_lower_bound == 2
+
+
+def test_observed_same_gw_and_future_event_exclusion() -> None:
+    first = _version(_fixture(24, 1))
+    future = replace(_version(_fixture(1, 2)), maximum_retained_event_timestamp=AS_OF)
+    view = _view(fixtures=(first.fixture, future.fixture), versions=(first, future), memberships=())
+    result = _observed(view, excluded=frozenset({first.fixture.key}))
+    assert result.windows[0].appearances_lower_bound is None
+    assert result.windows[0].unusable_scope_fixtures == (future.fixture.key,)
+
+
+def test_observed_future_truncation_and_earliest_revision() -> None:
+    first = _version()
+    later = replace(
+        first,
+        capture_id="later",
+        capture_known_at=KNOWN + timedelta(minutes=1),
+        observations=(replace(first.observations[0], nominal_minutes=1),),
+    )
+    future = _version(_fixture(-1, 2))
+    left = _observed(_view(memberships=()))
+    right = _observed(
+        _view(
+            fixtures=(first.fixture, future.fixture),
+            versions=(future, later, first),
+            memberships=(),
+        )
+    )
+    assert left == right
+
+
+def test_observed_exact_identity_conflict_fails_closed() -> None:
+    bad = replace(_version(), observations=(WorkloadObservation(1001, 999, 101, 90, True, True),))
+    with pytest.raises(ValueError, match="identity witness"):
+        _observed(_view(versions=(bad,), memberships=()))
+
+
+def test_observed_whole_bundle_error_does_not_license_positive_bound() -> None:
+    bad = replace(_version(), errors=("unresolved substitution",))
+    result = _observed(_view(versions=(bad,), memberships=()))
+    assert result.windows[0].nominal_minutes_lower_bound is None
+    assert result.windows[0].unusable_scope_fixtures == (_fixture().key,)
+
+
+@pytest.mark.parametrize("minutes", [10, 360])
+def test_no_verified_whistle_requires_more_than_six_hours(minutes: int) -> None:
+    fixture = replace(_fixture(), kickoff=AS_OF - timedelta(minutes=minutes))
+    version = replace(_version(fixture), maximum_retained_event_timestamp=None)
+    view = _view(fixtures=(fixture,), versions=(version,))
+    assert _snapshot(view).windows[0].nominal_minutes is None
+    observed = _observed(view)
+    assert observed.windows[0].nominal_minutes_lower_bound is None
+    assert any("six_hour" in issue for issue in observed.windows[0].unknown_reasons)
+
+
+def test_six_hour_margin_is_strict_but_does_not_claim_verified_completion() -> None:
+    fixture = replace(_fixture(), kickoff=AS_OF - timedelta(hours=6, microseconds=1))
+    version = replace(_version(fixture), maximum_retained_event_timestamp=None)
+    observed = _observed(_view(fixtures=(fixture,), versions=(version,)))
+    assert observed.windows[0].nominal_minutes_lower_bound == 90
+    assert observed.windows[0].completion_time_proxy
+    assert observed.exact_player_rest_hours is None
+
+
+def test_independently_verified_end_allows_shorter_margin_but_future_event_still_rejects() -> None:
+    fixture = _fixture(3)
+    version = replace(_version(fixture), verified_end_at=AS_OF - timedelta(hours=1))
+    assert (
+        _observed(_view(fixtures=(fixture,), versions=(version,)))
+        .windows[0]
+        .nominal_minutes_lower_bound
+        == 90
+    )
+    future = replace(version, maximum_retained_event_timestamp=AS_OF)
+    assert (
+        _observed(_view(fixtures=(fixture,), versions=(future,)))
+        .windows[0]
+        .nominal_minutes_lower_bound
+        is None
+    )
 
 
 def test_verified_whistle_does_not_use_nominal_duration_as_rest() -> None:
@@ -361,4 +512,7 @@ def test_workload_view_is_not_imported_by_prospective_paths() -> None:
     root = Path(__file__).resolve().parents[1] / "src/fpl"
     for directory in ("jobs", "features", "models", "optimize"):
         for path in (root / directory).rglob("*.py"):
+            if path.name == "stage_competitive_workload.py":
+                # Explicit offline dev-only staging/data-access audit; not a forecast path.
+                continue
             assert "competitive_workload_view" not in path.read_text(encoding="utf-8")

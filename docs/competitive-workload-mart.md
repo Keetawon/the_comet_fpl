@@ -98,3 +98,82 @@ excluded target-GW IDs, evidence class `retrospective_competitive_workload_devel
 version policy and promotion=false. This evidence must propagate through any later feature cache,
 candidate, full-points composition and reporting ledger. No model evaluation or filled workload
 mart is claimed by this implementation.
+
+## Additive observed-participation boundary and operational staging
+
+The historical membership audit found no trusted registration intervals for 2023–26. The
+versioned registry has 30,483 rows / 51 captures, exclusively 2026–27. Historical stints are
+`min/max(kickoff)` over fixture rows, including zero-minute rows; they are not registration
+boundaries. Neither that table nor the target-roster/price proxy licenses continuous membership.
+
+The separate `observed_participation_snapshot` method returns an
+`ObservedParticipationSnapshot`, never the exact-workload snapshot type. It scans the player's
+exact provider-ID/stable-code identity globally across the explicitly declared catalogue clubs.
+Transfers therefore retain witnessed participation without inventing continuous membership.
+For 72, 168 and 336 hours, it reports only observed nominal-minutes/starts/appearances **lower
+bounds**, including Monday–Thursday UTC and extra-time subsets. Directly measured zero remains
+distinct from NULL: a zero-duration substitute can have an appearance witness; an absent player
+or unused bench entry does not create a rested-zero feature. No positive participation witness
+means unavailable congestion evidence. Missing measured durations may reduce the nominal-minute
+lower bound, never create an exact total.
+
+Every output retains supporting whole-capture versions, catalogue and unusable fixture IDs,
+unknown-field reasons, and the unknowable count of unobserved player fixtures as NULL. Known
+failed catalogue fixtures are not a complete denominator for missing player participation.
+Exact player workload totals and exact rest stay NULL. The explicitly named last-observed
+appearance kickoff age is only an **upper bound** on actual kickoff-based rest when unobserved
+appearances remain possible. Nominal-period minutes are not FPL minutes or actual elapsed time.
+Incomplete membership, foreign-club/international/off-scope football and historical eventual-
+completion assumptions remain limitations even where positive congestion is directly witnessed.
+
+The prospective boundary is unchanged. This capability has no boolean escape hatch in
+`PointInTimeView`, is not on the production table allowlist, and carries evidence class
+`retrospective_observed_participation_lower_bound_development` with promotion prohibited.
+
+An additional conservative development eligibility rule applies when the exact final-whistle
+timestamp is unavailable: **kickoff + six hours must be strictly before the cutoff**, and every
+retained event timestamp must also be before it. Equality fails closed. A genuinely verified end
+before the cutoff may admit a fixture inside that margin; a later event or end still rejects it.
+Six hours is a fixed exclusion margin, not a provider SLA, inferred whistle, physical duration or
+historical real-deadline completion proof. The eventual-completion proxy flag remains true and
+exact whistle/rest fields remain NULL without independent evidence.
+
+`config/competitive_workload_staging.yaml` freezes a data-only operational cycle over the
+completed 574-match capture and the passed 13-match V2 interpretation pilot. The job requires
+explicit `--source-db`, `--db`, `--capture`, `--pilot-result`, and a new external `--results`
+directory. It refuses dirty worktrees, changed pinned parser/pilot/capture/database evidence,
+unknown fixture identity, path escape, mismatched raw bytes and destination reuse. It never
+issues HTTP requests, fits models or switches the default database.
+
+Under a DuckDB read-only source lease, the existing verified-copy helper creates a private
+temporary image. Atomic exclusive hardlink publication prevents a racing destination creator
+from being overwritten; the temporary link is then removed. The original is never opened
+writable, checkpointed or promoted. The new operational copy is held under the existing exclusive
+writer sidecar plus DuckDB write lease. Development schema, receipt and version inserts commit
+transactionally; original and input hashes are rechecked. Reports are write-once, and failed
+interpretations remain explicit versions, not dropped matches or fabricated zero rows.
+
+Five isolated tables are created only in that operational copy:
+
+- `dev_competitive_ingestion`: immutable run/input/config/source/database provenance;
+- `dev_competitive_raw_receipt`: exact raw bytes, paths, HTTP receipts, hashes and both original
+  receipt/client knowledge times;
+- `dev_competitive_match_version`: whole metadata+lineups+events interpretation versions,
+  separate actual interpretation/identity evidence times, nullable completion metadata and errors;
+- `dev_competitive_participation_version`: every raw roster row, exact nullable stable identities,
+  raw broad position, formation membership, nullable starts/appearance/nominal minutes and lineage;
+- `dev_competitive_coverage_version`: per-competition coverage, unresolved rows, interpretation
+  failures and full PL reconciliation pairs, including recorded FPL appearances absent in SDP.
+
+No existing table, global schema, frozen result or prospective consumer is changed. Each whole
+version binds its exact receipt identities, pinned parser and frozen identity-database hash.
+Repeated interpretation of identical evidence retains the first actual interpretation time;
+storage independently checks the semantic hash before accepting an idempotent repeat. Raw source
+revisions append new versions, and retrospective readers keep the earliest complete version
+under the pinned interpretation rather than silently selecting a later cleaner revision.
+
+The initial report's data-access check opens the actual operational database read-only and
+constructs the observed view from its retained whole versions. Its explicit limitations and NULL
+exact totals remain in the emitted evidence. Broader historical feature audits and any candidate
+use require their own declared population/cutoff and same-GW exclusions; this staging job is not
+a model evaluation or a registration proxy.

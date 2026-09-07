@@ -1,0 +1,86 @@
+algorithm_contract_version: '1.0'
+identity: retrospective_broad_starting_role_transition_v1
+evidence_class: retrospective_competitive_role_development
+status: fixed_algorithm_pending_coverage_based_formal_evaluation_preregistration
+formal_evaluation_authorized: false
+promotion_permitted: false
+target: provider_broad_role_conditional_on_hypothetical_start
+roles: [GK, DEF, MID, FWD]
+provider_labels:
+  Goalkeeper: GK
+  Defender: DEF
+  Midfielder: MID
+  Forward: FWD
+label_eligibility: completed_match_and_started_true_and_exact_licensed_raw_label
+excluded_role_labels: [Substitute, unknown, null]
+bench_and_unassigned: retained_membership_witness_not_role_target
+player_identity: exact_season_qualified_fpl_opta_anchor_to_permanent_code
+club_identity: verified_stable_team_code_never_current_end_season_player_dimension
+competitions: [8, 1, 2, 5, 6, 1125]
+version_policy: caller_selects_one_earliest_complete_version_duplicate_rows_rejected
+input_history: dated_completed_roster_memberships_with_nullable_starting_role
+event_cutoff: source_kickoff_strictly_before_complete_target_gw_first_kickoff
+completion_eligibility:
+  verified_end: independently_verified_end_strictly_before_cutoff
+  absent_verified_end: kickoff_plus_six_hours_strictly_before_cutoff
+  conservative_margin_hours: 6
+  retained_events: every_known_event_strictly_before_cutoff
+  missing_end: remains_null_with_completion_time_proxy_true
+  interpretation: retrospective_exclusion_margin_not_actual_whistle_sla_or_prospective_permission
+same_gw_exclusion: exclude_entire_target_season_and_gw_regardless_kickoff
+cup_gw: null_not_invented
+knowledge_time: original_capture_and_interpretation_times_retained_may_exceed_historical_cutoff
+prospective_knowledge_claim: false
+club_spell: contiguous_latest_observed_club_witness_spell_stop_at_other_club
+unobserved_transfer_chronology: unresolved_no_continuous_registration_claim
+season_boundary: same_stable_club_observed_history_carries_no_future_season_statistics
+current_state:
+  maximum_measured_starts: 5
+  newest_first_weights: [1.0, 0.707, 0.500, 0.354, 0.250]
+  normalization: sum_weights_of_actually_measured_recent_starting_roles
+global_prior: raw_counts_of_all_eligible_prior_starting_roles_uniform_only_if_no_role_observations
+transitions:
+  shape: [4, 4]
+  events: successive_measured_starts_within_same_observed_player_club_spell
+  ordinary_bench: no_transition_no_reset
+  unmeasured_or_unknown_start: break_transition_chain_never_bridge_unknown_role
+  prior_strength: 2.0
+  formula: '(N[a,b] + 2 * p_global[b]) / (sum_b N[a,b] + 2)'
+candidate:
+  alpha: 'n / (n + 2)'
+  formula: 'alpha * (q_recent @ T) + (1 - alpha) * p_global'
+  cold_start: exact_fold_global_prior
+baselines:
+  pooled_prior: exact_fold_global_prior
+  smoothed_last_role: '(onehot(last_measured_same_club_role) + 2 * p_global) / 3'
+  no_recent_role: exact_fold_global_prior
+fixed_diagnostic:
+  recent_state_persistence: 'alpha * q_recent + (1 - alpha) * p_global'
+  transition_attribution: requires_improvement_over_same_ewma_shrinkage_persistence
+  interpretation: beating_weaker_last_role_alone_does_not_establish_transition_value
+parameters_selected: none
+randomness: none
+outer_rows: all_declared_roster_players_and_separate_dgw_legs
+scoring_rows: pending_coverage_audit_only_measured_starting_role_targets
+coverage_based_evaluation_requirements:
+  season: '2025-26'
+  expected_pl_fixtures: 380
+  expected_complete_gw_batches: 38
+  expected_all_roster_prediction_rows: 29747
+  target_denominator: all_independently_observed_fpl_starters_never_provider_only_subset
+  exact_starter_count: pending_read_only_coverage_audit
+  minimum_season_starting_label_coverage: 0.95
+  targets: exact_fixture_club_player_crosswalk_and_valid_starting_role_interpretation
+  early_cold_rows: retained_with_uniform_or_fold_prior_fallback
+  minimum_relative_categorical_log_lift_vs_best_baseline: 0.01
+  maximum_multinomial_brier_relative_regression_vs_best_baseline: 0.0
+  maximum_full_season_class_marginal_absolute_bias: 0.05
+  maximum_temporal_violations: 0
+  diagnostics: [class, venue, early_gw_1_6, later_gw_7_plus, cold_start]
+  coverage_failure: no_formal_claim_or_scoring
+scoring_not_authorized_until:
+  - full_capture_metric_and_identity_coverage_audited_without_scoring
+  - exact_population_folds_baseline_metrics_gate_and_source_hashes_preregistered
+  - implementation_and_formal_runner_committed_cleanly
+  - exclusive_write_once_formal_run_reserved
+upstream_reuse: chronological_oos_predictions_only_no_target_role_in_downstream_predictors
