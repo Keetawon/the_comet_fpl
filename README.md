@@ -835,3 +835,11 @@ matches with both lineup/event payloads. The [current-component reference](docs/
 keeps the historical proxy boundary explicit; [broad-role history](docs/player-role-history-v1-design.md)
 and [disciplinary modelling](docs/player-disciplinary-design.md) are new unscored development
 designs. Source interpretation/coverage and clean formal preregistration remain mandatory.
+
+The subsequent [workload-minutes result](docs/player-workload-minutes-development.md)
+and [separate goals/assists results](docs/player-opportunity-development.md) are now
+retained. Their full gates remain ineligible at114/181folds. The separately
+[preregistered full-points synthesis](docs/full-player-pmf-design.md) therefore
+keeps those incumbents and tests only the full-gate-passed GK-saves replacement.
+This remains retrospective development with an explicit historical-price proxy,
+not a default change or historical deadline-reproduction claim.

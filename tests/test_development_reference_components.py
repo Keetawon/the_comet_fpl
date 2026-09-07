@@ -289,7 +289,12 @@ def test_typed_reference_rejects_invalid_grains(exact_reference, defect):
     elif defect == "side":
         rows = [r for r in rows if r.team_code == 101]
     elif defect == "position":
-        rows[-1] = replace(rows[-1], target=replace(rows[-1].target, position=Position.GK))
+        # Registry order is not guaranteed: the last row may already be a GK.
+        # Always mutate its position, while its other DGW leg remains unchanged.
+        original = rows[-1].target
+        assert any(r.target.code == original.code for r in rows[:-1])
+        changed = Position.DEF if original.position == Position.GK else Position.GK
+        rows[-1] = replace(rows[-1], target=replace(original, position=changed))
     elif defect == "cutoff":
         rows[0] = replace(
             rows[0], target=replace(rows[0].target, kickoff_time=fold.as_of - timedelta(seconds=1))

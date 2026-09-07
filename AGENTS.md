@@ -1790,3 +1790,31 @@ and `docs/player-opportunity-design.md`. None has been formally fitted at this
 preregistration commit. Both Stage B and Stage C retain181required folds, versus
 114nominal/38new-source folds available; no full-gate/synthesis acceptance is possible
 from these scoped runs. Do not hide that shortfall using all-fallback historical rows.
+
+Additive D/E result record (2026-09-07): all three separately registered candidates
+ran ONCE from clean `9f9e32d`, with the `cb11a64` evaluation code/config unchanged.
+Each retains 114 folds, 86,755 rows and all 821 direct price-proxy rows unchanged
+from CURRENT. Workload minutes improves mean log score only 0.00353654%, fails its
+1% current-control bar and is INCONCLUSIVE; 12,349,170 independent checks pass.
+Goals opportunity improves CURRENT 4.23577% but fails the required best-baseline
+primary/season checks (scoped INCONCLUSIVE); assists improves 2.75623% with all
+numeric checks passing (scoped SUPPORTED). Each opportunity audit passes 9,758,661
+checks. All final audits have zero failures; no candidate is rerun or retuned.
+
+All three remain full-gate INELIGIBLE: 114 folds versus the unchanged Stage B/C
+181-fold requirements, with only 38 new-source folds. None may enter synthesis or
+replace defaults; keep CURRENT minutes, goals and assists. Role/exposure/shrinkage
+is a joint construction, not evidence of a role-only effect. Historical roster,
+price, later-capture and completion-proxy caveats remain. See
+`docs/player-workload-minutes-development.md` and `docs/player-opportunity-development.md`
+for the immutable results, source pins, seasonal evidence and independent audits.
+
+Full-points synthesis V1 is now separately preregistered, not yet scored at this
+commit: `retrospective_player_points_synthesis_v1`, documented in
+`docs/full-player-pmf-design.md`. Mechanical full-gate acceptance selects only H
+GK saves; team Goal/CS, current-proxy minutes, goals/assists, DC, absent cards and
+joint BPS/bonus remain incumbent. The nominated fully measured cohort is2025-26,
+38GWs/380fixtures/29,747rows/270direct price proxies; the original821registry gap
+remains. Keep signed targets and disclose inherited0..34proper-score coarsening.
+Reproduce every incumbent fixture PMF before the single clean shared claim.
+This is development-only, with no component refits or production promotion.

@@ -1670,3 +1670,38 @@ including actual-type synthetic end-to-end runners and shared baseline component
 global Ruff and strict mypy185source files pass, changed4Python files pass format.
 Unfinished synthesis drafts are preserved externally during these clean formal runs.
 Known pre-existing full-format and Windows symlink limitations are unchanged.
+
+### 2026-09-07: D/E once-only results retained
+
+The separate workload-minutes, goals-opportunity and assists-opportunity evaluations
+are complete from clean `9f9e32d` (the `cb11a64` preregistered code/config unchanged).
+All use the exact frozen CURRENT controls on 114 folds / 86,755 rows, keeping all
+821 direct archive-price proxy rows unchanged. Workload minutes is INCONCLUSIVE
+(+0.00353654% NLL, below 1%); goals is scoped INCONCLUSIVE (+4.23577% vs CURRENT,
+required best-baseline primary/season checks fail); assists is scoped SUPPORTED
+(+2.75623%, all numeric diagnostics pass). The D independent audits pass 12,349,170
+checks; each E audit passes 9,758,661 checks, all with zero final failures.
+
+Every D/E full gate remains INELIGIBLE: 114 rather than 181 required folds, with
+only 38 new-source folds. The older all-fallback seasons cannot hide that shortfall.
+Retain CURRENT minutes, goals and assists in synthesis/defaults; no post-result
+retuning, formal rerun, role-only attribution or promotion is authorized. Results
+and independent receipts are retained byte-for-byte; see
+`docs/player-workload-minutes-development.md` and `docs/player-opportunity-development.md`.
+Proceed only with separately preregistered synthesis over components whose own
+full development gates permit inclusion. Preserve all proxy and knowledge-time
+limits and every earlier dated registration/evaluation record.
+
+### 2026-09-07: final full-points synthesis preregistration
+
+`retrospective_player_points_synthesis_v1` now freezes the full-gate-passed-
+successor-else-incumbent rule: H saves only. See `docs/full-player-pmf-design.md`
+and `config/player_points_synthesis_evaluation.yaml`. The exact current-selector
+proxy reference will be reproduced at zero PMF tolerance over all380fixtures
+before the exclusive candidate claim. There are no upstream fits or parameter
+selection; fixed2000joint draws/seed202627 and loaded2026/27rules remain unchanged.
+The signed full-points labels and legacy support limitations remain explicit.
+Data-only preflight passes728,434checks and the corrected focused gate180tests;
+Ruff/mypy189sources pass. Retain known broader format/Windows limitations, the
+initial order-dependent test failure and its deterministic test-only correction.
+No formal full-points result exists at this preregistration commit.
