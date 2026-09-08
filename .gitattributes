@@ -132,3 +132,12 @@ results/player_model_gw1_3_verification_2026-09-08.json -text
 # Additive canonical audit transport; V1 source and receipts remain unchanged.
 src/fpl/validate/audit_json.py -text
 tests/test_audit_json.py -text
+
+# New GW1-3 audit identity inherits V1 science and uses corrected transport.
+config/player_model_gw1_3_audit_v2.yaml -text
+src/fpl/jobs/evaluate_player_model_gw1_3_v2.py -text
+docs/player-model-gw1-3-preregistration-v2-2026-09-08.md -text
+tests/test_player_model_gw1_3_v2_identity.py -text
+results/player_model_gw1_3_strict_v2_2026-09-08.json -text
+results/player_model_gw1_3_retrospective_sdp_v2_2026-09-08.json -text
+results/player_model_gw1_3_verification_v2_2026-09-08.json -text
