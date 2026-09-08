@@ -1,5 +1,10 @@
 # FPL points-prediction system
 
+**Descriptive attacking-usage scouting (2026-09-08).** A current-season JSON/CSV export
+shows same-position xG/xA usage, long/recent context, observation depth and a defender
+watchlist. The frozen predictive V1 verdict remains **REFUTED**; this capability changes
+no forecasts or optimizer decisions. See the [scouting guide and commands](docs/player-attacking-usage-scouting-2026-09-08.md).
+
 **Owner-directed architectural adoption (2026-09-07, V2 branch only). SDP-backed V2 is the primary
 football-environment architecture. Historical experimental verdict remains INCONCLUSIVE under
 its frozen gate. Incumbent retained as operational fallback and prospective shadow comparator.**

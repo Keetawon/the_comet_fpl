@@ -109,3 +109,9 @@ results/attacking_role_premium_v1_independent_audit_2026-09-08.json -text whites
 docs/attacking-role-premium-v1-preregistration-2026-09-08.md -text
 results/attacking_role_premium_v1_cases_2026-09-08.json -text
 results/attacking_role_premium_v1_verification_2026-09-08.json -text
+
+# Descriptive scouting provenance; never a model promotion.
+src/fpl/features/player_attacking_usage.py -text
+src/fpl/publish/player_attacking_usage.py -text
+src/fpl/jobs/build_player_attacking_usage.py -text
+results/player_attacking_usage_scouting_verification_2026-09-08.json -text
