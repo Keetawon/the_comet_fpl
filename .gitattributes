@@ -76,3 +76,8 @@ src/fpl/transform/player_role_source.py -text
 tests/test_audit_player_role_source.py -text
 tests/test_player_role_source.py -text
 results/player_role_source_audit_2026-09-08.json -text
+# Additive attacking-usage feasibility audit; exact source/config/result fingerprints.
+config/attacking_role_premium_study.yaml -text
+src/fpl/jobs/audit_attacking_role_premium_feasibility.py -text
+tests/test_attacking_role_premium_feasibility.py -text
+results/attacking_role_premium_feasibility_2026-09-08.json -text
