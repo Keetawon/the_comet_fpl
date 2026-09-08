@@ -204,10 +204,151 @@ identity, field definition and raw-availability contract before use.
 
 ## Execution and verification record
 
-This section is completed additively after the frozen-scope commit and single bounded acquisition.
-The source-audit JSON and scope configuration are immutable inputs to that run. Its separate
-manifest records raw/normalized hashes, capture receipts, source coverage, revisions and replay.
-No model evaluation is authorized by a successful data run.
+The scope and importer were frozen from a clean worktree in commit
+`728aa174e686f23261a20b2dcf10c63f9d414f5b`, following starting SHA
+`266a71f29767562005aa3d518d6501bcfa4f4ba1`. The one authorized acquisition started at
+2026-09-08 07:43:09 UTC; its last network response was captured at 07:46:43 UTC and normalization
+completed at 07:48:06 UTC. It made 143 fresh requests, reused nine audited raw files, received
+only HTTP 200 responses, needed zero retries and retained 117,379,472 response bytes.
+All 152 source files and their immutable receipts remain available locally.
+
+The run contains **26,312 unique outfield player-fixture observations / 765 players** across
+2023/24 GW1-38: DEF 9,611; MID 12,847; FWD 3,854. All observations map to exact stable player
+codes and historical positions (100%; zero contradictions). The complete cross-snapshot registry
+contains 865 stable player identities, including keepers and players without an outfield row.
+Every row has measured xG/xA; shots, SOT, key passes and box touches are NULL for all rows.
+No ratios with retrospectively contaminated team denominators are constructed. Compatible
+complete player/team observation and availability witnesses would be required for any later share.
+
+An independent implementation checked all **152 raw hashes and 549,219 cumulative raw
+player-fixture appearances across versions**, reconciled every emitted normalized row, and
+retained 304 deterministic seed-0 raw examples. There were zero normalized row revisions across
+these archived merged-GW snapshots. The collector appends historical GW observations; unchanged
+archive rows therefore do not establish that the underlying provider never revised its values.
+The current prospective revision findings above remain a separate observation.
+
+The frozen practical screen passes all seven checks:
+
+| Measured data adequacy | Actual |
+|---|---:|
+| Target GWs with an eligible whole-future-GW archived snapshot | 36 |
+| Eligible player-fixture target labels | 24,947 |
+| Unique eligible players | 763 |
+| DEF / MID / FWD targets | 9,106 / 12,185 / 3,656 |
+| Players with at least 3 / 5 / 10 witnessed prior starts | 399 / 374 / 308 |
+| Target rows with at least 3 / 5 / 10 witnessed prior starts | 11,110 / 9,273 / 5,961 |
+| Paired xG/xA target measurement | 100% |
+| Target rows without any eligible prior observation | 25 |
+
+The 37 considered target GWs are GW2-38. GW17 has no archived snapshot that witnesses its exact
+whole eventual fixture population as still future: its 607 target labels are excluded from this
+coverage population. The specific mismatch is fixture 162 Bournemouth-Luton: the December 11
+snapshot still schedules it in GW17, while the first snapshot with the final nine-fixture
+population is dated December 21, after GW17 began on December 15. The fixture subsequently
+appears in GW28. The separate immutable attribution receipt has SHA256
+`1f6b491677c3a7a1463735fb1bbdaeba6ee5703b8c9411a2a4aafcc486ca6919`.
+Another 165 rows have no exact pre-cutoff registry entry and eleven have a
+pre-cutoff club mismatch. No position mismatches were found. The reconciliation is
+25,730 planning targets - 607 schedule-excluded - 165 registry-excluded - 11 club-excluded =
+24,947. These are valid exclusions, not repaired or zero-filled history. The eligible count is
+over retained observed target labels; it is not a claim that an entire prospective player roster
+was forecast historically.
+
+The earliest usable historical snapshot cutoff is **2023-08-16 02:35:27 UTC**, for 2023/24 GW2:
+522 eligible player targets, first target kickoff August 18 at 18:45 UTC. This is class-B
+archived-as-of availability. **No exact official historical FPL deadline or independently attested
+original public push time has been established.** Passing this data screen authorizes no model
+claim; the next study must explicitly accept and preregister the qualified cutoff convention.
+
+Offline replay made zero source requests and reproduced all 45,119,871 normalized bytes exactly.
+The original and replay manifest identities differ only as separate execution receipts; source
+capture times and normalized prediction-independent observations remain unchanged.
+
+| Artifact | SHA256 |
+|---|---|
+| Frozen source audit | `1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952` |
+| Frozen acquisition config | `2403c87e9de6e284801b97b450f5841606177f03ee30593fbd3de642c444f72a` |
+| Original acquisition manifest | `56da2a8c52f96c2d7d4b68586d86d9eeee3fc4011ae17235ddcf940b58dcf03c` |
+| Normalized observations JSONL | `0d699021537dc7e636f0dfb8e4484f98fc57263663806631c5c8e075b0c5cefc` |
+| Independent raw/coverage audit | `146a7209c412e20fbebb63c3c8377097d95b1cd711baf5cf465cb78da4edb409` |
+| Offline replay manifest | `a24ccab0317a621510b044167b34d386ebadcb7bfb14ba6cdc9c8c3e201589e3` |
+
+The Git-tracked original acquisition manifest and independent audit are exact byte copies of
+their immutable local receipts. Raw source files and normalized data live under the persistent
+operator evidence root:
+`D:/Personal/fpl-operations/verification/historical-player-attacking-20260908T070723Z/`.
+Retain this whole root, including earlier audit-probe directories used by nine cached receipts;
+the original `backfill-v1/source-index.json` resolves each exact file. The independent audit
+script and source-scope review receipt are retained there with their hashes. No operational DB
+was written.
+
+The acquisition command (already run once; do not repeat its reserved identity) was:
+
+```powershell
+python -m fpl.jobs.backfill_historical_player_attacking `
+  --config config/historical_player_attacking_backfill.yaml `
+  --output-dir D:/Personal/fpl-operations/verification/historical-player-attacking-20260908T070723Z/backfill-v1
+```
+
+The supported no-network reproduction command uses a new output directory:
+
+```powershell
+python -m fpl.jobs.backfill_historical_player_attacking `
+  --config config/historical_player_attacking_backfill.yaml `
+  --replay D:/Personal/fpl-operations/verification/historical-player-attacking-20260908T070723Z/backfill-v1 `
+  --output-dir D:/Personal/fpl-operations/verification/historical-player-attacking-20260908T070723Z/offline-replay-v1
+```
+
+The displayed replay directory is also already occupied by its immutable verified receipt;
+choose another fresh directory for any subsequent offline replay. The replay requires identical
+frozen parser/config/source-audit inputs and a clean V2 worktree.
+
+Validation: **65 focused pytest tests passed; 142 relevant broader regressions passed**. Global
+Ruff passed; strict mypy passed for 207 source files; changed-file formatting passed for all four
+new Python files. Focused tests cover historical position and transfer clubs, exact identities,
+NULL versus measured zero, availability/evidence classes, whole-GW exclusion, first-version and
+future-truncation invariance, raw hashes, duplicates/reversions, frozen scope, bounded retries,
+exclusive claims and deterministic offline replay. The broader run covers prior feasibility,
+PIT, live snapshots, quality rules, archive building/attacking ingestion, SDP selection and
+competitive participation. JUnit receipts and exact commands are retained under the evidence root.
+
+All 159 pre-existing research/config/model/production file fingerprints remain unchanged,
+including the prior feasibility result SHA256
+`65b950bfb95c965f4c776964f4b18074fa60aa74e4b7224b355ef969e0e31ed7`.
+No source under existing models, features, optimizer, storage or production jobs was changed.
+No model was designed, fitted, tuned, evaluated or promoted; frozen scientific verdicts and the
+SDP primary/incumbent fallback decisions are untouched.
+
+The complete repository suite and global formatting were not rerun. Previously documented Windows
+symlink failures and eleven unrelated global-format failures remain inherited limitations; they
+are not represented as a passing full-repository check. New pytest basetemp directories avoided
+the inherited default Windows temporary-directory permission issue without permission changes.
+
+## Answers to the requested source questions
+
+| Question | Finding |
+|---|---|
+| 1. Sources investigated? | Retained five-season FPL archive, local captures/manifests/Git history, upstream 2023/24-2025/26 commit histories, retained SDP match/lineup/event payloads, and two source-evidenced SDP endpoint probes. |
+| 2. True player/GW snapshots? | Immutable upstream merged-GW plus same-commit registry/fixture/team bundles; current complete FPL element-summary captures. SDP probe is season aggregate only. |
+| 3. Defensible historical times? | Audited 2023/24 class-B commit sequence; actual THE COMET historical capture and original public push timestamps are not established. |
+| 4. Bulk retrospective sources? | Own five-season downloads are July/August 2026 captures. The 2025/26 upstream sequence is sparse/bulk; 2024/25 includes a later correction. 2023/24 has a late GW26 import kept at its true March source time. |
+| 5. Earliest strict historical season? | No class-A claim. Qualified class B starts with 2023/24 GW1 observations on August 16, usable for the GW2 snapshot-cutoff population. |
+| 6. Chronological targets? | 36 eligible archived-snapshot target GWs, GW2-38 excluding GW17; 24,947 player-fixture targets. |
+| 7. Attacking fields? | xG, xA, xGI; minutes/starts and descriptive goals/assists/points/ICT components. |
+| 8. Historical xG/xA? | All acquired 2023/24 rows measured; retained 2022/23 begins measured coverage at GW16; no 2021/22 field. |
+| 9. Shots/SOT? | Not in the acquired player-match source. Team-level SDP values are not allocated to players. |
+| 10. Box touches? | Not available at player-match grain in the selected evidence. |
+| 11. Key passes/chances created? | Not in the historical player-match sample. A currently probed SDP season aggregate is insufficient. |
+| 12. Open play versus set pieces? | No complete player opportunity decomposition established; no decomposition invented from xG or goal events. |
+| 13. Deterministic player identity? | Yes: 100% of normalized rows map via exact same-snapshot numeric element to permanent code; zero contradictions. |
+| 14. Historical position? | Yes for every acquired row, from same-season/source position and registry; no 2026/27 position projection. |
+| 15. PIT-safe transfers? | Fixture-side membership is preserved; future targets require the pre-cutoff registry club. Eleven mismatches remain excluded; no inferred transfer announcement date. |
+| 16. Revision risk? | Zero archive row revisions observed across 38 snapshots; source collector behavior and sparse publication limit inference. Current FPL captures show ICT revisions. All raw versions remain retained. |
+| 17. Enough data? | The frozen practical data screen passes for a qualified xG/xA archived-snapshot study. Predictive usefulness is untested; exact historical deadline replay remains unproven. |
+| 18. Backfill executed? | Yes, once, after clean scope commit; offline replay only afterward. |
+| 19. Exact population? | One source, 2023/24 GW1-38, DEF/MID/FWD, 38 pinned commits, four fixed files each, 26,312 unique rows / 765 players. |
+| 20. Why not broader? | Additional seasons/endpoints were outside the frozen scope; stronger publication/deadline and player-event evidence was not established. |
+| 21. Prospective capture? | Retain complete immutable FPL element-summary/registry/fixtures with actual timestamps through existing daily and pre-deadline jobs. Preserve revisions and NULLs; certify any new fixture-level SDP player feed separately. |
 
 ## Next task
 
