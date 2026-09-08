@@ -204,6 +204,12 @@ It introduces no retrospective exception to production `FeatureSource`.
 The immutable inventory is retained in
 [`results/attacking_role_premium_feasibility_2026-09-08.json`](../results/attacking_role_premium_feasibility_2026-09-08.json).
 Its embedded Git identity is the clean audit execution commit, not a candidate preregistration.
+Execution commit: `45da5448e7895e24ea6bfd29ec013e20b3008ca9`.
+The initial inventory ran from `2026-09-08T06:57:30.233726Z` to
+`2026-09-08T06:57:38.776026Z`. A second process completed at
+`2026-09-08T06:57:48.073778Z` and produced identical bytes. The tracked copy preserves
+those exact 95,939 bytes, SHA256
+`65b950bfb95c965f4c776964f4b18074fa60aa74e4b7224b355ef969e0e31ed7`.
 
 | Verification | Result |
 |---|---|
@@ -215,7 +221,9 @@ Its embedded Git identity is the clean audit execution commit, not a candidate p
 | Git whitespace check | Passed |
 | Pre-existing config/result/model/feature/artifact/storage fingerprints | 157 checked, none changed |
 | Independent source/deadline/exposure/identity reconciliation | Matched the inventory counts |
+| Independent position/history counter reconciliation | 171 counters matched |
 | Independent retained forecast context reconciliation | 112 raw hashes, 30 fixtures / 60 sides, zero failures |
+| Same-input inventory replay and tracked copy | Byte-identical |
 
 The broader invocation initially passed 113 tests but hit 49 setup errors because Windows
 denied access to the default pytest temporary directory (`WinError 5`). Only those blocked
