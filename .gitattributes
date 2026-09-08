@@ -91,3 +91,19 @@ src/fpl/jobs/backfill_historical_player_attacking.py -text
 tests/test_historical_player_attacking.py -text
 tests/test_historical_player_attacking_backfill.py -text
 results/historical_player_attacking_backfill_independent_audit_2026-09-08.json -text
+
+# Fixed attacking-usage persistence V1: preserve preregistration/result byte identities.
+config/attacking_role_premium_v1.yaml -text
+src/fpl/features/attacking_role_premium_v1.py -text
+src/fpl/validate/attacking_role_premium_v1.py -text
+src/fpl/validate/attacking_role_premium_v1_metrics.py -text
+src/fpl/jobs/evaluate_attacking_role_premium_v1.py -text
+tests/test_attacking_role_premium_v1.py -text
+tests/test_attacking_role_premium_v1_population.py -text
+tests/test_attacking_role_premium_v1_metrics.py -text
+tests/test_evaluate_attacking_role_premium_v1.py -text
+results/attacking_role_premium_v1_population_2026-09-08.json -text
+results/attacking_role_premium_v1_development_2026-09-08.json -text
+results/attacking_role_premium_v1_diagnostics_2026-09-08.json -text
+results/attacking_role_premium_v1_independent_audit_2026-09-08.json -text
+docs/attacking-role-premium-v1-preregistration-2026-09-08.md -text
