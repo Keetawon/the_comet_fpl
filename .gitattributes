@@ -141,3 +141,4 @@ tests/test_player_model_gw1_3_v2_identity.py -text
 results/player_model_gw1_3_strict_v2_2026-09-08.json -text
 results/player_model_gw1_3_retrospective_sdp_v2_2026-09-08.json -text
 results/player_model_gw1_3_verification_v2_2026-09-08.json -text
+docs/player-model-gw1-3-scorecard-v2-2026-09-08.md -text
