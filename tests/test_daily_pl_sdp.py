@@ -277,6 +277,26 @@ def test_backup_failure_prevents_every_network_job(
     assert report["failures"] == ["OSError: backup disk full"]
 
 
+def test_interrupted_capture_retains_failed_receipt_and_backup(tmp_path, monkeypatch):
+    database = tmp_path / "operational.duckdb"
+    _official(database)
+
+    def interrupted(**kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(job.daily_snapshot, "run", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        job.run(database=database, runs=tmp_path / "runs", raw_only=True)
+    receipt = next((tmp_path / "runs").glob("*/report.json"))
+    report = json.loads(receipt.read_text())
+    assert report["failures"] == ["KeyboardInterrupt: capture interrupted"]
+    assert report["healthy"] is False
+    assert report["consumer_ready"] is False
+    assert report["exit_code"] == 1
+    assert (receipt.parent / "before.duckdb").is_file()
+    assert not database.with_name(database.name + ".daily-sdp.lock").exists()
+
+
 def test_staging_failure_preserves_new_raw_and_backup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -460,8 +460,10 @@ def artifact_bytes(artifact: ProspectivePointsArtifact) -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def write_artifact_atomic(path: Path, artifact: ProspectivePointsArtifact) -> str:
-    """Atomically replace ``path`` and return the SHA-256 of the exact bytes written."""
+def write_artifact_atomic(
+    path: Path, artifact: ProspectivePointsArtifact, *, overwrite: bool = True
+) -> str:
+    """Atomically publish bytes; immutable vintages refuse an existing destination."""
     payload = artifact_bytes(artifact)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
@@ -473,8 +475,12 @@ def write_artifact_atomic(path: Path, artifact: ProspectivePointsArtifact) -> st
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
-        temporary = None
+        if overwrite:
+            os.replace(temporary, path)
+            temporary = None
+        else:
+            # Atomic no-clobber publication on NTFS/POSIX, including competing writers.
+            os.link(temporary, path)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)

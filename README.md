@@ -9,6 +9,12 @@ use actual cutoff-known SDP versions with strict health checks and incumbent fal
 See the [decision](docs/sdp-primary-architecture-decision-2026-09-07.md) and
 [commands/runbook](docs/sdp-primary-operations.md). No main merge or default-branch change is authorized.
 
+The next operational phase audits fixture fallbacks, rechecks required incomplete provider
+history, preserves exact pre-deadline replay inputs, and records paired primary/incumbent-shadow
+forecasts before official deadlines. See the [remote capture package](docs/sdp-primary-remote-runtime.md)
+and [prospective evidence contract](docs/sdp-prospective-evidence.md). Remote deployment awaits an
+authorized runtime; no new player-component research is started during this evidence-collection phase.
+
 **Local SDP operations / revision PIT (2026-09-06).** Strict team observations now retain and
 select complete stats and fixture-metadata revisions known at the cutoff; tactical features
 roll over that selected vintage, never over multiple revisions as separate matches. Latest-only

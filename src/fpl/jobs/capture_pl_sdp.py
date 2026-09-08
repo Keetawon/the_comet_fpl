@@ -21,19 +21,37 @@ after a prediction cannot contaminate it -- `known_at` on every staged row is th
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import duckdb
+
 from fpl.config import load_sources
 from fpl.ingest.fpl_api import EgressBlockedError
-from fpl.ingest.pl_sdp import PlSdpClient, SdpMatchSummary, is_completed_scored_match
+from fpl.ingest.pl_sdp import (
+    PlSdpClient,
+    SdpMatchSummary,
+    is_completed_scored_match,
+    parse_team_stats,
+)
 from fpl.storage.db import initialise
 from fpl.transform import pl_sdp as sdp_transform
 
 logger = logging.getLogger("fpl.capture_pl_sdp")
+
+
+@dataclass
+class CaptureSource:
+    provider_match_id: int
+    request_fetched_at: datetime
+    payload_id: str
+    payload_sha256: str
+    known_at: datetime
+    new_version: bool
 
 
 @dataclass
@@ -47,6 +65,45 @@ class CaptureReport:
     requests: int = 0
     stats_requested: int = 0
     failures: tuple[str, ...] = ()
+    required_history_rechecks: tuple[int, ...] = ()
+    source_versions: tuple[CaptureSource, ...] = ()
+
+
+def required_core_rechecks(
+    con: duckdb.DuckDBPyConnection, *, season: str, completed: list[SdpMatchSummary]
+) -> set[int]:
+    """Retry invalid last-five evidence even after it ages out of the revision lookback.
+
+    This only chooses HTTP requests. Normalization and the prediction identity/PIT gates
+    still independently validate every response; no missing field is repaired here.
+    """
+    from fpl.storage.sdp_runtime import checked_metrics
+
+    counts: dict[int, int] = {}
+    required: set[int] = set()
+    for match in sorted(completed, key=lambda m: (m.kickoff, m.match_id), reverse=True):
+        for team in (match.home_team_id, match.away_team_id):
+            if team is not None:
+                if counts.get(team, 0) < 5:
+                    required.add(match.match_id)
+                counts[team] = counts.get(team, 0) + 1
+    rows = con.execute(
+        """SELECT sdp_match_id, CAST(payload AS VARCHAR) AS body
+        FROM raw_pl_sdp_payload WHERE provider='pl_sdp' AND season=? AND endpoint='match_stats'
+        QUALIFY row_number() OVER(PARTITION BY sdp_match_id
+            ORDER BY fetched_at DESC,payload_id DESC)=1""",
+        [season],
+    ).fetchall()
+    invalid = set()
+    for identifier, body in rows:
+        if identifier not in required:
+            continue
+        try:
+            for side in parse_team_stats(json.loads(body), match_id=identifier):
+                checked_metrics(dict(side.stats))
+        except (ValueError, TypeError, KeyError, RuntimeError):
+            invalid.add(identifier)
+    return invalid
 
 
 def capture(
@@ -58,6 +115,7 @@ def capture(
     client: PlSdpClient | None = None,
     now: datetime | None = None,
     refresh_stats: bool | None = None,
+    recheck_required_history: bool = False,
 ) -> CaptureReport:
     if limit_matches is not None and limit_matches <= 0:
         raise ValueError("limit_matches must be positive")
@@ -78,6 +136,7 @@ def capture(
     sdp = client or PlSdpClient(config=sources.pl_sdp)
     report = CaptureReport(season=resolved_season)
     failures: list[str] = []
+    versions: list[CaptureSource] = []
     try:
         con = initialise(db_path)
         try:
@@ -95,15 +154,30 @@ def capture(
             if report.matches_seen != len(summaries):
                 raise ValueError("duplicate provider match records in capture catalogue")
 
+            rechecks = (
+                required_core_rechecks(
+                    con,
+                    season=resolved_season,
+                    completed=[
+                        m
+                        for m in summaries
+                        if m.kickoff and is_completed_scored_match(m, now=moment)
+                    ],
+                )
+                if recheck_required_history
+                else set()
+            )
+            report.required_history_rechecks = tuple(sorted(rechecks))
+
             wanted: list[int] = []
             for summary in sorted(summaries, key=lambda item: item.match_id):
                 if not is_completed_scored_match(summary, now=moment):
                     continue
                 report.completed += 1
                 if horizon is not None and summary.kickoff is not None:
-                    if summary.kickoff < horizon:
+                    if summary.kickoff < horizon and summary.match_id not in rechecks:
                         continue
-                if summary.match_id in captured:
+                if summary.match_id in captured and summary.match_id not in rechecks:
                     report.already_captured += 1
                     continue
                 wanted.append(summary.match_id)
@@ -120,8 +194,24 @@ def capture(
                 except Exception as error:
                     failures.append(f"match {match_id}: {error}")
                     continue
-                _, is_new = sdp_transform.land_payload(
+                identifier, is_new = sdp_transform.land_payload(
                     con, raw, season=resolved_season, sdp_match_id=match_id
+                )
+                known = con.execute(
+                    "SELECT epoch_us(fetched_at) FROM raw_pl_sdp_payload WHERE payload_id=?",
+                    [identifier],
+                ).fetchone()
+                if known is None:
+                    raise RuntimeError("landed SDP payload receipt is unavailable")
+                versions.append(
+                    CaptureSource(
+                        match_id,
+                        raw.fetched_at,
+                        identifier,
+                        raw.sha256,
+                        sdp_transform._instant(known[0], name="fetched_at"),
+                        is_new,
+                    )
                 )
                 report.stats_fetched += 1
                 report.payloads_new += int(is_new)
@@ -132,6 +222,7 @@ def capture(
         if owned:
             sdp.close()
     report.failures = tuple(failures)
+    report.source_versions = tuple(versions)
     return report
 
 
@@ -155,6 +246,11 @@ def main(argv: list[str] | None = None) -> int:
         help="refetch completed-match stats so provider restatements can be retained",
     )
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument(
+        "--recheck-required-history",
+        action="store_true",
+        help="also revisit incomplete last-five club matches outside the lookback",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -168,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
             lookback_days=args.lookback_days,
             limit_matches=args.limit_matches,
             refresh_stats=args.refresh_stats,
+            recheck_required_history=args.recheck_required_history,
         )
     except EgressBlockedError as error:
         logger.error("%s", error)

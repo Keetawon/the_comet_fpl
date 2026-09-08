@@ -333,6 +333,7 @@ def run(
                     season=season,
                     refresh_stats=refresh,
                     lookback_days=lookback_days if refresh else None,
+                    recheck_required_history=refresh and not raw_only,
                 )
                 report[name] = asdict(captured)
                 report[name]["provider_listing_checked_at"] = datetime.now(UTC)
@@ -371,6 +372,7 @@ def run(
                 state = load_sdp_state(con, cutoff=datetime.now(UTC), season=season)
                 current_rows = [r for r in state.rows if r.season == season]
                 report["production_health"] = {
+                    "season": season,
                     "matches_valid": len(current_rows) // 2,
                     "latest_completed_match": max(state.expected.values(), default=None),
                     "latest_valid_sdp_known_at": max(
@@ -386,6 +388,9 @@ def run(
                     )
                     + int(state.global_failure == "SDP_IDENTITY_FALLBACK"),
                     "failures": {str(key): value for key, value in state.failures.items()},
+                    "current_match_failures": {
+                        str(key): value for key, value in state.failures.items() if key[0] == season
+                    },
                     "diagnostics": state.diagnostics,
                 }
             if include_workload:
@@ -398,6 +403,11 @@ def run(
         # Windows prevents hashing a writer-open file. No default/source DB is touched.
         with connect(database, read_only=True):
             report["database_sha256_after"] = _sha256(database)
+    except KeyboardInterrupt:
+        report["failures"].append("KeyboardInterrupt: capture interrupted")
+        if report["staging_status"] == "running":
+            report["staging_status"] = "failed"
+        raise
     except Exception as error:
         logger.exception("daily SDP cycle failed; retained raw successes are not rolled back")
         report["failures"].append(f"{type(error).__name__}: {error}")

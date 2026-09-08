@@ -35,6 +35,18 @@ Ordinary provider corrections are accepted as new immutable versions. No researc
 multi-snapshot revision probe is required before production use. Capture receipt success and
 source `known_at` are separate: an unchanged response does not advance its original source time.
 
+The staged daily cycle also rechecks incomplete core statistics among each club's last five
+completed PL matches, including required matches older than the ordinary lookback. The individual
+collector exposes this as `--recheck-required-history`. This bounded recheck fetches provider
+corrections; it neither fills missing fields nor drops an incomplete required match from selection.
+Receipts retain both the actual request time and the retained source version/time, so a successful
+unchanged response does not masquerade as newly known football evidence.
+
+The remote service/timer package and exact installation, storage, restart and health instructions
+are in [remote runtime](sdp-primary-remote-runtime.md). No remote host has been deployed:
+**BLOCKED ONLY ON RUNTIME AUTHORIZATION / CREDENTIALS**. GitHub Pages is static hosting and cannot
+run persistent ingestion. Do not substitute ephemeral Actions files for the operational database.
+
 ## Pre-prediction / pre-deadline
 
 From a clean committed V2 checkout:
@@ -54,11 +66,31 @@ Missing/invalid FPL prerequisites may independently stop both paths. The command
 that failure or invent fixtures/players. If a shared database is locked by another writer, let
 that writer finish before retrying; do not remove a live lock. No default DB is substituted.
 
-On SDP-primary fixtures, a complete incumbent forecast is also written to
+A complete incumbent forecast is also written when SDP is enabled, including all-fallback runs, to
 `unique-gw4-vintage.shadow-incumbent.jsonl`. Only the primary file is passed to the optimizer;
 the primary manifest binds the shadow hash. Do not publish the shadow as the platform default.
 The primary artifact must exist and pass its existing reader validation before optimizer use.
 Both artifacts remain separate immutable prospective evaluation vintages.
+
+The pre-deadline command preserves `forecast-source.duckdb` in its unique receipt directory before
+prediction. Both primary and shadow read this same snapshot. Later captures and evidence-ledger
+writes cannot change the replay input; retain this copy and the forecast's exact code commit.
+`forecast.json` records actual start/completion, cutoff, refresh/forecast/evidence exit codes and
+source/primary/shadow hashes. An explicit future cutoff is rejected before any refresh begins.
+`refresh-report.json` binds every capture and failure receipt with its hash, including a failure
+after the collector wrote its own receipt. Missing or malformed receipts force the source-failure
+fallback. Failure to retain a stable source copy stops the build with a durable failure receipt.
+SDP-enabled primary and shadow publication is atomic and refuses to overwrite an existing file,
+including competing writers. Explicitly disabled forecasts retain their prior publication behavior.
+
+After publication, the production command records both artifacts and their comparison binding in
+the operational prediction ledger. The pair must pass exact source/population/component checks
+and be recorded before every included official deadline. The recording timestamp comes from the
+clock, never from the forecast cutoff. A recording failure leaves the artifacts and source copy
+intact, returns nonzero, and must be resolved before treating the run as collected evidence.
+See [prospective evidence](sdp-prospective-evidence.md) for retained grains and outcome attachment.
+Direct `prospective_points_v1` runs remain useful for read-only replay; use the pre-deadline entry
+point for automatically refreshed and recorded production comparisons.
 
 For an already refreshed operational DB, the normal `prospective_points_v1` CLI defaults to the
 explicit YAML primary selector. Pass `--refresh-report <cycle/report.json>` to bind a successful

@@ -21,6 +21,22 @@ No main merge, PR or default-branch change is authorized. The additive decision,
 provenance and operations contracts are in
 `docs/sdp-primary-architecture-decision-2026-09-07.md` and `docs/sdp-primary-operations.md`.
 
+### Operational hardening and prospective evidence (2026-09-08)
+
+The active SDP work is capture reliability, exact fallback attribution, pre-deadline refresh,
+and immutable primary/incumbent-shadow evidence collection. A correct fail-closed fallback is
+acceptable; never optimize its percentage by weakening identity, core fields or cutoff rules.
+Recheck required incomplete recent-history matches even when they fall outside the ordinary
+five-day refresh window. A correction becomes usable only at its actual knowledge time.
+Production comparison pairs must be recorded before official FPL deadlines, using actual
+recording time, with identical cutoff, populations, FPL sources, scoring and player components.
+Keep original predictions separate from append-only finalized outcomes and preserve replay inputs.
+Player-component research remains deferred. Reopening requires enough prospective GWs/fixtures
+for a meaningful comparison, stable capture, understood fallback coverage, no unresolved
+PIT/provenance defects, and sufficient GK-shadow evidence to assess its end-to-end points impact.
+These are review conditions, not new numeric promotion thresholds or permission to retune a
+frozen candidate. Any subsequent research needs its own authorization and preregistration.
+
 ## Mission and current state
 
 This project predicts a full Fantasy Premier League (FPL) points distribution per player and

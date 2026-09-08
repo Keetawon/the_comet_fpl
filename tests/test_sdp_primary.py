@@ -296,6 +296,9 @@ def test_real_points_pipeline_primary_fallback_shadow_and_disabled(monkeypatch):
             con, **kwargs, sdp_refresh_failure="synthetic HTTP failure"
         )
         assert fail.records == disabled.records
+        assert fail.shadow_incumbent is not None
+        assert fail.shadow_incumbent.records == disabled.records
+        assert fail.shadow_incumbent.team_records == disabled.team_records
         assert (
             fail.football_environment_provenance["decisions"][0]["selector"]
             == "SDP_SOURCE_FALLBACK"
@@ -355,8 +358,13 @@ def test_pre_deadline_refresh_exception_still_attempts_incumbent(monkeypatch, tm
         raise OSError("synthetic unavailable SDP")
 
     calls = []
+    evidence_calls = []
     monkeypatch.setattr(job.daily_pl_sdp, "run", offline)
     monkeypatch.setattr(job.prospective_points_v1, "main", lambda args: calls.append(args) or 0)
+    monkeypatch.setattr(job, "_snapshot_source", lambda db, path: path.write_bytes(b"source"))
+    monkeypatch.setattr(
+        job.record_sdp_evidence, "main", lambda args: evidence_calls.append(args) or 0
+    )
     assert (
         job.main(
             [
@@ -376,3 +384,9 @@ def test_pre_deadline_refresh_exception_still_attempts_incumbent(monkeypatch, tm
     )
     assert "--sdp-refresh-failure" in calls[0]
     assert "--refresh-report" in calls[0]
+    assert len(evidence_calls) == 1
+    assert "--primary" in evidence_calls[0]
+    assert "--shadow" in evidence_calls[0]
+    receipt = json.loads(next((tmp_path / "runs").glob("*/forecast.json")).read_text())
+    assert receipt["refresh_exit_code"] == 1
+    assert receipt["forecast_exit_code"] == receipt["evidence_exit_code"] == 0

@@ -2154,7 +2154,6 @@ def predict_prospective_points(
         environment_provenance is not None
         and environment_config is not None
         and environment_config.shadow_incumbent
-        and environment_provenance["selector_counts_team_predictions"].get("SDP_PRIMARY", 0)
     ):
         shadow = predict_prospective_points(
             con,
@@ -2560,12 +2559,14 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             )
             shadow_path = args.output.with_name(args.output.stem + ".shadow-incumbent.jsonl")
-            shadow_hash = write_artifact_atomic(shadow_path, shadow)
+            shadow_hash = write_artifact_atomic(shadow_path, shadow, overwrite=False)
             assert result.football_environment_provenance is not None
             result.football_environment_provenance["shadow_incumbent_artifact_sha256"] = shadow_hash
             result.football_environment_provenance["shadow_incumbent_file"] = shadow_path.name
         artifact = build_prospective_artifact(result)
-        digest = write_artifact_atomic(args.output, artifact)
+        digest = write_artifact_atomic(
+            args.output, artifact, overwrite=result.football_environment_provenance is None
+        )
         logger.info(
             "wrote %d player-gameweek rows to %s (sha256=%s)",
             len(artifact.rows),
