@@ -81,3 +81,12 @@ config/attacking_role_premium_study.yaml -text
 src/fpl/jobs/audit_attacking_role_premium_feasibility.py -text
 tests/test_attacking_role_premium_feasibility.py -text
 results/attacking_role_premium_feasibility_2026-09-08.json -text
+
+# Additive historical player attacking source audit and bounded acquisition.
+config/historical_player_attacking_backfill.yaml -text
+results/historical_player_attacking_source_audit_2026-09-08.json -text
+results/historical_player_attacking_backfill_manifest_2026-09-08.json -text
+src/fpl/validate/historical_player_attacking.py -text
+src/fpl/jobs/backfill_historical_player_attacking.py -text
+tests/test_historical_player_attacking.py -text
+tests/test_historical_player_attacking_backfill.py -text
