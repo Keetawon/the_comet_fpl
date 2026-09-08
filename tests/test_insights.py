@@ -1035,9 +1035,7 @@ def test_players_insight_resolves_exact_cross_season_actual_endpoints(
         resolve_insight_evidence(data, outside)
 
     hidden_season = request.model_copy(
-        update={
-            "scope": request.scope.model_copy(update={"actual_season_from": "2024-25"})
-        }
+        update={"scope": request.scope.model_copy(update={"actual_season_from": "2024-25"})}
     )
     with pytest.raises(InsightEvidenceError, match="outside the page"):
         resolve_insight_evidence(data, hidden_season)
@@ -1055,13 +1053,9 @@ def test_players_insight_resolves_exact_cross_season_actual_endpoints(
         "player_actuals.json",
         remove_intermediate_period,
     )
-    gap_request = request.model_copy(
-        update={"manifest_sha256": manifest["content_sha256"]}
-    )
+    gap_request = request.model_copy(update={"manifest_sha256": manifest["content_sha256"]})
     gap_evidence = resolve_insight_evidence(data, gap_request)
-    gap_leader = next(
-        fact for fact in gap_evidence.facts if fact.id == "players.actual.rank.1"
-    )
+    gap_leader = next(fact for fact in gap_evidence.facts if fact.id == "players.actual.rank.1")
     assert gap_leader.statement.startswith("Vicario ranks 1 with 8 replayed actual points")
 
 
@@ -1206,9 +1200,7 @@ def test_player_analytics_cold_start_selector_matches_visible_reporting_scope(
         )
         evidence = resolve_insight_evidence(data, request)
         return next(
-            fact.statement
-            for fact in evidence.facts
-            if fact.id == "player.analytics.coverage"
+            fact.statement for fact in evidence.facts if fact.id == "player.analytics.coverage"
         )
 
     assert "1 published players" in coverage(False)

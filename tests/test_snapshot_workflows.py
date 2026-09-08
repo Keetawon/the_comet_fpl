@@ -13,9 +13,7 @@ from pathlib import Path
 from fpl.publish.public_dashboard import _ARCHIVE_FILENAMES
 
 ROOT = Path(__file__).resolve().parents[1]
-PINNED_CHECKOUT = (
-    "uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2"
-)
+PINNED_CHECKOUT = "uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2"
 
 
 def _workflow(name: str) -> str:
@@ -100,12 +98,9 @@ def test_recovery_and_manual_dispatch_force_a_content_identified_full_sweep() ->
         "AUTHORITATIVE_SWEEP: ${{ github.event_name == 'workflow_dispatch' || "
         "github.event.schedule == '0 5 * * *' }}"
     ) in workflow
-    assert (
-        'if [ "${AUTHORITATIVE_SWEEP}" = "false" ] && [ -d "${BASE}" ]; then'
-        in workflow
-    )
+    assert 'if [ "${AUTHORITATIVE_SWEEP}" = "false" ] && [ -d "${BASE}" ]; then' in workflow
     assert "authoritative recovery/manual pass: full element-summary sweep required" in workflow
-    assert 'existing_content="$(jq -r \'.content_sha256 // empty\'' in workflow
+    assert "existing_content=\"$(jq -r '.content_sha256 // empty'" in workflow
     assert 'if [ "${existing_content}" = "${CONTENT_SHA256}" ]; then' in workflow
     assert workflow.index('get "${API}/element-summary/${element_id}/"') < workflow.index(
         'existing_content="$(jq -r'
@@ -114,8 +109,8 @@ def test_recovery_and_manual_dispatch_force_a_content_identified_full_sweep() ->
 
 def test_provisional_sweep_requires_aggregate_rows_for_each_eligible_fixture() -> None:
     workflow = _workflow("provisional-player-history.yml")
-    assert '.element == $element_id' in workflow
-    assert '([.history[].fixture] | unique | length)' in workflow
+    assert ".element == $element_id" in workflow
+    assert "([.history[].fixture] | unique | length)" in workflow
     assert "foreign, invalid, or duplicate history rows" in workflow
     assert "MIN_HISTORY_ROWS_PER_FIXTURE=20" in workflow
     assert "COVERAGE_VIOLATION=" in workflow

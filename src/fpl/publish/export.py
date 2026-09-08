@@ -1033,12 +1033,8 @@ def _source_queries(
             "SELECT season, fixture FROM ledger_outcome_player_fixture"
         )
     if team_outcomes_present:
-        finalized_fixture_sources.append(
-            "SELECT season, fixture FROM ledger_outcome_team_fixture"
-        )
-    finalized_fixture_sql = "\n            UNION\n            ".join(
-        finalized_fixture_sources
-    )
+        finalized_fixture_sources.append("SELECT season, fixture FROM ledger_outcome_team_fixture")
+    finalized_fixture_sql = "\n            UNION\n            ".join(finalized_fixture_sources)
     provisional_player_observation = f"""
         WITH selected_capture AS ({_LATEST_PLAYER_HISTORY_CAPTURE}),
         finalized_fixture AS (
@@ -1712,8 +1708,7 @@ def _validate_provisional_fixture_consistency(con: duckdb.DuckDBPyConnection) ->
     ).fetchone()
     if overlap is not None:
         raise BiExportValidationError(
-            "provisional observation overlaps a finalized actual at the same grain: "
-            f"{overlap}"
+            f"provisional observation overlaps a finalized actual at the same grain: {overlap}"
         )
 
 

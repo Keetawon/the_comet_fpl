@@ -276,9 +276,7 @@ class InsightDisplayScope(_ExactModel):
         if any(value is not None for value in actual_endpoints) and not all(
             value is not None for value in actual_endpoints
         ):
-            raise ValueError(
-                "scope actual season/gameweek endpoints must be supplied together"
-            )
+            raise ValueError("scope actual season/gameweek endpoints must be supplied together")
         if all(value is not None for value in actual_endpoints):
             assert self.actual_season_from is not None
             assert self.actual_gw_from is not None

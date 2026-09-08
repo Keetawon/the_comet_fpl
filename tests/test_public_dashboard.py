@@ -165,9 +165,7 @@ def _documents() -> dict[str, dict[str, Any]]:
         FIXTURE_MATRIX_FILENAME: {
             "schema": FIXTURE_MATRIX_SCHEMA,
             "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
-            "teams": [
-                {"season": "2026-27", "team_code": 1, "preserved": "fixture"}
-            ],
+            "teams": [{"season": "2026-27", "team_code": 1, "preserved": "fixture"}],
             "schedule": {"gameweeks": [1, 2, 3, 4, 5]},
         },
         PLAYERS_FILENAME: {
@@ -411,12 +409,14 @@ def test_packages_only_formal_plans_and_reseals_a_deterministic_root_zip(tmp_pat
     assert public_documents[PLAYERS_FILENAME] == _documents()[PLAYERS_FILENAME]
     assert public_documents[PLAYER_ACTUALS_FILENAME] == _documents()[PLAYER_ACTUALS_FILENAME]
     assert public_documents[TEAM_ACTUALS_FILENAME] == _documents()[TEAM_ACTUALS_FILENAME]
-    assert public_documents[PLAYER_PROVISIONAL_ACTUALS_FILENAME] == _documents()[
-        PLAYER_PROVISIONAL_ACTUALS_FILENAME
-    ]
-    assert public_documents[TEAM_PROVISIONAL_ACTUALS_FILENAME] == _documents()[
-        TEAM_PROVISIONAL_ACTUALS_FILENAME
-    ]
+    assert (
+        public_documents[PLAYER_PROVISIONAL_ACTUALS_FILENAME]
+        == _documents()[PLAYER_PROVISIONAL_ACTUALS_FILENAME]
+    )
+    assert (
+        public_documents[TEAM_PROVISIONAL_ACTUALS_FILENAME]
+        == _documents()[TEAM_PROVISIONAL_ACTUALS_FILENAME]
+    )
     assert public_documents[PLAYER_HORIZONS_FILENAME] == _documents()[PLAYER_HORIZONS_FILENAME]
     horizon_payload = (first.output_dir / PLAYER_HORIZONS_FILENAME).read_bytes()
     assert horizon_payload.endswith(b"\n")

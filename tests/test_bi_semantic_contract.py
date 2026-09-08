@@ -153,9 +153,9 @@ def test_team_actual_contract_pins_finalised_match_grain_and_null_semantics() ->
         "team_bps": "unmeasured",
         "defensive_contribution": "unmeasured",
     }
-    assert (
-        ("season", "season"), ("opponent_team_id", "team_id")
-    ) in {join.on for join in table.joins}
+    assert (("season", "season"), ("opponent_team_id", "team_id")) in {
+        join.on for join in table.joins
+    }
     assert (
         ("season", "season"),
         ("team_id", "team_id"),

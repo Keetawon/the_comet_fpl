@@ -1536,9 +1536,7 @@ FACT_PLAYER_FIXTURE_ACTUAL_V4 = FACT_PLAYER_FIXTURE_ACTUAL.model_copy(
 SEMANTIC_CONTRACT_V4 = SemanticContract(
     version=4,
     tables=tuple(
-        FACT_PLAYER_FIXTURE_ACTUAL_V4
-        if table.name == "fact_player_fixture_actual"
-        else table
+        FACT_PLAYER_FIXTURE_ACTUAL_V4 if table.name == "fact_player_fixture_actual" else table
         for table in SEMANTIC_CONTRACT_V3.tables
     ),
 )
