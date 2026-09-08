@@ -92,18 +92,28 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
 
     def sidecar(source: Path, *args: Any, **kwargs: Any) -> dict[str, str]:
         calls.append(("sidecar", source))
+        target = args[0]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("{}")
         return {"source": "current operational observations"}
 
     monkeypatch.setattr(job, "package_public_dashboard", package)
     monkeypatch.setattr(job, "export_sdp_stats", sidecar)
+    monkeypatch.setattr(job, "check_observed_freshness", lambda *a: {})
+    monkeypatch.setattr(job, "retain_existing_plans", lambda *a: {"observations_refreshed": True})
     report = job.build(db, output, base_dashboard=old_base if retained else None)
     assert calls == [
-        ("package", old_base if retained else output / "dashboard-retained"),
+        (
+            "package",
+            output / "dashboard-with-retained-plans" if retained else output / "dashboard-retained",
+        ),
         ("sidecar", db),
     ]
-    assert report["base_dashboard"]["generated_at"] == ("old" if retained else "new")
+    assert report["base_dashboard"]["generated_at"] == "new"
     assert report["base_dashboard"]["mode"] == (
-        "retained_existing_generation" if retained else "refreshed_operational_generation"
+        "refreshed_observations_with_retained_plans"
+        if retained
+        else "refreshed_operational_generation"
     )
     assert report["forecast_regenerated"] is False
     assert old_evidence.read_bytes() == b"original forecast"

@@ -1,5 +1,14 @@
 # Frozen GW4–8 checkpoint and observed SDP dashboard operations
 
+Current publication repair: see
+[SDP data reconciliation](sdp-dashboard-data-reconciliation-2026-09-08.md).
+`build_sdp_dashboard --base-dashboard` now retains only the existing plan blocks;
+the operational generation supplies refreshed actuals and stored forecast exports.
+It refuses to install a preview if current FPL fixture/player rows are absent from
+the established actual/provisional exports. It no longer packages the entire stale
+base. Missing SDP fields remain NULL; provider core validity is independent of
+the descriptive per-field display. The existing command below remains applicable.
+
 The player model remains frozen at `17cfa2267ce4d7c89f96842220f40471b81152d2`.
 The GW1–3 V2 audit remains MIXED / NO FREEZE; V1 remains invalid. No inference,
 parameter change, new model research or historical audit rerun is part of this work.

@@ -18,10 +18,17 @@ from fpl.config import SdpMetric, config_dir, load_sdp_metrics, load_sources
 from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.ingest.fpl_api import ApiFixture, BootstrapStatic, ElementSummary, detect_season_skew
 from fpl.ingest.live_snapshot import POSITION_BY_TYPE
-from fpl.ingest.pl_sdp import parse_team_stats
+from fpl.ingest.pl_sdp import (
+    extract_items,
+    is_completed_scored_match,
+    parse_match_summary,
+    parse_team_stats,
+)
 from fpl.jobs.competitive_participation_pilot import publish_bytes
 from fpl.publish.player_attacking_usage import _raw_capture
-from fpl.storage.sdp_runtime import load_sdp_state, raw_at, workload_at
+from fpl.storage.sdp_runtime import _body, load_sdp_state, raw_at, workload_at
+from fpl.transform.competitive_participation import uint
+from fpl.transform.pl_sdp import KICKOFF_TOLERANCE_SECONDS
 
 SCHEMA = "fpl.sdp-stats"
 DISPLAY_CORRECTIONS_FILE = "sdp_dashboard_display_corrections.yaml"
@@ -44,7 +51,11 @@ FPL_FIELDS = (
     "expected_goals_conceded",
 )
 TEAM_FPL_FIELDS = ("goals_scored", "goals_conceded")
-OPPONENT_METRICS = {"shots_allowed": "shots", "expected_goals_allowed": "expected_goals"}
+OPPONENT_METRICS = {
+    "shots_allowed": "shots",
+    "shots_on_target_allowed": "shots_on_target",
+    "expected_goals_allowed": "expected_goals",
+}
 COMMON = {
     "season",
     "gw",
@@ -217,6 +228,103 @@ def metric_value(stats: dict[str, Any], metric: SdpMetric) -> float | int | None
     return result
 
 
+def _partial_current_stats(
+    con: duckdb.DuckDBPyConnection,
+    raw: list[dict[str, Any]],
+    *,
+    season: str,
+    fixture: int,
+    official: dict[str, Any],
+    cutoff: datetime,
+) -> tuple[dict[str, dict[str, Any]], datetime, str, int] | None:
+    """Display measured fields of an incomplete core, never license model use.
+
+    Recheck the latest immutable stats and metadata, exact crosswalk, PL identity,
+    completion and both teams independently of the production health result.
+    Missing fields stay missing; no older revision is substituted.
+    """
+    config = load_sources().pl_sdp
+    assert config is not None
+    raw = [row for row in raw if row["fetched_at"] <= cutoff]
+    crosswalk = con.execute(
+        """SELECT sdp_match_id FROM stg_pl_sdp_fixture_crosswalk
+           WHERE season=? AND fixture=? AND resolved_at<=?
+             AND corroborated_kickoff AND corroborated_teams""",
+        [season, fixture, cutoff],
+    ).fetchall()
+    if len(crosswalk) != 1:
+        return None
+    match_id = crosswalk[0][0]
+    stats_versions = [
+        r
+        for r in raw
+        if r["season"] == season
+        and r["endpoint"] == "match_stats"
+        and r["sdp_match_id"] == match_id
+    ]
+    if not stats_versions:
+        return None
+    capture = stats_versions[-1]
+    metadata = [r for r in raw if r["season"] == season and r["endpoint"] in {"match", "matches"}]
+    try:
+        for receipt in reversed(metadata):
+            payload = _body(receipt)
+            records = [payload] if receipt["endpoint"] == "match" else extract_items(payload)
+            selected = [
+                r
+                for r in records
+                if uint(r.get("matchId", r.get("id")), "metadata match") == match_id
+            ]
+            if not selected:
+                continue
+            if len(selected) != 1:
+                return None
+            record = selected[0]
+            match = parse_match_summary(record)
+            if (
+                uint(record.get("competitionId"), "competition") != config.competition
+                or match.season_id != config.season_id(season)
+                or not is_completed_scored_match(match, now=cutoff)
+                or match.kickoff is None
+                or abs((match.kickoff - official["kickoff"]).total_seconds())
+                > KICKOFF_TOLERANCE_SECONDS
+                or (match.home_team_id, match.away_team_id) != (official["home"], official["away"])
+            ):
+                return None
+            stats_payload = _body(capture)
+            if (
+                isinstance(stats_payload, dict)
+                and uint(stats_payload.get("matchId", match_id), "stats match") != match_id
+            ):
+                return None
+            sides = parse_team_stats(stats_payload, match_id=match_id)
+            if len(sides) != 2 or {s.side for s in sides} != {"home", "away"}:
+                return None
+            if any(s.team_id != official[s.side] for s in sides):
+                return None
+            for side in sides:
+                values = dict(side.stats)
+                for part, total in (
+                    ("ontargetScoringAtt", "totalScoringAtt"),
+                    ("attemptsIbox", "totalScoringAtt"),
+                    ("accuratePass", "totalPass"),
+                    ("accurateCross", "totalCross"),
+                    ("wonTackle", "totalTackle"),
+                ):
+                    left, right = _number(values.get(part)), _number(values.get(total))
+                    if left is not None and right is not None and left > right:
+                        return None
+            return (
+                {s.side: dict(s.stats) for s in sides},
+                max(capture["fetched_at"], receipt["fetched_at"]),
+                _version(capture["sha256"], receipt["sha256"]),
+                match_id,
+            )
+    except (ValueError, TypeError, KeyError):
+        return None
+    return None
+
+
 def _apply_display_corrections(
     con: duckdb.DuckDBPyConnection,
     *,
@@ -288,9 +396,14 @@ def _apply_display_corrections(
                 raise ValueError("display correction has positive or malformed target evidence")
         direct = teams[season, correction.fixture, correction.team_code]
         mirror = teams[season, correction.fixture, correction.opponent_team_code]
+        measured_sot = direct["sdp"]["shots_on_target"]
+        if measured_sot is not None and measured_sot == mirror["sdp"]["shots_on_target_allowed"]:
+            # A later validated provider observation supersedes the display-only
+            # override. Keep the original confirmation and raw versions intact.
+            continue
         if (
             direct["sdp"]["shots_on_target"] is not None
-            or mirror["sdp"]["shots_allowed"] is not None
+            or mirror["sdp"]["shots_on_target_allowed"] is not None
             or direct["fpl"]["goals_scored"] != correction.fpl_goals_scored
         ):
             raise ValueError("display correction would overwrite observed/provider evidence")
@@ -326,7 +439,7 @@ def _apply_display_corrections(
             "subject_team_code": correction.team_code,
         }
         direct["display_corrections"]["shots_on_target"] = {**public, "relation": "direct"}
-        mirror["display_corrections"]["shots_allowed"] = {
+        mirror["display_corrections"]["shots_on_target_allowed"] = {
             **public,
             "relation": "opponent_mirror",
         }
@@ -906,6 +1019,28 @@ def build_sdp_stats(
                     previous["source_version"] if previous is not None else None,
                 ),
             }
+        # Descriptive cells do not have to disappear because another core field
+        # is omitted. Only current, exactly mapped, completed matches can recover
+        # their measured fields here; production rows/health are never changed.
+        for fixture, official in fixtures.items():
+            if state.failures.get((current, fixture)) != "SDP_INCOMPLETE_FALLBACK":
+                continue
+            partial = _partial_current_stats(
+                con, raw, season=current, fixture=fixture, official=official, cutoff=cutoff
+            )
+            if partial is None:
+                continue
+            sides, known, version, provider_match_id = partial
+            for side_label, stats in sides.items():
+                row = teams[current, fixture, official[side_label]]
+                opposite = sides["away" if side_label == "home" else "home"]
+                row["sdp"] = {m.local_field: metric_value(stats, m) for m in metrics}
+                for metric_key, original in OPPONENT_METRICS.items():
+                    metric = next(m for m in metrics if m.local_field == original)
+                    row["sdp"][metric_key] = metric_value(opposite, metric)
+                row["known_at"] = _iso(max(known, datetime.fromisoformat(row["known_at"])))
+                row["provider_match_id"] = provider_match_id
+                row["source_version"] = _version(version, row["source_version"])
     fpl_count = len(players)
     lineup_count, lineup_failures = _add_lineups(
         con,
@@ -934,7 +1069,8 @@ def build_sdp_stats(
     if failures:
         notes.append(
             f"{failures} fixture(s) lack valid complete SDP core evidence; "
-            "metric rows remain unavailable."
+            "UNAVAILABLE labels core health. Individually measured current-match cells "
+            "can be displayed after separate raw/identity checks; omitted fields stay NULL."
         )
     if lineup_failures:
         notes.append(
@@ -1098,7 +1234,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                     raise ValueError("invalid team FPL/display source")
                 for metric, correction in row["display_corrections"].items():
                     if (
-                        metric not in {"shots_on_target", "shots_allowed"}
+                        metric not in {"shots_on_target", "shots_on_target_allowed"}
                         or not isinstance(correction, dict)
                         or set(correction) != DISPLAY_CORRECTION_FIELDS
                         or correction["value"] != 0
@@ -1149,11 +1285,11 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
     for entries in correction_rows.values():
         if len(entries) != 2 or {entry[1] for entry in entries} != {
             "shots_on_target",
-            "shots_allowed",
+            "shots_on_target_allowed",
         }:
             raise ValueError("display correction lacks an exact opponent mirror")
         direct = next(entry for entry in entries if entry[1] == "shots_on_target")
-        mirror = next(entry for entry in entries if entry[1] == "shots_allowed")
+        mirror = next(entry for entry in entries if entry[1] == "shots_on_target_allowed")
         if (
             direct[0]["season"] != mirror[0]["season"]
             or direct[0]["fixture"] != mirror[0]["fixture"]

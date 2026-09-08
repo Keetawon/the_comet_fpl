@@ -41,8 +41,8 @@ describe("Observed SDP sidecar contract", () => {
       opponent_name: direct.team_name,
       opponent_short_name: direct.team_short_name,
       was_home: !direct.was_home,
-      sdp: { ...direct.sdp, shots_allowed: null },
-      display_corrections: { shots_allowed: { ...shared, relation: "opponent_mirror" } },
+      sdp: { ...direct.sdp, shots_on_target_allowed: null },
+      display_corrections: { shots_on_target_allowed: { ...shared, relation: "opponent_mirror" } },
     });
     expect(parseSdpStats(data)).toBe(data);
     expect(direct.sdp.shots_on_target).toBeNull();

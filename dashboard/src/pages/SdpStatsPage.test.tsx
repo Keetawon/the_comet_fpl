@@ -8,6 +8,21 @@ vi.mock("@/data/sdpStats", async importOriginal => ({ ...await importOriginal<ob
 beforeEach(() => { vi.mocked(loadSdpStats).mockResolvedValue(sdpFixture()); });
 
 describe("Observed SDP dashboard tabs", () => {
+  it("exposes passing and defence groups and says Unavailable for missing values", async () => {
+    const data = sdpFixture();
+    data.metrics.push({ ...data.metrics[0], key: "passes", label: "Passes", group: "passing" });
+    data.metrics.push({ ...data.metrics[0], key: "tackles", label: "Tackles", group: "defence" });
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />);
+    const table = await screen.findByRole("table", { name: "Observed SDP team statistics" });
+    expect(within(table).getByRole("columnheader", { name: "Passes" })).toBeInTheDocument();
+    expect(within(table).getAllByText("Unavailable").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "passing" }));
+    expect(screen.getByRole("combobox", { name: "Metric group" })).toHaveValue("passing");
+    expect(within(table).queryByRole("columnheader", { name: "Shots" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "defence" }));
+    expect(within(table).getByRole("columnheader", { name: "Tackles" })).toBeInTheDocument();
+  });
   it("renders the exact team title, observed source scope, sortable table and labelled scatter", async () => {
     render(<TeamSdpStatsPage />);
     const table = await screen.findByRole("table", { name: "Observed SDP team statistics" });

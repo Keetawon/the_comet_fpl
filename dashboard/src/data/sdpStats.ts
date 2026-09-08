@@ -164,7 +164,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
       if (scope === "team") {
         if (!object(row.display_corrections)) return fail();
         for (const [metric, correction] of Object.entries(row.display_corrections)) {
-          if (!["shots_on_target", "shots_allowed"].includes(metric) || !object(correction) ||
+          if (!["shots_on_target", "shots_on_target_allowed"].includes(metric) || !object(correction) ||
               correction.value !== 0 || correction.evidence_class !== "owner_confirmed_display_correction" ||
               correction.provider_field !== "ontargetScoringAtt" || correction.provider_field_state !== "omitted" ||
               correction.corroboration !== "shot_accounting_and_fpl_goalkeeper_proxy_zero" ||
@@ -177,7 +177,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
               Date.parse(correction.owner_confirmation_recorded_at as string) > asOf ||
               (row.sdp as Record<string, unknown>)[metric] !== null || row.status !== "UNAVAILABLE" ||
               (metric === "shots_on_target" && (correction.relation !== "direct" || row.team_code !== correction.subject_team_code)) ||
-              (metric === "shots_allowed" && (correction.relation !== "opponent_mirror" || row.opponent_team_code !== correction.subject_team_code))) return fail();
+              (metric === "shots_on_target_allowed" && (correction.relation !== "opponent_mirror" || row.opponent_team_code !== correction.subject_team_code))) return fail();
           const entries = corrections.get(correction.correction_id) ?? [];
           entries.push({ row, metric, correction });
           corrections.set(correction.correction_id, entries);
@@ -206,7 +206,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
   for (const entries of corrections.values()) {
     if (entries.length !== 2 || new Set(entries.map(entry => entry.metric)).size !== 2) return fail();
     const direct = entries.find(entry => entry.metric === "shots_on_target")!;
-    const mirror = entries.find(entry => entry.metric === "shots_allowed")!;
+    const mirror = entries.find(entry => entry.metric === "shots_on_target_allowed")!;
     if (direct.row.season !== mirror.row.season || direct.row.fixture !== mirror.row.fixture ||
         direct.row.team_code !== mirror.row.opponent_team_code || direct.row.opponent_team_code !== mirror.row.team_code) return fail();
   }

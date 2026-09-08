@@ -20,6 +20,7 @@ from fpl.publish.sdp_stats import (
     _add_lineups,
     _apply_display_corrections,
     _fpl_rows,
+    _partial_current_stats,
     build_sdp_stats,
     export_sdp_stats,
     load_display_corrections,
@@ -28,6 +29,7 @@ from fpl.publish.sdp_stats import (
     validate_sdp_stats,
 )
 from fpl.storage.db import initialise
+from fpl.storage.sdp_runtime import load_sdp_state, raw_at
 from fpl.transform import pl_sdp
 
 from .test_pl_sdp_revision_pit import CAPTURED, SEASON, _raw, _rebuild
@@ -146,13 +148,13 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
     teams = {
         ("2026-27", 7, 7): {
             "status": "UNAVAILABLE",
-            "sdp": {"shots_on_target": None, "shots_allowed": None},
+            "sdp": {"shots_on_target": None, "shots_on_target_allowed": None, "shots_allowed": 6},
             "fpl": {"goals_scored": 0},
             "display_corrections": {},
         },
         ("2026-27", 7, 36): {
             "status": "UNAVAILABLE",
-            "sdp": {"shots_on_target": None, "shots_allowed": None},
+            "sdp": {"shots_on_target": None, "shots_on_target_allowed": None, "shots_allowed": 6},
             "fpl": {"goals_scored": 4},
             "display_corrections": {},
         },
@@ -225,9 +227,37 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
     direct = teams["2026-27", 7, 7]
     mirror = teams["2026-27", 7, 36]
     assert direct["status"] == mirror["status"] == "UNAVAILABLE"
-    assert direct["sdp"]["shots_on_target"] is mirror["sdp"]["shots_allowed"] is None
+    assert direct["sdp"]["shots_on_target"] is mirror["sdp"]["shots_on_target_allowed"] is None
+    assert mirror["sdp"]["shots_allowed"] == 6
+    assert "shots_allowed" not in mirror["display_corrections"]
     assert direct["display_corrections"]["shots_on_target"]["value"] == 0
-    assert mirror["display_corrections"]["shots_allowed"]["relation"] == "opponent_mirror"
+    assert mirror["display_corrections"]["shots_on_target_allowed"]["relation"] == "opponent_mirror"
+    # A later provider value wins without erasing the earlier owner receipt.
+    direct["sdp"]["shots_on_target"] = 1
+    mirror["sdp"]["shots_on_target_allowed"] = 1
+    direct["display_corrections"] = {}
+    mirror["display_corrections"] = {}
+    with duckdb.connect(str(tmp_path / "later-provider.duckdb")) as later_con:
+        later_con.execute(
+            "CREATE TABLE stg_pl_sdp_fixture_crosswalk AS SELECT '2026-27' AS season, "
+            "7 AS fixture, 2645201 AS sdp_match_id, TRUE AS corroborated_kickoff, "
+            "TRUE AS corroborated_teams, ?::TIMESTAMPTZ AS resolved_at",
+            [source_known],
+        )
+        assert (
+            _apply_display_corrections(
+                later_con,
+                cutoff=confirmed,
+                season="2026-27",
+                fixtures=fixtures,
+                players=players,
+                teams=teams,
+                raw=raw,
+            )
+            == 0
+        )
+    assert direct["display_corrections"] == {}
+    assert raw == original
 
 
 def test_committed_display_policy_is_bounded_and_leaves_fulham_unresolved() -> None:
@@ -315,6 +345,70 @@ def test_sdp_core_health_optional_null_and_revision_gate(tmp_path: Path) -> None
         assert len(failed) == 2 and all(r["status"] == "UNAVAILABLE" for r in failed)
         assert all(v is None for r in failed for v in r["sdp"].values())
         assert after["coverage"]["team_failures"] == 1
+
+
+@pytest.mark.parametrize(
+    "defect", [None, "string_ids", "identity", "corrupt", "future", "impossible", "late_mapping"]
+)
+def test_partial_display_preserves_measured_goals_and_does_not_promote_core(
+    tmp_path: Path, defect: str | None
+) -> None:
+    cutoff = CAPTURED + timedelta(days=1)
+    with initialise(tmp_path / "partial.duckdb") as con:
+
+        def omit_sot(payload: Any) -> None:
+            payload[0]["stats"].pop("ontargetScoringAtt")
+            payload[1]["stats"]["goals"] = 3
+
+        seed(con, change=omit_sot)  # type: ignore[no-untyped-call]
+        # Synthetic contemporaneous crosswalk; an actually later mapping fails.
+        if defect != "late_mapping":
+            con.execute("UPDATE stg_pl_sdp_fixture_crosswalk SET resolved_at=?", [CAPTURED])
+        before = load_sdp_state(con, cutoff=cutoff, season=SEASON)
+        assert before.failures[SEASON, 103] == "SDP_INCOMPLETE_FALLBACK"
+        raw = raw_at(con, cutoff)
+        metadata = next(r for r in raw if r["endpoint"] == "matches")
+        record = json.loads(metadata["body"])["content"][-1]
+        kickoff = datetime.fromtimestamp(record["kickoff"]["millis"] / 1000, UTC)
+        official = {"kickoff": kickoff, "home": 8, "away": 3}
+        if defect == "identity":
+            official["away"] = 999
+        capture = next(
+            r for r in raw if r["endpoint"] == "match_stats" and r["sdp_match_id"] == 300103
+        )
+        if defect == "corrupt":
+            capture["sha256"] = "b" * 64
+        if defect == "future":
+            capture["fetched_at"] = cutoff + timedelta(hours=1)
+        if defect == "impossible":
+            payload = json.loads(capture["body"])
+            payload[0]["stats"]["accuratePass"] = 99999
+            capture["body"] = json.dumps(payload)
+            capture["sha256"] = hashlib.sha256(capture["body"].encode()).hexdigest()
+            capture["byte_count"] = len(capture["body"].encode())
+        if defect == "string_ids":
+            for source in raw:
+                if source["endpoint"] == "matches":
+                    body = json.loads(source["body"])
+                    for item in body["content"]:
+                        item["id"] = str(item["id"])
+                        if "competitionId" in item:
+                            item["competitionId"] = str(item["competitionId"])
+                    source["body"] = json.dumps(body)
+                    source["sha256"] = hashlib.sha256(source["body"].encode()).hexdigest()
+                    source["byte_count"] = len(source["body"].encode())
+        result = _partial_current_stats(
+            con, raw, season=SEASON, fixture=103, official=official, cutoff=cutoff
+        )
+        if defect not in (None, "string_ids"):
+            assert result is None
+        else:
+            assert result is not None
+            sides = result[0]
+            assert sides["away"]["goals"] == 3
+            assert "ontargetScoringAtt" not in sides["home"]
+            assert sides["home"]["totalScoringAtt"] == 12
+        assert load_sdp_state(con, cutoff=cutoff, season=SEASON) == before
 
 
 def test_metric_aliases_finite_values_and_semantics() -> None:

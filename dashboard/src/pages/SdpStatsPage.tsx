@@ -45,7 +45,7 @@ function CoverageValue({ rows, metric, mode }: { rows: SdpMatch[]; metric: SdpMe
   const exposure = mode === "per90" && metric.aggregation !== "mean" ? `; ${fmt(value.minutes)} matched actual minutes` : "";
   const corrected = corrections.length ? ` ${corrections.map(correctionDescription).join(" ")}` : "";
   return <span title={`${sourceDescription(metric)} ${value.measured}/${value.matches} matches measured${exposure}. Missing observations are not zero.${corrected}`} className="tabular-nums">
-    {fmt(value.value)}{corrections.length > 0 && <sup className="ml-0.5" aria-label="owner-confirmed display correction">‡</sup>}<span className="ml-1 text-[10px] text-muted-foreground">{value.measured}/{value.matches}</span>
+    {value.value === null ? <span className="text-muted-foreground">Unavailable</span> : fmt(value.value)}{corrections.length > 0 && <sup className="ml-0.5" aria-label="owner-confirmed display correction">‡</sup>}<span className="ml-1 text-[10px] text-muted-foreground">{value.measured}/{value.matches}</span>
   </span>;
 }
 
@@ -122,7 +122,7 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
   const defaults = initialFilters(rows);
   const [filters, setFilters] = useState(defaults);
   const [mode, setMode] = useState<SdpMode>("total");
-  const [group, setGroup] = useState(defaultMetric?.group ?? "all");
+  const [group, setGroup] = useState(scope === "team" ? "overview" : defaultMetric?.group ?? "all");
   const [sortKey, setSortKey] = useState(defaultMetric ? metricId(defaultMetric) : "name");
   const [ascending, setAscending] = useState(false);
   const [compared, setCompared] = useState<string[]>([]);
@@ -131,7 +131,8 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
   const [page, setPage] = useState(0);
   const patchFilters = (patch: Partial<SdpFilters>) => { setFilters(current => ({ ...current, ...patch })); setPage(0); };
   const filtered = useMemo(() => selectSdpEntities(rows, scope, filters), [rows, scope, filters]);
-  const metrics = relevant.filter(m => group === "all" || m.group === group);
+  const overview = new Set(["goals", "shots", "shots_on_target", "expected_goals", "possession", "passes", "tackles", "fouls"]);
+  const metrics = relevant.filter(m => group === "all" || (group === "overview" ? m.source === "sdp" && overview.has(m.key) : m.group === group));
   const ordered = sortSdpEntities(filtered, relevant.find(m => metricId(m) === sortKey) ?? null, mode, ascending);
   const pageCount = Math.max(1, Math.ceil(ordered.length / 25));
   const currentPage = Math.min(page, pageCount - 1);
@@ -163,7 +164,7 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
   const teams = [...new Map(seasonRows.map(row => [String(row.team_code), row.team_name])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const selectedRows = filtered.flatMap(entity => entity.rows);
   const available = chartMetric ? filtered.filter(entity => metricValue(entity.rows, chartMetric, mode).value !== null).length : 0;
-  const reset = () => { setFilters(defaults); setMode("total"); setGroup(defaultMetric?.group ?? "all"); setSortKey(defaultMetric ? metricId(defaultMetric) : "name"); setAscending(false); setCompared([]); setDetail(null); setPage(0); setChartKey(defaultMetric ? metricId(defaultMetric) : ""); };
+  const reset = () => { setFilters(defaults); setMode("total"); setGroup(scope === "team" ? "overview" : defaultMetric?.group ?? "all"); setSortKey(defaultMetric ? metricId(defaultMetric) : "name"); setAscending(false); setCompared([]); setDetail(null); setPage(0); setChartKey(defaultMetric ? metricId(defaultMetric) : ""); };
   const chooseSeason = (season: string) => { const gws = rows.filter(row => row.season === season).map(row => row.gw); patchFilters({ season, from: Math.min(...gws), to: Math.max(...gws), team: "all" }); setCompared([]); setDetail(null); };
   const chooseComparison = (id: string) => setCompared(current => current.includes(id) ? current.filter(value => value !== id) : [...current.filter(value => filtered.some(row => row.id === value)), id].slice(0, 3));
   const exportCsv = () => { const url = URL.createObjectURL(new Blob([sdpCsv(ordered, metrics, mode)], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = `${scope}-observed-${filters.season}-gw${filters.from}-${filters.to}.csv`; link.click(); URL.revokeObjectURL(url); };
@@ -190,10 +191,15 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
       <Control label="Team" value={filters.team} options={[["all", "All clubs"], ...teams]} onChange={value => patchFilters({ team: value })} />
       <label className={`${labelClass} col-span-2`}>Search {scope === "team" ? "clubs" : "players"}<input className={inputClass} aria-label={`Search ${scope === "team" ? "clubs" : "players"}`} placeholder={scope === "team" ? "Search a club…" : "Search player or club…"} value={filters.search} onChange={e => patchFilters({ search: e.target.value })} /></label>
       {scope === "player" && <><Control label="FPL position" value={filters.position} options={[["all", "All positions"], ...["GK", "DEF", "MID", "FWD"].map(p => [p, p] as [string, string])]} onChange={value => patchFilters({ position: value })} /><label className={labelClass}>Minimum FPL minutes<input className={inputClass} aria-label="Minimum FPL minutes" type="number" min="0" value={filters.minMinutes} onChange={e => patchFilters({ minMinutes: Math.max(0, Number(e.target.value) || 0) })} /></label></>}
-      <Control label="Metric group" value={group} options={[["all", "All metrics"], ...[...new Set(relevant.map(m => m.group))].map(g => [g, g] as [string, string])]} onChange={setGroup} />
+      <Control label="Metric group" value={group} options={[...(scope === "team" ? [["overview", "Overview"] as [string, string]] : []), ["all", "All metrics"], ...[...new Set(relevant.map(m => m.group))].map(g => [g, g] as [string, string])]} onChange={setGroup} />
       <Control label="Display" value={mode} options={scope === "team" ? [["total", "Totals"], ["per_match", "Per match"]] : [["total", "Totals"], ["per90", "Per 90 actual minutes"]]} onChange={value => setMode(value as SdpMode)} />
       <Button variant="outline" onClick={reset}><RotateCcw />Reset filters</Button>
     </div><p className="mt-3 text-xs text-muted-foreground">Recent windows apply to each {scope === "team" ? "club" : "player"} after season, GW, team and venue filters. Both double-gameweek fixtures count. A missing value remains —. Percentage columns show a per-match mean, not a pooled percentage.</p>{scope === "player" && <p className="mt-1 text-xs text-muted-foreground">Exposure uses selected FPL minutes: below 180 is very low; 180 to 449 is low; 450+ is a larger sample. These describe sample size, not model confidence.</p>}</FilterPanel>
+    <div className="space-y-2" aria-label="Available statistic groups">
+      <p className="text-sm font-medium">{scope === "team" ? `${relevant.filter(m => m.source === "sdp").length} SDP team metrics` : "Observed player metrics ? FPL source"}</p>
+      <div className="flex flex-wrap gap-2">{[...(scope === "team" ? ["overview"] : []), ...new Set(relevant.map(m => m.group))].map(key => <Button key={key} size="sm" variant={group === key ? "default" : "outline"} aria-pressed={group === key} onClick={() => { setGroup(key); setPage(0); }}>{key === "overview" ? "Overview" : key.replaceAll("_", " ")}</Button>)}</div>
+      {scope === "team" && <p className="text-xs text-muted-foreground">Shooting, possession, passing, territory, defensive actions and discipline are separate source observations. Passing direction, long passes and crosses describe play patterns; no inferred play-type label is assigned. Core-incomplete matches retain individually measured cells; a missing field stays Unavailable.</p>}
+    </div>
     {relevant.length > 0 && <div className="flex flex-wrap items-end justify-between gap-3"><Control label="Trend metric" value={chartMetric ? metricId(chartMetric) : ""} options={metricOptions} onChange={setChartKey} /><p className="text-xs text-muted-foreground">Each cell shows measured / selected matches. Totals and rates require complete evidence. † Provider observation; not independently reconciled. ‡ Owner-confirmed display correction over an omitted field. Hover for exact provenance.</p></div>}
     <div className="rounded-lg border"><Table aria-label={scope === "team" ? "Observed SDP team statistics" : "Observed player statistics by source"} containerClassName="max-h-[620px]"><TableHeader className="sticky top-0 z-20 bg-background"><TableRow>
       <TableHead className="sticky left-0 z-30 bg-background"><button className="flex items-center gap-1" onClick={() => { setSortKey("name"); setAscending(sortKey === "name" ? !ascending : true); }}> {scope === "team" ? "Club" : "Player"}{sortKey === "name" && (ascending ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}</button></TableHead><TableHead>Compare</TableHead>{scope === "player" && <><TableHead>FPL position</TableHead><TableHead>Club(s)</TableHead><TableHead>FPL minutes / exposure</TableHead><TableHead>SDP starts</TableHead><TableHead title="Count of selected fixture rows with measured FPL minutes greater than zero. Unavailable if any selected minute field is missing.">FPL appearances</TableHead></>}<TableHead title="Selected fixture records, including recorded non-appearances.">Matches</TableHead>

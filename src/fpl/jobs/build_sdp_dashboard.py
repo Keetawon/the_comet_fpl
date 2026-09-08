@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from fpl.publish.dashboard_json import export_dashboard_json, validate_dashboard_json
+from fpl.publish.dashboard_refresh import check_observed_freshness, retain_existing_plans
 from fpl.publish.export import export_bi, validate_bi_export
 from fpl.publish.public_dashboard import package_public_dashboard
 from fpl.publish.sdp_stats import export_sdp_stats
@@ -81,10 +82,15 @@ def build(
             output / "dashboard-retained",
         )
         validate_dashboard_json(output / "dashboard-retained")
-        # An operational DB can intentionally contain no optimizer plans. A caller
-        # may explicitly retain an existing complete dashboard generation instead
-        # of running inference/optimization merely to satisfy the public packager.
-        base = base_dashboard if base_dashboard is not None else output / "dashboard-retained"
+        # The operational DB owns current observed data and stored forecasts.
+        # A legacy base supplies only existing plans, never its stale actuals.
+        base = output / "dashboard-retained"
+        retained_plans = None
+        if base_dashboard is not None:
+            retained_plans = retain_existing_plans(
+                base, base_dashboard, output / "dashboard-with-retained-plans"
+            )
+            base = output / "dashboard-with-retained-plans"
         base_manifest = validate_dashboard_json(base)
         package = package_public_dashboard(
             base,
@@ -92,6 +98,10 @@ def build(
             output / "dashboard-public-data.zip",
         )
         sidecar = export_sdp_stats(db, output / "public" / "sdp" / "sdp_stats.json", as_of=stamp)
+        freshness = check_observed_freshness(
+            output / "public" / "data",
+            json.loads((output / "public" / "sdp" / "sdp_stats.json").read_bytes()),
+        )
     report = {
         "schema": "fpl.sdp-dashboard-generation/v1",
         "started_at": stamp.isoformat(),
@@ -103,14 +113,16 @@ def build(
         else "Windows symlink privilege unavailable; validated before_publish copies retained",
         "public_package": package.metadata(),
         "base_dashboard": {
-            "mode": "retained_existing_generation"
+            "mode": "refreshed_observations_with_retained_plans"
             if base_dashboard is not None
             else "refreshed_operational_generation",
             "generated_at": base_manifest["generated_at"],
             "manifest_content_sha256": base_manifest["content_sha256"],
-            "statistics_sidecar_refreshed_independently": True,
+            "retained_plan_provenance": retained_plans,
+            "statistics_sidecar_refreshed_independently": False,
         },
         "sdp_sidecar": sidecar,
+        "observed_freshness_reconciliation": freshness,
         "forecast_regenerated": False,
         "remote_deployed": False,
         "preview_assets_installed": preview_public is not None,
@@ -133,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--base-dashboard",
         type=Path,
-        help="Explicit existing validated dashboard base; keeps its original forecast vintage",
+        help="Existing validated plan source; current observations come from the operational DB",
     )
     args = parser.parse_args(argv)
     print(
