@@ -168,8 +168,31 @@ Only additive feature/reporting/job/test files and this documentation are introd
 No forecast, Player Stats, FixtureEnvironment, SDP selector, optimizer, capture or ledger
 consumer imports this capability. The real production isolation receipt uses identical
 retained inputs for GW4-5, 654 players, primary and incumbent shadow forecasts, and a default
-optimizer run including a transfer. Final verification details are recorded in the additive
-scouting verification result alongside this documentation.
+optimizer run including a transfer. **Exact comparison passed**: primary and shadow each
+retain byte-identical forecast records (1,308 player-GW, 1,308 player-fixture and 40 team rows).
+All environment/selector/workload/GK-shadow values and the full optimizer policy/decision
+are identical, including XI, bench, captains and the GW5 transfer. The 20 fixtures include
+10 SDP-primary and 10 incomplete-fallback cases. No numeric tolerance was used.
+
+Whole artifact files differ only in truthful Git IDs, artifact linkage hashes/paths and
+derived optimizer run identity. Those provenance differences are enumerated rather than
+falsified to make whole-file hashes match. All 256 pre-existing source/config files and
+the retained inference DB remain unchanged. Scouting JSON/CSV replay is byte-identical;
+only its manifest's actual publication time changes. The full receipt and current coverage
+are in [the additive verification record](../results/player_attacking_usage_scouting_verification_2026-09-08.json).
+
+Verification: 46 feature tests, 28 export tests and three production-isolation tests pass;
+the relevant earlier source/PIT/frozen-arithmetic group passed 148 tests. Dashboard checks
+passed 81 with four inherited Windows symlink skips; 16 selected BI source-contract tests
+passed. Repository Ruff, strict mypy on all 214 source files, and six changed Python format
+checks pass. Scoped strict checking also passes for the new tests with imported legacy
+test-fixture bodies silent; unrestricted checking of those inherited fixtures exposes
+26 existing type errors. Global formatting failures were not rerun.
+
+One inherited optimizer limitation was reproduced independently of scouting: tied synthetic
+utilities can give equally valued but different XI/bench choices. The new isolation fixture
+uses unique synthetic utilities and retains exact decision assertions; the real full-registry
+before/after comparison also passes unchanged. No optimizer repair was made in this task.
 
 The frozen formal result SHA256 remains
 `de2bd6839de4ca246554010cad337445fc30faa9d89d408147d3dce41cec9e08`;
