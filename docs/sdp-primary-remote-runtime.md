@@ -146,6 +146,22 @@ at the same operational database; the runtime never runs or schedules a forecast
 prediction, or evaluation. Pre-deadline receipts land under the same runs root (the
 health CLI reads them wherever they are nested).
 
+On the authorized host, run a forecast as the same service user so database and artifact ownership
+remain consistent. From the pinned checkout, substitute the desired future horizon and a unique
+output name; use the configured paths if they differ from these sample defaults:
+
+```sh
+sudo -u comet-fpl env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory \
+  GIT_CONFIG_VALUE_0=/opt/comet-fpl/checkout \
+  /opt/comet-fpl/venv/bin/python -m fpl.jobs.pre_deadline_forecast \
+  --db /var/lib/comet-fpl/db/operational.duckdb --runs /var/lib/comet-fpl/runs \
+  --gw-from 4 --gw-to 8 --output /var/lib/comet-fpl/predictions/unique-gw4.jsonl
+```
+
+The protected Git setting trusts only this root-owned checkout for provenance commands. Let an
+active capture finish before starting; an overlapping writer fails closed. The September 8 Windows
+full-path verification took about 32 minutes, so begin with ample time before the official deadline.
+
 ## Storage
 
 The source operational database is on the order of **1.4 GB**, and each capture cycle

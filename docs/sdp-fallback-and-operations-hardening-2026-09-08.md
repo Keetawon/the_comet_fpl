@@ -123,8 +123,138 @@ The real saved artifacts also pass manifest/population/component parity and stri
 556 consumed SDP source versions and their metadata receipts. This was a read-only check; the
 old prediction was not relabeled or backfilled into the new prospective pair registry.
 
-Final live pre-deadline, paired-ledger and quality-gate verification will be recorded here before
-push. No after-refresh improvement is claimed at this stage.
+The real build completed successfully from clean implementation commit
+`2a96e91ee49604e152f77e47ff6e1bcf9d7037af`. The
+[verification receipt](data/sdp-operational-verification-2026-09-08.json) retains the command,
+timestamps, hashes, source example, capture rechecks, pair identity, deadline witness and checks.
+
+| Population | Before | After |
+|---|---:|---:|
+| SDP_PRIMARY fixtures | 21 | 21 |
+| Incumbent fallback fixtures | 29 | 29 |
+| Fallback rate | 58% | 58% |
+
+There are **zero fixable fixture causes at either audited cutoff and 29 legitimate fallbacks**.
+The same fixture IDs and four missing-SOT sources listed above remain. The capture-coverage defect
+is repaired: the revision pass fetched 13/13 matches, including all four required-history rechecks
+and three matches older than the ordinary lookback. Every SDP response was unchanged; no missing
+provider statistic was manufactured and no raw knowledge time advanced on an unchanged response.
+
+## Real pre-deadline verification
+
+```powershell
+python -m fpl.jobs.pre_deadline_forecast --db D:/Personal/fpl-operations/data/sdp-primary-v2.duckdb --runs D:/Personal/fpl-operations/sdp-primary-runs --gw-from 4 --gw-to 8 --draws 2000 --output D:/Personal/fpl-operations/predictions/sdp-primary-v2-20260908-hardening-gw4-8.jsonl
+```
+
+- Started `2026-09-08T03:26:37.939208Z`; completed `03:58:14.813444Z` (31m 36.9s).
+  Refresh, forecast and evidence exit codes were all zero. Allow a substantial pre-deadline
+  margin for full player-history capture, normalization and ledger insertion; this is not an
+  instantaneous build. The existing `--skip-player-history` option requires already-sufficient
+  official history and is not a substitute for missing prerequisites.
+- FPL refresh fetched the bootstrap, schedule, event-live and all 654 player histories. The new
+  snapshot is `1bfb3d92-6d5e-48bf-a665-1f489dc6c1da`, known at
+  `2026-09-08T03:37:39.610696Z`. This is a new source snapshot, not an old-data-only build.
+- The latest completed PL match detected was FPL fixture **29**, Arsenal vs Chelsea,
+  kickoff `2026-09-06T15:30:00Z`, SDP match **2645215**. Its raw stats hash is
+  `477e0196cff70c8aaf9fa04d5585b6f8e255d75405d9dc88072723ff0a9a1673`, originally fetched
+  `2026-09-07T14:37:45.225593Z`. Its consumed normalized known_at is
+  `2026-09-08T03:37:39.610696Z`, reflecting the new FPL metadata dependency. The receipt lists
+  this run's actual request time separately. Unchanged SDP bodies retain original raw times.
+- Normalization updated all 52 current valid team-source bindings to the new FPL metadata
+  version. Strict staging passed; tactical/chance construction and fixture-environment selection
+  ran through the real points job. Transport coverage remained 30/30 and core validity 26/30,
+  with four incomplete matches, zero current schema/identity failures and no global failure.
+- The prediction cutoff was actual post-refresh time `2026-09-08T03:52:24.844595Z`.
+  The preserved source DB hash is
+  `538560454f551a48eeaf015c318f7dea0fc6a34fccc56ee7f0e2b117ef7330d6`.
+- Primary artifact hash:
+  `566fe684a14ce2edc707286968d470891e7854e7e1ac44733fc0ab3d17d4914a`.
+  Incumbent shadow hash:
+  `d1e48736d869a697f79e9b383a0d627f7a3632e1b4b18321c933dc421385361e`.
+  A read-only replay using the same source DB, cutoff, commit, refresh receipt, seed, draws and
+  output basename reproduced **both artifacts byte-for-byte**. The replay was not a new evidence row.
+- An injected `httpx.ConnectError` at the refresh boundary was separately run through the real
+  wrapper, points pipeline and ledger on an isolated operational DB copy. It produced 50/50
+  `SDP_SOURCE_FALLBACK` fixtures, exactly matching the incumbent shadow, and recorded the pair
+  with a real clock cutoff. These controlled-test artifacts are explicitly excluded from the
+  production evidence ledger; no actual provider outage is claimed.
+- Two later retained provider versions were excluded at the original September 7 cutoff.
+  Its 1,112 selected football rows retained the same state hash before/after later captures.
+  This is an operational cutoff check, not a rerun or relabeling of historical research.
+  Focused tests also cover changed stats revisions, malformed data, NULLs and duplicate captures.
+
+## Active prospective ledger
+
+Production pair ID: `0cca9d810d3f984f30f53d37a8ad3a494f20266d910e4acc1ec161bce582fafb`.
+Actual record-entry time: `2026-09-08T03:53:18.937809Z`; transaction completed before the build
+finished. The exact retained bootstrap witnesses all five future official deadlines, starting
+with GW4 at `2026-09-12T12:30:00Z`. Every predicted kickoff was also future.
+
+The pair contains **3,270 player-gameweek, 3,270 player-fixture and 100 team-fixture rows per role**,
+with identical 654-player/50-fixture populations, FPL snapshot, scoring contracts, player
+components, cutoff, seed and draws. All 556 consumed SDP source versions and metadata receipts
+were revalidated; every consumed known_at is within cutoff. CS remains opponent PMF mass at zero.
+Repeating the record command preserved the pair ID and original created_at. The operational
+database has one new SDP comparison pair; its other 22 forecast vintages predate this delivery.
+The full-grain report confirms that every new pair outcome is pending/unattached. Original
+predictions remain immutable; existing finalized-outcome attachment is a separate append-only
+operation. Metric computation is deferred until outcomes exist; this task adds no new model claim.
+
+```text
+FPL API + SDP -> refresh / immutable raw / normalization / PIT + health
+                                      |
+                             explicit fixture selector
+                               /                    \
+               SDP Tactical / Chance              incumbent fallback
+                    Team Goal / CS                (when invalid)
+                               \                    /
+                                existing player pipeline -> primary points PMF
+Incumbent comparator ----------> existing player pipeline -> shadow points PMF
+                                both immutable vintages -> prospective ledger
+```
+
+## Checks and inherited limitations
+
+| Check | Result |
+|---|---|
+| Selector, revision, pre-deadline and artifact focused/regression set | 105 passed |
+| Evidence ledger and adjacent outcome/transport set | 78 passed |
+| Capture, daily wrapper and remote-runtime set | 50 passed |
+| Relevant broader regression set | 461 passed |
+| Ruff `check .` | Passed |
+| Strict mypy `src` | Passed, 202 source files |
+| Changed Python file formatting | Passed, 19 files |
+| Global formatting diagnostic | 11 unchanged inherited files need formatting; 499 already formatted |
+| Git whitespace check | Passed |
+
+These test sets overlap; their counts are not a unique-test total. The final corrected focused
+set passed after fixing a test's expected wording for a missing-model failure. The global-format
+failures are confined to unchanged insights/publish files and their tests (listed in the receipt).
+The full test suite was not rerun: the prior verification documents Windows symlink-permission
+failures and skips outside this change. No full-suite success is claimed.
+
+Frozen configurations, parameters, model/validation code, dated research reports and result
+artifacts have no diff from the starting commit. The research DB remains
+`0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8`.
+Local main remains `ede17377216807ca2635879d1153e268dcd04fe6`; remote main remains
+`4a58f079057d79189bd31a782e5f3c860b3c097f`, and the default branch remains main.
+No merge, PR, default-branch change, player research or GK scoring promotion occurred.
+Only the V2 implementation and additive verification documentation are authorized for push.
+
+## Monitoring
+
+```powershell
+python -m fpl.jobs.sdp_capture_health --runs D:/Personal/fpl-operations/sdp-primary-runs --db D:/Personal/fpl-operations/data/sdp-primary-v2.duckdb --max-success-age-hours 30
+python -m fpl.jobs.report_sdp_evidence --db D:/Personal/fpl-operations/data/sdp-primary-v2.duckdb --prediction-id 0cca9d810d3f984f30f53d37a8ad3a494f20266d910e4acc1ec161bce582fafb --grain team
+python -m fpl.jobs.audit_sdp_fallbacks --db D:/Personal/fpl-operations/data/sdp-primary-v2.duckdb --artifact D:/Personal/fpl-operations/predictions/sdp-primary-v2-20260908-hardening-gw4-8.jsonl --output D:/Personal/fpl-operations/verification/new-fallback-audit.json
+```
+
+Health verification found four completed receipts, none running/malformed/failed, and a healthy
+latest capture. Its four current incomplete matches are reported separately from 1,374 failures
+across all retained seasons. Do not present historical coverage limitations as current capture
+failures. Capture/workload coverage, fallback reasons, freshness, capture lag, source identity and
+schema failures should be monitored over the next prospective GWs.
+
 
 ## Runtime and prospective period
 

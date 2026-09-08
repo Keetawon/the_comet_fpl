@@ -91,8 +91,10 @@ The two sides must then agree on everything except the football environment and 
   position, club/opponent identity, and venue; every team-fixture row likewise. Same counts with
   different codes, fixtures, legs, or components are refused.
 * **Component modes** — only `football_environment.provenance`,
-  `football_environment.primary`, and `forecast_role` may differ; every other mode (all player
-  component models) must be identical.
+  `football_environment.primary`, and `forecast_role` may differ by role, subject to provenance
+  validation. The team
+  `component.team_clean_sheet` mode must carry the exact adopted primary/incumbent pair
+  described below. Every player component mode must be identical.
 * **Population recount** — after the vintage inserts, stored row counts must equal the manifests'
   declared counts at both grains.
 
@@ -100,15 +102,17 @@ The two sides must then agree on everything except the football environment and 
 
 * The primary MUST carry `football_environment.provenance` declaring
   `primary = "sdp_v2"` and `fallback = "trailing_goals_attack_defence"`, plus a well-formed
-  frozen model sha256 whose `model_known_at` precedes the cutoff.
+  frozen model sha256 whose `model_known_at` precedes the cutoff whenever SDP_PRIMARY is used.
+  An all-fallback pair may preserve missing model provenance as NULL.
 * The primary MUST bind `shadow_incumbent_artifact_sha256`, and it MUST equal the shadow's
   canonical artifact hash (required, never optional).
-* Every consumed `source_versions` entry must resolve to a retained `raw_pl_sdp_payload` row
-  with the declared sha256, whose receipt `fetched_at` equals the declared consumed `known_at`
-  and precedes the cutoff; a declared match-metadata receipt is validated the same way. A later
-  operational refresh receipt time is NEVER accepted as a consumed source time. The generic
-  knowledge-time/hash scan explicitly skips the `refresh` receipt subtree for exactly that
-  reason.
+* Every consumed `source_versions` entry must exactly match a full canonical provenance entry
+  emitted by `sdp_runtime.load_sdp_state` at the cutoff. That reader validates retained raw bytes,
+  hashes, source status, identity, metadata and core fields. An empty reader cannot witness
+  declared sources. Normalized `known_at` includes required metadata knowledge times and may
+  be later than the original raw `fetched_at`; both are retained and bounded by cutoff.
+  Refresh-attempt receipts are separate process evidence, not consumed football inputs, so the
+  generic source-time scan skips only their `refresh` subtree.
 * The shadow MUST declare `forecast_role = "shadow_incumbent"` and MUST NOT carry any SDP
   primary provenance or environment-primary claim.
 
@@ -189,7 +193,7 @@ python -m fpl.jobs.report_sdp_evidence \
 Exit codes: `0` recorded (or identical repeat: same id, original stamp kept); `1` refused
 (reason on stderr, nothing written — including zero partial ledger vintages).
 
-## Second-audit refinements (2026-09-08)
+## Additional validation details
 
 * **Adopted team-environment CS mode pair.** `component.team_clean_sheet` may differ
   between the sides ONLY as the exact adopted pair — primary

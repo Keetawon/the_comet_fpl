@@ -115,3 +115,21 @@ Archive reports, parameters, future-known rows and current live corrections must
 to reduce fallback counts. Diagnose source health and capture completeness, and use the incumbent
 until a valid version is actually available. Keep raw payload storage and the separate operational
 DB backups long enough to reconstruct every published prospective vintage.
+
+The [September 8 operational verification](sdp-fallback-and-operations-hardening-2026-09-08.md)
+records the real 31m 36.9s full build, immutable paired evidence and unchanged 21/29 fixture split.
+Use `sdp_capture_health` for capture status, `audit_sdp_fallbacks` for a saved vintage's exact
+attribution, and `report_sdp_evidence` for its retained primary/shadow rows. The full `--grain all`
+export can take several minutes on the current Windows database; the default team report is
+the smaller operational view.
+
+After official finality and a complete player-history refresh, append outcomes using the existing
+job, with capture/forecast writers stopped and the explicit operational DB:
+
+```powershell
+python -m fpl.jobs.attach_outcomes --db D:/FPL/operational.duckdb --season 2026-27 --as-of <actual-UTC-time>
+```
+
+This job appends finalized player/team outcomes separately, keeps identical repeats idempotent,
+and rejects changed repeats. It never replaces a prediction. Player-gameweek scoring also requires
+official gameweek finality and every predicted fixture leg. Missing outcomes remain unavailable.
