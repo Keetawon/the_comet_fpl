@@ -274,7 +274,15 @@ def fixture_identity(
         match.away_score,
     ):
         raise ValueError("fixture crosswalk independent identity contradiction")
-    return fixture, {"fixture": fixture, "provider_match_id": match.match_id, **provenance}
+    return fixture, {
+        "fixture": fixture,
+        "provider_match_id": match.match_id,
+        "home_provider_team_id": match.home_team_id,
+        "home_fpl_team_code": witness[1],
+        "away_provider_team_id": match.away_team_id,
+        "away_fpl_team_code": witness[2],
+        **provenance,
+    }
 
 
 def schema_inventory(sample: list[dict[str, Any]]) -> dict[str, Any]:
@@ -528,6 +536,20 @@ def run(
     with duckdb.connect(str(database), read_only=True) as con:
         sample = load_sample(root, retained, con)
         registry = registries(con, interpreted_at)
+        club_witnesses: dict[str, dict[int, dict[str, Any]]] = defaultdict(dict)
+        for candidate in sample:
+            if int(candidate["match"]["competitionId"]) != 8:
+                continue
+            try:
+                _, witness = fixture_identity(con, candidate, registry[candidate["season"]])
+            except ValueError:
+                # The fixture itself is explicitly quarantined below; it supplies no club anchor.
+                continue
+            for label in ("home", "away"):
+                pid, code = witness[f"{label}_provider_team_id"], witness[f"{label}_fpl_team_code"]
+                club_witnesses[candidate["season"]].setdefault(
+                    pid, {"provider_team_id": pid, "team_code": code, "fixture_identity": witness}
+                )
         matches, failures = [], []
         for entry in sample:
             identity = registry[entry["season"]]
@@ -541,6 +563,10 @@ def run(
                 "identity": identity["provenance"],
                 "source_database_sha256": DATABASE_SHA256,
                 "rule_sha256": CONFIG_SHA256,
+                "club_identity_witnesses": [
+                    club_witnesses[entry["season"]].get(int(entry["match"][node]["id"]))
+                    for node in ("homeTeam", "awayTeam")
+                ],
             }
             try:
                 fixture, fixture_provenance = fixture_identity(con, entry, identity)
@@ -550,6 +576,11 @@ def run(
                     instant(fixture_provenance["known_at"])
                     if fixture_provenance["known_at"]
                     else instant(identity["known_at"]),
+                    *(
+                        instant(w["fixture_identity"]["known_at"])
+                        for w in provenance["club_identity_witnesses"]
+                        if w is not None
+                    ),
                 )
                 result = parse_role_structure(
                     entry["match"],
@@ -572,11 +603,12 @@ def run(
                 }
                 for side in result["sides"]:
                     team = side["provider_team_id"]
+                    club = club_witnesses[entry["season"]].get(team)
                     for row in side["rows"]:
-                        row["team_code"] = team if team in identity["team_codes"] else None
+                        row["team_code"] = club["team_code"] if club is not None else None
                         row["promoted_club_sample"] = (
-                            team not in registry["2025-26"]["team_codes"]
-                            if entry["season"] == "2026-27"
+                            club["team_code"] not in registry["2025-26"]["team_codes"]
+                            if entry["season"] == "2026-27" and club is not None
                             else None
                         )
                         row["no_previous_season_fpl_registry_row"] = (

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterator
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ import pytest
 
 from fpl.config import repo_root
 from fpl.jobs import audit_player_role_source as audit
+from tests.test_player_role_source import CAPTURE, registry, structural_sample
 
 
 def test_checked_body_preserves_null_and_exact_bytes() -> None:
@@ -210,3 +212,144 @@ def test_changed_generic_rules_fail_before_interpretation(synthetic_run: dict[st
     with pytest.raises(ValueError, match="generic source rules changed"):
         audit.run(**synthetic_run)
     assert not synthetic_run["output"].exists()
+
+
+@pytest.fixture
+def historical_fixture() -> Iterator[tuple[duckdb.DuckDBPyConnection, dict[str, Any]]]:
+    with duckdb.connect() as con:
+        con.execute(
+            """CREATE TABLE stg_pl_sdp_fixture_crosswalk (
+                season VARCHAR, sdp_match_id INTEGER, fixture INTEGER,
+                corroborated_kickoff BOOLEAN, corroborated_teams BOOLEAN, corroborated_score BOOLEAN
+            )"""
+        )
+        con.execute(
+            "INSERT INTO stg_pl_sdp_fixture_crosswalk VALUES ('2025-26',9001,77,true,true,true)"
+        )
+        con.execute(
+            """CREATE TABLE stg_fixture (
+                season VARCHAR, fixture INTEGER, kickoff_time TIMESTAMPTZ,
+                team_h INTEGER, team_a INTEGER, team_h_score INTEGER, team_a_score INTEGER
+            )"""
+        )
+        con.execute(
+            """INSERT INTO stg_fixture VALUES
+                ('2025-26',77,'2025-09-14T15:00:00Z',2,8,1,0)"""
+        )
+        con.execute("CREATE TABLE mart_dim_team (season VARCHAR,team_id INTEGER,team_code INTEGER)")
+        con.execute(
+            """INSERT INTO mart_dim_team VALUES
+                ('2025-26',2,3),('2025-26',8,31),('2024-25',2,99),('2024-25',8,100)"""
+        )
+        yield (
+            con,
+            {
+                "season": "2025-26",
+                "match": {
+                    "matchId": "9001",
+                    "competitionId": "8",
+                    "season": "2025",
+                    "kickoff": "2025-09-14T15:00:00Z",
+                    "homeTeam": {"id": "3", "name": "Different provider display name", "score": 1},
+                    "awayTeam": {"id": "31", "name": "Away display name", "score": 0},
+                },
+            },
+        )
+
+
+def test_fixture_identity_rechecks_season_qualified_sides_and_preserves_witness(
+    historical_fixture: tuple[duckdb.DuckDBPyConnection, dict[str, Any]],
+) -> None:
+    con, entry = historical_fixture
+    fixture, evidence = audit.fixture_identity(con, entry, {"known_at": CAPTURE.isoformat()})
+    assert fixture == 77
+    assert evidence == {
+        "fixture": 77,
+        "provider_match_id": 9001,
+        "home_provider_team_id": 3,
+        "home_fpl_team_code": 3,
+        "away_provider_team_id": 31,
+        "away_fpl_team_code": 31,
+        "method": "existing_corroborated_crosswalk_and_archive_fixture",
+        "known_at": CAPTURE.isoformat(),
+        "historical_deadline_known_at": None,
+    }
+
+
+@pytest.mark.parametrize("witness", ["kickoff", "teams", "score"])
+def test_missing_fixture_corroboration_fails_closed(
+    historical_fixture: tuple[duckdb.DuckDBPyConnection, dict[str, Any]], witness: str
+) -> None:
+    con, entry = historical_fixture
+    con.execute(f"UPDATE stg_pl_sdp_fixture_crosswalk SET corroborated_{witness}=false")
+    with pytest.raises(ValueError, match="no unique corroborated fixture crosswalk"):
+        audit.fixture_identity(con, entry, {"known_at": CAPTURE.isoformat()})
+
+
+def test_duplicate_fixture_claim_is_not_arbitrarily_selected(
+    historical_fixture: tuple[duckdb.DuckDBPyConnection, dict[str, Any]],
+) -> None:
+    con, entry = historical_fixture
+    con.execute(
+        "INSERT INTO stg_pl_sdp_fixture_crosswalk SELECT * FROM stg_pl_sdp_fixture_crosswalk"
+    )
+    with pytest.raises(ValueError, match="no unique corroborated fixture crosswalk"):
+        audit.fixture_identity(con, entry, {"known_at": CAPTURE.isoformat()})
+
+
+@pytest.mark.parametrize("defect", ["kickoff", "score", "team"])
+def test_independent_fixture_contradiction_cannot_be_rescued_by_crosswalk_or_name(
+    historical_fixture: tuple[duckdb.DuckDBPyConnection, dict[str, Any]], defect: str
+) -> None:
+    con, entry = historical_fixture
+    if defect == "kickoff":
+        entry["match"]["kickoff"] = "2025-09-14T15:01:00Z"
+    elif defect == "score":
+        entry["match"]["homeTeam"]["score"] = 2
+    else:
+        entry["match"]["homeTeam"]["id"] = "99"
+    with pytest.raises(ValueError, match="independent identity contradiction"):
+        audit.fixture_identity(con, entry, {"known_at": CAPTURE.isoformat()})
+
+
+def test_cup_numeric_team_overlap_does_not_create_a_club_identity_anchor(
+    synthetic_run: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    match, lineups, events = structural_sample()
+    match["competitionId"] = "1"
+    match["homeTeam"]["name"] = "Home"
+    match["awayTeam"]["name"] = "Away"
+    sources = {
+        endpoint: {"captured_at_utc": CAPTURE.isoformat(), "retained_known_at": CAPTURE.isoformat()}
+        for endpoint in ("metadata", "lineups", "events")
+    }
+    sample = [
+        {
+            "sample_group": "synthetic",
+            "season": "2025-26",
+            "match": match,
+            "lineups": lineups,
+            "events": events,
+            "sources": sources,
+        }
+    ]
+    identities = {
+        "2025-26": {
+            "known_at": CAPTURE.isoformat(),
+            "rows": registry(),
+            "team_codes": [3, 31],
+            "provenance": {"source": "synthetic_registry"},
+        }
+    }
+    monkeypatch.setattr(audit, "load_sample", lambda *_args: deepcopy(sample))
+    monkeypatch.setattr(audit, "registries", lambda *_args: identities)
+    report = audit.run(**synthetic_run)
+    assert not report["failures"]
+    assert report["interpreted_matches"] == 1
+    observed = report["matches"][0]
+    assert observed["fixture"] is None
+    assert observed["provenance"]["club_identity_witnesses"] == [None, None]
+    players = [row for side in observed["sides"] for row in side["rows"]]
+    assert players
+    assert all(row["fpl_code"] is not None for row in players)
+    assert all(row["team_code"] is None for row in players)
