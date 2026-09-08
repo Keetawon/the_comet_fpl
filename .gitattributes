@@ -128,3 +128,7 @@ src/fpl/jobs/evaluate_player_model_gw1_3.py -text
 results/player_model_gw1_3_strict_2026-09-08.json -text
 results/player_model_gw1_3_retrospective_sdp_2026-09-08.json -text
 results/player_model_gw1_3_verification_2026-09-08.json -text
+
+# Additive canonical audit transport; V1 source and receipts remain unchanged.
+src/fpl/validate/audit_json.py -text
+tests/test_audit_json.py -text
