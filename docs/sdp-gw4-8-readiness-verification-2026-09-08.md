@@ -51,7 +51,8 @@ Exit 0; capture/staging health true; no request failures.
 
 The new authoritative bootstrap says **GW3 is current, finished and data_checked**;
 GW4 is next and unfinished. There is **no partially completed GW**. Thirty fixtures
-have finalized. The latest match kickoff is September 6, 15:30 UTC. The next official
+have finalized in total across GW1–GW3. The latest match kickoff is September 6,
+15:30 UTC. The next official
 deadline is **September 12, 12:30 UTC / 19:30 Asia/Bangkok**, witnessed by the new
 bootstrap, not inferred from the clock.
 

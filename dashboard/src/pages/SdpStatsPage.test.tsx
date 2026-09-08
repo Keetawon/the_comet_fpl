@@ -19,6 +19,23 @@ describe("Observed SDP dashboard tabs", () => {
     fireEvent.click(within(table).getByRole("button", { name: "Shots" }));
     expect(within(table).getByRole("columnheader", { name: "Shots" })).toHaveAttribute("aria-sort", "descending");
   });
+  it("labels completed fixtures across gameweeks and keeps observed-data freshness separate", async () => {
+    const data = sdpFixture();
+    data.gameweeks = [1, 2, 3].map(gw => ({
+      season: "2026-27",
+      gw,
+      finished: true,
+      fixtures_total: 10,
+      fixtures_completed: 10,
+      source_known_at: "2026-09-07T09:00:00+00:00",
+    }));
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />);
+    await screen.findByRole("table", { name: "Observed SDP team statistics" });
+    expect(screen.getByText("Official completed fixtures")).toBeInTheDocument();
+    expect(screen.getByText("30 across GW1-GW3")).toBeInTheDocument();
+    expect(screen.getByText(/refreshing these statistics does not refresh or relabel those predictions/i)).toBeInTheDocument();
+  });
   it("searches, filters history and resets all selection state", async () => {
     render(<TeamSdpStatsPage />);
     await screen.findByRole("table", { name: "Observed SDP team statistics" });
@@ -47,7 +64,7 @@ describe("Observed SDP dashboard tabs", () => {
     render(<PlayerSdpStatsPage />);
     const table = await screen.findByRole("table", { name: "Observed player statistics by source" });
     expect(screen.getByRole("heading", { name: "Players stat from SDP" })).toBeInTheDocument();
-    expect(screen.getByText("SDP player statistics are unavailable.")).toBeInTheDocument();
+    expect(screen.getByText("Detailed SDP player statistics are unavailable.")).toBeInTheDocument();
     expect(within(table).getByRole("columnheader", { name: "FPL · xG" })).toBeInTheDocument();
     expect(within(table).queryByRole("columnheader", { name: /Shots/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Display" }), { target: { value: "per90" } });

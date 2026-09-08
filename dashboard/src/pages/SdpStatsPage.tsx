@@ -135,6 +135,16 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
   const seasons = [...new Set(rows.map(row => row.season))].sort().reverse();
   const seasonRows = rows.filter(row => row.season === filters.season);
   const weeks = [...new Set(seasonRows.map(row => row.gw))].sort((a, b) => a - b);
+  const completedWeeks = data.gameweeks.filter(row =>
+    row.season === filters.season && row.fixtures_completed > 0,
+  );
+  const completedFixtureCount = completedWeeks.reduce(
+    (total, row) => total + row.fixtures_completed,
+    0,
+  );
+  const completedFixtureScope = completedWeeks.length
+    ? `${completedFixtureCount} across GW${completedWeeks[0].gw}-GW${completedWeeks.at(-1)!.gw}`
+    : "None witnessed";
   const weekLabel = (gw: number) => {
     const official = data.gameweeks.find(row => row.season === filters.season && row.gw === gw);
     return `GW${gw}${official && !official.finished ? " · in progress" : ""}`;
@@ -156,8 +166,9 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
 
   return <div className="space-y-4 p-4 lg:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="mb-2 flex flex-wrap items-center gap-2"><Badge variant="secondary">Observed · Premier League</Badge><Badge variant="outline">SDP {scope === "team" ? "team statistics" : "lineups"}</Badge>{scope === "player" && <Badge variant="outline">FPL enrichment · labelled separately</Badge>}</div><h1 className="text-2xl font-semibold tracking-tight">{scope === "team" ? "Team stat from SDP" : "Players stat from SDP"}</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">Explore recorded match performance, recent history and source coverage. These are observed statistics, not predictions.</p></div><Button variant="outline" onClick={exportCsv} disabled={!ordered.length}><Download />Export filtered CSV</Button></div>
-    {scope === "player" && data.source_status.player_stats === "UNAVAILABLE" && <div role="note" className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"><strong>SDP player statistics are unavailable.</strong> SDP provides witnessed lineups and broad provider positions. Additional statistics below are explicitly labelled FPL observations. Player shots, SOT and box touches are not inferred from team totals.</div>}
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[[scope === "team" ? "Clubs in scope" : "Players in scope", filtered.length], ["Observed fixture records", selectedRows.length], ["Complete chart metric", `${available} / ${filtered.length}`], ["Latest SDP known", date(data.source_status.latest_sdp_known_at)]].map(([label, value]) => <div key={label} className={cardClass}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}</div>
+    <div role="note" className="rounded-lg border bg-muted/35 p-3 text-sm text-muted-foreground"><strong className="text-foreground">Observed-data vintage:</strong> this tab was exported {date(data.as_of)}. Forecast and optimizer pages retain their own displayed publication vintages; refreshing these statistics does not refresh or relabel those predictions.</div>
+    {scope === "player" && data.source_status.player_stats === "UNAVAILABLE" && <div role="note" className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"><strong>Detailed SDP player statistics are unavailable.</strong> SDP provides witnessed lineups and broad provider positions. Every detailed player statistic below is an explicitly labelled FPL observation. Player shots, SOT and box touches are not inferred from team totals.</div>}
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">{[[scope === "team" ? "Clubs in scope" : "Players in scope", filtered.length], ["Official completed fixtures", completedFixtureScope], ["Observed fixture records", selectedRows.length], ["Complete chart metric", `${available} / ${filtered.length}`], ["Latest SDP known", date(data.source_status.latest_sdp_known_at)]].map(([label, value]) => <div key={label} className={cardClass}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}</div>
     <FilterPanel><div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 xl:grid-cols-6">
       <Control label="Season" value={filters.season} options={seasons.map(s => [s, s])} onChange={chooseSeason} />
       <Control label="GW from" value={String(filters.from)} options={weeks.filter(gw => gw <= filters.to).map(gw => [String(gw), weekLabel(gw)])} onChange={value => patchFilters({ from: Number(value) })} />
