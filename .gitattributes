@@ -115,3 +115,16 @@ src/fpl/features/player_attacking_usage.py -text
 src/fpl/publish/player_attacking_usage.py -text
 src/fpl/jobs/build_player_attacking_usage.py -text
 results/player_attacking_usage_scouting_verification_2026-09-08.json -text
+
+# Frozen current-model GW1-3 diagnostic, additive audit files only.
+config/player_model_gw1_3_audit.yaml -text
+docs/player-model-gw1-3-preregistration-2026-09-08.md -text
+src/fpl/validate/player_model_gw1_3_audit.py -text
+src/fpl/validate/player_model_gw1_3_sources.py -text
+src/fpl/validate/player_model_gw1_3_replay.py -text
+src/fpl/validate/player_model_gw1_3_metrics.py -text
+src/fpl/validate/sdp_counterfactual.py -text
+src/fpl/jobs/evaluate_player_model_gw1_3.py -text
+results/player_model_gw1_3_strict_2026-09-08.json -text
+results/player_model_gw1_3_retrospective_sdp_2026-09-08.json -text
+results/player_model_gw1_3_verification_2026-09-08.json -text
