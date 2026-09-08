@@ -16,6 +16,7 @@ import { SummaryPage } from "@/pages/SummaryPage";
 import { TeamAnalyticsPage } from "@/pages/TeamAnalyticsPage";
 import { TeamForecastVsActualPage } from "@/pages/TeamForecastVsActualPage";
 import { UserDraftPage } from "@/pages/UserDraftPage";
+import { PlayerSdpStatsPage, TeamSdpStatsPage } from "@/pages/SdpStatsPage";
 
 const DEFAULT_ROUTE = "summary";
 
@@ -23,8 +24,10 @@ const PAGES: Record<string, React.ComponentType> = {
   summary: SummaryPage,
   fixtures: FixtureMatrixPage,
   "team-analytics": TeamAnalyticsPage,
+  "team-stat-sdp": TeamSdpStatsPage,
   players: PlayersPage,
   "player-analytics": PlayerAnalyticsPage,
+  "players-stat-sdp": PlayerSdpStatsPage,
   "next-gw": NextGwPage,
   "plan-builder": PlanBuilderPage,
   "squad-draft": UserDraftPage,

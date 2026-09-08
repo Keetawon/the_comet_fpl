@@ -26,8 +26,10 @@ const PAGES: readonly PageDef[] = [
   { id: "summary", label: "Summary", icon: LayoutDashboard },
   { id: "fixtures", label: "Fixture matrix", icon: CalendarDays },
   { id: "team-analytics", label: "Team analytics", icon: Goal },
+  { id: "team-stat-sdp", label: "Team stat from SDP", icon: Goal },
   { id: "players", label: "Players", icon: Users },
   { id: "player-analytics", label: "Player analytics", icon: ScatterChart },
+  { id: "players-stat-sdp", label: "Players stat from SDP", icon: Users },
   { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList },
   { id: "plan-builder", label: "Plan builder", icon: Wand2 },
   { id: "squad-draft", label: "Squad draft", icon: ListPlus },
@@ -55,7 +57,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
           <div className="text-xs text-muted-foreground">FPL decision dashboard</div>
         </div>
       </div>
-      <ul className="flex-1 space-y-1 px-1.5 md:px-2">
+      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto px-1.5 md:px-2">
         {PAGES.map((page) => {
           const Icon = page.icon;
           return (

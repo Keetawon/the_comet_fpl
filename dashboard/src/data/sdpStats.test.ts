@@ -1,0 +1,59 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { loadSdpStats, parseSdpStats } from "./sdpStats";
+import { sdpFixture } from "@/test/sdpFixture";
+
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+describe("Observed SDP sidecar contract", () => {
+  it("preserves exact identities, nullable measurements and distinct FPL sources", () => {
+    const source = sdpFixture(); source.team_matches[0].sdp.shots = null;
+    const raw = JSON.stringify(source);
+    expect(parseSdpStats(source)).toBe(source);
+    expect(source.team_matches[0].sdp.shots).toBeNull();
+    expect(source.player_matches[0].minutes_sdp).toBeNull();
+    expect(source.player_matches[0].fpl?.expected_goals).toBe(0.2);
+    expect(JSON.stringify(source)).toBe(raw);
+  });
+  it.each(["future-known", "future-kickoff", "duplicate", "nonfinite", "identity", "denominator", "ambiguous-stat", "boolean-stat", "future-gameweek", "impossible-coverage", "unknown-status"])("fails closed on %s", defect => {
+    const data = sdpFixture();
+    if (defect === "future-known") data.team_matches[0].known_at = "2027-01-01T00:00:00Z";
+    if (defect === "future-kickoff") data.team_matches[0].kickoff_time = "2027-01-01T00:00:00Z";
+    if (defect === "duplicate") data.player_matches.push(data.player_matches[0]);
+    if (defect === "nonfinite") data.team_matches[0].sdp.shots = Number.NaN;
+    if (defect === "identity") data.player_matches[0] = { ...data.player_matches[0], code: null, provider_player_id: null };
+    if (defect === "denominator") data.metrics[3].per90_denominator = "minutes_sdp";
+    if (defect === "ambiguous-stat") data.metrics.push(data.metrics[0]);
+    if (defect === "boolean-stat") (data.team_matches[0].sdp as unknown as Record<string, unknown>).shots = false;
+    if (defect === "future-gameweek") data.gameweeks[0].source_known_at = "2027-01-01T00:00:00Z";
+    if (defect === "impossible-coverage") data.coverage.unmapped_players = -1;
+    if (defect === "unknown-status") data.team_matches[0].status = "GUESS";
+    expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+  });
+  it("accepts unmapped stable provider identity and separate historical team membership", () => {
+    const data = sdpFixture(); data.player_matches[0].code = null; data.player_matches[0].position = null;
+    expect(parseSdpStats(data).player_matches[0].code).toBeNull();
+  });
+  it("rejects a kickoff exactly at cutoff while allowing evidence known exactly at cutoff", () => {
+    const data = sdpFixture();
+    data.team_matches[0].known_at = data.as_of;
+    expect(parseSdpStats(data)).toBe(data);
+    data.team_matches[0].kickoff_time = data.as_of;
+    expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+  });
+  it("loads the separate static SDP namespace without opening the forecast data", async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => sdpFixture() });
+    vi.stubGlobal("fetch", fetch);
+    await loadSdpStats();
+    expect(fetch).toHaveBeenCalledExactlyOnceWith("/sdp/sdp_stats.json");
+  });
+  it("reports unpublished sidecar rather than fabricating rows", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    await expect(loadSdpStats()).rejects.toThrow(/have not been published/);
+  });
+  it("respects the existing Pages deployment base path", async () => {
+    vi.stubEnv("BASE_URL", "/the_comet_fpl/");
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => sdpFixture() });
+    vi.stubGlobal("fetch", fetch);
+    await loadSdpStats();
+    expect(fetch).toHaveBeenCalledExactlyOnceWith("/the_comet_fpl/sdp/sdp_stats.json");
+  });
+});

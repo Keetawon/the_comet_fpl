@@ -21,6 +21,10 @@ vi.mock("@/pages/PlayerAnalyticsPage", () => ({
 vi.mock("@/pages/TeamAnalyticsPage", () => ({
   TeamAnalyticsPage: () => <h1>Team analytics route</h1>,
 }));
+vi.mock("@/pages/SdpStatsPage", () => ({
+  TeamSdpStatsPage: () => <h1>Team stat from SDP</h1>,
+  PlayerSdpStatsPage: () => <h1>Players stat from SDP</h1>,
+}));
 vi.mock("@/pages/PlayerForecastVsActualPage", () => ({
   PlayerForecastVsActualPage: () => <h1>Player prediction accuracy route</h1>,
 }));
@@ -31,6 +35,13 @@ vi.mock("@/pages/TeamForecastVsActualPage", () => ({
 import App from "./App";
 
 describe("App deep-analytics routes", () => {
+  it("exposes two independent observed SDP routes", () => {
+    window.location.hash = "#team-stat-sdp";
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "Team stat from SDP" })).toBeInTheDocument();
+    act(() => { window.location.hash = "#players-stat-sdp"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    expect(screen.getByRole("heading", { name: "Players stat from SDP" })).toBeInTheDocument();
+  });
   afterEach(() => {
     window.location.hash = "";
   });
