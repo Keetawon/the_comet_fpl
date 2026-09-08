@@ -307,7 +307,8 @@ def _validate_scope(request: InsightSummaryRequest, run: Mapping[str, Any]) -> N
         allowed_seasons = {previous_season, request.season}
         if {actual_season_from, actual_season_to} - allowed_seasons:
             raise InsightEvidenceError(
-                "actual endpoint season is outside the page's forecast-season/immediate-prior scope"
+                "actual endpoint season is outside the page's "
+                "forecast-season/immediate-prior scope"
             )
         season_rank = {previous_season: 0, request.season: 1}
         actual_gw_from = request.scope.actual_gw_from
@@ -701,7 +702,8 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
             )
         actual_scored.sort(key=lambda item: (-item[1], int(item[0]["code"])))
         actual_scope_label = (
-            f"{actual_season_from} GW{actual_from} through {actual_season_to} GW{actual_to}"
+            f"{actual_season_from} GW{actual_from} through "
+            f"{actual_season_to} GW{actual_to}"
         )
         facts.append(
             _fact(

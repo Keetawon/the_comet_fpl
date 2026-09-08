@@ -769,7 +769,9 @@ def test_v3_validation_preserves_honest_nulls_in_legacy_non_grain_fields() -> No
         ("fact_finalized_team_fixture_outcome", "goals_for"),
     ],
 )
-def test_validation_rejects_null_in_guaranteed_fields(table_name: str, column_name: str) -> None:
+def test_validation_rejects_null_in_guaranteed_fields(
+    table_name: str, column_name: str
+) -> None:
     table = SEMANTIC_CONTRACT_V6.table(table_name)
     frame = _one_row_contract_frame(table_name, overrides={column_name: None})
 
@@ -788,7 +790,9 @@ def _provisional_fact_rows(
         player_outcomes_present=player_outcomes_present,
         team_outcomes_present=team_outcomes_present,
     )
-    player_table = SEMANTIC_CONTRACT_V6.table("fact_provisional_player_fixture_observation")
+    player_table = SEMANTIC_CONTRACT_V6.table(
+        "fact_provisional_player_fixture_observation"
+    )
     team_table = SEMANTIC_CONTRACT_V6.table("fact_provisional_team_fixture_observation")
     players = _fetch_arrow_table(
         con,
@@ -1328,9 +1332,9 @@ def test_player_actual_unions_latest_live_components_only_at_exact_finalized_led
     con = connect(database, read_only=True)
     try:
         table = SEMANTIC_CONTRACT_V6.table("fact_player_fixture_actual")
-        source = _source_queries(True, player_outcomes_present=True, team_outcomes_present=True)[
-            table.name
-        ]
+        source = _source_queries(
+            True, player_outcomes_present=True, team_outcomes_present=True
+        )[table.name]
         frame = _fetch_arrow_table(con, _contract_query(table, source))
         _validate_table_frame(table, frame)
         rows = frame.to_pylist()
@@ -1382,9 +1386,9 @@ def test_player_actual_rejects_archive_and_finalized_live_duplicate_grain(tmp_pa
     con = connect(database, read_only=True)
     try:
         table = SEMANTIC_CONTRACT_V6.table("fact_player_fixture_actual")
-        source = _source_queries(True, player_outcomes_present=True, team_outcomes_present=True)[
-            table.name
-        ]
+        source = _source_queries(
+            True, player_outcomes_present=True, team_outcomes_present=True
+        )[table.name]
         frame = _fetch_arrow_table(con, _contract_query(table, source))
         with pytest.raises(
             BiExportValidationError,
@@ -1486,10 +1490,10 @@ def test_team_actual_uses_official_live_scores_and_complete_player_components(
             reader.close()
 
     rows = read_rows()
-    assert [(row["team_id"], row["goals_for"], row["goals_against"]) for row in rows] == [
-        (1, 2, 0),
-        (2, 0, 2),
-    ]
+    assert [
+        (row["team_id"], row["goals_for"], row["goals_against"])
+        for row in rows
+    ] == [(1, 2, 0), (2, 0, 2)]
     # The official 2 includes scoring that is not reconstructed from the one recorded player goal.
     assert rows[0]["team_xg"] == pytest.approx(0.5)
     assert rows[0]["team_xgc"] == pytest.approx(0.7)
