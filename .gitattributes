@@ -105,5 +105,7 @@ tests/test_evaluate_attacking_role_premium_v1.py -text
 results/attacking_role_premium_v1_population_2026-09-08.json -text
 results/attacking_role_premium_v1_development_2026-09-08.json -text
 results/attacking_role_premium_v1_diagnostics_2026-09-08.json -text
-results/attacking_role_premium_v1_independent_audit_2026-09-08.json -text
+results/attacking_role_premium_v1_independent_audit_2026-09-08.json -text whitespace=cr-at-eol
 docs/attacking-role-premium-v1-preregistration-2026-09-08.md -text
+results/attacking_role_premium_v1_cases_2026-09-08.json -text
+results/attacking_role_premium_v1_verification_2026-09-08.json -text

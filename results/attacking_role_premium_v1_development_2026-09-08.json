@@ -1,0 +1,4505 @@
+{
+  "artifact_sha256": {
+    "claim.json": "b72601bd9189bdb5f7911735ef01cb93eeb569217b3978a6eec76295f6e16488",
+    "population.json": "edf0eb420f17c209b68d559448ebbcdde19510c97c7c7c85aad62f7d6bf9cc10",
+    "predictions-gw02.jsonl": "1f7961111e65e1752bd99f737de8b2d377110c65ebda8f82e607ed846c705955",
+    "predictions-gw03.jsonl": "be5b110a999de66e4daef0c5977ccfec219b89612f7a4ae00ab5dbcdb2bd84f6",
+    "predictions-gw04.jsonl": "0231b046aa2b21b477f92c92956e20bb3e62c495cb2ee7787bf20d9f14f6a358",
+    "predictions-gw05.jsonl": "d05ac8561beef3c456d667abfe51e2988efb2d5db987ed17ad682b09859f3c8b",
+    "predictions-gw06.jsonl": "74828beabd6de26c06a2bf4a7cb95ac39517ecdefaea1fdb76cd6f110b934a01",
+    "predictions-gw07.jsonl": "e9395ef0826f87d7dc2253f8aee79b301af8b4b30de43817a6fab099d62e8321",
+    "predictions-gw08.jsonl": "b0f7d2c5fe2f7f718eac9de492584d36f1e287cffadd3e74dd9886d19038b0aa",
+    "predictions-gw09.jsonl": "19bae21351be3da3e48b09e9e635cee0c79dcf6b10906ffa733d76eddb6e3125",
+    "predictions-gw10.jsonl": "9e8301e4bf779e4472ca2d820ea33094924f3ee7d4905d61d6b63e6388e82a3d",
+    "predictions-gw11.jsonl": "ed9bb50d864d0ee612ed622754d6e5464cc250c17abc47a793df3f5fe800d516",
+    "predictions-gw12.jsonl": "9e05e42d66997869c76122ec1738df201af81001d1d850496010070636a530c3",
+    "predictions-gw13.jsonl": "b698c913c24e2b0e749d3e2b348cfc60735ae68aa42dbb7d3fb09124eb616204",
+    "predictions-gw14.jsonl": "8fbf98d0e391752217687e0a5f13ebcf167206df2f6f4fc546da17b1e8c4dbf9",
+    "predictions-gw15.jsonl": "404697d388d6be09c82d3ef2154f19709b25a97c5be3aaec936c9747b40b3726",
+    "predictions-gw16.jsonl": "172cdda011ec5024e42d000b7f79c6fa632967cf56a77537fd2adc5398494595",
+    "predictions-gw18.jsonl": "2c6f40b2b5e63597f62e7a78b6066aab04fc7602a686632494aad2b939d1e2b9",
+    "predictions-gw19.jsonl": "6228f71fa2808dacc6bb0f353fd5a7ceaed139dac2d6e8f96cb2652a832e5378",
+    "predictions-gw20.jsonl": "e5aef98678329e8fc9586d14b93ca89361bc564b19ac2900f2962c657f895438",
+    "predictions-gw21.jsonl": "fafe03d26b21c2938ced3a7672b1bc3de8e9c6540a68cc35ccb88abc6c6b29ee",
+    "predictions-gw22.jsonl": "55900eefe6d3eedb5b0cfbeba47e496b9cc31c59504a2aaf277f3ec21a1d32d7",
+    "predictions-gw23.jsonl": "749577c1858f3fc8fd2d363a3a532bb70bfe0f6d1e91b26fb2c1f783716cd66b",
+    "predictions-gw24.jsonl": "2b93f1bd688948af23dec86c249ca755d90a708350f558d9bac2961a8ddad0af",
+    "predictions-gw25.jsonl": "ccb8db27fca77660e8dea21932733e66c6ef4eaf18ccf28d50255cbb0da19334",
+    "predictions-gw26.jsonl": "b87cfcd25d51d9c1dfba9684e9ddc5c2650d099644f082cd88afebf5972927bc",
+    "predictions-gw27.jsonl": "d574676deaaa648c10028d34e7ad648005b982ddcd9f0d27d152b9bea830eff4",
+    "predictions-gw28.jsonl": "6aabb9b81dfbf63aa78fa2bde2c868f9db18be4d3616aa33ac9429f30debbd3b",
+    "predictions-gw29.jsonl": "f60df3023e848b41d0699adcbf96fd6b9dcddb901566594dfc0fed0871418931",
+    "predictions-gw30.jsonl": "8502ae710baa0acd8ec02490113c7df369f1c3d2791e3c34d98817cf020a983b",
+    "predictions-gw31.jsonl": "571fa5ddb0270b67a1ac46aacffb35f666a9e60cf2bf99e8667859a9da81804d",
+    "predictions-gw32.jsonl": "e8653c3f1617e70460f3bbb0cbc1c5f902bc5ae72c1b6fc0b9c26568380f5cbb",
+    "predictions-gw33.jsonl": "12b0102532c05455fb74ec8e9d120f0bf998b53548337fb47bde7afb188749e1",
+    "predictions-gw34.jsonl": "8a92d6d463dc407f389558b9892ae7f306fbe799ebcb5ec4655a245ac64b5b3a",
+    "predictions-gw35.jsonl": "0b3890564b446f05ba4886dbad395b6442eedc23aba893456985fcc1112d8b04",
+    "predictions-gw36.jsonl": "049afac6cd10a00dccb7f80a5e6bc50bf6169284839fdc373ec8e4054d32694a",
+    "predictions-gw37.jsonl": "eff4d55b75268eb8c883e4cd7e5b0dd72ce1fc816c137bcb5be1e4497b6a2d42",
+    "predictions-gw38.jsonl": "9f4eb9d7bce5d5a6d683b7040e2581f6e6d36f86aa628523ab88917cc4e8de10",
+    "predictions.jsonl": "c1baa1a24593d4064eb394381431b67ab36aeef9445e226b634a478379afbf7e",
+    "provenance.json": "1ce0dc8cf59c77c6bda57bb6fc6f9b1f64a9a349514f8a16bb3d3da38422488c",
+    "scored.jsonl": "8adf68b56b9b9f1004bec1a04f1678e50022fddcd070d9324963faa567f1b9f6"
+  },
+  "claim_sha256": "b72601bd9189bdb5f7911735ef01cb93eeb569217b3978a6eec76295f6e16488",
+  "complete_outcome_rows": 24947,
+  "decision": {
+    "checks": {
+      "DEF_calibration": true,
+      "DEF_catastrophic_guardrail": true,
+      "FWD_calibration": true,
+      "FWD_catastrophic_guardrail": true,
+      "MID_calibration": true,
+      "MID_catastrophic_guardrail": true,
+      "all_bootstrap_relative_draws_defined": true,
+      "causal_and_pit_valid": true,
+      "def_nonnegative": false,
+      "pooled_calibration": true,
+      "uncertainty_supports_direction": false,
+      "xa_guardrail": false,
+      "xg_guardrail": false,
+      "xgi_materiality": false
+    },
+    "verdict": "REFUTED"
+  },
+  "development_only": true,
+  "evidence_class": "ARCHIVED_AS_OF",
+  "folds": [
+    {
+      "as_of": "2023-08-16T02:35:27+00:00",
+      "gw": 2,
+      "predictions_file": "predictions-gw02.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "1f7961111e65e1752bd99f737de8b2d377110c65ebda8f82e607ed846c705955",
+      "rows": 522,
+      "source_snapshot_id": "be15e285f106d1becc6f24c0c470ec9ada8c935a"
+    },
+    {
+      "as_of": "2023-08-23T13:08:45+00:00",
+      "gw": 3,
+      "predictions_file": "predictions-gw03.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "be5b110a999de66e4daef0c5977ccfec219b89612f7a4ae00ab5dbcdb2bd84f6",
+      "rows": 593,
+      "source_snapshot_id": "2749a5964950b3b34992cebde0351ac9e09fb54f"
+    },
+    {
+      "as_of": "2023-08-28T10:02:21+00:00",
+      "gw": 4,
+      "predictions_file": "predictions-gw04.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "0231b046aa2b21b477f92c92956e20bb3e62c495cb2ee7787bf20d9f14f6a358",
+      "rows": 598,
+      "source_snapshot_id": "2abff9370632b3b36bbdfa0870805b60fb392ef0"
+    },
+    {
+      "as_of": "2023-09-06T11:00:38+00:00",
+      "gw": 5,
+      "predictions_file": "predictions-gw05.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "d05ac8561beef3c456d667abfe51e2988efb2d5db987ed17ad682b09859f3c8b",
+      "rows": 629,
+      "source_snapshot_id": "b0ec80fec6916117225a6fbee11c35d8773c6f94"
+    },
+    {
+      "as_of": "2023-09-20T09:22:37+00:00",
+      "gw": 6,
+      "predictions_file": "predictions-gw06.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "74828beabd6de26c06a2bf4a7cb95ac39517ecdefaea1fdb76cd6f110b934a01",
+      "rows": 632,
+      "source_snapshot_id": "b9122f8c98f10a8217e5fb67bc4de447f6c685d5"
+    },
+    {
+      "as_of": "2023-09-25T15:34:01+00:00",
+      "gw": 7,
+      "predictions_file": "predictions-gw07.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "e9395ef0826f87d7dc2253f8aee79b301af8b4b30de43817a6fab099d62e8321",
+      "rows": 705,
+      "source_snapshot_id": "8b05861fb33ee89bae34c2b6d06564449a5885db"
+    },
+    {
+      "as_of": "2023-10-05T14:38:47+00:00",
+      "gw": 8,
+      "predictions_file": "predictions-gw08.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "b0f7d2c5fe2f7f718eac9de492584d36f1e287cffadd3e74dd9886d19038b0aa",
+      "rows": 637,
+      "source_snapshot_id": "96fbc38ee6e36e3a7250081a787b65a1a27c944d"
+    },
+    {
+      "as_of": "2023-10-19T20:26:02+00:00",
+      "gw": 9,
+      "predictions_file": "predictions-gw09.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "19bae21351be3da3e48b09e9e635cee0c79dcf6b10906ffa733d76eddb6e3125",
+      "rows": 640,
+      "source_snapshot_id": "32184fc221871431d8215c5dc8385af0eda7bdde"
+    },
+    {
+      "as_of": "2023-10-27T08:27:07+00:00",
+      "gw": 10,
+      "predictions_file": "predictions-gw10.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "9e8301e4bf779e4472ca2d820ea33094924f3ee7d4905d61d6b63e6388e82a3d",
+      "rows": 645,
+      "source_snapshot_id": "615da45c450fb13993b7e8da4c8388d7e2f57703"
+    },
+    {
+      "as_of": "2023-11-02T14:43:56+00:00",
+      "gw": 11,
+      "predictions_file": "predictions-gw11.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "ed9bb50d864d0ee612ed622754d6e5464cc250c17abc47a793df3f5fe800d516",
+      "rows": 646,
+      "source_snapshot_id": "e92d9881f2ef025a7a1093e47fdf02d9aa2f8655"
+    },
+    {
+      "as_of": "2023-11-09T20:03:21+00:00",
+      "gw": 12,
+      "predictions_file": "predictions-gw12.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "9e05e42d66997869c76122ec1738df201af81001d1d850496010070636a530c3",
+      "rows": 648,
+      "source_snapshot_id": "028f925c32fabb34798e416c569070d0cae329a2"
+    },
+    {
+      "as_of": "2023-11-24T13:22:14+00:00",
+      "gw": 13,
+      "predictions_file": "predictions-gw13.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "b698c913c24e2b0e749d3e2b348cfc60735ae68aa42dbb7d3fb09124eb616204",
+      "rows": 658,
+      "source_snapshot_id": "caf799bb68f58fb26ac80d8cb762c353891232f5"
+    },
+    {
+      "as_of": "2023-11-30T15:40:47+00:00",
+      "gw": 14,
+      "predictions_file": "predictions-gw14.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "8fbf98d0e391752217687e0a5f13ebcf167206df2f6f4fc546da17b1e8c4dbf9",
+      "rows": 662,
+      "source_snapshot_id": "acee0e28f8b201062270d709a7d72e4787680872"
+    },
+    {
+      "as_of": "2023-12-04T13:04:03+00:00",
+      "gw": 15,
+      "predictions_file": "predictions-gw15.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "404697d388d6be09c82d3ef2154f19709b25a97c5be3aaec936c9747b40b3726",
+      "rows": 667,
+      "source_snapshot_id": "c4f66ee30ef026bb7e8b7184b2427f9708c77d74"
+    },
+    {
+      "as_of": "2023-12-08T08:31:20+00:00",
+      "gw": 16,
+      "predictions_file": "predictions-gw16.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "172cdda011ec5024e42d000b7f79c6fa632967cf56a77537fd2adc5398494595",
+      "rows": 670,
+      "source_snapshot_id": "d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8"
+    },
+    {
+      "as_of": "2023-12-21T04:22:57+00:00",
+      "gw": 18,
+      "predictions_file": "predictions-gw18.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "2c6f40b2b5e63597f62e7a78b6066aab04fc7602a686632494aad2b939d1e2b9",
+      "rows": 617,
+      "source_snapshot_id": "62f7b7c0b2d897834613475b15d6dc3301f13e70"
+    },
+    {
+      "as_of": "2023-12-25T11:59:17+00:00",
+      "gw": 19,
+      "predictions_file": "predictions-gw19.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "6228f71fa2808dacc6bb0f353fd5a7ceaed139dac2d6e8f96cb2652a832e5378",
+      "rows": 681,
+      "source_snapshot_id": "d8a6fc58722beaa625195de9d51a0333dcb46439"
+    },
+    {
+      "as_of": "2023-12-29T05:12:14+00:00",
+      "gw": 20,
+      "predictions_file": "predictions-gw20.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "e5aef98678329e8fc9586d14b93ca89361bc564b19ac2900f2962c657f895438",
+      "rows": 683,
+      "source_snapshot_id": "2f06c2ae70511a7075d02913784ec77a5fb21aa1"
+    },
+    {
+      "as_of": "2024-01-03T08:57:32+00:00",
+      "gw": 21,
+      "predictions_file": "predictions-gw21.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "fafe03d26b21c2938ced3a7672b1bc3de8e9c6540a68cc35ccb88abc6c6b29ee",
+      "rows": 683,
+      "source_snapshot_id": "15783a5630abadb309ff4c3edbb3dc32e6a2b426"
+    },
+    {
+      "as_of": "2024-01-23T13:01:20+00:00",
+      "gw": 22,
+      "predictions_file": "predictions-gw22.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "55900eefe6d3eedb5b0cfbeba47e496b9cc31c59504a2aaf277f3ec21a1d32d7",
+      "rows": 697,
+      "source_snapshot_id": "546143eb5d0ae6d250e074374152e8be4b15719b"
+    },
+    {
+      "as_of": "2024-02-02T20:53:13+00:00",
+      "gw": 23,
+      "predictions_file": "predictions-gw23.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "749577c1858f3fc8fd2d363a3a532bb70bfe0f6d1e91b26fb2c1f783716cd66b",
+      "rows": 714,
+      "source_snapshot_id": "8a0d23451ea7c07699ba903feb364e8fe0085c0e"
+    },
+    {
+      "as_of": "2024-02-06T13:02:04+00:00",
+      "gw": 24,
+      "predictions_file": "predictions-gw24.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "2b93f1bd688948af23dec86c249ca755d90a708350f558d9bac2961a8ddad0af",
+      "rows": 717,
+      "source_snapshot_id": "5f49140e78b2052634abae57ce15e40f41dc32f7"
+    },
+    {
+      "as_of": "2024-02-14T10:42:14+00:00",
+      "gw": 25,
+      "predictions_file": "predictions-gw25.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "ccb8db27fca77660e8dea21932733e66c6ef4eaf18ccf28d50255cbb0da19334",
+      "rows": 859,
+      "source_snapshot_id": "73cf14c852c5bbafde20ba11ebc5acd6eff965aa"
+    },
+    {
+      "as_of": "2024-02-22T10:23:39+00:00",
+      "gw": 26,
+      "predictions_file": "predictions-gw26.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "b87cfcd25d51d9c1dfba9684e9ddc5c2650d099644f082cd88afebf5972927bc",
+      "rows": 572,
+      "source_snapshot_id": "f061aafa88a921dd70fd2b0f72b8020889d8e589"
+    },
+    {
+      "as_of": "2024-02-22T10:23:39+00:00",
+      "gw": 27,
+      "predictions_file": "predictions-gw27.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "d574676deaaa648c10028d34e7ad648005b982ddcd9f0d27d152b9bea830eff4",
+      "rows": 729,
+      "source_snapshot_id": "f061aafa88a921dd70fd2b0f72b8020889d8e589"
+    },
+    {
+      "as_of": "2024-03-07T16:57:57+00:00",
+      "gw": 28,
+      "predictions_file": "predictions-gw28.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "6aabb9b81dfbf63aa78fa2bde2c868f9db18be4d3616aa33ac9429f30debbd3b",
+      "rows": 814,
+      "source_snapshot_id": "446af195d2ee324a1217f34a5a2b591189efc983"
+    },
+    {
+      "as_of": "2024-03-15T13:56:21+00:00",
+      "gw": 29,
+      "predictions_file": "predictions-gw29.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "f60df3023e848b41d0699adcbf96fd6b9dcddb901566594dfc0fed0871418931",
+      "rows": 303,
+      "source_snapshot_id": "8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40"
+    },
+    {
+      "as_of": "2024-03-20T17:01:19+00:00",
+      "gw": 30,
+      "predictions_file": "predictions-gw30.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "8502ae710baa0acd8ec02490113c7df369f1c3d2791e3c34d98817cf020a983b",
+      "rows": 743,
+      "source_snapshot_id": "288c341ae1f28b260786e862b8917c865d953815"
+    },
+    {
+      "as_of": "2024-04-01T08:08:41+00:00",
+      "gw": 31,
+      "predictions_file": "predictions-gw31.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "571fa5ddb0270b67a1ac46aacffb35f666a9e60cf2bf99e8667859a9da81804d",
+      "rows": 747,
+      "source_snapshot_id": "4e6447daccfb053a496e4aebd37d264dfa949676"
+    },
+    {
+      "as_of": "2024-04-05T12:24:10+00:00",
+      "gw": 32,
+      "predictions_file": "predictions-gw32.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "e8653c3f1617e70460f3bbb0cbc1c5f902bc5ae72c1b6fc0b9c26568380f5cbb",
+      "rows": 749,
+      "source_snapshot_id": "7d6f6aafa94a937116f308a2393fb12e86c5771f"
+    },
+    {
+      "as_of": "2024-04-08T10:31:08+00:00",
+      "gw": 33,
+      "predictions_file": "predictions-gw33.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "12b0102532c05455fb74ec8e9d120f0bf998b53548337fb47bde7afb188749e1",
+      "rows": 750,
+      "source_snapshot_id": "436f1ff2d306783d3e3892dc3d3ce21712cbc08e"
+    },
+    {
+      "as_of": "2024-04-16T08:22:40+00:00",
+      "gw": 34,
+      "predictions_file": "predictions-gw34.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "8a92d6d463dc407f389558b9892ae7f306fbe799ebcb5ec4655a245ac64b5b3a",
+      "rows": 971,
+      "source_snapshot_id": "d7e0beda3436c5051116e1aeef652e96119ebf92"
+    },
+    {
+      "as_of": "2024-04-27T08:18:04+00:00",
+      "gw": 35,
+      "predictions_file": "predictions-gw35.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "0b3890564b446f05ba4886dbad395b6442eedc23aba893456985fcc1112d8b04",
+      "rows": 844,
+      "source_snapshot_id": "6f1e864e5a5bb58a0ad92a257e86df7a7d4816db"
+    },
+    {
+      "as_of": "2024-05-03T08:34:20+00:00",
+      "gw": 36,
+      "predictions_file": "predictions-gw36.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "049afac6cd10a00dccb7f80a5e6bc50bf6169284839fdc373ec8e4054d32694a",
+      "rows": 761,
+      "source_snapshot_id": "8f5194d666f608200916f2b62f8976e8c8beff87"
+    },
+    {
+      "as_of": "2024-05-09T13:15:25+00:00",
+      "gw": 37,
+      "predictions_file": "predictions-gw37.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "eff4d55b75268eb8c883e4cd7e5b0dd72ce1fc816c137bcb5be1e4497b6a2d42",
+      "rows": 998,
+      "source_snapshot_id": "2981ebc1630d6e0211c5847731c8fb79cecba785"
+    },
+    {
+      "as_of": "2024-05-19T02:36:03+00:00",
+      "gw": 38,
+      "predictions_file": "predictions-gw38.jsonl",
+      "predictions_published_before_outcome_access": true,
+      "predictions_sha256": "9f4eb9d7bce5d5a6d683b7040e2581f6e6d36f86aa628523ab88917cc4e8de10",
+      "rows": 763,
+      "source_snapshot_id": "5218c9f360c0415d7272775239f88ab0eb15e91d"
+    }
+  ],
+  "interpretation": "conditional attacking-usage persistence; not unconditional EV",
+  "official_deadline_replay": false,
+  "population": {
+    "evidence_class": "ARCHIVED_AS_OF",
+    "exclusions": {
+      "CUTOFF_CLUB_MISMATCH": 11,
+      "NO_CUTOFF_REGISTRY": 165,
+      "NO_WHOLE_FUTURE_GW_SNAPSHOT": 607
+    },
+    "folds": [
+      {
+        "by_position": {
+          "DEF": 196,
+          "FWD": 73,
+          "MID": 253
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 522,
+          "expected_goals_measured": 522,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 522,
+          "prior_history_absent": 4,
+          "prior_history_present": 518,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 0,
+          "prior_starts_ge_5": 0,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 522
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 196,
+            "expected_goals_measured": 196,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 196,
+            "prior_history_absent": 0,
+            "prior_history_present": 196,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 0,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 196
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 73,
+            "expected_goals_measured": 73,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 73,
+            "prior_history_absent": 0,
+            "prior_history_present": 73,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 0,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 73
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 253,
+            "expected_goals_measured": 253,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 253,
+            "prior_history_absent": 4,
+            "prior_history_present": 249,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 0,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 253
+          }
+        },
+        "cutoff": "2023-08-16T02:35:27+00:00",
+        "distinct_eligible_players": 522,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 4
+        },
+        "first_actual_target_kickoff": "2023-08-18T18:45:00+00:00",
+        "gw": 2,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 183,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 73,
+          "FWD": 19,
+          "MID": 91
+        },
+        "source_snapshot_id": "be15e285f106d1becc6f24c0c470ec9ada8c935a",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          11,
+          12,
+          13,
+          14,
+          16,
+          17,
+          18,
+          19,
+          20
+        ],
+        "target_rows": 522
+      },
+      {
+        "by_position": {
+          "DEF": 218,
+          "FWD": 87,
+          "MID": 288
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 593,
+          "expected_goals_measured": 593,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 593,
+          "prior_history_absent": 3,
+          "prior_history_present": 590,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 0,
+          "prior_starts_ge_5": 0,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 593
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 218,
+            "expected_goals_measured": 218,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 218,
+            "prior_history_absent": 0,
+            "prior_history_present": 218,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 0,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 218
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 87,
+            "expected_goals_measured": 87,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 87,
+            "prior_history_absent": 0,
+            "prior_history_present": 87,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 0,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 87
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 288,
+            "expected_goals_measured": 288,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 288,
+            "prior_history_absent": 3,
+            "prior_history_present": 285,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 0,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 288
+          }
+        },
+        "cutoff": "2023-08-23T13:08:45+00:00",
+        "distinct_eligible_players": 593,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 11
+        },
+        "first_actual_target_kickoff": "2023-08-25T19:00:00+00:00",
+        "gw": 3,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 203,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 84,
+          "FWD": 25,
+          "MID": 94
+        },
+        "source_snapshot_id": "2749a5964950b3b34992cebde0351ac9e09fb54f",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30
+        ],
+        "target_rows": 593
+      },
+      {
+        "by_position": {
+          "DEF": 219,
+          "FWD": 88,
+          "MID": 291
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 598,
+          "expected_goals_measured": 598,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 598,
+          "prior_history_absent": 0,
+          "prior_history_present": 598,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 135,
+          "prior_starts_ge_5": 0,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 598
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 219,
+            "expected_goals_measured": 219,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 219,
+            "prior_history_absent": 0,
+            "prior_history_present": 219,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 55,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 219
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 88,
+            "expected_goals_measured": 88,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 88,
+            "prior_history_absent": 0,
+            "prior_history_present": 88,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 15,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 88
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 291,
+            "expected_goals_measured": 291,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 291,
+            "prior_history_absent": 0,
+            "prior_history_present": 291,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 65,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 291
+          }
+        },
+        "cutoff": "2023-08-28T10:02:21+00:00",
+        "distinct_eligible_players": 598,
+        "exclusions": {
+          "CUTOFF_CLUB_MISMATCH": 6,
+          "NO_CUTOFF_REGISTRY": 15
+        },
+        "first_actual_target_kickoff": "2023-09-01T19:00:00+00:00",
+        "gw": 4,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 202,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 85,
+          "FWD": 25,
+          "MID": 92
+        },
+        "source_snapshot_id": "2abff9370632b3b36bbdfa0870805b60fb392ef0",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40
+        ],
+        "target_rows": 598
+      },
+      {
+        "by_position": {
+          "DEF": 231,
+          "FWD": 91,
+          "MID": 307
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 629,
+          "expected_goals_measured": 629,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 629,
+          "prior_history_absent": 10,
+          "prior_history_present": 619,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 179,
+          "prior_starts_ge_5": 0,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 629
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 231,
+            "expected_goals_measured": 231,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 231,
+            "prior_history_absent": 2,
+            "prior_history_present": 229,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 72,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 231
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 91,
+            "expected_goals_measured": 91,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 91,
+            "prior_history_absent": 1,
+            "prior_history_present": 90,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 23,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 91
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 307,
+            "expected_goals_measured": 307,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 307,
+            "prior_history_absent": 7,
+            "prior_history_present": 300,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 84,
+            "prior_starts_ge_5": 0,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 307
+          }
+        },
+        "cutoff": "2023-09-06T11:00:38+00:00",
+        "distinct_eligible_players": 629,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 3
+        },
+        "first_actual_target_kickoff": "2023-09-16T11:30:00+00:00",
+        "gw": 5,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 201,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 83,
+          "FWD": 24,
+          "MID": 94
+        },
+        "source_snapshot_id": "b0ec80fec6916117225a6fbee11c35d8773c6f94",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50
+        ],
+        "target_rows": 629
+      },
+      {
+        "by_position": {
+          "DEF": 232,
+          "FWD": 92,
+          "MID": 308
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 632,
+          "expected_goals_measured": 632,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 632,
+          "prior_history_absent": 0,
+          "prior_history_present": 632,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 194,
+          "prior_starts_ge_5": 97,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 632
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 232,
+            "expected_goals_measured": 232,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 232,
+            "prior_history_absent": 0,
+            "prior_history_present": 232,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 82,
+            "prior_starts_ge_5": 41,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 232
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 92,
+            "expected_goals_measured": 92,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 92,
+            "prior_history_absent": 0,
+            "prior_history_present": 92,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 23,
+            "prior_starts_ge_5": 10,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 92
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 308,
+            "expected_goals_measured": 308,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 308,
+            "prior_history_absent": 0,
+            "prior_history_present": 308,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 89,
+            "prior_starts_ge_5": 46,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 308
+          }
+        },
+        "cutoff": "2023-09-20T09:22:37+00:00",
+        "distinct_eligible_players": 632,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 1
+        },
+        "first_actual_target_kickoff": "2023-09-23T14:00:00+00:00",
+        "gw": 6,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 206,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 85,
+          "FWD": 25,
+          "MID": 96
+        },
+        "source_snapshot_id": "b9122f8c98f10a8217e5fb67bc4de447f6c685d5",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60
+        ],
+        "target_rows": 632
+      },
+      {
+        "by_position": {
+          "DEF": 256,
+          "FWD": 106,
+          "MID": 343
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 705,
+          "expected_goals_measured": 705,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 705,
+          "prior_history_absent": 0,
+          "prior_history_present": 705,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 235,
+          "prior_starts_ge_5": 146,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 705
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 256,
+            "expected_goals_measured": 256,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 256,
+            "prior_history_absent": 0,
+            "prior_history_present": 256,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 99,
+            "prior_starts_ge_5": 64,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 256
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 106,
+            "expected_goals_measured": 106,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 106,
+            "prior_history_absent": 0,
+            "prior_history_present": 106,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 30,
+            "prior_starts_ge_5": 17,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 106
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 343,
+            "expected_goals_measured": 343,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 343,
+            "prior_history_absent": 0,
+            "prior_history_present": 343,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 106,
+            "prior_starts_ge_5": 65,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 343
+          }
+        },
+        "cutoff": "2023-09-25T15:34:01+00:00",
+        "distinct_eligible_players": 633,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 4
+        },
+        "first_actual_target_kickoff": "2023-09-30T11:30:00+00:00",
+        "gw": 7,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 226,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 93,
+          "FWD": 31,
+          "MID": 102
+        },
+        "source_snapshot_id": "8b05861fb33ee89bae34c2b6d06564449a5885db",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          15,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70
+        ],
+        "target_rows": 705
+      },
+      {
+        "by_position": {
+          "DEF": 233,
+          "FWD": 94,
+          "MID": 310
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 637,
+          "expected_goals_measured": 637,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 637,
+          "prior_history_absent": 0,
+          "prior_history_present": 637,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 237,
+          "prior_starts_ge_5": 154,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 637
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 233,
+            "expected_goals_measured": 233,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 233,
+            "prior_history_absent": 0,
+            "prior_history_present": 233,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 95,
+            "prior_starts_ge_5": 69,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 233
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 94,
+            "expected_goals_measured": 94,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 94,
+            "prior_history_absent": 0,
+            "prior_history_present": 94,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 30,
+            "prior_starts_ge_5": 18,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 94
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 310,
+            "expected_goals_measured": 310,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 310,
+            "prior_history_absent": 0,
+            "prior_history_present": 310,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 112,
+            "prior_starts_ge_5": 67,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 310
+          }
+        },
+        "cutoff": "2023-10-05T14:38:47+00:00",
+        "distinct_eligible_players": 637,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 3
+        },
+        "first_actual_target_kickoff": "2023-10-07T11:30:00+00:00",
+        "gw": 8,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 209,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 87,
+          "FWD": 28,
+          "MID": 94
+        },
+        "source_snapshot_id": "96fbc38ee6e36e3a7250081a787b65a1a27c944d",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80
+        ],
+        "target_rows": 637
+      },
+      {
+        "by_position": {
+          "DEF": 235,
+          "FWD": 94,
+          "MID": 311
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 640,
+          "expected_goals_measured": 640,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 640,
+          "prior_history_absent": 0,
+          "prior_history_present": 640,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 248,
+          "prior_starts_ge_5": 177,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 640
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 235,
+            "expected_goals_measured": 235,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 235,
+            "prior_history_absent": 0,
+            "prior_history_present": 235,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 98,
+            "prior_starts_ge_5": 79,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 235
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 94,
+            "expected_goals_measured": 94,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 94,
+            "prior_history_absent": 0,
+            "prior_history_present": 94,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 34,
+            "prior_starts_ge_5": 21,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 94
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 311,
+            "expected_goals_measured": 311,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 311,
+            "prior_history_absent": 0,
+            "prior_history_present": 311,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 116,
+            "prior_starts_ge_5": 77,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 311
+          }
+        },
+        "cutoff": "2023-10-19T20:26:02+00:00",
+        "distinct_eligible_players": 640,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 5
+        },
+        "first_actual_target_kickoff": "2023-10-21T11:30:00+00:00",
+        "gw": 9,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 207,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 81,
+          "FWD": 26,
+          "MID": 100
+        },
+        "source_snapshot_id": "32184fc221871431d8215c5dc8385af0eda7bdde",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90
+        ],
+        "target_rows": 640
+      },
+      {
+        "by_position": {
+          "DEF": 237,
+          "FWD": 94,
+          "MID": 314
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 645,
+          "expected_goals_measured": 645,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 645,
+          "prior_history_absent": 0,
+          "prior_history_present": 645,
+          "prior_starts_ge_10": 0,
+          "prior_starts_ge_3": 260,
+          "prior_starts_ge_5": 196,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 645
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 237,
+            "expected_goals_measured": 237,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 237,
+            "prior_history_absent": 0,
+            "prior_history_present": 237,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 104,
+            "prior_starts_ge_5": 83,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 237
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 94,
+            "expected_goals_measured": 94,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 94,
+            "prior_history_absent": 0,
+            "prior_history_present": 94,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 36,
+            "prior_starts_ge_5": 24,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 94
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 314,
+            "expected_goals_measured": 314,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 314,
+            "prior_history_absent": 0,
+            "prior_history_present": 314,
+            "prior_starts_ge_10": 0,
+            "prior_starts_ge_3": 120,
+            "prior_starts_ge_5": 89,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 314
+          }
+        },
+        "cutoff": "2023-10-27T08:27:07+00:00",
+        "distinct_eligible_players": 645,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 1
+        },
+        "first_actual_target_kickoff": "2023-10-27T19:00:00+00:00",
+        "gw": 10,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 204,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 84,
+          "FWD": 23,
+          "MID": 97
+        },
+        "source_snapshot_id": "615da45c450fb13993b7e8da4c8388d7e2f57703",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100
+        ],
+        "target_rows": 645
+      },
+      {
+        "by_position": {
+          "DEF": 238,
+          "FWD": 94,
+          "MID": 314
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 646,
+          "expected_goals_measured": 646,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 646,
+          "prior_history_absent": 0,
+          "prior_history_present": 646,
+          "prior_starts_ge_10": 60,
+          "prior_starts_ge_3": 272,
+          "prior_starts_ge_5": 207,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 646
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 238,
+            "expected_goals_measured": 238,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 238,
+            "prior_history_absent": 0,
+            "prior_history_present": 238,
+            "prior_starts_ge_10": 24,
+            "prior_starts_ge_3": 112,
+            "prior_starts_ge_5": 88,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 238
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 94,
+            "expected_goals_measured": 94,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 94,
+            "prior_history_absent": 0,
+            "prior_history_present": 94,
+            "prior_starts_ge_10": 8,
+            "prior_starts_ge_3": 36,
+            "prior_starts_ge_5": 25,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 94
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 314,
+            "expected_goals_measured": 314,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 314,
+            "prior_history_absent": 0,
+            "prior_history_present": 314,
+            "prior_starts_ge_10": 28,
+            "prior_starts_ge_3": 124,
+            "prior_starts_ge_5": 94,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 314
+          }
+        },
+        "cutoff": "2023-11-02T14:43:56+00:00",
+        "distinct_eligible_players": 646,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 2
+        },
+        "first_actual_target_kickoff": "2023-11-04T12:30:00+00:00",
+        "gw": 11,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 208,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 86,
+          "FWD": 26,
+          "MID": 96
+        },
+        "source_snapshot_id": "e92d9881f2ef025a7a1093e47fdf02d9aa2f8655",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110
+        ],
+        "target_rows": 646
+      },
+      {
+        "by_position": {
+          "DEF": 239,
+          "FWD": 94,
+          "MID": 315
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 648,
+          "expected_goals_measured": 648,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 648,
+          "prior_history_absent": 0,
+          "prior_history_present": 648,
+          "prior_starts_ge_10": 96,
+          "prior_starts_ge_3": 280,
+          "prior_starts_ge_5": 224,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 648
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 239,
+            "expected_goals_measured": 239,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 239,
+            "prior_history_absent": 0,
+            "prior_history_present": 239,
+            "prior_starts_ge_10": 42,
+            "prior_starts_ge_3": 114,
+            "prior_starts_ge_5": 95,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 239
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 94,
+            "expected_goals_measured": 94,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 94,
+            "prior_history_absent": 0,
+            "prior_history_present": 94,
+            "prior_starts_ge_10": 10,
+            "prior_starts_ge_3": 37,
+            "prior_starts_ge_5": 27,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 94
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 315,
+            "expected_goals_measured": 315,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 315,
+            "prior_history_absent": 0,
+            "prior_history_present": 315,
+            "prior_starts_ge_10": 44,
+            "prior_starts_ge_3": 129,
+            "prior_starts_ge_5": 102,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 315
+          }
+        },
+        "cutoff": "2023-11-09T20:03:21+00:00",
+        "distinct_eligible_players": 648,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 10
+        },
+        "first_actual_target_kickoff": "2023-11-11T12:30:00+00:00",
+        "gw": 12,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 207,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 84,
+          "FWD": 21,
+          "MID": 102
+        },
+        "source_snapshot_id": "028f925c32fabb34798e416c569070d0cae329a2",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120
+        ],
+        "target_rows": 648
+      },
+      {
+        "by_position": {
+          "DEF": 241,
+          "FWD": 96,
+          "MID": 321
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 658,
+          "expected_goals_measured": 658,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 658,
+          "prior_history_absent": 0,
+          "prior_history_present": 658,
+          "prior_starts_ge_10": 109,
+          "prior_starts_ge_3": 289,
+          "prior_starts_ge_5": 238,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 658
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 241,
+            "expected_goals_measured": 241,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 241,
+            "prior_history_absent": 0,
+            "prior_history_present": 241,
+            "prior_starts_ge_10": 45,
+            "prior_starts_ge_3": 120,
+            "prior_starts_ge_5": 104,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 241
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 96,
+            "expected_goals_measured": 96,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 96,
+            "prior_history_absent": 0,
+            "prior_history_present": 96,
+            "prior_starts_ge_10": 10,
+            "prior_starts_ge_3": 37,
+            "prior_starts_ge_5": 28,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 96
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 321,
+            "expected_goals_measured": 321,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 321,
+            "prior_history_absent": 0,
+            "prior_history_present": 321,
+            "prior_starts_ge_10": 54,
+            "prior_starts_ge_3": 132,
+            "prior_starts_ge_5": 106,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 321
+          }
+        },
+        "cutoff": "2023-11-24T13:22:14+00:00",
+        "distinct_eligible_players": 658,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 4
+        },
+        "first_actual_target_kickoff": "2023-11-25T12:30:00+00:00",
+        "gw": 13,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 206,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 84,
+          "FWD": 25,
+          "MID": 97
+        },
+        "source_snapshot_id": "caf799bb68f58fb26ac80d8cb762c353891232f5",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          121,
+          122,
+          123,
+          124,
+          125,
+          126,
+          127,
+          128,
+          129,
+          130
+        ],
+        "target_rows": 658
+      },
+      {
+        "by_position": {
+          "DEF": 242,
+          "FWD": 98,
+          "MID": 322
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 662,
+          "expected_goals_measured": 662,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 662,
+          "prior_history_absent": 0,
+          "prior_history_present": 662,
+          "prior_starts_ge_10": 122,
+          "prior_starts_ge_3": 298,
+          "prior_starts_ge_5": 244,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 662
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 242,
+            "expected_goals_measured": 242,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 242,
+            "prior_history_absent": 0,
+            "prior_history_present": 242,
+            "prior_starts_ge_10": 50,
+            "prior_starts_ge_3": 123,
+            "prior_starts_ge_5": 105,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 242
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 98,
+            "expected_goals_measured": 98,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 98,
+            "prior_history_absent": 0,
+            "prior_history_present": 98,
+            "prior_starts_ge_10": 12,
+            "prior_starts_ge_3": 40,
+            "prior_starts_ge_5": 29,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 98
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 322,
+            "expected_goals_measured": 322,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 322,
+            "prior_history_absent": 0,
+            "prior_history_present": 322,
+            "prior_starts_ge_10": 60,
+            "prior_starts_ge_3": 135,
+            "prior_starts_ge_5": 110,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 322
+          }
+        },
+        "cutoff": "2023-11-30T15:40:47+00:00",
+        "distinct_eligible_players": 662,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 5
+        },
+        "first_actual_target_kickoff": "2023-12-02T15:00:00+00:00",
+        "gw": 14,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 206,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 82,
+          "FWD": 27,
+          "MID": 97
+        },
+        "source_snapshot_id": "acee0e28f8b201062270d709a7d72e4787680872",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          131,
+          132,
+          133,
+          134,
+          135,
+          136,
+          137,
+          138,
+          139,
+          140
+        ],
+        "target_rows": 662
+      },
+      {
+        "by_position": {
+          "DEF": 244,
+          "FWD": 98,
+          "MID": 325
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 667,
+          "expected_goals_measured": 667,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 667,
+          "prior_history_absent": 0,
+          "prior_history_present": 667,
+          "prior_starts_ge_10": 141,
+          "prior_starts_ge_3": 303,
+          "prior_starts_ge_5": 254,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 667
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 244,
+            "expected_goals_measured": 244,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 244,
+            "prior_history_absent": 0,
+            "prior_history_present": 244,
+            "prior_starts_ge_10": 58,
+            "prior_starts_ge_3": 124,
+            "prior_starts_ge_5": 111,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 244
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 98,
+            "expected_goals_measured": 98,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 98,
+            "prior_history_absent": 0,
+            "prior_history_present": 98,
+            "prior_starts_ge_10": 14,
+            "prior_starts_ge_3": 40,
+            "prior_starts_ge_5": 29,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 98
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 325,
+            "expected_goals_measured": 325,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 325,
+            "prior_history_absent": 0,
+            "prior_history_present": 325,
+            "prior_starts_ge_10": 69,
+            "prior_starts_ge_3": 139,
+            "prior_starts_ge_5": 114,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 325
+          }
+        },
+        "cutoff": "2023-12-04T13:04:03+00:00",
+        "distinct_eligible_players": 667,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 3
+        },
+        "first_actual_target_kickoff": "2023-12-05T19:30:00+00:00",
+        "gw": 15,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 205,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 85,
+          "FWD": 24,
+          "MID": 96
+        },
+        "source_snapshot_id": "c4f66ee30ef026bb7e8b7184b2427f9708c77d74",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          141,
+          142,
+          143,
+          144,
+          145,
+          146,
+          147,
+          148,
+          149,
+          150
+        ],
+        "target_rows": 667
+      },
+      {
+        "by_position": {
+          "DEF": 245,
+          "FWD": 98,
+          "MID": 327
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 670,
+          "expected_goals_measured": 670,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 670,
+          "prior_history_absent": 0,
+          "prior_history_present": 670,
+          "prior_starts_ge_10": 154,
+          "prior_starts_ge_3": 317,
+          "prior_starts_ge_5": 264,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 670
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 245,
+            "expected_goals_measured": 245,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 245,
+            "prior_history_absent": 0,
+            "prior_history_present": 245,
+            "prior_starts_ge_10": 66,
+            "prior_starts_ge_3": 129,
+            "prior_starts_ge_5": 114,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 245
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 98,
+            "expected_goals_measured": 98,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 98,
+            "prior_history_absent": 0,
+            "prior_history_present": 98,
+            "prior_starts_ge_10": 14,
+            "prior_starts_ge_3": 40,
+            "prior_starts_ge_5": 33,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 98
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 327,
+            "expected_goals_measured": 327,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 327,
+            "prior_history_absent": 0,
+            "prior_history_present": 327,
+            "prior_starts_ge_10": 74,
+            "prior_starts_ge_3": 148,
+            "prior_starts_ge_5": 117,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 327
+          }
+        },
+        "cutoff": "2023-12-08T08:31:20+00:00",
+        "distinct_eligible_players": 670,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 1
+        },
+        "first_actual_target_kickoff": "2023-12-09T12:30:00+00:00",
+        "gw": 16,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 210,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 83,
+          "FWD": 24,
+          "MID": 103
+        },
+        "source_snapshot_id": "d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          151,
+          152,
+          153,
+          154,
+          155,
+          156,
+          157,
+          158,
+          159,
+          160
+        ],
+        "target_rows": 670
+      },
+      {
+        "gw": 17,
+        "status": "NO_WHOLE_FUTURE_GW_SNAPSHOT",
+        "target_rows": 607
+      },
+      {
+        "by_position": {
+          "DEF": 226,
+          "FWD": 92,
+          "MID": 299
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 617,
+          "expected_goals_measured": 617,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 617,
+          "prior_history_absent": 0,
+          "prior_history_present": 617,
+          "prior_starts_ge_10": 159,
+          "prior_starts_ge_3": 296,
+          "prior_starts_ge_5": 253,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 617
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 226,
+            "expected_goals_measured": 226,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 226,
+            "prior_history_absent": 0,
+            "prior_history_present": 226,
+            "prior_starts_ge_10": 67,
+            "prior_starts_ge_3": 122,
+            "prior_starts_ge_5": 107,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 226
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 92,
+            "expected_goals_measured": 92,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 92,
+            "prior_history_absent": 0,
+            "prior_history_present": 92,
+            "prior_starts_ge_10": 16,
+            "prior_starts_ge_3": 37,
+            "prior_starts_ge_5": 31,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 92
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 299,
+            "expected_goals_measured": 299,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 299,
+            "prior_history_absent": 0,
+            "prior_history_present": 299,
+            "prior_starts_ge_10": 76,
+            "prior_starts_ge_3": 137,
+            "prior_starts_ge_5": 115,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 299
+          }
+        },
+        "cutoff": "2023-12-21T04:22:57+00:00",
+        "distinct_eligible_players": 617,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 4
+        },
+        "first_actual_target_kickoff": "2023-12-21T20:00:00+00:00",
+        "gw": 18,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 183,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 76,
+          "FWD": 22,
+          "MID": 85
+        },
+        "source_snapshot_id": "62f7b7c0b2d897834613475b15d6dc3301f13e70",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          171,
+          172,
+          173,
+          174,
+          175,
+          177,
+          178,
+          179,
+          180
+        ],
+        "target_rows": 617
+      },
+      {
+        "by_position": {
+          "DEF": 249,
+          "FWD": 98,
+          "MID": 334
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 681,
+          "expected_goals_measured": 681,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 681,
+          "prior_history_absent": 0,
+          "prior_history_present": 681,
+          "prior_starts_ge_10": 187,
+          "prior_starts_ge_3": 334,
+          "prior_starts_ge_5": 286,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 681
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 249,
+            "expected_goals_measured": 249,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 249,
+            "prior_history_absent": 0,
+            "prior_history_present": 249,
+            "prior_starts_ge_10": 76,
+            "prior_starts_ge_3": 137,
+            "prior_starts_ge_5": 120,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 249
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 98,
+            "expected_goals_measured": 98,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 98,
+            "prior_history_absent": 0,
+            "prior_history_present": 98,
+            "prior_starts_ge_10": 22,
+            "prior_starts_ge_3": 41,
+            "prior_starts_ge_5": 37,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 98
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 334,
+            "expected_goals_measured": 334,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 334,
+            "prior_history_absent": 0,
+            "prior_history_present": 334,
+            "prior_starts_ge_10": 89,
+            "prior_starts_ge_3": 156,
+            "prior_starts_ge_5": 129,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 334
+          }
+        },
+        "cutoff": "2023-12-25T11:59:17+00:00",
+        "distinct_eligible_players": 681,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 2
+        },
+        "first_actual_target_kickoff": "2023-12-26T12:30:00+00:00",
+        "gw": 19,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 204,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 82,
+          "FWD": 26,
+          "MID": 96
+        },
+        "source_snapshot_id": "d8a6fc58722beaa625195de9d51a0333dcb46439",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          181,
+          182,
+          183,
+          184,
+          185,
+          186,
+          187,
+          188,
+          189,
+          190
+        ],
+        "target_rows": 681
+      },
+      {
+        "by_position": {
+          "DEF": 249,
+          "FWD": 98,
+          "MID": 336
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 683,
+          "expected_goals_measured": 683,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 683,
+          "prior_history_absent": 0,
+          "prior_history_present": 683,
+          "prior_starts_ge_10": 191,
+          "prior_starts_ge_3": 338,
+          "prior_starts_ge_5": 299,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 683
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 249,
+            "expected_goals_measured": 249,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 249,
+            "prior_history_absent": 0,
+            "prior_history_present": 249,
+            "prior_starts_ge_10": 77,
+            "prior_starts_ge_3": 138,
+            "prior_starts_ge_5": 125,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 249
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 98,
+            "expected_goals_measured": 98,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 98,
+            "prior_history_absent": 0,
+            "prior_history_present": 98,
+            "prior_starts_ge_10": 22,
+            "prior_starts_ge_3": 42,
+            "prior_starts_ge_5": 38,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 98
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 336,
+            "expected_goals_measured": 336,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 336,
+            "prior_history_absent": 0,
+            "prior_history_present": 336,
+            "prior_starts_ge_10": 92,
+            "prior_starts_ge_3": 158,
+            "prior_starts_ge_5": 136,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 336
+          }
+        },
+        "cutoff": "2023-12-29T05:12:14+00:00",
+        "distinct_eligible_players": 683,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 2
+        },
+        "first_actual_target_kickoff": "2023-12-30T12:30:00+00:00",
+        "gw": 20,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 205,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 85,
+          "FWD": 22,
+          "MID": 98
+        },
+        "source_snapshot_id": "2f06c2ae70511a7075d02913784ec77a5fb21aa1",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          191,
+          192,
+          193,
+          194,
+          195,
+          196,
+          197,
+          198,
+          199,
+          200
+        ],
+        "target_rows": 683
+      },
+      {
+        "by_position": {
+          "DEF": 249,
+          "FWD": 98,
+          "MID": 336
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 683,
+          "expected_goals_measured": 683,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 683,
+          "prior_history_absent": 0,
+          "prior_history_present": 683,
+          "prior_starts_ge_10": 199,
+          "prior_starts_ge_3": 343,
+          "prior_starts_ge_5": 304,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 683
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 249,
+            "expected_goals_measured": 249,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 249,
+            "prior_history_absent": 0,
+            "prior_history_present": 249,
+            "prior_starts_ge_10": 81,
+            "prior_starts_ge_3": 140,
+            "prior_starts_ge_5": 126,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 249
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 98,
+            "expected_goals_measured": 98,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 98,
+            "prior_history_absent": 0,
+            "prior_history_present": 98,
+            "prior_starts_ge_10": 24,
+            "prior_starts_ge_3": 42,
+            "prior_starts_ge_5": 39,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 98
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 336,
+            "expected_goals_measured": 336,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 336,
+            "prior_history_absent": 0,
+            "prior_history_present": 336,
+            "prior_starts_ge_10": 94,
+            "prior_starts_ge_3": 161,
+            "prior_starts_ge_5": 139,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 336
+          }
+        },
+        "cutoff": "2024-01-03T08:57:32+00:00",
+        "distinct_eligible_players": 683,
+        "exclusions": {
+          "CUTOFF_CLUB_MISMATCH": 2,
+          "NO_CUTOFF_REGISTRY": 13
+        },
+        "first_actual_target_kickoff": "2024-01-12T19:45:00+00:00",
+        "gw": 21,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 199,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 81,
+          "FWD": 24,
+          "MID": 94
+        },
+        "source_snapshot_id": "15783a5630abadb309ff4c3edbb3dc32e6a2b426",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          201,
+          202,
+          203,
+          204,
+          205,
+          206,
+          207,
+          208,
+          209,
+          210
+        ],
+        "target_rows": 683
+      },
+      {
+        "by_position": {
+          "DEF": 254,
+          "FWD": 102,
+          "MID": 341
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 697,
+          "expected_goals_measured": 697,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 697,
+          "prior_history_absent": 0,
+          "prior_history_present": 697,
+          "prior_starts_ge_10": 212,
+          "prior_starts_ge_3": 350,
+          "prior_starts_ge_5": 305,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 697
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 254,
+            "expected_goals_measured": 254,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 254,
+            "prior_history_absent": 0,
+            "prior_history_present": 254,
+            "prior_starts_ge_10": 87,
+            "prior_starts_ge_3": 143,
+            "prior_starts_ge_5": 126,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 254
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 102,
+            "expected_goals_measured": 102,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 102,
+            "prior_history_absent": 0,
+            "prior_history_present": 102,
+            "prior_starts_ge_10": 27,
+            "prior_starts_ge_3": 42,
+            "prior_starts_ge_5": 39,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 102
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 341,
+            "expected_goals_measured": 341,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 341,
+            "prior_history_absent": 0,
+            "prior_history_present": 341,
+            "prior_starts_ge_10": 98,
+            "prior_starts_ge_3": 165,
+            "prior_starts_ge_5": 140,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 341
+          }
+        },
+        "cutoff": "2024-01-23T13:01:20+00:00",
+        "distinct_eligible_players": 697,
+        "exclusions": {
+          "CUTOFF_CLUB_MISMATCH": 1,
+          "NO_CUTOFF_REGISTRY": 10
+        },
+        "first_actual_target_kickoff": "2024-01-30T19:30:00+00:00",
+        "gw": 22,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 210,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 86,
+          "FWD": 27,
+          "MID": 97
+        },
+        "source_snapshot_id": "546143eb5d0ae6d250e074374152e8be4b15719b",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          211,
+          212,
+          213,
+          214,
+          215,
+          216,
+          217,
+          218,
+          219,
+          220
+        ],
+        "target_rows": 697
+      },
+      {
+        "by_position": {
+          "DEF": 260,
+          "FWD": 103,
+          "MID": 351
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 714,
+          "expected_goals_measured": 714,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 714,
+          "prior_history_absent": 8,
+          "prior_history_present": 706,
+          "prior_starts_ge_10": 218,
+          "prior_starts_ge_3": 352,
+          "prior_starts_ge_5": 313,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 714
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 260,
+            "expected_goals_measured": 260,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 260,
+            "prior_history_absent": 3,
+            "prior_history_present": 257,
+            "prior_starts_ge_10": 91,
+            "prior_starts_ge_3": 145,
+            "prior_starts_ge_5": 131,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 260
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 103,
+            "expected_goals_measured": 103,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 103,
+            "prior_history_absent": 2,
+            "prior_history_present": 101,
+            "prior_starts_ge_10": 27,
+            "prior_starts_ge_3": 41,
+            "prior_starts_ge_5": 38,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 103
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 351,
+            "expected_goals_measured": 351,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 351,
+            "prior_history_absent": 3,
+            "prior_history_present": 348,
+            "prior_starts_ge_10": 100,
+            "prior_starts_ge_3": 166,
+            "prior_starts_ge_5": 144,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 351
+          }
+        },
+        "cutoff": "2024-02-02T20:53:13+00:00",
+        "distinct_eligible_players": 714,
+        "exclusions": {
+          "CUTOFF_CLUB_MISMATCH": 2,
+          "NO_CUTOFF_REGISTRY": 1
+        },
+        "first_actual_target_kickoff": "2024-02-03T12:30:00+00:00",
+        "gw": 23,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 205,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 86,
+          "FWD": 25,
+          "MID": 94
+        },
+        "source_snapshot_id": "8a0d23451ea7c07699ba903feb364e8fe0085c0e",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          221,
+          222,
+          223,
+          224,
+          225,
+          226,
+          227,
+          228,
+          229,
+          230
+        ],
+        "target_rows": 714
+      },
+      {
+        "by_position": {
+          "DEF": 261,
+          "FWD": 104,
+          "MID": 352
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 717,
+          "expected_goals_measured": 717,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 717,
+          "prior_history_absent": 0,
+          "prior_history_present": 717,
+          "prior_starts_ge_10": 234,
+          "prior_starts_ge_3": 365,
+          "prior_starts_ge_5": 318,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 717
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 261,
+            "expected_goals_measured": 261,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 261,
+            "prior_history_absent": 0,
+            "prior_history_present": 261,
+            "prior_starts_ge_10": 97,
+            "prior_starts_ge_3": 150,
+            "prior_starts_ge_5": 133,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 261
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 104,
+            "expected_goals_measured": 104,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 104,
+            "prior_history_absent": 0,
+            "prior_history_present": 104,
+            "prior_starts_ge_10": 30,
+            "prior_starts_ge_3": 44,
+            "prior_starts_ge_5": 39,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 104
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 352,
+            "expected_goals_measured": 352,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 352,
+            "prior_history_absent": 0,
+            "prior_history_present": 352,
+            "prior_starts_ge_10": 107,
+            "prior_starts_ge_3": 171,
+            "prior_starts_ge_5": 146,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 352
+          }
+        },
+        "cutoff": "2024-02-06T13:02:04+00:00",
+        "distinct_eligible_players": 717,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 4
+        },
+        "first_actual_target_kickoff": "2024-02-10T12:30:00+00:00",
+        "gw": 24,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 207,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 88,
+          "FWD": 24,
+          "MID": 95
+        },
+        "source_snapshot_id": "5f49140e78b2052634abae57ce15e40f41dc32f7",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          231,
+          232,
+          233,
+          234,
+          235,
+          236,
+          237,
+          238,
+          239,
+          240
+        ],
+        "target_rows": 717
+      },
+      {
+        "by_position": {
+          "DEF": 312,
+          "FWD": 123,
+          "MID": 424
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 859,
+          "expected_goals_measured": 859,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 859,
+          "prior_history_absent": 0,
+          "prior_history_present": 859,
+          "prior_starts_ge_10": 284,
+          "prior_starts_ge_3": 441,
+          "prior_starts_ge_5": 390,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 859
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 312,
+            "expected_goals_measured": 312,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 312,
+            "prior_history_absent": 0,
+            "prior_history_present": 312,
+            "prior_starts_ge_10": 118,
+            "prior_starts_ge_3": 182,
+            "prior_starts_ge_5": 164,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 312
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 123,
+            "expected_goals_measured": 123,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 123,
+            "prior_history_absent": 0,
+            "prior_history_present": 123,
+            "prior_starts_ge_10": 41,
+            "prior_starts_ge_3": 55,
+            "prior_starts_ge_5": 50,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 123
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 424,
+            "expected_goals_measured": 424,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 424,
+            "prior_history_absent": 0,
+            "prior_history_present": 424,
+            "prior_starts_ge_10": 125,
+            "prior_starts_ge_3": 204,
+            "prior_starts_ge_5": 176,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 424
+          }
+        },
+        "cutoff": "2024-02-14T10:42:14+00:00",
+        "distinct_eligible_players": 721,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 9
+        },
+        "first_actual_target_kickoff": "2024-02-17T12:30:00+00:00",
+        "gw": 25,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 248,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 105,
+          "FWD": 31,
+          "MID": 112
+        },
+        "source_snapshot_id": "73cf14c852c5bbafde20ba11ebc5acd6eff965aa",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          176,
+          241,
+          242,
+          243,
+          244,
+          245,
+          246,
+          247,
+          248,
+          249,
+          250,
+          257
+        ],
+        "target_rows": 859
+      },
+      {
+        "by_position": {
+          "DEF": 203,
+          "FWD": 83,
+          "MID": 286
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 572,
+          "expected_goals_measured": 572,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 572,
+          "prior_history_absent": 0,
+          "prior_history_present": 572,
+          "prior_starts_ge_10": 195,
+          "prior_starts_ge_3": 297,
+          "prior_starts_ge_5": 264,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 572
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 203,
+            "expected_goals_measured": 203,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 203,
+            "prior_history_absent": 0,
+            "prior_history_present": 203,
+            "prior_starts_ge_10": 81,
+            "prior_starts_ge_3": 124,
+            "prior_starts_ge_5": 109,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 203
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 83,
+            "expected_goals_measured": 83,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 83,
+            "prior_history_absent": 0,
+            "prior_history_present": 83,
+            "prior_starts_ge_10": 24,
+            "prior_starts_ge_3": 36,
+            "prior_starts_ge_5": 34,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 83
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 286,
+            "expected_goals_measured": 286,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 286,
+            "prior_history_absent": 0,
+            "prior_history_present": 286,
+            "prior_starts_ge_10": 90,
+            "prior_starts_ge_3": 137,
+            "prior_starts_ge_5": 121,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 286
+          }
+        },
+        "cutoff": "2024-02-22T10:23:39+00:00",
+        "distinct_eligible_players": 572,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 5
+        },
+        "first_actual_target_kickoff": "2024-02-24T15:00:00+00:00",
+        "gw": 26,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 163,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 70,
+          "FWD": 17,
+          "MID": 76
+        },
+        "source_snapshot_id": "f061aafa88a921dd70fd2b0f72b8020889d8e589",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          251,
+          252,
+          253,
+          254,
+          256,
+          258,
+          259,
+          260
+        ],
+        "target_rows": 572
+      },
+      {
+        "by_position": {
+          "DEF": 264,
+          "FWD": 108,
+          "MID": 357
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 729,
+          "expected_goals_measured": 729,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 729,
+          "prior_history_absent": 0,
+          "prior_history_present": 729,
+          "prior_starts_ge_10": 244,
+          "prior_starts_ge_3": 372,
+          "prior_starts_ge_5": 330,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 729
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 264,
+            "expected_goals_measured": 264,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 264,
+            "prior_history_absent": 0,
+            "prior_history_present": 264,
+            "prior_starts_ge_10": 101,
+            "prior_starts_ge_3": 156,
+            "prior_starts_ge_5": 139,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 264
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 108,
+            "expected_goals_measured": 108,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 108,
+            "prior_history_absent": 0,
+            "prior_history_present": 108,
+            "prior_starts_ge_10": 31,
+            "prior_starts_ge_3": 44,
+            "prior_starts_ge_5": 41,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 108
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 357,
+            "expected_goals_measured": 357,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 357,
+            "prior_history_absent": 0,
+            "prior_history_present": 357,
+            "prior_starts_ge_10": 112,
+            "prior_starts_ge_3": 172,
+            "prior_starts_ge_5": 150,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 357
+          }
+        },
+        "cutoff": "2024-02-22T10:23:39+00:00",
+        "distinct_eligible_players": 729,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 9
+        },
+        "first_actual_target_kickoff": "2024-03-02T15:00:00+00:00",
+        "gw": 27,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 208,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 89,
+          "FWD": 21,
+          "MID": 98
+        },
+        "source_snapshot_id": "f061aafa88a921dd70fd2b0f72b8020889d8e589",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          261,
+          262,
+          263,
+          264,
+          265,
+          266,
+          267,
+          268,
+          269,
+          270
+        ],
+        "target_rows": 729
+      },
+      {
+        "by_position": {
+          "DEF": 292,
+          "FWD": 121,
+          "MID": 401
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 814,
+          "expected_goals_measured": 814,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 814,
+          "prior_history_absent": 0,
+          "prior_history_present": 814,
+          "prior_starts_ge_10": 279,
+          "prior_starts_ge_3": 414,
+          "prior_starts_ge_5": 372,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 814
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 292,
+            "expected_goals_measured": 292,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 292,
+            "prior_history_absent": 0,
+            "prior_history_present": 292,
+            "prior_starts_ge_10": 117,
+            "prior_starts_ge_3": 173,
+            "prior_starts_ge_5": 154,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 292
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 121,
+            "expected_goals_measured": 121,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 121,
+            "prior_history_absent": 0,
+            "prior_history_present": 121,
+            "prior_starts_ge_10": 38,
+            "prior_starts_ge_3": 52,
+            "prior_starts_ge_5": 48,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 121
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 401,
+            "expected_goals_measured": 401,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 401,
+            "prior_history_absent": 0,
+            "prior_history_present": 401,
+            "prior_starts_ge_10": 124,
+            "prior_starts_ge_3": 189,
+            "prior_starts_ge_5": 170,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 401
+          }
+        },
+        "cutoff": "2024-03-07T16:57:57+00:00",
+        "distinct_eligible_players": 738,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 6
+        },
+        "first_actual_target_kickoff": "2024-03-09T12:30:00+00:00",
+        "gw": 28,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 228,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 93,
+          "FWD": 27,
+          "MID": 108
+        },
+        "source_snapshot_id": "446af195d2ee324a1217f34a5a2b591189efc983",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          162,
+          271,
+          272,
+          273,
+          274,
+          275,
+          276,
+          277,
+          278,
+          279,
+          280
+        ],
+        "target_rows": 814
+      },
+      {
+        "by_position": {
+          "DEF": 113,
+          "FWD": 48,
+          "MID": 142
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 303,
+          "expected_goals_measured": 303,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 303,
+          "prior_history_absent": 0,
+          "prior_history_present": 303,
+          "prior_starts_ge_10": 107,
+          "prior_starts_ge_3": 158,
+          "prior_starts_ge_5": 143,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 303
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 113,
+            "expected_goals_measured": 113,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 113,
+            "prior_history_absent": 0,
+            "prior_history_present": 113,
+            "prior_starts_ge_10": 45,
+            "prior_starts_ge_3": 68,
+            "prior_starts_ge_5": 62,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 113
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 48,
+            "expected_goals_measured": 48,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 48,
+            "prior_history_absent": 0,
+            "prior_history_present": 48,
+            "prior_starts_ge_10": 13,
+            "prior_starts_ge_3": 20,
+            "prior_starts_ge_5": 18,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 48
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 142,
+            "expected_goals_measured": 142,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 142,
+            "prior_history_absent": 0,
+            "prior_history_present": 142,
+            "prior_starts_ge_10": 49,
+            "prior_starts_ge_3": 70,
+            "prior_starts_ge_5": 63,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 142
+          }
+        },
+        "cutoff": "2024-03-15T13:56:21+00:00",
+        "distinct_eligible_players": 303,
+        "exclusions": {},
+        "first_actual_target_kickoff": "2024-03-16T15:00:00+00:00",
+        "gw": 29,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 82,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 34,
+          "FWD": 12,
+          "MID": 36
+        },
+        "source_snapshot_id": "8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          283,
+          286,
+          287,
+          289
+        ],
+        "target_rows": 303
+      },
+      {
+        "by_position": {
+          "DEF": 271,
+          "FWD": 109,
+          "MID": 363
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 743,
+          "expected_goals_measured": 743,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 743,
+          "prior_history_absent": 0,
+          "prior_history_present": 743,
+          "prior_starts_ge_10": 266,
+          "prior_starts_ge_3": 383,
+          "prior_starts_ge_5": 346,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 743
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 271,
+            "expected_goals_measured": 271,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 271,
+            "prior_history_absent": 0,
+            "prior_history_present": 271,
+            "prior_starts_ge_10": 110,
+            "prior_starts_ge_3": 160,
+            "prior_starts_ge_5": 146,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 271
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 109,
+            "expected_goals_measured": 109,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 109,
+            "prior_history_absent": 0,
+            "prior_history_present": 109,
+            "prior_starts_ge_10": 35,
+            "prior_starts_ge_3": 47,
+            "prior_starts_ge_5": 44,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 109
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 363,
+            "expected_goals_measured": 363,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 363,
+            "prior_history_absent": 0,
+            "prior_history_present": 363,
+            "prior_starts_ge_10": 121,
+            "prior_starts_ge_3": 176,
+            "prior_starts_ge_5": 156,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 363
+          }
+        },
+        "cutoff": "2024-03-20T17:01:19+00:00",
+        "distinct_eligible_players": 743,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 4
+        },
+        "first_actual_target_kickoff": "2024-03-30T12:30:00+00:00",
+        "gw": 30,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 204,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 84,
+          "FWD": 24,
+          "MID": 96
+        },
+        "source_snapshot_id": "288c341ae1f28b260786e862b8917c865d953815",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          291,
+          292,
+          293,
+          294,
+          295,
+          296,
+          297,
+          298,
+          299,
+          300
+        ],
+        "target_rows": 743
+      },
+      {
+        "by_position": {
+          "DEF": 271,
+          "FWD": 110,
+          "MID": 366
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 747,
+          "expected_goals_measured": 747,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 747,
+          "prior_history_absent": 0,
+          "prior_history_present": 747,
+          "prior_starts_ge_10": 271,
+          "prior_starts_ge_3": 384,
+          "prior_starts_ge_5": 349,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 747
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 271,
+            "expected_goals_measured": 271,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 271,
+            "prior_history_absent": 0,
+            "prior_history_present": 271,
+            "prior_starts_ge_10": 112,
+            "prior_starts_ge_3": 161,
+            "prior_starts_ge_5": 146,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 271
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 110,
+            "expected_goals_measured": 110,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 110,
+            "prior_history_absent": 0,
+            "prior_history_present": 110,
+            "prior_starts_ge_10": 35,
+            "prior_starts_ge_3": 47,
+            "prior_starts_ge_5": 44,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 110
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 366,
+            "expected_goals_measured": 366,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 366,
+            "prior_history_absent": 0,
+            "prior_history_present": 366,
+            "prior_starts_ge_10": 124,
+            "prior_starts_ge_3": 176,
+            "prior_starts_ge_5": 159,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 366
+          }
+        },
+        "cutoff": "2024-04-01T08:08:41+00:00",
+        "distinct_eligible_players": 747,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 2
+        },
+        "first_actual_target_kickoff": "2024-04-02T18:30:00+00:00",
+        "gw": 31,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 201,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 83,
+          "FWD": 21,
+          "MID": 97
+        },
+        "source_snapshot_id": "4e6447daccfb053a496e4aebd37d264dfa949676",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          301,
+          302,
+          303,
+          304,
+          305,
+          306,
+          307,
+          308,
+          309,
+          310
+        ],
+        "target_rows": 747
+      },
+      {
+        "by_position": {
+          "DEF": 273,
+          "FWD": 110,
+          "MID": 366
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 749,
+          "expected_goals_measured": 749,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 749,
+          "prior_history_absent": 0,
+          "prior_history_present": 749,
+          "prior_starts_ge_10": 274,
+          "prior_starts_ge_3": 387,
+          "prior_starts_ge_5": 352,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 749
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 273,
+            "expected_goals_measured": 273,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 273,
+            "prior_history_absent": 0,
+            "prior_history_present": 273,
+            "prior_starts_ge_10": 113,
+            "prior_starts_ge_3": 161,
+            "prior_starts_ge_5": 148,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 273
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 110,
+            "expected_goals_measured": 110,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 110,
+            "prior_history_absent": 0,
+            "prior_history_present": 110,
+            "prior_starts_ge_10": 35,
+            "prior_starts_ge_3": 47,
+            "prior_starts_ge_5": 44,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 110
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 366,
+            "expected_goals_measured": 366,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 366,
+            "prior_history_absent": 0,
+            "prior_history_present": 366,
+            "prior_starts_ge_10": 126,
+            "prior_starts_ge_3": 179,
+            "prior_starts_ge_5": 160,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 366
+          }
+        },
+        "cutoff": "2024-04-05T12:24:10+00:00",
+        "distinct_eligible_players": 749,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 1
+        },
+        "first_actual_target_kickoff": "2024-04-06T11:30:00+00:00",
+        "gw": 32,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 205,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 88,
+          "FWD": 22,
+          "MID": 95
+        },
+        "source_snapshot_id": "7d6f6aafa94a937116f308a2393fb12e86c5771f",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          311,
+          312,
+          313,
+          314,
+          315,
+          316,
+          317,
+          318,
+          319,
+          320
+        ],
+        "target_rows": 749
+      },
+      {
+        "by_position": {
+          "DEF": 274,
+          "FWD": 110,
+          "MID": 366
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 750,
+          "expected_goals_measured": 750,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 750,
+          "prior_history_absent": 0,
+          "prior_history_present": 750,
+          "prior_starts_ge_10": 278,
+          "prior_starts_ge_3": 393,
+          "prior_starts_ge_5": 356,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 750
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 274,
+            "expected_goals_measured": 274,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 274,
+            "prior_history_absent": 0,
+            "prior_history_present": 274,
+            "prior_starts_ge_10": 114,
+            "prior_starts_ge_3": 164,
+            "prior_starts_ge_5": 150,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 274
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 110,
+            "expected_goals_measured": 110,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 110,
+            "prior_history_absent": 0,
+            "prior_history_present": 110,
+            "prior_starts_ge_10": 35,
+            "prior_starts_ge_3": 47,
+            "prior_starts_ge_5": 44,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 110
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 366,
+            "expected_goals_measured": 366,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 366,
+            "prior_history_absent": 0,
+            "prior_history_present": 366,
+            "prior_starts_ge_10": 129,
+            "prior_starts_ge_3": 182,
+            "prior_starts_ge_5": 162,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 366
+          }
+        },
+        "cutoff": "2024-04-08T10:31:08+00:00",
+        "distinct_eligible_players": 750,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 5
+        },
+        "first_actual_target_kickoff": "2024-04-13T11:30:00+00:00",
+        "gw": 33,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 206,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 84,
+          "FWD": 25,
+          "MID": 97
+        },
+        "source_snapshot_id": "436f1ff2d306783d3e3892dc3d3ce21712cbc08e",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          321,
+          322,
+          323,
+          324,
+          325,
+          326,
+          327,
+          328,
+          329,
+          330
+        ],
+        "target_rows": 750
+      },
+      {
+        "by_position": {
+          "DEF": 345,
+          "FWD": 146,
+          "MID": 480
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 971,
+          "expected_goals_measured": 971,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 971,
+          "prior_history_absent": 0,
+          "prior_history_present": 971,
+          "prior_starts_ge_10": 362,
+          "prior_starts_ge_3": 510,
+          "prior_starts_ge_5": 467,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 971
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 345,
+            "expected_goals_measured": 345,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 345,
+            "prior_history_absent": 0,
+            "prior_history_present": 345,
+            "prior_starts_ge_10": 152,
+            "prior_starts_ge_3": 216,
+            "prior_starts_ge_5": 200,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 345
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 146,
+            "expected_goals_measured": 146,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 146,
+            "prior_history_absent": 0,
+            "prior_history_present": 146,
+            "prior_starts_ge_10": 47,
+            "prior_starts_ge_3": 64,
+            "prior_starts_ge_5": 57,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 146
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 480,
+            "expected_goals_measured": 480,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 480,
+            "prior_history_absent": 0,
+            "prior_history_present": 480,
+            "prior_starts_ge_10": 163,
+            "prior_starts_ge_3": 230,
+            "prior_starts_ge_5": 210,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 480
+          }
+        },
+        "cutoff": "2024-04-16T08:22:40+00:00",
+        "distinct_eligible_players": 719,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 6
+        },
+        "first_actual_target_kickoff": "2024-04-20T14:00:00+00:00",
+        "gw": 34,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 269,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 113,
+          "FWD": 25,
+          "MID": 131
+        },
+        "source_snapshot_id": "d7e0beda3436c5051116e1aeef652e96119ebf92",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          281,
+          282,
+          284,
+          285,
+          288,
+          290,
+          331,
+          333,
+          334,
+          335,
+          336,
+          338,
+          340
+        ],
+        "target_rows": 971
+      },
+      {
+        "by_position": {
+          "DEF": 311,
+          "FWD": 126,
+          "MID": 407
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 844,
+          "expected_goals_measured": 844,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 844,
+          "prior_history_absent": 0,
+          "prior_history_present": 844,
+          "prior_starts_ge_10": 314,
+          "prior_starts_ge_3": 433,
+          "prior_starts_ge_5": 397,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 844
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 311,
+            "expected_goals_measured": 311,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 311,
+            "prior_history_absent": 0,
+            "prior_history_present": 311,
+            "prior_starts_ge_10": 129,
+            "prior_starts_ge_3": 181,
+            "prior_starts_ge_5": 167,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 311
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 126,
+            "expected_goals_measured": 126,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 126,
+            "prior_history_absent": 0,
+            "prior_history_present": 126,
+            "prior_starts_ge_10": 36,
+            "prior_starts_ge_3": 50,
+            "prior_starts_ge_5": 46,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 126
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 407,
+            "expected_goals_measured": 407,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 407,
+            "prior_history_absent": 0,
+            "prior_history_present": 407,
+            "prior_starts_ge_10": 149,
+            "prior_starts_ge_3": 202,
+            "prior_starts_ge_5": 184,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 407
+          }
+        },
+        "cutoff": "2024-04-27T08:18:04+00:00",
+        "distinct_eligible_players": 759,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 4
+        },
+        "first_actual_target_kickoff": "2024-04-27T11:30:00+00:00",
+        "gw": 35,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 224,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 91,
+          "FWD": 25,
+          "MID": 108
+        },
+        "source_snapshot_id": "6f1e864e5a5bb58a0ad92a257e86df7a7d4816db",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          255,
+          341,
+          342,
+          343,
+          344,
+          345,
+          346,
+          347,
+          348,
+          349,
+          350
+        ],
+        "target_rows": 844
+      },
+      {
+        "by_position": {
+          "DEF": 277,
+          "FWD": 113,
+          "MID": 371
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 761,
+          "expected_goals_measured": 761,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 761,
+          "prior_history_absent": 0,
+          "prior_history_present": 761,
+          "prior_starts_ge_10": 302,
+          "prior_starts_ge_3": 397,
+          "prior_starts_ge_5": 369,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 761
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 277,
+            "expected_goals_measured": 277,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 277,
+            "prior_history_absent": 0,
+            "prior_history_present": 277,
+            "prior_starts_ge_10": 123,
+            "prior_starts_ge_3": 166,
+            "prior_starts_ge_5": 156,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 277
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 113,
+            "expected_goals_measured": 113,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 113,
+            "prior_history_absent": 0,
+            "prior_history_present": 113,
+            "prior_starts_ge_10": 37,
+            "prior_starts_ge_3": 48,
+            "prior_starts_ge_5": 44,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 113
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 371,
+            "expected_goals_measured": 371,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 371,
+            "prior_history_absent": 0,
+            "prior_history_present": 371,
+            "prior_starts_ge_10": 142,
+            "prior_starts_ge_3": 183,
+            "prior_starts_ge_5": 169,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 371
+          }
+        },
+        "cutoff": "2024-05-03T08:34:20+00:00",
+        "distinct_eligible_players": 761,
+        "exclusions": {},
+        "first_actual_target_kickoff": "2024-05-03T19:00:00+00:00",
+        "gw": 36,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 204,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 83,
+          "FWD": 22,
+          "MID": 99
+        },
+        "source_snapshot_id": "8f5194d666f608200916f2b62f8976e8c8beff87",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          351,
+          352,
+          353,
+          354,
+          355,
+          356,
+          357,
+          358,
+          359,
+          360
+        ],
+        "target_rows": 761
+      },
+      {
+        "by_position": {
+          "DEF": 368,
+          "FWD": 144,
+          "MID": 486
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 998,
+          "expected_goals_measured": 998,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 998,
+          "prior_history_absent": 0,
+          "prior_history_present": 998,
+          "prior_starts_ge_10": 395,
+          "prior_starts_ge_3": 517,
+          "prior_starts_ge_5": 485,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 998
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 368,
+            "expected_goals_measured": 368,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 368,
+            "prior_history_absent": 0,
+            "prior_history_present": 368,
+            "prior_starts_ge_10": 161,
+            "prior_starts_ge_3": 212,
+            "prior_starts_ge_5": 203,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 368
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 144,
+            "expected_goals_measured": 144,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 144,
+            "prior_history_absent": 0,
+            "prior_history_present": 144,
+            "prior_starts_ge_10": 46,
+            "prior_starts_ge_3": 59,
+            "prior_starts_ge_5": 55,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 144
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 486,
+            "expected_goals_measured": 486,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 486,
+            "prior_history_absent": 0,
+            "prior_history_present": 486,
+            "prior_starts_ge_10": 188,
+            "prior_starts_ge_3": 246,
+            "prior_starts_ge_5": 227,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 486
+          }
+        },
+        "cutoff": "2024-05-09T13:15:25+00:00",
+        "distinct_eligible_players": 761,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 4
+        },
+        "first_actual_target_kickoff": "2024-05-11T11:30:00+00:00",
+        "gw": 37,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 264,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 106,
+          "FWD": 25,
+          "MID": 133
+        },
+        "source_snapshot_id": "2981ebc1630d6e0211c5847731c8fb79cecba785",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          332,
+          337,
+          339,
+          361,
+          362,
+          363,
+          364,
+          365,
+          366,
+          367,
+          368,
+          369,
+          370
+        ],
+        "target_rows": 998
+      },
+      {
+        "by_position": {
+          "DEF": 278,
+          "FWD": 113,
+          "MID": 372
+        },
+        "counts": {
+          "box_touches_measured": 0,
+          "expected_assists_measured": 763,
+          "expected_goals_measured": 763,
+          "key_passes_measured": 0,
+          "paired_xg_xa_measured": 763,
+          "prior_history_absent": 0,
+          "prior_history_present": 763,
+          "prior_starts_ge_10": 308,
+          "prior_starts_ge_3": 399,
+          "prior_starts_ge_5": 374,
+          "shots_measured": 0,
+          "shots_on_target_measured": 0,
+          "target_rows": 763
+        },
+        "coverage_by_position": {
+          "DEF": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 278,
+            "expected_goals_measured": 278,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 278,
+            "prior_history_absent": 0,
+            "prior_history_present": 278,
+            "prior_starts_ge_10": 125,
+            "prior_starts_ge_3": 167,
+            "prior_starts_ge_5": 158,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 278
+          },
+          "FWD": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 113,
+            "expected_goals_measured": 113,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 113,
+            "prior_history_absent": 0,
+            "prior_history_present": 113,
+            "prior_starts_ge_10": 37,
+            "prior_starts_ge_3": 48,
+            "prior_starts_ge_5": 44,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 113
+          },
+          "MID": {
+            "box_touches_measured": 0,
+            "expected_assists_measured": 372,
+            "expected_goals_measured": 372,
+            "key_passes_measured": 0,
+            "paired_xg_xa_measured": 372,
+            "prior_history_absent": 0,
+            "prior_history_present": 372,
+            "prior_starts_ge_10": 146,
+            "prior_starts_ge_3": 184,
+            "prior_starts_ge_5": 172,
+            "shots_measured": 0,
+            "shots_on_target_measured": 0,
+            "target_rows": 372
+          }
+        },
+        "cutoff": "2024-05-19T02:36:03+00:00",
+        "distinct_eligible_players": 763,
+        "exclusions": {
+          "NO_CUTOFF_REGISTRY": 2
+        },
+        "first_actual_target_kickoff": "2024-05-19T15:00:00+00:00",
+        "gw": 38,
+        "official_fpl_deadline": null,
+        "paired_minutes_ge_45": 201,
+        "paired_minutes_ge_45_by_position": {
+          "DEF": 84,
+          "FWD": 24,
+          "MID": 93
+        },
+        "source_snapshot_id": "5218c9f360c0415d7272775239f88ab0eb15e91d",
+        "status": "AVAILABLE_ARCHIVE_SNAPSHOT_CUTOFF",
+        "target_fixture_ids": [
+          371,
+          372,
+          373,
+          374,
+          375,
+          376,
+          377,
+          378,
+          379,
+          380
+        ],
+        "target_rows": 763
+      }
+    ],
+    "frozen_availability_audit_reproduced": true,
+    "input_sha256": {
+      "audit": "146a7209c412e20fbebb63c3c8377097d95b1cd711baf5cf465cb78da4edb409",
+      "manifest": "56da2a8c52f96c2d7d4b68586d86d9eeee3fc4011ae17235ddcf940b58dcf03c",
+      "observations": "0d699021537dc7e636f0dfb8e4484f98fc57263663806631c5c8e075b0c5cefc",
+      "scope": "2403c87e9de6e284801b97b450f5841606177f03ee30593fbd3de642c444f72a"
+    },
+    "kind": "attacking_usage_population_reproduction_no_predictive_scoring",
+    "normalized_versions": 26312,
+    "official_historical_deadlines": null,
+    "paired_minutes_ge_45": 7403,
+    "players_with_prior_starts": {
+      "10": 308,
+      "3": 399,
+      "5": 374
+    },
+    "population_sha256": "f2467d7fc5a66df79c6d2d8c33b7adcca0085143d2ba0c2884bfce07624743ec",
+    "raw_payload_hashes_checked": 152,
+    "source_snapshot_count": 38,
+    "target_gameweeks": 36,
+    "target_roster_is_retained_observed_population": true,
+    "target_rows": 24947,
+    "unique_players": 763
+  },
+  "positions": {
+    "DEF": {
+      "candidate": {
+        "conditional_position_gw_ranking": {
+          "mean_spearman": 0.18364537847780274,
+          "relative_future_xgi90_lift": 0.6232865860182173,
+          "scoreable_groups": 36,
+          "top_decile_mean_xgi90": 0.17655722828366607,
+          "top_decile_rows": 325
+        },
+        "xa": {
+          "mae": 0.0631262116098064,
+          "mean_error": 0.0069481255845961955,
+          "mean_observation": 0.05569553199906475,
+          "mean_prediction": 0.06264365758366094,
+          "spearman": 0.2873309478284351
+        },
+        "xg": {
+          "mae": 0.0719319497161484,
+          "mean_error": 0.0012756521731136115,
+          "mean_observation": 0.05306975307406939,
+          "mean_prediction": 0.054345405247182996,
+          "spearman": 0.10213432050330548
+        },
+        "xgi": {
+          "mae": 0.11160396575772835,
+          "mean_error": 0.008223777757709806,
+          "mean_observation": 0.10876528507313413,
+          "mean_prediction": 0.11698906283084394,
+          "spearman": 0.19460990782719717
+        }
+      },
+      "control": {
+        "conditional_position_gw_ranking": {
+          "mean_spearman": 0.21780294489370408,
+          "relative_future_xgi90_lift": 0.7535377240847729,
+          "scoreable_groups": 36,
+          "top_decile_mean_xgi90": 0.19072403044657515,
+          "top_decile_rows": 325
+        },
+        "xa": {
+          "mae": 0.06190955338608723,
+          "mean_error": 0.007482805117527627,
+          "mean_observation": 0.05569553199906475,
+          "mean_prediction": 0.06317833711659238,
+          "spearman": 0.3540345368719394
+        },
+        "xg": {
+          "mae": 0.07113029979503864,
+          "mean_error": 0.001055736550795839,
+          "mean_observation": 0.05306975307406939,
+          "mean_prediction": 0.05412548962486522,
+          "spearman": 0.1126740263248356
+        },
+        "xgi": {
+          "mae": 0.11102452224694782,
+          "mean_error": 0.008538541668323464,
+          "mean_observation": 0.10876528507313413,
+          "mean_prediction": 0.11730382674145759,
+          "spearman": 0.23440000759444163
+        }
+      },
+      "positive_shift_rows": 101,
+      "premium_quantiles": {
+        "0.0": 0.025193798449612403,
+        "0.1": 0.18274529569892475,
+        "0.5": 0.48968007156854393,
+        "0.75": 0.6428571428571428,
+        "0.9": 0.7955180294565768,
+        "0.975": 0.9057995495495496,
+        "1.0": 0.9888268156424581
+      },
+      "relative_mae_lift": {
+        "xa": -0.019652188671620864,
+        "xg": -0.011270160865618547,
+        "xgi": -0.0052190588083927325
+      },
+      "rows": 3050
+    },
+    "FWD": {
+      "candidate": {
+        "conditional_position_gw_ranking": {
+          "mean_spearman": 0.19852177800902604,
+          "relative_future_xgi90_lift": 0.5149903955463135,
+          "scoreable_groups": 36,
+          "top_decile_mean_xgi90": 0.7668191745122527,
+          "top_decile_rows": 107
+        },
+        "xa": {
+          "mae": 0.08949632131060505,
+          "mean_error": 0.0004821496767636774,
+          "mean_observation": 0.08770043690208172,
+          "mean_prediction": 0.08818258657884541,
+          "spearman": 0.20777393278850032
+        },
+        "xg": {
+          "mae": 0.3508087160567586,
+          "mean_error": 0.024006163471344346,
+          "mean_observation": 0.4184540422065027,
+          "mean_prediction": 0.44246020567784705,
+          "spearman": 0.162464336265121
+        },
+        "xgi": {
+          "mae": 0.3720423182900544,
+          "mean_error": 0.024488313148108013,
+          "mean_observation": 0.5061544791085845,
+          "mean_prediction": 0.5306427922566924,
+          "spearman": 0.1941927830616408
+        }
+      },
+      "control": {
+        "conditional_position_gw_ranking": {
+          "mean_spearman": 0.23416731390491352,
+          "relative_future_xgi90_lift": 0.5806496516916018,
+          "scoreable_groups": 36,
+          "top_decile_mean_xgi90": 0.8000529011051282,
+          "top_decile_rows": 107
+        },
+        "xa": {
+          "mae": 0.08885014986636593,
+          "mean_error": 0.0010956387812280364,
+          "mean_observation": 0.08770043690208172,
+          "mean_prediction": 0.08879607568330977,
+          "spearman": 0.24250308414280208
+        },
+        "xg": {
+          "mae": 0.34830963549872895,
+          "mean_error": 0.0286786339800416,
+          "mean_observation": 0.4184540422065027,
+          "mean_prediction": 0.44713267618654423,
+          "spearman": 0.20636880457298198
+        },
+        "xgi": {
+          "mae": 0.3692232137172296,
+          "mean_error": 0.029774272761269625,
+          "mean_observation": 0.5061544791085845,
+          "mean_prediction": 0.535928751869854,
+          "spearman": 0.23942019652469948
+        }
+      },
+      "positive_shift_rows": 59,
+      "premium_quantiles": {
+        "0.0": 0.028169014084507043,
+        "0.1": 0.18883222845486997,
+        "0.5": 0.5068506006006006,
+        "0.75": 0.6553762875762035,
+        "0.9": 0.8333333333333333,
+        "0.975": 0.9279089861751152,
+        "1.0": 0.9927536231884058
+      },
+      "relative_mae_lift": {
+        "xa": -0.007272598247847478,
+        "xg": -0.0071748820685116664,
+        "xgi": -0.007635231123316698
+      },
+      "rows": 864
+    },
+    "MID": {
+      "candidate": {
+        "conditional_position_gw_ranking": {
+          "mean_spearman": 0.3883278605081473,
+          "relative_future_xgi90_lift": 0.8011249735958561,
+          "scoreable_groups": 36,
+          "top_decile_mean_xgi90": 0.5526429337357994,
+          "top_decile_rows": 366
+        },
+        "xa": {
+          "mae": 0.11925066399693138,
+          "mean_error": 0.00766791928947236,
+          "mean_observation": 0.13156963781537964,
+          "mean_prediction": 0.139237557104852,
+          "spearman": 0.333819583818386
+        },
+        "xg": {
+          "mae": 0.17619267304211284,
+          "mean_error": 0.006633689150950759,
+          "mean_observation": 0.17526244870689833,
+          "mean_prediction": 0.1818961378578491,
+          "spearman": 0.3227101212416862
+        },
+        "xgi": {
+          "mae": 0.2392942724287838,
+          "mean_error": 0.014301608440423117,
+          "mean_observation": 0.306832086522278,
+          "mean_prediction": 0.3211336949627011,
+          "spearman": 0.3890146613682626
+        }
+      },
+      "control": {
+        "conditional_position_gw_ranking": {
+          "mean_spearman": 0.4307868509950487,
+          "relative_future_xgi90_lift": 0.9268781874432903,
+          "scoreable_groups": 36,
+          "top_decile_mean_xgi90": 0.5912280547274898,
+          "top_decile_rows": 366
+        },
+        "xa": {
+          "mae": 0.11591798722490287,
+          "mean_error": 0.008366843543416954,
+          "mean_observation": 0.13156963781537964,
+          "mean_prediction": 0.1399364813587966,
+          "spearman": 0.37648706505873764
+        },
+        "xg": {
+          "mae": 0.17137901337244885,
+          "mean_error": 0.006362181673742489,
+          "mean_observation": 0.17526244870689833,
+          "mean_prediction": 0.18162463038064083,
+          "spearman": 0.36386527765154797
+        },
+        "xgi": {
+          "mae": 0.23268946706169688,
+          "mean_error": 0.014729025217159443,
+          "mean_observation": 0.306832086522278,
+          "mean_prediction": 0.3215611117394374,
+          "spearman": 0.43054998315899556
+        }
+      },
+      "positive_shift_rows": 442,
+      "premium_quantiles": {
+        "0.0": 0.004405286343612335,
+        "0.1": 0.14049193231011414,
+        "0.5": 0.5052083333333334,
+        "0.75": 0.6762114537444934,
+        "0.9": 0.8550091791240495,
+        "0.975": 0.9403555010726325,
+        "1.0": 0.9980237154150198
+      },
+      "relative_mae_lift": {
+        "xa": -0.028750298826035327,
+        "xg": -0.028087801271225198,
+        "xgi": -0.028384634038186456
+      },
+      "rows": 3489
+    }
+  },
+  "primary": {
+    "candidate": {
+      "conditional_position_gw_ranking": {
+        "mean_spearman": 0.2568316723316587,
+        "relative_future_xgi90_lift": 0.7231640859767363,
+        "scoreable_groups": 108,
+        "top_decile_mean_xgi90": 0.42819306342394126,
+        "top_decile_rows": 798
+      },
+      "xa": {
+        "mae": 0.09265504980515546,
+        "mean_error": 0.006532720620655313,
+        "mean_observation": 0.09518992522199185,
+        "mean_prediction": 0.10172264584264716,
+        "spearman": 0.45124770944911324
+      },
+      "xg": {
+        "mae": 0.15361710300570358,
+        "mean_error": 0.006453735757788089,
+        "mean_observation": 0.15330240752136948,
+        "mean_prediction": 0.15975614327915758,
+        "spearman": 0.47671846961839415
+      },
+      "xgi": {
+        "mae": 0.20217943739939281,
+        "mean_error": 0.012986456378443399,
+        "mean_observation": 0.24849233274336133,
+        "mean_prediction": 0.2614787891218047,
+        "spearman": 0.5240931476771805
+      }
+    },
+    "control": {
+      "conditional_position_gw_ranking": {
+        "mean_spearman": 0.2942523699312221,
+        "relative_future_xgi90_lift": 0.8355328411457903,
+        "scoreable_groups": 108,
+        "top_decile_mean_xgi90": 0.4561158375233671,
+        "top_decile_rows": 798
+      },
+      "xa": {
+        "mae": 0.09050770292311122,
+        "mean_error": 0.007154005759613946,
+        "mean_observation": 0.09518992522199185,
+        "mean_prediction": 0.1023439309816058,
+        "spearman": 0.48206218824721814
+      },
+      "xg": {
+        "mae": 0.1507265050793251,
+        "mean_error": 0.006780492786488017,
+        "mean_observation": 0.15330240752136948,
+        "mean_prediction": 0.16008290030785752,
+        "spearman": 0.4908692613812632
+      },
+      "xgi": {
+        "mae": 0.19849887884413583,
+        "mean_error": 0.01393449854610196,
+        "mean_observation": 0.24849233274336133,
+        "mean_prediction": 0.26242683128946326,
+        "spearman": 0.5423964631299081
+      }
+    },
+    "positive_shift_rows": 602,
+    "premium_quantiles": {
+      "0.0": 0.004405286343612335,
+      "0.1": 0.1575731981981982,
+      "0.5": 0.5,
+      "0.75": 0.660868578775217,
+      "0.9": 0.8326771653543308,
+      "0.975": 0.9282753876580011,
+      "1.0": 0.9980237154150198
+    },
+    "relative_mae_lift": {
+      "xa": -0.02372557045082083,
+      "xg": -0.01917776787073508,
+      "xgi": -0.018541961429147453
+    },
+    "rows": 7403
+  },
+  "primary_minimum_target_minutes": 45,
+  "provenance": {
+    "branch": "claude/comet-fpl-v2-architecture-mqrj8f",
+    "config_sha256": "08589200d0285309fcfd0ef3620509d06f24c5b422e3dd629428d39657f040b7",
+    "frozen_inputs_sha256": {
+      "config/attacking_role_premium_study.yaml": "5a3ca31aa9e655f897b1c2f2670efc950e94a2402aaf55ede60860a9df64a903",
+      "config/data_quality.yaml": "7a038c4c041bf80c899bb23f9df195705de01321b4c6eca63e0396ea67ceeba0",
+      "config/historical_player_attacking_backfill.yaml": "2403c87e9de6e284801b97b450f5841606177f03ee30593fbd3de642c444f72a",
+      "docs/attacking-role-premium-v1-preregistration-2026-09-08.md": "cd715d021049b9d975c9ba9def7f12c4bb56d5c96470ab0b464b5cc4c0635ece",
+      "results/attacking_role_premium_feasibility_2026-09-08.json": "65b950bfb95c965f4c776964f4b18074fa60aa74e4b7224b355ef969e0e31ed7",
+      "results/attacking_role_premium_v1_population_2026-09-08.json": "1cff23498587cbbaccabad008a490c81dc7c4678f679703809ae296054f13533",
+      "results/historical_player_attacking_backfill_independent_audit_2026-09-08.json": "146a7209c412e20fbebb63c3c8377097d95b1cd711baf5cf465cb78da4edb409",
+      "results/historical_player_attacking_backfill_manifest_2026-09-08.json": "56da2a8c52f96c2d7d4b68586d86d9eeee3fc4011ae17235ddcf940b58dcf03c",
+      "results/historical_player_attacking_source_audit_2026-09-08.json": "1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952"
+    },
+    "implementation_git_blobs": {
+      "src/fpl/config.py": "b38b4681a6c875ab87c416044a7756f147c13777",
+      "src/fpl/features/attacking_role_premium_v1.py": "7dbd42b7459595a604da04d895f04627f8155a0d",
+      "src/fpl/features/pit.py": "bb37f5a3b5c2fc5885dbbb13d910f68e18923680",
+      "src/fpl/jobs/backfill_historical_player_attacking.py": "4aaa68c575385a56dbb33f791793892cd7cc4428",
+      "src/fpl/jobs/competitive_participation_pilot.py": "091cc5a0b3bf8da4c1cf052a57e8b965bb6a6a6e",
+      "src/fpl/jobs/evaluate_attacking_role_premium_v1.py": "794f3d560e42d36e22e7f3f2571326ca897c9bff",
+      "src/fpl/storage/db.py": "d7219c68f0166e2d11668b4f0303f848f6710757",
+      "src/fpl/validate/attacking_role_premium_v1.py": "6bd5d66d16a441a4601ea463d7f7e6245620957d",
+      "src/fpl/validate/attacking_role_premium_v1_metrics.py": "1e4aa30ff431d3614390f627071dd92fb59e64f1",
+      "src/fpl/validate/development_program_provenance.py": "76fa9dbd8643d19e6e5d9c6defcdffd5423c2a3f",
+      "src/fpl/validate/historical_player_attacking.py": "7797968457a3fdcc60459c7e2f15ae759dba124a",
+      "src/fpl/validate/metrics.py": "b1f66e96786fb0f22de3cbf4a3c6b0b6b238c8cd"
+    },
+    "implementation_sha256": {
+      "src/fpl/config.py": "bd7f716305466329c91d1cdd59c82ad172888ccd8e3e2c6d347266b2e29f467a",
+      "src/fpl/features/attacking_role_premium_v1.py": "0b291668aea4c06e0d3066687dcca41475406c4ba0b54b8429d1be646512fae1",
+      "src/fpl/features/pit.py": "c024fb1e276615c0fc6b004234feb31677dbfd2c7e76d7b6b2c2d0f6809e0bf7",
+      "src/fpl/jobs/backfill_historical_player_attacking.py": "7551d79b671460831a198d5fc9adaeec495212d22b1aa6485fff56c969da63f7",
+      "src/fpl/jobs/competitive_participation_pilot.py": "67d1bba737046ae385ca810dff6d3e956d35dab4cdc0d0c3aa83890b4b7ed1fc",
+      "src/fpl/jobs/evaluate_attacking_role_premium_v1.py": "5e6ea2688e056bb1d96e5e80709e25c0b2127979eb4170fd809b412a81f8cc73",
+      "src/fpl/storage/db.py": "0251cc73ccdc4748b95ced9aa586335de3374141aea66065df9282a5729626e5",
+      "src/fpl/validate/attacking_role_premium_v1.py": "693a5c9dda17256901442c597c8d6f03d302bd642ba207feecdad20188e8f4ed",
+      "src/fpl/validate/attacking_role_premium_v1_metrics.py": "63b92a74ba23b984e76e94c0c32eba80ef7d2bafd6126574e978e6d1505c6883",
+      "src/fpl/validate/development_program_provenance.py": "1b91bb1e1725ee673f9311c63c870feeb7cf5cee1d7f45501bf0f7fd936b1211",
+      "src/fpl/validate/historical_player_attacking.py": "08105702d3eea13c96522f1011fd031cf8fe19deaf5135453852e502a8e3f5a7",
+      "src/fpl/validate/metrics.py": "d568420cc77b54cd9903cd4ee13c9ca4856c0712f8b11b6cf56986576b1b8fef"
+    },
+    "observations_sha256": "0d699021537dc7e636f0dfb8e4484f98fc57263663806631c5c8e075b0c5cefc",
+    "preregistration_git_head": "deafed70a1a2fbe65701f719523fbcb064efde8b",
+    "raw_source_sha256": {
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/028f925c32fabb34798e416c569070d0cae329a2/data/2023-24/fixtures.csv": "c3126aa8a52413170b3d0629235d3bc84cb394f8cff7c516da56c36c61785c3b",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/028f925c32fabb34798e416c569070d0cae329a2/data/2023-24/gws/merged_gw.csv": "d5e11fcd64e4c4713266448c0d1b0a97bf92243e11ad7a5ffdf2f7b2f51f80d5",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/028f925c32fabb34798e416c569070d0cae329a2/data/2023-24/players_raw.csv": "e5d6c262ee0d3a7ee7508d54f3403c22824aaedb2026b40a792eda44888af140",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/028f925c32fabb34798e416c569070d0cae329a2/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/15783a5630abadb309ff4c3edbb3dc32e6a2b426/data/2023-24/fixtures.csv": "12234149191fde12d8aa0bc45b5ff19ef4028ade7b31ebcfbbbd6deeb8b41758",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/15783a5630abadb309ff4c3edbb3dc32e6a2b426/data/2023-24/gws/merged_gw.csv": "ae656d5e04dfc3692008ce355e76bdb0efd12ab28b28192e5c7e49c9d7bf0953",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/15783a5630abadb309ff4c3edbb3dc32e6a2b426/data/2023-24/players_raw.csv": "5b9fbd630edf53935bacdece09dabbd0fe19c33ea390c1b8478e547e779b8dd1",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/15783a5630abadb309ff4c3edbb3dc32e6a2b426/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/204c134d8e90e2b6e69ec252aa3ef6f10f21e73c/data/2023-24/fixtures.csv": "d8521bdbb80edb5141bc17df71bf6026275f2e56fd6a6dc6041b3ae23a39ce6a",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/204c134d8e90e2b6e69ec252aa3ef6f10f21e73c/data/2023-24/gws/merged_gw.csv": "e9c09c8856f1c86b4f920f46ddd5033af83409439dfda53be925df2a3e7c8a9e",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/204c134d8e90e2b6e69ec252aa3ef6f10f21e73c/data/2023-24/players_raw.csv": "43d8cf5efb3d901f2499558c40b392b7f0ee22afe28030f36266ad29024c63d9",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/204c134d8e90e2b6e69ec252aa3ef6f10f21e73c/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/fixtures.csv": "5b4aef2aa20f4f1062936d92004ee10311727fae5326608ba650e46ba7dc6035",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/gws/merged_gw.csv": "32e84407d5ff88ca4f9b8fd54cf6aa1e4691c69a5446995afcfa9d77248838bc",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/players_raw.csv": "c02546cd5d9039a0fd17e9f4c21a900f422473afc5cc4fa5a5b3ac5a3f4966e9",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/288c341ae1f28b260786e862b8917c865d953815/data/2023-24/fixtures.csv": "245c43105abdfc7096d7e89f5eda603d281eab54fc92563cd02bbdc0cb45998e",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/288c341ae1f28b260786e862b8917c865d953815/data/2023-24/gws/merged_gw.csv": "85d3ff8a6ab0d4487cc4a83b43c6a808aa2664f75374725670c858bd38121dbe",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/288c341ae1f28b260786e862b8917c865d953815/data/2023-24/players_raw.csv": "d1bf90ac8ab75bf339fcdb3a1813051f144d1a032871a4d305a8d8ff0f46ed57",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/288c341ae1f28b260786e862b8917c865d953815/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2981ebc1630d6e0211c5847731c8fb79cecba785/data/2023-24/fixtures.csv": "997ae360a5cdf6ae03b6acc628bbe6576b978dfa663a77f1451b8f8f51f3592b",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2981ebc1630d6e0211c5847731c8fb79cecba785/data/2023-24/gws/merged_gw.csv": "7c89458fbb3fac3294bd5ecd513ced9ccd228a0ea8b33a7956cfb28cb5d1a4d6",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2981ebc1630d6e0211c5847731c8fb79cecba785/data/2023-24/players_raw.csv": "c885fc92e6d7d7a281b65e469b84d1556431b1936e1009b852e4b831ca5dc78e",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2981ebc1630d6e0211c5847731c8fb79cecba785/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2abff9370632b3b36bbdfa0870805b60fb392ef0/data/2023-24/fixtures.csv": "f4e2ef11fbaaf4dc8c17a11f267eb6d533fb164483570648db04df14f37eebf2",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2abff9370632b3b36bbdfa0870805b60fb392ef0/data/2023-24/gws/merged_gw.csv": "2bf92d952113cb5713271e4a4268b1c8e7d4b99649d1760de60c6d55fc424058",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2abff9370632b3b36bbdfa0870805b60fb392ef0/data/2023-24/players_raw.csv": "2de12ee93083ba2df52ca04e165991cfffac523271a4b7faf165e1e9703f8da2",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2abff9370632b3b36bbdfa0870805b60fb392ef0/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2f06c2ae70511a7075d02913784ec77a5fb21aa1/data/2023-24/fixtures.csv": "277ecc65fb7e781719f07eef6210a90179e6d9731c886b34f64c2826ed41b93a",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2f06c2ae70511a7075d02913784ec77a5fb21aa1/data/2023-24/gws/merged_gw.csv": "3bbe1bbb4163f704cb964d4de5659cd53a00c4f4b56bbda19cb0d3d553a9760d",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2f06c2ae70511a7075d02913784ec77a5fb21aa1/data/2023-24/players_raw.csv": "a3b40f227cb24cc8c23988c4ab2cac38926048a8d63182852e4baa6ef2298db7",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2f06c2ae70511a7075d02913784ec77a5fb21aa1/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/32184fc221871431d8215c5dc8385af0eda7bdde/data/2023-24/fixtures.csv": "9c6d9430f378aa78cac4032dbe6714355431b51dd59a6c2418bf04095b7f713a",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/32184fc221871431d8215c5dc8385af0eda7bdde/data/2023-24/gws/merged_gw.csv": "0d17ccf6dd50a8808d33eff07dcb3246b0512d32c1adac6f6171ec797c476789",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/32184fc221871431d8215c5dc8385af0eda7bdde/data/2023-24/players_raw.csv": "6b3e7a90cdf87f7203ba9099c86c5cdb6d0b921d2b7b5154b3ffafed67c7bf74",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/32184fc221871431d8215c5dc8385af0eda7bdde/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/392588ec1664432358f9481b81c3a8c1d53a60a3/data/2023-24/fixtures.csv": "d4e0453cb9467e3cdbdbb8317ca6704766e62dff5b1e82e00a56fc04c9ae7185",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/392588ec1664432358f9481b81c3a8c1d53a60a3/data/2023-24/gws/merged_gw.csv": "1730011824aaaef5661e2e810c31826994b7bb97fbcafd4da4fb7fda8b1e7b67",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/392588ec1664432358f9481b81c3a8c1d53a60a3/data/2023-24/players_raw.csv": "e0268530cd47c1a060aa1ba79c0ca6d4443b123383a5c8188e3b1387601b6507",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/392588ec1664432358f9481b81c3a8c1d53a60a3/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/436f1ff2d306783d3e3892dc3d3ce21712cbc08e/data/2023-24/fixtures.csv": "0f0f380b8ac935c9a3c2f97235172759fcd4d4c60d5488ea85bd206aaf730da3",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/436f1ff2d306783d3e3892dc3d3ce21712cbc08e/data/2023-24/gws/merged_gw.csv": "66bf9823afc348d94f2acbdf6c4343b057d4eeb9ef4feb5c4787f8d46edc4097",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/436f1ff2d306783d3e3892dc3d3ce21712cbc08e/data/2023-24/players_raw.csv": "1eadcf5a84569d6d20f17cb944acf842c3a3dcf260cd3e79376e3416aa361343",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/436f1ff2d306783d3e3892dc3d3ce21712cbc08e/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/446af195d2ee324a1217f34a5a2b591189efc983/data/2023-24/fixtures.csv": "e1c58b7ca6f5fcdf5def49c844838b9a33e76ca5998e96c1ebade9a55f599d8e",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/446af195d2ee324a1217f34a5a2b591189efc983/data/2023-24/gws/merged_gw.csv": "0f2dca13ede52e912be4abd05c44665e93520a744286c75ba55f2f0ee3c850bc",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/446af195d2ee324a1217f34a5a2b591189efc983/data/2023-24/players_raw.csv": "0560e1479a6c794a8b78c289160df2ff2425f4e36a241d68fa5ffd69d19f98a1",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/446af195d2ee324a1217f34a5a2b591189efc983/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/4e6447daccfb053a496e4aebd37d264dfa949676/data/2023-24/fixtures.csv": "843c6d5d5743eb683808b971d23c80212ba45ed99277b258a10cce813e455f13",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/4e6447daccfb053a496e4aebd37d264dfa949676/data/2023-24/gws/merged_gw.csv": "ae89ef527a2d76c5cae12268ac220dbe98d0fc2d61a299d1dc0fe66c3aabe762",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/4e6447daccfb053a496e4aebd37d264dfa949676/data/2023-24/players_raw.csv": "f31113dc48028816e854884249a3b60ca38f3270506e41c3217e52913affb67d",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/4e6447daccfb053a496e4aebd37d264dfa949676/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/5218c9f360c0415d7272775239f88ab0eb15e91d/data/2023-24/fixtures.csv": "dfaa9fbf9005b44d2e5aa38b1d5aaabad2022ae385085a5ff7533b930abef8b0",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/5218c9f360c0415d7272775239f88ab0eb15e91d/data/2023-24/gws/merged_gw.csv": "9842aa45a121fc3f20eb5d170add2bfe3828280fca7fde370c4e2fc9eec702a9",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/5218c9f360c0415d7272775239f88ab0eb15e91d/data/2023-24/players_raw.csv": "3e90220acb84bb47d7ef3c2504872147d3e79c33c3ff3298e33b7b93f8cc1d3d",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/5218c9f360c0415d7272775239f88ab0eb15e91d/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/546143eb5d0ae6d250e074374152e8be4b15719b/data/2023-24/fixtures.csv": "fbfd0780fd97b29fee22e35a3e826270200ab7f051654ea0f52bcea831c7025b",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/546143eb5d0ae6d250e074374152e8be4b15719b/data/2023-24/gws/merged_gw.csv": "7d2f50f260210788b450a37c377a4ec95982c0bccb3281cbb3f2663c73724f76",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/546143eb5d0ae6d250e074374152e8be4b15719b/data/2023-24/players_raw.csv": "0f795692e6217b048f77f6681f3e6171df57071718b0e865621966b35e0a6b14",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/546143eb5d0ae6d250e074374152e8be4b15719b/data/2023-24/teams.csv": "88fb278680ee176c06bd9e73b39598e7ea4c7d9662eeb671556b766138a9b257",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/5f49140e78b2052634abae57ce15e40f41dc32f7/data/2023-24/fixtures.csv": "95c991173deaf166379c1bc05a26d11835967f2d8fdb40ec44f22001776af32b",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/5f49140e78b2052634abae57ce15e40f41dc32f7/data/2023-24/gws/merged_gw.csv": "ffcb26bd9271d6d0e7f868fb93511472a46a5d8a3ffa4c79b9a7667f21040483",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/5f49140e78b2052634abae57ce15e40f41dc32f7/data/2023-24/players_raw.csv": "975a71644ac8765615d6fcb40846cf553ecb231d8834fdf9c440be8eec669e1a",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/5f49140e78b2052634abae57ce15e40f41dc32f7/data/2023-24/teams.csv": "88fb278680ee176c06bd9e73b39598e7ea4c7d9662eeb671556b766138a9b257",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/615da45c450fb13993b7e8da4c8388d7e2f57703/data/2023-24/fixtures.csv": "df5a8ca0ab5e023382fe7150d79da12177b1172c8a32f3f26e4a0155b6534896",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/615da45c450fb13993b7e8da4c8388d7e2f57703/data/2023-24/gws/merged_gw.csv": "8698847c61cc24af0ff0d92dc8a62d499c3dd2beedf4f8b6be82041c1fe24295",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/615da45c450fb13993b7e8da4c8388d7e2f57703/data/2023-24/players_raw.csv": "172ad0ffa59d3d9dab023072e890e006a4a54e6cba3357af427757f3243092ac",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/615da45c450fb13993b7e8da4c8388d7e2f57703/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/62f7b7c0b2d897834613475b15d6dc3301f13e70/data/2023-24/fixtures.csv": "c28c7c2435dbb2fb724a264c4855da92151cb86de4b2dffaa9c03e4ee89adc88",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/62f7b7c0b2d897834613475b15d6dc3301f13e70/data/2023-24/gws/merged_gw.csv": "527230137d47f772243bbe624a40572d264901b1aef1b9e6f2f9791a59040005",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/62f7b7c0b2d897834613475b15d6dc3301f13e70/data/2023-24/players_raw.csv": "26614586c9c701b9d3fd5d1ffdc7daa05527acade14981e6dce875ac0443f1a4",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/62f7b7c0b2d897834613475b15d6dc3301f13e70/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/6f1e864e5a5bb58a0ad92a257e86df7a7d4816db/data/2023-24/fixtures.csv": "44bf7e9db3ecf89809aa748cb411090f2efa1829b7192bd98a476431f0f64c1c",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/6f1e864e5a5bb58a0ad92a257e86df7a7d4816db/data/2023-24/gws/merged_gw.csv": "2382ef2da59eea0355d541c943bfae7e9c1f7d6f17f0e84b4ff0d9c36e9633ad",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/6f1e864e5a5bb58a0ad92a257e86df7a7d4816db/data/2023-24/players_raw.csv": "da4b42ef9871166e6fcd866b082668e76b01233c2112cdce685b629311f14e88",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/6f1e864e5a5bb58a0ad92a257e86df7a7d4816db/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/73cf14c852c5bbafde20ba11ebc5acd6eff965aa/data/2023-24/fixtures.csv": "741afeb2ee33113ea3aaa0f22fb04c664a997f986b4d57e3b5cf730f1b1e0278",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/73cf14c852c5bbafde20ba11ebc5acd6eff965aa/data/2023-24/gws/merged_gw.csv": "4b777820630f1f43e83f1da77084cebeef0d4b1533594b3491dd373a549d5308",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/73cf14c852c5bbafde20ba11ebc5acd6eff965aa/data/2023-24/players_raw.csv": "5408c808160a3c82fbb4a9bc383d1d7dae1e216c05f5168e79a9cdc5ae939617",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/73cf14c852c5bbafde20ba11ebc5acd6eff965aa/data/2023-24/teams.csv": "88fb278680ee176c06bd9e73b39598e7ea4c7d9662eeb671556b766138a9b257",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/7d6f6aafa94a937116f308a2393fb12e86c5771f/data/2023-24/fixtures.csv": "db84f0e4a4ea6b8ed4d9fe7864c091ce6134b284c0f74e7c578fdae846296037",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/7d6f6aafa94a937116f308a2393fb12e86c5771f/data/2023-24/gws/merged_gw.csv": "661887177748828ac63927689b13315c41c734fde1675f3e3a46cd017e11cef9",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/7d6f6aafa94a937116f308a2393fb12e86c5771f/data/2023-24/players_raw.csv": "eeaa1126c3462d0e9df69ffa2d24c7e2acfb997e6d8f56c771e174c09de65f07",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/7d6f6aafa94a937116f308a2393fb12e86c5771f/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8a0d23451ea7c07699ba903feb364e8fe0085c0e/data/2023-24/fixtures.csv": "9967958cbd986851587aab0f165512cb77648caa94fbc2387cc58bb22dd21721",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8a0d23451ea7c07699ba903feb364e8fe0085c0e/data/2023-24/gws/merged_gw.csv": "d3d6263829b5a524b9066724cffd7979f511a5856d8ac46542318175afab1db6",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8a0d23451ea7c07699ba903feb364e8fe0085c0e/data/2023-24/players_raw.csv": "2daa605dbeec6a3bf4981a919fb139429fafc4dc66353180a8553f6b6717a6f3",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8a0d23451ea7c07699ba903feb364e8fe0085c0e/data/2023-24/teams.csv": "88fb278680ee176c06bd9e73b39598e7ea4c7d9662eeb671556b766138a9b257",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40/data/2023-24/fixtures.csv": "47a4bd33bc6a478c162774158037dcff85d0297146254b7708a0357b42d59724",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40/data/2023-24/gws/merged_gw.csv": "37aecd9ea5b86e1024c66d3c4d1363847c7405ce81e87675a1bc28722066a3c3",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40/data/2023-24/players_raw.csv": "b1213a887e4b634c774f1b3a2bc2c6252ac184d6f792088f6f639619223bfafb",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8b05861fb33ee89bae34c2b6d06564449a5885db/data/2023-24/fixtures.csv": "1dcc0fd05aaa43b93cb3136e8907d4a6aec653ed1214abd90da370e283aa3dac",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8b05861fb33ee89bae34c2b6d06564449a5885db/data/2023-24/gws/merged_gw.csv": "43bc2058a4d7deacbd64e50f05e13a50bfcd6f9fc872bda7adf4f2d1eb4451d6",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8b05861fb33ee89bae34c2b6d06564449a5885db/data/2023-24/players_raw.csv": "fe8efc55623f52c2a86d95b500d502ee55e59d660f23232948cf0fc82f22ffcd",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8b05861fb33ee89bae34c2b6d06564449a5885db/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8f5194d666f608200916f2b62f8976e8c8beff87/data/2023-24/fixtures.csv": "6d2c9fe16b84baa5a51c8fd92e62454a3d6a424a3ffc7925e75ee68723f13f8e",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8f5194d666f608200916f2b62f8976e8c8beff87/data/2023-24/gws/merged_gw.csv": "7a5d1d9585f7ee9eb387816ab1a8e1c6f341863722888a63b4ec5999002916ca",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8f5194d666f608200916f2b62f8976e8c8beff87/data/2023-24/players_raw.csv": "dadcafe794509709cab8cec56c24a2a6a50cfd42b27e71e1062384101f565b46",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/8f5194d666f608200916f2b62f8976e8c8beff87/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/96fbc38ee6e36e3a7250081a787b65a1a27c944d/data/2023-24/fixtures.csv": "07b88250be0903a76b6334a7db56b9d9c148fc4a301c5e2338ce2c27dd01f367",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/96fbc38ee6e36e3a7250081a787b65a1a27c944d/data/2023-24/gws/merged_gw.csv": "359ab5c95e9bde13c9e3f0a740e3b32871cbd6272845b14d82533627d647aa9e",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/96fbc38ee6e36e3a7250081a787b65a1a27c944d/data/2023-24/players_raw.csv": "6c89876a381c84b5cb7a5a14dc6f49d95bbe5927c79f249a8ba10663a048baaa",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/96fbc38ee6e36e3a7250081a787b65a1a27c944d/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/acee0e28f8b201062270d709a7d72e4787680872/data/2023-24/fixtures.csv": "bd1d618c7a7436d4d4222189d7a66f93dd292e98f36ec5cff4c1d0ca45e6eed7",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/acee0e28f8b201062270d709a7d72e4787680872/data/2023-24/gws/merged_gw.csv": "b9be7a46f49d0f454319027d11b719871131c791286a6dfebd9baaa2d8020064",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/acee0e28f8b201062270d709a7d72e4787680872/data/2023-24/players_raw.csv": "52620cb5c6b8369cdbe5301b7350ddf8540fc9e17242184731a22850b1fa45f6",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/acee0e28f8b201062270d709a7d72e4787680872/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/b0ec80fec6916117225a6fbee11c35d8773c6f94/data/2023-24/fixtures.csv": "aa54dff9b9bf48d3db40376c39e84fe9b96d356bd2ed930811203b4df7fac508",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/b0ec80fec6916117225a6fbee11c35d8773c6f94/data/2023-24/gws/merged_gw.csv": "2de879b9402a7eb644adf61423e7297b1ab4d7267156f0ca019fe23d7e32c517",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/b0ec80fec6916117225a6fbee11c35d8773c6f94/data/2023-24/players_raw.csv": "e989216816b2c0693728ae7f914c496bd4f637a96ab47aa21fad89ad0893ac3f",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/b0ec80fec6916117225a6fbee11c35d8773c6f94/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/b9122f8c98f10a8217e5fb67bc4de447f6c685d5/data/2023-24/fixtures.csv": "d3903d8296c17e4706442eefac97c8993e9e1a6f46f9f03ce42575375f3833bc",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/b9122f8c98f10a8217e5fb67bc4de447f6c685d5/data/2023-24/gws/merged_gw.csv": "68de17b0e73ab774ce83d70b6324f71bbbb7dcf9443811c8900d74cd2dc36131",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/b9122f8c98f10a8217e5fb67bc4de447f6c685d5/data/2023-24/players_raw.csv": "4ebcc9a6c7f040c58de97f6597bb7f9f7b09f79820a8d6a73722690fed86d817",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/b9122f8c98f10a8217e5fb67bc4de447f6c685d5/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/fixtures.csv": "1966ce5b29a9e7934a731d16e147a6e1f2f37e778b474d16f1ef0ff4d133aabc",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/gws/merged_gw.csv": "53a22379f865e4fbac55e46778e68455f88ae88d1b2a89edf24ca3290e8cd493",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/players_raw.csv": "7a81e3845349c55fc89ce3ae8dfda07e78a0675d2297477612eeaee20572bb77",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/c4f66ee30ef026bb7e8b7184b2427f9708c77d74/data/2023-24/fixtures.csv": "c9f99615ca61bba4a8306f88131119b5539bb0862fee3178e54501111498f8f1",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/c4f66ee30ef026bb7e8b7184b2427f9708c77d74/data/2023-24/gws/merged_gw.csv": "06845415c63a14308c440f3ae65dfa678be62a0d3430cfd53d668b83a2927a85",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/c4f66ee30ef026bb7e8b7184b2427f9708c77d74/data/2023-24/players_raw.csv": "b91179173c8b99758da62cae8f8959242548b6e6075be621105fa7c53286f823",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/c4f66ee30ef026bb7e8b7184b2427f9708c77d74/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/caf799bb68f58fb26ac80d8cb762c353891232f5/data/2023-24/fixtures.csv": "f796324b9c36732372b1d472523f9988312ac401124f15ef1669a0e32c409fa3",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/caf799bb68f58fb26ac80d8cb762c353891232f5/data/2023-24/gws/merged_gw.csv": "eae451340c84638d0ea6eacce7d25525b5945b54c15ece689ca535f8396f233a",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/caf799bb68f58fb26ac80d8cb762c353891232f5/data/2023-24/players_raw.csv": "e0756846c374c84c843535abb97255ef67357ebd32a262666bdc15cd1ddc8768",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/caf799bb68f58fb26ac80d8cb762c353891232f5/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/cbf39345fdfa826870e37b1b2c777b543fed56d2/data/2023-24/fixtures.csv": "245c43105abdfc7096d7e89f5eda603d281eab54fc92563cd02bbdc0cb45998e",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/cbf39345fdfa826870e37b1b2c777b543fed56d2/data/2023-24/gws/merged_gw.csv": "a3ae5833f35e99150759b5008f4cb8937ccd3b0fd9a90da85a0932f5513b4121",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/cbf39345fdfa826870e37b1b2c777b543fed56d2/data/2023-24/players_raw.csv": "d1bf90ac8ab75bf339fcdb3a1813051f144d1a032871a4d305a8d8ff0f46ed57",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/cbf39345fdfa826870e37b1b2c777b543fed56d2/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8/data/2023-24/fixtures.csv": "42cdf2f3e48989b03fc23f6a1028c7c429073cfce16c4e67be1fd7cef041093d",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8/data/2023-24/gws/merged_gw.csv": "f26a61b99ab79d7f8c8a7bf1bb799cdd75385558ea44ca1e4d06dea23660b262",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8/data/2023-24/players_raw.csv": "698673d4db773f7fe7dd6986b3bd7a51dfb13ce11fcc1c2672717064145467a8",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d7e0beda3436c5051116e1aeef652e96119ebf92/data/2023-24/fixtures.csv": "0d503de5d4188f5da43eb2df3085bd9eb3c4e00ec9cca60884fa3fcbd2ef5eed",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d7e0beda3436c5051116e1aeef652e96119ebf92/data/2023-24/gws/merged_gw.csv": "83b1850f238ae0f648bab8b8d9ae34fe7ec3a9c903910fe6368d1baedf541924",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d7e0beda3436c5051116e1aeef652e96119ebf92/data/2023-24/players_raw.csv": "64c83b4404a17c8f229e49aa454cd5ed50a470ff187963297a9f2f8de1ab0d72",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d7e0beda3436c5051116e1aeef652e96119ebf92/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d8a6fc58722beaa625195de9d51a0333dcb46439/data/2023-24/fixtures.csv": "c13feab86ca123d646a7ea287e727e184d81d0da71ed6087dbd2bf2717fce3d4",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d8a6fc58722beaa625195de9d51a0333dcb46439/data/2023-24/gws/merged_gw.csv": "5c0960eca8f4b961ee27ce23d4c1a88b5a8884fcf096a6c52c4278695b3acf55",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d8a6fc58722beaa625195de9d51a0333dcb46439/data/2023-24/players_raw.csv": "398517d6ecf1ba34d5969c190e96af8448760f1b3836b1e1b865faabbde0093d",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/d8a6fc58722beaa625195de9d51a0333dcb46439/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/e92d9881f2ef025a7a1093e47fdf02d9aa2f8655/data/2023-24/fixtures.csv": "08d3c03c92c160765d1ff2b71cb8bc86fc45a1a72dfca06a08ed6988ec5764fa",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/e92d9881f2ef025a7a1093e47fdf02d9aa2f8655/data/2023-24/gws/merged_gw.csv": "3f154889ad7a52784df0872772ed0e96da852d429accccdf30bc46b43fd8acd5",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/e92d9881f2ef025a7a1093e47fdf02d9aa2f8655/data/2023-24/players_raw.csv": "e408017b9e46a0e069b14297ed25308fa81e0ccc0aa02285628dad03ccbb7b2f",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/e92d9881f2ef025a7a1093e47fdf02d9aa2f8655/data/2023-24/teams.csv": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/f061aafa88a921dd70fd2b0f72b8020889d8e589/data/2023-24/fixtures.csv": "8b3849fcba1d4bc09dc259269c7ae35a74e9f3546e67833fe2635ffdc2c4be95",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/f061aafa88a921dd70fd2b0f72b8020889d8e589/data/2023-24/gws/merged_gw.csv": "2ec98334a17571e656ddeb323a96b84933d85b15c65adfabadb7f79c4d9e139e",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/f061aafa88a921dd70fd2b0f72b8020889d8e589/data/2023-24/players_raw.csv": "16761c731e8b40bac8503edd5faed002fabd5e527e7de181f947891f388381d3",
+      "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/f061aafa88a921dd70fd2b0f72b8020889d8e589/data/2023-24/teams.csv": "88fb278680ee176c06bd9e73b39598e7ea4c7d9662eeb671556b766138a9b257"
+    },
+    "runtime": {
+      "packages": {
+        "PyYAML": "6.0.3",
+        "duckdb": "1.5.5",
+        "httpx": "0.28.1",
+        "polars": "1.43.0",
+        "pydantic": "2.13.4"
+      },
+      "python": "3.12.14"
+    },
+    "study_id": "attacking_role_premium_v1"
+  },
+  "study_id": "attacking_role_premium_v1",
+  "unavailable_outcome_rows": 0,
+  "uncertainty": {
+    "absolute_mae_improvement_ci95": [
+      -0.005181490200765947,
+      -0.002211024293161674
+    ],
+    "defined_relative_draws": 10000,
+    "draws": 10000,
+    "gw_blocks": 36,
+    "policy": "paired whole-GW resampling; pooled player-row weighting retained",
+    "relative_mae_improvement_ci95": [
+      -0.026213850198506163,
+      -0.011146412992320144
+    ],
+    "seed": 20260908
+  }
+}
