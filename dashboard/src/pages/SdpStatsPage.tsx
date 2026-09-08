@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { loadSdpStats } from "@/data/sdpStats";
 import type { SdpMatch, SdpMetric, SdpScope, SdpStatsData } from "@/data/sdpStats";
-import { finite, metricId, metricRaw, metricValue, sdpCsv, selectSdpEntities, sortSdpEntities } from "@/lib/sdpStats";
+import { correctionDescription, finite, metricCorrections, metricId, metricRaw, metricValue, sdpCsv, selectSdpEntities, sortSdpEntities } from "@/lib/sdpStats";
 import type { SdpEntity, SdpFilters, SdpMode } from "@/lib/sdpStats";
 
 const fmt = (value: number | null | undefined, digits = 2) => value == null ? "—" : new Intl.NumberFormat("en-GB", { maximumFractionDigits: digits }).format(value);
@@ -41,10 +41,17 @@ const sourceDescription = (metric: SdpMetric) => `${metric.source.toUpperCase()}
 
 function CoverageValue({ rows, metric, mode }: { rows: SdpMatch[]; metric: SdpMetric; mode: SdpMode }) {
   const value = metricValue(rows, metric, mode);
+  const corrections = metricCorrections(rows, metric);
   const exposure = mode === "per90" && metric.aggregation !== "mean" ? `; ${fmt(value.minutes)} matched actual minutes` : "";
-  return <span title={`${sourceDescription(metric)} ${value.measured}/${value.matches} matches measured${exposure}. Missing observations are not zero.`} className="tabular-nums">
-    {fmt(value.value)}<span className="ml-1 text-[10px] text-muted-foreground">{value.measured}/{value.matches}</span>
+  const corrected = corrections.length ? ` ${corrections.map(correctionDescription).join(" ")}` : "";
+  return <span title={`${sourceDescription(metric)} ${value.measured}/${value.matches} matches measured${exposure}. Missing observations are not zero.${corrected}`} className="tabular-nums">
+    {fmt(value.value)}{corrections.length > 0 && <sup className="ml-0.5" aria-label="owner-confirmed display correction">‡</sup>}<span className="ml-1 text-[10px] text-muted-foreground">{value.measured}/{value.matches}</span>
   </span>;
+}
+
+function MatchValue({ row, metric }: { row: SdpMatch; metric: SdpMetric }) {
+  const corrections = metricCorrections([row], metric);
+  return <span className="tabular-nums" title={corrections.map(correctionDescription).join(" ") || sourceDescription(metric)}>{fmt(metricRaw(row, metric))}{corrections.length > 0 && <sup className="ml-0.5" aria-label="owner-confirmed display correction">‡</sup>}</span>;
 }
 
 function ObservedTrend({ entity, metric, mode }: { entity: SdpEntity; metric: SdpMetric; mode: SdpMode }) {
@@ -67,7 +74,7 @@ function ObservedTrend({ entity, metric, mode }: { entity: SdpEntity; metric: Sd
         return point.value === null ? null : <g key={point.row.fixture}>
           {previous?.value != null && <line x1={x(previous.index)} y1={y(previous.value)} x2={x(index)} y2={y(point.value)} stroke="currentColor" strokeWidth="2" opacity=".6" />}
           <circle cx={x(index)} cy={y(point.value)} r="4" fill="currentColor" tabIndex={0} role="img" aria-label={`GW${point.row.gw} ${point.row.opponent_short_name}: ${fmt(point.value)}`}>
-            <title>{date(point.row.kickoff_time)} · GW{point.row.gw} · {point.row.opponent_short_name}: {fmt(point.value)}</title>
+            <title>{date(point.row.kickoff_time)} · GW{point.row.gw} · {point.row.opponent_short_name}: {fmt(point.value)}{metricCorrections([point.row], metric).length ? "; owner-confirmed display correction" : ""}</title>
           </circle>
           {(points.length <= 12 || index === 0 || index === points.length - 1) && <text x={x(index)} y={height - 6} fill="currentColor" fontSize="10" textAnchor="middle">GW{point.row.gw}</text>}
         </g>;
@@ -102,9 +109,9 @@ function MatchDetail({ entity, scope, metrics, mode, trendMetric, onClose }: { e
     <div className="rounded-lg border bg-background"><Table aria-label={`${entity.name} observed match log`} containerClassName="max-h-[440px]"><TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>Match</TableHead><TableHead>Club</TableHead><TableHead>Opponent</TableHead>{scope === "player" && <><TableHead>SDP XI / bench</TableHead><TableHead>FPL min</TableHead><TableHead>Provider position</TableHead></>}{metrics.map(m => <TableHead key={metricId(m)}>{m.source.toUpperCase()} · {m.label}</TableHead>)}<TableHead>Source known (UTC)</TableHead><TableHead>Status</TableHead></TableRow></TableHeader><TableBody>{[...entity.rows].reverse().map(row => <TableRow key={row.fixture}>
       <TableCell><div className="font-medium">{row.season} · GW{row.gw}</div><div className="text-xs text-muted-foreground">{date(row.kickoff_time)}</div></TableCell><TableCell>{row.team_short_name}</TableCell><TableCell>{row.opponent_short_name} ({row.was_home ? "H" : "A"})</TableCell>
       {scope === "player" && <><TableCell>{row.started === true ? "Starting XI" : row.bench === true ? "Bench" : "Unknown"}</TableCell><TableCell>{fmt(row.minutes_fpl, 0)}</TableCell><TableCell>{row.provider_position ?? "—"}{row.provider_sub_position ? ` / ${row.provider_sub_position}` : ""}</TableCell></>}
-      {metrics.map(m => <TableCell key={metricId(m)} className="tabular-nums">{fmt(metricRaw(row, m))}</TableCell>)}<TableCell className="text-xs">{new Date(row.known_at).toISOString()}</TableCell><TableCell><Badge variant="outline">{row.status.replaceAll("_", " ")}</Badge></TableCell>
+      {metrics.map(m => <TableCell key={metricId(m)}><MatchValue row={row} metric={m} /></TableCell>)}<TableCell className="text-xs">{new Date(row.known_at).toISOString()}</TableCell><TableCell><Badge variant="outline">{row.status.replaceAll("_", " ")}</Badge></TableCell>
     </TableRow>)}</TableBody></Table></div>
-    <p className="text-xs text-muted-foreground">Match logs show raw observed values. Nominal SDP event-clock intervals are not official minutes and never supply a per-90 denominator.</p>
+    <p className="text-xs text-muted-foreground">Match logs show observed source values plus explicitly marked display corrections. Nominal SDP event-clock intervals are not official minutes and never supply a per-90 denominator.</p>
   </section>;
 }
 
@@ -145,6 +152,10 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
   const completedFixtureScope = completedWeeks.length
     ? `${completedFixtureCount} across GW${completedWeeks[0].gw}-GW${completedWeeks.at(-1)!.gw}`
     : "None witnessed";
+  const fixtureRows = new Map<number, SdpMatch[]>();
+  for (const row of seasonRows) fixtureRows.set(row.fixture, [...fixtureRows.get(row.fixture) ?? [], row]);
+  const providerCoreValid = [...fixtureRows.values()].filter(fixture => fixture.length === 2 && fixture.every(row => row.status !== "UNAVAILABLE")).length;
+  const displayCorrectionIds = new Set(seasonRows.flatMap(row => Object.values(row.display_corrections ?? {}).filter(correction => correction.relation === "direct").map(correction => correction.correction_id)));
   const weekLabel = (gw: number) => {
     const official = data.gameweeks.find(row => row.season === filters.season && row.gw === gw);
     return `GW${gw}${official && !official.finished ? " · in progress" : ""}`;
@@ -167,8 +178,9 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
   return <div className="space-y-4 p-4 lg:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="mb-2 flex flex-wrap items-center gap-2"><Badge variant="secondary">Observed · Premier League</Badge><Badge variant="outline">SDP {scope === "team" ? "team statistics" : "lineups"}</Badge>{scope === "player" && <Badge variant="outline">FPL enrichment · labelled separately</Badge>}</div><h1 className="text-2xl font-semibold tracking-tight">{scope === "team" ? "Team stat from SDP" : "Players stat from SDP"}</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">Explore recorded match performance, recent history and source coverage. These are observed statistics, not predictions.</p></div><Button variant="outline" onClick={exportCsv} disabled={!ordered.length}><Download />Export filtered CSV</Button></div>
     <div role="note" className="rounded-lg border bg-muted/35 p-3 text-sm text-muted-foreground"><strong className="text-foreground">Observed-data vintage:</strong> this tab was exported {date(data.as_of)}. Forecast and optimizer pages retain their own displayed publication vintages; refreshing these statistics does not refresh or relabel those predictions.</div>
+    {scope === "team" && displayCorrectionIds.size > 0 && <div role="note" className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"><strong>{displayCorrectionIds.size} owner-confirmed display correction{displayCorrectionIds.size === 1 ? " is" : "s are"} active.</strong> The original SDP field remains missing, provider core validity is unchanged, and corrected values are marked <span aria-hidden="true">‡</span> in tables and match logs. Charts and CSV use the same labelled display value.</div>}
     {scope === "player" && data.source_status.player_stats === "UNAVAILABLE" && <div role="note" className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"><strong>Detailed SDP player statistics are unavailable.</strong> SDP provides witnessed lineups and broad provider positions. Every detailed player statistic below is an explicitly labelled FPL observation. Player shots, SOT and box touches are not inferred from team totals.</div>}
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">{[[scope === "team" ? "Clubs in scope" : "Players in scope", filtered.length], ["Official completed fixtures", completedFixtureScope], ["Observed fixture records", selectedRows.length], ["Complete chart metric", `${available} / ${filtered.length}`], ["Latest SDP known", date(data.source_status.latest_sdp_known_at)]].map(([label, value]) => <div key={label} className={cardClass}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}</div>
+    <div className={`grid grid-cols-2 gap-3 ${scope === "team" ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>{[[scope === "team" ? "Clubs in scope" : "Players in scope", filtered.length], ["Official completed fixtures", completedFixtureScope], ...(scope === "team" ? [["Provider core-valid fixtures", `${providerCoreValid} / ${fixtureRows.size}`]] : []), ["Observed fixture records", selectedRows.length], ["Complete chart metric", `${available} / ${filtered.length}`], ["Latest SDP known", date(data.source_status.latest_sdp_known_at)]].map(([label, value]) => <div key={label} className={cardClass}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}</div>
     <FilterPanel><div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 xl:grid-cols-6">
       <Control label="Season" value={filters.season} options={seasons.map(s => [s, s])} onChange={chooseSeason} />
       <Control label="GW from" value={String(filters.from)} options={weeks.filter(gw => gw <= filters.to).map(gw => [String(gw), weekLabel(gw)])} onChange={value => patchFilters({ from: Number(value) })} />
@@ -182,7 +194,7 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
       <Control label="Display" value={mode} options={scope === "team" ? [["total", "Totals"], ["per_match", "Per match"]] : [["total", "Totals"], ["per90", "Per 90 actual minutes"]]} onChange={value => setMode(value as SdpMode)} />
       <Button variant="outline" onClick={reset}><RotateCcw />Reset filters</Button>
     </div><p className="mt-3 text-xs text-muted-foreground">Recent windows apply to each {scope === "team" ? "club" : "player"} after season, GW, team and venue filters. Both double-gameweek fixtures count. A missing value remains —. Percentage columns show a per-match mean, not a pooled percentage.</p>{scope === "player" && <p className="mt-1 text-xs text-muted-foreground">Exposure uses selected FPL minutes: below 180 is very low; 180 to 449 is low; 450+ is a larger sample. These describe sample size, not model confidence.</p>}</FilterPanel>
-    {relevant.length > 0 && <div className="flex flex-wrap items-end justify-between gap-3"><Control label="Trend metric" value={chartMetric ? metricId(chartMetric) : ""} options={metricOptions} onChange={setChartKey} /><p className="text-xs text-muted-foreground">Each cell shows measured / selected matches. Totals and rates require complete evidence. † Provider observation; not independently reconciled. Hover a metric for its exact source field.</p></div>}
+    {relevant.length > 0 && <div className="flex flex-wrap items-end justify-between gap-3"><Control label="Trend metric" value={chartMetric ? metricId(chartMetric) : ""} options={metricOptions} onChange={setChartKey} /><p className="text-xs text-muted-foreground">Each cell shows measured / selected matches. Totals and rates require complete evidence. † Provider observation; not independently reconciled. ‡ Owner-confirmed display correction over an omitted field. Hover for exact provenance.</p></div>}
     <div className="rounded-lg border"><Table aria-label={scope === "team" ? "Observed SDP team statistics" : "Observed player statistics by source"} containerClassName="max-h-[620px]"><TableHeader className="sticky top-0 z-20 bg-background"><TableRow>
       <TableHead className="sticky left-0 z-30 bg-background"><button className="flex items-center gap-1" onClick={() => { setSortKey("name"); setAscending(sortKey === "name" ? !ascending : true); }}> {scope === "team" ? "Club" : "Player"}{sortKey === "name" && (ascending ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}</button></TableHead><TableHead>Compare</TableHead>{scope === "player" && <><TableHead>FPL position</TableHead><TableHead>Club(s)</TableHead><TableHead>FPL minutes / exposure</TableHead><TableHead>SDP starts</TableHead><TableHead title="Count of selected fixture rows with measured FPL minutes greater than zero. Unavailable if any selected minute field is missing.">FPL appearances</TableHead></>}<TableHead title="Selected fixture records, including recorded non-appearances.">Matches</TableHead>
       {metrics.map(metric => <TableHead key={metricId(metric)} aria-sort={sortKey === metricId(metric) ? ascending ? "ascending" : "descending" : "none"}><button className="flex items-center gap-1 text-left" onClick={() => { setSortKey(metricId(metric)); setAscending(sortKey === metricId(metric) ? !ascending : false); }} title={sourceDescription(metric)}>
@@ -199,7 +211,21 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
     {selectedDetail && <MatchDetail entity={selectedDetail} scope={scope} metrics={metrics} mode={mode} trendMetric={chartMetric} onClose={() => setDetail(null)} />}
     {scope === "team" && xMetric && yMetric && <AnalyticsScatter title="Observed attack and defence" points={scatterPoints} xAxis={{ label: labelFor(xMetric, mode), direction: "explanatory", bounds: { min: 0 } }} yAxis={{ label: labelFor(yMetric, mode), direction: "explanatory", bounds: { min: 0 } }} vintageLabel={`SDP observed; export as of ${data.as_of}`} horizonLabel={`${filters.season} GW${filters.from}–${filters.to}; ${filters.recent === "all" ? "full selected range" : `last ${filters.recent} matches per club`}; ${filters.venue}`} description={`${scatterPoints.length} clubs plotted; ${filtered.length - scatterPoints.length} lack complete paired metrics.`} readingNote="Recorded team xG and exact opponent xG describe completed matches. Higher team xG and lower opponent xG indicate the stronger observed balance; neither forecasts the next fixture." />}
     <InsightSummaryPanel items={[{ id: "scope", statement: `${filtered.length} ${scope === "team" ? "clubs" : "players"} and ${selectedRows.length} observed fixture records match this scope.` }, { id: "coverage", statement: chartMetric ? `${available} have complete ${chartMetric.source.toUpperCase()} ${chartMetric.label} evidence for the selected display.` : "No observed metric is available in this source scope." }]} localOnlyReason="Observed source statistics remain a deterministic description. No AI or prediction model is called." />
-    <details className={`${cardClass} text-xs`}><summary className="cursor-pointer font-medium">Source coverage and freshness</summary><p className="mt-2 text-muted-foreground">FINAL marks completed fixtures; provider observations may still be corrected in later captures.</p><dl className="mt-3 grid gap-2 sm:grid-cols-2"><div><dt className="text-muted-foreground">SDP team stats</dt><dd>{data.source_status.team_stats}</dd></div><div><dt className="text-muted-foreground">SDP player stats / lineups</dt><dd>{data.source_status.player_stats} / {data.source_status.player_lineups}</dd></div><div><dt className="text-muted-foreground">FPL enrichment</dt><dd>{data.source_status.fpl_enrichment}</dd></div><div><dt className="text-muted-foreground">Export cutoff (UTC)</dt><dd>{new Date(data.as_of).toISOString()}</dd></div><div><dt className="text-muted-foreground">Latest SDP known (UTC)</dt><dd>{data.source_status.latest_sdp_known_at ? new Date(data.source_status.latest_sdp_known_at).toISOString() : "Unavailable"}</dd></div><div><dt className="text-muted-foreground">Latest FPL known (UTC)</dt><dd>{data.source_status.latest_fpl_known_at ? new Date(data.source_status.latest_fpl_known_at).toISOString() : "Unavailable"}</dd></div><div><dt className="text-muted-foreground">Team source failures / unmapped players</dt><dd>{data.coverage.team_failures} / {data.coverage.unmapped_players}</dd></div></dl>{data.source_status.notes.map(note => <p key={note} className="mt-2 text-muted-foreground">{note}</p>)}</details>
+    <details className={`${cardClass} text-xs`}>
+      <summary className="cursor-pointer font-medium">Source coverage and freshness</summary>
+      <p className="mt-2 text-muted-foreground">FINAL marks completed fixtures; provider observations may still be corrected in later captures.</p>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div><dt className="text-muted-foreground">SDP team stats</dt><dd>{data.source_status.team_stats}</dd></div>
+        {scope === "team" && <div><dt className="text-muted-foreground">Provider core-valid / display corrections</dt><dd>{providerCoreValid} fixtures / {displayCorrectionIds.size} owner-confirmed values</dd></div>}
+        <div><dt className="text-muted-foreground">SDP player stats / lineups</dt><dd>{data.source_status.player_stats} / {data.source_status.player_lineups}</dd></div>
+        <div><dt className="text-muted-foreground">FPL enrichment</dt><dd>{data.source_status.fpl_enrichment}</dd></div>
+        <div><dt className="text-muted-foreground">Export cutoff (UTC)</dt><dd>{new Date(data.as_of).toISOString()}</dd></div>
+        <div><dt className="text-muted-foreground">Latest SDP known (UTC)</dt><dd>{data.source_status.latest_sdp_known_at ? new Date(data.source_status.latest_sdp_known_at).toISOString() : "Unavailable"}</dd></div>
+        <div><dt className="text-muted-foreground">Latest FPL known (UTC)</dt><dd>{data.source_status.latest_fpl_known_at ? new Date(data.source_status.latest_fpl_known_at).toISOString() : "Unavailable"}</dd></div>
+        <div><dt className="text-muted-foreground">Team source failures / unmapped players</dt><dd>{data.coverage.team_failures} / {data.coverage.unmapped_players}</dd></div>
+      </dl>
+      {data.source_status.notes.map(note => <p key={note} className="mt-2 text-muted-foreground">{note}</p>)}
+    </details>
   </div>;
 }
 

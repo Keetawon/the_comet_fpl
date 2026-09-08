@@ -8,11 +8,13 @@ import math
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import duckdb
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from fpl.config import SdpMetric, load_sdp_metrics, load_sources
+from fpl.config import SdpMetric, config_dir, load_sdp_metrics, load_sources
 from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.ingest.fpl_api import ApiFixture, BootstrapStatic, ElementSummary, detect_season_skew
 from fpl.ingest.live_snapshot import POSITION_BY_TYPE
@@ -22,6 +24,7 @@ from fpl.publish.player_attacking_usage import _raw_capture
 from fpl.storage.sdp_runtime import load_sdp_state, raw_at, workload_at
 
 SCHEMA = "fpl.sdp-stats"
+DISPLAY_CORRECTIONS_FILE = "sdp_dashboard_display_corrections.yaml"
 FPL_FIELDS = (
     "minutes",
     "starts",
@@ -59,6 +62,7 @@ COMMON = {
     "provider_match_id",
     "source_version",
 }
+TEAM_FIELDS = {"sdp", "fpl", "display_corrections"}
 PLAYER_FIELDS = {
     "code",
     "provider_player_id",
@@ -94,6 +98,85 @@ COVERAGE_FIELDS = {
     "unmapped_players",
     "seasons",
 }
+DISPLAY_CORRECTION_FIELDS = {
+    "correction_id",
+    "value",
+    "evidence_class",
+    "owner_confirmation_recorded_at",
+    "source_known_at",
+    "provider_match_id",
+    "provider_field",
+    "provider_field_state",
+    "raw_payload_sha256",
+    "corroboration",
+    "relation",
+    "subject_team_code",
+}
+SOT_TARGET_FIELDS = (
+    "expectedGoalsOnTarget",
+    "attIboxTarget",
+    "attOboxTarget",
+    "attHdTarget",
+    "attLfTarget",
+    "attRfTarget",
+    "attObpTarget",
+    "attIboxGoal",
+    "attOboxGoal",
+    "attPenGoal",
+    "attFreekickGoal",
+)
+
+
+class DisplayCorrection(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    correction_id: str = Field(pattern=r"^[a-z0-9-]+$")
+    season: str
+    fixture: int = Field(gt=0)
+    team_code: int = Field(gt=0)
+    opponent_team_code: int = Field(gt=0)
+    provider_match_id: int = Field(gt=0)
+    provider_side: Literal["home", "away"]
+    provider_field: Literal["ontargetScoringAtt"]
+    raw_payload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_known_at: datetime
+    owner_confirmation_recorded_at: datetime
+    display_value: Literal[0]
+    total_scoring_attempts: int = Field(gt=0)
+    shot_off_target_attempts: int = Field(ge=0)
+    blocked_attempts: int | None = Field(default=None, ge=0)
+    opponent_goalkeeper_saves: Literal[0]
+    fpl_goals_scored: Literal[0]
+
+    @model_validator(mode="after")
+    def _valid_times_and_sides(self) -> DisplayCorrection:
+        source = AsOf(self.source_known_at).ts
+        confirmed = AsOf(self.owner_confirmation_recorded_at).ts
+        if source > confirmed or self.team_code == self.opponent_team_code:
+            raise ValueError("invalid display-correction timing or team identity")
+        return self
+
+
+class DisplayCorrectionPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    schema_id: Literal["fpl.sdp-dashboard-display-corrections"]
+    version: Literal[1]
+    corrections: tuple[DisplayCorrection, ...]
+
+    @model_validator(mode="after")
+    def _unique_corrections(self) -> DisplayCorrectionPolicy:
+        ids = [row.correction_id for row in self.corrections]
+        keys = [
+            (row.season, row.fixture, row.team_code, row.provider_field) for row in self.corrections
+        ]
+        if len(ids) != len(set(ids)) or len(keys) != len(set(keys)):
+            raise ValueError("duplicate display correction")
+        return self
+
+
+def load_display_corrections(path: Path | None = None) -> DisplayCorrectionPolicy:
+    return DisplayCorrectionPolicy.model_validate(
+        yaml.safe_load((path or config_dir() / DISPLAY_CORRECTIONS_FILE).read_bytes())
+    )
 
 
 def _iso(value: datetime) -> str:
@@ -132,6 +215,123 @@ def metric_value(stats: dict[str, Any], metric: SdpMetric) -> float | int | None
     if metric.type == "percent" and result is not None and result > 100:
         return None
     return result
+
+
+def _apply_display_corrections(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    cutoff: datetime,
+    season: str,
+    fixtures: dict[int, dict[str, Any]],
+    players: list[dict[str, Any]],
+    teams: dict[tuple[str, int, int], dict[str, Any]],
+    raw: list[dict[str, Any]],
+) -> int:
+    """Add cutoff-safe display values while leaving source values and health unchanged."""
+    applied = 0
+    for correction in load_display_corrections().corrections:
+        confirmed = AsOf(correction.owner_confirmation_recorded_at).ts
+        if correction.season != season or confirmed > cutoff or correction.fixture not in fixtures:
+            continue
+        fixture = fixtures[correction.fixture]
+        target = fixture["home"] if correction.provider_side == "home" else fixture["away"]
+        opponent = fixture["away"] if correction.provider_side == "home" else fixture["home"]
+        if (target, opponent) != (correction.team_code, correction.opponent_team_code):
+            raise ValueError("display correction differs from exact FPL fixture identity")
+        crosswalk = con.execute(
+            """SELECT sdp_match_id FROM stg_pl_sdp_fixture_crosswalk
+               WHERE season=? AND fixture=? AND resolved_at<=?
+                 AND corroborated_kickoff AND corroborated_teams""",
+            [season, correction.fixture, cutoff],
+        ).fetchall()
+        if crosswalk != [(correction.provider_match_id,)]:
+            raise ValueError("display correction differs from exact SDP crosswalk")
+        sources = [
+            row
+            for row in raw
+            if row["endpoint"] == "match_stats"
+            and row["sdp_match_id"] == correction.provider_match_id
+            and row["sha256"] == correction.raw_payload_sha256
+        ]
+        if len(sources) != 1:
+            raise ValueError("display correction raw payload is missing or ambiguous")
+        source = sources[0]
+        if AsOf(source["fetched_at"]).ts != AsOf(correction.source_known_at).ts:
+            raise ValueError("display correction raw source time changed")
+        parsed = parse_team_stats(json.loads(source["body"]), match_id=correction.provider_match_id)
+        side = next((row for row in parsed if row.side == correction.provider_side), None)
+        if side is None or side.team_id != correction.team_code:
+            raise ValueError("display correction differs from raw side identity")
+        stats = dict(side.stats)
+        if correction.provider_field in stats:
+            raise ValueError("display correction cannot replace an explicit provider field")
+        observed = {
+            "total_scoring_attempts": _number(stats.get("totalScoringAtt"), integer=True),
+            "shot_off_target_attempts": _number(stats.get("shotOffTarget"), integer=True),
+            "blocked_attempts": _number(stats.get("blockedScoringAtt"), integer=True),
+        }
+        expected = {
+            "total_scoring_attempts": correction.total_scoring_attempts,
+            "shot_off_target_attempts": correction.shot_off_target_attempts,
+            "blocked_attempts": correction.blocked_attempts,
+        }
+        observed_parts = [observed[key] for key in ("shot_off_target_attempts", "blocked_attempts")]
+        if (
+            observed != expected
+            or not any(value is not None for value in observed_parts)
+            or sum(value for value in observed_parts if value is not None)
+            != correction.total_scoring_attempts
+        ):
+            raise ValueError("display correction shot accounting is not corroborated")
+        for field in SOT_TARGET_FIELDS:
+            if field in stats and _number(stats[field]) != 0:
+                raise ValueError("display correction has positive or malformed target evidence")
+        direct = teams[season, correction.fixture, correction.team_code]
+        mirror = teams[season, correction.fixture, correction.opponent_team_code]
+        if (
+            direct["sdp"]["shots_on_target"] is not None
+            or mirror["sdp"]["shots_allowed"] is not None
+            or direct["fpl"]["goals_scored"] != correction.fpl_goals_scored
+        ):
+            raise ValueError("display correction would overwrite observed/provider evidence")
+        goalkeeper_rows = [
+            row
+            for row in players
+            if row["season"] == season
+            and row["fixture"] == correction.fixture
+            and row["team_code"] == correction.opponent_team_code
+            and row["position"] == "GK"
+            and row["minutes_fpl"] is not None
+            and row["minutes_fpl"] > 0
+        ]
+        if (
+            not goalkeeper_rows
+            or sum(row["minutes_fpl"] for row in goalkeeper_rows) < 90
+            or any(row["fpl"]["saves"] is None for row in goalkeeper_rows)
+            or sum(row["fpl"]["saves"] for row in goalkeeper_rows)
+            != correction.opponent_goalkeeper_saves
+        ):
+            raise ValueError("display correction lacks the pinned FPL goalkeeper proxy")
+        public = {
+            "correction_id": correction.correction_id,
+            "value": correction.display_value,
+            "evidence_class": "owner_confirmed_display_correction",
+            "owner_confirmation_recorded_at": _iso(confirmed),
+            "source_known_at": _iso(AsOf(correction.source_known_at).ts),
+            "provider_match_id": correction.provider_match_id,
+            "provider_field": correction.provider_field,
+            "provider_field_state": "omitted",
+            "raw_payload_sha256": correction.raw_payload_sha256,
+            "corroboration": "shot_accounting_and_fpl_goalkeeper_proxy_zero",
+            "subject_team_code": correction.team_code,
+        }
+        direct["display_corrections"]["shots_on_target"] = {**public, "relation": "direct"}
+        mirror["display_corrections"]["shots_allowed"] = {
+            **public,
+            "relation": "opponent_mirror",
+        }
+        applied += 1
+    return applied
 
 
 def metric_catalog() -> list[dict[str, Any]]:
@@ -638,6 +838,7 @@ def build_sdp_stats(
             ),
             "sdp": dict.fromkeys(team_keys),
             "fpl": dict.fromkeys(TEAM_FPL_FIELDS),
+            "display_corrections": {},
         }
     for fixture, row in fixtures.items():
         for home in (True, False):
@@ -657,6 +858,7 @@ def build_sdp_stats(
                 ),
                 "sdp": dict.fromkeys(team_keys),
                 "fpl": dict.fromkeys(TEAM_FPL_FIELDS),
+                "display_corrections": {},
             }
     for fixture, source in fixtures.items():
         for home in (True, False):
@@ -696,6 +898,7 @@ def build_sdp_stats(
                 ),
                 "sdp": measured,
                 "fpl": previous["fpl"] if previous is not None else dict.fromkeys(TEAM_FPL_FIELDS),
+                "display_corrections": {},
                 "provider_match_id": observed.provenance["provider_match_id"],
                 "source_version": _version(
                     source["sha256"],
@@ -711,6 +914,15 @@ def build_sdp_stats(
         season=current,
         cutoff=cutoff,
         names=names,
+    )
+    display_corrections = _apply_display_corrections(
+        con,
+        cutoff=cutoff,
+        season=current,
+        fixtures=fixtures,
+        players=players,
+        teams=teams,
+        raw=raw,
     )
     team_rows = [teams[k] for k in sorted(teams)]
     players.sort(
@@ -728,9 +940,14 @@ def build_sdp_stats(
         notes.append(
             f"{lineup_failures} retained lineup bundle(s) failed identity/source validation."
         )
+    if display_corrections:
+        notes.append(
+            f"{display_corrections} owner-confirmed display correction(s) are shown separately; "
+            "raw provider fields remain missing and SDP core validity is unchanged."
+        )
     document = {
         "schema": SCHEMA,
-        "json_schema_version": 1,
+        "json_schema_version": 2,
         "as_of": _iso(cutoff),
         "source_status": {
             "team_stats": "UNAVAILABLE" if not valid else "PARTIAL" if failures else "AVAILABLE",
@@ -776,7 +993,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             "gameweeks",
         }
         or document["schema"] != SCHEMA
-        or document["json_schema_version"] != 1
+        or document["json_schema_version"] != 2
     ):
         raise ValueError("invalid SDP sidecar envelope")
     cutoff = AsOf(datetime.fromisoformat(document["as_of"])).ts
@@ -816,10 +1033,11 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             raise ValueError("invalid gameweek completeness")
         if datetime.fromisoformat(gw["source_known_at"]) > cutoff:
             raise ValueError("future-known gameweek completeness")
+    correction_rows: dict[str, list[tuple[dict[str, Any], str, dict[str, Any]]]] = {}
     for scope in ("team", "player"):
         seen: set[tuple[Any, ...]] = set()
         for row in document[f"{scope}_matches"]:
-            if set(row) != COMMON | ({"sdp", "fpl"} if scope == "team" else PLAYER_FIELDS):
+            if set(row) != COMMON | (TEAM_FIELDS if scope == "team" else PLAYER_FIELDS):
                 raise ValueError("unexpected public observed-row field")
             if row["status"] not in {"FINAL", "PROVISIONAL", "UNAVAILABLE"}:
                 raise ValueError("unknown observed-row status")
@@ -873,8 +1091,53 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                 for field in ("started", "bench", "appeared"):
                     if row[field] is not None and type(row[field]) is not bool:
                         raise ValueError("invalid observed membership marker")
-            if scope == "team" and set(row["fpl"]) != set(TEAM_FPL_FIELDS):
-                raise ValueError("invalid team FPL score source")
+            if scope == "team":
+                if set(row["fpl"]) != set(TEAM_FPL_FIELDS) or not isinstance(
+                    row["display_corrections"], dict
+                ):
+                    raise ValueError("invalid team FPL/display source")
+                for metric, correction in row["display_corrections"].items():
+                    if (
+                        metric not in {"shots_on_target", "shots_allowed"}
+                        or not isinstance(correction, dict)
+                        or set(correction) != DISPLAY_CORRECTION_FIELDS
+                        or correction["value"] != 0
+                        or correction["evidence_class"] != "owner_confirmed_display_correction"
+                        or correction["provider_field"] != "ontargetScoringAtt"
+                        or correction["provider_field_state"] != "omitted"
+                        or correction["corroboration"]
+                        != "shot_accounting_and_fpl_goalkeeper_proxy_zero"
+                        or not re.fullmatch(r"[a-z0-9-]+", correction["correction_id"])
+                        or not re.fullmatch(r"[0-9a-f]{64}", correction["raw_payload_sha256"])
+                        or type(correction["provider_match_id"]) is not int
+                        or correction["provider_match_id"] <= 0
+                        or type(correction["subject_team_code"]) is not int
+                        or correction["subject_team_code"] <= 0
+                        or row["sdp"][metric] is not None
+                        or row["status"] != "UNAVAILABLE"
+                    ):
+                        raise ValueError("invalid display correction provenance")
+                    source_known = AsOf(datetime.fromisoformat(correction["source_known_at"])).ts
+                    confirmed = AsOf(
+                        datetime.fromisoformat(correction["owner_confirmation_recorded_at"])
+                    ).ts
+                    if source_known > confirmed or confirmed > cutoff:
+                        raise ValueError("future or contradictory display correction")
+                    if metric == "shots_on_target":
+                        valid_relation = (
+                            correction["relation"] == "direct"
+                            and row["team_code"] == correction["subject_team_code"]
+                        )
+                    else:
+                        valid_relation = (
+                            correction["relation"] == "opponent_mirror"
+                            and row["opponent_team_code"] == correction["subject_team_code"]
+                        )
+                    if not valid_relation:
+                        raise ValueError("display correction relation contradicts row identity")
+                    correction_rows.setdefault(correction["correction_id"], []).append(
+                        (row, metric, correction)
+                    )
             for source in ("sdp", "fpl"):
                 for value in row[source].values():
                     if value is not None and (
@@ -883,6 +1146,23 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                         or not math.isfinite(value)
                     ):
                         raise ValueError("non-finite/non-numeric observed metric")
+    for entries in correction_rows.values():
+        if len(entries) != 2 or {entry[1] for entry in entries} != {
+            "shots_on_target",
+            "shots_allowed",
+        }:
+            raise ValueError("display correction lacks an exact opponent mirror")
+        direct = next(entry for entry in entries if entry[1] == "shots_on_target")
+        mirror = next(entry for entry in entries if entry[1] == "shots_allowed")
+        if (
+            direct[0]["season"] != mirror[0]["season"]
+            or direct[0]["fixture"] != mirror[0]["fixture"]
+            or direct[0]["team_code"] != mirror[0]["opponent_team_code"]
+            or direct[0]["opponent_team_code"] != mirror[0]["team_code"]
+            or {key: value for key, value in direct[2].items() if key != "relation"}
+            != {key: value for key, value in mirror[2].items() if key != "relation"}
+        ):
+            raise ValueError("display correction mirror provenance differs")
 
     def check_strings(value: Any) -> None:
         if isinstance(value, dict):

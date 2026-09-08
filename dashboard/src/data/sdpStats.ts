@@ -17,6 +17,21 @@ export interface SdpMetric {
   provider_field?: string | null;
 }
 
+export interface SdpDisplayCorrection {
+  correction_id: string;
+  value: 0;
+  evidence_class: "owner_confirmed_display_correction";
+  owner_confirmation_recorded_at: string;
+  source_known_at: string;
+  provider_match_id: number;
+  provider_field: "ontargetScoringAtt";
+  provider_field_state: "omitted";
+  raw_payload_sha256: string;
+  corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero";
+  relation: "direct" | "opponent_mirror";
+  subject_team_code: number;
+}
+
 export interface SdpMatch {
   season: string;
   gw: number;
@@ -34,6 +49,7 @@ export interface SdpMatch {
   provider_match_id?: number | null;
   source_version?: string | null;
   sdp: Record<string, number | null>;
+  display_corrections?: Record<string, SdpDisplayCorrection>;
   // Player fields are absent on team rows. Unknown identities and measurements stay NULL.
   code?: number | null;
   provider_player_id?: number | null;
@@ -52,7 +68,7 @@ export interface SdpMatch {
 
 export interface SdpStatsData {
   schema: "fpl.sdp-stats";
-  json_schema_version: 1;
+  json_schema_version: 2;
   as_of: string;
   source_status: {
     team_stats: SourceAvailability;
@@ -88,7 +104,7 @@ const timestamp = (v: unknown) => typeof v === "string" &&
 
 export function parseSdpStats(payload: unknown): SdpStatsData {
   const fail = () => { throw new Error("The observed SDP file is invalid or incompatible. Republish its source data."); };
-  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || payload.json_schema_version !== 1 ||
+  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || payload.json_schema_version !== 2 ||
       !timestamp(payload.as_of) || !object(payload.source_status) || !object(payload.coverage) ||
       !Array.isArray(payload.metrics) || !Array.isArray(payload.team_matches) ||
       !Array.isArray(payload.player_matches) || !Array.isArray(payload.gameweeks)) return fail();
@@ -119,6 +135,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
     gameweeks.add(key);
   }
   const catalog = new Set<string>();
+  const corrections = new Map<string, { row: Record<string, unknown>; metric: string; correction: Record<string, unknown> }[]>();
   for (const m of payload.metrics) {
     if (!object(m) || !["team", "player", "both"].includes(String(m.scope)) ||
         !["sdp", "fpl"].includes(String(m.source)) ||
@@ -144,6 +161,28 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
       for (const source of [row.sdp, row.fpl]) {
         if (source !== undefined && (!object(source) || Object.values(source).some(v => !nullableNumber(v)))) return fail();
       }
+      if (scope === "team") {
+        if (!object(row.display_corrections)) return fail();
+        for (const [metric, correction] of Object.entries(row.display_corrections)) {
+          if (!["shots_on_target", "shots_allowed"].includes(metric) || !object(correction) ||
+              correction.value !== 0 || correction.evidence_class !== "owner_confirmed_display_correction" ||
+              correction.provider_field !== "ontargetScoringAtt" || correction.provider_field_state !== "omitted" ||
+              correction.corroboration !== "shot_accounting_and_fpl_goalkeeper_proxy_zero" ||
+              !["direct", "opponent_mirror"].includes(String(correction.relation)) ||
+              typeof correction.correction_id !== "string" || !/^[a-z0-9-]+$/.test(correction.correction_id) ||
+              typeof correction.raw_payload_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(correction.raw_payload_sha256) ||
+              !positiveId(correction.provider_match_id) || !positiveId(correction.subject_team_code) ||
+              !timestamp(correction.source_known_at) || !timestamp(correction.owner_confirmation_recorded_at) ||
+              Date.parse(correction.source_known_at as string) > Date.parse(correction.owner_confirmation_recorded_at as string) ||
+              Date.parse(correction.owner_confirmation_recorded_at as string) > asOf ||
+              (row.sdp as Record<string, unknown>)[metric] !== null || row.status !== "UNAVAILABLE" ||
+              (metric === "shots_on_target" && (correction.relation !== "direct" || row.team_code !== correction.subject_team_code)) ||
+              (metric === "shots_allowed" && (correction.relation !== "opponent_mirror" || row.opponent_team_code !== correction.subject_team_code))) return fail();
+          const entries = corrections.get(correction.correction_id) ?? [];
+          entries.push({ row, metric, correction });
+          corrections.set(correction.correction_id, entries);
+        }
+      }
       if (scope === "player") {
         if (!positiveId(row.code) && !positiveId(row.provider_player_id)) return fail();
         if (row.code != null && !positiveId(row.code)) return fail();
@@ -163,6 +202,13 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
       if (seen.has(key)) return fail();
       seen.add(key);
     }
+  }
+  for (const entries of corrections.values()) {
+    if (entries.length !== 2 || new Set(entries.map(entry => entry.metric)).size !== 2) return fail();
+    const direct = entries.find(entry => entry.metric === "shots_on_target")!;
+    const mirror = entries.find(entry => entry.metric === "shots_allowed")!;
+    if (direct.row.season !== mirror.row.season || direct.row.fixture !== mirror.row.fixture ||
+        direct.row.team_code !== mirror.row.opponent_team_code || direct.row.opponent_team_code !== mirror.row.team_code) return fail();
   }
   return payload as unknown as SdpStatsData;
 }

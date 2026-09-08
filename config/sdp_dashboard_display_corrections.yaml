@@ -1,0 +1,56 @@
+schema_id: fpl.sdp-dashboard-display-corrections
+version: 1
+corrections:
+  - correction_id: 2026-27-f7-aston-villa-sot
+    season: 2026-27
+    fixture: 7
+    team_code: 7
+    opponent_team_code: 36
+    provider_match_id: 2645201
+    provider_side: away
+    provider_field: ontargetScoringAtt
+    raw_payload_sha256: 2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf
+    source_known_at: "2026-09-04T17:47:07.612331+00:00"
+    owner_confirmation_recorded_at: "2026-09-08T14:40:50.135115+00:00"
+    display_value: 0
+    total_scoring_attempts: 6
+    shot_off_target_attempts: 6
+    blocked_attempts: null
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0
+
+  - correction_id: 2026-27-f20-aston-villa-sot
+    season: 2026-27
+    fixture: 20
+    team_code: 7
+    opponent_team_code: 3
+    provider_match_id: 2645206
+    provider_side: home
+    provider_field: ontargetScoringAtt
+    raw_payload_sha256: 328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5
+    source_known_at: "2026-09-04T16:17:39.555102+00:00"
+    owner_confirmation_recorded_at: "2026-09-08T14:40:50.135115+00:00"
+    display_value: 0
+    total_scoring_attempts: 7
+    shot_off_target_attempts: 5
+    blocked_attempts: 2
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0
+
+  - correction_id: 2026-27-f28-spurs-sot
+    season: 2026-27
+    fixture: 28
+    team_code: 6
+    opponent_team_code: 17
+    provider_match_id: 2645224
+    provider_side: away
+    provider_field: ontargetScoringAtt
+    raw_payload_sha256: cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786
+    source_known_at: "2026-09-07T14:37:57.266972+00:00"
+    owner_confirmation_recorded_at: "2026-09-08T14:40:50.135115+00:00"
+    display_value: 0
+    total_scoring_attempts: 11
+    shot_off_target_attempts: 7
+    blocked_attempts: 4
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0

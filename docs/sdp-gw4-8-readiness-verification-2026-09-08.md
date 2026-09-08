@@ -133,6 +133,17 @@ provider fields, deterministic identities, official fixture-time clubs, actual
 minutes and explicit formation membership. All checks passed. Both complete real
 sidecars passed the frontend parser; the separate exports differed only in as_of.
 
+Three current-season SOT values are now recorded as owner-confirmed display
+corrections at `2026-09-08T14:40:50.135115Z`: fixture 7 Aston Villa,
+fixture 20 Aston Villa and fixture 28 Spurs, each with value zero. Their immutable
+raw SDP payloads omit `ontargetScoringAtt`; none is rewritten. Exact shot-accounting
+reconciliation and the opponent's official FPL goalkeeper record (90+ minutes,
+zero saves) corroborate the owner confirmation without changing provider validity.
+Fixture 19 Fulham remains NULL because it has no owner confirmation. The current
+provider health population therefore remains **26 core-valid of 30 completed
+fixtures across GW1-GW3**, while **three separate display corrections** are exposed
+with provenance in the table, charts and CSV.
+
 The first full public package was correctly refused because this operational DB
 has no required platform optimizer plans. The failed generation was preserved.
 The completed preview explicitly retains a sanitized existing dashboard base
@@ -142,9 +153,9 @@ No optimizer or forecast was rerun to manufacture plans. Windows symlink
 publication still fails with inherited WinError 1314; validated before_publish
 copies were retained using the documented existing hook, not called a passed gate.
 
-Final statistics export as_of: **2026-09-08 14:04:06.518694 UTC**;
-7,156,319 bytes; SHA256
-`859b49f093a7853351a3d2a6a1e8f25bc5b522208584fbf072759f9b1400e33c`.
+Final statistics export as_of: **2026-09-08 15:17:24.331811 UTC**;
+7,256,219 bytes; SHA256
+`c47fe610b9b8c8382a3cb0d7cedba1ee985ae496210fdd7dd7191b5c426af26d`.
 Eighteen HTTP-served preview assets matched their built bytes, including the
 sidecar and both new route labels in the JS bundle.
 

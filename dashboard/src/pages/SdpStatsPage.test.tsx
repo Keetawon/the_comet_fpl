@@ -36,6 +36,37 @@ describe("Observed SDP dashboard tabs", () => {
     expect(screen.getByText("30 across GW1-GW3")).toBeInTheDocument();
     expect(screen.getByText(/refreshing these statistics does not refresh or relabel those predictions/i)).toBeInTheDocument();
   });
+  it("labels owner-confirmed team display corrections without relabelling provider validity", async () => {
+    const data = sdpFixture();
+    const metric = { ...data.metrics[0], key: "shots_on_target", label: "Shots on target" };
+    data.metrics.push(metric);
+    const row = data.team_matches.find(item => item.team_code === 1 && item.gw === 6)!;
+    row.status = "UNAVAILABLE";
+    row.sdp.shots_on_target = null;
+    row.display_corrections = {
+      shots_on_target: {
+        correction_id: "2026-27-f6-team-1-sot",
+        value: 0,
+        evidence_class: "owner_confirmed_display_correction",
+        owner_confirmation_recorded_at: "2026-09-08T07:00:00+00:00",
+        source_known_at: "2026-09-07T07:00:00+00:00",
+        provider_match_id: 123,
+        provider_field: "ontargetScoringAtt",
+        provider_field_state: "omitted",
+        raw_payload_sha256: "a".repeat(64),
+        corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero",
+        relation: "direct",
+        subject_team_code: 1,
+      },
+    };
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />);
+    await screen.findByRole("table", { name: "Observed SDP team statistics" });
+    expect(screen.getByText(/1 owner-confirmed display correction is active/i)).toBeInTheDocument();
+    expect(screen.getByText(/provider core validity is unchanged/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "GW from" }), { target: { value: "6" } });
+    expect(screen.getAllByLabelText("owner-confirmed display correction").length).toBeGreaterThan(0);
+  });
   it("searches, filters history and resets all selection state", async () => {
     render(<TeamSdpStatsPage />);
     await screen.findByRole("table", { name: "Observed SDP team statistics" });

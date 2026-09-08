@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import timedelta
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -14,10 +15,14 @@ import pytest
 from fpl.config import load_sdp_metrics
 from fpl.jobs.export_sdp_stats import main
 from fpl.publish.sdp_stats import (
+    DisplayCorrection,
+    DisplayCorrectionPolicy,
     _add_lineups,
+    _apply_display_corrections,
     _fpl_rows,
     build_sdp_stats,
     export_sdp_stats,
+    load_display_corrections,
     metric_value,
     sdp_stats_bytes,
     validate_sdp_stats,
@@ -96,6 +101,144 @@ def test_actual_zero_and_signed_recorded_points_preserved(tmp_path: Path) -> Non
     assert row["minutes_fpl"] == 0
     assert row["fpl"]["total_points_as_recorded"] == -2
     assert row["fpl"]["bps"] == -1
+
+
+def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    source_known = datetime(2026, 9, 4, 17, 47, tzinfo=UTC)
+    confirmed = datetime(2026, 9, 8, 14, 40, tzinfo=UTC)
+    correction = DisplayCorrection(
+        correction_id="2026-27-f7-team-7-sot",
+        season="2026-27",
+        fixture=7,
+        team_code=7,
+        opponent_team_code=36,
+        provider_match_id=2645201,
+        provider_side="away",
+        provider_field="ontargetScoringAtt",
+        raw_payload_sha256="a" * 64,
+        source_known_at=source_known,
+        owner_confirmation_recorded_at=confirmed,
+        display_value=0,
+        total_scoring_attempts=6,
+        shot_off_target_attempts=6,
+        blocked_attempts=None,
+        opponent_goalkeeper_saves=0,
+        fpl_goals_scored=0,
+    )
+    monkeypatch.setattr(
+        "fpl.publish.sdp_stats.load_display_corrections",
+        lambda: DisplayCorrectionPolicy(
+            schema_id="fpl.sdp-dashboard-display-corrections",
+            version=1,
+            corrections=(correction,),
+        ),
+    )
+    fixtures = {
+        7: {
+            "home": 36,
+            "away": 7,
+            "home_score": 4,
+            "away_score": 0,
+        }
+    }
+    teams = {
+        ("2026-27", 7, 7): {
+            "status": "UNAVAILABLE",
+            "sdp": {"shots_on_target": None, "shots_allowed": None},
+            "fpl": {"goals_scored": 0},
+            "display_corrections": {},
+        },
+        ("2026-27", 7, 36): {
+            "status": "UNAVAILABLE",
+            "sdp": {"shots_on_target": None, "shots_allowed": None},
+            "fpl": {"goals_scored": 4},
+            "display_corrections": {},
+        },
+    }
+    players = [
+        {
+            "season": "2026-27",
+            "fixture": 7,
+            "team_code": 36,
+            "position": "GK",
+            "minutes_fpl": 90,
+            "fpl": {"saves": 0},
+        }
+    ]
+    body = json.dumps(
+        [
+            {"side": "Home", "team": {"id": 36}, "stats": {"ontargetScoringAtt": 6}},
+            {
+                "side": "Away",
+                "team": {"id": 7},
+                "stats": {"totalScoringAtt": 6, "shotOffTarget": 6, "goals": 0},
+            },
+        ]
+    )
+    raw = [
+        {
+            "endpoint": "match_stats",
+            "sdp_match_id": 2645201,
+            "sha256": "a" * 64,
+            "fetched_at": source_known,
+            "body": body,
+        }
+    ]
+    db = tmp_path / "source.duckdb"
+    with initialise(db) as con:
+        con.execute(
+            """INSERT INTO stg_pl_sdp_fixture_crosswalk
+               (season,fixture,sdp_match_id,match_method,corroborated_kickoff,
+                corroborated_teams,resolved_at)
+               VALUES ('2026-27',7,2645201,'exact',TRUE,TRUE,?)""",
+            [source_known],
+        )
+        original = deepcopy(raw)
+        assert (
+            _apply_display_corrections(
+                con,
+                cutoff=confirmed - timedelta(seconds=1),
+                season="2026-27",
+                fixtures=fixtures,
+                players=players,
+                teams=teams,
+                raw=raw,
+            )
+            == 0
+        )
+        assert teams["2026-27", 7, 7]["display_corrections"] == {}
+        assert (
+            _apply_display_corrections(
+                con,
+                cutoff=confirmed,
+                season="2026-27",
+                fixtures=fixtures,
+                players=players,
+                teams=teams,
+                raw=raw,
+            )
+            == 1
+        )
+    assert raw == original
+    direct = teams["2026-27", 7, 7]
+    mirror = teams["2026-27", 7, 36]
+    assert direct["status"] == mirror["status"] == "UNAVAILABLE"
+    assert direct["sdp"]["shots_on_target"] is mirror["sdp"]["shots_allowed"] is None
+    assert direct["display_corrections"]["shots_on_target"]["value"] == 0
+    assert mirror["display_corrections"]["shots_allowed"]["relation"] == "opponent_mirror"
+
+
+def test_committed_display_policy_is_bounded_and_leaves_fulham_unresolved() -> None:
+    policy = load_display_corrections()
+    assert {(row.fixture, row.team_code, row.display_value) for row in policy.corrections} == {
+        (7, 7, 0),
+        (20, 7, 0),
+        (28, 6, 0),
+    }
+    assert all(row.provider_field == "ontargetScoringAtt" for row in policy.corrections)
+    assert (19, 54) not in {(row.fixture, row.team_code) for row in policy.corrections}
 
 
 def test_transfer_uses_fixture_time_club_not_current_club(tmp_path: Path) -> None:

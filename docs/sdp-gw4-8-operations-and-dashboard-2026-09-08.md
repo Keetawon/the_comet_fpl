@@ -122,6 +122,23 @@ nominal SDP event-clock durations do not. Partial-GW ended matches may appear in
 descriptive views while the prospective scorer still waits for whole-GW finality.
 Nothing from these pages enters xP, PMFs, optimizer, transfers or captaincy.
 
+### Owner-confirmed SOT display corrections
+
+`config/sdp_dashboard_display_corrections.yaml` records three exact display-only
+zeros confirmed by the owner at `2026-09-08T14:40:50.135115Z`: Aston Villa in
+fixtures 7 and 20, and Spurs in fixture 28. The exporter applies the value only
+after the confirmation cutoff and only when the deterministic fixture/provider
+crosswalk, raw payload hash, omitted provider field, shot-accounting evidence and
+official opponent-goalkeeper zero-save evidence all match the pinned policy.
+
+The raw SDP field remains NULL, the source row remains `UNAVAILABLE`, and the
+provider core-valid count remains 26/30. The correction is copied to the opponent's
+`shots_allowed` display with the same provenance so tables, charts and CSV exports
+remain consistent. Fixture 19 Fulham is deliberately absent from the policy and
+stays unavailable. A missing `ontargetScoringAtt` is never globally interpreted as
+zero. These display corrections cannot affect the environment selector, prediction,
+PMF or optimizer.
+
 The current operational DB has no `platform_default` / `platform_diagnostic`
 optimizer plans. The unchanged public sanitizer therefore correctly refused the
 first all-operational package. Its failed generation is retained. The explicit

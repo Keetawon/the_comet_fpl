@@ -13,6 +13,42 @@ describe("Observed SDP sidecar contract", () => {
     expect(source.player_matches[0].fpl?.expected_goals).toBe(0.2);
     expect(JSON.stringify(source)).toBe(raw);
   });
+  it("accepts a mirrored owner-confirmed display correction while raw SDP stays NULL", () => {
+    const data = sdpFixture();
+    const direct = data.team_matches[0];
+    direct.status = "UNAVAILABLE";
+    direct.sdp.shots_on_target = null;
+    const shared = {
+      correction_id: "2026-27-f1-team-3-sot",
+      value: 0 as const,
+      evidence_class: "owner_confirmed_display_correction" as const,
+      owner_confirmation_recorded_at: "2026-09-08T07:00:00+00:00",
+      source_known_at: "2026-09-07T07:00:00+00:00",
+      provider_match_id: 123,
+      provider_field: "ontargetScoringAtt" as const,
+      provider_field_state: "omitted" as const,
+      raw_payload_sha256: "a".repeat(64),
+      corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero" as const,
+      subject_team_code: direct.team_code,
+    };
+    direct.display_corrections = { shots_on_target: { ...shared, relation: "direct" } };
+    data.team_matches.push({
+      ...direct,
+      team_code: direct.opponent_team_code,
+      team_name: direct.opponent_name,
+      team_short_name: direct.opponent_short_name,
+      opponent_team_code: direct.team_code,
+      opponent_name: direct.team_name,
+      opponent_short_name: direct.team_short_name,
+      was_home: !direct.was_home,
+      sdp: { ...direct.sdp, shots_allowed: null },
+      display_corrections: { shots_allowed: { ...shared, relation: "opponent_mirror" } },
+    });
+    expect(parseSdpStats(data)).toBe(data);
+    expect(direct.sdp.shots_on_target).toBeNull();
+    direct.sdp.shots_on_target = 0;
+    expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+  });
   it.each(["future-known", "future-kickoff", "duplicate", "nonfinite", "identity", "denominator", "ambiguous-stat", "boolean-stat", "future-gameweek", "impossible-coverage", "unknown-status"])("fails closed on %s", defect => {
     const data = sdpFixture();
     if (defect === "future-known") data.team_matches[0].known_at = "2027-01-01T00:00:00Z";

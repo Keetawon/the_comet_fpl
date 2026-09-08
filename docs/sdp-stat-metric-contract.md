@@ -164,6 +164,28 @@ matching minute denominator. The UI exposes measured/selected coverage, so a
 partial total cannot masquerade as a full-range statistic. Source rows, not
 numeric GW gaps, define last-three/last-five windows; every DGW leg counts.
 
+### Owner-confirmed display corrections
+
+Schema version 2 adds a narrowly scoped `display_corrections` map to team-match
+rows. A correction never changes the retained SDP value, provider health, core-valid
+count, selector or model input. The raw `sdp` metric stays NULL and the row remains
+`UNAVAILABLE`; the UI, charts and CSV may display the separately proven value with
+an explicit `owner_confirmed_display_correction` provenance marker.
+
+The current policy contains exactly three `ontargetScoringAtt = 0` display values:
+fixture 7 Aston Villa, fixture 20 Aston Villa and fixture 28 Spurs. Each correction
+binds the exact fixture/team/provider-match crosswalk, immutable raw-payload hash,
+source knowledge time and owner-confirmation record time. The provider field is
+omitted in all three raw payloads. The zero is additionally corroborated by complete
+shot accounting (`totalScoringAtt = shotOffTarget + blockedScoringAtt`, allowing an
+omitted zero component) and the opponent's official FPL goalkeeper record showing
+90 or more minutes and zero saves, with no positive target evidence.
+
+Omission alone never means zero. Fixture 19 Fulham has the same missing provider
+field but no owner-confirmed correction, so it remains unavailable. A correction
+cannot replace an explicit provider value, pass a future cutoff, or enter the SDP
+provider-valid population.
+
 ## Availability, publication and verification
 
 All source reads require actual `known_at <= as_of` and observed kickoff before
