@@ -55,7 +55,11 @@ def test_only_existing_plan_blocks_are_carried_into_the_fresh_generation(
             {
                 key: [],
                 "fresh_context": "GW3",
-                "component_modes": {"football_environment.provenance": '{"pmf":[0.1,0.9]}'},
+                "component_modes": {
+                    "football_environment.provenance": '{"pmf":[0.1,0.9]}',
+                    "player_history.provenance": '{"live_captures":["private-source"]}',
+                    "player_history.contract": "prospective_archive_live_player_history/v1",
+                },
             },
         )
     for name in ("player_actuals.json", "team_actuals.json"):
@@ -80,7 +84,11 @@ def test_only_existing_plan_blocks_are_carried_into_the_fresh_generation(
     assert json.loads((output / "summary.json").read_bytes())["fresh_context"] == "GW3"
     modes = json.loads((output / "summary.json").read_bytes())["component_modes"]
     assert modes == {
-        "football_environment.provenance_sha256": hashlib.sha256(b'{"pmf":[0.1,0.9]}').hexdigest()
+        "football_environment.provenance_sha256": hashlib.sha256(b'{"pmf":[0.1,0.9]}').hexdigest(),
+        "player_history.provenance_sha256": hashlib.sha256(
+            b'{"live_captures":["private-source"]}'
+        ).hexdigest(),
+        "player_history.contract": "prospective_archive_live_player_history/v1",
     }
     assert (
         '"pmf"'
@@ -89,6 +97,8 @@ def test_only_existing_plan_blocks_are_carried_into_the_fresh_generation(
         ]
     )
     assert {p.name: p.read_bytes() for p in old.iterdir()} == before
+    assert "private-source" not in (output / "summary.json").read_text()
+    assert "private-source" in (fresh / "summary.json").read_text()
     write(old / "next_gw.json", {"plans": [{"forecast_run_id": "different"}]})
     with pytest.raises(ValueError, match="exact forecast vintage"):
         refresh.retain_existing_plans(fresh, old, tmp_path / "refused")

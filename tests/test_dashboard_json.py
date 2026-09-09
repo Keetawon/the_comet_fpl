@@ -2509,6 +2509,31 @@ def test_summary_snapshots_the_latest_run(tmp_path: Path) -> None:
     assert summary["optimizer_plans"][0]["decision_sha256"] == "dec-1"
 
 
+@pytest.mark.parametrize("shadow_id", ["000-shadow", "zzz-shadow"])
+def test_summary_primary_default_does_not_depend_on_shadow_hash_order(
+    tmp_path: Path, shadow_id: str
+) -> None:
+    export_dir = _build_source_export(tmp_path)
+    for name, rows in _source_tables().items():
+        additions = [{**row, "run_id": shadow_id} for row in rows if row.get("run_id") == RUN_ID]
+        if not additions:
+            continue
+        if name == "dim_forecast_run":
+            modes = json.loads(additions[0]["component_modes"])
+            additions[0]["component_modes"] = json.dumps(
+                {**modes, "forecast_role": "shadow_incumbent"}
+            )
+        _rewrite_table(export_dir, name, [*rows, *additions])
+    manifest_path = export_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["exported_run_ids"] = sorted([RUN_ID, shadow_id])
+    manifest["content_sha256"] = _strict_manifest_content_sha256(manifest)
+    manifest_path.write_bytes(_canonical_json_bytes(manifest, indent=2))
+    models = build_dashboard_read_models(export_dir)
+    assert models.summary["latest_run"]["run_id"] == RUN_ID
+    assert models.summary["top_xp"][0]["expected_points"] == 5.5
+
+
 def test_reads_only_parquet_and_opens_no_duckdb_handle(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

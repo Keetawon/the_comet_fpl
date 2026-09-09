@@ -101,13 +101,16 @@ def retain_existing_plans(fresh: Path, previous: Path, output: Path) -> dict[str
     def public_metadata(value: Any) -> None:
         if isinstance(value, dict):
             modes = value.get("component_modes")
-            if isinstance(modes, dict) and "football_environment.provenance" in modes:
-                body = modes.pop("football_environment.provenance")
-                if not isinstance(body, str):
-                    raise ValueError("unexpected serialized environment provenance")
-                digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-                modes["football_environment.provenance_sha256"] = digest
-                redacted.add(digest)
+            if isinstance(modes, dict):
+                for key in ("football_environment.provenance", "player_history.provenance"):
+                    if key not in modes:
+                        continue
+                    body = modes.pop(key)
+                    if not isinstance(body, str):
+                        raise ValueError("unexpected serialized source provenance")
+                    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+                    modes[f"{key}_sha256"] = digest
+                    redacted.add(digest)
             for child in value.values():
                 public_metadata(child)
         elif isinstance(value, list):
