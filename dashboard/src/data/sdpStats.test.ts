@@ -64,25 +64,33 @@ describe("Observed SDP sidecar contract", () => {
     if (defect === "unknown-status") data.team_matches[0].status = "GUESS";
     expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
   });
-  it("accepts a direct blocked-attempt correction without inventing an opponent defensive block", () => {
+  it.each(["shots_blocked", "expected_goals_on_target"])("accepts direct %s correction without an invented opponent mirror", metric => {
     const data = sdpFixture();
+    data.json_schema_version = 4;
+    for (const m of data.metrics) m.omitted_zero_display = false;
+    for (const row of data.team_matches) row.display_assumptions = {};
     const direct = data.team_matches[0];
     direct.status = "UNAVAILABLE";
-    direct.sdp.shots_blocked = null;
+    direct.sdp[metric] = null;
     const correction = {
       correction_id: "synthetic-blocked-zero", value: 0 as const,
       evidence_class: "owner_confirmed_display_correction" as const,
-      provider_field: "blockedScoringAtt" as const, provider_field_state: "omitted" as const,
-      corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero" as const,
+      provider_field: metric === "expected_goals_on_target" ? "expectedGoalsOnTarget" as const : "blockedScoringAtt" as const, provider_field_state: "omitted" as const,
+      corroboration: metric === "expected_goals_on_target" ? "owner_confirmed_xgot_with_corroborated_zero_sot" as const : "shot_accounting_and_fpl_goalkeeper_proxy_zero" as const,
       relation: "direct" as "direct" | "opponent_mirror",
       subject_team_code: direct.team_code, provider_match_id: 123,
       raw_payload_sha256: "a".repeat(64),
       source_known_at: "2026-09-07T07:00:00+00:00",
       owner_confirmation_recorded_at: "2026-09-08T07:00:00+00:00",
     };
-    direct.display_corrections = { shots_blocked: correction };
+    direct.display_corrections = { [metric]: correction };
     expect(parseSdpStats(data)).toBe(data);
-    expect(direct.sdp.shots_blocked).toBeNull();
+    expect(direct.sdp[metric]).toBeNull();
+    if (metric === "expected_goals_on_target") {
+      data.json_schema_version = 3;
+      expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+      data.json_schema_version = 4;
+    }
     correction.relation = "opponent_mirror";
     expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
     correction.relation = "direct";

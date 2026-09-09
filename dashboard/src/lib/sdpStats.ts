@@ -1,6 +1,6 @@
 import type { SdpDisplayAssumption, SdpDisplayCorrection, SdpMatch, SdpMetric, SdpScope } from "@/data/sdpStats";
 
-export type SdpMode = "total" | "per_match" | "per90";
+export type SdpMode = "total" | "per_match" | "per_appearance" | "per90";
 export interface SdpFilters {
   season: string; from: number; to: number; team: string; venue: "all" | "home" | "away";
   recent: "all" | "3" | "5"; search: string; position: string; minMinutes: number;
@@ -28,7 +28,7 @@ export const metricRaw = (row: SdpMatch, metric: SdpMetric): number | null => {
   return finite(value) ? value : null;
 };
 export const correctionDescription = (correction: SdpDisplayCorrection) =>
-  `Owner-confirmed display correction recorded ${correction.owner_confirmation_recorded_at}; raw SDP ${correction.provider_field} was omitted; corroborated by shot accounting and the official FPL goalkeeper proxy; raw payload SHA256 ${correction.raw_payload_sha256}. Provider core validity is unchanged.`;
+  `Owner-confirmed display correction recorded ${correction.owner_confirmation_recorded_at}; raw SDP ${correction.provider_field} was omitted; ${correction.provider_field === "expectedGoalsOnTarget" ? "xGOT zero confirmed by the owner, supported by corroborated zero shots on target" : "corroborated by shot accounting and the official FPL goalkeeper proxy"}; raw payload SHA256 ${correction.raw_payload_sha256}. Provider core validity is unchanged.`;
 export const assumptionDescription = (assumption: SdpDisplayAssumption) =>
   `Owner-directed display assumption recorded ${assumption.policy_recorded_at}; raw SDP ${assumption.provider_field} was omitted and is shown as zero for this sparse count. This is not a provider-verified zero; raw remains NULL. Raw payload SHA256 ${assumption.raw_payload_sha256}. Provider core validity is unchanged.`;
 export function metricCorrections(rows: readonly SdpMatch[], metric: SdpMetric): SdpDisplayCorrection[] {
@@ -40,6 +40,14 @@ export function metricAssumptions(rows: readonly SdpMatch[], metric: SdpMetric):
 }
 
 export function metricValue(rows: readonly SdpMatch[], metric: SdpMetric, mode: SdpMode): MetricValue {
+  // Per-appearance averages require witnessed actual exposure for every selected row.
+  // A missing minute value is not a DNP; unknown exposure keeps the average unavailable.
+  if (mode === "per_appearance") {
+    if (!rows.every(row => finite(row.minutes_fpl) && row.minutes_fpl >= 0)) {
+      return { value: null, measured: 0, matches: rows.length, minutes: null };
+    }
+    rows = rows.filter(row => row.minutes_fpl! > 0);
+  }
   const values = rows.map(row => metricRaw(row, metric));
   const measured = values.filter(finite).length;
   const result: MetricValue = { value: null, measured, matches: rows.length, minutes: null };
@@ -55,7 +63,7 @@ export function metricValue(rows: readonly SdpMatch[], metric: SdpMetric, mode: 
     const value = exposure > 0 ? total / exposure * 90 : null;
     return { ...result, minutes: finite(exposure) ? exposure : null, value: finite(value) && finite(exposure) ? value : null };
   }
-  return { ...result, value: mode === "per_match" ? total / rows.length : total };
+  return { ...result, value: (mode === "per_match" || mode === "per_appearance") ? total / rows.length : total };
 }
 
 export function selectSdpEntities(rows: readonly SdpMatch[], scope: SdpScope, filters: SdpFilters): SdpEntity[] {
@@ -100,8 +108,8 @@ const csvCell = (value: unknown) => {
   return `"${text.replaceAll('"', '""')}"`;
 };
 export function sdpCsv(rows: readonly SdpEntity[], metrics: readonly SdpMetric[], mode: SdpMode): string {
-  const label = (m: SdpMetric) => `${m.source.toUpperCase()} ${m.label}${m.aggregation === "mean" ? " [per-match mean]" : ""}${m.verified_semantics ? "" : ` [provider observation; not independently reconciled; ${m.provider_field ?? m.key}]`}`;
-  const header = ["Name", "Stable identity", "Clubs in selected scope", "Season", "First kickoff", "Last kickoff", "Match rows", "Display mode", ...metrics.flatMap(m => [label(m), `${label(m)} displayed matches`, `${label(m)} display provenance`])];
-  const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); const assumptions = metricAssumptions(row.rows, m); return [value.value, `${value.measured}/${value.matches}${assumptions.length ? ` (${assumptions.length} assumed zero)` : ""}`, [...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription)].join(" | ")]; })]);
+  const label = (m: SdpMetric) => `${m.source.toUpperCase()} ${m.label}${m.aggregation === "mean" ? " [per-match mean]" : mode === "per_match" ? " [average per match]" : mode === "per_appearance" ? " [average per appearance; FPL minutes > 0]" : mode === "per90" ? " [per 90 actual minutes]" : ""}${m.verified_semantics ? "" : ` [provider observation; not independently reconciled; ${m.provider_field ?? m.key}]`}`;
+  const header = ["Name", "Stable identity", "Clubs in selected scope", "Season", "First kickoff", "Last kickoff", "Match rows", "Display mode", ...metrics.flatMap(m => [label(m), `${label(m)} displayed ${mode === "per_appearance" ? "appearances" : "matches"}`, `${label(m)} display provenance`])];
+  const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); const assumptions = metricAssumptions(row.rows, m); return [value.value, mode === "per_appearance" && row.rows.some(r => !finite(r.minutes_fpl)) ? "unknown appearances (missing FPL minutes)" : `${value.measured}/${value.matches}${assumptions.length ? ` (${assumptions.length} assumed zero)` : ""}`, [...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription)].join(" | ")]; })]);
   return [header, ...records].map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }

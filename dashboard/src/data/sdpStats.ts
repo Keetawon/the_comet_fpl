@@ -44,10 +44,10 @@ export interface SdpDisplayCorrection {
   owner_confirmation_recorded_at: string;
   source_known_at: string;
   provider_match_id: number;
-  provider_field: "ontargetScoringAtt" | "blockedScoringAtt";
+  provider_field: "ontargetScoringAtt" | "blockedScoringAtt" | "expectedGoalsOnTarget";
   provider_field_state: "omitted";
   raw_payload_sha256: string;
-  corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero";
+  corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero" | "owner_confirmed_xgot_with_corroborated_zero_sot";
   relation: "direct" | "opponent_mirror";
   subject_team_code: number;
 }
@@ -89,7 +89,7 @@ export interface SdpMatch {
 
 export interface SdpStatsData {
   schema: "fpl.sdp-stats";
-  json_schema_version: 2 | 3;
+  json_schema_version: 2 | 3 | 4;
   as_of: string;
   source_status: {
     team_stats: SourceAvailability;
@@ -125,7 +125,7 @@ const timestamp = (v: unknown) => typeof v === "string" &&
 
 export function parseSdpStats(payload: unknown): SdpStatsData {
   const fail = () => { throw new Error("The observed SDP file is invalid or incompatible. Republish its source data."); };
-  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3].includes(payload.json_schema_version as number) ||
+  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3, 4].includes(payload.json_schema_version as number) ||
       !timestamp(payload.as_of) || !object(payload.source_status) || !object(payload.coverage) ||
       !Array.isArray(payload.metrics) || !Array.isArray(payload.team_matches) ||
       !Array.isArray(payload.player_matches) || !Array.isArray(payload.gameweeks)) return fail();
@@ -163,7 +163,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
         !["sum", "mean"].includes(String(m.aggregation)) ||
         ![null, "minutes_sdp", "minutes_fpl"].includes(m.per90_denominator as null | string) ||
         typeof m.verified_semantics !== "boolean" ||
-        (payload.json_schema_version === 3 && typeof m.omitted_zero_display !== "boolean") ||
+        (Number(payload.json_schema_version) >= 3 && typeof m.omitted_zero_display !== "boolean") ||
         [m.key, m.label, m.group, m.unit].some(v => typeof v !== "string")) return fail();
     if (m.per90_denominator !== null && m.per90_denominator !== `minutes_${m.source}`) return fail();
     const key = `${m.scope}:${m.source}:${m.key}`;
@@ -185,7 +185,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
       }
       if (scope === "team") {
         if (!object(row.display_corrections) ||
-            (payload.json_schema_version === 3 && !object(row.display_assumptions)) ||
+            (Number(payload.json_schema_version) >= 3 && !object(row.display_assumptions)) ||
             (row.display_assumptions !== undefined && !object(row.display_assumptions))) return fail();
         for (const [metric, assumption] of Object.entries(row.display_assumptions ?? {})) {
           if (!OMITTED_ZERO_DISPLAY_FIELDS.has(metric) || !object(assumption) ||
@@ -201,10 +201,11 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
               Object.hasOwn(row.display_corrections, metric)) return fail();
         }
         for (const [metric, correction] of Object.entries(row.display_corrections)) {
-          if (!["shots_on_target", "shots_on_target_allowed", "shots_blocked"].includes(metric) || !object(correction) ||
+          if (!["shots_on_target", "shots_on_target_allowed", "shots_blocked", "expected_goals_on_target"].includes(metric) || !object(correction) ||
+              (metric === "expected_goals_on_target" && Number(payload.json_schema_version) < 4) ||
               correction.value !== 0 || correction.evidence_class !== "owner_confirmed_display_correction" ||
-              correction.provider_field !== (metric === "shots_blocked" ? "blockedScoringAtt" : "ontargetScoringAtt") || correction.provider_field_state !== "omitted" ||
-              correction.corroboration !== "shot_accounting_and_fpl_goalkeeper_proxy_zero" ||
+              correction.provider_field !== (metric === "expected_goals_on_target" ? "expectedGoalsOnTarget" : metric === "shots_blocked" ? "blockedScoringAtt" : "ontargetScoringAtt") || correction.provider_field_state !== "omitted" ||
+              correction.corroboration !== (metric === "expected_goals_on_target" ? "owner_confirmed_xgot_with_corroborated_zero_sot" : "shot_accounting_and_fpl_goalkeeper_proxy_zero") ||
               !["direct", "opponent_mirror"].includes(String(correction.relation)) ||
               typeof correction.correction_id !== "string" || !/^[a-z0-9-]+$/.test(correction.correction_id) ||
               typeof correction.raw_payload_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(correction.raw_payload_sha256) ||
@@ -213,7 +214,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
               Date.parse(correction.source_known_at as string) > Date.parse(correction.owner_confirmation_recorded_at as string) ||
               Date.parse(correction.owner_confirmation_recorded_at as string) > asOf ||
               (row.sdp as Record<string, unknown>)[metric] !== null || row.status !== "UNAVAILABLE" ||
-              (["shots_on_target", "shots_blocked"].includes(metric) && (correction.relation !== "direct" || row.team_code !== correction.subject_team_code)) ||
+              (["shots_on_target", "shots_blocked", "expected_goals_on_target"].includes(metric) && (correction.relation !== "direct" || row.team_code !== correction.subject_team_code)) ||
               (metric === "shots_on_target_allowed" && (correction.relation !== "opponent_mirror" || row.opponent_team_code !== correction.subject_team_code))) return fail();
           const entries = corrections.get(correction.correction_id) ?? [];
           entries.push({ row, metric, correction });
@@ -241,7 +242,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
     }
   }
   for (const entries of corrections.values()) {
-    if (entries.length === 1 && entries[0].metric === "shots_blocked") continue;
+    if (entries.length === 1 && ["shots_blocked", "expected_goals_on_target"].includes(entries[0].metric)) continue;
     if (entries.length !== 2 || new Set(entries.map(entry => entry.metric)).size !== 2) return fail();
     const direct = entries.find(entry => entry.metric === "shots_on_target");
     const mirror = entries.find(entry => entry.metric === "shots_on_target_allowed");

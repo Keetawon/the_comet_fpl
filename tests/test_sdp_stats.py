@@ -149,6 +149,8 @@ def test_omitted_sparse_count_assumption_is_display_only_and_cutoff_safe() -> No
         ("ontargetScoringAtt", 6, 6, None),
         ("blockedScoringAtt", 6, 6, None),
         ("ontargetScoringAtt", 11, 3, 8),
+        ("expectedGoalsOnTarget", 6, 6, None),
+        ("expectedGoalsOnTarget", 11, 3, 8),
     ],
 )
 def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
@@ -184,7 +186,7 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
         "fpl.publish.sdp_stats.load_display_corrections",
         lambda: DisplayCorrectionPolicy(
             schema_id="fpl.sdp-dashboard-display-corrections",
-            version=2,
+            version=3,
             corrections=(correction,),
         ),
     )
@@ -204,6 +206,7 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
                 "shots_on_target_allowed": None,
                 "shots_allowed": 6,
                 "shots_blocked": None,
+                "expected_goals_on_target": None,
             },
             "fpl": {"goals_scored": 0},
             "display_corrections": {},
@@ -300,6 +303,25 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
                     teams=teams,
                     raw=[{**raw[0], "body": json.dumps(broken)}],
                 )
+        if provider_field == "expectedGoalsOnTarget":
+            for field, value, error in [
+                ("ontargetScoringAtt", 1, "shots-on-target evidence"),
+                ("ontargetScoringAtt", None, "shots-on-target evidence"),
+                ("expectedGoalsOnTarget", None, "explicit provider field"),
+                ("expectedGoalsOnTarget", 0.2, "explicit provider field"),
+            ]:
+                broken = json.loads(body)
+                broken[1]["stats"][field] = value
+                with pytest.raises(ValueError, match=error):
+                    _apply_display_corrections(
+                        con,
+                        cutoff=confirmed,
+                        season="2026-27",
+                        fixtures=fixtures,
+                        players=players,
+                        teams=teams,
+                        raw=[{**raw[0], "body": json.dumps(broken)}],
+                    )
         assert (
             _apply_display_corrections(
                 con,
@@ -319,10 +341,13 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
     assert direct["sdp"]["shots_on_target"] is mirror["sdp"]["shots_on_target_allowed"] is None
     assert mirror["sdp"]["shots_allowed"] == 6
     assert "shots_allowed" not in mirror["display_corrections"]
-    metric = "shots_blocked" if provider_field == "blockedScoringAtt" else "shots_on_target"
+    metric = {
+        "blockedScoringAtt": "shots_blocked",
+        "expectedGoalsOnTarget": "expected_goals_on_target",
+    }.get(provider_field, "shots_on_target")
     assert direct["sdp"][metric] is None
     assert direct["display_corrections"][metric]["value"] == 0
-    if provider_field == "blockedScoringAtt":
+    if provider_field != "ontargetScoringAtt":
         assert mirror["display_corrections"] == {}
     else:
         assert (
@@ -359,13 +384,17 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
 
 def test_committed_display_policy_is_bounded_and_preserves_confirmation_times() -> None:
     policy = load_display_corrections()
-    assert policy.version == 2
+    assert policy.version == 3
     assert {(row.fixture, row.team_code, row.provider_field) for row in policy.corrections} == {
         (7, 7, "ontargetScoringAtt"),
         (7, 7, "blockedScoringAtt"),
         (19, 54, "ontargetScoringAtt"),
         (20, 7, "ontargetScoringAtt"),
         (28, 6, "ontargetScoringAtt"),
+        (7, 7, "expectedGoalsOnTarget"),
+        (19, 54, "expectedGoalsOnTarget"),
+        (20, 7, "expectedGoalsOnTarget"),
+        (28, 6, "expectedGoalsOnTarget"),
     }
     old = {(7, "ontargetScoringAtt"), (20, "ontargetScoringAtt"), (28, "ontargetScoringAtt")}
     for row in policy.corrections:
@@ -374,6 +403,8 @@ def test_committed_display_policy_is_bounded_and_preserves_confirmation_times() 
             if (row.fixture, row.provider_field) in old
             else "2026-09-09T02:12:10+00:00"
         )
+        if row.provider_field == "expectedGoalsOnTarget":
+            expected = "2026-09-09T07:24:08+00:00"
         assert row.owner_confirmation_recorded_at.isoformat() == expected
         assert row.display_value == 0
     with pytest.raises(ValueError, match="require policy version 2"):
@@ -382,20 +413,34 @@ def test_committed_display_policy_is_bounded_and_preserves_confirmation_times() 
             version=1,
             corrections=policy.corrections,
         )
+    with pytest.raises(ValueError, match="require policy version 3"):
+        DisplayCorrectionPolicy(
+            schema_id=policy.schema_id, version=2, corrections=policy.corrections
+        )
 
 
-def test_public_blocked_display_correction_has_no_invented_opponent_mirror(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("metric", "provider_field"),
+    [("shots_blocked", "blockedScoringAtt"), ("expected_goals_on_target", "expectedGoalsOnTarget")],
+)
+def test_public_direct_display_correction_has_no_invented_opponent_mirror(
+    tmp_path: Path, metric: str, provider_field: str
+) -> None:
     db = tmp_path / "source.duckdb"
     _write(db)
     document = _load(db)
     row = document["team_matches"][0]
-    row["display_corrections"]["shots_blocked"] = {
+    row["display_corrections"][metric] = {
         "correction_id": "synthetic-blocked-zero",
         "value": 0,
         "evidence_class": "owner_confirmed_display_correction",
-        "provider_field": "blockedScoringAtt",
+        "provider_field": provider_field,
         "provider_field_state": "omitted",
-        "corroboration": "shot_accounting_and_fpl_goalkeeper_proxy_zero",
+        "corroboration": (
+            "owner_confirmed_xgot_with_corroborated_zero_sot"
+            if metric == "expected_goals_on_target"
+            else "shot_accounting_and_fpl_goalkeeper_proxy_zero"
+        ),
         "raw_payload_sha256": "a" * 64,
         "provider_match_id": 123,
         "subject_team_code": row["team_code"],
@@ -404,8 +449,13 @@ def test_public_blocked_display_correction_has_no_invented_opponent_mirror(tmp_p
         "owner_confirmation_recorded_at": document["as_of"],
     }
     validate_sdp_stats(document)
-    assert row["sdp"]["shots_blocked"] is None
-    row["display_corrections"]["shots_blocked"]["relation"] = "opponent_mirror"
+    assert row["sdp"][metric] is None
+    if metric == "expected_goals_on_target":
+        document["json_schema_version"] = 3
+        with pytest.raises(ValueError, match="provenance"):
+            validate_sdp_stats(document)
+        document["json_schema_version"] = 4
+    row["display_corrections"][metric]["relation"] = "opponent_mirror"
     with pytest.raises(ValueError, match="relation"):
         validate_sdp_stats(document)
 

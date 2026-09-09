@@ -179,7 +179,7 @@ class DisplayCorrection(BaseModel):
     opponent_team_code: int = Field(gt=0)
     provider_match_id: int = Field(gt=0)
     provider_side: Literal["home", "away"]
-    provider_field: Literal["ontargetScoringAtt", "blockedScoringAtt"]
+    provider_field: Literal["ontargetScoringAtt", "blockedScoringAtt", "expectedGoalsOnTarget"]
     raw_payload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_known_at: datetime
     owner_confirmation_recorded_at: datetime
@@ -202,7 +202,7 @@ class DisplayCorrection(BaseModel):
 class DisplayCorrectionPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     schema_id: Literal["fpl.sdp-dashboard-display-corrections"]
-    version: Literal[1, 2]
+    version: Literal[1, 2, 3]
     corrections: tuple[DisplayCorrection, ...]
 
     @model_validator(mode="after")
@@ -217,6 +217,10 @@ class DisplayCorrectionPolicy(BaseModel):
             r.provider_field != "ontargetScoringAtt" for r in self.corrections
         ):
             raise ValueError("blocked-shot corrections require policy version 2")
+        if self.version < 3 and any(
+            r.provider_field == "expectedGoalsOnTarget" for r in self.corrections
+        ):
+            raise ValueError("xGOT corrections require policy version 3")
         return self
 
 
@@ -429,27 +433,36 @@ def _apply_display_corrections(
         ):
             raise ValueError("display correction shot accounting is not corroborated")
         blocked_correction = correction.provider_field == "blockedScoringAtt"
+        sot_correction = correction.provider_field == "ontargetScoringAtt"
         if blocked_correction and (
             observed["shot_off_target_attempts"] != correction.total_scoring_attempts
             or ("ontargetScoringAtt" in stats and _number(stats["ontargetScoringAtt"]) != 0)
         ):
             raise ValueError("blocked-shot zero requires off-target attempts to exhaust all shots")
+        if correction.provider_field == "expectedGoalsOnTarget" and (
+            "ontargetScoringAtt" in stats and _number(stats["ontargetScoringAtt"]) != 0
+        ):
+            raise ValueError("xGOT zero contradicts explicit shots-on-target evidence")
         for field in SOT_TARGET_FIELDS:
             if field in stats and _number(stats[field]) != 0:
                 raise ValueError("display correction has positive or malformed target evidence")
         direct = teams[season, correction.fixture, correction.team_code]
         mirror = teams[season, correction.fixture, correction.opponent_team_code]
-        metric_key = "shots_blocked" if blocked_correction else "shots_on_target"
+        metric_key = {
+            "blockedScoringAtt": "shots_blocked",
+            "ontargetScoringAtt": "shots_on_target",
+            "expectedGoalsOnTarget": "expected_goals_on_target",
+        }[correction.provider_field]
         measured = direct["sdp"][metric_key]
         if measured is not None and (
-            blocked_correction or measured == mirror["sdp"]["shots_on_target_allowed"]
+            not sot_correction or measured == mirror["sdp"]["shots_on_target_allowed"]
         ):
             # A later validated provider observation supersedes the display-only
             # override. Keep the original confirmation and raw versions intact.
             continue
         if (
             direct["sdp"][metric_key] is not None
-            or (not blocked_correction and mirror["sdp"]["shots_on_target_allowed"] is not None)
+            or (sot_correction and mirror["sdp"]["shots_on_target_allowed"] is not None)
             or direct["fpl"]["goals_scored"] != correction.fpl_goals_scored
         ):
             raise ValueError("display correction would overwrite observed/provider evidence")
@@ -481,12 +494,16 @@ def _apply_display_corrections(
             "provider_field": correction.provider_field,
             "provider_field_state": "omitted",
             "raw_payload_sha256": correction.raw_payload_sha256,
-            "corroboration": "shot_accounting_and_fpl_goalkeeper_proxy_zero",
+            "corroboration": (
+                "owner_confirmed_xgot_with_corroborated_zero_sot"
+                if correction.provider_field == "expectedGoalsOnTarget"
+                else "shot_accounting_and_fpl_goalkeeper_proxy_zero"
+            ),
             "subject_team_code": correction.team_code,
         }
         direct.setdefault("display_assumptions", {}).pop(metric_key, None)
         direct["display_corrections"][metric_key] = {**public, "relation": "direct"}
-        if not blocked_correction:
+        if sot_correction:
             mirror["display_corrections"]["shots_on_target_allowed"] = {
                 **public,
                 "relation": "opponent_mirror",
@@ -1189,7 +1206,7 @@ def build_sdp_stats(
         )
     document = {
         "schema": SCHEMA,
-        "json_schema_version": 3,
+        "json_schema_version": 4,
         "as_of": _iso(cutoff),
         "source_status": {
             "team_stats": "UNAVAILABLE" if not valid else "PARTIAL" if failures else "AVAILABLE",
@@ -1235,7 +1252,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             "gameweeks",
         }
         or document["schema"] != SCHEMA
-        or document["json_schema_version"] != 3
+        or document["json_schema_version"] not in (3, 4)
     ):
         raise ValueError("invalid SDP sidecar envelope")
     cutoff = AsOf(datetime.fromisoformat(document["as_of"])).ts
@@ -1369,20 +1386,34 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                 for metric, correction in row["display_corrections"].items():
                     if (
                         metric
-                        not in {"shots_on_target", "shots_on_target_allowed", "shots_blocked"}
+                        not in {
+                            "shots_on_target",
+                            "shots_on_target_allowed",
+                            "shots_blocked",
+                            "expected_goals_on_target",
+                        }
+                        or (
+                            metric == "expected_goals_on_target"
+                            and document["json_schema_version"] < 4
+                        )
                         or not isinstance(correction, dict)
                         or set(correction) != DISPLAY_CORRECTION_FIELDS
                         or correction["value"] != 0
                         or correction["evidence_class"] != "owner_confirmed_display_correction"
                         or correction["provider_field"]
                         != (
-                            "blockedScoringAtt"
-                            if metric == "shots_blocked"
-                            else "ontargetScoringAtt"
+                            {
+                                "shots_blocked": "blockedScoringAtt",
+                                "expected_goals_on_target": "expectedGoalsOnTarget",
+                            }.get(metric, "ontargetScoringAtt")
                         )
                         or correction["provider_field_state"] != "omitted"
                         or correction["corroboration"]
-                        != "shot_accounting_and_fpl_goalkeeper_proxy_zero"
+                        != (
+                            "owner_confirmed_xgot_with_corroborated_zero_sot"
+                            if metric == "expected_goals_on_target"
+                            else "shot_accounting_and_fpl_goalkeeper_proxy_zero"
+                        )
                         or not re.fullmatch(r"[a-z0-9-]+", correction["correction_id"])
                         or not re.fullmatch(r"[0-9a-f]{64}", correction["raw_payload_sha256"])
                         or type(correction["provider_match_id"]) is not int
@@ -1399,7 +1430,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                     ).ts
                     if source_known > confirmed or confirmed > cutoff:
                         raise ValueError("future or contradictory display correction")
-                    if metric in {"shots_on_target", "shots_blocked"}:
+                    if metric in {"shots_on_target", "shots_blocked", "expected_goals_on_target"}:
                         valid_relation = (
                             correction["relation"] == "direct"
                             and row["team_code"] == correction["subject_team_code"]
@@ -1424,7 +1455,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                         raise ValueError("non-finite/non-numeric observed metric")
     for entries in correction_rows.values():
         # Blocked attacking attempts are not the opponent's defensive block count.
-        if len(entries) == 1 and entries[0][1] == "shots_blocked":
+        if len(entries) == 1 and entries[0][1] in {"shots_blocked", "expected_goals_on_target"}:
             continue
         if len(entries) != 2 or {entry[1] for entry in entries} != {
             "shots_on_target",

@@ -11,8 +11,8 @@ describe("SDP observed descriptive arithmetic", () => {
     expect(metricValue([sdpMatch({ sdp: { shots: 0 } })], shooting, "total").value).toBe(0);
     expect(metricValue([], shooting, "total").value).toBeNull();
   });
-  it.each(["ontargetScoringAtt", "blockedScoringAtt"] as const)("uses the labelled %s display correction consistently without changing raw SDP", providerField => {
-    const key = providerField === "blockedScoringAtt" ? "shots_blocked" : "shots_on_target";
+  it.each(["ontargetScoringAtt", "blockedScoringAtt", "expectedGoalsOnTarget"] as const)("uses the labelled %s display correction consistently without changing raw SDP", providerField => {
+    const key = providerField === "expectedGoalsOnTarget" ? "expected_goals_on_target" : providerField === "blockedScoringAtt" ? "shots_blocked" : "shots_on_target";
     const metric = { ...shooting, key, label: key };
     const row = sdpMatch({
       status: "UNAVAILABLE",
@@ -28,7 +28,7 @@ describe("SDP observed descriptive arithmetic", () => {
           provider_field: providerField,
           provider_field_state: "omitted",
           raw_payload_sha256: "a".repeat(64),
-          corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero",
+          corroboration: providerField === "expectedGoalsOnTarget" ? "owner_confirmed_xgot_with_corroborated_zero_sot" : "shot_accounting_and_fpl_goalkeeper_proxy_zero",
           relation: "direct",
           subject_team_code: 3,
         },
@@ -41,6 +41,27 @@ describe("SDP observed descriptive arithmetic", () => {
     const csv = sdpCsv([{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "—", code: null, teamCode: 3, rows: [row] }], [metric], "total");
     expect(csv).toContain("Owner-confirmed display correction");
     expect(csv).toContain(`${providerField} was omitted`);
+    expect(metricValue([row], metric, "per_match").value).toBe(0);
+    expect(sdpCsv([{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "", code: null, teamCode: 3, rows: [row] }], [metric], "per_match")).toContain("average per match");
+  });
+  it("averages player stats over witnessed appearances, excluding DNPs without treating unknown minutes as zero", () => {
+    const rows = [
+      sdpMatch({ minutes_fpl: 30, fpl: { expected_goals: 0.1 } }),
+      sdpMatch({ minutes_fpl: 90, fpl: { expected_goals: 0.5 } }),
+      sdpMatch({ minutes_fpl: 0, fpl: { expected_goals: null } }),
+    ];
+    expect(metricValue(rows, fplXg, "per_appearance")).toEqual({ value: 0.3, measured: 2, matches: 2, minutes: null });
+    expect(metricValue([rows[2]], fplXg, "per_appearance").value).toBeNull();
+    expect(metricValue([...rows, sdpMatch({ minutes_fpl: null })], fplXg, "per_appearance").value).toBeNull();
+    expect(metricValue([...rows, sdpMatch({ minutes_fpl: 90, fpl: { expected_goals: null } })], fplXg, "per_appearance").value).toBeNull();
+    const entity = { id: "fpl:1", name: "Player", clubs: "ARS", position: "DEF", code: 1, teamCode: 3, rows };
+    const csv = sdpCsv([entity], [fplXg], "per_appearance");
+    expect(csv).toContain('"0.3","2/2"');
+    expect(csv).toContain("average per appearance; FPL minutes > 0");
+    expect(sdpCsv([entity], [fplXg], "per_appearance")).toBe(csv);
+    expect(sdpCsv([{ ...entity, rows: [sdpMatch({ minutes_fpl: null })] }], [fplXg], "per_appearance")).toContain("unknown appearances (missing FPL minutes)");
+    const other = { ...entity, id: "fpl:2", rows: [sdpMatch({ minutes_fpl: 60, fpl: { expected_goals: 0.4 } })] };
+    expect(sortSdpEntities([entity, other], fplXg, "per_appearance", false)[0].id).toBe("fpl:2");
   });
   it("shows a raw omitted sparse count as an explicitly labelled assumed zero", () => {
     const metric = { ...shooting, key: "shots_outside_box", provider_field: "attemptsObox", omitted_zero_display: true };

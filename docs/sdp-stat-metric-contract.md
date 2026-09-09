@@ -213,3 +213,15 @@ database writer has closed. The dashboard build wrapper binds this sidecar to it
 public release while leaving the existing sealed read-model package unchanged.
 No network request, provider credential, model fit, forecast, or optimizer action
 is performed by this exporter.
+
+### September 9 display addendum: averages and xGOT
+
+Current sidecar schema version 4 adds four owner-confirmed xGOT zeros at fixtures
+7/19/20/28 (Aston Villa/Fulham/Aston Villa/Spurs), recorded separately at
+2026-09-09T07:24:08Z. Earlier confirmation records and raw omitted fields are
+unchanged. The team view defaults to average per match; the player view defaults
+to average per witnessed FPL appearance, excluding measured zero-minute DNPs and
+failing closed on unknown minutes. Match logs and exposure counts remain explicit.
+`Partial SDP` is a display label for provider core-incomplete match records and
+does not upgrade provider health. See the [dated delivery and denominator
+contract](sdp-average-and-xgot-display-2026-09-09.md) for provenance and verification.

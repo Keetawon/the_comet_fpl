@@ -15,13 +15,13 @@ describe("Observed SDP dashboard tabs", () => {
     vi.mocked(loadSdpStats).mockResolvedValue(data);
     render(<TeamSdpStatsPage />);
     const table = await screen.findByRole("table", { name: "Observed SDP team statistics" });
-    expect(within(table).getByRole("columnheader", { name: "Passes" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Passes /match" })).toBeInTheDocument();
     expect(within(table).getAllByText("Unavailable").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "passing" }));
     expect(screen.getByRole("combobox", { name: "Metric group" })).toHaveValue("passing");
-    expect(within(table).queryByRole("columnheader", { name: "Shots" })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("columnheader", { name: "Shots /match" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "defence" }));
-    expect(within(table).getByRole("columnheader", { name: "Tackles" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Tackles /match" })).toBeInTheDocument();
   });
   it("renders the exact team title, observed source scope, sortable table and labelled scatter", async () => {
     render(<TeamSdpStatsPage />);
@@ -31,8 +31,8 @@ describe("Observed SDP dashboard tabs", () => {
     expect(screen.getByRole("group", { name: /Observed attack and defence/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
-    fireEvent.click(within(table).getByRole("button", { name: "Shots" }));
-    expect(within(table).getByRole("columnheader", { name: "Shots" })).toHaveAttribute("aria-sort", "descending");
+    fireEvent.click(within(table).getByRole("button", { name: "Shots /match" }));
+    expect(within(table).getByRole("columnheader", { name: "Shots /match" })).toHaveAttribute("aria-sort", "descending");
   });
   it("labels completed fixtures across gameweeks and keeps observed-data freshness separate", async () => {
     const data = sdpFixture();
@@ -81,6 +81,8 @@ describe("Observed SDP dashboard tabs", () => {
     expect(screen.getByText(/provider core validity is unchanged/i)).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "GW from" }), { target: { value: "6" } });
     expect(screen.getAllByLabelText("owner-confirmed display correction").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "View Arsenal match detail" }));
+    expect(screen.getByText("Partial SDP")).toHaveAttribute("title", expect.stringContaining("Required provider core fields are missing"));
   });
   it("searches, filters history and resets all selection state", async () => {
     render(<TeamSdpStatsPage />);
@@ -95,6 +97,7 @@ describe("Observed SDP dashboard tabs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
     expect(screen.getByRole("textbox", { name: "Search clubs" })).toHaveValue("");
     expect(screen.getByRole("combobox", { name: "Recent history" })).toHaveValue("5");
+    expect(screen.getByRole("combobox", { name: "Display" })).toHaveValue("per_match");
     expect(screen.queryByRole("table", { name: "Arsenal observed match log" })).not.toBeInTheDocument();
   });
   it("limits comparisons to three with a complete exact-value table", async () => {
@@ -111,7 +114,7 @@ describe("Observed SDP dashboard tabs", () => {
     const table = await screen.findByRole("table", { name: "Observed player statistics by source" });
     expect(screen.getByRole("heading", { name: "Players stat from SDP" })).toBeInTheDocument();
     expect(screen.getByText("Detailed SDP player statistics are unavailable.")).toBeInTheDocument();
-    expect(within(table).getByRole("columnheader", { name: "FPL · xG" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "FPL · xG /app" })).toBeInTheDocument();
     expect(within(table).queryByRole("columnheader", { name: /Shots/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Display" }), { target: { value: "per90" } });
     expect(within(table).getByRole("columnheader", { name: "FPL · xG /90" })).toBeInTheDocument();
@@ -145,7 +148,8 @@ describe("Observed SDP dashboard tabs", () => {
     vi.mocked(loadSdpStats).mockResolvedValue(data);
     render(<PlayerSdpStatsPage />);
     const table = await screen.findByRole("table", { name: "Observed player statistics by source" });
-    expect(within(table).getByText("Exposure unknown")).toBeInTheDocument();
+    expect(within(table).getAllByText("Exposure unknown").length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByRole("combobox", { name: "Display" }), { target: { value: "total" } });
     fireEvent.click(screen.getByRole("checkbox", { name: "Compare Player 1" }));
     const comparison = screen.getByRole("region", { name: "Selected comparison" });
     expect(within(comparison).getAllByText("-5").length).toBeGreaterThan(0);
@@ -159,7 +163,7 @@ describe("Observed SDP dashboard tabs", () => {
     vi.mocked(loadSdpStats).mockResolvedValue(data);
     render(<TeamSdpStatsPage />);
     const table = await screen.findByRole("table", { name: "Observed SDP team statistics" });
-    const heading = within(table).getByRole("button", { name: "Shots †" });
+    const heading = within(table).getByRole("button", { name: "Shots /match †" });
     expect(heading).toHaveAttribute("title", expect.stringContaining("totalScoringAtt. Provider observation; not independently reconciled"));
     expect(within(table).getAllByTitle(/totalScoringAtt.*5\/5 matches displayed/)).toHaveLength(4);
     expect(within(table).getAllByTitle(/totalScoringAtt.*5\/5 matches displayed/)[0]).not.toHaveTextContent("—");
@@ -177,6 +181,13 @@ describe("Observed SDP dashboard tabs", () => {
     const column = (name: string) => headers.findIndex(head => head.textContent === name);
     const cells = (name: string) => within(within(table).getByRole("button", { name: `View ${name} match detail` }).closest("tr")!).getAllByRole("cell");
     expect(cells("Player 1")[column("FPL appearances")]).toHaveTextContent(/^4$/);
+    expect(screen.getByRole("combobox", { name: "Display" })).toHaveValue("per_appearance");
+    expect(cells("Player 1")[column("FPL · xG /app")]).toHaveTextContent("0.2");
+    expect(cells("Player 1")[column("FPL · xG /app")]).toHaveTextContent("4/4");
+    expect(cells("Player 2")[column("FPL · xG /app")]).toHaveTextContent("Unavailable");
+    fireEvent.change(screen.getByRole("combobox", { name: "Display" }), { target: { value: "total" } });
+    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+    expect(screen.getByRole("combobox", { name: "Display" })).toHaveValue("per_appearance");
     expect(cells("Player 1")[column("Matches")]).toHaveTextContent(/^5$/);
     expect(cells("Player 1")[column("SDP starts")]).toHaveTextContent(/^5$/);
     expect(cells("Player 2")[column("FPL appearances")]).toHaveTextContent(/^—$/);
