@@ -27,7 +27,15 @@ from fpl.ingest.pl_sdp import (
 )
 from fpl.jobs.competitive_participation_pilot import publish_bytes
 from fpl.publish.player_attacking_usage import _raw_capture
-from fpl.storage.sdp_runtime import _body, load_sdp_state, raw_at, workload_at
+from fpl.storage.sdp_runtime import (
+    CORE_FIELDS,
+    SdpHealthError,
+    _body,
+    checked_metrics,
+    load_sdp_state,
+    raw_at,
+    workload_at,
+)
 from fpl.transform.competitive_participation import uint
 from fpl.transform.pl_sdp import KICKOFF_TOLERANCE_SECONDS
 
@@ -510,6 +518,45 @@ def _apply_display_corrections(
             }
         applied += 1
     return applied
+
+
+def _owner_corrected_dashboard_valid(
+    sides: dict[str, dict[str, Any]],
+    rows: dict[str, dict[str, Any]],
+    *,
+    raw_sha256: str,
+    cutoff: datetime,
+) -> bool:
+    """Validate effective dashboard data using confirmed values, never mutate raw/model data.
+
+    Called only after the existing exact match/metadata/source checks and correction
+    corroboration. Sparse-count assumptions do not satisfy this validation.
+    """
+    core_corrected = False
+    if set(sides) != {"home", "away"} or set(rows) != set(sides):
+        return False
+    for side, stats in sides.items():
+        effective = dict(stats)
+        for correction in rows[side]["display_corrections"].values():
+            if correction["relation"] != "direct":
+                continue
+            field = correction["provider_field"]
+            if (
+                correction["evidence_class"] != "owner_confirmed_display_correction"
+                or correction["raw_payload_sha256"] != raw_sha256
+                or correction["subject_team_code"] != rows[side]["team_code"]
+                or correction["provider_match_id"] != rows[side]["provider_match_id"]
+                or datetime.fromisoformat(correction["owner_confirmation_recorded_at"]) > cutoff
+                or field in effective
+            ):
+                return False
+            effective[field] = correction["value"]
+            core_corrected |= field in CORE_FIELDS
+        try:
+            checked_metrics(effective)
+        except SdpHealthError:
+            return False
+    return core_corrected
 
 
 def _omitted_zero_assumptions(
@@ -1017,6 +1064,7 @@ def build_sdp_stats(
     metrics = load_sdp_metrics().metrics
     team_keys = [m.local_field for m in metrics] + list(OPPONENT_METRICS)
     teams: dict[tuple[str, int, int], dict[str, Any]] = {}
+    partial_sources: dict[int, tuple[dict[str, dict[str, Any]], str]] = {}
     view = PointInTimeView(FeatureSource(con), AsOf(cutoff))
     metadata = view.observed_team_football(
         providers=["pl_sdp", "fpl_archive"],
@@ -1140,6 +1188,7 @@ def build_sdp_stats(
             if partial is None:
                 continue
             sides, known, version, provider_match_id, stats_sha256 = partial
+            partial_sources[fixture] = (sides, stats_sha256)
             for side_label, stats in sides.items():
                 row = teams[current, fixture, official[side_label]]
                 opposite = sides["away" if side_label == "home" else "home"]
@@ -1176,6 +1225,15 @@ def build_sdp_stats(
         teams=teams,
         raw=raw,
     )
+    for row in teams.values():
+        row["dashboard_status"] = (
+            "INCOMPLETE" if row["status"] == "UNAVAILABLE" else "PROVIDER_VALID"
+        )
+    for fixture, (sides, stats_sha256) in partial_sources.items():
+        pair = {side: teams[current, fixture, fixtures[fixture][side]] for side in sides}
+        if _owner_corrected_dashboard_valid(sides, pair, raw_sha256=stats_sha256, cutoff=cutoff):
+            for row in pair.values():
+                row["dashboard_status"] = "OWNER_CONFIRMED_VALID"
     team_rows = [teams[k] for k in sorted(teams)]
     players.sort(
         key=lambda r: (r["season"], r["fixture"], r["code"] or 0, r["provider_player_id"] or 0)
@@ -1206,7 +1264,7 @@ def build_sdp_stats(
         )
     document = {
         "schema": SCHEMA,
-        "json_schema_version": 4,
+        "json_schema_version": 5,
         "as_of": _iso(cutoff),
         "source_status": {
             "team_stats": "UNAVAILABLE" if not valid else "PARTIAL" if failures else "AVAILABLE",
@@ -1252,7 +1310,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             "gameweeks",
         }
         or document["schema"] != SCHEMA
-        or document["json_schema_version"] not in (3, 4)
+        or document["json_schema_version"] not in (3, 4, 5)
     ):
         raise ValueError("invalid SDP sidecar envelope")
     cutoff = AsOf(datetime.fromisoformat(document["as_of"])).ts
@@ -1296,10 +1354,21 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
     for scope in ("team", "player"):
         seen: set[tuple[Any, ...]] = set()
         for row in document[f"{scope}_matches"]:
-            if set(row) != COMMON | (TEAM_FIELDS if scope == "team" else PLAYER_FIELDS):
+            fields = COMMON | (TEAM_FIELDS if scope == "team" else PLAYER_FIELDS)
+            if scope == "team" and document["json_schema_version"] >= 5:
+                fields = fields | {"dashboard_status"}
+            if set(row) != fields:
                 raise ValueError("unexpected public observed-row field")
             if row["status"] not in {"FINAL", "PROVISIONAL", "UNAVAILABLE"}:
                 raise ValueError("unknown observed-row status")
+            if scope == "team" and document["json_schema_version"] >= 5:
+                allowed = (
+                    {"INCOMPLETE", "OWNER_CONFIRMED_VALID"}
+                    if row["status"] == "UNAVAILABLE"
+                    else {"PROVIDER_VALID"}
+                )
+                if row["dashboard_status"] not in allowed:
+                    raise ValueError("dashboard status contradicts provider status")
             for field in ("gw", "fixture", "team_code", "opponent_team_code"):
                 if type(row[field]) is not int or row[field] <= 0:
                     raise ValueError("invalid observed numeric identity")
@@ -1453,6 +1522,37 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                         or not math.isfinite(value)
                     ):
                         raise ValueError("non-finite/non-numeric observed metric")
+    if document["json_schema_version"] >= 5:
+        pairs: dict[tuple[str, int], list[dict[str, Any]]] = {}
+        core_keys = {
+            field: next(
+                m.local_field for m in load_sdp_metrics().metrics if field in m.provider_fields
+            )
+            for field in CORE_FIELDS
+        }
+        for row in document["team_matches"]:
+            if row["dashboard_status"] == "OWNER_CONFIRMED_VALID":
+                pairs.setdefault((row["season"], row["fixture"]), []).append(row)
+                effective = {field: row["sdp"][key] for field, key in core_keys.items()}
+                for c in row["display_corrections"].values():
+                    if c["relation"] == "direct" and c["provider_field"] in CORE_FIELDS:
+                        effective[c["provider_field"]] = c["value"]
+                try:
+                    checked_metrics(effective)
+                except SdpHealthError as error:
+                    raise ValueError("corrected dashboard core remains invalid") from error
+        for pair in pairs.values():
+            if (
+                len(pair) != 2
+                or pair[0]["team_code"] != pair[1]["opponent_team_code"]
+                or pair[1]["team_code"] != pair[0]["opponent_team_code"]
+                or not any(
+                    c["relation"] == "direct" and c["provider_field"] in CORE_FIELDS
+                    for row in pair
+                    for c in row["display_corrections"].values()
+                )
+            ):
+                raise ValueError("corrected dashboard fixture lacks paired correction evidence")
     for entries in correction_rows.values():
         # Blocked attacking attempts are not the opponent's defensive block count.
         if len(entries) == 1 and entries[0][1] in {"shots_blocked", "expected_goals_on_target"}:

@@ -8,6 +8,24 @@ vi.mock("@/data/sdpStats", async importOriginal => ({ ...await importOriginal<ob
 beforeEach(() => { vi.mocked(loadSdpStats).mockResolvedValue(sdpFixture()); });
 
 describe("Observed SDP dashboard tabs", () => {
+  it("counts the corrected fixture as ready and labels it valid with owner confirmation", async () => {
+    const data = sdpFixture();
+    const row = data.team_matches[0];
+    row.status = "UNAVAILABLE";
+    row.dashboard_status = "OWNER_CONFIRMED_VALID";
+    data.team_matches = [row, { ...row, team_code: row.opponent_team_code,
+      team_name: "Opponent", team_short_name: "OPP", opponent_team_code: row.team_code,
+      opponent_name: row.team_name, opponent_short_name: row.team_short_name, was_home: !row.was_home }];
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />);
+    await screen.findByRole("table", { name: "Observed SDP team statistics" });
+    expect(screen.getByText("Dashboard-ready fixtures").parentElement).toHaveTextContent("1 / 1");
+    expect(screen.getByLabelText("Dashboard validation breakdown")).toHaveTextContent("1 dashboard-ready fixtures: 0 from complete SDP + 1 validated with owner-confirmed zeros. 0 still incomplete.");
+    fireEvent.click(screen.getByRole("button", { name: "View Arsenal match detail" }));
+    expect(screen.getByText("Valid · owner-confirmed")).toBeInTheDocument();
+    expect(screen.queryByText("Incomplete")).not.toBeInTheDocument();
+    expect(row.status).toBe("UNAVAILABLE");
+  });
   it("exposes passing and defence groups and says Unavailable for missing values", async () => {
     const data = sdpFixture();
     data.metrics.push({ ...data.metrics[0], key: "passes", label: "Passes", group: "passing" });
@@ -78,11 +96,11 @@ describe("Observed SDP dashboard tabs", () => {
     render(<TeamSdpStatsPage />);
     await screen.findByRole("table", { name: "Observed SDP team statistics" });
     expect(screen.getByText(/1 owner-confirmed display correction is active/i)).toBeInTheDocument();
-    expect(screen.getByText(/provider core validity is unchanged/i)).toBeInTheDocument();
+    expect(screen.getByText(/Confirmed zeros are accepted by dashboard validation/i)).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "GW from" }), { target: { value: "6" } });
     expect(screen.getAllByLabelText("owner-confirmed display correction").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "View Arsenal match detail" }));
-    expect(screen.getByText("Partial SDP")).toHaveAttribute("title", expect.stringContaining("Required provider core fields are missing"));
+    expect(screen.getByText("Incomplete")).toHaveAttribute("title", expect.stringContaining("Dashboard validation uses source observations plus owner-confirmed corrections"));
   });
   it("searches, filters history and resets all selection state", async () => {
     render(<TeamSdpStatsPage />);

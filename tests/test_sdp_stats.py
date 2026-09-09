@@ -452,6 +452,8 @@ def test_public_direct_display_correction_has_no_invented_opponent_mirror(
     assert row["sdp"][metric] is None
     if metric == "expected_goals_on_target":
         document["json_schema_version"] = 3
+        for team in document["team_matches"]:
+            team.pop("dashboard_status")
         with pytest.raises(ValueError, match="provenance"):
             validate_sdp_stats(document)
         document["json_schema_version"] = 4

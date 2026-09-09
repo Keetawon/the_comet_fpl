@@ -225,3 +225,41 @@ failing closed on unknown minutes. Match logs and exposure counts remain explici
 `Partial SDP` is a display label for provider core-incomplete match records and
 does not upgrade provider health. See the [dated delivery and denominator
 contract](sdp-average-and-xgot-display-2026-09-09.md) for provenance and verification.
+
+### September 9 follow-up: confirmed zeros satisfy Dashboard validation
+
+The earlier UI counted only untouched provider completeness even after accepting
+confirmed zero values. Schema version 5 now includes a separate `dashboard_status`:
+`PROVIDER_VALID`, `OWNER_CONFIRMED_VALID`, or `INCOMPLETE`. The main card reports
+Dashboard-ready fixtures, and match logs show **Valid · owner-confirmed** for
+successfully corrected fixtures. The raw provider status remains in provenance.
+
+This is an effective-data check, not an unconditional relabelling. After the
+existing exact fixture/side/metadata checks, it applies already-corroborated owner
+corrections to a copy of both raw team-stat dictionaries and runs the existing
+numeric/core-field validator. Source hashes must match the latest retained raw
+payload; confirmations must be available by the export cutoff. Another missing
+core field, a changed raw version, a contradiction, missing side or unconfirmed
+sparse-count assumption cannot make a fixture valid. No provider payload,
+normalization/model policy or frozen forecast is rewritten. This status is a
+descriptive Dashboard contract, not an input to the production selector.
+
+Verified export at `2026-09-09T08:21:23.060039+00:00`:
+
+- **30/30 Dashboard-ready fixtures** across GW1–GW3: 26 provider-complete and
+  four valid with owner confirmation (fixtures 7, 19, 20 and 28); zero incomplete.
+- Both team sides carry the corrected *fixture* validation status. Raw team/player
+  measurements and all original correction values/timestamps are unchanged.
+- Sidecar SHA256:
+  `314235c4fbba80cc1be3fa4bc0f8d80338163779358b610106b9f5a8ff73d36f`.
+- Existing averages, chart values and CSV values remain unchanged.
+- 68 Python source/publication/validation tests and 50 frontend tests passed.
+  Global Ruff, strict mypy (229 source files), changed-file formatting and the
+  TypeScript/Vite build passed. Existing Fast Refresh/bundle-size warnings remain.
+- Actual preview HTTP bytes and the frontend parser/fixture-count calculation
+  were verified. Browser discovery still returned no connected browser; no visual
+  screenshot or rendered-browser pass is claimed.
+
+Local verification receipts are retained under
+`D:/Personal/fpl-operations/verification/sdp-owner-valid-20260909/`.
+Refresh the existing host preview at `http://127.0.0.1:4173/#team-stat-sdp`.

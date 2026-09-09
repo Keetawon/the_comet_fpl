@@ -15,6 +15,8 @@ export const metricId = (m: SdpMetric) => `${m.scope}:${m.source}:${m.key}`;
 export const entityId = (row: SdpMatch, scope: SdpScope) => scope === "team"
   ? `team:${row.team_code}` : row.code != null ? `fpl:${row.code}` : `sdp:${row.provider_player_id}`;
 export const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+// Older exports have no effective validation receipt: do not upgrade them by inference.
+export const dashboardTeamStatus = (row: SdpMatch) => row.dashboard_status ?? (row.status === "UNAVAILABLE" ? "INCOMPLETE" : "PROVIDER_VALID");
 export const metricCorrection = (row: SdpMatch, metric: SdpMetric): SdpDisplayCorrection | null =>
   metric.source === "sdp" ? row.display_corrections?.[metric.key] ?? null : null;
 export const metricAssumption = (row: SdpMatch, metric: SdpMetric): SdpDisplayAssumption | null =>

@@ -2,6 +2,7 @@
 export type SdpScope = "team" | "player";
 export type SdpSource = "sdp" | "fpl";
 export type SourceAvailability = "AVAILABLE" | "PARTIAL" | "UNAVAILABLE";
+export type DashboardTeamStatus = "PROVIDER_VALID" | "OWNER_CONFIRMED_VALID" | "INCOMPLETE";
 
 export interface SdpMetric {
   key: string;
@@ -65,6 +66,7 @@ export interface SdpMatch {
   opponent_short_name: string;
   was_home: boolean;
   status: string;
+  dashboard_status?: DashboardTeamStatus;
   known_at: string;
   provider_match_id?: number | null;
   source_version?: string | null;
@@ -89,7 +91,7 @@ export interface SdpMatch {
 
 export interface SdpStatsData {
   schema: "fpl.sdp-stats";
-  json_schema_version: 2 | 3 | 4;
+  json_schema_version: 2 | 3 | 4 | 5;
   as_of: string;
   source_status: {
     team_stats: SourceAvailability;
@@ -125,7 +127,7 @@ const timestamp = (v: unknown) => typeof v === "string" &&
 
 export function parseSdpStats(payload: unknown): SdpStatsData {
   const fail = () => { throw new Error("The observed SDP file is invalid or incompatible. Republish its source data."); };
-  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3, 4].includes(payload.json_schema_version as number) ||
+  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3, 4, 5].includes(payload.json_schema_version as number) ||
       !timestamp(payload.as_of) || !object(payload.source_status) || !object(payload.coverage) ||
       !Array.isArray(payload.metrics) || !Array.isArray(payload.team_matches) ||
       !Array.isArray(payload.player_matches) || !Array.isArray(payload.gameweeks)) return fail();
@@ -184,6 +186,9 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
         if (source !== undefined && (!object(source) || Object.values(source).some(v => !nullableNumber(v)))) return fail();
       }
       if (scope === "team") {
+        if (Number(payload.json_schema_version) < 5 && row.dashboard_status !== undefined) return fail();
+        if (Number(payload.json_schema_version) >= 5 && !(row.status === "UNAVAILABLE"
+          ? ["INCOMPLETE", "OWNER_CONFIRMED_VALID"] : ["PROVIDER_VALID"]).includes(String(row.dashboard_status))) return fail();
         if (!object(row.display_corrections) ||
             (Number(payload.json_schema_version) >= 3 && !object(row.display_assumptions)) ||
             (row.display_assumptions !== undefined && !object(row.display_assumptions))) return fail();
@@ -248,6 +253,17 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
     const mirror = entries.find(entry => entry.metric === "shots_on_target_allowed");
     if (!direct || !mirror || direct.row.season !== mirror.row.season || direct.row.fixture !== mirror.row.fixture ||
         direct.row.team_code !== mirror.row.opponent_team_code || direct.row.opponent_team_code !== mirror.row.team_code) return fail();
+  }
+  if (Number(payload.json_schema_version) >= 5) {
+    const teams = payload.team_matches as unknown as SdpMatch[];
+    const core = ["expected_goals", "shots", "shots_on_target", "shots_inside_box", "touches_in_opposition_box", "possession", "passes", "accurate_passes"];
+    for (const row of teams.filter(r => r.dashboard_status === "OWNER_CONFIRMED_VALID")) {
+      const pair = teams.filter(r => r.season === row.season && r.fixture === row.fixture);
+      if (pair.length !== 2 || pair.some(r => r.dashboard_status !== "OWNER_CONFIRMED_VALID") ||
+        pair[0].team_code !== pair[1].opponent_team_code || pair[1].team_code !== pair[0].opponent_team_code ||
+        !pair.some(r => r.display_corrections?.shots_on_target?.relation === "direct")) return fail();
+      if (!core.every(key => { const value = row.display_corrections?.[key]?.value ?? row.sdp[key]; return typeof value === "number" && Number.isFinite(value) && value >= 0; })) return fail();
+    }
   }
   return payload as unknown as SdpStatsData;
 }

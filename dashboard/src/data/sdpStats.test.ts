@@ -13,7 +13,7 @@ describe("Observed SDP sidecar contract", () => {
     expect(source.player_matches[0].fpl?.expected_goals).toBe(0.2);
     expect(JSON.stringify(source)).toBe(raw);
   });
-  it("accepts a mirrored owner-confirmed display correction while raw SDP stays NULL", () => {
+  it.each([2, 5] as const)("accepts mirrored owner-confirmed evidence in schema %s while raw SDP stays NULL", version => {
     const data = sdpFixture();
     const direct = data.team_matches[0];
     direct.status = "UNAVAILABLE";
@@ -44,6 +44,25 @@ describe("Observed SDP sidecar contract", () => {
       sdp: { ...direct.sdp, shots_on_target_allowed: null },
       display_corrections: { shots_on_target_allowed: { ...shared, relation: "opponent_mirror" } },
     });
+    if (version === 5) {
+      data.json_schema_version = 5;
+      data.metrics.forEach(m => { m.omitted_zero_display = false; });
+      data.team_matches.forEach(r => {
+        r.display_assumptions = {};
+        r.dashboard_status = r.status === "UNAVAILABLE" ? "OWNER_CONFIRMED_VALID" : "PROVIDER_VALID";
+        Object.assign(r.sdp, { shots_inside_box: 3, touches_in_opposition_box: 5, passes: 300, accurate_passes: 250 });
+      });
+      data.team_matches.at(-1)!.sdp.shots_on_target = 2;
+      direct.sdp.expected_goals = null;
+      expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+      direct.sdp.expected_goals = 0.2;
+      data.team_matches.at(-1)!.dashboard_status = "INCOMPLETE";
+      expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+      data.team_matches.at(-1)!.dashboard_status = "OWNER_CONFIRMED_VALID";
+      data.json_schema_version = 4;
+      expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+      data.json_schema_version = 5;
+    }
     expect(parseSdpStats(data)).toBe(data);
     expect(direct.sdp.shots_on_target).toBeNull();
     direct.sdp.shots_on_target = 0;
