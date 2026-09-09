@@ -8,6 +8,42 @@ vi.mock("@/data/sdpStats", async importOriginal => ({ ...await importOriginal<ob
 beforeEach(() => { vi.mocked(loadSdpStats).mockResolvedValue(sdpFixture()); });
 
 describe("Observed SDP dashboard tabs", () => {
+  it.each([
+    ["team", "Observed SDP team statistics", "Arsenal", "Shots /match", "clubs"],
+    ["player", "Observed player statistics by source", "Player 1", "FPL · xG /app", "players"],
+  ])("expands the %s table with sorting, comparisons and match logs intact", async (scope, tableName, name, metric, search) => {
+    render(scope === "team" ? <TeamSdpStatsPage /> : <PlayerSdpStatsPage />);
+    const table = await screen.findByRole("table", { name: tableName });
+    fireEvent.change(screen.getByRole("textbox", { name: `Search ${search}` }), { target: { value: name } });
+    fireEvent.click(within(table).getByRole("button", { name: metric }));
+    const originalSort = within(table).getByRole("columnheader", { name: metric }).getAttribute("aria-sort");
+    const originalRows = table.textContent;
+    const enter = screen.getByRole("button", { name: `Enter SDP ${scope} statistics table fullscreen` });
+    enter.focus();
+    fireEvent.click(enter);
+    const expanded = await screen.findByRole("dialog", { name: `SDP ${scope} statistics table fullscreen` });
+    expect(within(expanded).getByRole("table", { name: tableName })).toBe(table);
+    expect(table.textContent).toBe(originalRows);
+    expect(table.parentElement).toHaveClass("max-h-[calc(100dvh-9rem)]");
+    fireEvent.click(within(expanded).getByRole("checkbox", { name: `Compare ${name}` }));
+    expect(within(expanded).getByRole("table", { name: "Exact comparison values" })).toBeInTheDocument();
+    fireEvent.click(within(expanded).getByRole("button", { name: `View ${name} match detail` }));
+    expect(within(expanded).getByRole("table", { name: `${name} observed match log` })).toBeInTheDocument();
+    expect(within(expanded).getByRole("button", { name: "Next" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(enter).toHaveFocus();
+    expect(table.parentElement).toHaveClass("max-h-[620px]");
+    expect(screen.getByRole("textbox", { name: `Search ${search}` })).toHaveValue(name);
+    expect(within(table).getByRole("columnheader", { name: metric })).toHaveAttribute("aria-sort", originalSort);
+    expect(within(table).getByRole("checkbox", { name: `Compare ${name}` })).toBeChecked();
+    expect(screen.getByRole("table", { name: `${name} observed match log` })).toBeInTheDocument();
+    fireEvent.click(enter);
+    fireEvent.click(await screen.findByRole("button", { name: `Exit SDP ${scope} statistics table fullscreen` }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(table.textContent).toBe(originalRows);
+  });
+
   it("counts the corrected fixture as ready and labels it valid with owner confirmation", async () => {
     const data = sdpFixture();
     const row = data.team_matches[0];
