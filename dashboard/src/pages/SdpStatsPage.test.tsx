@@ -161,8 +161,8 @@ describe("Observed SDP dashboard tabs", () => {
     const table = await screen.findByRole("table", { name: "Observed SDP team statistics" });
     const heading = within(table).getByRole("button", { name: "Shots †" });
     expect(heading).toHaveAttribute("title", expect.stringContaining("totalScoringAtt. Provider observation; not independently reconciled"));
-    expect(within(table).getAllByTitle(/totalScoringAtt.*5\/5 matches measured/)).toHaveLength(4);
-    expect(within(table).getAllByTitle(/totalScoringAtt.*5\/5 matches measured/)[0]).not.toHaveTextContent("—");
+    expect(within(table).getAllByTitle(/totalScoringAtt.*5\/5 matches displayed/)).toHaveLength(4);
+    expect(within(table).getAllByTitle(/totalScoringAtt.*5\/5 matches displayed/)[0]).not.toHaveTextContent("—");
     expect(data.metrics[0].verified_semantics).toBe(false);
     expect(screen.getByRole("group", { name: /Observed attack and defence/ })).toBeInTheDocument();
   });

@@ -15,6 +15,26 @@ export interface SdpMetric {
   verified_semantics: boolean;
   description?: string;
   provider_field?: string | null;
+  omitted_zero_display?: boolean;
+}
+
+export const OMITTED_ZERO_POLICY_RECORDED_AT = "2026-09-09T02:47:16.006705+00:00";
+export const OMITTED_ZERO_DISPLAY_FIELDS = new Set([
+  "shots_inside_box", "shots_outside_box", "shots_blocked",
+  "big_chances_created", "big_chances_scored", "big_chances_missed",
+  "accurate_crosses", "corners", "blocks", "saves",
+  "possession_won_attacking_third", "yellow_cards", "red_cards", "offsides",
+]);
+
+export interface SdpDisplayAssumption {
+  value: 0;
+  evidence_class: "owner_directed_omitted_count_assumption";
+  policy_recorded_at: string;
+  source_known_at: string;
+  provider_match_id: number;
+  provider_field: string;
+  provider_field_state: "omitted";
+  raw_payload_sha256: string;
 }
 
 export interface SdpDisplayCorrection {
@@ -50,6 +70,7 @@ export interface SdpMatch {
   source_version?: string | null;
   sdp: Record<string, number | null>;
   display_corrections?: Record<string, SdpDisplayCorrection>;
+  display_assumptions?: Record<string, SdpDisplayAssumption>;
   // Player fields are absent on team rows. Unknown identities and measurements stay NULL.
   code?: number | null;
   provider_player_id?: number | null;
@@ -68,7 +89,7 @@ export interface SdpMatch {
 
 export interface SdpStatsData {
   schema: "fpl.sdp-stats";
-  json_schema_version: 2;
+  json_schema_version: 2 | 3;
   as_of: string;
   source_status: {
     team_stats: SourceAvailability;
@@ -104,7 +125,7 @@ const timestamp = (v: unknown) => typeof v === "string" &&
 
 export function parseSdpStats(payload: unknown): SdpStatsData {
   const fail = () => { throw new Error("The observed SDP file is invalid or incompatible. Republish its source data."); };
-  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || payload.json_schema_version !== 2 ||
+  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3].includes(payload.json_schema_version as number) ||
       !timestamp(payload.as_of) || !object(payload.source_status) || !object(payload.coverage) ||
       !Array.isArray(payload.metrics) || !Array.isArray(payload.team_matches) ||
       !Array.isArray(payload.player_matches) || !Array.isArray(payload.gameweeks)) return fail();
@@ -142,6 +163,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
         !["sum", "mean"].includes(String(m.aggregation)) ||
         ![null, "minutes_sdp", "minutes_fpl"].includes(m.per90_denominator as null | string) ||
         typeof m.verified_semantics !== "boolean" ||
+        (payload.json_schema_version === 3 && typeof m.omitted_zero_display !== "boolean") ||
         [m.key, m.label, m.group, m.unit].some(v => typeof v !== "string")) return fail();
     if (m.per90_denominator !== null && m.per90_denominator !== `minutes_${m.source}`) return fail();
     const key = `${m.scope}:${m.source}:${m.key}`;
@@ -162,7 +184,22 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
         if (source !== undefined && (!object(source) || Object.values(source).some(v => !nullableNumber(v)))) return fail();
       }
       if (scope === "team") {
-        if (!object(row.display_corrections)) return fail();
+        if (!object(row.display_corrections) ||
+            (payload.json_schema_version === 3 && !object(row.display_assumptions)) ||
+            (row.display_assumptions !== undefined && !object(row.display_assumptions))) return fail();
+        for (const [metric, assumption] of Object.entries(row.display_assumptions ?? {})) {
+          if (!OMITTED_ZERO_DISPLAY_FIELDS.has(metric) || !object(assumption) ||
+              assumption.value !== 0 || assumption.evidence_class !== "owner_directed_omitted_count_assumption" ||
+              assumption.provider_field_state !== "omitted" || typeof assumption.provider_field !== "string" ||
+              !assumption.provider_field || !positiveId(assumption.provider_match_id) ||
+              assumption.provider_match_id !== row.provider_match_id ||
+              typeof assumption.raw_payload_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(assumption.raw_payload_sha256) ||
+              !timestamp(assumption.source_known_at) || Date.parse(assumption.source_known_at as string) > asOf ||
+              assumption.policy_recorded_at !== OMITTED_ZERO_POLICY_RECORDED_AT ||
+              Date.parse(assumption.policy_recorded_at as string) > asOf ||
+              (row.sdp as Record<string, unknown>)[metric] !== null ||
+              Object.hasOwn(row.display_corrections, metric)) return fail();
+        }
         for (const [metric, correction] of Object.entries(row.display_corrections)) {
           if (!["shots_on_target", "shots_on_target_allowed", "shots_blocked"].includes(metric) || !object(correction) ||
               correction.value !== 0 || correction.evidence_class !== "owner_confirmed_display_correction" ||

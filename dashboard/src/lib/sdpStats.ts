@@ -1,4 +1,4 @@
-import type { SdpDisplayCorrection, SdpMatch, SdpMetric, SdpScope } from "@/data/sdpStats";
+import type { SdpDisplayAssumption, SdpDisplayCorrection, SdpMatch, SdpMetric, SdpScope } from "@/data/sdpStats";
 
 export type SdpMode = "total" | "per_match" | "per90";
 export interface SdpFilters {
@@ -17,17 +17,26 @@ export const entityId = (row: SdpMatch, scope: SdpScope) => scope === "team"
 export const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 export const metricCorrection = (row: SdpMatch, metric: SdpMetric): SdpDisplayCorrection | null =>
   metric.source === "sdp" ? row.display_corrections?.[metric.key] ?? null : null;
+export const metricAssumption = (row: SdpMatch, metric: SdpMetric): SdpDisplayAssumption | null =>
+  metric.source === "sdp" ? row.display_assumptions?.[metric.key] ?? null : null;
 export const metricRaw = (row: SdpMatch, metric: SdpMetric): number | null => {
   const correction = metricCorrection(row, metric);
   if (correction) return correction.value;
+  const assumption = metricAssumption(row, metric);
+  if (assumption) return assumption.value;
   const value = row[metric.source]?.[metric.key];
   return finite(value) ? value : null;
 };
 export const correctionDescription = (correction: SdpDisplayCorrection) =>
   `Owner-confirmed display correction recorded ${correction.owner_confirmation_recorded_at}; raw SDP ${correction.provider_field} was omitted; corroborated by shot accounting and the official FPL goalkeeper proxy; raw payload SHA256 ${correction.raw_payload_sha256}. Provider core validity is unchanged.`;
+export const assumptionDescription = (assumption: SdpDisplayAssumption) =>
+  `Owner-directed display assumption recorded ${assumption.policy_recorded_at}; raw SDP ${assumption.provider_field} was omitted and is shown as zero for this sparse count. This is not a provider-verified zero; raw remains NULL. Raw payload SHA256 ${assumption.raw_payload_sha256}. Provider core validity is unchanged.`;
 export function metricCorrections(rows: readonly SdpMatch[], metric: SdpMetric): SdpDisplayCorrection[] {
   const found = rows.flatMap(row => metricCorrection(row, metric) ?? []);
   return [...new Map(found.map(correction => [correction.correction_id, correction])).values()];
+}
+export function metricAssumptions(rows: readonly SdpMatch[], metric: SdpMetric): SdpDisplayAssumption[] {
+  return rows.flatMap(row => metricAssumption(row, metric) ?? []);
 }
 
 export function metricValue(rows: readonly SdpMatch[], metric: SdpMetric, mode: SdpMode): MetricValue {
@@ -92,7 +101,7 @@ const csvCell = (value: unknown) => {
 };
 export function sdpCsv(rows: readonly SdpEntity[], metrics: readonly SdpMetric[], mode: SdpMode): string {
   const label = (m: SdpMetric) => `${m.source.toUpperCase()} ${m.label}${m.aggregation === "mean" ? " [per-match mean]" : ""}${m.verified_semantics ? "" : ` [provider observation; not independently reconciled; ${m.provider_field ?? m.key}]`}`;
-  const header = ["Name", "Stable identity", "Clubs in selected scope", "Season", "First kickoff", "Last kickoff", "Match rows", "Display mode", ...metrics.flatMap(m => [label(m), `${label(m)} measured matches`, `${label(m)} display provenance`])];
-  const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); return [value.value, `${value.measured}/${value.matches}`, corrections.map(correctionDescription).join(" | ")]; })]);
+  const header = ["Name", "Stable identity", "Clubs in selected scope", "Season", "First kickoff", "Last kickoff", "Match rows", "Display mode", ...metrics.flatMap(m => [label(m), `${label(m)} displayed matches`, `${label(m)} display provenance`])];
+  const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); const assumptions = metricAssumptions(row.rows, m); return [value.value, `${value.measured}/${value.matches}${assumptions.length ? ` (${assumptions.length} assumed zero)` : ""}`, [...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription)].join(" | ")]; })]);
   return [header, ...records].map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { loadSdpStats } from "@/data/sdpStats";
 import type { SdpMatch, SdpMetric, SdpScope, SdpStatsData } from "@/data/sdpStats";
-import { correctionDescription, finite, metricCorrections, metricId, metricRaw, metricValue, sdpCsv, selectSdpEntities, sortSdpEntities } from "@/lib/sdpStats";
+import { assumptionDescription, correctionDescription, finite, metricAssumptions, metricCorrections, metricId, metricRaw, metricValue, sdpCsv, selectSdpEntities, sortSdpEntities } from "@/lib/sdpStats";
 import type { SdpEntity, SdpFilters, SdpMode } from "@/lib/sdpStats";
 
 const fmt = (value: number | null | undefined, digits = 2) => value == null ? "—" : new Intl.NumberFormat("en-GB", { maximumFractionDigits: digits }).format(value);
@@ -37,21 +37,23 @@ function labelFor(metric: SdpMetric, mode: SdpMode) {
   return `${metric.source === "fpl" ? "FPL · " : ""}${metric.label}${suffix}${metric.verified_semantics ? "" : " †"}`;
 }
 
-const sourceDescription = (metric: SdpMetric) => `${metric.source.toUpperCase()} ${metric.provider_field ?? metric.key}. ${metric.verified_semantics ? metric.description ?? "Recorded source value." : "Provider observation; not independently reconciled."}`;
+const sourceDescription = (metric: SdpMetric) => `${metric.source.toUpperCase()} ${metric.provider_field ?? metric.key}. ${metric.verified_semantics ? metric.description ?? "Recorded source value." : "Provider observation; not independently reconciled."}${metric.omitted_zero_display ? " An omitted value may be displayed as an owner-directed assumed zero and is marked §." : ""}`;
 
 function CoverageValue({ rows, metric, mode }: { rows: SdpMatch[]; metric: SdpMetric; mode: SdpMode }) {
   const value = metricValue(rows, metric, mode);
   const corrections = metricCorrections(rows, metric);
+  const assumptions = metricAssumptions(rows, metric);
   const exposure = mode === "per90" && metric.aggregation !== "mean" ? `; ${fmt(value.minutes)} matched actual minutes` : "";
-  const corrected = corrections.length ? ` ${corrections.map(correctionDescription).join(" ")}` : "";
-  return <span title={`${sourceDescription(metric)} ${value.measured}/${value.matches} matches measured${exposure}. Missing observations are not zero.${corrected}`} className="tabular-nums">
-    {value.value === null ? <span className="text-muted-foreground">Unavailable</span> : fmt(value.value)}{corrections.length > 0 && <sup className="ml-0.5" aria-label="owner-confirmed display correction">‡</sup>}<span className="ml-1 text-[10px] text-muted-foreground">{value.measured}/{value.matches}</span>
+  const provenance = [...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription)].join(" ");
+  return <span title={`${sourceDescription(metric)} ${value.measured}/${value.matches} matches displayed; ${assumptions.length} assumed zero${exposure}. Missing observations outside the explicit sparse-count policy remain unavailable. ${provenance}`} className="tabular-nums">
+    {value.value === null ? <span className="text-muted-foreground">Unavailable</span> : fmt(value.value)}{corrections.length > 0 && <sup className="ml-0.5" aria-label="owner-confirmed display correction">‡</sup>}{assumptions.length > 0 && <sup className="ml-0.5" aria-label="owner-directed omitted-count assumption">§</sup>}<span className="ml-1 text-[10px] text-muted-foreground">{value.measured}/{value.matches}</span>
   </span>;
 }
 
 function MatchValue({ row, metric }: { row: SdpMatch; metric: SdpMetric }) {
   const corrections = metricCorrections([row], metric);
-  return <span className="tabular-nums" title={corrections.map(correctionDescription).join(" ") || sourceDescription(metric)}>{fmt(metricRaw(row, metric))}{corrections.length > 0 && <sup className="ml-0.5" aria-label="owner-confirmed display correction">‡</sup>}</span>;
+  const assumptions = metricAssumptions([row], metric);
+  return <span className="tabular-nums" title={[...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription)].join(" ") || sourceDescription(metric)}>{fmt(metricRaw(row, metric))}{corrections.length > 0 && <sup className="ml-0.5" aria-label="owner-confirmed display correction">‡</sup>}{assumptions.length > 0 && <sup className="ml-0.5" aria-label="owner-directed omitted-count assumption">§</sup>}</span>;
 }
 
 function ObservedTrend({ entity, metric, mode }: { entity: SdpEntity; metric: SdpMetric; mode: SdpMode }) {
@@ -74,7 +76,7 @@ function ObservedTrend({ entity, metric, mode }: { entity: SdpEntity; metric: Sd
         return point.value === null ? null : <g key={point.row.fixture}>
           {previous?.value != null && <line x1={x(previous.index)} y1={y(previous.value)} x2={x(index)} y2={y(point.value)} stroke="currentColor" strokeWidth="2" opacity=".6" />}
           <circle cx={x(index)} cy={y(point.value)} r="4" fill="currentColor" tabIndex={0} role="img" aria-label={`GW${point.row.gw} ${point.row.opponent_short_name}: ${fmt(point.value)}`}>
-            <title>{date(point.row.kickoff_time)} · GW{point.row.gw} · {point.row.opponent_short_name}: {fmt(point.value)}{metricCorrections([point.row], metric).length ? "; owner-confirmed display correction" : ""}</title>
+            <title>{date(point.row.kickoff_time)} · GW{point.row.gw} · {point.row.opponent_short_name}: {fmt(point.value)}{metricCorrections([point.row], metric).length ? "; owner-confirmed display correction" : ""}{metricAssumptions([point.row], metric).length ? "; owner-directed omitted-count assumption" : ""}</title>
           </circle>
           {(points.length <= 12 || index === 0 || index === points.length - 1) && <text x={x(index)} y={height - 6} fill="currentColor" fontSize="10" textAnchor="middle">GW{point.row.gw}</text>}
         </g>;
@@ -111,7 +113,7 @@ function MatchDetail({ entity, scope, metrics, mode, trendMetric, onClose }: { e
       {scope === "player" && <><TableCell>{row.started === true ? "Starting XI" : row.bench === true ? "Bench" : "Unknown"}</TableCell><TableCell>{fmt(row.minutes_fpl, 0)}</TableCell><TableCell>{row.provider_position ?? "—"}{row.provider_sub_position ? ` / ${row.provider_sub_position}` : ""}</TableCell></>}
       {metrics.map(m => <TableCell key={metricId(m)}><MatchValue row={row} metric={m} /></TableCell>)}<TableCell className="text-xs">{new Date(row.known_at).toISOString()}</TableCell><TableCell><Badge variant="outline">{row.status.replaceAll("_", " ")}</Badge></TableCell>
     </TableRow>)}</TableBody></Table></div>
-    <p className="text-xs text-muted-foreground">Match logs show observed source values plus explicitly marked display corrections. Nominal SDP event-clock intervals are not official minutes and never supply a per-90 denominator.</p>
+    <p className="text-xs text-muted-foreground">Match logs show observed source values plus explicitly marked display corrections and omitted-count assumptions. Nominal SDP event-clock intervals are not official minutes and never supply a per-90 denominator.</p>
   </section>;
 }
 
@@ -157,6 +159,7 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
   for (const row of seasonRows) fixtureRows.set(row.fixture, [...fixtureRows.get(row.fixture) ?? [], row]);
   const providerCoreValid = [...fixtureRows.values()].filter(fixture => fixture.length === 2 && fixture.every(row => row.status !== "UNAVAILABLE")).length;
   const displayCorrectionIds = new Set(seasonRows.flatMap(row => Object.values(row.display_corrections ?? {}).filter(correction => correction.relation === "direct").map(correction => correction.correction_id)));
+  const displayAssumptionCount = seasonRows.reduce((count, row) => count + Object.keys(row.display_assumptions ?? {}).length, 0);
   const weekLabel = (gw: number) => {
     const official = data.gameweeks.find(row => row.season === filters.season && row.gw === gw);
     return `GW${gw}${official && !official.finished ? " · in progress" : ""}`;
@@ -180,6 +183,7 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
     <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="mb-2 flex flex-wrap items-center gap-2"><Badge variant="secondary">Observed · Premier League</Badge><Badge variant="outline">SDP {scope === "team" ? "team statistics" : "lineups"}</Badge>{scope === "player" && <Badge variant="outline">FPL enrichment · labelled separately</Badge>}</div><h1 className="text-2xl font-semibold tracking-tight">{scope === "team" ? "Team stat from SDP" : "Players stat from SDP"}</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">Explore recorded match performance, recent history and source coverage. These are observed statistics, not predictions.</p></div><Button variant="outline" onClick={exportCsv} disabled={!ordered.length}><Download />Export filtered CSV</Button></div>
     <div role="note" className="rounded-lg border bg-muted/35 p-3 text-sm text-muted-foreground"><strong className="text-foreground">Observed-data vintage:</strong> this tab was exported {date(data.as_of)}. Forecast and optimizer pages retain their own displayed publication vintages; refreshing these statistics does not refresh or relabel those predictions.</div>
     {scope === "team" && displayCorrectionIds.size > 0 && <div role="note" className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"><strong>{displayCorrectionIds.size} owner-confirmed display correction{displayCorrectionIds.size === 1 ? " is" : "s are"} active.</strong> The original SDP field remains missing, provider core validity is unchanged, and corrected values are marked <span aria-hidden="true">‡</span> in tables and match logs. Charts and CSV use the same labelled display value.</div>}
+    {scope === "team" && displayAssumptionCount > 0 && <div role="note" className="rounded-lg border border-sky-400/40 bg-sky-50 p-3 text-sm text-sky-950 dark:bg-sky-950/20 dark:text-sky-100"><strong>{displayAssumptionCount} omitted sparse-count cells are displayed as assumed zero.</strong> They are marked <span aria-hidden="true">§</span> and are not provider-verified zeros. Raw values remain NULL; core validity and predictions are unchanged. Continuous, percentage and high-volume/core missing fields remain Unavailable.</div>}
     {scope === "player" && data.source_status.player_stats === "UNAVAILABLE" && <div role="note" className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"><strong>Detailed SDP player statistics are unavailable.</strong> SDP provides witnessed lineups and broad provider positions. Every detailed player statistic below is an explicitly labelled FPL observation. Player shots, SOT and box touches are not inferred from team totals.</div>}
     <div className={`grid grid-cols-2 gap-3 ${scope === "team" ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>{[[scope === "team" ? "Clubs in scope" : "Players in scope", filtered.length], ["Official completed fixtures", completedFixtureScope], ...(scope === "team" ? [["Provider core-valid fixtures", `${providerCoreValid} / ${fixtureRows.size}`]] : []), ["Observed fixture records", selectedRows.length], ["Complete chart metric", `${available} / ${filtered.length}`], ["Latest SDP known", date(data.source_status.latest_sdp_known_at)]].map(([label, value]) => <div key={label} className={cardClass}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}</div>
     <FilterPanel><div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 xl:grid-cols-6">
@@ -194,13 +198,13 @@ function ReadyPage({ data, scope }: { data: SdpStatsData; scope: SdpScope }) {
       <Control label="Metric group" value={group} options={[...(scope === "team" ? [["overview", "Overview"] as [string, string]] : []), ["all", "All metrics"], ...[...new Set(relevant.map(m => m.group))].map(g => [g, g] as [string, string])]} onChange={setGroup} />
       <Control label="Display" value={mode} options={scope === "team" ? [["total", "Totals"], ["per_match", "Per match"]] : [["total", "Totals"], ["per90", "Per 90 actual minutes"]]} onChange={value => setMode(value as SdpMode)} />
       <Button variant="outline" onClick={reset}><RotateCcw />Reset filters</Button>
-    </div><p className="mt-3 text-xs text-muted-foreground">Recent windows apply to each {scope === "team" ? "club" : "player"} after season, GW, team and venue filters. Both double-gameweek fixtures count. A missing value remains —. Percentage columns show a per-match mean, not a pooled percentage.</p>{scope === "player" && <p className="mt-1 text-xs text-muted-foreground">Exposure uses selected FPL minutes: below 180 is very low; 180 to 449 is low; 450+ is a larger sample. These describe sample size, not model confidence.</p>}</FilterPanel>
+    </div><p className="mt-3 text-xs text-muted-foreground">Recent windows apply to each {scope === "team" ? "club" : "player"} after season, GW, team and venue filters. Both double-gameweek fixtures count. Sparse omitted counts can display an explicit assumed zero (§); all other missing values remain —. Percentage columns show a per-match mean, not a pooled percentage.</p>{scope === "player" && <p className="mt-1 text-xs text-muted-foreground">Exposure uses selected FPL minutes: below 180 is very low; 180 to 449 is low; 450+ is a larger sample. These describe sample size, not model confidence.</p>}</FilterPanel>
     <div className="space-y-2" aria-label="Available statistic groups">
       <p className="text-sm font-medium">{scope === "team" ? `${relevant.filter(m => m.source === "sdp").length} SDP team metrics` : "Observed player metrics ? FPL source"}</p>
       <div className="flex flex-wrap gap-2">{[...(scope === "team" ? ["overview"] : []), ...new Set(relevant.map(m => m.group))].map(key => <Button key={key} size="sm" variant={group === key ? "default" : "outline"} aria-pressed={group === key} onClick={() => { setGroup(key); setPage(0); }}>{key === "overview" ? "Overview" : key.replaceAll("_", " ")}</Button>)}</div>
-      {scope === "team" && <p className="text-xs text-muted-foreground">Shooting, possession, passing, territory, defensive actions and discipline are separate source observations. Passing direction, long passes and crosses describe play patterns; no inferred play-type label is assigned. Core-incomplete matches retain individually measured cells; a missing field stays Unavailable.</p>}
+      {scope === "team" && <p className="text-xs text-muted-foreground">Shooting, possession, passing, territory, defensive actions and discipline are separate source observations. Passing direction, long passes and crosses describe play patterns; no inferred play-type label is assigned. Core-incomplete matches retain individually measured cells. Omitted sparse event counts may show assumed zero (§); other missing fields stay Unavailable.</p>}
     </div>
-    {relevant.length > 0 && <div className="flex flex-wrap items-end justify-between gap-3"><Control label="Trend metric" value={chartMetric ? metricId(chartMetric) : ""} options={metricOptions} onChange={setChartKey} /><p className="text-xs text-muted-foreground">Each cell shows measured / selected matches. Totals and rates require complete evidence. † Provider observation; not independently reconciled. ‡ Owner-confirmed display correction over an omitted field. Hover for exact provenance.</p></div>}
+    {relevant.length > 0 && <div className="flex flex-wrap items-end justify-between gap-3"><Control label="Trend metric" value={chartMetric ? metricId(chartMetric) : ""} options={metricOptions} onChange={setChartKey} /><p className="text-xs text-muted-foreground">Each cell shows displayed / selected matches. Totals and rates require complete display coverage. † Provider observation; not independently reconciled. ‡ Owner-confirmed correction. § Owner-directed assumed zero for an omitted sparse count. Hover for exact provenance.</p></div>}
     <div className="rounded-lg border"><Table aria-label={scope === "team" ? "Observed SDP team statistics" : "Observed player statistics by source"} containerClassName="max-h-[620px]"><TableHeader className="sticky top-0 z-20 bg-background"><TableRow>
       <TableHead className="sticky left-0 z-30 bg-background"><button className="flex items-center gap-1" onClick={() => { setSortKey("name"); setAscending(sortKey === "name" ? !ascending : true); }}> {scope === "team" ? "Club" : "Player"}{sortKey === "name" && (ascending ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}</button></TableHead><TableHead>Compare</TableHead>{scope === "player" && <><TableHead>FPL position</TableHead><TableHead>Club(s)</TableHead><TableHead>FPL minutes / exposure</TableHead><TableHead>SDP starts</TableHead><TableHead title="Count of selected fixture rows with measured FPL minutes greater than zero. Unavailable if any selected minute field is missing.">FPL appearances</TableHead></>}<TableHead title="Selected fixture records, including recorded non-appearances.">Matches</TableHead>
       {metrics.map(metric => <TableHead key={metricId(metric)} aria-sort={sortKey === metricId(metric) ? ascending ? "ascending" : "descending" : "none"}><button className="flex items-center gap-1 text-left" onClick={() => { setSortKey(metricId(metric)); setAscending(sortKey === metricId(metric) ? !ascending : false); }} title={sourceDescription(metric)}>

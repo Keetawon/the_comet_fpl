@@ -89,6 +89,37 @@ describe("Observed SDP sidecar contract", () => {
     correction.owner_confirmation_recorded_at = "2027-01-01T00:00:00Z";
     expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
   });
+  it("accepts only labelled sparse-count assumptions in schema v3", () => {
+    const data = sdpFixture();
+    data.json_schema_version = 3;
+    data.as_of = "2026-09-10T00:00:00+00:00";
+    for (const metric of data.metrics) metric.omitted_zero_display = false;
+    for (const row of data.team_matches) row.display_assumptions = {};
+    const row = data.team_matches[0];
+    row.provider_match_id = 123;
+    row.source_version = "b".repeat(64);
+    row.sdp.shots_outside_box = null;
+    data.metrics.push({
+      ...data.metrics[0], key: "shots_outside_box", provider_field: "attemptsObox",
+      omitted_zero_display: true,
+    });
+    row.display_assumptions!.shots_outside_box = {
+      value: 0,
+      evidence_class: "owner_directed_omitted_count_assumption",
+      policy_recorded_at: "2026-09-09T02:47:16.006705+00:00",
+      source_known_at: "2026-09-07T07:00:00+00:00",
+      provider_match_id: 123,
+      provider_field: "attemptsObox",
+      provider_field_state: "omitted",
+      raw_payload_sha256: "b".repeat(64),
+    };
+    expect(parseSdpStats(data)).toBe(data);
+    row.sdp.shots_outside_box = 0;
+    expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+    row.sdp.shots_outside_box = null;
+    row.display_assumptions!.shots = row.display_assumptions!.shots_outside_box;
+    expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+  });
   it("accepts unmapped stable provider identity and separate historical team membership", () => {
     const data = sdpFixture(); data.player_matches[0].code = null; data.player_matches[0].position = null;
     expect(parseSdpStats(data).player_matches[0].code).toBeNull();

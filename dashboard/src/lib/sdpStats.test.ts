@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metricCorrections, metricRaw, metricValue, sdpCsv, selectSdpEntities, sortSdpEntities } from "./sdpStats";
+import { metricAssumptions, metricCorrections, metricRaw, metricValue, sdpCsv, selectSdpEntities, sortSdpEntities } from "./sdpStats";
 import { fplXg, possession, sdpFixture, sdpMatch, shooting } from "@/test/sdpFixture";
 import type { SdpFilters } from "./sdpStats";
 
@@ -41,6 +41,32 @@ describe("SDP observed descriptive arithmetic", () => {
     const csv = sdpCsv([{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "—", code: null, teamCode: 3, rows: [row] }], [metric], "total");
     expect(csv).toContain("Owner-confirmed display correction");
     expect(csv).toContain(`${providerField} was omitted`);
+  });
+  it("shows a raw omitted sparse count as an explicitly labelled assumed zero", () => {
+    const metric = { ...shooting, key: "shots_outside_box", provider_field: "attemptsObox", omitted_zero_display: true };
+    const row = sdpMatch({
+      provider_match_id: 123,
+      source_version: "b".repeat(64),
+      sdp: { shots_outside_box: null },
+      display_assumptions: {
+        shots_outside_box: {
+          value: 0,
+          evidence_class: "owner_directed_omitted_count_assumption",
+          policy_recorded_at: "2026-09-09T02:47:16.006705+00:00",
+          source_known_at: "2026-09-07T07:00:00+00:00",
+          provider_match_id: 123,
+          provider_field: "attemptsObox",
+          provider_field_state: "omitted",
+          raw_payload_sha256: "b".repeat(64),
+        },
+      },
+    });
+    expect(row.sdp.shots_outside_box).toBeNull();
+    expect(metricRaw(row, metric)).toBe(0);
+    expect(metricAssumptions([row], metric)).toHaveLength(1);
+    const csv = sdpCsv([{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "—", code: null, teamCode: 3, rows: [row] }], [metric], "total");
+    expect(csv).toContain("1/1 (1 assumed zero)");
+    expect(csv).toContain("not a provider-verified zero");
   });
   it("uses matched actual FPL minutes for FPL per90 and never nominal SDP time", () => {
     const row = sdpMatch({ fpl: { expected_goals: 0.5 }, minutes_fpl: 45, minutes_sdp: null, nominal_minutes_sdp: 90 });

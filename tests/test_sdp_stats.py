@@ -15,11 +15,13 @@ import pytest
 from fpl.config import load_sdp_metrics
 from fpl.jobs.export_sdp_stats import main
 from fpl.publish.sdp_stats import (
+    OMITTED_ZERO_POLICY_RECORDED_AT,
     DisplayCorrection,
     DisplayCorrectionPolicy,
     _add_lineups,
     _apply_display_corrections,
     _fpl_rows,
+    _omitted_zero_assumptions,
     _partial_current_stats,
     build_sdp_stats,
     export_sdp_stats,
@@ -103,6 +105,42 @@ def test_actual_zero_and_signed_recorded_points_preserved(tmp_path: Path) -> Non
     assert row["minutes_fpl"] == 0
     assert row["fpl"]["total_points_as_recorded"] == -2
     assert row["fpl"]["bps"] == -1
+
+
+def test_omitted_sparse_count_assumption_is_display_only_and_cutoff_safe() -> None:
+    metrics = load_sdp_metrics().metrics
+    stats = {"totalScoringAtt": 4, "attemptsIbox": 4, "totalPass": 500}
+    kwargs = {
+        "source_known_at": OMITTED_ZERO_POLICY_RECORDED_AT - timedelta(days=1),
+        "provider_match_id": 123,
+        "raw_payload_sha256": "a" * 64,
+    }
+    assert (
+        _omitted_zero_assumptions(
+            stats,
+            metrics,
+            cutoff=OMITTED_ZERO_POLICY_RECORDED_AT - timedelta(microseconds=1),
+            **kwargs,
+        )
+        == {}
+    )
+    assumptions = _omitted_zero_assumptions(
+        stats, metrics, cutoff=OMITTED_ZERO_POLICY_RECORDED_AT, **kwargs
+    )
+    assert assumptions["shots_outside_box"]["value"] == 0
+    assert assumptions["shots_outside_box"]["provider_field"].startswith("attemptsObox")
+    assert assumptions["offsides"]["evidence_class"] == ("owner_directed_omitted_count_assumption")
+    assert "shots_inside_box" not in assumptions
+    assert "passes" not in assumptions
+    assert "expected_goals_on_target" not in assumptions
+    assert stats == {"totalScoringAtt": 4, "attemptsIbox": 4, "totalPass": 500}
+    explicit_zero = _omitted_zero_assumptions(
+        {**stats, "attemptsObox": 0},
+        metrics,
+        cutoff=OMITTED_ZERO_POLICY_RECORDED_AT,
+        **kwargs,
+    )
+    assert "shots_outside_box" not in explicit_zero
 
 
 @pytest.mark.parametrize(
@@ -369,6 +407,34 @@ def test_public_blocked_display_correction_has_no_invented_opponent_mirror(tmp_p
     assert row["sdp"]["shots_blocked"] is None
     row["display_corrections"]["shots_blocked"]["relation"] = "opponent_mirror"
     with pytest.raises(ValueError, match="relation"):
+        validate_sdp_stats(document)
+
+
+def test_public_omitted_count_assumption_keeps_raw_null_and_fails_closed(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "source.duckdb"
+    _write(db)
+    document = _load(db)
+    policy_time = OMITTED_ZERO_POLICY_RECORDED_AT.isoformat()
+    document["as_of"] = policy_time
+    row = document["team_matches"][0]
+    row["provider_match_id"] = 123
+    row["sdp"]["shots_outside_box"] = None
+    row["display_assumptions"]["shots_outside_box"] = {
+        "value": 0,
+        "evidence_class": "owner_directed_omitted_count_assumption",
+        "policy_recorded_at": policy_time,
+        "source_known_at": row["known_at"],
+        "provider_match_id": 123,
+        "provider_field": "attemptsObox | attempts_obox | shots_outside_box",
+        "provider_field_state": "omitted",
+        "raw_payload_sha256": "a" * 64,
+    }
+    validate_sdp_stats(document)
+    assert row["sdp"]["shots_outside_box"] is None
+    row["sdp"]["shots_outside_box"] = 0
+    with pytest.raises(ValueError, match="omitted-count"):
         validate_sdp_stats(document)
 
 

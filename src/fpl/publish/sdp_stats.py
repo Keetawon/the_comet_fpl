@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -32,6 +33,27 @@ from fpl.transform.pl_sdp import KICKOFF_TOLERANCE_SECONDS
 
 SCHEMA = "fpl.sdp-stats"
 DISPLAY_CORRECTIONS_FILE = "sdp_dashboard_display_corrections.yaml"
+OMITTED_ZERO_POLICY_RECORDED_AT = datetime.fromisoformat("2026-09-09T02:47:16.006705+00:00")
+# Display-only policy for sparse nonnegative counts. High-volume/core counts,
+# percentages and continuous values remain unavailable when omitted.
+OMITTED_ZERO_DISPLAY_FIELDS = frozenset(
+    {
+        "shots_inside_box",
+        "shots_outside_box",
+        "shots_blocked",
+        "big_chances_created",
+        "big_chances_scored",
+        "big_chances_missed",
+        "accurate_crosses",
+        "corners",
+        "blocks",
+        "saves",
+        "possession_won_attacking_third",
+        "yellow_cards",
+        "red_cards",
+        "offsides",
+    }
+)
 FPL_FIELDS = (
     "minutes",
     "starts",
@@ -73,7 +95,7 @@ COMMON = {
     "provider_match_id",
     "source_version",
 }
-TEAM_FIELDS = {"sdp", "fpl", "display_corrections"}
+TEAM_FIELDS = {"sdp", "fpl", "display_corrections", "display_assumptions"}
 PLAYER_FIELDS = {
     "code",
     "provider_player_id",
@@ -122,6 +144,16 @@ DISPLAY_CORRECTION_FIELDS = {
     "corroboration",
     "relation",
     "subject_team_code",
+}
+DISPLAY_ASSUMPTION_FIELDS = {
+    "value",
+    "evidence_class",
+    "policy_recorded_at",
+    "source_known_at",
+    "provider_match_id",
+    "provider_field",
+    "provider_field_state",
+    "raw_payload_sha256",
 }
 SOT_TARGET_FIELDS = (
     "expectedGoalsOnTarget",
@@ -240,7 +272,7 @@ def _partial_current_stats(
     fixture: int,
     official: dict[str, Any],
     cutoff: datetime,
-) -> tuple[dict[str, dict[str, Any]], datetime, str, int] | None:
+) -> tuple[dict[str, dict[str, Any]], datetime, str, int, str] | None:
     """Display measured fields of an incomplete core, never license model use.
 
     Recheck the latest immutable stats and metadata, exact crosswalk, PL identity,
@@ -323,6 +355,7 @@ def _partial_current_stats(
                 max(capture["fetched_at"], receipt["fetched_at"]),
                 _version(capture["sha256"], receipt["sha256"]),
                 match_id,
+                capture["sha256"],
             )
     except (ValueError, TypeError, KeyError):
         return None
@@ -451,6 +484,7 @@ def _apply_display_corrections(
             "corroboration": "shot_accounting_and_fpl_goalkeeper_proxy_zero",
             "subject_team_code": correction.team_code,
         }
+        direct.setdefault("display_assumptions", {}).pop(metric_key, None)
         direct["display_corrections"][metric_key] = {**public, "relation": "direct"}
         if not blocked_correction:
             mirror["display_corrections"]["shots_on_target_allowed"] = {
@@ -459,6 +493,37 @@ def _apply_display_corrections(
             }
         applied += 1
     return applied
+
+
+def _omitted_zero_assumptions(
+    stats: dict[str, Any],
+    metrics: Sequence[SdpMetric],
+    *,
+    cutoff: datetime,
+    source_known_at: datetime,
+    provider_match_id: int,
+    raw_payload_sha256: str,
+) -> dict[str, dict[str, Any]]:
+    """Mark raw omissions that the owner elects to view as sparse-count zeros."""
+    if cutoff < OMITTED_ZERO_POLICY_RECORDED_AT:
+        return {}
+    assumptions: dict[str, dict[str, Any]] = {}
+    for metric in metrics:
+        if metric.local_field not in OMITTED_ZERO_DISPLAY_FIELDS:
+            continue
+        if any(field in stats for field in metric.provider_fields):
+            continue
+        assumptions[metric.local_field] = {
+            "value": 0,
+            "evidence_class": "owner_directed_omitted_count_assumption",
+            "policy_recorded_at": _iso(OMITTED_ZERO_POLICY_RECORDED_AT),
+            "source_known_at": _iso(source_known_at),
+            "provider_match_id": provider_match_id,
+            "provider_field": " | ".join(metric.provider_fields),
+            "provider_field_state": "omitted",
+            "raw_payload_sha256": raw_payload_sha256,
+        }
+    return assumptions
 
 
 def metric_catalog() -> list[dict[str, Any]]:
@@ -481,6 +546,7 @@ def metric_catalog() -> list[dict[str, Any]]:
                 if metric.verified_semantics
                 else ("Provider observation; not independently reconciled. " + metric.description),
                 "provider_field": " | ".join(metric.provider_fields),
+                "omitted_zero_display": metric.local_field in OMITTED_ZERO_DISPLAY_FIELDS,
             }
         )
     for key, original in OPPONENT_METRICS.items():
@@ -509,6 +575,7 @@ def metric_catalog() -> list[dict[str, Any]]:
                 "verified_semantics": True,
                 "description": "Official FPL fixture score for this exact home/away side.",
                 "provider_field": "team_h_score / team_a_score",
+                "omitted_zero_display": False,
             }
         )
     groups = {
@@ -543,6 +610,7 @@ def metric_catalog() -> list[dict[str, Any]]:
                 "verified_semantics": True,
                 "description": "Observed FPL element-summary value, separate from SDP.",
                 "provider_field": "total_points" if field == "total_points_as_recorded" else field,
+                "omitted_zero_display": False,
             }
         )
     return catalog
@@ -966,6 +1034,7 @@ def build_sdp_stats(
             "sdp": dict.fromkeys(team_keys),
             "fpl": dict.fromkeys(TEAM_FPL_FIELDS),
             "display_corrections": {},
+            "display_assumptions": {},
         }
     for fixture, row in fixtures.items():
         for home in (True, False):
@@ -986,6 +1055,7 @@ def build_sdp_stats(
                 "sdp": dict.fromkeys(team_keys),
                 "fpl": dict.fromkeys(TEAM_FPL_FIELDS),
                 "display_corrections": {},
+                "display_assumptions": {},
             }
     for fixture, source in fixtures.items():
         for home in (True, False):
@@ -1026,6 +1096,14 @@ def build_sdp_stats(
                 "sdp": measured,
                 "fpl": previous["fpl"] if previous is not None else dict.fromkeys(TEAM_FPL_FIELDS),
                 "display_corrections": {},
+                "display_assumptions": _omitted_zero_assumptions(
+                    dict(side.stats),
+                    metrics,
+                    cutoff=cutoff,
+                    source_known_at=source["fetched_at"],
+                    provider_match_id=observed.provenance["provider_match_id"],
+                    raw_payload_sha256=source["sha256"],
+                ),
                 "provider_match_id": observed.provenance["provider_match_id"],
                 "source_version": _version(
                     source["sha256"],
@@ -1044,7 +1122,7 @@ def build_sdp_stats(
             )
             if partial is None:
                 continue
-            sides, known, version, provider_match_id = partial
+            sides, known, version, provider_match_id, stats_sha256 = partial
             for side_label, stats in sides.items():
                 row = teams[current, fixture, official[side_label]]
                 opposite = sides["away" if side_label == "home" else "home"]
@@ -1055,6 +1133,14 @@ def build_sdp_stats(
                 row["known_at"] = _iso(max(known, datetime.fromisoformat(row["known_at"])))
                 row["provider_match_id"] = provider_match_id
                 row["source_version"] = _version(version, row["source_version"])
+                row["display_assumptions"] = _omitted_zero_assumptions(
+                    stats,
+                    metrics,
+                    cutoff=cutoff,
+                    source_known_at=known,
+                    provider_match_id=provider_match_id,
+                    raw_payload_sha256=stats_sha256,
+                )
     fpl_count = len(players)
     lineup_count, lineup_failures = _add_lineups(
         con,
@@ -1084,7 +1170,7 @@ def build_sdp_stats(
         notes.append(
             f"{failures} fixture(s) lack valid complete SDP core evidence; "
             "UNAVAILABLE labels core health. Individually measured current-match cells "
-            "can be displayed after separate raw/identity checks; omitted fields stay NULL."
+            "can be displayed after separate raw/identity checks; raw omitted fields stay NULL."
         )
     if lineup_failures:
         notes.append(
@@ -1095,9 +1181,15 @@ def build_sdp_stats(
             f"{display_corrections} owner-confirmed display correction(s) are shown separately; "
             "raw provider fields remain missing and SDP core validity is unchanged."
         )
+    display_assumptions = sum(len(row["display_assumptions"]) for row in team_rows)
+    if display_assumptions:
+        notes.append(
+            f"{display_assumptions} omitted sparse-count cell(s) are shown as owner-directed "
+            "display assumptions. Raw values remain NULL and provider core validity is unchanged."
+        )
     document = {
         "schema": SCHEMA,
-        "json_schema_version": 2,
+        "json_schema_version": 3,
         "as_of": _iso(cutoff),
         "source_status": {
             "team_stats": "UNAVAILABLE" if not valid else "PARTIAL" if failures else "AVAILABLE",
@@ -1143,7 +1235,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             "gameweeks",
         }
         or document["schema"] != SCHEMA
-        or document["json_schema_version"] != 2
+        or document["json_schema_version"] != 3
     ):
         raise ValueError("invalid SDP sidecar envelope")
     cutoff = AsOf(datetime.fromisoformat(document["as_of"])).ts
@@ -1242,10 +1334,38 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                     if row[field] is not None and type(row[field]) is not bool:
                         raise ValueError("invalid observed membership marker")
             if scope == "team":
-                if set(row["fpl"]) != set(TEAM_FPL_FIELDS) or not isinstance(
-                    row["display_corrections"], dict
+                if (
+                    set(row["fpl"]) != set(TEAM_FPL_FIELDS)
+                    or not isinstance(row["display_corrections"], dict)
+                    or not isinstance(row["display_assumptions"], dict)
                 ):
                     raise ValueError("invalid team FPL/display source")
+                for metric, assumption in row["display_assumptions"].items():
+                    if (
+                        metric not in OMITTED_ZERO_DISPLAY_FIELDS
+                        or not isinstance(assumption, dict)
+                        or set(assumption) != DISPLAY_ASSUMPTION_FIELDS
+                        or assumption["value"] != 0
+                        or assumption["evidence_class"] != "owner_directed_omitted_count_assumption"
+                        or assumption["provider_field_state"] != "omitted"
+                        or assumption["provider_match_id"] != row["provider_match_id"]
+                        or not isinstance(assumption["provider_field"], str)
+                        or not assumption["provider_field"]
+                        or not re.fullmatch(r"[0-9a-f]{64}", assumption["raw_payload_sha256"])
+                        or row["sdp"][metric] is not None
+                        or metric in row["display_corrections"]
+                    ):
+                        raise ValueError("invalid omitted-count display assumption")
+                    source_known = AsOf(datetime.fromisoformat(assumption["source_known_at"])).ts
+                    policy_recorded = AsOf(
+                        datetime.fromisoformat(assumption["policy_recorded_at"])
+                    ).ts
+                    if (
+                        source_known > cutoff
+                        or policy_recorded != OMITTED_ZERO_POLICY_RECORDED_AT
+                        or policy_recorded > cutoff
+                    ):
+                        raise ValueError("future or contradictory display assumption")
                 for metric, correction in row["display_corrections"].items():
                     if (
                         metric
