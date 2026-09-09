@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { loadFixtureMatrix, loadNextGw } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadSummary } from "@/data/load";
 import type { DashboardManifest, NextGwPlan, TeamRecord, WindowLabel } from "@/data/types";
 import { WINDOW_LABELS } from "@/data/types";
 import {
@@ -167,8 +167,8 @@ export function TeamAnalyticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadFixtureMatrix(), loadNextGw()])
-      .then(([fixtureData, nextGw]) => {
+    Promise.all([loadFixtureMatrix(), loadNextGw(), loadSummary()])
+      .then(([fixtureData, nextGw, summary]) => {
         if (cancelled) return;
         const runs = fixtureData.manifest?.runs?.length
           ? fixtureData.manifest.runs.map((run) => ({
@@ -182,7 +182,7 @@ export function TeamAnalyticsPage() {
         const defaultRun = defaultVintageRunId(
           runs,
           nextGw.plans,
-          fixtureData.manifest?.runs.at(-1)?.run_id ?? null,
+          summary.latest_run?.run_id ?? null,
         );
         const selected = runs.find((run) => run.run_id === defaultRun) ?? runs[0];
         setState({
