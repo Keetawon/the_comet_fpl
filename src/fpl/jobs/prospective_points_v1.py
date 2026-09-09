@@ -153,7 +153,7 @@ from fpl.types import Position
 from fpl.validate.freshness import FreshnessError, require_prospective_freshness
 from fpl.validate.metrics import Distribution, poisson_pmf
 from fpl.validate.minutes_baselines import MinuteBins, TargetRow
-from fpl.validate.minutes_harness import player_fixture_history
+from fpl.validate.minutes_harness import _history_rows
 from fpl.validate.points_harness import (
     TARGET_RULESET,
     PointsComponentSuite,
@@ -163,7 +163,13 @@ from fpl.validate.points_harness_v3 import (
     DEFAULT_DRAWS,
     _fixture_seed,
     _residual_prediction,
-    _residual_training_rows,
+)
+from fpl.validate.prospective_player_history import (
+    HISTORY_CONTRACT,
+    canonical_provenance,
+    history_provenance,
+    load_player_history,
+    residual_training_rows,
 )
 
 if TYPE_CHECKING:
@@ -391,7 +397,7 @@ def _trailing_row_eligible(
     share; the repository constant is that a player's share travels while the team scale does
     not).
     """
-    if frontier_season is not None and season == frontier_season:
+    if frontier_season is not None and season >= frontier_season:
         return True
     club = current_club.get(code)
     return club is not None and row_team_code == club
@@ -402,6 +408,7 @@ def trailing_ict(
     as_of: datetime,
     *,
     current_club: Mapping[int, int] | None = None,
+    history: pl.DataFrame | None = None,
 ) -> dict[int, tuple[float, float]]:
     """``code -> (mean influence, mean creativity)`` over appeared history before ``as_of``.
 
@@ -433,6 +440,7 @@ def trailing_ict(
     strictly before ``as_of``, with both ICT components measured. A NULL is skipped, never read as
     zero, and zero-minute rows with measured ICT still count -- identical to the previous filter.
     """
+    rows: list[tuple[Any, ...]]
     if current_club is None:
         rows = [
             (code, influence, creativity, None, None)
@@ -449,17 +457,12 @@ def trailing_ict(
         ]
         frontier = None
     else:
-        rows = con.execute(
-            """
-            SELECT f.code, f.influence, f.creativity, f.season, t.team_code
-            FROM mart_fact_player_fixture AS f
-            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
-            WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
-              AND f.influence IS NOT NULL AND f.creativity IS NOT NULL
-            ORDER BY f.code, f.kickoff_time, f.season, f.fixture
-            """,
-            [as_of],
-        ).fetchall()
+        frame = history if history is not None else load_player_history(con, as_of)
+        rows = (
+            frame.drop_nulls(["influence", "creativity"])
+            .select("code", "influence", "creativity", "season", "team_code")
+            .rows()
+        )
         frontier = _trailing_frontier_season(con, as_of)
 
     influence_by_code: dict[int, list[float]] = defaultdict(list)
@@ -491,6 +494,7 @@ def last_team_code(
     as_of: datetime,
     *,
     current_club: Mapping[int, int] | None = None,
+    history: pl.DataFrame | None = None,
 ) -> dict[int, int]:
     """``code -> team_code`` of the club a player last appeared for before ``as_of`` (transfer).
 
@@ -516,16 +520,8 @@ def last_team_code(
             [as_of],
         ).pl()
         return {int(r["code"]): int(r["team_code"]) for r in frame.iter_rows(named=True)}
-    rows = con.execute(
-        """
-        SELECT f.code, t.team_code, f.season
-        FROM mart_fact_player_fixture AS f
-        LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
-        WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
-        ORDER BY f.kickoff_time, f.season, f.fixture, f.code
-        """,
-        [as_of],
-    ).fetchall()
+    frame = history if history is not None else load_player_history(con, as_of)
+    rows = frame.select("code", "team_code", "season").iter_rows()
     frontier = _trailing_frontier_season(con, as_of)
     last: dict[int, int] = {}
     for code, team_code, season in rows:
@@ -636,6 +632,7 @@ def trailing5_minute_bins(
     window: int = 5,
     alpha: float = MINUTES_SHRINKAGE_ALPHA,
     current_club: Mapping[int, int] | None = None,
+    history: pl.DataFrame | None = None,
 ) -> dict[int, tuple[tuple[float, float, float, float], int]]:
     """``code -> (shrunk minute-bin distribution, n)`` over the most recent ``window`` rows.
 
@@ -677,16 +674,8 @@ def trailing5_minute_bins(
         ).pl()
         frontier = None
     else:
-        frame = con.execute(
-            """
-            SELECT f.code, f.position, f.minutes, f.season, t.team_code
-            FROM mart_fact_player_fixture AS f
-            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
-            WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
-            ORDER BY f.code, f.kickoff_time, f.fixture
-            """,
-            [as_of],
-        ).pl()
+        frame = history if history is not None else load_player_history(con, as_of)
+        frame = frame.sort(["code", "kickoff_time", "season", "fixture"])
         frontier = _trailing_frontier_season(con, as_of)
     n_bins = bins.n_bins()
     by_code: dict[int, list[int]] = defaultdict(list)
@@ -804,6 +793,7 @@ def appeared_attack_signals(
     *,
     kind: str,
     current_club: Mapping[int, int] | None = None,
+    history: pl.DataFrame | None = None,
 ) -> tuple[dict[int, list[tuple[float, float | None, float | None]]], float]:
     """Trailing attacking-signal history for the team-coupled (V3) goals allocation.
 
@@ -832,21 +822,10 @@ def appeared_attack_signals(
         ).pl()
         frontier = None
     else:
-        frame = con.execute(
-            """
-            SELECT f.season, f.gw, f.fixture,
-                   strftime(
-                       CAST(f.kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ'
-                   ) AS kickoff_time,
-                   f.code, f.expected_goals, f.threat, t.team_code
-            FROM mart_fact_player_fixture AS f
-            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
-            WHERE f.minutes IS NOT NULL AND f.minutes > 0
-              AND CAST(f.kickoff_time AS TIMESTAMPTZ) < ?
-            ORDER BY CAST(f.kickoff_time AS TIMESTAMPTZ), f.season, f.fixture, f.code
-            """,
-            [as_of],
-        ).pl()
+        frame = history if history is not None else load_player_history(con, as_of)
+        frame = frame.filter(pl.col("minutes") > 0).with_columns(
+            pl.col("kickoff_time").dt.convert_time_zone("UTC").dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
         frontier = _trailing_frontier_season(con, as_of)
     if not frame.is_empty():
         frame = frame.sort(["kickoff_time", "season", "fixture", "code"], maintain_order=True)
@@ -919,6 +898,7 @@ def appeared_assist_signals(
     *,
     kind: str,
     current_club: Mapping[int, int] | None = None,
+    history: pl.DataFrame | None = None,
 ) -> tuple[dict[int, list[tuple[float, float | None, float | None]]], float]:
     """Trailing assist-signal history for the team-coupled assists allocation.
 
@@ -948,21 +928,10 @@ def appeared_assist_signals(
         ).pl()
         frontier = None
     else:
-        frame = con.execute(
-            """
-            SELECT f.season, f.gw, f.fixture,
-                   strftime(
-                       CAST(f.kickoff_time AS TIMESTAMPTZ), '%Y-%m-%dT%H:%M:%SZ'
-                   ) AS kickoff_time,
-                   f.code, f.expected_assists, f.creativity, t.team_code
-            FROM mart_fact_player_fixture AS f
-            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
-            WHERE f.minutes IS NOT NULL AND f.minutes > 0
-              AND CAST(f.kickoff_time AS TIMESTAMPTZ) < ?
-            ORDER BY CAST(f.kickoff_time AS TIMESTAMPTZ), f.season, f.fixture, f.code
-            """,
-            [as_of],
-        ).pl()
+        frame = history if history is not None else load_player_history(con, as_of)
+        frame = frame.filter(pl.col("minutes") > 0).with_columns(
+            pl.col("kickoff_time").dt.convert_time_zone("UTC").dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
         frontier = _trailing_frontier_season(con, as_of)
     if not frame.is_empty():
         frame = frame.sort(["kickoff_time", "season", "fixture", "code"], maintain_order=True)
@@ -992,13 +961,21 @@ def appeared_assist_signals(
     return appeared, pos_signal_mean
 
 
-def league_assist_rate(con: duckdb.DuckDBPyConnection, as_of: datetime) -> float:
+def league_assist_rate(
+    con: duckdb.DuckDBPyConnection, as_of: datetime, *, history: pl.DataFrame | None = None
+) -> float:
     """Fold-local ``sum(assists) / sum(goals)`` over history before ``as_of`` (measured ~0.90).
 
     Team assists scale with team goals: a team's assisted-goal expectation is
     ``lambda_team * assist_rate``. Measured stable across seasons (0.89-0.94). Point in time
     (``kickoff_time < as_of``); a degenerate empty/zero-goal window falls back to 0.90.
     """
+    if history is not None:
+        measured = history.drop_nulls(["assists", "goals_scored"])
+        goals = measured["goals_scored"].sum()
+        return (
+            max(0.0, min(2.0, float(measured["assists"].sum()) / float(goals))) if goals else 0.90
+        )
     row = con.execute(
         """
         SELECT sum(assists) AS a, sum(goals_scored) AS g
@@ -1221,6 +1198,7 @@ class ProspectivePointsResult:
     selectable_player_registry_sha256: str
     football_environment_provenance: dict[str, Any] | None = None
     shadow_incumbent: ProspectivePointsResult | None = None
+    player_history_provenance: dict[str, Any] | None = None
 
 
 def _stage_a_uses_league_average(
@@ -1348,8 +1326,31 @@ def predict_prospective_points(
         gw_from=gw_from,
         gw_to=gw_to,
     )
-    trailing = trailing_ict(con, as_of, current_club=current_club)
-    last_team = last_team_code(con, as_of, current_club=current_club)
+    player_history = load_player_history(con, as_of)
+    if (
+        not freshness.cold_start
+        and player_history.filter(
+            (pl.col("season") == freshness.most_recent_completed_season)
+            & (pl.col("gw") == freshness.most_recent_completed_gw)
+        ).is_empty()
+    ):
+        raise ValueError("latest completed GW is captured but absent from consumed player history")
+    frontier = _trailing_frontier_season(con, as_of)
+    trailing_history = player_history.filter(
+        pl.col("code").is_in(list(current_club))
+        & (
+            (pl.col("season") >= frontier if frontier is not None else pl.lit(False))
+            | (
+                pl.col("team_code")
+                == pl.col("code").replace_strict(current_club, default=None, return_dtype=pl.Int64)
+            )
+        )
+    )
+    player_history_evidence = history_provenance(
+        con, player_history, as_of, trailing=trailing_history
+    )
+    trailing = trailing_ict(con, as_of, current_club=current_club, history=player_history)
+    last_team = last_team_code(con, as_of, current_club=current_club, history=player_history)
     # "With history" means with ELIGIBLE history (owner rule 2026-08-17): a player whose every
     # archived row is stale and at a former club is a cold start, not a transfer.
     codes_with_history = set(last_team)
@@ -1359,62 +1360,50 @@ def predict_prospective_points(
         else {}
     )
     trailing5_bins = (
-        trailing5_minute_bins(con, as_of, bins, current_club=current_club)
+        trailing5_minute_bins(con, as_of, bins, current_club=current_club, history=player_history)
         if appearance == "seasonal"
         else {}
     )
 
     # 2. Point-in-time component histories + fitted models (identical construction to the v3 fold).
-    minutes_history = tuple(player_fixture_history(con, as_of=as_of))
-    player_history_frame = con.execute(
-        """
-        SELECT season, gw, fixture,
-               strftime(kickoff_time, '%Y-%m-%dT%H:%M:%SZ') AS kickoff_time,
-               code, position, COALESCE(goals_scored, 0) AS goals,
-               COALESCE(assists, 0) AS assists, minutes,
-               saves, goals_conceded, defensive_contribution,
-               expected_goals, expected_assists, creativity
-        FROM mart_fact_player_fixture
-        WHERE minutes IS NOT NULL AND kickoff_time < ?
-        ORDER BY kickoff_time, season, fixture, code
-        """,
-        [as_of],
-    ).pl()
-    player_history_frame = player_history_frame.sort(
-        ["kickoff_time", "season", "fixture", "code"], maintain_order=True
-    )
+    minutes_history = tuple(_history_rows(player_history))
+    player_history_frame = player_history.with_columns(
+        pl.col("kickoff_time").dt.convert_time_zone("UTC").dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    ).rename({"goals_scored": "goals"})
     goals_history: list[PlayerHistoryRow] = []
     assists_history: list[AssistHistoryRow] = []
     saves_history: list[GkSavesHistoryRow] = []
     dc_history: list[DcHistoryRow] = []
     for r in player_history_frame.iter_rows(named=True):
         position = Position.from_archive_label(r["position"])
-        goals_history.append(
-            PlayerHistoryRow(
-                season=r["season"],
-                gw=r["gw"],
-                fixture=r["fixture"],
-                kickoff_time=r["kickoff_time"],
-                code=r["code"],
-                position=position,
-                goals=r["goals"],
-                expected_goals=r["expected_goals"],
+        if r["goals"] is not None:
+            goals_history.append(
+                PlayerHistoryRow(
+                    season=r["season"],
+                    gw=r["gw"],
+                    fixture=r["fixture"],
+                    kickoff_time=r["kickoff_time"],
+                    code=r["code"],
+                    position=position,
+                    goals=r["goals"],
+                    expected_goals=r["expected_goals"],
+                )
             )
-        )
-        assists_history.append(
-            AssistHistoryRow(
-                season=r["season"],
-                gw=r["gw"],
-                fixture=r["fixture"],
-                kickoff_time=r["kickoff_time"],
-                code=r["code"],
-                position=position,
-                assists=r["assists"],
-                minutes=r["minutes"],
-                expected_assists=r["expected_assists"],
-                creativity=r["creativity"],
+        if r["assists"] is not None:
+            assists_history.append(
+                AssistHistoryRow(
+                    season=r["season"],
+                    gw=r["gw"],
+                    fixture=r["fixture"],
+                    kickoff_time=r["kickoff_time"],
+                    code=r["code"],
+                    position=position,
+                    assists=r["assists"],
+                    minutes=r["minutes"],
+                    expected_assists=r["expected_assists"],
+                    creativity=r["creativity"],
+                )
             )
-        )
         saves_history.append(
             GkSavesHistoryRow(
                 position=position,
@@ -1438,7 +1427,7 @@ def predict_prospective_points(
     assists_model = resolved_suite.fit_assists(assists_history)
     saves_model = resolved_suite.fit_saves(saves_history)
     dc_model = resolved_suite.fit_dc(dc_history, rules.defensive_contribution.thresholds)
-    residual_rows = _residual_training_rows(con, as_of)
+    residual_rows = residual_training_rows(player_history)
     residual_model = fit_residual_model(
         residual_rows,
         bps,
@@ -1564,7 +1553,7 @@ def predict_prospective_points(
     pos_signal_mean = 0.0
     if attacking == "v3":
         appeared, pos_signal_mean = appeared_attack_signals(
-            con, as_of, kind=signal_kind, current_club=current_club
+            con, as_of, kind=signal_kind, current_club=current_club, history=player_history
         )
         signal_by_code = {
             code: mean_trailing_signal(rows, kind=signal_kind, window=share_window)
@@ -1587,13 +1576,13 @@ def predict_prospective_points(
     assist_rate = 0.90
     if assists == "coupled":
         assist_appeared, pos_assist_signal_mean = appeared_assist_signals(
-            con, as_of, kind=assist_kind, current_club=current_club
+            con, as_of, kind=assist_kind, current_club=current_club, history=player_history
         )
         assist_signal_by_code = {
             code: mean_trailing_signal(rows, kind=assist_slot_kind, window=share_window)
             for code, rows in assist_appeared.items()
         }
-        assist_rate = league_assist_rate(con, as_of)
+        assist_rate = league_assist_rate(con, as_of, history=player_history)
 
     # 4. Assemble targets: registry players x their scheduled fixtures, grouped by fixture (the
     #    whole-fixture population is both teams -- exactly the bonus-ranking population).
@@ -2149,6 +2138,7 @@ def predict_prospective_points(
             season=season,
         ),
         football_environment_provenance=environment_provenance,
+        player_history_provenance=player_history_evidence,
     )
     if (
         environment_provenance is not None
@@ -2204,6 +2194,7 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             "config_sha256": result.config_sha256,
             "archive_sha256": result.archive_sha256,
             "components": result.component_names,
+            "player_history": result.player_history_provenance,
             **(
                 {"football_environment": result.football_environment_provenance}
                 if result.football_environment_provenance is not None
@@ -2381,6 +2372,11 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
         "share_signal_kind": result.share_signal_kind,
         **{f"component.{name}": value for name, value in result.component_names.items()},
     }
+    if result.player_history_provenance is not None:
+        component_modes["player_history.contract"] = HISTORY_CONTRACT
+        component_modes["player_history.provenance"] = canonical_provenance(
+            result.player_history_provenance
+        )
     if result.football_environment_provenance is not None:
         # Existing manifest contract carries extensible, immutable component provenance.
         # Each fixture reason and exact SDP source version is bound to the artifact hash.
