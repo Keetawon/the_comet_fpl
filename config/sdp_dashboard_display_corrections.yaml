@@ -1,5 +1,5 @@
 schema_id: fpl.sdp-dashboard-display-corrections
-version: 1
+version: 2
 corrections:
   - correction_id: 2026-27-f7-aston-villa-sot
     season: 2026-27
@@ -16,6 +16,44 @@ corrections:
     total_scoring_attempts: 6
     shot_off_target_attempts: 6
     blocked_attempts: null
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0
+
+  # Owner confirmation recorded on receipt of the September 9 follow-up.
+  # shotOffTarget is NOT attemptsObox (which is 4 in both raw matches).
+  - correction_id: 2026-27-f7-aston-villa-blocked
+    season: 2026-27
+    fixture: 7
+    team_code: 7
+    opponent_team_code: 36
+    provider_match_id: 2645201
+    provider_side: away
+    provider_field: blockedScoringAtt
+    raw_payload_sha256: 2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf
+    source_known_at: "2026-09-04T17:47:07.612331+00:00"
+    owner_confirmation_recorded_at: "2026-09-09T02:12:10+00:00"
+    display_value: 0
+    total_scoring_attempts: 6
+    shot_off_target_attempts: 6
+    blocked_attempts: null
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0
+
+  - correction_id: 2026-27-f19-fulham-sot
+    season: 2026-27
+    fixture: 19
+    team_code: 54
+    opponent_team_code: 56
+    provider_match_id: 2645213
+    provider_side: away
+    provider_field: ontargetScoringAtt
+    raw_payload_sha256: b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef
+    source_known_at: "2026-09-04T17:47:22.418236+00:00"
+    owner_confirmation_recorded_at: "2026-09-09T02:12:10+00:00"
+    display_value: 0
+    total_scoring_attempts: 11
+    shot_off_target_attempts: 3
+    blocked_attempts: 8
     opponent_goalkeeper_saves: 0
     fpl_goals_scored: 0
 

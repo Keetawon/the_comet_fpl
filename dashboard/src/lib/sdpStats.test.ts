@@ -11,20 +11,21 @@ describe("SDP observed descriptive arithmetic", () => {
     expect(metricValue([sdpMatch({ sdp: { shots: 0 } })], shooting, "total").value).toBe(0);
     expect(metricValue([], shooting, "total").value).toBeNull();
   });
-  it("uses the labelled display correction consistently without changing raw SDP", () => {
-    const metric = { ...shooting, key: "shots_on_target", label: "Shots on target" };
+  it.each(["ontargetScoringAtt", "blockedScoringAtt"] as const)("uses the labelled %s display correction consistently without changing raw SDP", providerField => {
+    const key = providerField === "blockedScoringAtt" ? "shots_blocked" : "shots_on_target";
+    const metric = { ...shooting, key, label: key };
     const row = sdpMatch({
       status: "UNAVAILABLE",
-      sdp: { shots_on_target: null },
+      sdp: { [key]: null },
       display_corrections: {
-        shots_on_target: {
+        [key]: {
           correction_id: "2026-27-f7-team-7-sot",
           value: 0,
           evidence_class: "owner_confirmed_display_correction",
           owner_confirmation_recorded_at: "2026-09-08T07:00:00+00:00",
           source_known_at: "2026-09-07T07:00:00+00:00",
           provider_match_id: 123,
-          provider_field: "ontargetScoringAtt",
+          provider_field: providerField,
           provider_field_state: "omitted",
           raw_payload_sha256: "a".repeat(64),
           corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero",
@@ -33,13 +34,13 @@ describe("SDP observed descriptive arithmetic", () => {
         },
       },
     });
-    expect(row.sdp.shots_on_target).toBeNull();
+    expect(row.sdp[key]).toBeNull();
     expect(metricRaw(row, metric)).toBe(0);
     expect(metricValue([row], metric, "total")).toEqual({ value: 0, measured: 1, matches: 1, minutes: null });
     expect(metricCorrections([row], metric)).toHaveLength(1);
     const csv = sdpCsv([{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "—", code: null, teamCode: 3, rows: [row] }], [metric], "total");
     expect(csv).toContain("Owner-confirmed display correction");
-    expect(csv).toContain("ontargetScoringAtt was omitted");
+    expect(csv).toContain(`${providerField} was omitted`);
   });
   it("uses matched actual FPL minutes for FPL per90 and never nominal SDP time", () => {
     const row = sdpMatch({ fpl: { expected_goals: 0.5 }, minutes_fpl: 45, minutes_sdp: null, nominal_minutes_sdp: 90 });

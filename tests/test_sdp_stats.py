@@ -105,8 +105,21 @@ def test_actual_zero_and_signed_recorded_points_preserved(tmp_path: Path) -> Non
     assert row["fpl"]["bps"] == -1
 
 
+@pytest.mark.parametrize(
+    ("provider_field", "total", "off_target", "blocked"),
+    [
+        ("ontargetScoringAtt", 6, 6, None),
+        ("blockedScoringAtt", 6, 6, None),
+        ("ontargetScoringAtt", 11, 3, 8),
+    ],
+)
 def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
-    tmp_path: Path, monkeypatch: Any
+    tmp_path: Path,
+    monkeypatch: Any,
+    provider_field: Any,
+    total: int,
+    off_target: int,
+    blocked: int | None,
 ) -> None:
     source_known = datetime(2026, 9, 4, 17, 47, tzinfo=UTC)
     confirmed = datetime(2026, 9, 8, 14, 40, tzinfo=UTC)
@@ -118,14 +131,14 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
         opponent_team_code=36,
         provider_match_id=2645201,
         provider_side="away",
-        provider_field="ontargetScoringAtt",
+        provider_field=provider_field,
         raw_payload_sha256="a" * 64,
         source_known_at=source_known,
         owner_confirmation_recorded_at=confirmed,
         display_value=0,
-        total_scoring_attempts=6,
-        shot_off_target_attempts=6,
-        blocked_attempts=None,
+        total_scoring_attempts=total,
+        shot_off_target_attempts=off_target,
+        blocked_attempts=blocked,
         opponent_goalkeeper_saves=0,
         fpl_goals_scored=0,
     )
@@ -133,7 +146,7 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
         "fpl.publish.sdp_stats.load_display_corrections",
         lambda: DisplayCorrectionPolicy(
             schema_id="fpl.sdp-dashboard-display-corrections",
-            version=1,
+            version=2,
             corrections=(correction,),
         ),
     )
@@ -148,7 +161,12 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
     teams = {
         ("2026-27", 7, 7): {
             "status": "UNAVAILABLE",
-            "sdp": {"shots_on_target": None, "shots_on_target_allowed": None, "shots_allowed": 6},
+            "sdp": {
+                "shots_on_target": None,
+                "shots_on_target_allowed": None,
+                "shots_allowed": 6,
+                "shots_blocked": None,
+            },
             "fpl": {"goals_scored": 0},
             "display_corrections": {},
         },
@@ -175,7 +193,13 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
             {
                 "side": "Away",
                 "team": {"id": 7},
-                "stats": {"totalScoringAtt": 6, "shotOffTarget": 6, "goals": 0},
+                "stats": {
+                    "totalScoringAtt": total,
+                    "shotOffTarget": off_target,
+                    "goals": 0,
+                    "attemptsObox": 4,
+                    **({"blockedScoringAtt": blocked} if blocked is not None else {}),
+                },
             },
         ]
     )
@@ -211,6 +235,33 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
             == 0
         )
         assert teams["2026-27", 7, 7]["display_corrections"] == {}
+        # Outside-box totals never replace the required off-target evidence.
+        broken = json.loads(body)
+        broken[1]["stats"]["attemptsObox"] = total
+        del broken[1]["stats"]["shotOffTarget"]
+        with pytest.raises(ValueError, match="shot accounting"):
+            _apply_display_corrections(
+                con,
+                cutoff=confirmed,
+                season="2026-27",
+                fixtures=fixtures,
+                players=players,
+                teams=teams,
+                raw=[{**raw[0], "body": json.dumps(broken)}],
+            )
+        if provider_field == "blockedScoringAtt":
+            broken = json.loads(body)
+            broken[1]["stats"]["ontargetScoringAtt"] = 1
+            with pytest.raises(ValueError, match="off-target attempts"):
+                _apply_display_corrections(
+                    con,
+                    cutoff=confirmed,
+                    season="2026-27",
+                    fixtures=fixtures,
+                    players=players,
+                    teams=teams,
+                    raw=[{**raw[0], "body": json.dumps(broken)}],
+                )
         assert (
             _apply_display_corrections(
                 con,
@@ -230,10 +281,18 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
     assert direct["sdp"]["shots_on_target"] is mirror["sdp"]["shots_on_target_allowed"] is None
     assert mirror["sdp"]["shots_allowed"] == 6
     assert "shots_allowed" not in mirror["display_corrections"]
-    assert direct["display_corrections"]["shots_on_target"]["value"] == 0
-    assert mirror["display_corrections"]["shots_on_target_allowed"]["relation"] == "opponent_mirror"
+    metric = "shots_blocked" if provider_field == "blockedScoringAtt" else "shots_on_target"
+    assert direct["sdp"][metric] is None
+    assert direct["display_corrections"][metric]["value"] == 0
+    if provider_field == "blockedScoringAtt":
+        assert mirror["display_corrections"] == {}
+    else:
+        assert (
+            mirror["display_corrections"]["shots_on_target_allowed"]["relation"]
+            == "opponent_mirror"
+        )
     # A later provider value wins without erasing the earlier owner receipt.
-    direct["sdp"]["shots_on_target"] = 1
+    direct["sdp"][metric] = 1
     mirror["sdp"]["shots_on_target_allowed"] = 1
     direct["display_corrections"] = {}
     mirror["display_corrections"] = {}
@@ -260,15 +319,57 @@ def test_owner_display_correction_is_cutoff_safe_and_keeps_raw_null(
     assert raw == original
 
 
-def test_committed_display_policy_is_bounded_and_leaves_fulham_unresolved() -> None:
+def test_committed_display_policy_is_bounded_and_preserves_confirmation_times() -> None:
     policy = load_display_corrections()
-    assert {(row.fixture, row.team_code, row.display_value) for row in policy.corrections} == {
-        (7, 7, 0),
-        (20, 7, 0),
-        (28, 6, 0),
+    assert policy.version == 2
+    assert {(row.fixture, row.team_code, row.provider_field) for row in policy.corrections} == {
+        (7, 7, "ontargetScoringAtt"),
+        (7, 7, "blockedScoringAtt"),
+        (19, 54, "ontargetScoringAtt"),
+        (20, 7, "ontargetScoringAtt"),
+        (28, 6, "ontargetScoringAtt"),
     }
-    assert all(row.provider_field == "ontargetScoringAtt" for row in policy.corrections)
-    assert (19, 54) not in {(row.fixture, row.team_code) for row in policy.corrections}
+    old = {(7, "ontargetScoringAtt"), (20, "ontargetScoringAtt"), (28, "ontargetScoringAtt")}
+    for row in policy.corrections:
+        expected = (
+            "2026-09-08T14:40:50.135115+00:00"
+            if (row.fixture, row.provider_field) in old
+            else "2026-09-09T02:12:10+00:00"
+        )
+        assert row.owner_confirmation_recorded_at.isoformat() == expected
+        assert row.display_value == 0
+    with pytest.raises(ValueError, match="require policy version 2"):
+        DisplayCorrectionPolicy(
+            schema_id=policy.schema_id,
+            version=1,
+            corrections=policy.corrections,
+        )
+
+
+def test_public_blocked_display_correction_has_no_invented_opponent_mirror(tmp_path: Path) -> None:
+    db = tmp_path / "source.duckdb"
+    _write(db)
+    document = _load(db)
+    row = document["team_matches"][0]
+    row["display_corrections"]["shots_blocked"] = {
+        "correction_id": "synthetic-blocked-zero",
+        "value": 0,
+        "evidence_class": "owner_confirmed_display_correction",
+        "provider_field": "blockedScoringAtt",
+        "provider_field_state": "omitted",
+        "corroboration": "shot_accounting_and_fpl_goalkeeper_proxy_zero",
+        "raw_payload_sha256": "a" * 64,
+        "provider_match_id": 123,
+        "subject_team_code": row["team_code"],
+        "relation": "direct",
+        "source_known_at": row["known_at"],
+        "owner_confirmation_recorded_at": document["as_of"],
+    }
+    validate_sdp_stats(document)
+    assert row["sdp"]["shots_blocked"] is None
+    row["display_corrections"]["shots_blocked"]["relation"] = "opponent_mirror"
+    with pytest.raises(ValueError, match="relation"):
+        validate_sdp_stats(document)
 
 
 def test_transfer_uses_fixture_time_club_not_current_club(tmp_path: Path) -> None:

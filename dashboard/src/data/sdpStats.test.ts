@@ -64,6 +64,31 @@ describe("Observed SDP sidecar contract", () => {
     if (defect === "unknown-status") data.team_matches[0].status = "GUESS";
     expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
   });
+  it("accepts a direct blocked-attempt correction without inventing an opponent defensive block", () => {
+    const data = sdpFixture();
+    const direct = data.team_matches[0];
+    direct.status = "UNAVAILABLE";
+    direct.sdp.shots_blocked = null;
+    const correction = {
+      correction_id: "synthetic-blocked-zero", value: 0 as const,
+      evidence_class: "owner_confirmed_display_correction" as const,
+      provider_field: "blockedScoringAtt" as const, provider_field_state: "omitted" as const,
+      corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero" as const,
+      relation: "direct" as "direct" | "opponent_mirror",
+      subject_team_code: direct.team_code, provider_match_id: 123,
+      raw_payload_sha256: "a".repeat(64),
+      source_known_at: "2026-09-07T07:00:00+00:00",
+      owner_confirmation_recorded_at: "2026-09-08T07:00:00+00:00",
+    };
+    direct.display_corrections = { shots_blocked: correction };
+    expect(parseSdpStats(data)).toBe(data);
+    expect(direct.sdp.shots_blocked).toBeNull();
+    correction.relation = "opponent_mirror";
+    expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+    correction.relation = "direct";
+    correction.owner_confirmation_recorded_at = "2027-01-01T00:00:00Z";
+    expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+  });
   it("accepts unmapped stable provider identity and separate historical team membership", () => {
     const data = sdpFixture(); data.player_matches[0].code = null; data.player_matches[0].position = null;
     expect(parseSdpStats(data).player_matches[0].code).toBeNull();
