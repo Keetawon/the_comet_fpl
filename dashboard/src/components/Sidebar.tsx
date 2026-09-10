@@ -29,7 +29,6 @@ const PAGES: readonly PageDef[] = [
   { id: "team-stat-sdp", label: "Team stat from SDP", icon: Goal },
   { id: "players", label: "Players", icon: Users },
   { id: "player-analytics", label: "Player analytics", icon: ScatterChart },
-  { id: "players-stat-sdp", label: "Players stat from SDP", icon: Users },
   { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList },
   { id: "plan-builder", label: "Plan builder", icon: Wand2 },
   { id: "squad-draft", label: "Squad draft", icon: ListPlus },
