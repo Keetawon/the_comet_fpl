@@ -1,6 +1,6 @@
-// Browser-only squad sandbox. By default it binds to the one formal platform-default forecast;
+// Browser-only squad sandbox. By default it uses the current published forecast;
 // an explicit optimizer-run hash handoff may instead seed that exact plan's first-week squad.
-// The matching forecast and recorded rules snapshot are always resolved together. This page never
+// The recorded squad rules remain bound to an exact same-season audited plan. This page never
 // runs the optimizer or writes a decision artifact. Structural FPL squad rules are enforced while
 // budget is deliberately advisory so managers can explore future value-growth scenarios.
 
@@ -39,13 +39,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
+import { loadNextGw, loadOptimizerAudit, loadPlayers, loadSummary } from "@/data/load";
 import type {
   AuditPlan,
+  DashboardManifest,
   NextGwPlan,
   OptimizerAuditData,
   PlayerRecord,
   RulesSnapshot,
+  SummaryData,
 } from "@/data/types";
 import {
   buildUserDraftLoadedHorizonContext,
@@ -89,6 +91,7 @@ interface ReadyState {
   status: "ready";
   plan: NextGwPlan;
   auditPlan: AuditPlan;
+  forecast: Pick<NonNullable<SummaryData["latest_run"]>, "run_id" | "season" | "as_of" | "gw_from" | "gw_to">;
   players: PlayerRecord[];
   rules: UserDraftRules;
   loadedGws: number[];
@@ -190,11 +193,31 @@ function resolveReadyState(
   plans: readonly NextGwPlan[],
   audit: OptimizerAuditData,
   optimizerRunId: string | null,
+  latestRun: SummaryData["latest_run"],
+  manifest: DashboardManifest | null,
 ): ReadyState {
   const plan = planForHandoff(plans, optimizerRunId);
   const auditPlan = matchingAuditPlan(plan, audit);
   const snapshot: RulesSnapshot = auditPlan.rules_snapshot;
-  if (snapshot.season !== plan.season || auditPlan.season !== plan.season) {
+  // An old optimizer plan supplies recorded squad rules, not the current forecast vintage.
+  // Explicit handoffs still reproduce their original plan and forecast together.
+  const forecast = optimizerRunId == null && latestRun != null
+    ? latestRun
+    : { ...plan, run_id: plan.forecast_run_id };
+  if (optimizerRunId == null && latestRun != null) {
+    const matchingRuns = manifest?.runs.filter((run) =>
+      run.run_id === forecast.run_id && run.season === forecast.season &&
+      run.as_of === forecast.as_of && run.gw_from === forecast.gw_from &&
+      run.gw_to === forecast.gw_to,
+    );
+    if (matchingRuns?.length !== 1) {
+      throw new Error(
+        "Squad Draft cannot bind the current forecast to the published player manifest. " +
+          "Refresh and republish summary.json and players.json together.",
+      );
+    }
+  }
+  if (snapshot.season !== forecast.season || auditPlan.season !== forecast.season) {
     throw new Error(
       "Squad Draft rules and selected forecast belong to different seasons. " +
         "Re-publish the dashboard read models together.",
@@ -202,8 +225,8 @@ function resolveReadyState(
   }
   const rules = deriveUserDraftRules(snapshot);
   const loadedGws = Array.from(
-    { length: Math.min(5, plan.gw_to - plan.gw_from + 1) },
-    (_, index) => plan.gw_from + index,
+    { length: Math.min(5, forecast.gw_to - forecast.gw_from + 1) },
+    (_, index) => forecast.gw_from + index,
   );
   if (loadedGws.length === 0) {
     throw new Error("Squad Draft requires at least one loaded forecast gameweek.");
@@ -211,8 +234,8 @@ function resolveReadyState(
 
   const runPlayers = allPlayers.filter(
     (player) =>
-      player.run_id === plan.forecast_run_id &&
-      player.season === plan.season &&
+      player.run_id === forecast.run_id &&
+      player.season === forecast.season &&
       player.now_cost != null &&
       Number.isFinite(player.now_cost) &&
       player.now_cost >= 0,
@@ -228,7 +251,7 @@ function resolveReadyState(
       "Squad Draft found no priced players for the selected forecast vintage.",
     );
   }
-  return { status: "ready", plan, auditPlan, players: runPlayers, rules, loadedGws };
+  return { status: "ready", plan, auditPlan, forecast, players: runPlayers, rules, loadedGws };
 }
 
 function restoreDraft(
@@ -262,8 +285,8 @@ function restoreDraft(
   if (
     (stored.version !== 2 && stored.version !== 3) ||
     stored.optimizerRunId !== state.plan.optimizer_run_id ||
-    stored.forecastRunId !== state.plan.forecast_run_id ||
-    stored.season !== state.plan.season
+    stored.forecastRunId !== state.forecast.run_id ||
+    stored.season !== state.forecast.season
   ) {
     return empty(
       "A saved draft belongs to another optimizer run or forecast vintage, so a new draft was started.",
@@ -381,9 +404,9 @@ function managerCurrentDraft(
   state: ReadyState,
   preview: ManagerTeamPreview,
 ): PlayerRecord[] {
-  if (preview.planning_gw !== state.plan.gw_from) {
+  if (preview.planning_gw !== state.forecast.gw_from) {
     throw new Error(
-      `Manager capture plans GW${preview.planning_gw}, but the selected forecast starts at GW${state.plan.gw_from}. ` +
+      `Manager capture plans GW${preview.planning_gw}, but the selected forecast starts at GW${state.forecast.gw_from}. ` +
         "Refresh and republish the matching forecast before importing this team.",
     );
   }
@@ -394,7 +417,7 @@ function managerCurrentDraft(
     if (!player) {
       throw new Error(
         `Current-team player ${captured.web_name} (${captured.code}) is missing from forecast ` +
-          `${state.plan.forecast_run_id}.`,
+          `${state.forecast.run_id}.`,
       );
     }
     if (
@@ -434,8 +457,8 @@ function storeDraft(
     version: 3,
     seedSource,
     optimizerRunId: state.plan.optimizer_run_id,
-    forecastRunId: state.plan.forecast_run_id,
-    season: state.plan.season,
+    forecastRunId: state.forecast.run_id,
+    season: state.forecast.season,
     managerCaptureId: seedSource === "manager_current" ? managerCaptureId : null,
     playerCodes: players.map((player) => player.code),
   };
@@ -813,13 +836,15 @@ export function UserDraftPage() {
       });
       return;
     }
-    Promise.all([loadPlayers(), loadNextGw(), loadOptimizerAudit()])
-      .then(async ([playersData, nextGw, audit]) => {
+    Promise.all([loadPlayers(), loadNextGw(), loadOptimizerAudit(), loadSummary()])
+      .then(async ([playersData, nextGw, audit, summary]) => {
         const ready = resolveReadyState(
           playersData.players,
           nextGw.plans,
           audit,
           handoff?.optimizerRunId ?? null,
+          summary.latest_run,
+          playersData.manifest,
         );
         let restored: RestoredDraft;
         let preview: ManagerTeamPreview | null = null;
@@ -1018,16 +1043,20 @@ export function UserDraftPage() {
         <div className="max-w-3xl">
           <h1 className="text-lg font-semibold">Squad Draft</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Build a manual what-if squad from the selected optimizer forecast. A handoff starts
+            Build a manual what-if squad from the current published forecast. An optimizer handoff starts
             from that run's optimized first-week squad; you can then edit it freely. Position
             quotas and the maximum-per-club rule are enforced; cost is shown but never blocks an
             experimental draft. Nothing here re-runs or replaces the optimizer.
           </p>
         </div>
         <div className="text-right text-xs text-muted-foreground">
-          <p>{state.plan.season} · GW{state.loadedGws[0]}–GW{state.loadedGws.at(-1)}</p>
-          <p title={state.plan.forecast_run_id}>
-            {state.plan.display_label} · forecast {state.plan.forecast_run_id.slice(0, 12)}…
+          <p>{state.forecast.season} · GW{state.loadedGws[0]}–GW{state.loadedGws.at(-1)}</p>
+          <p title={state.forecast.run_id}>
+            Forecast {state.forecast.run_id.slice(0, 12)}…
+            {" · "}as of {state.forecast.as_of?.replace("T", " ").slice(0, 16) ?? "unavailable"} UTC
+          </p>
+          <p title={`Rules from optimizer ${state.plan.optimizer_run_id}`}>
+            Squad rules: {state.plan.display_label} · {state.auditPlan.rules_snapshot.season}
           </p>
         </div>
       </div>
@@ -1184,7 +1213,7 @@ export function UserDraftPage() {
             </p>
             <p className="sm:col-span-2 lg:col-span-4 text-muted-foreground">
               Selling value and bank are manager-capture values. Prices and totals in the draft
-              table remain advisory now-costs from forecast {state.plan.forecast_run_id.slice(0, 12)}…
+              table remain advisory now-costs from forecast {state.forecast.run_id.slice(0, 12)}…
             </p>
           </div>
         )}
