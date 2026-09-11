@@ -133,3 +133,12 @@ python -m fpl.jobs.attach_outcomes --db D:/FPL/operational.duckdb --season 2026-
 This job appends finalized player/team outcomes separately, keeps identical repeats idempotent,
 and rejects changed repeats. It never replaces a prediction. Player-gameweek scoring also requires
 official gameweek finality and every predicted fixture leg. Missing outcomes remain unavailable.
+
+## Descriptive Dashboard xG supplements
+
+The existing `export_sdp_stats` / Dashboard build now emits schema 6. Where historical
+SDP xG is missing, explicitly marked FPL archive player sums may supplement the
+display after source, identity, exposure and completeness checks. No new CLI/config
+is required. Raw SDP, provider core validity and prediction selection are unchanged.
+See [the source contract and verified coverage](sdp-fpl-xg-display-supplement-2026-09-11.md)
+for capture-time semantics, remaining gaps, CSV provenance and publication commands.

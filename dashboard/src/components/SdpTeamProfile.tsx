@@ -1,7 +1,7 @@
 import { ArrowUpRight, X } from "lucide-react";
 import type { SdpMatch, SdpMetric } from "@/data/sdpStats";
 import { Button } from "@/components/ui/button";
-import { assumptionDescription, correctionDescription, finite, metricAssumptions, metricCorrections, metricId, metricRaw, metricValue } from "@/lib/sdpStats";
+import { assumptionDescription, correctionDescription, finite, metricAssumptions, metricCorrections, metricId, metricRaw, metricValue, metricSupplements, metricSourceLabel, supplementDescription } from "@/lib/sdpStats";
 import type { SdpEntity, SdpMode } from "@/lib/sdpStats";
 import { sdpNumber as fmt, teamBenchmark, teamMetricLabel } from "@/lib/sdpTeamAnalysis";
 
@@ -9,14 +9,15 @@ export function MetricCell({ rows, metric, mode, coverage = true }: { rows: SdpM
   const value = metricValue(rows, metric, mode);
   const corrections = metricCorrections(rows, metric), assumptions = metricAssumptions(rows, metric);
   const title = [
-    `${metric.source.toUpperCase()} · ${metric.provider_field ?? metric.key}. ${metric.description ?? "Recorded match statistic."}`,
+    `${metricSourceLabel(metric)} · ${metric.provider_field ?? metric.key}. ${metric.description ?? "Recorded match statistic."}`,
     `${value.measured}/${value.matches} matches. ${metric.verified_semantics ? "" : "Provider observation; not independently reconciled."}`,
-    ...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription),
+    ...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription), ...metricSupplements(rows, metric).map(supplementDescription),
   ].join(" ");
   return <span title={title} className="tabular-nums">
     {value.value === null ? <span className="text-muted-foreground">Unavailable</span> : fmt(value.value)}
     {corrections.length > 0 && <sup className="ml-0.5 text-amber-700 dark:text-amber-300" aria-label="owner-confirmed display correction">‡</sup>}
     {assumptions.length > 0 && <sup className="ml-0.5 text-sky-700 dark:text-sky-300" aria-label="owner-directed omitted-count assumption">§</sup>}
+    {metricSupplements(rows, metric).length > 0 && <sup className="ml-1 text-xs text-sky-700 dark:text-sky-300" aria-label="FPL archive xG supplement">FPL</sup>}
     {coverage && <span className="ml-2 text-xs font-normal text-muted-foreground">{value.measured}/{value.matches}</span>}
   </span>;
 }
@@ -38,7 +39,7 @@ export function TeamTrend({ entity, metric, compact = false }: { entity: SdpEnti
     {values.map((value, i) => value === null ? null : <g key={entity.rows[i].fixture}>
       {i > 0 && values[i - 1] !== null && <line x1={x(i - 1)} y1={y(values[i - 1]!)} x2={x(i)} y2={y(value)} stroke="currentColor" strokeWidth={compact ? 3 : 2} />}
       <circle cx={x(i)} cy={y(value)} r={compact ? 3 : 4} fill="currentColor">
-        <title>GW{entity.rows[i].gw} · {entity.rows[i].opponent_short_name} ({entity.rows[i].was_home ? "H" : "A"}): {fmt(value)}{metricCorrections([entity.rows[i]], metric).length ? " · owner-confirmed" : ""}{metricAssumptions([entity.rows[i]], metric).length ? " · assumed zero" : ""}</title>
+        <title>GW{entity.rows[i].gw} · {entity.rows[i].opponent_short_name} ({entity.rows[i].was_home ? "H" : "A"}): {fmt(value)}{metricSupplements([entity.rows[i]], metric).map(s => ` | ${supplementDescription(s)}`).join("")}{metricCorrections([entity.rows[i]], metric).length ? " · owner-confirmed" : ""}{metricAssumptions([entity.rows[i]], metric).length ? " · assumed zero" : ""}</title>
       </circle>
     </g>)}
   </svg>;
@@ -70,7 +71,7 @@ export function TeamProfile({ team, league, fullRange, metrics, onLog }: { team:
         </div>;
       })}
     </div>
-    <p className="border-t px-5 py-3 text-xs leading-relaxed text-muted-foreground">Percentiles describe values, not team quality. Benchmarks use all clubs in the same season, GW range, venue and recent window, including marked display corrections and assumptions; searching or selecting a club does not change them. Recent changes are descriptive.</p>
+    <p className="border-t px-5 py-3 text-xs leading-relaxed text-muted-foreground">Percentiles describe values, not team quality. Benchmarks use all clubs in the same season, GW range, venue and recent window, including marked display corrections, assumptions and FPL supplements; searching or selecting a club does not change them. Recent changes are descriptive.</p>
   </section>;
 }
 

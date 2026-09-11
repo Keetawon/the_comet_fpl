@@ -1,10 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { metricAssumptions, metricCorrections, metricRaw, metricValue, sdpCsv, selectSdpEntities, sortSdpEntities } from "./sdpStats";
-import { fplXg, possession, sdpFixture, sdpMatch, shooting } from "@/test/sdpFixture";
+import { fplSupplement, fplXg, possession, sdpFixture, sdpMatch, shooting, xg } from "@/test/sdpFixture";
 import type { SdpFilters } from "./sdpStats";
 
 const filters: SdpFilters = { season: "2026-27", from: 1, to: 6, team: "all", venue: "all", recent: "all", search: "", position: "all", minMinutes: 0 };
 describe("SDP observed descriptive arithmetic", () => {
+  it("uses labelled FPL supplements consistently for mixed-source averages, sort and CSV without replacing SDP", () => {
+    const a = sdpMatch({ sdp: { expected_goals: null }, status: "UNAVAILABLE", dashboard_status: "INCOMPLETE" });
+    a.display_supplements = { expected_goals: fplSupplement(a, 2) };
+    const b = sdpMatch({ fixture: 2, sdp: { expected_goals: 1 } });
+    const before = JSON.stringify([a, b]);
+    expect(metricRaw(a, xg)).toBe(2);
+    expect(metricValue([a, b], xg, "per_match").value).toBe(1.5);
+    const entity = { id: "team:3", name: "Arsenal", clubs: "ARS", position: "", code: null, teamCode: 3, rows: [a, b] };
+    const csv = sdpCsv([entity], [xg], "per_match");
+    expect(csv).toContain("SDP / marked FPL xG");
+    expect(csv).toContain('"1.5","2/2"');
+    expect(csv).toContain("FPL archive player-sum xG");
+    expect(csv).toContain("Actual archive capture");
+    expect(sdpCsv([entity], [xg], "per_match")).toBe(csv);
+    expect(sortSdpEntities([entity, { ...entity, id: "team:2", rows: [b] }], xg, "per_match", false)[0].id).toBe("team:3");
+    expect(metricValue([a, sdpMatch({ sdp: { expected_goals: null } })], xg, "per_match").value).toBeNull();
+    expect(JSON.stringify([a, b])).toBe(before);
+    a.sdp.expected_goals = 0;
+    expect(metricRaw(a, xg)).toBe(0);
+  });
   it("does not turn a missing match metric into zero or a complete aggregate", () => {
     const value = metricValue([sdpMatch(), sdpMatch({ sdp: { shots: null } })], shooting, "total");
     expect(value).toEqual({ value: null, measured: 1, matches: 2, minutes: null });

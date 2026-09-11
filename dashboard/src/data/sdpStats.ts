@@ -53,6 +53,18 @@ export interface SdpDisplayCorrection {
   subject_team_code: number;
 }
 
+export interface FplXgSupplement {
+  value: number;
+  source: "fpl_archive_player_sum";
+  evidence_class: "retrospective_descriptive";
+  season: string; fixture: number; gw: number; kickoff_time: string;
+  subject_team_code: number; opponent_team_code: number; was_home: boolean;
+  source_known_at: string;
+  player_rows: number; appeared_players: number; starters: 11;
+  source_sha256: Record<string, string>;
+  records_sha256: string;
+}
+
 export interface SdpMatch {
   season: string;
   gw: number;
@@ -73,6 +85,7 @@ export interface SdpMatch {
   sdp: Record<string, number | null>;
   display_corrections?: Record<string, SdpDisplayCorrection>;
   display_assumptions?: Record<string, SdpDisplayAssumption>;
+  display_supplements?: Record<string, FplXgSupplement>;
   // Player fields are absent on team rows. Unknown identities and measurements stay NULL.
   code?: number | null;
   provider_player_id?: number | null;
@@ -91,7 +104,7 @@ export interface SdpMatch {
 
 export interface SdpStatsData {
   schema: "fpl.sdp-stats";
-  json_schema_version: 2 | 3 | 4 | 5;
+  json_schema_version: 2 | 3 | 4 | 5 | 6;
   as_of: string;
   source_status: {
     team_stats: SourceAvailability;
@@ -127,7 +140,7 @@ const timestamp = (v: unknown) => typeof v === "string" &&
 
 export function parseSdpStats(payload: unknown): SdpStatsData {
   const fail = () => { throw new Error("The observed SDP file is invalid or incompatible. Republish its source data."); };
-  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3, 4, 5].includes(payload.json_schema_version as number) ||
+  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3, 4, 5, 6].includes(payload.json_schema_version as number) ||
       !timestamp(payload.as_of) || !object(payload.source_status) || !object(payload.coverage) ||
       !Array.isArray(payload.metrics) || !Array.isArray(payload.team_matches) ||
       !Array.isArray(payload.player_matches) || !Array.isArray(payload.gameweeks)) return fail();
@@ -186,6 +199,29 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
         if (source !== undefined && (!object(source) || Object.values(source).some(v => !nullableNumber(v)))) return fail();
       }
       if (scope === "team") {
+        if (Number(payload.json_schema_version) < 6 && row.display_supplements !== undefined) return fail();
+        if (Number(payload.json_schema_version) >= 6) {
+          if (!object(row.display_supplements)) return fail();
+          for (const [key, s] of Object.entries(row.display_supplements)) {
+            const opponent = key === "expected_goals_allowed";
+            if (!["expected_goals", "expected_goals_allowed"].includes(key) || row.sdp[key] !== null || !object(s) ||
+                typeof s.value !== "number" || !Number.isFinite(s.value) || s.value < 0 ||
+                s.source !== "fpl_archive_player_sum" || s.evidence_class !== "retrospective_descriptive" ||
+                s.season !== row.season || s.fixture !== row.fixture || s.gw !== row.gw ||
+                s.subject_team_code !== row[opponent ? "opponent_team_code" : "team_code"] ||
+                s.opponent_team_code !== row[opponent ? "team_code" : "opponent_team_code"] ||
+                s.was_home !== (opponent ? !row.was_home : row.was_home) || !timestamp(s.kickoff_time) ||
+                Date.parse(s.kickoff_time as string) !== Date.parse(row.kickoff_time as string) ||
+                !timestamp(s.source_known_at) || Date.parse(s.source_known_at as string) > Math.min(asOf, Date.parse(row.known_at as string)) ||
+                Date.parse(s.source_known_at as string) < Date.parse(row.kickoff_time as string) ||
+                typeof s.player_rows !== "number" || typeof s.appeared_players !== "number" ||
+                !positiveId(s.player_rows) || !positiveId(s.appeared_players) || s.appeared_players < 11 ||
+                s.appeared_players > s.player_rows || s.starters !== 11 ||
+                typeof s.records_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(s.records_sha256) ||
+                !object(s.source_sha256) || Object.keys(s.source_sha256).sort().join() !== "raw_fixtures,raw_merged_gw,raw_players,raw_teams" ||
+                Object.values(s.source_sha256).some(h => typeof h !== "string" || !/^[0-9a-f]{64}$/.test(h))) return fail();
+          }
+        }
         if (Number(payload.json_schema_version) < 5 && row.dashboard_status !== undefined) return fail();
         if (Number(payload.json_schema_version) >= 5 && !(row.status === "UNAVAILABLE"
           ? ["INCOMPLETE", "OWNER_CONFIRMED_VALID"] : ["PROVIDER_VALID"]).includes(String(row.dashboard_status))) return fail();

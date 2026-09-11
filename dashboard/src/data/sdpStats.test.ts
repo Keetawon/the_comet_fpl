@@ -1,9 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadSdpStats, parseSdpStats } from "./sdpStats";
-import { sdpFixture } from "@/test/sdpFixture";
+import { fplSupplement, sdpFixture } from "@/test/sdpFixture";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe("Observed SDP sidecar contract", () => {
+  it("validates versioned FPL supplement provenance and fails closed on changed identity, dates or raw replacement", () => {
+    const data = sdpFixture(); data.json_schema_version = 6;
+    data.metrics.forEach(m => { m.omitted_zero_display = false; });
+    data.team_matches.forEach(r => { r.display_assumptions = {}; r.display_supplements = {}; r.dashboard_status = "PROVIDER_VALID"; });
+    const row = data.team_matches[0]; row.sdp.expected_goals = null;
+    row.display_supplements = { expected_goals: fplSupplement(row) };
+    const raw = JSON.stringify(data);
+    expect(parseSdpStats(data)).toBe(data);
+    expect(JSON.stringify(data)).toBe(raw);
+    for (const [key, value] of Object.entries({ fixture: 999, subject_team_code: 999, source_known_at: "2027-01-01T00:00:00Z", player_rows: 10, starters: 10, value: -1, evidence_class: "strict_pit", records_sha256: "bad" })) {
+      const broken = structuredClone(data);
+      Object.assign(broken.team_matches[0].display_supplements!.expected_goals, { [key]: value });
+      expect(() => parseSdpStats(broken)).toThrow();
+    }
+    const replaced = structuredClone(data); replaced.team_matches[0].sdp.expected_goals = 0;
+    expect(() => parseSdpStats(replaced)).toThrow();
+    data.json_schema_version = 5;
+    expect(() => parseSdpStats(data)).toThrow();
+  });
   it("preserves exact identities, nullable measurements and distinct FPL sources", () => {
     const source = sdpFixture(); source.team_matches[0].sdp.shots = null;
     const raw = JSON.stringify(source);

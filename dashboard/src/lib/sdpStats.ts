@@ -1,4 +1,4 @@
-import type { SdpDisplayAssumption, SdpDisplayCorrection, SdpMatch, SdpMetric, SdpScope } from "@/data/sdpStats";
+import type { FplXgSupplement, SdpDisplayAssumption, SdpDisplayCorrection, SdpMatch, SdpMetric, SdpScope } from "@/data/sdpStats";
 
 export type SdpMode = "total" | "per_match" | "per_appearance" | "per90";
 export interface SdpFilters {
@@ -21,13 +21,19 @@ export const metricCorrection = (row: SdpMatch, metric: SdpMetric): SdpDisplayCo
   metric.source === "sdp" ? row.display_corrections?.[metric.key] ?? null : null;
 export const metricAssumption = (row: SdpMatch, metric: SdpMetric): SdpDisplayAssumption | null =>
   metric.source === "sdp" ? row.display_assumptions?.[metric.key] ?? null : null;
+export const metricSupplement = (row: SdpMatch, metric: SdpMetric): FplXgSupplement | null =>
+  metric.source === "sdp" && row.sdp[metric.key] == null ? row.display_supplements?.[metric.key] ?? null : null;
+export const metricSupplements = (rows: readonly SdpMatch[], metric: SdpMetric) => rows.flatMap(row => metricSupplement(row, metric) ?? []);
+export const metricSourceLabel = (metric: SdpMetric) => metric.source === "sdp" && ["expected_goals", "expected_goals_allowed"].includes(metric.key) ? "SDP / marked FPL" : metric.source.toUpperCase();
+export const supplementDescription = (s: FplXgSupplement) =>
+  `FPL archive player-sum xG (${s.season}, fixture ${s.fixture}, team ${s.subject_team_code}): ${s.player_rows} measured player rows including GK; ${s.appeared_players} appearances, 11 explicit starts. Actual archive capture ${s.source_known_at}. Retrospective descriptive evidence; no independent substitute-roster completeness witness. Rounded FPL player totals may differ from SDP. Records SHA256 ${s.records_sha256}; source SHA256 ${Object.entries(s.source_sha256).sort().map(([key, hash]) => `${key}=${hash}`).join(", ")}. Raw SDP and core validity unchanged.`;
 export const metricRaw = (row: SdpMatch, metric: SdpMetric): number | null => {
   const correction = metricCorrection(row, metric);
   if (correction) return correction.value;
   const assumption = metricAssumption(row, metric);
   if (assumption) return assumption.value;
   const value = row[metric.source]?.[metric.key];
-  return finite(value) ? value : null;
+  return finite(value) ? value : metricSupplement(row, metric)?.value ?? null;
 };
 export const correctionDescription = (correction: SdpDisplayCorrection) =>
   `Owner-confirmed display correction recorded ${correction.owner_confirmation_recorded_at}; raw SDP ${correction.provider_field} was omitted; ${correction.provider_field === "expectedGoalsOnTarget" ? "xGOT zero confirmed by the owner, supported by corroborated zero shots on target" : "corroborated by shot accounting and the official FPL goalkeeper proxy"}; raw payload SHA256 ${correction.raw_payload_sha256}. Provider core validity is unchanged.`;
@@ -110,8 +116,8 @@ const csvCell = (value: unknown) => {
   return `"${text.replaceAll('"', '""')}"`;
 };
 export function sdpCsv(rows: readonly SdpEntity[], metrics: readonly SdpMetric[], mode: SdpMode): string {
-  const label = (m: SdpMetric) => `${m.source.toUpperCase()} ${m.label}${m.aggregation === "mean" ? " [per-match mean]" : mode === "per_match" ? " [average per match]" : mode === "per_appearance" ? " [average per appearance; FPL minutes > 0]" : mode === "per90" ? " [per 90 actual minutes]" : ""}${m.verified_semantics ? "" : ` [provider observation; not independently reconciled; ${m.provider_field ?? m.key}]`}`;
+  const label = (m: SdpMetric) => `${metricSourceLabel(m)} ${m.label}${m.aggregation === "mean" ? " [per-match mean]" : mode === "per_match" ? " [average per match]" : mode === "per_appearance" ? " [average per appearance; FPL minutes > 0]" : mode === "per90" ? " [per 90 actual minutes]" : ""}${m.verified_semantics ? "" : ` [provider observation; not independently reconciled; ${m.provider_field ?? m.key}]`}`;
   const header = ["Name", "Stable identity", "Clubs in selected scope", "Season", "First kickoff", "Last kickoff", "Match rows", "Display mode", ...metrics.flatMap(m => [label(m), `${label(m)} displayed ${mode === "per_appearance" ? "appearances" : "matches"}`, `${label(m)} display provenance`])];
-  const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); const assumptions = metricAssumptions(row.rows, m); return [value.value, mode === "per_appearance" && row.rows.some(r => !finite(r.minutes_fpl)) ? "unknown appearances (missing FPL minutes)" : `${value.measured}/${value.matches}${assumptions.length ? ` (${assumptions.length} assumed zero)` : ""}`, [...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription)].join(" | ")]; })]);
+  const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); const assumptions = metricAssumptions(row.rows, m); return [value.value, mode === "per_appearance" && row.rows.some(r => !finite(r.minutes_fpl)) ? "unknown appearances (missing FPL minutes)" : `${value.measured}/${value.matches}${assumptions.length ? ` (${assumptions.length} assumed zero)` : ""}`, [...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription), ...metricSupplements(row.rows, m).map(supplementDescription)].join(" | ")]; })]);
   return [header, ...records].map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }

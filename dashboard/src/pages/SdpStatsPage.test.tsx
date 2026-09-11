@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadSdpStats } from "@/data/sdpStats";
-import { sdpFixture } from "@/test/sdpFixture";
+import { fplSupplement, sdpFixture } from "@/test/sdpFixture";
 import { sdpCsv, selectSdpEntities } from "@/lib/sdpStats";
 import { TeamSdpStatsPage } from "./SdpStatsPage";
 
@@ -10,6 +10,25 @@ beforeEach(() => { vi.mocked(loadSdpStats).mockResolvedValue(sdpFixture()); });
 const table = () => screen.findByRole("table", { name: "Observed SDP team statistics" });
 
 describe("SDP football observatory", () => {
+  it("labels FPL-derived historical xG in the table, trend, scatter and match log without upgrading SDP health", async () => {
+    const data = sdpFixture();
+    data.team_matches.forEach(row => {
+      row.season = "2023-24"; row.status = "UNAVAILABLE"; row.dashboard_status = "INCOMPLETE";
+      row.sdp.expected_goals = null;
+      row.display_supplements = { expected_goals: fplSupplement(row, 2) };
+    });
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />); const grid = await table();
+    expect(screen.getByText("FPL xG supplement")).toBeInTheDocument();
+    expect(within(grid).getAllByLabelText("FPL archive xG supplement")).toHaveLength(4);
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(4);
+    expect(screen.getAllByTitle(/FPL archive player-sum xG/).length).toBeGreaterThan(4);
+    expect(screen.getByLabelText("Dashboard validation breakdown")).toHaveTextContent("0 dashboard-ready fixtures");
+    fireEvent.click(within(grid).getByRole("button", { name: "View Arsenal match detail" }));
+    const log = screen.getByRole("table", { name: "Arsenal observed match log" });
+    expect(within(log).getAllByLabelText("FPL archive xG supplement")).toHaveLength(5);
+    expect(within(log).getAllByText("Incomplete")).toHaveLength(5);
+  });
   it("shows retained historical measured fields even when core xG coverage is incomplete", async () => {
     const data = sdpFixture();
     data.team_matches = data.team_matches.map(row => ({ ...row, season: "2025-26", status: "UNAVAILABLE", dashboard_status: "INCOMPLETE", sdp: { ...row.sdp, expected_goals: null } }));

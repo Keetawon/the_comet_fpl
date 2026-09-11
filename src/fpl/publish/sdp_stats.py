@@ -26,6 +26,7 @@ from fpl.ingest.pl_sdp import (
     parse_team_stats,
 )
 from fpl.jobs.competitive_participation_pilot import publish_bytes
+from fpl.publish.fpl_team_xg import TABLES, FplXgSupplement, apply_team_xg_supplements
 from fpl.publish.player_attacking_usage import _raw_capture
 from fpl.storage.sdp_runtime import (
     CORE_FIELDS,
@@ -1309,6 +1310,15 @@ def build_sdp_stats(
             for row in pair.values():
                 row["dashboard_status"] = "OWNER_CONFIRMED_VALID"
     team_rows = [teams[k] for k in sorted(teams)]
+    notes.extend(apply_team_xg_supplements(con, team_rows, cutoff=cutoff, current=current))
+    notes.append(
+        "Marked FPL xG supplements sum every recorded player (including GK) with measured xG "
+        "and eleven explicit starters; xGA uses the opponent sum. Archive ingestion receipts "
+        "establish actual capture time, not historical deadline availability. This is descriptive "
+        "retrospective evidence; raw SDP and provider core validity are unchanged. "
+        "Archive coverage does not independently prove that every substitute was recorded. "
+        "SDP and rounded FPL player xG totals may differ; comparisons can contain both sources."
+    )
     players.sort(
         key=lambda r: (r["season"], r["fixture"], r["code"] or 0, r["provider_player_id"] or 0)
     )
@@ -1338,7 +1348,7 @@ def build_sdp_stats(
         )
     document = {
         "schema": SCHEMA,
-        "json_schema_version": 5,
+        "json_schema_version": 6,
         "as_of": _iso(cutoff),
         "source_status": {
             "team_stats": "UNAVAILABLE" if not valid else "PARTIAL" if failures else "AVAILABLE",
@@ -1384,7 +1394,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             "gameweeks",
         }
         or document["schema"] != SCHEMA
-        or document["json_schema_version"] not in (3, 4, 5)
+        or document["json_schema_version"] not in (3, 4, 5, 6)
     ):
         raise ValueError("invalid SDP sidecar envelope")
     cutoff = AsOf(datetime.fromisoformat(document["as_of"])).ts
@@ -1431,10 +1441,43 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             fields = COMMON | (TEAM_FIELDS if scope == "team" else PLAYER_FIELDS)
             if scope == "team" and document["json_schema_version"] >= 5:
                 fields = fields | {"dashboard_status"}
+            if scope == "team" and document["json_schema_version"] >= 6:
+                fields = fields | {"display_supplements"}
             if set(row) != fields:
                 raise ValueError("unexpected public observed-row field")
             if row["status"] not in {"FINAL", "PROVISIONAL", "UNAVAILABLE"}:
                 raise ValueError("unknown observed-row status")
+            if scope == "team" and document["json_schema_version"] >= 6:
+                supplements = row["display_supplements"]
+                if not isinstance(supplements, dict):
+                    raise ValueError("invalid FPL display supplements")
+                for metric, supplement in supplements.items():
+                    parsed = FplXgSupplement.model_validate(supplement)
+                    opponent = metric == "expected_goals_allowed"
+                    if (
+                        metric not in {"expected_goals", "expected_goals_allowed"}
+                        or row["sdp"].get(metric) is not None
+                        or parsed.season != row["season"]
+                        or parsed.fixture != row["fixture"]
+                        or parsed.gw != row["gw"]
+                        or parsed.subject_team_code
+                        != row["opponent_team_code" if opponent else "team_code"]
+                        or parsed.opponent_team_code
+                        != row["team_code" if opponent else "opponent_team_code"]
+                        or parsed.was_home != (not row["was_home"] if opponent else row["was_home"])
+                        or AsOf(datetime.fromisoformat(parsed.kickoff_time)).ts
+                        != datetime.fromisoformat(row["kickoff_time"])
+                        or not datetime.fromisoformat(row["kickoff_time"])
+                        <= AsOf(datetime.fromisoformat(parsed.source_known_at)).ts
+                        <= min(cutoff, datetime.fromisoformat(row["known_at"]))
+                        or parsed.appeared_players > parsed.player_rows
+                        or set(parsed.source_sha256) != set(TABLES)
+                        or any(
+                            not re.fullmatch(r"[0-9a-f]{64}", h)
+                            for h in parsed.source_sha256.values()
+                        )
+                    ):
+                        raise ValueError("FPL supplement source/identity mismatch")
             if scope == "team" and document["json_schema_version"] >= 5:
                 allowed = (
                     {"INCOMPLETE", "OWNER_CONFIRMED_VALID"}

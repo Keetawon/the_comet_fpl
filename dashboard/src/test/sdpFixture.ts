@@ -1,4 +1,13 @@
-import type { SdpMatch, SdpMetric, SdpStatsData } from "@/data/sdpStats";
+import type { FplXgSupplement, SdpMatch, SdpMetric, SdpStatsData } from "@/data/sdpStats";
+
+export const fplSupplement = (row: SdpMatch, value = 2): FplXgSupplement => ({
+  value, source: "fpl_archive_player_sum", evidence_class: "retrospective_descriptive",
+  season: row.season, fixture: row.fixture, gw: row.gw, kickoff_time: row.kickoff_time,
+  subject_team_code: row.team_code, opponent_team_code: row.opponent_team_code, was_home: row.was_home,
+  source_known_at: row.known_at, player_rows: 20, appeared_players: 15, starters: 11,
+  source_sha256: Object.fromEntries(["raw_merged_gw", "raw_players", "raw_fixtures", "raw_teams"].map(key => [key, "a".repeat(64)])),
+  records_sha256: "b".repeat(64),
+});
 
 export const shooting: SdpMetric = { key: "shots", label: "Shots", group: "Attacking", source: "sdp", scope: "team", unit: "count", aggregation: "sum", per90_denominator: null, verified_semantics: true };
 export const xg: SdpMetric = { ...shooting, key: "expected_goals", label: "xG", unit: "xg" };
