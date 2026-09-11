@@ -46,6 +46,21 @@ const props = {
 };
 
 describe("AnalyticsScatter", () => {
+  it("labels observed points with abbreviations without moving or conflating coincident points", () => {
+    render(<AnalyticsScatter {...props} provenanceLabel="Observed" points={[
+      { id: 1, label: "Arsenal", shortLabel: "ARS", x: 1.5, y: 1 },
+      { id: 2, label: "Chelsea", shortLabel: "CHE", x: 1.5, y: 1 },
+    ]} />);
+    const labels = screen.getAllByTestId("analytics-point-label");
+    expect(labels.map(label => label.textContent)).toEqual(["ARS", "CHE"]);
+    expect(labels[0].getAttribute("x") === labels[1].getAttribute("x") && labels[0].getAttribute("y") === labels[1].getAttribute("y")).toBe(false);
+    const plotted = screen.getAllByTestId("analytics-point");
+    expect(plotted[0].getAttribute("cx")).toBe(plotted[1].getAttribute("cx"));
+    expect(plotted[0].getAttribute("cy")).toBe(plotted[1].getAttribute("cy"));
+    expect(screen.queryByText(/^Forecast /)).not.toBeInTheDocument();
+    fireEvent.focus(plotted[0]);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Arsenal");
+  });
   it("renders an accessible chart with exact axis labels and declared directions", () => {
     render(<AnalyticsScatter {...props} />);
 

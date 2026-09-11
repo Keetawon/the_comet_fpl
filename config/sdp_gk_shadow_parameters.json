@@ -1,0 +1,23 @@
+{
+  "known_at": "2026-09-07T10:42:55.586053+00:00",
+  "mode": "shadow_only",
+  "parameter_selection": "last_chronological_retained_fold_no_refit",
+  "precision": {
+    "as_of": "2026-05-24 15:00:00+00:00",
+    "excluded_gw": [
+      "2025-26",
+      38
+    ],
+    "fraction": 0.3514892386499773,
+    "maximum_training_event": "2026-05-19 19:15:00+00:00",
+    "measured_sides": 3695,
+    "shots": 48414,
+    "sot": 17017
+  },
+  "schema_version": 1,
+  "source_fold_file": "2025-26-gw38.json",
+  "source_fold_sha256": "9ed26767cc41758373b6f6284f502616196e30882aed08bfd544e06ddee7d166",
+  "source_keys_sha256": "672d8665592cacdea18300c3de89bd72cfe2119ce58bde8272de0c75d0280d58",
+  "source_result": "results/player_saves_opportunity_development.json",
+  "source_result_sha256": "79e61b51951e04795c8acb34a3e17db6e1fa417ed3717f7014b40d71ecf39ed2"
+}

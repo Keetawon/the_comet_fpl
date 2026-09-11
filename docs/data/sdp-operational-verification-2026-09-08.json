@@ -1,0 +1,474 @@
+{
+  "after": {
+    "SDP_INCOMPLETE_FALLBACK": 29,
+    "SDP_PRIMARY": 21
+  },
+  "before": {
+    "FALLBACK": 29,
+    "SDP_PRIMARY": 21
+  },
+  "capture": {
+    "consumer_ready": true,
+    "finished_at": "2026-09-08 03:52:20.202989+00:00",
+    "healthy": true,
+    "missing": {
+      "already_captured": 30,
+      "completed": 30,
+      "failures": [],
+      "matches_seen": 380,
+      "payloads_new": 0,
+      "provider_listing_checked_at": "2026-09-08 03:40:43.507788+00:00",
+      "requests": 4,
+      "required_history_rechecks": [],
+      "season": "2026-27",
+      "source_versions": [],
+      "stats_fetched": 0,
+      "stats_requested": 0
+    },
+    "revision": {
+      "already_captured": 0,
+      "completed": 30,
+      "failures": [],
+      "matches_seen": 380,
+      "payloads_new": 0,
+      "provider_listing_checked_at": "2026-09-08 03:41:07.946434+00:00",
+      "requests": 17,
+      "required_history_rechecks": [
+        2645201,
+        2645206,
+        2645213,
+        2645224
+      ],
+      "season": "2026-27",
+      "source_versions": [
+        {
+          "known_at": "2026-09-04 17:47:07.612331+00:00",
+          "new_version": false,
+          "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+          "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+          "provider_match_id": 2645201,
+          "request_fetched_at": "2026-09-08 03:40:49.833492+00:00"
+        },
+        {
+          "known_at": "2026-09-04 16:17:39.555102+00:00",
+          "new_version": false,
+          "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+          "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+          "provider_match_id": 2645206,
+          "request_fetched_at": "2026-09-08 03:40:51.336814+00:00"
+        },
+        {
+          "known_at": "2026-09-04 17:47:22.418236+00:00",
+          "new_version": false,
+          "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+          "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+          "provider_match_id": 2645213,
+          "request_fetched_at": "2026-09-08 03:40:52.838778+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:45.225593+00:00",
+          "new_version": false,
+          "payload_id": "2aad73c742955afc9562229b5226bf99b2de761d78a94a65654b3dcd5c2d7f76",
+          "payload_sha256": "477e0196cff70c8aaf9fa04d5585b6f8e255d75405d9dc88072723ff0a9a1673",
+          "provider_match_id": 2645215,
+          "request_fetched_at": "2026-09-08 03:40:54.399507+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:46.813072+00:00",
+          "new_version": false,
+          "payload_id": "b91f158dba2759e7b5f1e70f358ae22a9a4f4a8067061cbcd86553bda4005c5f",
+          "payload_sha256": "71ab5dc1e5ded1431b2f63e570abdd41e4b176bc435acc89da89800757a1ada5",
+          "provider_match_id": 2645216,
+          "request_fetched_at": "2026-09-08 03:40:55.857360+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:48.358527+00:00",
+          "new_version": false,
+          "payload_id": "3264e8b888e739d4635c42deefda5f16e016218497760215bcb0ab2108c46723",
+          "payload_sha256": "bc033c18aec4aaa260bd5cc330cc4eb64f2009a34a8857b82f98d267fe58eb8c",
+          "provider_match_id": 2645217,
+          "request_fetched_at": "2026-09-08 03:40:57.372759+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:49.784357+00:00",
+          "new_version": false,
+          "payload_id": "5b8c90b19cb43a70fdbcece69a53cbf6c5bbf1605051d162cfdbe816bb21ecf3",
+          "payload_sha256": "8803b6b7bb691a8e78bdc4efc425bed7a02b6a1a47024e89a3e2967bf2200057",
+          "provider_match_id": 2645218,
+          "request_fetched_at": "2026-09-08 03:40:58.851907+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:51.234295+00:00",
+          "new_version": false,
+          "payload_id": "9b4cc287d6e44c32b1eab8b3c82bb2049a56bf9bb5524fa677bf2312fa6e6cad",
+          "payload_sha256": "9027614c13301aa238b221949ef6c75bc69cec32744a880a2c049984a24c9a69",
+          "provider_match_id": 2645219,
+          "request_fetched_at": "2026-09-08 03:41:00.346120+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:52.764881+00:00",
+          "new_version": false,
+          "payload_id": "946c9585933d2cf2c8ab62e6a06eab035a86b08b9aed48fb9af779b6b60b34fb",
+          "payload_sha256": "c8553a5d7cb7d63915e7ae4c9ff4605b61d871d83cdb86eeab8209a79cbcd8ea",
+          "provider_match_id": 2645220,
+          "request_fetched_at": "2026-09-08 03:41:01.853294+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:38:12.903979+00:00",
+          "new_version": false,
+          "payload_id": "ea2c705ec8123c6ddb0d73566c07241d25a74f39e3859d160b43f575e5edd05e",
+          "payload_sha256": "5e37cc45281c7ea3da6530dcbf27a24f5fd2f17610180059283f26ecb8cc2348",
+          "provider_match_id": 2645221,
+          "request_fetched_at": "2026-09-08 03:41:03.348403+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:54.205923+00:00",
+          "new_version": false,
+          "payload_id": "624548ed36cd762c3ce11881dce2084e8034378b4494ecf636be7abe008829de",
+          "payload_sha256": "af841442aeb371980041f1e58fd45b17a3a5fd96c1427c83e6249e91130336ba",
+          "provider_match_id": 2645222,
+          "request_fetched_at": "2026-09-08 03:41:04.850257+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:55.699763+00:00",
+          "new_version": false,
+          "payload_id": "fcf257417c5f024da3eb2d3141617f0b4a0f8fc3efef050f4865f13e188ef711",
+          "payload_sha256": "a4a0dab94e8da06e4ef79e9c4a629a86b427ed53f81b2fab6f01b20df8409bdc",
+          "provider_match_id": 2645223,
+          "request_fetched_at": "2026-09-08 03:41:06.346650+00:00"
+        },
+        {
+          "known_at": "2026-09-07 14:37:57.266972+00:00",
+          "new_version": false,
+          "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+          "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+          "provider_match_id": 2645224,
+          "request_fetched_at": "2026-09-08 03:41:07.938979+00:00"
+        }
+      ],
+      "stats_fetched": 13,
+      "stats_requested": 13
+    },
+    "run_id": "20260908T032637.988688Z-136c3fd6",
+    "snapshot_exit_code": 0,
+    "staging_status": "verified",
+    "staging_verification": {
+      "as_of": "2026-09-08 03:51:29.037936+00:00",
+      "expected_matches": 30,
+      "football_rows": 60,
+      "healthy": true,
+      "missing_or_invalid_match_ids": [],
+      "reader": "PointInTimeView.observed_team_football / observed_team_tactical_form",
+      "tactical_rows": 240
+    },
+    "started_at": "2026-09-08 03:26:37.988688+00:00"
+  },
+  "classification": {
+    "FIXABLE_NOW": 0,
+    "LEGITIMATE_FAIL_CLOSED": 29
+  },
+  "command": "python -m fpl.jobs.pre_deadline_forecast --db D:/Personal/fpl-operations/data/sdp-primary-v2.duckdb --runs D:/Personal/fpl-operations/sdp-primary-runs --gw-from 4 --gw-to 8 --draws 2000 --output D:/Personal/fpl-operations/predictions/sdp-primary-v2-20260908-hardening-gw4-8.jsonl",
+  "controlled_network_outage": {
+    "fallback": 50,
+    "finished_at": "2026-09-08T03:35:59.841244+00:00",
+    "fixtures": 50,
+    "isolated_ledger_recorded": true,
+    "network_failure": "injected httpx.ConnectError at refresh boundary",
+    "prediction_cutoff": "2026-09-08T03:29:48.420298+00:00",
+    "primary_equals_incumbent_shadow": true,
+    "production_evidence": false,
+    "receipt": {
+      "evidence_exit_code": 0,
+      "evidence_failure": null,
+      "finished_at": "2026-09-08 03:35:57.846167+00:00",
+      "forecast_exit_code": 0,
+      "forecast_failure": null,
+      "prediction_cutoff": "2026-09-08 03:29:48.420298+00:00",
+      "primary_artifact": "D:\\Personal\\fpl-operations\\verification\\sdp-hardening-20260908T015114Z\\controlled-source-outage\\controlled-outage.jsonl",
+      "primary_artifact_sha256": "8cf409c3e92bf85a0019fe63da6774cfd7ba5cc2979e842f6ab207f044d3a852",
+      "refresh_exit_code": 1,
+      "refresh_report": "D:\\Personal\\fpl-operations\\verification\\sdp-hardening-20260908T015114Z\\controlled-source-outage\\runs\\pre-deadline-20260908T032945.370076Z\\refresh-report.json",
+      "refresh_report_sha256": "faf8271ae4ef281797948d45dddb03fab213f91109a264548b2dd0be1726c70a",
+      "shadow_artifact": "D:\\Personal\\fpl-operations\\verification\\sdp-hardening-20260908T015114Z\\controlled-source-outage\\controlled-outage.shadow-incumbent.jsonl",
+      "shadow_artifact_sha256": "c4609672fc1f80c864cffd58552b62dbe254eadb463bef86920297e46971dfd8",
+      "source_database": "D:\\Personal\\fpl-operations\\verification\\sdp-hardening-20260908T015114Z\\controlled-source-outage\\runs\\pre-deadline-20260908T032945.370076Z\\forecast-source.duckdb",
+      "source_database_sha256": "91899a219c39d01885be3198c52e17aaa999468eb6b2c0ba3c50498a9a2ed4e6",
+      "started_at": "2026-09-08 03:29:45.327636+00:00"
+    },
+    "started_at": "2026-09-08T03:29:45.326287+00:00",
+    "verification_only": true
+  },
+  "created_at": "2026-09-08T03:53:18.937809+00:00",
+  "deadline_evidence": {
+    "capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+    "captured_at": "2026-09-08T03:37:39.610696+00:00",
+    "deadlines": {
+      "4": "2026-09-12T12:30:00+00:00",
+      "5": "2026-09-18T17:30:00+00:00",
+      "6": "2026-10-10T10:00:00+00:00",
+      "7": "2026-10-17T10:00:00+00:00",
+      "8": "2026-10-23T17:30:00+00:00"
+    },
+    "payload_sha256": "01fa0e3d2d034fa87536ddacdbd710fd81ddbe7c19d489f3064e499a6ade7d81",
+    "rule": "created_at (actual record entry instant) <= the official deadline of every included gameweek, and every predicted kickoff strictly future; deadlines witnessed from the cutoff-known bootstrap-static payload the runs consumed, with the retained raw bytes re-hashed",
+    "source": "snapshot_payload/snapshot_capture bootstrap-static"
+  },
+  "deterministic_replay": {
+    "code_commit": "2a96e91ee49604e152f77e47ff6e1bcf9d7037af",
+    "cutoff": "2026-09-08T03:52:24.844595+00:00",
+    "deterministic": true,
+    "finished_at": "2026-09-08T03:54:47.922929+00:00",
+    "identical_artifact_hashes": {
+      "sdp-primary-v2-20260908-hardening-gw4-8.jsonl": "566fe684a14ce2edc707286968d470891e7854e7e1ac44733fc0ab3d17d4914a",
+      "sdp-primary-v2-20260908-hardening-gw4-8.shadow-incumbent.jsonl": "d1e48736d869a697f79e9b383a0d627f7a3632e1b4b18321c933dc421385361e"
+    },
+    "production_evidence": false,
+    "source_database_sha256": "538560454f551a48eeaf015c318f7dea0fc6a34fccc56ee7f0e2b117ef7330d6",
+    "started_at": "2026-09-08T03:53:46.606503+00:00"
+  },
+  "frozen_research_database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "global_format_inherited_files": [
+    "src/fpl/insights/contracts.py",
+    "src/fpl/insights/evidence.py",
+    "src/fpl/publish/contract.py",
+    "src/fpl/publish/dashboard_json.py",
+    "src/fpl/publish/export.py",
+    "tests/test_bi_export.py",
+    "tests/test_bi_semantic_contract.py",
+    "tests/test_dashboard_json.py",
+    "tests/test_insights.py",
+    "tests/test_public_dashboard.py",
+    "tests/test_snapshot_workflows.py"
+  ],
+  "health": {
+    "checked_at": "2026-09-08T03:59:21.077701+00:00",
+    "completed_receipts": {
+      "count": 4
+    },
+    "database": "D:\\Personal\\fpl-operations\\data\\sdp-primary-v2.duckdb",
+    "exit_code": 0,
+    "failed_receipts": {
+      "count": 0,
+      "latest_finished_at": null,
+      "latest_run_id": null
+    },
+    "freshness_unproven": false,
+    "healthy": true,
+    "latest_completed": {
+      "consumer_ready": true,
+      "database": "D:\\Personal\\fpl-operations\\data\\sdp-primary-v2.duckdb",
+      "exit_code": 0,
+      "finished_at": "2026-09-08T03:52:20.202989+00:00",
+      "healthy": true,
+      "mode": "capture_and_stage",
+      "problem": null,
+      "run_id": "pre-deadline-20260908T032637.982207Z/20260908T032637.988688Z-136c3fd6",
+      "started_at": "2026-09-08T03:26:37.988688+00:00"
+    },
+    "latest_success": {
+      "consumer_ready": true,
+      "database": "D:\\Personal\\fpl-operations\\data\\sdp-primary-v2.duckdb",
+      "exit_code": 0,
+      "finished_at": "2026-09-08T03:52:20.202989+00:00",
+      "healthy": true,
+      "mode": "capture_and_stage",
+      "problem": null,
+      "run_id": "pre-deadline-20260908T032637.982207Z/20260908T032637.988688Z-136c3fd6",
+      "started_at": "2026-09-08T03:26:37.988688+00:00"
+    },
+    "malformed_receipts": {
+      "count": 0,
+      "run_ids": []
+    },
+    "max_success_age_hours": 30.0,
+    "newer_suspects": {
+      "count": 0,
+      "latest_run_id": null
+    },
+    "other_database_receipts": {
+      "count": 0
+    },
+    "production_health": {
+      "current_failure_count": 4,
+      "failure_count": 1374,
+      "failure_count_scope": "all_retained_seasons",
+      "global_failure": null,
+      "identity_failures": 0,
+      "latest_completed_match": "2026-09-06 15:30:00+00:00",
+      "latest_valid_sdp_known_at": "2026-09-08T03:37:39.610696+00:00",
+      "matches_valid": 26,
+      "schema_validation_failures": 0,
+      "season": "2026-27",
+      "source_finished_at": "2026-09-08T03:52:20.202989+00:00",
+      "source_run_id": "pre-deadline-20260908T032637.982207Z/20260908T032637.988688Z-136c3fd6"
+    },
+    "receipts_scanned": 4,
+    "running_receipts": {
+      "count": 0,
+      "latest_run_id": null
+    },
+    "runs_root": "D:\\Personal\\fpl-operations\\sdp-primary-runs",
+    "schema": "fpl.sdp-capture-health",
+    "schema_version": 2,
+    "stale": false,
+    "success_age_hours": 0.11691,
+    "unattributed_receipts": {
+      "count": 0
+    },
+    "undated_receipts": {
+      "count": 0,
+      "latest_run_id": null
+    },
+    "verdict": "healthy"
+  },
+  "idempotent_pair_repeat_preserved_id_and_created_at": true,
+  "latest_completed_match": {
+    "consumed_source": {
+      "competition": 8,
+      "fetched_at": "2026-09-07T14:37:45.225593+00:00",
+      "fpl_metadata_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+      "fpl_metadata_known_at": "2026-09-08T03:37:39.610696+00:00",
+      "known_at": "2026-09-08T03:37:39.610696+00:00",
+      "match_metadata_payload_id": "fb58171066e17da8bb51b63542e29419e3979a4b81fee9f02de60d3c24a48ec6",
+      "match_metadata_sha256": "21761aa2f04a77deaa43e8a101e33b95d1539147fe24014120c972aab8d64fd1",
+      "normalization_version": "sdp_production_health_v1",
+      "payload_id": "2aad73c742955afc9562229b5226bf99b2de761d78a94a65654b3dcd5c2d7f76",
+      "payload_sha256": "477e0196cff70c8aaf9fa04d5585b6f8e255d75405d9dc88072723ff0a9a1673",
+      "provider": "pl_sdp",
+      "provider_match_id": 2645215,
+      "schema_version": null,
+      "season": "2026-27"
+    },
+    "fixture": 29,
+    "kickoff": "2026-09-06T15:30:00+00:00",
+    "teams": [
+      "Arsenal",
+      "Chelsea"
+    ]
+  },
+  "membership_per_role": {
+    "blank_gameweek_rows": 0,
+    "player_fixture_rows": 3270,
+    "player_gameweek_rows": 3270,
+    "team_fixture_rows": 100
+  },
+  "normalization": {
+    "changed": true,
+    "changed_current_valid_team_source_bindings": 52,
+    "fpl_known_at": "2026-09-08T03:37:39.610696+00:00",
+    "new_fpl_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+    "note": "New FPL metadata versions were normalized. Unchanged SDP raw payloads retain their original hashes and times."
+  },
+  "outcome_attachment_counts": {
+    "player_fixture_rows": {
+      "primary": {
+        "attached": 0,
+        "rows": 3270
+      },
+      "shadow": {
+        "attached": 0,
+        "rows": 3270
+      }
+    },
+    "player_gameweek_rows": {
+      "primary": {
+        "attached": 0,
+        "rows": 3270
+      },
+      "shadow": {
+        "attached": 0,
+        "rows": 3270
+      }
+    },
+    "team_fixture_rows": {
+      "primary": {
+        "attached": 0,
+        "rows": 100
+      },
+      "shadow": {
+        "attached": 0,
+        "rows": 100
+      }
+    }
+  },
+  "pair_count": 1,
+  "pit": {
+    "checks": [
+      {
+        "database": "D:\\Personal\\fpl-operations\\sdp-primary-runs\\20260908T015110.930266Z-18ecafdb\\before.duckdb",
+        "later_raw_versions_excluded": 0,
+        "selected_rows": 1112,
+        "selected_state_sha256": "7c6b3c9e75cba8114c9c4da232ceb4f04078265e372601edaa85db9ee8422e5a"
+      },
+      {
+        "database": "D:\\Personal\\fpl-operations\\data\\sdp-primary-v2.duckdb",
+        "later_raw_versions_excluded": 2,
+        "selected_rows": 1112,
+        "selected_state_sha256": "7c6b3c9e75cba8114c9c4da232ceb4f04078265e372601edaa85db9ee8422e5a"
+      }
+    ],
+    "cutoff": "2026-09-07T15:20:00.757039+00:00",
+    "earlier_selected_state_unchanged": true,
+    "scope": "Operational revision-cutoff check; no historical research replay or relabeling of retrospective captures."
+  },
+  "prediction_id": "0cca9d810d3f984f30f53d37a8ad3a494f20266d910e4acc1ec161bce582fafb",
+  "receipt": {
+    "evidence_exit_code": 0,
+    "evidence_failure": null,
+    "finished_at": "2026-09-08 03:58:14.813444+00:00",
+    "forecast_exit_code": 0,
+    "forecast_failure": null,
+    "prediction_cutoff": "2026-09-08 03:52:24.844595+00:00",
+    "primary_artifact": "D:\\Personal\\fpl-operations\\predictions\\sdp-primary-v2-20260908-hardening-gw4-8.jsonl",
+    "primary_artifact_sha256": "566fe684a14ce2edc707286968d470891e7854e7e1ac44733fc0ab3d17d4914a",
+    "refresh_exit_code": 0,
+    "refresh_report": "D:\\Personal\\fpl-operations\\sdp-primary-runs\\pre-deadline-20260908T032637.982207Z\\refresh-report.json",
+    "refresh_report_sha256": "cf0f506d011ad9b9689be436acc04d01cc89b398629e66d528230801f6c16528",
+    "shadow_artifact": "D:\\Personal\\fpl-operations\\predictions\\sdp-primary-v2-20260908-hardening-gw4-8.shadow-incumbent.jsonl",
+    "shadow_artifact_sha256": "d1e48736d869a697f79e9b383a0d627f7a3632e1b4b18321c933dc421385361e",
+    "source_database": "D:\\Personal\\fpl-operations\\sdp-primary-runs\\pre-deadline-20260908T032637.982207Z\\forecast-source.duckdb",
+    "source_database_sha256": "538560454f551a48eeaf015c318f7dea0fc6a34fccc56ee7f0e2b117ef7330d6",
+    "started_at": "2026-09-08 03:26:37.939208+00:00"
+  },
+  "remote_runtime": "BLOCKED ONLY ON RUNTIME AUTHORIZATION / CREDENTIALS; package prepared, not deployed",
+  "starting_sha": "52924f99d83ba4a7b4b72867d7d70ac77d728741",
+  "verified_implementation_sha": "2a96e91ee49604e152f77e47ff6e1bcf9d7037af",
+  "workload_competitions": {
+    "1": {
+      "captured": 0,
+      "expected": 0,
+      "failures": [],
+      "valid": 0
+    },
+    "1125": {
+      "captured": 0,
+      "expected": 0,
+      "failures": [],
+      "valid": 0
+    },
+    "2": {
+      "captured": 0,
+      "expected": 0,
+      "failures": [],
+      "valid": 0
+    },
+    "5": {
+      "captured": 0,
+      "expected": 0,
+      "failures": [],
+      "valid": 0
+    },
+    "6": {
+      "captured": 0,
+      "expected": 0,
+      "failures": [],
+      "valid": 0
+    },
+    "8": {
+      "captured": 10,
+      "expected": 10,
+      "failures": [],
+      "valid": 10
+    }
+  }
+}

@@ -4,6 +4,39 @@ These instructions apply to the entire repository and to every agent or sub-agen
 it. More specific `AGENTS.md` files may add local guidance, but they must not weaken the data
 correctness rules below.
 
+## Owner-directed SDP architectural adoption (2026-09-07, V2 branch only)
+
+**Owner-directed architectural adoption. SDP-backed V2 is the primary football-environment
+architecture. Historical experimental verdict remains INCONCLUSIVE under its frozen gate.
+Incumbent retained as operational fallback and prospective shadow comparator.**
+The owner explicitly authorizes this operational default on
+`claude/comet-fpl-v2-architecture-mqrj8f`; it is the narrow exception to older default-freeze
+language below. Phase A did not clear the old 1% gate. No frozen report, result, gate or claim
+is rejudged. No candidate fitting, retuning or new historical evaluation is authorized here.
+Player minutes/goals/assists/cards/DC/saves scoring remain incumbent; H GK saves stays shadow-only.
+Production uses only actual cutoff-known immutable SDP versions with exact fixture/club/player
+identity and fail-closed core-field health. Missing fields never become zero. Competitive cup
+and European lineups/events supply witnessed workload only, never EPL Tactical State V1 stats.
+No main merge, PR or default-branch change is authorized. The additive decision, exact selector,
+provenance and operations contracts are in
+`docs/sdp-primary-architecture-decision-2026-09-07.md` and `docs/sdp-primary-operations.md`.
+
+### Operational hardening and prospective evidence (2026-09-08)
+
+The active SDP work is capture reliability, exact fallback attribution, pre-deadline refresh,
+and immutable primary/incumbent-shadow evidence collection. A correct fail-closed fallback is
+acceptable; never optimize its percentage by weakening identity, core fields or cutoff rules.
+Recheck required incomplete recent-history matches even when they fall outside the ordinary
+five-day refresh window. A correction becomes usable only at its actual knowledge time.
+Production comparison pairs must be recorded before official FPL deadlines, using actual
+recording time, with identical cutoff, populations, FPL sources, scoring and player components.
+Keep original predictions separate from append-only finalized outcomes and preserve replay inputs.
+Player-component research remains deferred. Reopening requires enough prospective GWs/fixtures
+for a meaningful comparison, stable capture, understood fallback coverage, no unresolved
+PIT/provenance defects, and sufficient GK-shadow evidence to assess its end-to-end points impact.
+These are review conditions, not new numeric promotion thresholds or permission to retune a
+frozen candidate. Any subsequent research needs its own authorization and preregistration.
+
 ## Mission and current state
 
 This project predicts a full Fantasy Premier League (FPL) points distribution per player and
@@ -580,6 +613,122 @@ player/team monitoring and deterministic/optional evidence-bound insight summari
 development-only. P2.5 in `DEV-ROADMAP.md` owns any later post-deadline work; this implementation
 does not authorize a model-default change or reinterpretation of a frozen evaluation.
 
+## V2: the football-first prediction engine (2026-09-04)
+
+V2 is an architectural addition, not a replacement. **V1 is untouched**: no model, config,
+frozen result, candidate document, ledger row or prospective default changed, and no frozen
+evaluation was re-run, amended or re-judged. V2 is development-only and nothing in it is
+promoted.
+
+`docs/v2-architecture.md` is the authoritative description. In outline:
+
+```
+Premier League / FPL data -> football data layer -> football engine -> fixture environment
+    -> FPL component engine -> full points distribution -> decision / optimizer
+```
+
+The contract between the football half and the FPL half is `FixtureEnvironment`
+(`src/fpl/artifacts/fixture_environment.py`). Components receive it; they never query a table.
+Because `models/component_engine_v2.py` produces the composer's existing
+`ComponentDistributions`, the composer, the prospective artifact contract and the optimizer are
+unchanged — V2 plugs in at a boundary that was already in the right place.
+
+### The football data layer is provider-agnostic, and that is the design point
+
+`mart_fact_team_match_stats_v2` is *the team-match football fact* at one club x one fixture,
+carrying a `provider` column — it is **not** "the SDP table". Two providers share the grain:
+
+* **`fpl_archive`** — derived from marts already in this repository. Available for every season,
+  so V2 is runnable and evaluable with no external capture.
+* **`pl_sdp`** — the Premier League SDP backend. The owner machine completed the first real
+  capture of five historical seasons plus current completed matches on 2026-09-05: 1,921
+  match-stat payloads / 3,842 team sides now populate the provider fact. The exhaustive inventory
+  observed 246 fields; only goals, xG, and SOT currently
+  satisfy the independent-reconciliation rule for `verified_semantics: true`. See
+  `docs/pl-sdp-real-provider-validation-2026-09-05.md`. The source remains network-dependent, and
+  every unverified or unmapped value stays losslessly available rather than guessed.
+
+Sharing one grain makes reconciliation structural rather than a script, and where two providers
+measure the same concept by different routes **both values are kept in separate columns** —
+`expected_goals_allowed` (the opponent's xG mirrored) and `expected_goals_conceded_measured`
+(FPL's per-player xGC) are the standing example. A metric a provider does not carry is NULL.
+
+Metric columns on the V2 tables are generated from `config/pl_sdp_metrics.yaml` by
+`storage.db.ensure_sdp_metric_columns`, exactly as ruleset target columns are generated from the
+scoring configs: adding a metric is a config change, never a schema migration. Unmapped provider
+fields land in the tall store `stg_pl_sdp_team_match_metric` and are reported by
+`jobs.audit_pl_sdp`, so a wrong guess in the dictionary is lossless rather than destructive.
+
+### Identity is measured, never assumed
+
+Whether `stg_fixture.pulse_id` equals the SDP `matchId` is a question, and
+`jobs.audit_pl_sdp --stage` answers it into `results/pl_sdp_identity_audit.json`. Resolution is
+pulse_id first (corroborated on season, kickoff within 300 seconds, score, and teams), then a
+deterministic fallback on season and kickoff, narrowing multiple candidates by teams and then
+score. A selected
+candidate's Home/Away teams are always corroborated. Ambiguity, contradiction, and one SDP match
+claimed by two fixtures all fail closed.
+Club names corroborate a match already made; they never make one, and a name resolving to two
+clubs across seasons is dropped rather than picked. `pulse_id_match_rate` is `None`, not `0.0`,
+when no fixture carried a pulse_id.
+
+The real audit measured `pulse_id == matchId` at **0/1,900 (0%)**. All 2,280 fixtures instead
+resolved one-to-one by season and kickoff, narrowing multiple candidates by teams and then score,
+and always corroborating Home/Away team codes before accepting a match. All 2,280 reconciled
+kickoffs are now exactly equal after resolving SDP's `Europe/London` wall time to UTC; the maximum
+absolute delta is zero seconds. There was zero ambiguity, contradiction, duplicate claim, or
+unmatched fixture. That fallback is required plumbing, not a temporary bridge.
+
+### V2 evaluation results: both candidates failed, and are left as committed
+
+`config/v2_team_environment_evaluation.yaml` and `config/v2_gk_saves_evaluation.yaml` were
+pre-registered before any candidate ran. Both declare
+`promotion_requires_prospective_window`, so no historical result could promote anything.
+Full record: `docs/v2-team-engine-development.md`; result:
+`results/v2_team_environment_development.json`.
+
+**Harness validation.** The incumbent `trailing_goals_attack_defence` scores **1.50030** over
+181 folds and 3,640 predictions under the V2 harness, against the frozen Phase 1 record of
+**1.5003 over 181 folds and 3,640 predictions**. The harness reproduces the incumbent to five
+decimal places, which is what makes the comparisons below about models rather than about a new
+harness.
+
+**Team environment: not promoted, fails its gate.** Best rung (`goals + xG`) scores 1.49599, a
+**+0.2867%** lift against a 1% bar, and **2021-22 regresses -0.2108%**, so it fails the
+per-season non-regression rule as well. Rungs C and D are bit-identical to B because `pl_sdp`
+was uncaptured at that frozen evaluation's knowledge time: the upper ablation ladder is
+**untested, not null**, and nothing here says whether shot volume or territory helps. The
+inner-holdout xG weight rises monotonically with coverage (0 folds fitted in 2021-22; 6 folds
+in 2022-23 at a selected weight of **0.000**; then 0.362 / 0.579 / 0.645), so the pooled figure
+averages over two seasons in which the candidate could not differ from its own floor.
+
+**GK saves V2: not promoted, and the hypothesis is refuted in the regime that matters.** The
+candidate replaced V1's identity — in which shots on target faced is a deterministic function of
+goals conceded — with a directly predicted shots-faced quantity. Pooled it improves log score
++0.168% and CRPS +0.63%, and **the per-season split inverts that**: +1.37% (2021-22) and +2.28%
+(2022-23), then **-1.10%, -1.24%, -0.27%** once the engine's goal rate carries xG. The crossover
+is exactly the xG-coverage boundary. Both candidates are left as committed and are **not
+retuned**.
+
+### V2 job surface
+
+```
+python -m fpl.jobs.audit_pl_sdp --probe              # discover provider season ids (network)
+python -m fpl.jobs.backfill_pl_sdp --season 2024-25  # historical capture (network)
+python -m fpl.jobs.capture_pl_sdp --lookback-days 5  # incremental capture (network)
+python -m fpl.jobs.audit_pl_sdp --stage              # stage + identity/coverage/reconciliation
+python -m fpl.jobs.build_db                          # rebuild, including the V2 marts
+python -m fpl.validate.dev_v2_team_environment --results results/
+python -m fpl.jobs.prospective_environment_v2 --gw-from 1 --gw-to 5
+```
+
+`.github/workflows/pl-sdp-capture.yml` is a durable raw-inspection path, mirroring `snapshot.yml`
+(curl/gzip/jq only, no Python) so a Python refactor cannot stop a capture. It is statically valid
+against the observed cursor/result envelopes, but cannot be dispatched until the workflow exists
+on the default branch, and no checksum-validating importer for its packages exists yet. The six
+configured season ids are live-verified; the first capture used direct local provider access. Any
+new season still requires evidence rather than a guessed id.
+
 ## Non-negotiable correctness rules
 
 Preserve the R1-R6 rules in `README.md` and their tests.
@@ -641,11 +790,33 @@ Also preserve these data contracts:
 - Event time and knowledge time are different. `kickoff_time` prevents use of future match
   outcomes, but schedules, postponements, availability, and API fields must also be versioned
   by `known_at`/`captured_at` before they are safe for walk-forward backtests.
+- A provider metric this repository has never observed is an ASSUMPTION. Keep its provider
+  field names as alias lists carrying `verified_semantics: false`, retain every unmapped field
+  in the tall metric store, and promote a name to verified only after a real payload has been
+  inspected AND reconciled against an independent source.
+- Two providers measuring the same concept by different routes get two columns. Never fill one
+  from the other, and never reconcile a disagreement away -- the disagreement is information
+  about the sources.
+- Fixture identity across data sources is measured, not assumed. Corroborate on enough
+  dimensions to be deterministic, fail closed on ambiguity or contradiction, and never
+  fuzzy-match: a wrong fuzzy match is indistinguishable from a right one.
+- A post-match measurement added to a feature-readable table must be registered in
+  `features.pit.OUTCOME_COLUMNS` in the same change. A new column that silently defaults to
+  "safe to read from the future" is the leak the point-in-time layer exists to prevent.
+- Never project a bare `TIMESTAMPTZ` into a `fetchall()`/`fetchone()` result. DuckDB converts
+  it through `pytz`, which this project does not depend on (it pins `tzdata` for `zoneinfo`),
+  so such a query passes on a machine that happens to have `pytz` and raises on a clean
+  install. Project `epoch_us(...)` and rebuild the instant in Python. The Arrow path
+  (`to_arrow_table()` into Polars) is unaffected. Found three times now -- BI export, outcome
+  and ledger attachment, and the V2 SDP transform -- and guarded behaviourally by
+  `tests/test_no_pytz_dependency.py`.
 
 ## Repository map and boundaries
 
 - `config/`: sources, scoring rules, and declarative data-quality policy.
-- `src/fpl/ingest/`: external archive/API boundaries and raw payload handling.
+- `src/fpl/ingest/`: external archive/API boundaries and raw payload handling, including
+  `pl_sdp` (the Premier League SDP client: raw-preserving, schema-drift tolerant, loud on an
+  envelope it cannot interpret).
 - `src/fpl/storage/`: DuckDB connection policy, schema, and append-only prediction ledger.
 - `src/fpl/transform/`: raw-to-staging crosswalks, validation, facts, and targets.
 - `src/fpl/features/`: point-in-time-safe read API and, later, feature construction.
@@ -653,6 +824,9 @@ Also preserve these data contracts:
   It reads outcomes, which the feature layer may not -- scoring a prediction needs the label.
 - `src/fpl/models/`: scoring, the Stage A team-goals models, Stage B minutes candidates, and
   Stage C attacking-goals baselines/probes.
+  V2 adds `football_engine_v2` (one attack/defence rating system per football signal),
+  `gk_saves_v2`, `defensive_environment_v2`, and `component_engine_v2` (the adapter onto the
+  unchanged composer input).
 - `src/fpl/artifacts/`: stable, typed prospective-points and optimizer-decision transport contracts.
 - `src/fpl/optimize/`: Stage E squad, lineup, captain, and bounded transfer planning.
 - `src/fpl/jobs/`: thin orchestration/CLI entry points.
@@ -946,6 +1120,55 @@ figure. `docs/research-adaptation.md` carries the evidence and the contradicting
   derived by a consumer from per-gameweek values. Cost is not a reason to avoid it: convolving all
   599 players over five cumulative horizons takes **0.16 s** in pure Python, and the resulting
   payload is 305 KB of JSON (about 76 KB gzipped) against 819 KB for the raw distributions.
+- **Team shots on target faced is measurable from the archive, and its implied save rate
+  corroborates the league constant.** Summing `saves + goals_conceded` over a club's goalkeeper
+  appearances in a fixture gives a measured team-level shots-on-target-allowed with **100%
+  coverage in all five seasons** (mean 4.16 to 4.92 per team-match, sd ~2.4). Its implied league
+  save rate is **0.6726 pooled** (0.667 to 0.677 per season) against the independently measured
+  67.3% +/- 0.4pp -- so the proxy's semantics are corroborated rather than assumed. This is what
+  makes a saves upgrade evaluable with no external data at all.
+- **A realised correlation between two outcomes is NOT an upper bound on the predictable
+  relationship between them, and this repository has now been caught by that twice.**
+  `corr(team shots on target allowed, goals allowed)` is **0.621** over 3,800 team-matches, which
+  looks like V1's saves identity (which implicitly assumes 1.0) discarding 61% of the variance.
+  Measured on 2025-26's 767 goalkeeper appearances, that variance is almost entirely
+  unpredictable: `corr(V1 implied shots faced, actual)` is **0.310**, `corr(V2 directly predicted
+  shots faced, actual)` is **0.279** -- V1's rearrangement of its own goal rate is the BETTER
+  predictor -- and the two predictions agree with each other at **0.764**, far more than either
+  agrees with reality. Both carry under half the spread of the outcome (sd 1.14 and 0.93 against
+  2.16). Compare the Stage A recency audit, where a level correction that fixed the level almost
+  exactly was worth -0.01%. Do not re-open a modelling question on a realised statistic alone;
+  measure the PREDICTIONS against each other and against the outcome first.
+- **The V2 blend learns to distrust a signal it cannot see, and the fold record proves it.**
+  Across 181 folds the inner-holdout weight on xG rises monotonically with coverage: xG cleared
+  the coverage floor in 0 of 30 folds in 2021-22, 6 of 37 in 2022-23 -- where the holdout chose a
+  weight of exactly **0.000** -- then all 38 folds in each later season at mean weights 0.362,
+  0.579 and 0.645. A candidate whose signal is absent in early seasons is therefore identical to
+  its own floor there, so its pooled lift averages over seasons in which it could not differ.
+  **Fourth pooled-figure trap in this repository**, after xG coverage, home advantage and the
+  Stage A Poisson zero: always split by season before discussing a number.
+- **Goalkeeper saves distributions are under-dispersed in both V1 and V2**, at PIT-80 coverage
+  0.7604 and 0.7626 against a nominal 0.80 over 3,686 goalkeeper appearances. That is a separate
+  defect from where the shot volume comes from, and neither candidate addressed it. Both models
+  also truncate at 10 saves; 5 of 3,846 goalkeeper appearances (0.13%) exceed it, identically for
+  both, so the comparison is fair but neither can score an 11-save match.
+- **Defensive-contribution counts are roughly twice as dispersed as a Poisson, and that
+  understates every threshold probability.** Measured over 2025-26 appearances of 60+ minutes,
+  variance/mean is **1.88 (DEF, n=3,026), 2.12 (MID, n=3,265), 1.61 (FWD, n=765)** against a
+  Poisson's 1.0. The consequence is directional and large: at the same mean, a Poisson gives
+  `P(DC >= threshold)` of 0.2180 against an actual **0.2697** for defenders, 0.1019 against
+  **0.1792** for midfielders (a 76% under-statement), and 0.0011 against **0.0118** for
+  forwards. Any model that reaches a DC threshold probability by evaluating a Poisson at a
+  predicted mean will under-predict, worst for midfielders -- which is exactly the slice
+  ordering measured for V2 DC. Estimating the threshold probability directly as a frequency,
+  as `defensive_contribution_v1` does, avoids this entirely at the cost of resolution.
+- **A model can rank far better while scoring worse, and Brier will not tell you which.**
+  V2 DC beats V1 on AUC 0.7755 -> 0.8801 overall (forwards 0.630 -> 0.955) and on Brier by
+  3.5%, while LOSING mean log score by 2.18% -- because it under-predicts by a factor of 2.5
+  (mean predicted 0.0559 against an observed 0.1387). A log score charges `-log(p)` on every
+  event at an understated `p`; a bounded quadratic barely notices; AUC is invariant to any
+  monotone transform and so sees only the ordering. Report all three, and read a disagreement
+  between them as a calibration statement rather than a tie.
 
 ## Priorities for upcoming work
 
@@ -1185,6 +1408,210 @@ active delivery order.
    `(season, as_at_gw)` anchor; never describe it as state known at the forecast `as_of` or use it
    as point-in-time model evidence.
 
+10. The V2 football-first architecture is implemented **development-only** and promotes nothing.
+    `trailing_goals_attack_defence` remains the Stage A model and `gk_saves_v1` remains the
+    composer's saves component. Both V2 candidates failed their pre-registered gates and are left
+    as committed: **do not retune either**, and do not re-run or re-judge
+    `results/v2_team_environment_development.json`. A successor needs its own named policy and
+    its own amendment, not a post-hoc tweak. The V2 team engine is deliberately NOT wired into
+    `jobs/prospective_points_v1.py`; `jobs/prospective_environment_v2.py` produces the football
+    forecast for analysis instead, so no decision path consumes an ungated candidate.
+11. Real `pl_sdp` data now exists. The first isolated successor
+    `retrospective_real_sot_team_environment_v1` has completed its single clean outer evaluation
+    and is **INCONCLUSIVE**, not promoted: on 2,280 team-sides / 114 folds, REAL SOT improves mean
+    log score only 0.0374% beyond the exact goals+xG control (1.489436 to 1.488879), versus the
+    frozen 1% bar. CRPS improves 0.0833% and PIT-80 is unchanged, but log score regresses slightly
+    in 2024-25 and 2025-26. Zero SOT weight was selected in 72/114 folds; the main effect is mild
+    prediction shrinkage. The result does not justify a territory/box-touch rung. The separate
+    validation-only `RetrospectiveBackfillView` retains original September 2026 capture identities
+    and applies `source_match_kickoff < prediction_as_of`; it is not a mode of `PointInTimeView`.
+    Production, prospective, dashboard, optimizer, and promotion evidence continue to require
+    `known_at <= as_of`. See `docs/v2-real-sot-development.md`. Never rerun or reinterpret this
+    result, zero-fill absent SOT, or describe retrospective evidence as historical deadline proof.
+
+    Owner-authorized additive follow-up (2026-09-06): the coverage-only omitted-SOT audit
+    corroborates 42 scored-season zeros (37 concordant accounting/FPL-proxy cases plus five
+    explicit match reports). This does not change the raw NULL rule. Only the separate
+    validation-only `shots_on_target_corroborated` column may carry these version-pinned
+    interpretations; unresolved omissions and explicit NULLs remain NULL. The new candidate
+    `retrospective_corroborated_zero_sot_team_environment_v2` is preregistered in
+    `docs/v2-corroborated-zero-sot-design.md`, with the original estimator/control/grid unchanged.
+    Run its formal outer evaluation once from a clean committed worktree; preserve both frozen
+    prior results. No team averages, territory, inner-selection changes or prospective wiring.
+
+    The successor has now completed that one clean run at `59b53e0`: **INCONCLUSIVE**, not
+    promoted. Mean log score is 1.488525 versus the identical goals+xG control's 1.489436:
+    +0.0612% lift, short of 1%, with a small 2024-25 regression. CRPS improves 0.1298% and
+    overall PIT-80 absolute error improves slightly. Zero SOT weight is selected in 65/114
+    folds. Its new result retains all 6,840 PMFs across 2,280 team-sides; no source values or
+    prior artifacts changed. Preserve `results/v2_corroborated_zero_sot_development.json`
+    and its preregistration without rerunning or retuning. See the matching development doc.
+    Territory remains unjustified; a weekly-inner-selection hypothesis for unchanged goals+xG
+    needs its own future authorization and candidate, and is not implemented here.
+
+12. The V2 defensive-contribution candidate `team_environment_share_dc_threshold_v2` has had
+    its single development evaluation (`docs/v2-dc-development.md`,
+    `results/v2_dc_development.json`) and is **not promoted**: it misses the primary metric by
+    -2.18%. Its pre-registered mechanism test nonetheless PASSES -- the transferred-player
+    slice improves +11.42% log, +12.46% Brier, AUC 0.770 -> 0.923 -- so the failure is located
+    in the Poisson threshold conversion, not in the team-environment allocation. Leave it as
+    committed and **do not swap the count distribution after the fact**: an over-dispersed
+    successor needs its own named candidate and its own amendment, and its dispersion parameter
+    must be fitted inside each fold rather than taken from the measured constant above, which
+    was measured on the evaluation population and would be leakage.
+
+## Owner-authorized weekly inner-selection experiment (2026-09-06)
+
+The source-confirmed inner/outer mismatch is now isolated in an additive preregistration:
+`retrospective_goals_xg_weekly_inner_selection_v1`, against the unchanged
+`retrospective_goals_xg_control_v1`. Read `docs/v2-weekly-inner-selection-design.md` and its
+diagnostic note. The separate validation-only selector changes **only the inner refit schedule**;
+goals still select decay/prior before goals+xG select blend weights. Existing grids, outer-season
+promoted priors, archive xG, output, population and frozen engine remain unchanged. No SOT or
+other SDP feature enters this candidate. Strict prospective paths and all prior results stay frozen.
+
+Commit implementation/tests/preregistration cleanly before formal scoring. The runner must first
+reproduce all unchanged-control PMFs, identities, parameters and scores on 2,280 team-sides /
+114 folds, then reserve its one-run claim before evaluating the candidate exactly once. Retain
+fixture PMFs, paired GW-clustered uncertainty and selection diagnostics. This is retrospective
+archive development, never automatic promotion. A failed control check forbids candidate scoring;
+an interrupted claimed candidate must not be silently restarted. No second experiment is authorized.
+
+The one formal run is now complete at clean `507c3d2`: **INCONCLUSIVE**. Mean log score
+1.486650879 versus the reproduced control's 1.489436133 is **+0.1870%**, below 1%; CRPS improves
+0.3667% and all three full seasons improve. Early GW1-6 improves 0.5199% overall but regresses
+in 2025-26. Aggregate PIT-80 moves slightly farther from 80% (80.83%→81.10%), still within the
+frozen guardrail. Parameter switching eases only modestly; xG weight zero falls 25→12/114 folds.
+Preserve `results/v2_weekly_inner_selection_development.json` and the matching development doc
+without rerunning or retuning. The sole next recommendation is a separately authorized,
+separately preregistered SOT incremental test against the frozen weekly-inner control; no such
+candidate is implemented or licensed by this result, and nothing is promoted.
+
+## Revision-safe SDP and local operations (owner-authorized 2026-09-06)
+
+The latest-only reporting fact is NOT a historical version reader. Strict football PIT now
+uses `mart_fact_team_match_stats_v2_version`: retain complete whole-payload SDP revisions and
+complete exact-capture fixture metadata; require both knowledge times <= cutoff, select one
+revision per team-fixture/provider, then enforce event time. Raw/staging capture times remain
+unchanged. An unbuilt version read model fails closed rather than silently using latest rows.
+Tactical model features roll over those cutoff-selected match rows, not over every revision
+or over the latest reporting aggregate. The reporting marts remain latest-only for audit/BI.
+Incomplete later payload/metadata never replaces older valid evidence; incorrect non-NULL
+club identities still fail. A provider A→B→A reversion is a new capture event, while a
+consecutive unchanged response remains idempotent and retains its original knowledge time.
+
+Use `jobs.daily_pl_sdp` only with explicit separate persistent operational `--db` and `--runs`.
+It holds single-writer locks, takes a consistent backup, captures missing current-season stats
+without a lookback limit plus seven-day revisions, stages, and checks freshness/PIT access.
+`--raw-only` explicitly defers staging and is not consumer-ready. Protect original/frozen DBs;
+never route default forecasts or optimizers to the operational copy without owner direction.
+See `docs/pl-sdp-revision-pit-and-local-daily.md` for the regression and runbook.
+
+The owner authorizes developing a NEW model after these data prerequisites are verified.
+Development is not conditional on first beating an existing model by 1%. This does NOT
+change or reinterpret any frozen result/gate: each new named experiment must declare its
+own research question, comparisons, evidence regime and suitable decision criteria BEFORE
+outer scoring, with clean committed provenance. Production use remains a separate explicit
+decision. Do not rerun historical candidates or infer promotion from this authorization.
+
+## Owner-authorized weekly-inner SOT increment (2026-09-07)
+
+The owner now authorizes ONE separately named follow-up:
+`retrospective_goals_xg_sot_weekly_inner_selection_v1`, compared to the exact frozen
+weekly-inner goals+xG candidate as control. Read `docs/v2-weekly-sot-design.md` and
+`config/v2_weekly_sot_evaluation.yaml`. Add only historical SDP SOT under the unchanged
+corroborated-zero/earliest-complete-payload policy; archive goals/xG, weekly selection,
+grids and scored population remain fixed. Do not rerun the previous formal candidates.
+
+Infrastructure is committed first; commit implementation/tests/preregistration before a
+clean formal run. Reproduce the weekly control's PMFs/parameters/scores before reserving
+the new durable one-run claim. Retain >=1% relative log lift plus inherited guardrails;
+below that bar keep the existing model/defaults. Even a pass is retrospective development
+only, requiring separate prospective evidence and promotion authority. Prediction spread
+is diagnostic, not accuracy. Keep collecting raw SDP regardless of this experiment's result.
+Local additive commits are authorized; no push, main sync/merge, rebase, PR, second
+experiment, or production/optimizer/default change in this task.
+
+The one formal run is now complete at clean `fd514cf`: **INCONCLUSIVE**. Weekly control
+reproduces exactly (zero PMF difference); SOT log score 1.485667700 versus 1.486650879 is
+only **+0.066134%**, below 1%, with a small 2024-25 regression. CRPS improves 0.140509%,
+but pooled reciprocal zero-goal/clean-sheet Brier worsens 0.079366% and rate SD contracts
+2.6314%. Retain the result at `results/v2_weekly_sot_development.json` and its development
+note without retuning/rerunning. Existing defaults remain unchanged; this result does not
+justify territory or discarding SDP captures. Continue strict-prospective collection.
+
+## Owner-authorized structural Tactical Matchup V1 (2026-09-07)
+
+This new authorization supersedes the prior session's no-push/no-next-experiment scope,
+not any old scientific result. Preserve local weekly-SOT commit `462e46c`; the snapshot-only
+main change was normally merged at `9e861de`. No rebase, main promotion, PR or default change.
+
+Read the three new tactical design documents and `config/v2_tactical_matchup_evaluation.yaml`.
+The exact primary incumbent is CURRENT prospective `TrailingGoalsAttackDefence`: expanding
+archive recorded goals, six-match league shrinkage, neutral missing-team ratios, Poisson0..10.
+It is not the weekly goals+xG research model, and despite its name it has no recency decay.
+The separate development candidate forecasts five continuous recent-state deltas, then fits
+a regularized tactical matchup log-rate correction around that incumbent. No player/DC work.
+
+The coverage-only audit licenses exactly six provider keys/five dimensions; provider-labelled
+semantics are not globally upgraded to independently verified. Earliest complete whole-payload
+versions and original known_at are retained in a new validation-only capability. Raw NULL stays
+NULL; explicit recent-state pooling is a model estimate, not imputation of provider data.
+Strict prospective/PIT/optimizer/dashboard capabilities and defaults remain unchanged.
+The >=95% paired-field coverage rule selected2023-24/2025-26 before fitting:1520sides/76folds.
+The nonconsecutive coverage-selected population limits generalization. Do not add excluded
+seasons or dimensions after seeing goal results.
+
+Commit implementation/tests/preregistration cleanly, reproduce the incumbent against retained
+PMFs AND its actual prospective adapter, then reserve ONE durable candidate claim and evaluate
+once. All goal-layer style predictions must be sequential event-time out-of-sample; whole GW
+batches remain isolated, including delayed legs. Retain full PMFs, source/version provenance,
+selected strengths/scalers, style/persistence diagnostics, paired goal/CS loss and guard checks.
+Two explicitly preregistered diagnostic arms share the selected penalty; they cannot replace
+the named candidate or obtain an independent promotion verdict. Both >=1% goal-log lift and
+>=1% CS-Brier lift plus frozen guardrails are required for SUPPORTED, still development-only.
+Do not tune/restart after a claimed result. The separate competitive-workload audit is data-only
+and cannot feed this model. Push completed additive evidence only to the V2 branch.
+
+### Tactical V1 retained execution failure (2026-09-07)
+
+The one authorized attempt at clean preregistration SHA `672a36d` is consumed. Incumbent
+reproduction passed: 1520 sides/76 folds, exact PMFs against reference AND current prospective
+adapter (max difference0). The tactical pass failed at historical123/189,2024-25GW10 with
+`ValueError: Poisson Newton backtracking failed to find a safe descent step`. No complete
+candidate scoring, style diagnostics or PMF publication exists. Verdict **INCONCLUSIVE due
+to incomplete execution**, not a measured failure of the1% bars or scientific refutation.
+The fixed result path contains an explicitly tagged execution-failure record, not normal
+runner output; retain it and the original local claim to block accidental reruns.
+Do not repair/restart this candidate under its consumed authorization. Any renewed execution
+needs a separate explicit numerical/provenance amendment, tests and preregistration; no new
+football features or changed gate are inferred. Original database, strict prospective paths,
+frozen results and defaults remain unchanged. See `docs/v2-tactical-matchup-development.md`
+and the verification record for the exact failure, source hashes and non-green environmental
+gate items. Successful provider/coverage evidence is not successful model evidence.
+
+## Tactical numerical amendment (owner-authorized continuation, 2026-09-07)
+
+After the retained V1 failure, the owner explicitly authorized the recommended numerical-only
+amendment. `retrospective_tactical_matchup_team_environment_v1_numeric1` inherits the original
+hash-pinned statistical contract unchanged. Only cancellation-safe objective differences and
+gradient-plus-undamped-step convergence checks change; the old solver/result/claim remain.
+See `docs/v2-tactical-numerical-amendment.md`. Preserve both 1% gates, dimensions, population,
+distribution and defaults. Commit clean preregistration and tests before its single claimed run;
+reproduce the exact incumbent first. Retain full-batch diagnostics and failure state if needed,
+never resume or selectively score incomplete checkpoints. This authorization is not permission
+to restart the original identity, add features, retune after scoring, or promote any model.
+
+Completed ONCE at clean `e76a54b`: **INCONCLUSIVE**, 1,520 sides/76 folds. Goal NLL
+1.493490819 vs incumbent 1.497607513 (+0.274885%); CS Brier .169203463 vs .170025703
+(+0.483597%). Both miss 1%; both seasons improve, but early-season CS regresses and paired
+GW-clustered intervals include zero. All five style MSEs improve; precision has no useful
+rank correlation and the three matchup interactions add no material goal-score value.
+All 636 numerical fits converge; 58,268 independent checks find zero violations. Preserve
+`results/v2_tactical_numeric_development.json` and its consumed claim, no rerun or promotion.
+See `docs/v2-tactical-numeric-development.md` and verification record. A two-stage shot-creation
+to goals model is only a next-direction recommendation, not authorized implementation here.
+
 ## Sub-agent coordination and handoff
 
 - Give each sub-agent a bounded, non-overlapping scope and name the files it may edit.
@@ -1230,3 +1657,218 @@ Installed general-purpose skills that complement them are:
 - `github:gh-fix-ci` when diagnosing or repairing failing GitHub Actions checks after CI exists.
 
 Skills do not override the repository invariants, offline-test policy, or explicit user scope.
+
+## Authorized football-process development program (2026-09-07)
+
+The owner authorizes additive, development-only chance creation, competitive participation,
+role/workload, component and full-points research. Each formal candidate still requires its own
+clean preregistration, exact CURRENT prospective comparator reproduction, one exclusive run claim,
+immutable result and independent verification. Passing successor else incumbent is the predeclared
+DEVELOPMENT synthesis rule; it never promotes or changes prospective/default/optimizer consumers.
+The completed tactical numeric1 result remains INCONCLUSIVE and immutable. Do not rerun it.
+
+Phase A preregistration: `docs/v2-chance-creation-design.md` and
+`config/v2_chance_creation_evaluation.yaml`. Coverage-only audit selects 2023-24 through2025-26,
+each760/760 paired goals+existing archive xG+SDP attempts. Frozen OOS style predictions feed separate
+regularized volume and quality means, then heavily pooled league conversion, same Poisson Goal/CS
+family. Dual1% Goal NLL and CS-Brier gates remain. No result exists at registration.
+Independent Phase B pilot contract: `docs/competitive-participation-pilot.md` and its config;
+freeze implementation before bounded collection, use exact Opta/FPL identity only, label derived
+nominal durations separately, and validate them before a workload/role model can consume them.
+`docs/football-development-incumbent-audit.md` records exact defaults and inherited limitations;
+historically best research candidates are not substitutes for current comparator behavior.
+
+### Retained chance result and downstream hard blockers (2026-09-07)
+
+`retrospective_chance_creation_team_environment_v1` was scored ONCE at clean
+`6529e71a85e45d276759ec3a5d9824382f5a5431`, after its separately documented pre-fit metadata
+serialization correction. All3,800 incumbent PMFs reproduce exactly;2,280sides/114folds across
+2023-24..2025-26 give NLL1.490035478 vs1.496896051 (+0.4583%) and CS Brier0.169951345
+vs0.171251344 (+0.7591%). Both1% gates fail, as does the2025-26CS seasonal guardrail:
+**INCONCLUSIVE**, development-only, immutable and not retuned. Independent117,195 arithmetic/
+provenance checks pass; strict prospective/default/optimizer behavior stays unchanged.
+See `docs/v2-chance-creation-development.md` and the full retained result/independent audit.
+
+The independent competitive pilot captured13matches/39HTTP200responses but only12/13interpret
+under its frozen contract: League Cup2603048 has12Millwall starters/two goalkeepers in the raw
+roster versus11in formation. Do not silently discard a player or lower the coverage gate. Valid
+PL subset121played durations agrees within1minute, but this does not license the failed match
+or a workload/role mart. A second hard blocker affects exact historical current-default player
+comparison:821price-sensitive cold rows lack proven deadline `now_cost`/complete registry;
+all51retained snapshot captures are2026-27. Archive `value` is not an authorized substitute.
+Phases C–J are not evaluated; do not invent results or call the whole program complete.
+`docs/football-program-blocked-2026-09-07.md` records dependencies, actual tests and evidence.
+
+### Subsequent owner evidence amendment (2026-09-07)
+
+The owner now licenses a NEW explicitly retrospective archive-price proxy implementation of
+the current prospective minutes selector for the original821price-sensitive cold rows
+(742without history,79with ineligible club/season history). This supersedes only the preceding
+prohibition on that substitute for new, separately preregistered DEVELOPMENT comparisons.
+It is not true deadline price, prospective knowledge or exact historical default evidence.
+Established paths must not consult it. Control/candidate use identical proxy inputs; retain
+all/proxy/non-proxy/cold/established slices and a predeclared diagnostic proxy exclusion.
+Downstream coupled allocations/bonus must track propagated dependence separately.
+
+The owner also authorizes additive independent source resolution and a NEW participation
+interpretation contract. Preserve the failed original pilot, raw roster labels and all player
+records. Only corroborated general rules may resolve a formation/roster disagreement; unresolved
+fixtures make affected workload windows unavailable, never zero. They do not block independent
+complete windows. Continue the authorized player research phases only after these boundaries and
+coverage are verified. Every candidate still requires clean preregistration, comparator checks,
+one exclusive formal run, immutable results and independent verification. Phase A stays frozen
+INCONCLUSIVE; no production/default/optimizer changes. See
+`docs/football-program-evidence-amendment-2026-09-07.md`.
+
+The newly preregistered participation V2 offline pilot now passes its scoped contract:
+13fixtures,26sides,266/266selected-club identities,160/160PL starter/appearance comparisons,
+121duration comparisons at0.231405-minute MAE. The extra Millwall roster record remains NULL;
+global all-roster exposure is not claimed. Preserve both the first supplemental prior-presence
+audit and its policy reconciliation; three missing prior-club witnesses are not contradictions.
+See `docs/competitive-participation-v2-development.md`. The shared retrospective current-minutes
+proxy reference also completed114folds/86,755PMFs/821direct proxy rows from clean `eea2381`,
+without candidate scoring; see `docs/retrospective-minutes-proxy-reference.md`. No new player
+candidate or full-points synthesis result exists yet. Historical membership intervals remain
+unproved, so exact workload/rest cannot be fabricated from stint min/max dates. The original
+Stage B181-fold requirement remains unsatisfied by this smaller reference population.
+
+The bounded competitive acquisition now retains574matches/1,148lineup-event endpoints across
+all20PL clubs and six competitive competitions, including1,122newHTTP200responses; no model
+was fitted. See `docs/competitive-workload-capture-development.md`. New operational staging,
+observed-workload lower bounds, coarse starting-role history and a current-component reference
+are implemented separately from production. Exact player registration/rest remains unproved.
+Do not equate successful raw capture with valid participation or silently bridge missing windows.
+The role algorithm is fixed but still awaits coverage-based formal registration. The card target
+audit finds only FPL-scored none/yellow/red states, including10zero-minute card labels; the
+new bounded disciplinary design must not erase them or draw independent physical yellow/red
+events. No new player candidate has been formally scored. Preserve original Stage B AND Stage C
+goals/assists minimum181-fold requirements;114fold development results cannot be declared eligible
+for the passed-successor synthesis rule by adding all-fallback folds or lowering the threshold.
+
+The first clean operational competitive staging cycle is retained from `71c11bf`:
+574whole versions,21,036roster rows,1,161raw receipts in a new database copy.
+Independent32,015checks find no integrity/identity contradiction, but only342/380PL matches
+interpret under V2 and role coverage is7,524/8,360starters(90%), below95%. No role formal run
+is licensed yet. Preserve failed interpretations and four stoppage-clipping duration
+outliers; a separately corroborated interpretation amendment must not rewrite V2.
+See `docs/competitive-workload-staging-v2-development.md`. Source/default databases and
+frozen model results remain unchanged; optional cards remain absent in default callers.
+
+V3 competitive restaging now preserves all V2/raw data and recovers43matches:558/574valid,
+including371/380PL. Independent25,677checks pass; broad-role labels cover8,162/8,360FPL
+starters(97.63%). A pre-score role-scaffold finality fix must retain completed competitive
+extra-time/shootout/aggregate history before final registration; its initial535-version
+coverage report remains frozen. See `docs/competitive-workload-staging-v3-development.md`.
+
+The independent disciplinary candidate has now run ONCE from clean `54d9ffe` on114folds/
+86,755rows/821price-proxy rows. Joint NLL0.183069516 vs position-control0.185183364(+1.1415%),
+yellow log+1.2163%, but red log and red Brier regress: **INCONCLUSIVE**, not synthesis-eligible.
+Do not retune red pooling or select yellow alone. Independent5,214,137checks reconcile every
+PMF, score, source and gate; see `docs/player-disciplinary-development.md`. The optional card
+component remains absent from defaults and the passed-successor synthesis rule keeps incumbent
+disciplinary behavior. This does not stop independent authorized workload/role/attack/DC/saves
+research. Retrospective price/roster caveats and original181-fold Stage B/C minima remain.
+
+The broad starting-role transition candidate now has its final coverage-only preregistration:
+`docs/player-role-evaluation-v1-preregistration.md`. The corrected competitive finality boundary
+retains574source bundles/19,320history rows and unchanged8,162/8,360starter labels. All29,747
+2025-26roster rows receive separately retrospective OOS predictions; only measured starters are
+scored. This predicts broad role conditional on a hypothetical start, not starting probability
+or substitute role. The matched recent-state persistence diagnostic must accompany transition
+claims. No role formal result exists at this preregistration commit. Focused140tests pass;
+global Ruff and changed-file format/strict mypy pass. Historical Windows/full-format failures
+remain documented separately, not relabelled as a green full gate.
+
+Broad-role V1 has now run ONCE from clean `9e1b34d`:29,747OOS predictions/8,162labels,
+38GWs. Its fixed primary gate is SUPPORTED_FOR_DEVELOPMENT (+33.43494%NLL vs smoothed
+last role), but transition NLL.480621 is13.84953% worse than matched EWMA persistence
+.422155. Transition attribution is NOT supported; do not switch to the diagnostic arm
+after scoring. Independent4,192,346checks pass. See `docs/player-role-development.md`.
+The original four broad labels mean hypothetical starting role, not actual next XI or
+substitute role. No production/default promotion follows.
+
+DC and GK-saves successors now have separate pre-score contracts in
+`docs/dc-predicted-environment-v1-design.md` and
+`docs/player-saves-opportunity-design.md`. The DC successor predicts its environment
+and exposure from prior evidence; the old DC V2 oracle-environment figures are
+qualified additively in `docs/v2-dc-evidence-qualification.md`, never rewritten.
+GK saves consumes only retained event-time OOS shot forecasts, not a rerun of Phase A.
+The write-once current-component reference shares unchanged baseline arithmetic,
+not challenger fits. Neither new candidate has a formal result at this commit.
+The coverage-only full-points population is fixed to measured 2025-26 targets before
+G/H scoring; see `docs/full-player-pmf-population-audit.md`. Older missing DC remains
+NULL. All historical price-proxy and prospective restrictions remain intact.
+
+The OOS-shot GK-saves successor has now run ONCE from clean `f0c52fe`:2,313keeper
+appearances/114GWs, NLL2.019983491→1.975058197(+2.22404%), CRPS+4.20264%, all three
+seasonal1%/calibration guards pass. **SUPPORTED for development synthesis only**;
+independent175,108checks reconcile its full probabilities and evidence. See
+`docs/player-saves-opportunity-development.md`. No current saves default changes.
+Unknown source SOT remains NULL, and original later capture times remain retrospective.
+The synthesis must project saved parameters onto every GK roster row without using
+actual appearance. Other components still require their own full gates.
+
+The separately preregistered DC successor also ran ONCE from clean `f0c52fe`:
+7,859measured outfield appearances/28folds, NLL.342467929→.330258420(+3.56515%).
+Its307past-witnessed transfer rows regress1.53959%, failing the fixed guardrail:
+**INCONCLUSIVE**, keep current DC in synthesis/defaults. Independent7,358,810checks
+pass. Dispersion adds only0.39407%against the same-input Poisson diagnostic, with
+uncertainty including zero. Never choose that diagnostic posthoc. See
+`docs/v2-dc-predicted-environment-development.md`.
+
+The final separate workload-minutes and goals/assists opportunity registrations now
+pin the retained complete reference, OOS transition-role forecasts and explicit
+821-row archive-price proxy boundary. See `docs/player-workload-minutes-evaluation-v1-preregistration.md`
+and `docs/player-opportunity-design.md`. None has been formally fitted at this
+preregistration commit. Both Stage B and Stage C retain181required folds, versus
+114nominal/38new-source folds available; no full-gate/synthesis acceptance is possible
+from these scoped runs. Do not hide that shortfall using all-fallback historical rows.
+
+Additive D/E result record (2026-09-07): all three separately registered candidates
+ran ONCE from clean `9f9e32d`, with the `cb11a64` evaluation code/config unchanged.
+Each retains 114 folds, 86,755 rows and all 821 direct price-proxy rows unchanged
+from CURRENT. Workload minutes improves mean log score only 0.00353654%, fails its
+1% current-control bar and is INCONCLUSIVE; 12,349,170 independent checks pass.
+Goals opportunity improves CURRENT 4.23577% but fails the required best-baseline
+primary/season checks (scoped INCONCLUSIVE); assists improves 2.75623% with all
+numeric checks passing (scoped SUPPORTED). Each opportunity audit passes 9,758,661
+checks. All final audits have zero failures; no candidate is rerun or retuned.
+
+All three remain full-gate INELIGIBLE: 114 folds versus the unchanged Stage B/C
+181-fold requirements, with only 38 new-source folds. None may enter synthesis or
+replace defaults; keep CURRENT minutes, goals and assists. Role/exposure/shrinkage
+is a joint construction, not evidence of a role-only effect. Historical roster,
+price, later-capture and completion-proxy caveats remain. See
+`docs/player-workload-minutes-development.md` and `docs/player-opportunity-development.md`
+for the immutable results, source pins, seasonal evidence and independent audits.
+
+Full-points synthesis V1 is now separately preregistered, not yet scored at this
+commit: `retrospective_player_points_synthesis_v1`, documented in
+`docs/full-player-pmf-design.md`. Mechanical full-gate acceptance selects only H
+GK saves; team Goal/CS, current-proxy minutes, goals/assists, DC, absent cards and
+joint BPS/bonus remain incumbent. The nominated fully measured cohort is2025-26,
+38GWs/380fixtures/29,747rows/270direct price proxies; the original821registry gap
+remains. Keep signed targets and disclose inherited0..34proper-score coarsening.
+Reproduce every incumbent fixture PMF before the single clean shared claim.
+This is development-only, with no component refits or production promotion.
+
+Additive final synthesis result (2026-09-07): the registered H-only full-points
+candidate ran ONCE from clean `e716ec1`, after all 380 fixture controls reproduced
+at zero tolerance. On 29,747 rows / 38 GWs, NLL 1.088996402 -> 1.088375224 improves
+only 0.0570413%, and CRPS 0.669071035 -> 0.669132236 regresses slightly. Five of
+seven gates pass: **INCONCLUSIVE**, no default replacement or retuning. Independent
+4,297,806 checks pass with zero failures; all 3,427 GK projections include DNPs,
+not just H's appeared score population. Full distributions/source hashes and
+signed/coarsened targets are retained; the original 821-row registry gap and
+270 direct proxy rows here remain explicit. See `docs/full-player-pmf-development.md`
+and `docs/football-program-completion-2026-09-07.md`.
+
+The authorized program is complete within its documented evidence boundaries.
+Only H saves passed a full component gate; that saves-count result does not imply
+the final points synthesis passed. Keep all production/prospective/optimizer
+defaults. D/E retain 114-versus-181-fold ineligibility, F/G retain failed guards,
+and C's transition model still loses the stronger matched persistence diagnostic.
+The corrected broader partition passes 3,572 tests / four skips, excluding the
+known Windows symlink suite; eleven unrelated global-format failures remain.
+Do not describe the entire repository gate as all green. No subsequent experiment
+or shadow schedule is activated by this retained-result documentation.

@@ -1,0 +1,40 @@
+# Read-only health check over the capture receipts. Reports the newest completed receipt,
+# the elapsed success age, production health separately, and running/failed/malformed/
+# undated receipts; unknown evidence stays null. A newer malformed, undated, or
+# unattributed receipt blocks any healthy verdict from an older one, and an explicit
+# --max-success-age-hours bound that cannot be proven (freshness blocked by suspects)
+# exits nonzero with verdict "unknown". Needs no network: the socket allowlist
+# deliberately excludes AF_INET/AF_INET6.
+
+[Unit]
+Description=The Comet FPL - SDP capture receipt health check (read-only)
+Documentation=file:/opt/comet-fpl/checkout/docs/sdp-primary-remote-runtime.md
+
+[Service]
+Type=oneshot
+User=comet-fpl
+Group=comet-fpl
+UMask=0027
+EnvironmentFile=/etc/default/comet-fpl-sdp
+WorkingDirectory=/opt/comet-fpl/checkout
+ExecStartPre=/bin/sh /usr/local/sbin/comet-fpl-verify-pin /opt/comet-fpl/checkout
+ExecStart=/opt/comet-fpl/venv/bin/python -m fpl.jobs.sdp_capture_health --runs ${SDP_RUNS} --db ${SDP_DB} --max-success-age-hours ${SDP_HEALTH_MAX_AGE_HOURS}
+TimeoutStartSec=300
+TimeoutStopSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=

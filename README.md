@@ -1,5 +1,34 @@
 # FPL points-prediction system
 
+**Descriptive attacking-usage scouting (2026-09-08).** A current-season JSON/CSV export
+shows same-position xG/xA usage, long/recent context, observation depth and a defender
+watchlist. The frozen predictive V1 verdict remains **REFUTED**; this capability changes
+no forecasts or optimizer decisions. See the [scouting guide and commands](docs/player-attacking-usage-scouting-2026-09-08.md).
+
+**Owner-directed architectural adoption (2026-09-07, V2 branch only). SDP-backed V2 is the primary
+football-environment architecture. Historical experimental verdict remains INCONCLUSIVE under
+its frozen gate. Incumbent retained as operational fallback and prospective shadow comparator.**
+This is the explicit operational exception to earlier default-freeze statements below. Player
+challengers are not promoted; H saves remains shadow-only. Daily capture and pre-deadline refresh
+use actual cutoff-known SDP versions with strict health checks and incumbent fallback.
+See the [decision](docs/sdp-primary-architecture-decision-2026-09-07.md) and
+[commands/runbook](docs/sdp-primary-operations.md). No main merge or default-branch change is authorized.
+
+The next operational phase audits fixture fallbacks, rechecks required incomplete provider
+history, preserves exact pre-deadline replay inputs, and records paired primary/incumbent-shadow
+forecasts before official deadlines. See the [remote capture package](docs/sdp-primary-remote-runtime.md)
+and [prospective evidence contract](docs/sdp-prospective-evidence.md). Remote deployment awaits an
+authorized runtime; no new player-component research is started during this evidence-collection phase.
+
+**Local SDP operations / revision PIT (2026-09-06).** Strict team observations now retain and
+select complete stats and fixture-metadata revisions known at the cutoff; tactical features
+roll over that selected vintage, never over multiple revisions as separate matches. Latest-only
+reporting marts stay separate. The new locked/backed-up `python -m fpl.jobs.daily_pl_sdp`
+requires explicit operational `--db` and `--runs`; `--raw-only` preserves capture while staging
+is deferred. See [the revision-PIT and local daily runbook](docs/pl-sdp-revision-pit-and-local-daily.md).
+No default consumer or frozen model result is changed. The owner permits new model research
+without requiring an earlier 1% win; new evaluation criteria must still be frozen beforehand.
+
 Produces, for every FPL player and gameweek, a **full distribution of fantasy points** —
 not a point estimate — because the three questions a manager actually asks have three
 different answers:
@@ -11,6 +40,42 @@ different answers:
 | Is this differential worth it? | exact cumulative downside/upside probabilities and deadline ownership |
 
 A single `xP` answers only the first.
+
+**V2 (2026-09-04): a football-first prediction engine is implemented development-only, alongside
+V1 rather than instead of it.** V1 is untouched — no model, config, frozen result, candidate
+document, ledger row or prospective default changed. V2 inserts the layer V1 never had: it models
+the football match environment first (`Premier League / FPL data -> football data layer -> football
+engine -> fixture environment -> FPL component engine -> full points distribution -> decision`),
+with `FixtureEnvironment` as the contract between the two halves. Because the V2 component engine
+produces the composer's existing input type, the composer, artifact contract and optimizer are
+unchanged. **Both V2 candidates failed their pre-registered gates and are left as committed**: the
+team environment reached +0.2867% against a 1% bar with a 2021-22 regression, and GK Saves V2 —
+which replaced V1's identity treating shots faced as a deterministic function of goals conceded —
+is refuted in the regime that matters, winning the two pre-xG seasons and losing every season after
+them. See `docs/v2-architecture.md` and `docs/v2-team-engine-development.md`. The first real Premier
+League SDP capture was validated on 2026-09-05: six configured seasons, 1,921 match-stat payloads,
+and an exact measured fixture crosswalk now populate the V2 football fact alongside
+`fpl_archive`. This new evidence does not reinterpret the frozen V2 evaluations or license a
+historical point-in-time rerun; see `docs/pl-sdp-real-provider-validation-2026-09-05.md`.
+
+The first isolated real-SOT successor completed its single retrospective outer evaluation and is
+**inconclusive, not promoted**. On 2,280 team-sides / 114 folds, adding REAL SOT to the exact goals+xG
+control improves mean log score only 0.0374%, far below the frozen 1% bar, and regresses slightly in
+two of three seasons. `RetrospectiveBackfillView` remains validation-only and preserves the original
+September 2026 capture time; production PIT, forecasts, dashboards, and optimizer still require
+`known_at <= as_of`. See `docs/v2-real-sot-development.md`.
+
+An owner-authorized missing-SOT audit now corroborates all 42 omissions in the scored seasons
+without replacing raw NULLs or imputing team averages. A separately named SOT-only successor is
+preregistered in `docs/v2-corroborated-zero-sot-design.md`: it uses a validation-only interpreted
+column, the unchanged estimator/control/grid, and one new clean-provenance development run.
+The first result and every prospective default remain frozen.
+
+That successor has now completed its single clean run: **INCONCLUSIVE**, with only **0.0612%**
+log-score lift over goals+xG (1.488525 versus 1.489436), below the unchanged 1% bar and with a
+small 2024-25 regression. CRPS improves 0.1298%; overall PIT-80 improves slightly. Raw values,
+the old results and all live models remain unchanged. See
+`docs/v2-corroborated-zero-sot-development.md`; no territory candidate is licensed by this result.
 
 **Current status: the data foundation, development-only forward pipeline through Stage E,
 append-only forecast/outcome ledgers, BI semantic contract version 6, ten established dashboard
@@ -228,6 +293,24 @@ tests/
 .github/workflows/               -- CI plus daily and finalized-history R5 capture
 ```
 
+V2 adds, without disturbing any of the above:
+
+```
+config/pl_sdp_metrics.yaml            football metric dictionary (exact verified keys + fallbacks)
+config/v2_*_evaluation.yaml           pre-registered V2 contracts
+src/fpl/ingest/pl_sdp.py              Premier League SDP client
+src/fpl/transform/pl_sdp.py           landing, staging, measured fixture crosswalk
+src/fpl/transform/football_v2.py      the provider-tagged team-match football fact + tactical form
+src/fpl/artifacts/fixture_environment.py   the football <-> fantasy contract
+src/fpl/models/football_engine_v2.py       one rating system per football signal
+src/fpl/models/gk_saves_v2.py              saves from predicted shots faced
+src/fpl/models/defensive_environment_v2.py DC as a team environment x role share
+src/fpl/models/component_engine_v2.py      adapter onto the UNCHANGED composer input
+src/fpl/validate/v2_environment_harness.py walk-forward harness
+src/fpl/validate/dev_v2_team_environment.py the development runner
+src/fpl/jobs/{backfill,capture,audit}_pl_sdp.py, prospective_environment_v2.py
+```
+
 ## Storage layers
 
 `raw_` (as landed, immutable) → `stg_` (typed, deduped, crosswalked) → `mart_`
@@ -296,7 +379,8 @@ table. Four runtime layers plus two static ones:
 1. `AsOf` rejects naive datetimes, so timezone cannot silently move the boundary.
 2. No caller SQL; column names are validated against a per-table allowlist.
 3. `observed_*` appends `kickoff_time < as_of` itself, after any caller filters.
-4. Live facts and schedules additionally select only versions with `known_at <= as_of`.
+4. Any readable fact carrying `known_at` additionally enforces `known_at <= as_of`; versioned live
+   facts and schedules select the latest eligible version.
 5. `schedule()` may return future rows but projects only pre-kickoff columns — a future
    outcome is absent, not merely filtered.
 6. An **AST scan** fails any module in `features/` that imports duckdb, calls `.execute(`,
@@ -546,6 +630,19 @@ promoted; see
 
 ---
 
+## Development-only weekly-inner SOT follow-up
+
+The owner authorized one new incremental SOT test against the frozen weekly-inner goals+xG
+control. The [preregistration](docs/v2-weekly-sot-design.md) keeps goals/xG, population,
+weekly selection and grids unchanged, and reuses the verified historical SOT interpretation.
+Formal evaluation requires clean committed provenance and exact control reproduction first.
+Below 1% relative log-score lift, keep existing defaults; even a pass is not promotion.
+The daily operational database/raw collection remains separate from this frozen research DB.
+
+The single run is complete: **INCONCLUSIVE**, only **+0.066134%** log-score lift and a small
+2024-25 regression. Pooled clean-sheet Brier worsens slightly; existing defaults stay.
+See the [development result](docs/v2-weekly-sot-development.md). Do not rerun or retune it.
+
 ## The Stage A bar
 
 ```bash
@@ -688,6 +785,20 @@ permission to widen the grid. Full result and caveats in
 [`docs/phase1-candidate-v3-development.md`](docs/phase1-candidate-v3-development.md). The
 trailing-goals baseline remains the Stage A model.
 
+### Tactical Matchup numerical-only continuation (2026-09-07)
+
+The owner authorized one separately preregistered numerical-method amendment after Tactical
+V1's incomplete execution. The same tactical hypothesis, incumbent, features, population,
+Poisson family and dual 1% materiality gates remain frozen; the old failure is not rerun or
+rewritten. [Amendment policy](docs/v2-tactical-numerical-amendment.md) specifies the separate
+solver, strict clean-provenance one-run guard and durable diagnostics. Development only;
+prospective, optimizer and dashboard defaults remain unchanged.
+
+The single clean amended run is now complete: **INCONCLUSIVE**, goal log-score improvement
+**0.274885%**, clean-sheet Brier improvement **0.483597%**, both below the 1% bars. Style forecasts
+improve but goal/CS value remains too small to replace the incumbent. [Full retained result
+and interpretation](docs/v2-tactical-numeric-development.md); no promotion or old-result rewrite.
+
 ### Candidate V4: leakage-safe successor, development-only result, not promoted
 
 `dynamic_team_goals_v4` is pre-registered (contract amendment 1.5) as the leakage-safe structural
@@ -709,3 +820,54 @@ the corrected batch candidate V2, and the trailing-goals baseline remains Stage 
 and caveats in
 [`docs/phase1-candidate-v4-development.md`](docs/phase1-candidate-v4-development.md). Design and
 the frozen grid in [`docs/phase1-candidate-v4-design.md`](docs/phase1-candidate-v4-design.md).
+
+### Football-process research program (development only, 2026-09-07)
+
+The new [chance-creation preregistration](docs/v2-chance-creation-design.md) separates shot volume,
+chance quality and strongly pooled conversion, reusing frozen OOS tactical forecasts. Its
+coverage-only audit qualifies 2023-24 through2025-26. The independent
+[competitive-participation pilot](docs/competitive-participation-pilot.md) validates identities and
+derived participation before any workload/role use. Each new model has a separate one-run contract;
+none replaces current forecasts, optimizer inputs or dashboard defaults. See the
+[incumbent audit](docs/football-development-incumbent-audit.md) for the exact comparator paths and
+limitations; frozen tactical numeric1 and every earlier evaluation remain unchanged.
+
+The [single chance-creation run](docs/v2-chance-creation-development.md) is now retained:
+NLL+0.4583%,clean-sheet Brier+0.7591%, **INCONCLUSIVE** against both1% gates. Defaults remain
+unchanged. The [participation pilot](docs/competitive-participation-pilot-development.md)
+captured13matches but found one contradictory lineup, and historical exact-current player
+comparison lacks deadline price-registry evidence. The [program handoff](docs/football-program-blocked-2026-09-07.md)
+records these hard blockers: later player/component/full-points phases are not claimed complete.
+
+The owner's subsequent [evidence amendment](docs/football-program-evidence-amendment-2026-09-07.md)
+licenses an explicitly labelled archive-price proxy for the 821 historical cold-start rows,
+plus independent lineup-source resolution and a new participation interpretation boundary.
+The original pilot and Phase A result remain frozen. Dependent player research may continue
+only under separate clean, single-run development contracts; production defaults do not change.
+
+The [V2 participation pilot](docs/competitive-participation-v2-development.md) now passes its
+scoped interpretation checks, and the [minutes proxy reference](docs/retrospective-minutes-proxy-reference.md)
+retains114folds/86,755PMFs with821direct proxy rows. These are data/comparator prerequisites,
+not new player-model results or production-valid historical forecasts.
+
+The [competitive capture](docs/competitive-workload-capture-development.md) now contains574
+matches with both lineup/event payloads. The [current-component reference](docs/development-reference-components.md)
+keeps the historical proxy boundary explicit; [broad-role history](docs/player-role-history-v1-design.md)
+and [disciplinary modelling](docs/player-disciplinary-design.md) are new unscored development
+designs. Source interpretation/coverage and clean formal preregistration remain mandatory.
+
+The subsequent [workload-minutes result](docs/player-workload-minutes-development.md)
+and [separate goals/assists results](docs/player-opportunity-development.md) are now
+retained. Their full gates remain ineligible at114/181folds. The separately
+[preregistered full-points synthesis](docs/full-player-pmf-design.md) therefore
+keeps those incumbents and tests only the full-gate-passed GK-saves replacement.
+This remains retrospective development with an explicit historical-price proxy,
+not a default change or historical deadline-reproduction claim.
+
+The [complete authorized program](docs/football-program-completion-2026-09-07.md)
+is now retained. Its [single final points synthesis](docs/full-player-pmf-development.md)
+improves NLL only **0.0570%** and slightly worsens CRPS: **INCONCLUSIVE**. Only the
+GK-saves component passed its full development gate; this is not a full-pipeline
+or production promotion. Every default remains unchanged, and the original
+historical-price proxy, participation, coverage and signed-score limitations stay
+explicit. No previous frozen experiment was retuned or rerun.

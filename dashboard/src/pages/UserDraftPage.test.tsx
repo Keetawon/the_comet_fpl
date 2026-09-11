@@ -2,16 +2,19 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadNextGw, loadOptimizerAudit, loadPlayers } from "@/data/load";
+import { loadNextGw, loadOptimizerAudit, loadPlayers, loadSummary } from "@/data/load";
 import auditSample from "@/data/sampleOptimizerAudit.json";
 import nextGwSample from "@/data/sampleNextGw.json";
 import playersSample from "@/data/samplePlayers.json";
+import summarySample from "@/data/sampleSummary.json";
 import type {
+  DashboardManifest,
   NextGwPlan,
   OptimizerAuditData,
   PlayerFixture,
   PlayerRecord,
   PlanPlayer,
+  SummaryData,
 } from "@/data/types";
 import {
   fetchManagerTeamMembers,
@@ -24,6 +27,7 @@ vi.mock("@/data/load", () => ({
   loadNextGw: vi.fn(),
   loadOptimizerAudit: vi.fn(),
   loadPlayers: vi.fn(),
+  loadSummary: vi.fn(),
 }));
 vi.mock("@/lib/planServer", () => ({
   fetchManagerTeamMembers: vi.fn(),
@@ -100,11 +104,126 @@ beforeEach(() => {
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
   vi.mocked(loadOptimizerAudit).mockResolvedValue(audit);
   vi.mocked(loadPlayers).mockResolvedValue({ players: draftPlayers, manifest: null });
+  vi.mocked(loadSummary).mockResolvedValue({ ...summarySample, latest_run: null } as SummaryData);
   vi.mocked(fetchManagerTeamMembers).mockReset();
   vi.mocked(fetchManagerTeamMembersCapture).mockReset();
 });
 
+function publishCurrentForecast(gw: number) {
+  const latestRun = {
+    ...summarySample.latest_run!,
+    run_id: `current-gw-${gw}`,
+    season: plans[0].season,
+    as_of: "2026-09-09T05:52:47Z",
+    gw_from: gw,
+    gw_to: gw + 4,
+  };
+  const players = draftPlayers.map((player) => ({
+    ...player,
+    run_id: latestRun.run_id,
+    as_of: latestRun.as_of,
+    fixtures: player.fixtures.map((fixture, index) => ({
+      ...fixture,
+      gw: gw + index,
+      expected_points: 2,
+    })),
+  }));
+  const manifest: DashboardManifest = {
+    schema: "fpl.dashboard-manifest",
+    json_schema_version: 9,
+    generated_at: latestRun.as_of,
+    ease_index_formula_version: "fixture-ease-v1",
+    run_ids: [latestRun.run_id],
+    runs: [{ ...latestRun, horizon_gameweeks: 5 }],
+    source: {
+      export_schema: "synthetic",
+      export_schema_version: 1,
+      semantic_contract_version: 6,
+      export_content_sha256: "synthetic",
+      export_created_at: latestRun.as_of,
+      database_sha256: "synthetic",
+    },
+    files: {},
+    content_sha256: "synthetic",
+  };
+  vi.mocked(loadSummary).mockResolvedValue({ ...summarySample, latest_run: latestRun } as SummaryData);
+  vi.mocked(loadPlayers).mockResolvedValue({ players: [...draftPlayers, ...players], manifest });
+  return { latestRun, players, manifest };
+}
+
 describe("UserDraftPage", () => {
+  it.each([4, 5])("imports GW%s against the current forecast even when the retained optimizer plan is older", async (gw) => {
+    const user = userEvent.setup();
+    const { latestRun, players } = publishCurrentForecast(gw);
+    const planBytes = JSON.stringify(plans);
+    const auditBytes = JSON.stringify(audit);
+    const stored = JSON.stringify({
+      version: 3,
+      seedSource: "manual",
+      optimizerRunId: plans[0].optimizer_run_id,
+      forecastRunId: plans[0].forecast_run_id,
+      season: plans[0].season,
+      managerCaptureId: null,
+      playerCodes: [1],
+    });
+    window.localStorage.setItem(USER_DRAFT_STORAGE_KEY, stored);
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValue({ ...managerPreview, planning_gw: gw });
+    const { container } = render(<UserDraftPage />);
+    await screen.findByRole("heading", { name: "Squad Draft" });
+    expect(screen.getByText(`${plans[0].season} · GW${gw}–GW${gw + 4}`)).toBeInTheDocument();
+    expect(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY)).toBe(stored);
+
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Fetch current team" }));
+
+    expect(await screen.findByText("15/15 players")).toBeInTheDocument();
+    expect(container.querySelector("tfoot")).toHaveTextContent("150.0");
+    expect(JSON.parse(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY) ?? "{}")).toMatchObject({
+      forecastRunId: latestRun.run_id,
+      optimizerRunId: plans[0].optimizer_run_id,
+      seedSource: "manager_current",
+      playerCodes: players.map((player) => player.code),
+    });
+    expect(JSON.stringify(plans)).toBe(planBytes);
+    expect(JSON.stringify(audit)).toBe(auditBytes);
+  });
+
+  it("rejects a mismatched current manifest without replacing stored picks", async () => {
+    const { players, manifest } = publishCurrentForecast(4);
+    vi.mocked(loadPlayers).mockResolvedValue({
+      players,
+      manifest: { ...manifest, runs: manifest.runs.map((run) => ({ ...run, gw_from: 3 })) },
+    });
+    window.localStorage.setItem(USER_DRAFT_STORAGE_KEY, "retained old draft");
+    render(<UserDraftPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("cannot bind the current forecast");
+    expect(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY)).toBe("retained old draft");
+    expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
+  });
+
+  it("keeps the GW guard and saved draft if the manager is newer than the published forecast", async () => {
+    const user = userEvent.setup();
+    publishCurrentForecast(4);
+    vi.mocked(fetchManagerTeamMembers).mockResolvedValue({ ...managerPreview, planning_gw: 5 });
+    render(<UserDraftPage />);
+    await screen.findByRole("heading", { name: "Squad Draft" });
+    await user.click(screen.getByRole("button", { name: "Add Draft 01" }));
+    const stored = window.localStorage.getItem(USER_DRAFT_STORAGE_KEY);
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Fetch current team" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("plans GW5, but the selected forecast starts at GW4");
+    expect(screen.getByText("1/15 players")).toBeInTheDocument();
+    expect(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY)).toBe(stored);
+  });
+
+  it("does not silently return to the old plan when current forecast players are missing", async () => {
+    const { manifest } = publishCurrentForecast(4);
+    vi.mocked(loadPlayers).mockResolvedValue({ players: draftPlayers, manifest });
+    render(<UserDraftPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("no priced players for the selected forecast");
+    expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
+  });
+
   it("keeps hosted Squad Draft manual and never exposes manager import controls", async () => {
     vi.stubEnv("VITE_HOSTED_STATIC", "true");
 
@@ -337,6 +456,7 @@ describe("UserDraftPage", () => {
   });
 
   it("loads the exact captured current team from a typed handoff", async () => {
+    publishCurrentForecast(4);
     vi.mocked(fetchManagerTeamMembersCapture).mockResolvedValue(managerPreview);
     window.location.hash =
       `#squad-draft?optimizer_run_id=${encodeURIComponent(plans[0].optimizer_run_id)}` +

@@ -6,12 +6,14 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw, loadTeamActuals, loadTeamProvisionalActuals } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadSummary, loadTeamActuals, loadTeamProvisionalActuals } from "@/data/load";
 import sample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
+import summarySample from "@/data/sampleSummary.json";
 import type {
   FixtureScheduleOverlay,
   NextGwPlan,
+  SummaryData,
   TeamActualFixture,
   TeamActualsData,
 } from "@/data/types";
@@ -157,6 +159,7 @@ vi.mock("@/data/load", () => ({
   loadNextGw: vi.fn(),
   loadTeamActuals: vi.fn(),
   loadTeamProvisionalActuals: vi.fn(),
+  loadSummary: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -175,6 +178,7 @@ beforeEach(() => {
     captured_at: null,
     teams: [],
   });
+  vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
 });
 
 describe("FixtureMatrixPage", () => {

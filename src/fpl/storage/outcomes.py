@@ -10,7 +10,7 @@ outcome cannot be attached twice.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fpl.config import load_scoring_rules
@@ -311,6 +311,20 @@ def select_finalized_outcomes(
     return sorted(outcomes, key=lambda item: (item.season, item.code, item.fixture))
 
 
+def _instant_from_epoch_us(value: object, *, name: str) -> datetime:
+    """Rebuild an aware UTC instant from DuckDB `epoch_us()` microseconds.
+
+    A `datetime` is still accepted so any caller already holding one keeps working; anything
+    else raises rather than being coerced, because a silently wrong kickoff moves the
+    point-in-time boundary.
+    """
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise OutcomeSourceError(f"{name} is not an epoch-microsecond integer: {value!r}")
+    return datetime.fromtimestamp(value / 1_000_000, tz=UTC)
+
+
 def _historical_team_rows(
     con: duckdb.DuckDBPyConnection, *, as_of: datetime, season: str | None
 ) -> list[tuple[object, ...]]:
@@ -322,7 +336,7 @@ def _historical_team_rows(
     return con.execute(
         f"""
         SELECT
-            f.season, f.fixture, f.gw, f.kickoff_time, f.team_h, f.team_a,
+            f.season, f.fixture, f.gw, epoch_us(f.kickoff_time), f.team_h, f.team_a,
             f.team_h_score, f.team_a_score, home.team_code, away.team_code
         FROM stg_fixture AS f
         LEFT JOIN stg_team AS home
@@ -375,7 +389,7 @@ def _live_team_rows(
             WHERE version_rank = 1
         )
         SELECT
-            f.season, f.fixture, f.gw, f.kickoff_time, f.team_h, f.team_a,
+            f.season, f.fixture, f.gw, epoch_us(f.kickoff_time), f.team_h, f.team_a,
             f.team_h_score, f.team_a_score, home.team_code, away.team_code
         FROM latest_fixture AS f
         LEFT JOIN latest_team AS home
@@ -439,11 +453,15 @@ def select_finalized_team_outcomes(
         away_id = _required_int(team_a, name=f"fixture {fixture_key} away team")
         if home_id == away_id:
             raise OutcomeSourceError(f"finalized fixture {fixture_key} has the same team twice")
-        if not isinstance(kickoff_time, datetime):
-            raise OutcomeSourceError(
-                f"finalized fixture {fixture_key} has a non-datetime kickoff_time"
-            )
-        kickoff = kickoff_time
+        # Both selectors project `epoch_us(kickoff_time)` rather than the TIMESTAMPTZ itself.
+        # DuckDB converts a TIMESTAMPTZ fetched through `fetchall()` into a Python datetime via
+        # `pytz`, which this project does not declare as a dependency -- it pins `tzdata` for
+        # `zoneinfo` -- so a clean install raised ModuleNotFoundError here. Exact microseconds
+        # carry no timezone name, so no IANA lookup happens at all. Same fix, and same reason,
+        # as the one already applied to the BI exporter's provenance reads.
+        kickoff = _instant_from_epoch_us(
+            kickoff_time, name=f"finalized fixture {fixture_key} kickoff_time"
+        )
         _require_aware(kickoff, name=f"fixture {fixture_key} kickoff_time")
         home_score = _required_int(team_h_score, name=f"fixture {fixture_key} home score")
         away_score = _required_int(team_a_score, name=f"fixture {fixture_key} away score")
@@ -518,11 +536,18 @@ def _new_outcomes_only(
 
 
 def _team_values(outcome: TeamLedgerOutcome) -> tuple[object, ...]:
+    """The immutable values a re-attachment must match, with kickoff as epoch microseconds.
+
+    Matches the comparison query below, which projects `epoch_us(kickoff_time)`: DuckDB
+    converts a fetched TIMESTAMPTZ through `pytz`, an undeclared dependency here. Comparing
+    integers is also stricter than comparing datetimes, which can differ in tzinfo
+    representation while denoting the same instant.
+    """
     return (
         outcome.team_code,
         outcome.opponent_team_id,
         outcome.gw,
-        outcome.kickoff_time,
+        round(outcome.kickoff_time.timestamp() * 1_000_000),
         outcome.was_home,
         outcome.goals_for,
         outcome.goals_against,
@@ -543,7 +568,7 @@ def _new_team_outcomes_only(
         for outcome in pair:
             existing = con.execute(
                 """
-                SELECT team_code, opponent_team_id, gw, kickoff_time, was_home,
+                SELECT team_code, opponent_team_id, gw, epoch_us(kickoff_time), was_home,
                        goals_for, goals_against
                 FROM ledger_outcome_team_fixture
                 WHERE season = ? AND fixture = ? AND team_id = ?

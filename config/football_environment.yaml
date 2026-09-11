@@ -1,0 +1,12 @@
+# Owner-directed architectural adoption. This is not a changed research verdict.
+schema_version: 1
+football_environment_primary: sdp_v2
+football_environment_fallback: trailing_goals_attack_defence
+shadow_incumbent: true
+gk_saves_candidate_mode: shadow
+frozen_parameters: config/sdp_v2_frozen_parameters.json
+frozen_parameters_sha256: 043ae6ab2afef1064ce7a3d8544552b7f4fae247216daff6556257fe01f1526b
+gk_shadow_parameters: config/sdp_gk_shadow_parameters.json
+gk_shadow_parameters_sha256: 2e03ba5d38a93aaea3f0abd4b34ff79b48565c06ad4f1e1e67952c0f6e82a638
+lookback_days: 5
+workload_competitions: [8, 1, 2, 5, 6, 1125]

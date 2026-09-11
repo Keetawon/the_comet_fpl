@@ -6,11 +6,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayerProvisionalActuals, loadPlayers } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayerProvisionalActuals, loadPlayers, loadSummary } from "@/data/load";
 import playersSample from "@/data/samplePlayers.json";
 import teamsSample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
 import horizonsSample from "@/data/samplePlayerHorizons.json";
+import summarySample from "@/data/sampleSummary.json";
 import type {
   NextGwPlan,
   PlayerActualFixture,
@@ -19,6 +20,7 @@ import type {
   PlayerHorizonsData,
   PlayerProvisionalActualFixture,
   PlayerRecord,
+  SummaryData,
   TeamRecord,
 } from "@/data/types";
 import { PLAYER_HORIZON_FIELDS } from "@/data/types";
@@ -60,6 +62,7 @@ vi.mock("@/data/load", () => ({
   loadPlayerHorizons: vi.fn(),
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
+  loadSummary: vi.fn(),
 }));
 
 vi.mock("@/lib/planServer", async () => {
@@ -248,6 +251,7 @@ beforeEach(() => {
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
+  vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
 });
 
 afterEach(() => {

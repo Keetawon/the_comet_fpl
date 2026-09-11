@@ -1,0 +1,20 @@
+{
+  "stats": [
+    {
+      "side": "home",
+      "stats": [
+        {"name": "goals", "value": 3},
+        {"name": "expected_goals", "value": 2.41},
+        {"name": "ontarget_scoring_att", "value": 8}
+      ]
+    },
+    {
+      "side": "away",
+      "stats": [
+        {"name": "goals", "value": 0},
+        {"name": "expected_goals", "value": 0.62},
+        {"name": "ontarget_scoring_att", "value": 2}
+      ]
+    }
+  ]
+}

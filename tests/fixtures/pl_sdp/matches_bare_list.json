@@ -1,0 +1,13 @@
+[
+  {
+    "id": 116001,
+    "season": {"id": 719, "label": "2025/26"},
+    "matchweek": 12,
+    "kickoffTime": "2025-11-25T15:00:00Z",
+    "status": "COMPLETE",
+    "homeTeam": {"id": 1, "name": "Arsenal"},
+    "awayTeam": {"id": 4, "name": "Chelsea"},
+    "homeScore": 2,
+    "awayScore": 1
+  }
+]

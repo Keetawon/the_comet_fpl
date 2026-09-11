@@ -1,0 +1,572 @@
+contract_version: '1.0'
+study_id: historical_player_attacking_backfill_v1
+development_only: true
+expected_branch: claude/comet-fpl-v2-architecture-mqrj8f
+starting_head: 266a71f29767562005aa3d518d6501bcfa4f4ba1
+source_repository: vaastav/Fantasy-Premier-League
+season: 2023-24
+gameweeks:
+- 1
+- 2
+- 3
+- 4
+- 5
+- 6
+- 7
+- 8
+- 9
+- 10
+- 11
+- 12
+- 13
+- 14
+- 15
+- 16
+- 17
+- 18
+- 19
+- 20
+- 21
+- 22
+- 23
+- 24
+- 25
+- 26
+- 27
+- 28
+- 29
+- 30
+- 31
+- 32
+- 33
+- 34
+- 35
+- 36
+- 37
+- 38
+positions:
+- DEF
+- MID
+- FWD
+evidence_class: ARCHIVED_AS_OF
+snapshots:
+- snapshot_id: be15e285f106d1becc6f24c0c470ec9ada8c935a
+  commit_sha: be15e285f106d1becc6f24c0c470ec9ada8c935a
+  tree_sha: 94e10219c417d7dca26e4ceabe2ac1457ff64f4d
+  parent_shas:
+  - a5fe899bd3104fd0f197a2e5f9cef7121a792a21
+  author_date: '2023-08-16T02:35:27Z'
+  committer_date: '2023-08-16T02:35:27Z'
+  source_known_at: '2023-08-16T02:35:27Z'
+  paths: &id001
+    stats: data/2023-24/gws/merged_gw.csv
+    registry: data/2023-24/players_raw.csv
+    fixtures: data/2023-24/fixtures.csv
+    teams: data/2023-24/teams.csv
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 2749a5964950b3b34992cebde0351ac9e09fb54f
+  commit_sha: 2749a5964950b3b34992cebde0351ac9e09fb54f
+  tree_sha: e01182853e888a50ef218088fa1fab5882fad97c
+  parent_shas:
+  - e5d69eea2e7b32952e26d765d3a769af1db7540e
+  author_date: '2023-08-23T13:08:45Z'
+  committer_date: '2023-08-23T13:08:45Z'
+  source_known_at: '2023-08-23T13:08:45Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 2abff9370632b3b36bbdfa0870805b60fb392ef0
+  commit_sha: 2abff9370632b3b36bbdfa0870805b60fb392ef0
+  tree_sha: 1ca68dd0ee0ea4f199ff8cf0fb8430a617ef888b
+  parent_shas:
+  - 66deb80fbcbacb517549acad47f4c72f19c4b287
+  author_date: '2023-08-28T10:02:21Z'
+  committer_date: '2023-08-28T10:02:21Z'
+  source_known_at: '2023-08-28T10:02:21Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: b0ec80fec6916117225a6fbee11c35d8773c6f94
+  commit_sha: b0ec80fec6916117225a6fbee11c35d8773c6f94
+  tree_sha: 436dd280978be7b373ff9acc8b681d39cab4aff0
+  parent_shas:
+  - 2abff9370632b3b36bbdfa0870805b60fb392ef0
+  author_date: '2023-09-06T11:00:38Z'
+  committer_date: '2023-09-06T11:00:38Z'
+  source_known_at: '2023-09-06T11:00:38Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: b9122f8c98f10a8217e5fb67bc4de447f6c685d5
+  commit_sha: b9122f8c98f10a8217e5fb67bc4de447f6c685d5
+  tree_sha: 8fb01db80534f49d0215906a7916ae03fde20896
+  parent_shas:
+  - 92f8ef76148f1afd5c535441aedc60cb8fe24806
+  author_date: '2023-09-20T09:22:25Z'
+  committer_date: '2023-09-20T09:22:37Z'
+  source_known_at: '2023-09-20T09:22:37Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 8b05861fb33ee89bae34c2b6d06564449a5885db
+  commit_sha: 8b05861fb33ee89bae34c2b6d06564449a5885db
+  tree_sha: 26e083bf17fe30ecb88949724f01b9ab796487da
+  parent_shas:
+  - b9122f8c98f10a8217e5fb67bc4de447f6c685d5
+  author_date: '2023-09-25T15:34:01Z'
+  committer_date: '2023-09-25T15:34:01Z'
+  source_known_at: '2023-09-25T15:34:01Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 96fbc38ee6e36e3a7250081a787b65a1a27c944d
+  commit_sha: 96fbc38ee6e36e3a7250081a787b65a1a27c944d
+  tree_sha: ce75443476602ef8887fac7ccb83c82398e0ad6f
+  parent_shas:
+  - 61abef7dd3988bde4371710a622cead74498ffb0
+  author_date: '2023-10-05T14:38:47Z'
+  committer_date: '2023-10-05T14:38:47Z'
+  source_known_at: '2023-10-05T14:38:47Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 32184fc221871431d8215c5dc8385af0eda7bdde
+  commit_sha: 32184fc221871431d8215c5dc8385af0eda7bdde
+  tree_sha: a842b2d94926f4fe0bad86efdf8c78c1510c114c
+  parent_shas:
+  - 96fbc38ee6e36e3a7250081a787b65a1a27c944d
+  author_date: '2023-10-19T20:26:02Z'
+  committer_date: '2023-10-19T20:26:02Z'
+  source_known_at: '2023-10-19T20:26:02Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 615da45c450fb13993b7e8da4c8388d7e2f57703
+  commit_sha: 615da45c450fb13993b7e8da4c8388d7e2f57703
+  tree_sha: cd6f5d300ddb4c0486b8a190969f01c37df31c4b
+  parent_shas:
+  - 32184fc221871431d8215c5dc8385af0eda7bdde
+  author_date: '2023-10-27T08:27:07Z'
+  committer_date: '2023-10-27T08:27:07Z'
+  source_known_at: '2023-10-27T08:27:07Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: e92d9881f2ef025a7a1093e47fdf02d9aa2f8655
+  commit_sha: e92d9881f2ef025a7a1093e47fdf02d9aa2f8655
+  tree_sha: 9198ad9f100450766eaaf24268cda3a15b9a095f
+  parent_shas:
+  - 615da45c450fb13993b7e8da4c8388d7e2f57703
+  author_date: '2023-11-02T14:43:56Z'
+  committer_date: '2023-11-02T14:43:56Z'
+  source_known_at: '2023-11-02T14:43:56Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 028f925c32fabb34798e416c569070d0cae329a2
+  commit_sha: 028f925c32fabb34798e416c569070d0cae329a2
+  tree_sha: e15c3ac3e99eaa5223858ffd767475010108c229
+  parent_shas:
+  - e92d9881f2ef025a7a1093e47fdf02d9aa2f8655
+  author_date: '2023-11-09T20:03:21Z'
+  committer_date: '2023-11-09T20:03:21Z'
+  source_known_at: '2023-11-09T20:03:21Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: caf799bb68f58fb26ac80d8cb762c353891232f5
+  commit_sha: caf799bb68f58fb26ac80d8cb762c353891232f5
+  tree_sha: 8f7aaf78105e8b152a7e2674feb00c9f01226b1b
+  parent_shas:
+  - 028f925c32fabb34798e416c569070d0cae329a2
+  author_date: '2023-11-24T13:22:14Z'
+  committer_date: '2023-11-24T13:22:14Z'
+  source_known_at: '2023-11-24T13:22:14Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: acee0e28f8b201062270d709a7d72e4787680872
+  commit_sha: acee0e28f8b201062270d709a7d72e4787680872
+  tree_sha: 124bdd264da55be7a3eee4c8e7ad6c22563d70d7
+  parent_shas:
+  - caf799bb68f58fb26ac80d8cb762c353891232f5
+  author_date: '2023-11-30T15:40:47Z'
+  committer_date: '2023-11-30T15:40:47Z'
+  source_known_at: '2023-11-30T15:40:47Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: c4f66ee30ef026bb7e8b7184b2427f9708c77d74
+  commit_sha: c4f66ee30ef026bb7e8b7184b2427f9708c77d74
+  tree_sha: 0834a8411570000a3851c525487e123af4cd82b9
+  parent_shas:
+  - acee0e28f8b201062270d709a7d72e4787680872
+  author_date: '2023-12-04T13:04:03Z'
+  committer_date: '2023-12-04T13:04:03Z'
+  source_known_at: '2023-12-04T13:04:03Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8
+  commit_sha: d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8
+  tree_sha: d8311367f585aed0a0379a355dcfd7838c69755a
+  parent_shas:
+  - c4f66ee30ef026bb7e8b7184b2427f9708c77d74
+  author_date: '2023-12-08T08:31:20Z'
+  committer_date: '2023-12-08T08:31:20Z'
+  source_known_at: '2023-12-08T08:31:20Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 392588ec1664432358f9481b81c3a8c1d53a60a3
+  commit_sha: 392588ec1664432358f9481b81c3a8c1d53a60a3
+  tree_sha: 981267c49c2e6c53d58208506d4d486446c7fd67
+  parent_shas:
+  - d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8
+  author_date: '2023-12-11T13:35:55Z'
+  committer_date: '2023-12-11T13:35:55Z'
+  source_known_at: '2023-12-11T13:35:55Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 62f7b7c0b2d897834613475b15d6dc3301f13e70
+  commit_sha: 62f7b7c0b2d897834613475b15d6dc3301f13e70
+  tree_sha: 9b82362994263819b0f04e66ca0b26b427af7e2e
+  parent_shas:
+  - 392588ec1664432358f9481b81c3a8c1d53a60a3
+  author_date: '2023-12-21T04:22:57Z'
+  committer_date: '2023-12-21T04:22:57Z'
+  source_known_at: '2023-12-21T04:22:57Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: d8a6fc58722beaa625195de9d51a0333dcb46439
+  commit_sha: d8a6fc58722beaa625195de9d51a0333dcb46439
+  tree_sha: 53ce114116e68bd36c892b90b886d1c403829ddb
+  parent_shas:
+  - 62f7b7c0b2d897834613475b15d6dc3301f13e70
+  author_date: '2023-12-25T11:59:17Z'
+  committer_date: '2023-12-25T11:59:17Z'
+  source_known_at: '2023-12-25T11:59:17Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 2f06c2ae70511a7075d02913784ec77a5fb21aa1
+  commit_sha: 2f06c2ae70511a7075d02913784ec77a5fb21aa1
+  tree_sha: 9502af566e33e4d7db018a4d612445bdf70ae2ad
+  parent_shas:
+  - d8a6fc58722beaa625195de9d51a0333dcb46439
+  author_date: '2023-12-29T05:12:14Z'
+  committer_date: '2023-12-29T05:12:14Z'
+  source_known_at: '2023-12-29T05:12:14Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 15783a5630abadb309ff4c3edbb3dc32e6a2b426
+  commit_sha: 15783a5630abadb309ff4c3edbb3dc32e6a2b426
+  tree_sha: cc55efe91a88f53b096a298fa6b70b329fd0e7e9
+  parent_shas:
+  - 2f06c2ae70511a7075d02913784ec77a5fb21aa1
+  author_date: '2024-01-03T08:57:32Z'
+  committer_date: '2024-01-03T08:57:32Z'
+  source_known_at: '2024-01-03T08:57:32Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 546143eb5d0ae6d250e074374152e8be4b15719b
+  commit_sha: 546143eb5d0ae6d250e074374152e8be4b15719b
+  tree_sha: 0acd30e06273a82ce1bc2171d49923039ab21ee3
+  parent_shas:
+  - 15783a5630abadb309ff4c3edbb3dc32e6a2b426
+  author_date: '2024-01-23T13:01:20Z'
+  committer_date: '2024-01-23T13:01:20Z'
+  source_known_at: '2024-01-23T13:01:20Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 8a0d23451ea7c07699ba903feb364e8fe0085c0e
+  commit_sha: 8a0d23451ea7c07699ba903feb364e8fe0085c0e
+  tree_sha: f254dd34946cd7dceb6de506de71d24dec9afbd0
+  parent_shas:
+  - 546143eb5d0ae6d250e074374152e8be4b15719b
+  author_date: '2024-02-02T20:53:13Z'
+  committer_date: '2024-02-02T20:53:13Z'
+  source_known_at: '2024-02-02T20:53:13Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 5f49140e78b2052634abae57ce15e40f41dc32f7
+  commit_sha: 5f49140e78b2052634abae57ce15e40f41dc32f7
+  tree_sha: 0311b3f77050b20de09079f8cda66ee87b338331
+  parent_shas:
+  - 8a0d23451ea7c07699ba903feb364e8fe0085c0e
+  author_date: '2024-02-06T13:02:04Z'
+  committer_date: '2024-02-06T13:02:04Z'
+  source_known_at: '2024-02-06T13:02:04Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 73cf14c852c5bbafde20ba11ebc5acd6eff965aa
+  commit_sha: 73cf14c852c5bbafde20ba11ebc5acd6eff965aa
+  tree_sha: 6687fd3e28adda1e56f1f8905bd9b324c9883472
+  parent_shas:
+  - 5f49140e78b2052634abae57ce15e40f41dc32f7
+  author_date: '2024-02-14T10:42:14Z'
+  committer_date: '2024-02-14T10:42:14Z'
+  source_known_at: '2024-02-14T10:42:14Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: f061aafa88a921dd70fd2b0f72b8020889d8e589
+  commit_sha: f061aafa88a921dd70fd2b0f72b8020889d8e589
+  tree_sha: d482ce1290ead823a42eaf073d411922cbe75105
+  parent_shas:
+  - 73cf14c852c5bbafde20ba11ebc5acd6eff965aa
+  author_date: '2024-02-22T10:23:39Z'
+  committer_date: '2024-02-22T10:23:39Z'
+  source_known_at: '2024-02-22T10:23:39Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 446af195d2ee324a1217f34a5a2b591189efc983
+  commit_sha: 446af195d2ee324a1217f34a5a2b591189efc983
+  tree_sha: ff0250aa90e31452fb148cf76f531ccba7a1e6b4
+  parent_shas:
+  - f061aafa88a921dd70fd2b0f72b8020889d8e589
+  author_date: '2024-03-07T16:57:57Z'
+  committer_date: '2024-03-07T16:57:57Z'
+  source_known_at: '2024-03-07T16:57:57Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40
+  commit_sha: 8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40
+  tree_sha: 97ae6db638319370d0ff1dbcb799807272e8a7fd
+  parent_shas:
+  - 446af195d2ee324a1217f34a5a2b591189efc983
+  author_date: '2024-03-15T13:56:21Z'
+  committer_date: '2024-03-15T13:56:21Z'
+  source_known_at: '2024-03-15T13:56:21Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: cbf39345fdfa826870e37b1b2c777b543fed56d2
+  commit_sha: cbf39345fdfa826870e37b1b2c777b543fed56d2
+  tree_sha: 160cbc484596539eff4db7d7305692aadcc6fee9
+  parent_shas:
+  - 8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40
+  author_date: '2024-03-20T16:55:33Z'
+  committer_date: '2024-03-20T16:55:33Z'
+  source_known_at: '2024-03-20T16:55:33Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 288c341ae1f28b260786e862b8917c865d953815
+  commit_sha: 288c341ae1f28b260786e862b8917c865d953815
+  tree_sha: 090bc52a110a32c6f6bf15346e4f6752d28e1926
+  parent_shas:
+  - cbf39345fdfa826870e37b1b2c777b543fed56d2
+  author_date: '2024-03-20T17:01:19Z'
+  committer_date: '2024-03-20T17:01:19Z'
+  source_known_at: '2024-03-20T17:01:19Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 4e6447daccfb053a496e4aebd37d264dfa949676
+  commit_sha: 4e6447daccfb053a496e4aebd37d264dfa949676
+  tree_sha: 3dc612ce221c4be0aa6ace3efa01f113fdd92698
+  parent_shas:
+  - 288c341ae1f28b260786e862b8917c865d953815
+  author_date: '2024-04-01T08:08:41Z'
+  committer_date: '2024-04-01T08:08:41Z'
+  source_known_at: '2024-04-01T08:08:41Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 7d6f6aafa94a937116f308a2393fb12e86c5771f
+  commit_sha: 7d6f6aafa94a937116f308a2393fb12e86c5771f
+  tree_sha: 8be7bb9b5ebc96c0931b472de835fe3fdcb52b6a
+  parent_shas:
+  - 4e6447daccfb053a496e4aebd37d264dfa949676
+  author_date: '2024-04-05T12:24:10Z'
+  committer_date: '2024-04-05T12:24:10Z'
+  source_known_at: '2024-04-05T12:24:10Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 436f1ff2d306783d3e3892dc3d3ce21712cbc08e
+  commit_sha: 436f1ff2d306783d3e3892dc3d3ce21712cbc08e
+  tree_sha: 7c60e34b53d52ba68646b04bb236291613f1a47a
+  parent_shas:
+  - 7d6f6aafa94a937116f308a2393fb12e86c5771f
+  author_date: '2024-04-08T10:31:08Z'
+  committer_date: '2024-04-08T10:31:08Z'
+  source_known_at: '2024-04-08T10:31:08Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: d7e0beda3436c5051116e1aeef652e96119ebf92
+  commit_sha: d7e0beda3436c5051116e1aeef652e96119ebf92
+  tree_sha: de7d807808f32e45363f954c7d4a986de89df015
+  parent_shas:
+  - 436f1ff2d306783d3e3892dc3d3ce21712cbc08e
+  author_date: '2024-04-16T08:22:40Z'
+  committer_date: '2024-04-16T08:22:40Z'
+  source_known_at: '2024-04-16T08:22:40Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 6f1e864e5a5bb58a0ad92a257e86df7a7d4816db
+  commit_sha: 6f1e864e5a5bb58a0ad92a257e86df7a7d4816db
+  tree_sha: d6acffd39a0d28530a0f1a16b34e0098df2e6925
+  parent_shas:
+  - 721ee8dea60eee580662c8782a0e4dca6f32a85b
+  author_date: '2024-04-27T08:17:47Z'
+  committer_date: '2024-04-27T08:18:04Z'
+  source_known_at: '2024-04-27T08:18:04Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 8f5194d666f608200916f2b62f8976e8c8beff87
+  commit_sha: 8f5194d666f608200916f2b62f8976e8c8beff87
+  tree_sha: 0878e0841d99d8bd4f3eef7ecffd502299ff78ec
+  parent_shas:
+  - 6f1e864e5a5bb58a0ad92a257e86df7a7d4816db
+  author_date: '2024-05-03T08:34:20Z'
+  committer_date: '2024-05-03T08:34:20Z'
+  source_known_at: '2024-05-03T08:34:20Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 2981ebc1630d6e0211c5847731c8fb79cecba785
+  commit_sha: 2981ebc1630d6e0211c5847731c8fb79cecba785
+  tree_sha: 5a22f03dddf579c860bb4755f6d6895e457481c6
+  parent_shas:
+  - 8f5194d666f608200916f2b62f8976e8c8beff87
+  author_date: '2024-05-09T13:15:25Z'
+  committer_date: '2024-05-09T13:15:25Z'
+  source_known_at: '2024-05-09T13:15:25Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 5218c9f360c0415d7272775239f88ab0eb15e91d
+  commit_sha: 5218c9f360c0415d7272775239f88ab0eb15e91d
+  tree_sha: afd4d7fecb7e0d5e503298d4e85bb1d84b4194e1
+  parent_shas:
+  - 2981ebc1630d6e0211c5847731c8fb79cecba785
+  author_date: '2024-05-19T02:36:03Z'
+  committer_date: '2024-05-19T02:36:03Z'
+  source_known_at: '2024-05-19T02:36:03Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+- snapshot_id: 204c134d8e90e2b6e69ec252aa3ef6f10f21e73c
+  commit_sha: 204c134d8e90e2b6e69ec252aa3ef6f10f21e73c
+  tree_sha: cff93939d33f37229d18c4263372c6689a6616a7
+  parent_shas:
+  - 5218c9f360c0415d7272775239f88ab0eb15e91d
+  author_date: '2024-05-27T18:05:02Z'
+  committer_date: '2024-05-27T18:05:02Z'
+  source_known_at: '2024-05-27T18:05:02Z'
+  paths: *id001
+  audited_source_witness: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+cache:
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/gws/merged_gw.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-02\response-0003-53a22379f865e4fbac55e46778e68455f88ae88d1b2a89edf24ca3290e8cd493.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-02\response-0003.json
+    sha256: 53a22379f865e4fbac55e46778e68455f88ae88d1b2a89edf24ca3290e8cd493
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/players_raw.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-02\response-0004-7a81e3845349c55fc89ce3ae8dfda07e78a0675d2297477612eeaee20572bb77.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-02\response-0004.json
+    sha256: 7a81e3845349c55fc89ce3ae8dfda07e78a0675d2297477612eeaee20572bb77
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/fixtures.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-02\response-0005-1966ce5b29a9e7934a731d16e147a6e1f2f37e778b474d16f1ef0ff4d133aabc.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-02\response-0005.json
+    sha256: 1966ce5b29a9e7934a731d16e147a6e1f2f37e778b474d16f1ef0ff4d133aabc
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/teams.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-02\response-0006-9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-02\response-0006.json
+    sha256: 9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/gws/merged_gw.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0002-32e84407d5ff88ca4f9b8fd54cf6aa1e4691c69a5446995afcfa9d77248838bc.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0002.json
+    sha256: 32e84407d5ff88ca4f9b8fd54cf6aa1e4691c69a5446995afcfa9d77248838bc
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/players_raw.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0003-c02546cd5d9039a0fd17e9f4c21a900f422473afc5cc4fa5a5b3ac5a3f4966e9.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0003.json
+    sha256: c02546cd5d9039a0fd17e9f4c21a900f422473afc5cc4fa5a5b3ac5a3f4966e9
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/fixtures.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0004-5b4aef2aa20f4f1062936d92004ee10311727fae5326608ba650e46ba7dc6035.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0004.json
+    sha256: 5b4aef2aa20f4f1062936d92004ee10311727fae5326608ba650e46ba7dc6035
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/15783a5630abadb309ff4c3edbb3dc32e6a2b426/data/2023-24/gws/merged_gw.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0008-ae656d5e04dfc3692008ce355e76bdb0efd12ab28b28192e5c7e49c9d7bf0953.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0008.json
+    sha256: ae656d5e04dfc3692008ce355e76bdb0efd12ab28b28192e5c7e49c9d7bf0953
+  ? https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/15783a5630abadb309ff4c3edbb3dc32e6a2b426/data/2023-24/players_raw.csv
+  : raw_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0009-5b9fbd630edf53935bacdece09dabbd0fe19c33ea390c1b8478e547e779b8dd1.raw
+    receipt_file: D:\Personal\fpl-operations\verification\historical-player-attacking-20260908T070723Z\archive-probe-03\response-0009.json
+    sha256: 5b9fbd630edf53935bacdece09dabbd0fe19c33ea390c1b8478e547e779b8dd1
+limits:
+  maximum_urls: 152
+  maximum_attempts: 304
+  maximum_bytes: 201326592
+  minimum_interval_seconds: 1.5
+  max_retries: 1
+frozen_inputs:
+  results/historical_player_attacking_source_audit_2026-09-08.json: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+  results/attacking_role_premium_feasibility_2026-09-08.json: 65b950bfb95c965f4c776964f4b18074fa60aa74e4b7224b355ef969e0e31ed7
+  config/attacking_role_premium_study.yaml: 5a3ca31aa9e655f897b1c2f2670efc950e94a2402aaf55ede60860a9df64a903
+  config/data_quality.yaml: 7a038c4c041bf80c899bb23f9df195705de01321b4c6eca63e0396ea67ceeba0
+practical_sufficiency:
+  purpose: data adequacy only; not a model or promotion gate
+  expected_reference_outfield_rows: 26312
+  expected_reference_players: 765
+  expected_reference_target_gameweeks: 37
+  target_gameweeks_considered:
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 17
+  - 18
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 26
+  - 27
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+  - 35
+  - 36
+  - 37
+  - 38
+  minimum_chronological_target_gameweeks: 24
+  minimum_outfield_target_rows: 10000
+  minimum_unique_players: 300
+  minimum_players_with_5_prior_starts: 100
+  minimum_players_with_10_prior_starts: 50
+  minimum_measured_xg_xa_fraction: 0.95
+  minimum_positions_present: 3
+  expected_counts_are_retrospective_planning_estimates_not_guarantees: true
+  retrospective_planning_estimates:
+    target_rows_gw2_38: 25730
+    target_players: 765
+    target_rows_by_position:
+      DEF: 9394
+      MID: 12569
+      FWD: 3767
+    players_with_prior_starts:
+      '3': 399
+      '5': 374
+      '10': 308
+    target_rows_with_prior_starts:
+      '3': 11408
+      '5': 9525
+      '10': 6125
+    evidence_class: RETROSPECTIVE_DEVELOPMENT
+    not_a_historical_availability_claim: true
+cutoff_contract:
+  official_historical_deadline: null
+  invent_deadline_from_kickoff: false
+  coverage_only_cutoff: latest audited archived source snapshot preceding every actual
+    fixture kickoff in target GW; same-snapshot schedule must witness whole future
+    GW
+  future_model_preregistration_required: true
+  same_gameweek_history: exclude every target-GW leg
+normalization:
+  version: historical_player_attacking_v1
+  duplicate_fixture_player: reject
+  first_or_changed_versions_only: true
+  historical_selection: earliest eligible observation version; never substitute latest
+    corrected value
+  NULL_is_zero: false
+  cross_season_identity: stable FPL code only
+  historical_position: same-version FPL element_type and source position
+  fixture_club: source fixture sides and same-version permanent team codes
+  unavailable_optional_fields: 'null'
+no_model_design_fitting_tuning_scoring_or_production_changes: true

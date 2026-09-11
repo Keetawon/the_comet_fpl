@@ -1,0 +1,144 @@
+# Preserve exact bytes for new hash-pinned tactical evidence across Windows checkouts.
+config/sdp_v2_frozen_parameters.json -text
+config/sdp_gk_shadow_parameters.json -text
+src/fpl/validate/tactical_state.py -text
+src/fpl/validate/tactical_matchup.py -text
+src/fpl/validate/tactical_math.py -text
+src/fpl/validate/chance_creation.py -text
+results/v2_tactical_metric_audit.json -text whitespace=cr-at-eol
+results/v2_tactical_matchup_development.json -text whitespace=cr-at-eol
+results/v2_tactical_numeric_development.json -text whitespace=cr-at-eol
+results/v2_chance_target_audit.json -text whitespace=cr-at-eol
+results/v2_chance_creation_development.json -text whitespace=cr-at-eol
+config/v2_chance_creation_evaluation.yaml -text whitespace=cr-at-eol
+config/competitive_participation_pilot.yaml -text whitespace=cr-at-eol
+results/competitive_participation_pilot_development.json -text whitespace=cr-at-eol
+results/competitive_participation_pilot_independent_audit.json -text whitespace=cr-at-eol
+results/football_program_prerequisite_audit_20260907.json -text whitespace=cr-at-eol
+results/v2_chance_creation_independent_audit.json -text whitespace=cr-at-eol
+config/retrospective_current_minutes_proxy_v1.yaml -text whitespace=cr-at-eol
+config/competitive_participation_v2.yaml -text whitespace=cr-at-eol
+config/competitive_workload_capture.yaml -text whitespace=cr-at-eol
+config/retrospective_minutes_control_cache.yaml -text whitespace=cr-at-eol
+results/competitive_participation_v2_development.json -text whitespace=cr-at-eol
+results/competitive_participation_v2_independent_audit.json -text whitespace=cr-at-eol
+results/competitive_participation_v2_extended_prior_check.json -text whitespace=cr-at-eol
+results/retrospective_minutes_proxy_cache_manifest.json -text whitespace=cr-at-eol
+results/football_evidence_amendment_gate_20260907.json -text whitespace=cr-at-eol
+results/competitive_workload_raw_capture_2025.json -text whitespace=cr-at-eol
+results/retrospective_minutes_proxy_independent_audit.json -text whitespace=cr-at-eol
+results/player_disciplinary_target_audit.json -text whitespace=cr-at-eol
+config/competitive_workload_staging.yaml -text whitespace=cr-at-eol
+config/player_role_history_v1.yaml -text whitespace=cr-at-eol
+config/player_disciplinary_evaluation.yaml -text whitespace=cr-at-eol
+config/competitive_participation_v3.yaml -text whitespace=cr-at-eol
+results/competitive_straight_red_source_audit.json -text whitespace=cr-at-eol
+results/competitive_workload_staging_v2.json -text whitespace=cr-at-eol
+results/competitive_workload_staging_v2_independent_audit.json -text whitespace=cr-at-eol
+results/football_program_pre_v3_stage_gate.json -text whitespace=cr-at-eol
+results/competitive_workload_staging_v3.json -text whitespace=cr-at-eol
+results/competitive_workload_staging_v3_independent_audit.json -text whitespace=cr-at-eol
+results/player_role_coverage_initial_finality_filter.json -text whitespace=cr-at-eol
+results/player_disciplinary_development.json -text whitespace=cr-at-eol
+results/player_disciplinary_independent_audit.json -text whitespace=cr-at-eol
+config/player_role_history_evaluation.yaml -text whitespace=cr-at-eol
+results/player_role_coverage_v1.json -text whitespace=cr-at-eol
+results/player_role_coverage_finality_amendment_audit.json -text whitespace=cr-at-eol
+results/player_role_history_development.json -text whitespace=cr-at-eol
+results/player_role_history_independent_audit.json -text whitespace=cr-at-eol
+results/player_saves_opportunity_coverage.json -text whitespace=cr-at-eol
+results/dc_predicted_environment_coverage.json -text whitespace=cr-at-eol
+config/dc_predicted_environment_evaluation.yaml -text whitespace=cr-at-eol
+config/player_saves_opportunity_evaluation.yaml -text whitespace=cr-at-eol
+results/player_saves_opportunity_development.json -text whitespace=cr-at-eol
+results/player_saves_opportunity_independent_audit.json -text whitespace=cr-at-eol
+results/current_component_proxy_cache_manifest.json -text whitespace=cr-at-eol
+config/player_workload_minutes_evaluation.yaml -text whitespace=cr-at-eol
+config/player_opportunity_evaluation.yaml -text whitespace=cr-at-eol
+results/v2_dc_predicted_environment_development.json -text whitespace=cr-at-eol
+results/v2_dc_predicted_environment_independent_audit.json -text whitespace=cr-at-eol
+results/player_workload_minutes_coverage.json -text whitespace=cr-at-eol
+results/player_workload_minutes_synthetic_runtime_audit.json -text whitespace=cr-at-eol
+results/player_workload_minutes_development.json -text whitespace=cr-at-eol
+results/player_workload_minutes_independent_audit.json -text whitespace=cr-at-eol
+results/player_workload_minutes_feature_audit.json -text whitespace=cr-at-eol
+results/player_opportunity_goals_development.json -text whitespace=cr-at-eol
+results/player_opportunity_assists_development.json -text whitespace=cr-at-eol
+results/player_opportunity_goals_independent_audit.json -text whitespace=cr-at-eol
+results/player_opportunity_assists_independent_audit.json -text whitespace=cr-at-eol
+config/player_points_synthesis_evaluation.yaml -text whitespace=cr-at-eol
+results/player_points_synthesis_development.json -text whitespace=cr-at-eol
+results/player_points_synthesis_independent_audit.json -text whitespace=cr-at-eol
+# Additive role-source audit: preserve its new rule/source/result byte fingerprints.
+config/player_role_source_audit.yaml -text
+src/fpl/jobs/audit_player_role_source.py -text
+src/fpl/transform/player_role_source.py -text
+tests/test_audit_player_role_source.py -text
+tests/test_player_role_source.py -text
+results/player_role_source_audit_2026-09-08.json -text
+# Additive attacking-usage feasibility audit; exact source/config/result fingerprints.
+config/attacking_role_premium_study.yaml -text
+src/fpl/jobs/audit_attacking_role_premium_feasibility.py -text
+tests/test_attacking_role_premium_feasibility.py -text
+results/attacking_role_premium_feasibility_2026-09-08.json -text
+
+# Additive historical player attacking source audit and bounded acquisition.
+config/historical_player_attacking_backfill.yaml -text
+results/historical_player_attacking_source_audit_2026-09-08.json -text
+results/historical_player_attacking_backfill_manifest_2026-09-08.json -text
+src/fpl/validate/historical_player_attacking.py -text
+src/fpl/jobs/backfill_historical_player_attacking.py -text
+tests/test_historical_player_attacking.py -text
+tests/test_historical_player_attacking_backfill.py -text
+results/historical_player_attacking_backfill_independent_audit_2026-09-08.json -text
+
+# Fixed attacking-usage persistence V1: preserve preregistration/result byte identities.
+config/attacking_role_premium_v1.yaml -text
+src/fpl/features/attacking_role_premium_v1.py -text
+src/fpl/validate/attacking_role_premium_v1.py -text
+src/fpl/validate/attacking_role_premium_v1_metrics.py -text
+src/fpl/jobs/evaluate_attacking_role_premium_v1.py -text
+tests/test_attacking_role_premium_v1.py -text
+tests/test_attacking_role_premium_v1_population.py -text
+tests/test_attacking_role_premium_v1_metrics.py -text
+tests/test_evaluate_attacking_role_premium_v1.py -text
+results/attacking_role_premium_v1_population_2026-09-08.json -text
+results/attacking_role_premium_v1_development_2026-09-08.json -text
+results/attacking_role_premium_v1_diagnostics_2026-09-08.json -text
+results/attacking_role_premium_v1_independent_audit_2026-09-08.json -text whitespace=cr-at-eol
+docs/attacking-role-premium-v1-preregistration-2026-09-08.md -text
+results/attacking_role_premium_v1_cases_2026-09-08.json -text
+results/attacking_role_premium_v1_verification_2026-09-08.json -text
+
+# Descriptive scouting provenance; never a model promotion.
+src/fpl/features/player_attacking_usage.py -text
+src/fpl/publish/player_attacking_usage.py -text
+src/fpl/jobs/build_player_attacking_usage.py -text
+results/player_attacking_usage_scouting_verification_2026-09-08.json -text
+
+# Frozen current-model GW1-3 diagnostic, additive audit files only.
+config/player_model_gw1_3_audit.yaml -text
+docs/player-model-gw1-3-preregistration-2026-09-08.md -text
+src/fpl/validate/player_model_gw1_3_audit.py -text
+src/fpl/validate/player_model_gw1_3_sources.py -text
+src/fpl/validate/player_model_gw1_3_replay.py -text
+src/fpl/validate/player_model_gw1_3_metrics.py -text
+src/fpl/validate/sdp_counterfactual.py -text
+src/fpl/jobs/evaluate_player_model_gw1_3.py -text
+results/player_model_gw1_3_strict_2026-09-08.json -text
+results/player_model_gw1_3_retrospective_sdp_2026-09-08.json -text
+results/player_model_gw1_3_verification_2026-09-08.json -text
+
+# Additive canonical audit transport; V1 source and receipts remain unchanged.
+src/fpl/validate/audit_json.py -text
+tests/test_audit_json.py -text
+
+# New GW1-3 audit identity inherits V1 science and uses corrected transport.
+config/player_model_gw1_3_audit_v2.yaml -text
+src/fpl/jobs/evaluate_player_model_gw1_3_v2.py -text
+docs/player-model-gw1-3-preregistration-v2-2026-09-08.md -text
+tests/test_player_model_gw1_3_v2_identity.py -text
+results/player_model_gw1_3_strict_v2_2026-09-08.json -text
+results/player_model_gw1_3_retrospective_sdp_v2_2026-09-08.json -text
+results/player_model_gw1_3_verification_v2_2026-09-08.json -text
+docs/player-model-gw1-3-scorecard-v2-2026-09-08.md -text

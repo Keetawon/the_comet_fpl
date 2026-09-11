@@ -1,0 +1,17 @@
+# Daily 07:00 local-host schedule for the SDP primary capture, mirroring the registered
+# Windows task. OnCalendar evaluates in the host's local timezone: set the timezone
+# deliberately (the owner works in Asia/Bangkok) so the schedule lands where intended.
+# Persistent=true runs a missed schedule at the next boot, closing the offline-machine gap.
+
+[Unit]
+Description=Daily schedule for the Comet FPL SDP primary capture
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+RandomizedDelaySec=15min
+AccuracySec=1min
+Persistent=true
+Unit=comet-fpl-sdp-capture.service
+
+[Install]
+WantedBy=timers.target

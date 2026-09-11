@@ -45,6 +45,7 @@ import { VintageSelect } from "@/components/VintageSelect";
 import {
   loadFixtureMatrix,
   loadNextGw,
+  loadSummary,
   loadTeamActuals,
   loadTeamProvisionalActuals,
 } from "@/data/load";
@@ -348,8 +349,9 @@ export function FixtureMatrixPage() {
       loadNextGw(),
       loadTeamActuals(),
       loadTeamProvisionalActuals(),
+      loadSummary(),
     ])
-      .then(([fixtureData, nextGw, teamActuals, provisionalActuals]) => {
+      .then(([fixtureData, nextGw, teamActuals, provisionalActuals, summary]) => {
         if (cancelled) return;
         const seen = new Map<string, { run_id: string; season: string; gw_from: number; gw_to: number }>();
         for (const t of fixtureData.teams) {
@@ -371,7 +373,7 @@ export function FixtureMatrixPage() {
         const defaultRun = defaultVintageRunId(
           runs,
           nextGw.plans,
-          fixtureData.manifest?.runs.at(-1)?.run_id ?? null,
+          summary.latest_run?.run_id ?? null,
         );
         const first =
           fixtureData.teams.find((t) => t.run_id === defaultRun) ?? fixtureData.teams[0];

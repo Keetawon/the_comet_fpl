@@ -1,0 +1,1040 @@
+{
+  "completed": true,
+  "candidate": "retrospective_role_exposure_player_assists_v1",
+  "input_result": "D:\\Personal\\fpl-operations\\verification\\player-opportunity-assists-20260907T123600Z\\result.json",
+  "input_result_sha256": "0e168375f6928b7245816c77cb0e2de135dcc5ed92984d132d3a18cbf9c74a0b",
+  "evaluation_head": "9f9e32d351495e73a32c8d76f5e21c189f5990b3",
+  "audit_script_sha256": "c1ec00b6d9c46fae63c7142c7ebba8e331aaa2f4093184f118c88217357021cd",
+  "started_at_utc": "2026-09-07T12:49:34.656468+00:00",
+  "finished_at_utc": "2026-09-07T12:54:17.945857+00:00",
+  "checks": 9758661,
+  "failures": [],
+  "all_checks_passed": true,
+  "maximum_numeric_difference": 4.440892098500626e-16,
+  "numeric_tolerance": {
+    "absolute": 2e-12,
+    "relative": 2e-12
+  },
+  "row_count": 86755,
+  "fold_count": 114,
+  "direct_proxy_rows": 821,
+  "fold_scores": [
+    {
+      "season": "2023-24",
+      "gw": 1,
+      "rows": 658,
+      "current_nll": 0.182566910653351,
+      "candidate_nll": 0.182566910653351
+    },
+    {
+      "season": "2023-24",
+      "gw": 2,
+      "rows": 595,
+      "current_nll": 0.13723101449796277,
+      "candidate_nll": 0.13723101449796277
+    },
+    {
+      "season": "2023-24",
+      "gw": 3,
+      "rows": 685,
+      "current_nll": 0.14604686545374207,
+      "candidate_nll": 0.14604686545374207
+    },
+    {
+      "season": "2023-24",
+      "gw": 4,
+      "rows": 703,
+      "current_nll": 0.25739802048341026,
+      "candidate_nll": 0.25739802048341026
+    },
+    {
+      "season": "2023-24",
+      "gw": 5,
+      "rows": 717,
+      "current_nll": 0.12852858907405143,
+      "candidate_nll": 0.12852858907405143
+    },
+    {
+      "season": "2023-24",
+      "gw": 6,
+      "rows": 718,
+      "current_nll": 0.16095550138368192,
+      "candidate_nll": 0.16095550138368192
+    },
+    {
+      "season": "2023-24",
+      "gw": 7,
+      "rows": 804,
+      "current_nll": 0.16941957978182348,
+      "candidate_nll": 0.16941957978182348
+    },
+    {
+      "season": "2023-24",
+      "gw": 8,
+      "rows": 725,
+      "current_nll": 0.138401535570413,
+      "candidate_nll": 0.138401535570413
+    },
+    {
+      "season": "2023-24",
+      "gw": 9,
+      "rows": 730,
+      "current_nll": 0.1355224034372724,
+      "candidate_nll": 0.1355224034372724
+    },
+    {
+      "season": "2023-24",
+      "gw": 10,
+      "rows": 731,
+      "current_nll": 0.13327872393406148,
+      "candidate_nll": 0.13327872393406148
+    },
+    {
+      "season": "2023-24",
+      "gw": 11,
+      "rows": 733,
+      "current_nll": 0.14543362661107032,
+      "candidate_nll": 0.14543362661107032
+    },
+    {
+      "season": "2023-24",
+      "gw": 12,
+      "rows": 743,
+      "current_nll": 0.12956548442898339,
+      "candidate_nll": 0.12956548442898339
+    },
+    {
+      "season": "2023-24",
+      "gw": 13,
+      "rows": 747,
+      "current_nll": 0.17040452198505232,
+      "candidate_nll": 0.17040452198505232
+    },
+    {
+      "season": "2023-24",
+      "gw": 14,
+      "rows": 753,
+      "current_nll": 0.14613225453260079,
+      "candidate_nll": 0.14613225453260079
+    },
+    {
+      "season": "2023-24",
+      "gw": 15,
+      "rows": 757,
+      "current_nll": 0.12076906091710696,
+      "candidate_nll": 0.12076906091710696
+    },
+    {
+      "season": "2023-24",
+      "gw": 16,
+      "rows": 758,
+      "current_nll": 0.10869904973313634,
+      "candidate_nll": 0.10869904973313634
+    },
+    {
+      "season": "2023-24",
+      "gw": 17,
+      "rows": 686,
+      "current_nll": 0.08964410175009878,
+      "candidate_nll": 0.08964410175009878
+    },
+    {
+      "season": "2023-24",
+      "gw": 18,
+      "rows": 700,
+      "current_nll": 0.09055286399553657,
+      "candidate_nll": 0.09055286399553657
+    },
+    {
+      "season": "2023-24",
+      "gw": 19,
+      "rows": 771,
+      "current_nll": 0.20124259703599875,
+      "candidate_nll": 0.20124259703599875
+    },
+    {
+      "season": "2023-24",
+      "gw": 20,
+      "rows": 773,
+      "current_nll": 0.14717693822401146,
+      "candidate_nll": 0.14717693822401146
+    },
+    {
+      "season": "2023-24",
+      "gw": 21,
+      "rows": 787,
+      "current_nll": 0.19813155370447463,
+      "candidate_nll": 0.19813155370447463
+    },
+    {
+      "season": "2023-24",
+      "gw": 22,
+      "rows": 799,
+      "current_nll": 0.15682012952301072,
+      "candidate_nll": 0.15682012952301072
+    },
+    {
+      "season": "2023-24",
+      "gw": 23,
+      "rows": 809,
+      "current_nll": 0.19601815529579578,
+      "candidate_nll": 0.19601815529579578
+    },
+    {
+      "season": "2023-24",
+      "gw": 24,
+      "rows": 814,
+      "current_nll": 0.13723512126541443,
+      "candidate_nll": 0.13723512126541443
+    },
+    {
+      "season": "2023-24",
+      "gw": 25,
+      "rows": 982,
+      "current_nll": 0.11538230133297103,
+      "candidate_nll": 0.11538230133297103
+    },
+    {
+      "season": "2023-24",
+      "gw": 26,
+      "rows": 649,
+      "current_nll": 0.13738812651113644,
+      "candidate_nll": 0.13738812651113644
+    },
+    {
+      "season": "2023-24",
+      "gw": 27,
+      "rows": 832,
+      "current_nll": 0.11945579779346702,
+      "candidate_nll": 0.11945579779346702
+    },
+    {
+      "season": "2023-24",
+      "gw": 28,
+      "rows": 924,
+      "current_nll": 0.1274316606671471,
+      "candidate_nll": 0.1274316606671471
+    },
+    {
+      "season": "2023-24",
+      "gw": 29,
+      "rows": 344,
+      "current_nll": 0.1175379311992568,
+      "candidate_nll": 0.1175379311992568
+    },
+    {
+      "season": "2023-24",
+      "gw": 30,
+      "rows": 842,
+      "current_nll": 0.12186385576873042,
+      "candidate_nll": 0.12186385576873042
+    },
+    {
+      "season": "2023-24",
+      "gw": 31,
+      "rows": 844,
+      "current_nll": 0.11081394454407875,
+      "candidate_nll": 0.11081394454407875
+    },
+    {
+      "season": "2023-24",
+      "gw": 32,
+      "rows": 846,
+      "current_nll": 0.15467589846075566,
+      "candidate_nll": 0.15467589846075566
+    },
+    {
+      "season": "2023-24",
+      "gw": 33,
+      "rows": 851,
+      "current_nll": 0.13997072088423113,
+      "candidate_nll": 0.13997072088423113
+    },
+    {
+      "season": "2023-24",
+      "gw": 34,
+      "rows": 1099,
+      "current_nll": 0.12432905910942621,
+      "candidate_nll": 0.12432905910942621
+    },
+    {
+      "season": "2023-24",
+      "gw": 35,
+      "rows": 960,
+      "current_nll": 0.0914454710377569,
+      "candidate_nll": 0.0914454710377569
+    },
+    {
+      "season": "2023-24",
+      "gw": 36,
+      "rows": 859,
+      "current_nll": 0.12920960427947226,
+      "candidate_nll": 0.12920960427947226
+    },
+    {
+      "season": "2023-24",
+      "gw": 37,
+      "rows": 1132,
+      "current_nll": 0.10757674536389648,
+      "candidate_nll": 0.10757674536389648
+    },
+    {
+      "season": "2023-24",
+      "gw": 38,
+      "rows": 865,
+      "current_nll": 0.15431763414255142,
+      "candidate_nll": 0.15431763414255142
+    },
+    {
+      "season": "2024-25",
+      "gw": 1,
+      "rows": 616,
+      "current_nll": 0.12235214704171904,
+      "candidate_nll": 0.12235214704171904
+    },
+    {
+      "season": "2024-25",
+      "gw": 2,
+      "rows": 627,
+      "current_nll": 0.1859209496927233,
+      "candidate_nll": 0.1859209496927233
+    },
+    {
+      "season": "2024-25",
+      "gw": 3,
+      "rows": 648,
+      "current_nll": 0.16822976609789198,
+      "candidate_nll": 0.16822976609789198
+    },
+    {
+      "season": "2024-25",
+      "gw": 4,
+      "rows": 659,
+      "current_nll": 0.158135036852639,
+      "candidate_nll": 0.158135036852639
+    },
+    {
+      "season": "2024-25",
+      "gw": 5,
+      "rows": 661,
+      "current_nll": 0.14207560689204038,
+      "candidate_nll": 0.14207560689204038
+    },
+    {
+      "season": "2024-25",
+      "gw": 6,
+      "rows": 664,
+      "current_nll": 0.16147082590549316,
+      "candidate_nll": 0.16147082590549316
+    },
+    {
+      "season": "2024-25",
+      "gw": 7,
+      "rows": 666,
+      "current_nll": 0.15807381655988742,
+      "candidate_nll": 0.15807381655988742
+    },
+    {
+      "season": "2024-25",
+      "gw": 8,
+      "rows": 667,
+      "current_nll": 0.20002934218665067,
+      "candidate_nll": 0.20002934218665067
+    },
+    {
+      "season": "2024-25",
+      "gw": 9,
+      "rows": 670,
+      "current_nll": 0.18732074307810379,
+      "candidate_nll": 0.18732074307810379
+    },
+    {
+      "season": "2024-25",
+      "gw": 10,
+      "rows": 674,
+      "current_nll": 0.13236686361210884,
+      "candidate_nll": 0.13236686361210884
+    },
+    {
+      "season": "2024-25",
+      "gw": 11,
+      "rows": 678,
+      "current_nll": 0.11243251602723754,
+      "candidate_nll": 0.11243251602723754
+    },
+    {
+      "season": "2024-25",
+      "gw": 12,
+      "rows": 684,
+      "current_nll": 0.15515698458742339,
+      "candidate_nll": 0.15515698458742339
+    },
+    {
+      "season": "2024-25",
+      "gw": 13,
+      "rows": 690,
+      "current_nll": 0.16558000271918133,
+      "candidate_nll": 0.16558000271918133
+    },
+    {
+      "season": "2024-25",
+      "gw": 14,
+      "rows": 693,
+      "current_nll": 0.1638628819130113,
+      "candidate_nll": 0.1638628819130113
+    },
+    {
+      "season": "2024-25",
+      "gw": 15,
+      "rows": 630,
+      "current_nll": 0.21468973031888675,
+      "candidate_nll": 0.21468973031888675
+    },
+    {
+      "season": "2024-25",
+      "gw": 16,
+      "rows": 701,
+      "current_nll": 0.13641733799471442,
+      "candidate_nll": 0.13641733799471442
+    },
+    {
+      "season": "2024-25",
+      "gw": 17,
+      "rows": 701,
+      "current_nll": 0.12783918673584962,
+      "candidate_nll": 0.12783918673584962
+    },
+    {
+      "season": "2024-25",
+      "gw": 18,
+      "rows": 705,
+      "current_nll": 0.08550893608620078,
+      "candidate_nll": 0.08550893608620078
+    },
+    {
+      "season": "2024-25",
+      "gw": 19,
+      "rows": 709,
+      "current_nll": 0.16396360637215412,
+      "candidate_nll": 0.16396360637215412
+    },
+    {
+      "season": "2024-25",
+      "gw": 20,
+      "rows": 711,
+      "current_nll": 0.11933203824412886,
+      "candidate_nll": 0.11933203824412886
+    },
+    {
+      "season": "2024-25",
+      "gw": 21,
+      "rows": 724,
+      "current_nll": 0.11097138753244706,
+      "candidate_nll": 0.11097138753244706
+    },
+    {
+      "season": "2024-25",
+      "gw": 22,
+      "rows": 729,
+      "current_nll": 0.18608379960013818,
+      "candidate_nll": 0.18608379960013818
+    },
+    {
+      "season": "2024-25",
+      "gw": 23,
+      "rows": 736,
+      "current_nll": 0.17129200267382066,
+      "candidate_nll": 0.17129200267382066
+    },
+    {
+      "season": "2024-25",
+      "gw": 24,
+      "rows": 809,
+      "current_nll": 0.14468766322143187,
+      "candidate_nll": 0.14468766322143187
+    },
+    {
+      "season": "2024-25",
+      "gw": 25,
+      "rows": 836,
+      "current_nll": 0.17170262140182543,
+      "candidate_nll": 0.17170262140182543
+    },
+    {
+      "season": "2024-25",
+      "gw": 26,
+      "rows": 763,
+      "current_nll": 0.15938914706159404,
+      "candidate_nll": 0.15938914706159404
+    },
+    {
+      "season": "2024-25",
+      "gw": 27,
+      "rows": 764,
+      "current_nll": 0.14341996930515669,
+      "candidate_nll": 0.14341996930515669
+    },
+    {
+      "season": "2024-25",
+      "gw": 28,
+      "rows": 769,
+      "current_nll": 0.08650791688165588,
+      "candidate_nll": 0.08650791688165588
+    },
+    {
+      "season": "2024-25",
+      "gw": 29,
+      "rows": 623,
+      "current_nll": 0.1531904369974878,
+      "candidate_nll": 0.1531904369974878
+    },
+    {
+      "season": "2024-25",
+      "gw": 30,
+      "rows": 771,
+      "current_nll": 0.0934991454271224,
+      "candidate_nll": 0.0934991454271224
+    },
+    {
+      "season": "2024-25",
+      "gw": 31,
+      "rows": 772,
+      "current_nll": 0.11083765499725105,
+      "candidate_nll": 0.11083765499725105
+    },
+    {
+      "season": "2024-25",
+      "gw": 32,
+      "rows": 847,
+      "current_nll": 0.16944617106218615,
+      "candidate_nll": 0.16944617106218615
+    },
+    {
+      "season": "2024-25",
+      "gw": 33,
+      "rows": 930,
+      "current_nll": 0.10636421857533417,
+      "candidate_nll": 0.10636421857533417
+    },
+    {
+      "season": "2024-25",
+      "gw": 34,
+      "rows": 629,
+      "current_nll": 0.13150726171088675,
+      "candidate_nll": 0.13150726171088675
+    },
+    {
+      "season": "2024-25",
+      "gw": 35,
+      "rows": 781,
+      "current_nll": 0.12161728369689791,
+      "candidate_nll": 0.12161728369689791
+    },
+    {
+      "season": "2024-25",
+      "gw": 36,
+      "rows": 781,
+      "current_nll": 0.09768103492727978,
+      "candidate_nll": 0.09768103492727978
+    },
+    {
+      "season": "2024-25",
+      "gw": 37,
+      "rows": 781,
+      "current_nll": 0.12573799722882587,
+      "candidate_nll": 0.12573799722882587
+    },
+    {
+      "season": "2024-25",
+      "gw": 38,
+      "rows": 784,
+      "current_nll": 0.108589862136412,
+      "candidate_nll": 0.108589862136412
+    },
+    {
+      "season": "2025-26",
+      "gw": 1,
+      "rows": 690,
+      "current_nll": 0.14331393068122045,
+      "candidate_nll": 0.14331393068122045
+    },
+    {
+      "season": "2025-26",
+      "gw": 2,
+      "rows": 705,
+      "current_nll": 0.21168972709958123,
+      "candidate_nll": 0.21168972709958123
+    },
+    {
+      "season": "2025-26",
+      "gw": 3,
+      "rows": 712,
+      "current_nll": 0.18671930724274977,
+      "candidate_nll": 0.14968777962178378
+    },
+    {
+      "season": "2025-26",
+      "gw": 4,
+      "rows": 740,
+      "current_nll": 0.10385817391926291,
+      "candidate_nll": 0.09634287254449894
+    },
+    {
+      "season": "2025-26",
+      "gw": 5,
+      "rows": 741,
+      "current_nll": 0.13195573752071854,
+      "candidate_nll": 0.12854101694203882
+    },
+    {
+      "season": "2025-26",
+      "gw": 6,
+      "rows": 742,
+      "current_nll": 0.1341029890841213,
+      "candidate_nll": 0.13421340467375661
+    },
+    {
+      "season": "2025-26",
+      "gw": 7,
+      "rows": 743,
+      "current_nll": 0.21998122990802074,
+      "candidate_nll": 0.15440281483203125
+    },
+    {
+      "season": "2025-26",
+      "gw": 8,
+      "rows": 745,
+      "current_nll": 0.12412741238011418,
+      "candidate_nll": 0.12054490231209884
+    },
+    {
+      "season": "2025-26",
+      "gw": 9,
+      "rows": 746,
+      "current_nll": 0.21805624404231208,
+      "candidate_nll": 0.17989317015952402
+    },
+    {
+      "season": "2025-26",
+      "gw": 10,
+      "rows": 747,
+      "current_nll": 0.12533869336993586,
+      "candidate_nll": 0.11766710072188447
+    },
+    {
+      "season": "2025-26",
+      "gw": 11,
+      "rows": 752,
+      "current_nll": 0.13731301878337687,
+      "candidate_nll": 0.13313819847010455
+    },
+    {
+      "season": "2025-26",
+      "gw": 12,
+      "rows": 755,
+      "current_nll": 0.19455373429290268,
+      "candidate_nll": 0.13055859646949955
+    },
+    {
+      "season": "2025-26",
+      "gw": 13,
+      "rows": 755,
+      "current_nll": 0.12062960410352795,
+      "candidate_nll": 0.11856670056247627
+    },
+    {
+      "season": "2025-26",
+      "gw": 14,
+      "rows": 758,
+      "current_nll": 0.15818691585255099,
+      "candidate_nll": 0.15125962542688504
+    },
+    {
+      "season": "2025-26",
+      "gw": 15,
+      "rows": 759,
+      "current_nll": 0.1157049879253907,
+      "candidate_nll": 0.1141113633367364
+    },
+    {
+      "season": "2025-26",
+      "gw": 16,
+      "rows": 760,
+      "current_nll": 0.1767959824240888,
+      "candidate_nll": 0.14320280165343474
+    },
+    {
+      "season": "2025-26",
+      "gw": 17,
+      "rows": 770,
+      "current_nll": 0.14644737007550862,
+      "candidate_nll": 0.10935358082763222
+    },
+    {
+      "season": "2025-26",
+      "gw": 18,
+      "rows": 775,
+      "current_nll": 0.10195927846453119,
+      "candidate_nll": 0.09857261823050506
+    },
+    {
+      "season": "2025-26",
+      "gw": 19,
+      "rows": 780,
+      "current_nll": 0.10561586643473615,
+      "candidate_nll": 0.09865596331572375
+    },
+    {
+      "season": "2025-26",
+      "gw": 20,
+      "rows": 790,
+      "current_nll": 0.12983332253616803,
+      "candidate_nll": 0.12463150510561866
+    },
+    {
+      "season": "2025-26",
+      "gw": 21,
+      "rows": 795,
+      "current_nll": 0.13110325322137714,
+      "candidate_nll": 0.1252796184078173
+    },
+    {
+      "season": "2025-26",
+      "gw": 22,
+      "rows": 799,
+      "current_nll": 0.08441531111396514,
+      "candidate_nll": 0.08576853680261591
+    },
+    {
+      "season": "2025-26",
+      "gw": 23,
+      "rows": 803,
+      "current_nll": 0.14030195201252446,
+      "candidate_nll": 0.13668278335726972
+    },
+    {
+      "season": "2025-26",
+      "gw": 24,
+      "rows": 811,
+      "current_nll": 0.12249152025663079,
+      "candidate_nll": 0.12062340702060417
+    },
+    {
+      "season": "2025-26",
+      "gw": 25,
+      "rows": 817,
+      "current_nll": 0.13346595805959774,
+      "candidate_nll": 0.13157496594271056
+    },
+    {
+      "season": "2025-26",
+      "gw": 26,
+      "rows": 896,
+      "current_nll": 0.1210065273033762,
+      "candidate_nll": 0.11565692871233249
+    },
+    {
+      "season": "2025-26",
+      "gw": 27,
+      "rows": 818,
+      "current_nll": 0.09630519890326229,
+      "candidate_nll": 0.09530673512652797
+    },
+    {
+      "season": "2025-26",
+      "gw": 28,
+      "rows": 819,
+      "current_nll": 0.14210087846498187,
+      "candidate_nll": 0.14325778032977823
+    },
+    {
+      "season": "2025-26",
+      "gw": 29,
+      "rows": 820,
+      "current_nll": 0.09410835639975917,
+      "candidate_nll": 0.09305919940489028
+    },
+    {
+      "season": "2025-26",
+      "gw": 30,
+      "rows": 822,
+      "current_nll": 0.07619906658743697,
+      "candidate_nll": 0.07477114385379348
+    },
+    {
+      "season": "2025-26",
+      "gw": 31,
+      "rows": 664,
+      "current_nll": 0.11624892620338854,
+      "candidate_nll": 0.10978190417039405
+    },
+    {
+      "season": "2025-26",
+      "gw": 32,
+      "rows": 826,
+      "current_nll": 0.10926500180139942,
+      "candidate_nll": 0.1121877213786362
+    },
+    {
+      "season": "2025-26",
+      "gw": 33,
+      "rows": 1077,
+      "current_nll": 0.12263430751564128,
+      "candidate_nll": 0.11649729957796054
+    },
+    {
+      "season": "2025-26",
+      "gw": 34,
+      "rows": 582,
+      "current_nll": 0.17369330024511642,
+      "candidate_nll": 0.12542421914318216
+    },
+    {
+      "season": "2025-26",
+      "gw": 35,
+      "rows": 832,
+      "current_nll": 0.1289248193214372,
+      "candidate_nll": 0.12582850015803138
+    },
+    {
+      "season": "2025-26",
+      "gw": 36,
+      "rows": 920,
+      "current_nll": 0.10082657586509766,
+      "candidate_nll": 0.09367223368129728
+    },
+    {
+      "season": "2025-26",
+      "gw": 37,
+      "rows": 840,
+      "current_nll": 0.1533375694805938,
+      "candidate_nll": 0.1245518495421156
+    },
+    {
+      "season": "2025-26",
+      "gw": 38,
+      "rows": 841,
+      "current_nll": 0.10213682531345704,
+      "candidate_nll": 0.10200016109092833
+    }
+  ],
+  "overall_recomputed": {
+    "current": {
+      "log_score": 0.13882165237895794,
+      "rps": 0.03193337189978903,
+      "brier_any": 0.029343347769628512,
+      "pit80": 0.7990432828079074,
+      "mean_prediction": 0.03422127637706736,
+      "mean_error": -0.0002551226777421584,
+      "mae": 0.061240811392307096,
+      "prediction_sd": 0.06465922495937067,
+      "pit80_error": 0.0009567171920926709
+    },
+    "position_baseline": {
+      "log_score": 0.14754348509214166,
+      "rps": 0.03326420784694205,
+      "brier_any": 0.030675163151672444,
+      "pit80": 0.8038499221946862,
+      "mean_prediction": 0.036049304046365895,
+      "mean_error": 0.0015729049915563782,
+      "mae": 0.06772726069791257,
+      "prediction_sd": 0.017315942779286605,
+      "pit80_error": 0.0038499221946861617
+    },
+    "trailing_baseline": {
+      "log_score": 0.14146448823930605,
+      "rps": 0.03277732392605639,
+      "brier_any": 0.03019219796338958,
+      "pit80": 0.8014754192841911,
+      "mean_prediction": 0.03557934820963502,
+      "mean_error": 0.0011029491548255042,
+      "mae": 0.06449604117504636,
+      "prediction_sd": 0.05374286574372086,
+      "pit80_error": 0.0014754192841910374
+    },
+    "candidate": {
+      "log_score": 0.1349954031253863,
+      "rps": 0.031828495011377314,
+      "brier_any": 0.029243865926853612,
+      "pit80": 0.7993775574894819,
+      "mean_prediction": 0.03422127637717323,
+      "mean_error": -0.00025512267763628534,
+      "mae": 0.06144549732663862,
+      "prediction_sd": 0.061617107770780694,
+      "pit80_error": 0.0006224425105181286
+    }
+  },
+  "relative_log_lift_vs_current": 0.027562337632509034,
+  "season_recomputed": {
+    "2023-24": {
+      "current": {
+        "log_score": 0.14060797407473502,
+        "rps": 0.03285362431316581,
+        "brier_any": 0.029502551518782876,
+        "pit80": 0.7972750210260723,
+        "mean_prediction": 0.033071100770283024,
+        "mean_error": -0.002959176773871728,
+        "mae": 0.06105721090207564,
+        "prediction_sd": 0.06427279729153482,
+        "pit80_error": 0.002724978973927761
+      },
+      "position_baseline": {
+        "log_score": 0.15261147404282965,
+        "rps": 0.03474836760424708,
+        "brier_any": 0.03139011689421155,
+        "pit80": 0.8020185029436502,
+        "mean_prediction": 0.036217587965446,
+        "mean_error": 0.00018731042129125212,
+        "mae": 0.06936421291264865,
+        "prediction_sd": 0.01742314004614179,
+        "pit80_error": 0.0020185029436501356
+      },
+      "trailing_baseline": {
+        "log_score": 0.1451821397248383,
+        "rps": 0.03402319478371988,
+        "brier_any": 0.03066448835268273,
+        "pit80": 0.7998317914213625,
+        "mean_prediction": 0.03625551293598842,
+        "mean_error": 0.00022523539183366817,
+        "mae": 0.0661968567275608,
+        "prediction_sd": 0.055284232331778926,
+        "pit80_error": 0.0001682085786375298
+      },
+      "candidate": {
+        "log_score": 0.14060797407473502,
+        "rps": 0.03285362431316581,
+        "brier_any": 0.029502551518782876,
+        "pit80": 0.7972750210260723,
+        "mean_prediction": 0.033071100770283024,
+        "mean_error": -0.002959176773871728,
+        "mae": 0.06105721090207564,
+        "prediction_sd": 0.06427279729153482,
+        "pit80_error": 0.002724978973927761
+      }
+    },
+    "2024-25": {
+      "current": {
+        "log_score": 0.14239585083761785,
+        "rps": 0.033222206555732776,
+        "brier_any": 0.030580778297556704,
+        "pit80": 0.7984825715647106,
+        "mean_prediction": 0.0367745205304167,
+        "mean_error": 0.0009280227112619141,
+        "mae": 0.06458300077743956,
+        "prediction_sd": 0.06770024325703526,
+        "pit80_error": 0.0015174284352894585
+      },
+      "position_baseline": {
+        "log_score": 0.15206606625274327,
+        "rps": 0.03449489474788367,
+        "brier_any": 0.03186032902593177,
+        "pit80": 0.8028076091338929,
+        "mean_prediction": 0.036412245581856025,
+        "mean_error": 0.000565747762701239,
+        "mae": 0.06929178107438222,
+        "prediction_sd": 0.017299018684415926,
+        "pit80_error": 0.0028076091338928855
+      },
+      "trailing_baseline": {
+        "log_score": 0.14460343039026033,
+        "rps": 0.03390585202701717,
+        "brier_any": 0.03127450544604627,
+        "pit80": 0.8004984789062787,
+        "mean_prediction": 0.03667362554875542,
+        "mean_error": 0.0008271277296006307,
+        "mae": 0.06644607739525484,
+        "prediction_sd": 0.055799132681519786,
+        "pit80_error": 0.0004984789062786321
+      },
+      "candidate": {
+        "log_score": 0.14239585083761785,
+        "rps": 0.033222206555732776,
+        "brier_any": 0.030580778297556704,
+        "pit80": 0.7984825715647106,
+        "mean_prediction": 0.0367745205304167,
+        "mean_error": 0.0009280227112619141,
+        "mae": 0.06458300077743956,
+        "prediction_sd": 0.06770024325703526,
+        "pit80_error": 0.0015174284352894585
+      }
+    },
+    "2025-26": {
+      "current": {
+        "log_score": 0.13375851092084137,
+        "rps": 0.029831722022297575,
+        "brier_any": 0.028049329934650927,
+        "pit80": 0.7982653712979461,
+        "mean_prediction": 0.03302884721365036,
+        "mean_error": 0.0013617883505717334,
+        "mae": 0.0583589265493838,
+        "prediction_sd": 0.06207021376664898,
+        "pit80_error": 0.0017346287020539863
+      },
+      "position_baseline": {
+        "log_score": 0.138331277025315,
+        "rps": 0.030652398941698425,
+        "brier_any": 0.028873741813574747,
+        "pit80": 0.8053585235485932,
+        "mean_prediction": 0.035548266180112725,
+        "mean_error": 0.0038812073170340945,
+        "mae": 0.06465659091560677,
+        "prediction_sd": 0.017212142300917617,
+        "pit80_error": 0.005358523548593119
+      },
+      "trailing_baseline": {
+        "log_score": 0.1348706485542309,
+        "rps": 0.030497324483337456,
+        "brier_any": 0.02872759894933567,
+        "pit80": 0.8011564191347027,
+        "mean_prediction": 0.0339000472672181,
+        "mean_error": 0.00223298840413947,
+        "mae": 0.061007972445613484,
+        "prediction_sd": 0.05009395273847079,
+        "pit80_error": 0.0011564191347026576
+      },
+      "candidate": {
+        "log_score": 0.12259952836819381,
+        "rps": 0.029525856070969445,
+        "brier_any": 0.027759198248432603,
+        "pit80": 0.7996772783810132,
+        "mean_prediction": 0.033028847213959135,
+        "mean_error": 0.0013617883508805048,
+        "mae": 0.05895587845152289,
+        "prediction_sd": 0.05227210524289203,
+        "pit80_error": 0.00032272161898683205
+      }
+    }
+  },
+  "correction_applied_rows": 16193,
+  "fallback_counts": {
+    "unsupported_prior_role_history_exact_incumbent": 57704,
+    "cold_start_exact_incumbent": 821,
+    "unavailable_current_role_exact_incumbent": 11370,
+    "unmeasured_recent_signal_exact_incumbent": 667
+  },
+  "role_forecast_present_rows": 29747,
+  "scoped_diagnostic_verdict": "SUPPORTED",
+  "numeric_gates": {
+    "primary_vs_current": true,
+    "primary_vs_best_required_baseline": true,
+    "rps_no_regression": true,
+    "brier_no_regression": true,
+    "pit80": true,
+    "season_consistency": true,
+    "required_baseline_season_consistency": true,
+    "same_population": true,
+    "direct_proxy_count": true,
+    "zero_candidate_event_leakage": true
+  },
+  "full_gate_verdict": "INELIGIBLE",
+  "development_synthesis_eligible": false,
+  "promotion_permitted": false,
+  "candidate_or_upstream_fit_calls": 0,
+  "fpl_imports": 0,
+  "source_database_read_only": true,
+  "limitations": [
+    "retrospective archive roster/price/source knowledge times remain unproven",
+    "114 folds and one competitive-role season do not meet Stage C 181-fold requirement",
+    "closed-form equation/source-statistic reconciliation is not a new evaluation or tuning run"
+  ]
+}

@@ -1,0 +1,76 @@
+contract_version: '1.0'
+registration_status: REGISTERED
+evidence_class: retrospective_role_and_archive_price_proxy_development
+reference: retrospective_current_component_proxy_v1
+minutes: retrospective_current_minutes_proxy_v1
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+minutes_manifest_sha256: 5b813d58b71bad97a5c81774aaf70c0bca5f4e0e3bcd518e6f26e0acfea19bac
+component_reference_manifest_sha256: c76bb1936b332b05bd8e3970af3dbd5b3e95c428d1005783c59d82b88d8f04b9
+role_result_sha256: c330d44a227ff6ff10cce1d5813f582d48dadfa181816c9333d6389358940809
+role_model: retrospective_broad_starting_role_transition_v1
+role_context_policy: original_OOS_hypothetical_start_probabilities_as_soft_covariates_not_actual_role_exposure
+candidate_identity:
+  goals: retrospective_role_exposure_player_goals_v1
+  assists: retrospective_role_exposure_player_assists_v1
+signal:
+  goals: expected_goals
+  assists: expected_assists
+target:
+  goals: goals_scored
+  assists: assists
+required_baseline_names:
+  goals: [positional_goal_rate_poisson, trailing_player_goal_rate_poisson]
+  assists: [positional_assist_rate_poisson, trailing_player_assist_rate_poisson]
+source_contract:
+  goals: config/phase3_evaluation.yaml
+  assists: config/phase3_stage_c_assists_evaluation.yaml
+seasons: ['2023-24', '2024-25', '2025-26']
+role_available_seasons: ['2025-26']
+population: exact_complete_retained_current_minutes_proxy_roster_including_DNP
+expected_rows: 86755
+expected_folds: 114
+expected_direct_proxy_rows: 821
+season_rows: {'2023-24': 29725, '2024-25': 27283, '2025-26': 29747}
+signal_coverage_threshold: 1.0
+role_prior_minutes: 900.0
+player_prior_minutes: 90.0
+window: 5
+window_policy: original_trailing_eligible_then_last_five_appeared_then_measured_signal_only
+minimum_prior_gameweeks: 8
+new_minimum_training_rows: null
+minutes_bins: [[0, 0], [1, 59], [60, 89], [90, null]]
+bin_mean_fallback: [0.0, 30.0, 75.0, 90.0]
+pool_policy: exact_incumbent_pre_cap_budget_of_eligible_players_only
+minimum_pool_players: 2
+missing_policy: keep_exact_incumbent_rate_and_PMF_no_source_imputation
+distribution: existing_conditional_Poisson_0_to_10_tail_folded_then_original_appearance_mixture_once
+conditional_cap: existing_current_team_scale_unchanged
+assist_conversion: exact_current_fold_local_league_assist_rate_unchanged
+completed_label_margin_hours: 6
+event_policy: whole_target_GW_exclusion_and_prior_kickoff_plus_six_hours_strictly_before_cutoff
+normalization: fold_local_only
+parameters_selected: none_fixed_closed_form_no_grid
+seed: 202627
+scorer: existing_score_attacking_predictions_identical_per_arm
+primary: mean_log_score
+minimum_primary_lift_vs_current: 0.01
+minimum_primary_lift_vs_required_best_baseline: 0.01
+maximum_rps_relative_regression: 0.0
+maximum_brier_any_relative_regression: 0.0
+maximum_pit80_absolute_error: 0.05
+require_no_season_log_regression: true
+minimum_prediction_coverage: 1.0
+minimum_gate_folds: 181
+full_gate_status_by_population: INELIGIBLE
+development_synthesis_eligible: false
+promotion_permitted: false
+one_run_per_candidate: true
+clean_worktree_required: true
+dirty_or_resume_escape: none
+result_external_write_once: true
+refutation_relative_regression: 0.01
+diagnostic_signal_predictions: posterior_signal_per_minute_times_expected_minutes_not_team_xG_forecast
+diagnostic_signal_comparator: old_measured_per_appearance_signal_times_current_p_play_not_goal_model
+slices: [overall, season, position, home_away, GW1_6_GW7plus, cold_established, direct_proxy_nonproxy,
+         propagated_team_proxy, role_forecast_present_absent, correction_applied_fallback]
+uncertainty: paired_per_player_fixture_loss_GW_clustered_standard_error

@@ -1,0 +1,72 @@
+# V2 goalkeeper-saves evaluation contract.
+#
+# Pre-registered before the candidate runs. New contract; amends nothing.
+#
+# The hypothesis, stated before measuring: V1 models saves as
+# `Poisson(k * lambda_conceded)` with `k = save_rate / (1 - save_rate)`, which makes shots on
+# target faced a DETERMINISTIC function of goals conceded. Measured on this archive the
+# correlation between team shots on target allowed and goals allowed is 0.621, so that
+# identity discards roughly 61% of the variance in shots faced. If the football engine
+# predicts shots faced as a quantity in its own right, the saves distribution should improve
+# on both sharpness and calibration.
+
+contract_version: "1.0"
+phase: "v2-gk-saves"
+status: development_only
+
+amendments: []
+
+population:
+  grain: "player_fixture"
+  # Goalkeeper appearances only. A goalkeeper who did not play has no saves outcome; scoring
+  # a zero for him would measure team selection, not the saves model.
+  filter: "position == 'GK' AND minutes > 0"
+  target: "saves"
+  # Both components must be measured. A NULL is unmeasured and is never read as zero.
+  require_measured: ["saves", "goals_conceded"]
+  seasons_from_data: true
+  gameweeks: "observed_only"
+
+walk_forward:
+  fold_unit: "observed_gameweek"
+  cutoff: "first_kickoff_of_gameweek"
+  minimum_training_observed_gameweeks: 8
+  forbid_random_split: true
+  forbid_full_dataset_fitting: true
+
+candidates:
+  - name: "gk_saves_v1_from_team_conceded"
+    description: >-
+      The incumbent. saves ~ Poisson(k * lambda_conceded), k = s/(1-s), with s derived
+      fold-locally over goalkeeper appearances. Re-run here on identical rows rather than
+      compared against a frozen number from a different population.
+    is_baseline: true
+  - name: "gk_saves_v2_from_expected_shots_faced"
+    description: >-
+      saves ~ Poisson(s * expected_shots_on_target_faced), with expected shots faced supplied
+      by the V2 football engine and `s` the fold-local league save rate. Falls back to the V1
+      identity for any fixture the engine cannot supply shots faced for, so it is never
+      worse-informed than V1.
+
+metrics:
+  primary: "mean_log_score"
+  reported:
+    - "mean_log_score"
+    - "crps"
+    - "rps"
+    - "pit_interval_80_coverage"
+    - "mean_absolute_error"
+    - "mean_error"
+  calibration: "randomised_pit"
+
+splits:
+  - "season"
+  - "venue"
+  - "shots_faced_regime"
+
+promotion:
+  minimum_relative_log_lift: 0.01
+  maximum_crps_relative_regression: 0.0
+  pit_interval_80_maximum_absolute_error: 0.05
+  require_each_reported_season_to_pass: true
+  promotion_requires_prospective_window: true

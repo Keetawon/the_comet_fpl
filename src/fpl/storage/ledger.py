@@ -632,15 +632,30 @@ def attach_outcomes(
 
 
 def _team_outcome_values(outcome: TeamLedgerOutcome) -> tuple[object, ...]:
+    """The immutable values a re-attachment must match exactly.
+
+    `kickoff_time` is rendered as epoch microseconds to match the comparison query, which
+    projects `epoch_us(kickoff_time)` rather than the TIMESTAMPTZ itself. DuckDB converts a
+    fetched TIMESTAMPTZ into a Python datetime through `pytz`, which this project does not
+    declare as a dependency (it pins `tzdata` for `zoneinfo`), so a clean install raised
+    ModuleNotFoundError here. Microseconds carry no timezone name, so no IANA lookup happens --
+    and comparing two integers is a stricter equality test than comparing two datetimes that
+    could differ only in tzinfo representation.
+    """
     return (
         outcome.team_code,
         outcome.opponent_team_id,
         outcome.gw,
-        outcome.kickoff_time,
+        _epoch_microseconds(outcome.kickoff_time),
         outcome.was_home,
         outcome.goals_for,
         outcome.goals_against,
     )
+
+
+def _epoch_microseconds(value: datetime) -> int:
+    """An aware instant as exact epoch microseconds, matching DuckDB's `epoch_us()`."""
+    return round(value.timestamp() * 1_000_000)
 
 
 def attach_team_outcomes(
@@ -665,7 +680,7 @@ def attach_team_outcomes(
         for outcome in pair:
             existing = con.execute(
                 """
-                SELECT team_code, opponent_team_id, gw, kickoff_time, was_home,
+                SELECT team_code, opponent_team_id, gw, epoch_us(kickoff_time), was_home,
                        goals_for, goals_against
                 FROM ledger_outcome_team_fixture
                 WHERE season = ? AND fixture = ? AND team_id = ?

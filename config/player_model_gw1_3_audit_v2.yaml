@@ -1,0 +1,18 @@
+schema_version: 1
+audit_id: player_model_gw1_3_20260908_v2
+status: RETROSPECTIVE_FROZEN_DIAGNOSTIC
+base_config: config/player_model_gw1_3_audit.yaml
+base_config_sha256: 2d3adaaf7e372ac2c44b4c38c18879ee15397af747468aa02ec6b80cd7943cba
+v1_verification: results/player_model_gw1_3_verification_2026-09-08.json
+v1_verification_sha256: c163a1895e9e57258a514d7a043999560c1c78281ff397bcdc989a9ca6a5d564
+v1_scorecard: docs/player-model-gw1-3-scorecard-2026-09-08.md
+v1_scorecard_sha256: 17807d5c53e79056dfd436366a5da2aa96738a2e12049b0497c7189c8115cdee
+serializer_repair_sha: 1e5d93831a2c1564af6349389b6f0c523cd1818e
+serializer_source: src/fpl/validate/audit_json.py
+serializer_sha256: 650044e35bcc4c02f3ec28420775f7ea0a4622bee030d133d5482e8d146a0682
+output_directory_name: formal-v2
+allowed_effective_config_changes:
+- audit_id
+- default_output_dir
+formal_attempts_authorized: 1
+no_new_model_or_scientific_rule: true

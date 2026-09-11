@@ -1,0 +1,74 @@
+{
+  "record_type": "additive_post_result_verification_not_a_model_evaluation",
+  "recorded_at_utc": "2026-09-07T13:30:40Z",
+  "branch": "claude/comet-fpl-v2-architecture-mqrj8f",
+  "program_start_sha": "ba24f23ce712214ac26db438b0356d729bdbc69c",
+  "resumed_start_sha": "cb11a64c93b0cc6e9e7a0e146032b060a67ea347",
+  "synthesis_clean_preregistration_and_evaluation_sha": "e716ec1b9299578369f1e394c901e3b1a82bc3ea",
+  "result_documentation_written_after_formal_run": true,
+  "synthesis_result_sha256": "0d3599fd5d95a9e301c8f4ea465e71bf235499446f318a3c22403f5d9328543d",
+  "synthesis_independent_audit_sha256": "358badbf26be931377075518fe4b9bca2204d63e6950bf78127e55c6da187b94",
+  "synthesis_independent_checks": 4297806,
+  "synthesis_independent_failures": 0,
+  "prior_frozen_result_modified_or_deleted_since_program_start": [],
+  "current_prospective_job_changed_since_program_start": false,
+  "existing_scoring_configuration_changed_since_program_start": false,
+  "original_databases_unchanged": [
+    {
+      "path": "D:/Personal/workspace/the_comet_fpl/.worktrees/sdp_test/data/fpl.duckdb",
+      "sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8"
+    },
+    {
+      "path": "D:/Personal/workspace/the_comet_fpl/data/fpl.duckdb",
+      "sha256": "b886977a4603a9c8b6dea2e0ed6652d2b4864a71fc707b54201ac8fb1656f2ce"
+    }
+  ],
+  "new_isolated_development_database": {
+    "path": "D:/Personal/fpl-operations/development/competitive-workload-v3-20260907T094600Z.duckdb",
+    "sha256": "a8584ce79f421e0bd43057f3a8f63bac03e30b59cc1c2407b8a7c28387a35021",
+    "default_consumers_switched": false
+  },
+  "corrected_broad_python_partition": {
+    "command": "python -m pytest --ignore=tests/test_bi_export.py -q --basetemp D:/Personal/fpl-operations/verification/pytest-program-final-corrected-20260907T131300Z --junitxml D:/Personal/fpl-operations/verification/pytest-program-final-corrected-20260907T131300Z.xml",
+    "passed": 3572,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 4,
+    "terminal_seconds": 417.82,
+    "xml_suite_seconds": 417.787,
+    "xml_sha256": "db80d0e9f3f9cd58325bedef32f0fda0aa5e3f90d6f34e380cfe40f878b3233c",
+    "excluded_known_windows_symlink_suite": "tests/test_bi_export.py",
+    "excluded_suite_counted_as_passed": false,
+    "earlier_partition": {
+      "passed": 3571,
+      "failed": 1,
+      "skipped": 4,
+      "failure": "order-dependent invalid-position test could replace GK with GK",
+      "correction": "test input always changes position, committed before synthesis scoring; no model changes"
+    }
+  },
+  "focused_preformal_tests_passed": 180,
+  "ruff_check": "passed",
+  "strict_mypy": {"passed": true, "source_files": 189},
+  "all_program_changed_python_format": {"passed": true, "files": 65},
+  "global_format": {
+    "passed": false,
+    "already_formatted_files": 470,
+    "preexisting_failures": [
+      "src/fpl/insights/contracts.py",
+      "src/fpl/insights/evidence.py",
+      "src/fpl/publish/contract.py",
+      "src/fpl/publish/dashboard_json.py",
+      "src/fpl/publish/export.py",
+      "tests/test_bi_export.py",
+      "tests/test_bi_semantic_contract.py",
+      "tests/test_dashboard_json.py",
+      "tests/test_insights.py",
+      "tests/test_public_dashboard.py",
+      "tests/test_snapshot_workflows.py"
+    ]
+  },
+  "entire_repository_gate_claimed_green": false,
+  "production_promotion": false,
+  "next_experiment_implemented": false
+}

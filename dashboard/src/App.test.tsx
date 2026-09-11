@@ -10,7 +10,7 @@ vi.mock("@/components/ThemeToggle", () => ({
 }));
 vi.mock("@/pages/SummaryPage", () => ({ SummaryPage: () => <h1>Summary route</h1> }));
 vi.mock("@/pages/FixtureMatrixPage", () => ({ FixtureMatrixPage: () => null }));
-vi.mock("@/pages/PlayersPage", () => ({ PlayersPage: () => null }));
+vi.mock("@/pages/PlayersPage", () => ({ PlayersPage: () => <h1>Players route</h1> }));
 vi.mock("@/pages/NextGwPage", () => ({ NextGwPage: () => null }));
 vi.mock("@/pages/PlanBuilderPage", () => ({ PlanBuilderPage: () => null }));
 vi.mock("@/pages/UserDraftPage", () => ({ UserDraftPage: () => null }));
@@ -20,6 +20,9 @@ vi.mock("@/pages/PlayerAnalyticsPage", () => ({
 }));
 vi.mock("@/pages/TeamAnalyticsPage", () => ({
   TeamAnalyticsPage: () => <h1>Team analytics route</h1>,
+}));
+vi.mock("@/pages/SdpStatsPage", () => ({
+  TeamSdpStatsPage: () => <h1>Team stat from SDP</h1>,
 }));
 vi.mock("@/pages/PlayerForecastVsActualPage", () => ({
   PlayerForecastVsActualPage: () => <h1>Player prediction accuracy route</h1>,
@@ -31,6 +34,14 @@ vi.mock("@/pages/TeamForecastVsActualPage", () => ({
 import App from "./App";
 
 describe("App deep-analytics routes", () => {
+  it("keeps the SDP team route and sends retired SDP player bookmarks to Players", () => {
+    window.location.hash = "#team-stat-sdp";
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "Team stat from SDP" })).toBeInTheDocument();
+    act(() => { window.location.hash = "#players-stat-sdp"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    expect(screen.getByRole("heading", { name: "Players route" })).toBeInTheDocument();
+    expect(screen.getByText("active:players")).toBeInTheDocument();
+  });
   afterEach(() => {
     window.location.hash = "";
   });

@@ -1,0 +1,442 @@
+{
+  "completed": true,
+  "checks": 7358810,
+  "failures": 0,
+  "failure_details": [],
+  "maximum_absolute_numeric_difference": 4.858489620715372e-15,
+  "models_fitted": 0,
+  "candidate_rerun": false,
+  "git_head": "f0c52fe1e5546dd21e8f37b75bb8022c2d9c8bae",
+  "result_sha256": "a54ae95ca7a9111278fbc33b499021fa5bfc2cd6f0dbe788518d7de4157273f3",
+  "database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "all_source_pins_checked": 542,
+  "primary_rows": 7859,
+  "all_outfield_rows": 19856,
+  "upstream_folds": 38,
+  "outer_folds": 28,
+  "all_prior_source_hashes_reproduced": true,
+  "all_count_pmf_masses_checked": true,
+  "current_comparator_hash_reproduced": true,
+  "dispersion_certificates": [
+    {
+      "gw": 11,
+      "alpha": 0.0711203719388752,
+      "prior_oos_rows": 2587
+    },
+    {
+      "gw": 12,
+      "alpha": 0.06512474759522027,
+      "prior_oos_rows": 2869
+    },
+    {
+      "gw": 13,
+      "alpha": 0.06828665443071869,
+      "prior_oos_rows": 3152
+    },
+    {
+      "gw": 14,
+      "alpha": 0.06989664364718025,
+      "prior_oos_rows": 3436
+    },
+    {
+      "gw": 15,
+      "alpha": 0.07533453406522779,
+      "prior_oos_rows": 3721
+    },
+    {
+      "gw": 16,
+      "alpha": 0.07462645525301054,
+      "prior_oos_rows": 4011
+    },
+    {
+      "gw": 17,
+      "alpha": 0.07519398766808705,
+      "prior_oos_rows": 4292
+    },
+    {
+      "gw": 18,
+      "alpha": 0.07579468967949013,
+      "prior_oos_rows": 4574
+    },
+    {
+      "gw": 19,
+      "alpha": 0.0783841135440469,
+      "prior_oos_rows": 4847
+    },
+    {
+      "gw": 20,
+      "alpha": 0.07899393521431666,
+      "prior_oos_rows": 5121
+    },
+    {
+      "gw": 21,
+      "alpha": 0.08085289024720885,
+      "prior_oos_rows": 5398
+    },
+    {
+      "gw": 22,
+      "alpha": 0.07948730438937833,
+      "prior_oos_rows": 5672
+    },
+    {
+      "gw": 23,
+      "alpha": 0.0802258770833941,
+      "prior_oos_rows": 5943
+    },
+    {
+      "gw": 24,
+      "alpha": 0.07947686226742869,
+      "prior_oos_rows": 6226
+    },
+    {
+      "gw": 25,
+      "alpha": 0.07821662155319334,
+      "prior_oos_rows": 6507
+    },
+    {
+      "gw": 26,
+      "alpha": 0.07432935423844564,
+      "prior_oos_rows": 6790
+    },
+    {
+      "gw": 27,
+      "alpha": 0.0736496109690062,
+      "prior_oos_rows": 7096
+    },
+    {
+      "gw": 28,
+      "alpha": 0.07472427521692374,
+      "prior_oos_rows": 7373
+    },
+    {
+      "gw": 29,
+      "alpha": 0.07187812602185059,
+      "prior_oos_rows": 7654
+    },
+    {
+      "gw": 30,
+      "alpha": 0.07164772520018003,
+      "prior_oos_rows": 7940
+    },
+    {
+      "gw": 31,
+      "alpha": 0.07417611823842829,
+      "prior_oos_rows": 8216
+    },
+    {
+      "gw": 32,
+      "alpha": 0.0738698249201676,
+      "prior_oos_rows": 8443
+    },
+    {
+      "gw": 33,
+      "alpha": 0.07185594449701845,
+      "prior_oos_rows": 8726
+    },
+    {
+      "gw": 34,
+      "alpha": 0.07184494840807171,
+      "prior_oos_rows": 9091
+    },
+    {
+      "gw": 35,
+      "alpha": 0.07177848279980635,
+      "prior_oos_rows": 9282
+    },
+    {
+      "gw": 36,
+      "alpha": 0.0700696978112655,
+      "prior_oos_rows": 9566
+    },
+    {
+      "gw": 37,
+      "alpha": 0.06997875116826376,
+      "prior_oos_rows": 9868
+    },
+    {
+      "gw": 38,
+      "alpha": 0.06926879136811363,
+      "prior_oos_rows": 10154
+    }
+  ],
+  "overall": {
+    "rows": 7859,
+    "arms": {
+      "incumbent": {
+        "mean_log_score": 0.3424679289155542,
+        "brier_score": 0.10416293425277512,
+        "auc": 0.7754641708490271,
+        "mean_predicted": 0.13280760244591142,
+        "observed_rate": 0.1386944903931798,
+        "reliability": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 3767,
+            "predicted": 0.040506967050534366,
+            "observed": 0.04061587470135386
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 1989,
+            "predicted": 0.12853665914194426,
+            "observed": 0.13725490196078433
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 1046,
+            "predicted": 0.22840227800441418,
+            "observed": 0.2390057361376673
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 623,
+            "predicted": 0.3241509557411471,
+            "observed": 0.3756019261637239
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 304,
+            "predicted": 0.4162883946082088,
+            "observed": 0.40131578947368424
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 113,
+            "predicted": 0.5113285876907893,
+            "observed": 0.4336283185840708
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 17,
+            "predicted": 0.6058327717894861,
+            "observed": 0.5294117647058824
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          }
+        ]
+      },
+      "poisson": {
+        "mean_log_score": 0.33156502977379,
+        "brier_score": 0.10293594267635778,
+        "auc": 0.8051306482195546,
+        "mean_predicted": 0.113080048885947,
+        "observed_rate": 0.1386944903931798,
+        "reliability": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 4586,
+            "predicted": 0.038643895368981475,
+            "observed": 0.0453554295682512
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 1767,
+            "predicted": 0.14253891213116732,
+            "observed": 0.1799660441426146
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 865,
+            "predicted": 0.24688433033627638,
+            "observed": 0.33641618497109826
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 434,
+            "predicted": 0.3431234696502568,
+            "observed": 0.41013824884792627
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 162,
+            "predicted": 0.44570259891520175,
+            "observed": 0.4506172839506173
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 36,
+            "predicted": 0.5373423488509508,
+            "observed": 0.4722222222222222
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 9,
+            "predicted": 0.6211405716387054,
+            "observed": 0.5555555555555556
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          }
+        ]
+      },
+      "candidate": {
+        "mean_log_score": 0.3302584196579315,
+        "brier_score": 0.1023960363188157,
+        "auc": 0.8043683359514029,
+        "mean_predicted": 0.1310911878715077,
+        "observed_rate": 0.1386944903931798,
+        "reliability": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 3804,
+            "predicted": 0.04421216738431688,
+            "observed": 0.03286014721345951
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 2218,
+            "predicted": 0.14406825357398617,
+            "observed": 0.14156898106402163
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 1105,
+            "predicted": 0.24674901680436853,
+            "observed": 0.31221719457013575
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 545,
+            "predicted": 0.34088776271354576,
+            "observed": 0.4036697247706422
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 166,
+            "predicted": 0.43853083038964596,
+            "observed": 0.45180722891566266
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 21,
+            "predicted": 0.5372172491783542,
+            "observed": 0.5238095238095238
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 0,
+            "predicted": null,
+            "observed": null
+          }
+        ]
+      }
+    },
+    "paired_loss": {
+      "incumbent": {
+        "paired_mean": -0.01220950925762268,
+        "gw_clustered_standard_error": 0.0035448997995017823,
+        "clusters": 28,
+        "normal_95_interval": [
+          -0.019157512864646176,
+          -0.005261505650599187
+        ],
+        "negative_favours": "retrospective_predicted_environment_gamma_poisson_dc_v1",
+        "serial_dependence_adjusted": false
+      },
+      "poisson": {
+        "paired_mean": -0.001306610115858486,
+        "gw_clustered_standard_error": 0.0011928166582167111,
+        "clusters": 28,
+        "normal_95_interval": [
+          -0.00364453076596324,
+          0.0010313105342462678
+        ],
+        "negative_favours": "retrospective_predicted_environment_gamma_poisson_dc_v1",
+        "serial_dependence_adjusted": false
+      }
+    }
+  },
+  "relative_lift_vs_current": 0.03565154055822065,
+  "nb_relative_log_lift_vs_same_input_poisson": 0.003940735597930511,
+  "verdict": "INCONCLUSIVE",
+  "finished_at_utc": "2026-09-07T10:48:46.089516+00:00",
+  "exact_comparator_arithmetic_rows": 19856,
+  "exact_comparator_sha256": "a6fb288ba96a762dd803ea9a74a2ab1d06e21a4c5e2d61e54bba9aebf2408312",
+  "verifier_addendum": {
+    "initial_report_retained": "independent-audit.json",
+    "initial_report_sha256": "29ff391141624d323ea48b642eac5628a19d8ea635b208e2806226c6d480e0ee",
+    "issue": "The verifier reassociated 5*(sum_hits/n) as (5*sum_hits)/n before byte hashing. Both passed numeric tolerance but differed at last bits. The original model, predictions, scores and evaluation are unchanged.",
+    "correction": "All 19,856 stored CURRENT probabilities now independently match the original ordered scalar arithmetic exactly, and their complete prediction hash reproduces.",
+    "fit_called": false,
+    "candidate_rerun": false
+  }
+}

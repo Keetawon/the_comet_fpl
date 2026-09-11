@@ -28,6 +28,8 @@ export interface AnalyticsScatterAxis {
 export interface AnalyticsScatterPoint {
   id: string | number;
   label: string;
+  /** Optional source-owned abbreviation, displayed beside the point. */
+  shortLabel?: string;
   x: number;
   y: number;
   xDisplay?: string;
@@ -53,6 +55,7 @@ export interface AnalyticsScatterProps {
   /** Optional concise visible provenance; exact labels remain in the SVG description and point name. */
   vintageDisplayLabel?: string;
   horizonDisplayLabel?: string;
+  provenanceLabel?: string;
   medianX?: number | null;
   medianY?: number | null;
   emptyMessage?: string;
@@ -173,6 +176,7 @@ export function AnalyticsScatter({
   horizonLabel,
   vintageDisplayLabel = vintageLabel,
   horizonDisplayLabel = horizonLabel,
+  provenanceLabel = "Forecast",
   medianX = null,
   medianY = null,
   emptyMessage = "No eligible values to plot.",
@@ -233,6 +237,25 @@ export function AnalyticsScatter({
       ? "end"
       : "center";
   const activeVerticalPlacement = activeY < HEIGHT * 0.24 ? "below" : "above";
+  // Keep abbreviated labels inside the plot and try alternate positions when
+  // neighbours coincide. Coordinates and values of the points never move.
+  const occupied: { x: number; y: number; width: number }[] = [];
+  const pointLabels = eligible.flatMap(point => {
+    if (!point.shortLabel) return [];
+    const px = scale(point.x, xDomain, MARGIN.left, MARGIN.left + PLOT_WIDTH);
+    const py = scale(point.y, yDomain, MARGIN.top + PLOT_HEIGHT, MARGIN.top);
+    const width = point.shortLabel.length * 9;
+    const options = [-10, 20, -28, 38, -46, 56].flatMap(dy => [8, -width - 8].map(dx => ({
+      x: Math.max(MARGIN.left + 2, Math.min(MARGIN.left + PLOT_WIDTH - width - 2, px + dx)),
+      y: Math.max(MARGIN.top + 14, Math.min(MARGIN.top + PLOT_HEIGHT - 2, py + dy)),
+      width,
+    })));
+    const placement = options.find(p => !occupied.some(q =>
+      p.x < q.x + q.width + 3 && p.x + p.width + 3 > q.x && Math.abs(p.y - q.y) < 16,
+    )) ?? options[0];
+    occupied.push(placement);
+    return [{ point, px, py, ...placement }];
+  });
 
   return (
     <section className={cn("rounded-lg border bg-card p-3", className)} aria-labelledby={`${id}-title`}>
@@ -245,7 +268,7 @@ export function AnalyticsScatter({
         </p>
       )}
       <p className="mt-1 text-[11px] text-muted-foreground">
-        Forecast {vintageDisplayLabel} · {horizonDisplayLabel}
+        {provenanceLabel} {vintageDisplayLabel} · {horizonDisplayLabel}
       </p>
 
       <div className="relative mt-2 w-full overflow-visible">
@@ -356,6 +379,12 @@ export function AnalyticsScatter({
                 />
               );
             })}
+          </g>
+          <g aria-hidden="true" pointerEvents="none">
+            {pointLabels.map(({ point, px, py, x, y, width }) => <g key={point.id}>
+              <line x1={px} y1={py} x2={Math.max(x, Math.min(x + width, px))} y2={y - 5} stroke={point.color ?? "var(--chart-2)"} opacity="0.45" />
+              <text data-testid="analytics-point-label" x={x} y={y} fontSize="13" fontWeight="600" fill="var(--foreground)" stroke="var(--card)" strokeWidth="3" paintOrder="stroke">{point.shortLabel}</text>
+            </g>)}
           </g>
         </svg>
 

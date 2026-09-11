@@ -1,0 +1,479 @@
+{
+  "blockers": [
+    "No connected Browser: rendered desktop/mobile, console and screenshots unverified.",
+    "Live Pages workflow requires main; merge/default changes not authorized. Local preview served."
+  ],
+  "branch": "claude/comet-fpl-v2-architecture-mqrj8f",
+  "capture_health": {
+    "checked_at": "2026-09-08T14:01:22.929858+00:00",
+    "completed_receipts": {
+      "count": 5
+    },
+    "database": "D:\\Personal\\fpl-operations\\data\\sdp-primary-v2.duckdb",
+    "exit_code": 0,
+    "failed_receipts": {
+      "count": 0,
+      "latest_finished_at": null,
+      "latest_run_id": null
+    },
+    "freshness_unproven": false,
+    "healthy": true,
+    "latest_completed": {
+      "consumer_ready": true,
+      "database": "D:\\Personal\\fpl-operations\\data\\sdp-primary-v2.duckdb",
+      "exit_code": 0,
+      "finished_at": "2026-09-08T13:53:39.210386+00:00",
+      "healthy": true,
+      "mode": "capture_and_stage",
+      "problem": null,
+      "run_id": "20260908T132407.750092Z-7cd8385d",
+      "started_at": "2026-09-08T13:24:07.750092+00:00"
+    },
+    "latest_success": {
+      "consumer_ready": true,
+      "database": "D:\\Personal\\fpl-operations\\data\\sdp-primary-v2.duckdb",
+      "exit_code": 0,
+      "finished_at": "2026-09-08T13:53:39.210386+00:00",
+      "healthy": true,
+      "mode": "capture_and_stage",
+      "problem": null,
+      "run_id": "20260908T132407.750092Z-7cd8385d",
+      "started_at": "2026-09-08T13:24:07.750092+00:00"
+    },
+    "malformed_receipts": {
+      "count": 0,
+      "run_ids": []
+    },
+    "max_success_age_hours": 30.0,
+    "newer_suspects": {
+      "count": 0,
+      "latest_run_id": null
+    },
+    "other_database_receipts": {
+      "count": 0
+    },
+    "production_health": {
+      "current_failure_count": 4,
+      "failure_count": 1374,
+      "failure_count_scope": "all_retained_seasons",
+      "global_failure": null,
+      "identity_failures": 0,
+      "latest_completed_match": "2026-09-06 15:30:00+00:00",
+      "latest_valid_sdp_known_at": "2026-09-08T13:35:11.208041+00:00",
+      "matches_valid": 26,
+      "schema_validation_failures": 0,
+      "season": "2026-27",
+      "source_finished_at": "2026-09-08T13:53:39.210386+00:00",
+      "source_run_id": "20260908T132407.750092Z-7cd8385d"
+    },
+    "receipts_scanned": 5,
+    "running_receipts": {
+      "count": 0,
+      "latest_run_id": null
+    },
+    "runs_root": "D:\\Personal\\fpl-operations\\sdp-primary-runs",
+    "schema": "fpl.sdp-capture-health",
+    "schema_version": 2,
+    "stale": false,
+    "success_age_hours": 0.128811,
+    "unattributed_receipts": {
+      "count": 0
+    },
+    "undated_receipts": {
+      "count": 0,
+      "latest_run_id": null
+    },
+    "verdict": "healthy"
+  },
+  "checkpoint": {
+    "contract": {
+      "checkpoint_id": "sdp_fixed_origin_gw4_8_20260908_v1",
+      "forecast_emitter_sha": "2a96e91ee49604e152f77e47ff6e1bcf9d7037af",
+      "gameweeks": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "model_freeze_sha": "17cfa2267ce4d7c89f96842220f40471b81152d2",
+      "prediction_id": "0cca9d810d3f984f30f53d37a8ad3a494f20266d910e4acc1ec161bce582fafb",
+      "primary_artifact_sha256": "566fe684a14ce2edc707286968d470891e7854e7e1ac44733fc0ab3d17d4914a",
+      "qualitative_policy": "no_numeric_promotion_gate_continue_frozen_prospective_monitoring",
+      "schema_version": 1,
+      "scoring": {
+        "fixture_support_max": 34,
+        "log_floor": 1e-12,
+        "proper_target": "sum_individually_coarsened_fixture_targets",
+        "signed_target": "total_points_as_recorded"
+      },
+      "season": "2026-27",
+      "selection_registered_at": "2026-09-08T13:23:50.1346117+00:00",
+      "shadow_artifact_sha256": "d1e48736d869a697f79e9b383a0d627f7a3632e1b4b18321c933dc421385361e",
+      "vintage_policy": "fixed_origin"
+    },
+    "metrics_computed": false,
+    "operations": {
+      "fallback_fixtures": 29,
+      "forecast_fixture_count": 50,
+      "n_finalized_gameweeks": 0,
+      "n_scored_player_gameweeks": 0,
+      "n_scored_team_gameweeks": 0,
+      "player_pairs_expected": 3270,
+      "player_pairs_scored": 0,
+      "sdp_primary_fixtures": 21,
+      "selector_reason_counts_fixtures": {
+        "SDP_INCOMPLETE_FALLBACK": 29,
+        "SDP_PRIMARY": 21
+      },
+      "team_pairs_expected": 100,
+      "team_pairs_scored": 0
+    },
+    "replay_byte_identical": true,
+    "report_version": "c1ba2f464f3deedd219b73349640929476f4a678ff9b5fd2ba6b966529323562",
+    "scoring": {
+      "fixture_support_max": 34,
+      "log_floor": 1e-12,
+      "proper_target": "sum_individually_coarsened_fixture_targets",
+      "signed_target": "total_points_as_recorded"
+    },
+    "status": "PENDING"
+  },
+  "checks": {
+    "changed_python_format": "PASS: 8 files",
+    "checkpoint_export_public_tests_passed": 94,
+    "frontend_affected_tests_after_final_csv_labels": 19,
+    "frontend_focused_passed": 42,
+    "frontend_full_suite_earlier": {
+      "inherited_timeout": 1,
+      "passed": 345,
+      "unchanged_timeout_test_isolated": "PASS"
+    },
+    "frontend_lint": {
+      "errors": 0,
+      "inherited_warnings": 9
+    },
+    "production_regressions_passed": 206,
+    "ruff": "PASS src tests",
+    "strict_mypy": "PASS src: 227 source files",
+    "typescript_vite_build": "PASS",
+    "updated_wrapper_tests_passed": 6
+  },
+  "classification": "OPERATIONAL_VERIFICATION_NO_MODEL_EVALUATION",
+  "dashboard": {
+    "base_dashboard": {
+      "generated_at": "2026-09-04T06:53:14.338653+00:00",
+      "manifest_content_sha256": "68affe902b3c79e035ac44ddcb05aca66c8e8ee1e4c84bd439918e49c8692539",
+      "mode": "retained_existing_generation",
+      "statistics_sidecar_refreshed_independently": true
+    },
+    "bi_atomic_publish": false,
+    "browser_verified": false,
+    "dashboard_atomic_publish": false,
+    "forecast_regenerated": false,
+    "live_deployed": false,
+    "preview_urls": [
+      "http://127.0.0.1:4173/#team-stat-sdp",
+      "http://127.0.0.1:4173/#players-stat-sdp"
+    ],
+    "public_package_sha256": "0e81709e45301491ee84eac0ebb50310b6dc0e306af5f9d8af291895afd8da0c",
+    "publication_limitation": "Windows symlink privilege unavailable; validated before_publish copies retained",
+    "screenshots": null,
+    "sdp_sidecar": {
+      "as_of": "2026-09-08T14:04:06.518694+00:00",
+      "byte_count": 7156319,
+      "coverage": {
+        "fpl_player_matches": 1890,
+        "player_matches": 1890,
+        "sdp_lineup_player_matches": 401,
+        "seasons": [
+          "2021-22",
+          "2022-23",
+          "2023-24",
+          "2024-25",
+          "2025-26",
+          "2026-27"
+        ],
+        "team_failures": 1374,
+        "team_matches": 3860,
+        "unmapped_players": 0
+      },
+      "schema": "fpl.sdp-stats",
+      "sha256": "859b49f093a7853351a3d2a6a1e8f25bc5b522208584fbf072759f9b1400e33c",
+      "source_status": {
+        "fpl_enrichment": "AVAILABLE",
+        "latest_completed_kickoff": "2026-09-06T15:30:00+00:00",
+        "latest_fpl_known_at": "2026-09-08T13:35:11.208041+00:00",
+        "latest_sdp_known_at": "2026-09-08T13:53:35.925253+00:00",
+        "notes": [
+          "Observed match statistics only. No predictions or player-role inference.",
+          "Detailed SDP player statistics are not present in retained captures; FPL enrichment is labelled separately.",
+          "SDP nominal participation intervals are not elapsed or FPL minutes and cannot be used for per90 rates.",
+          "FINAL denotes an ended fixture; provider statistics and recorded FPL points may still be revised.",
+          "1374 fixture(s) lack valid complete SDP core evidence; metric rows remain unavailable."
+        ],
+        "player_lineups": "PARTIAL",
+        "player_stats": "UNAVAILABLE",
+        "team_stats": "PARTIAL"
+      }
+    },
+    "served_asset_count": 18
+  },
+  "execution_git_head": "116db25e1d3046a6b6369c736f01d4bc657e5157",
+  "execution_worktree_note": "Additive reporting implementation was under verification; no model inference executed. Final delivery commit is recorded in Git.",
+  "external_evidence_root": "D:\\Personal\\fpl-operations\\verification\\gw4-8-checkpoint-20260908T131550Z",
+  "external_receipts": {
+    "capture-health-final.json": {
+      "bytes": 4728,
+      "sha256": "0e9f3c9d472568b1612034c8037cb4194d77ac41866a7f84068f13d5217ae3fa"
+    },
+    "dashboard-preview-generation/receipt.json": {
+      "bytes": 2919,
+      "sha256": "f9e1c8613dbb55467b7f748893992f44a02d0a29cd4fa2044fb1b8b2d1eb98ab"
+    },
+    "fixed-origin.json": {
+      "bytes": 2365140,
+      "sha256": "4355ca91cef63bc6e0b728b35687f3d862c78bdbda700c5bf36270689b6816a6"
+    },
+    "fixed-pair-registration-verified.json": {
+      "bytes": 1628254,
+      "sha256": "ecaed6e1e37e0c4fd2d07d050214e504f6d23d00c16e7dd8792c29872d0f4cec"
+    },
+    "frontend-sdp-parser-verification.json": {
+      "bytes": 9515,
+      "sha256": "8593fb85cb4d4afec4d077a75ce3ed7b73e2a9d2ca8d9718dd0669e01dc53077"
+    },
+    "independent-final-freeze-verification.json": {
+      "bytes": 150634,
+      "sha256": "20057ea81dfa5ec999e9bc1e04bbf1b29f568825c15349c546a5694f2190985e"
+    },
+    "independent-ledger-isolation-verification.json": {
+      "bytes": 6195,
+      "sha256": "08a2952cfd24e3c4da3e490caf1ef2279fbbf848c606be053f16966ba5fd0151"
+    },
+    "model-content-identity-verified.json": {
+      "bytes": 25105,
+      "sha256": "2107888f807a8265ab6a6b658225e21b79807723ca746a7ae621c496cd5973f4"
+    },
+    "scheduler-final.json": {
+      "bytes": 1065,
+      "sha256": "eaf07d814571c8e96f0d782698f4200024ad91a7b7bf495b5e6028f1f413d61a"
+    },
+    "sdp-raw-observation-reconciliation-addendum.json": {
+      "bytes": 2339,
+      "sha256": "20b05145d3869c4d7835c17a3756bcb2f237b38603c5666edb15914f55c63e3e"
+    },
+    "sdp-raw-observation-reconciliation.json": {
+      "bytes": 13145,
+      "sha256": "56643b34b68fdd5896cea0c4dbdc551de7f7825992c3efc76cd1a796f0671d7e"
+    },
+    "served-preview-verification.json": {
+      "bytes": 4542,
+      "sha256": "e4354818724f0cbcfe79b22d426106dcdd6c66a8d185ec7a914d60ecb8de2ae6"
+    }
+  },
+  "forecast_emitter_sha": "2a96e91ee49604e152f77e47ff6e1bcf9d7037af",
+  "implementation_content_sha256": {
+    ".github/workflows/deploy-dashboard.yml": "c7f4cd539f244e3fae5fb05caa26336a1f97367af4303b3b417e6320619952be",
+    "dashboard/src/App.test.tsx": "e9845335c838f5c65b3cae8d6c6c36bfcd365ac8c17aa838a360e5c1517d8cc0",
+    "dashboard/src/App.tsx": "474c97aee668a5b52e78d21e36356c27e81df159554bb920a22e62e319c6c0f6",
+    "dashboard/src/components/Sidebar.test.tsx": "a19d0150f017cb288c9c6bbeb78c534c8f6a68e52b8a8075b475d00c4c944099",
+    "dashboard/src/components/Sidebar.tsx": "a3f99d4706d4a4a086183cd7dab96978cc5f04a8ad35576d9401d1f1870b6584",
+    "dashboard/src/data/sdpStats.test.ts": "f8223335bbfdd2930b83f32bacb092b2b2d1d212b9ad71384119cc8002e09da1",
+    "dashboard/src/data/sdpStats.ts": "b4923443b78c45ebf633e76e053b002c13155d026127a41351e72530cb3867b7",
+    "dashboard/src/lib/sdpStats.test.ts": "e9979983570eeb9535c2ec769b7a0bf3d56970fb353b274544a4762d097ff548",
+    "dashboard/src/lib/sdpStats.ts": "cea6306dae4489ec7fc1acb035daa100f124df2de04a0b6f3b601725ad87199a",
+    "dashboard/src/pages/SdpStatsPage.test.tsx": "1234fd09e3c8d9dc0a2978e9daabe6c1c4beeab22447b85e01462826efa113cf",
+    "dashboard/src/pages/SdpStatsPage.tsx": "0242c8d1fbada8866d26be6bc5becda0267eb87cd3eaf0bdb5016701bfc99d26",
+    "dashboard/src/test/sdpFixture.ts": "c3e2cb8937ab53111f897cef7f1b3787ff1743b23722fdcc4dd5ed10621d71ba",
+    "src/fpl/jobs/build_sdp_dashboard.py": "d2ed886b448040f70ba22e5b06675b2a31463f374ab82ef1e9b4ec054ae9db74",
+    "src/fpl/jobs/export_sdp_stats.py": "e0161a931b93b6e168308412c2f2c7d23d6980f37b084c9fa96ef95b33aac404",
+    "src/fpl/jobs/score_sdp_checkpoint.py": "35eb5b9ded502a77d66000a49d1807b404b947668b927adbede9ac164cffb925",
+    "src/fpl/publish/sdp_stats.py": "6b5fc2b2e66be8b29f8ae76deb4bcd5af611d3a0b3295851b9c6a578f865afd7",
+    "src/fpl/validate/sdp_checkpoint.py": "4bc092c681f2cf26dffc42cdfa6e0bc9b8729507f7fa4914d1d2a5d45989355d"
+  },
+  "limitations": [
+    "Operational DB lacks required platform optimizer plans; original refusal preserved; explicit retained existing public base used.",
+    "Existing Windows WinError1314 prevents symlink publication; documented validated-copy preview only.",
+    "Existing default pytest temp path inaccessible; one corrected writable-basetemp rerun passed.",
+    "SDP detailed player metrics unavailable; observed FPL enrichment is explicitly labelled.",
+    "Known incomplete provider fields remain NULL; zero new provider revisions does not mean complete statistics.",
+    "No selected GW4-8 outcomes eligible; no numerical promotion gate invented."
+  ],
+  "model_freeze_sha": "17cfa2267ce4d7c89f96842220f40471b81152d2",
+  "preservation": {
+    "default_branch_modified": false,
+    "frozen_file_failures": 0,
+    "frozen_files_verified": 392,
+    "gw1_3_audit_rerun": false,
+    "main_modified": false,
+    "model_or_config_changes": false,
+    "optimizer_tables_present": false,
+    "unchanged_forecast_ledger_rows": 149025,
+    "unchanged_forecast_ledger_tables": 5
+  },
+  "recorded_at": "2026-09-08T14:12:00.328715+00:00",
+  "refresh": {
+    "captured_matches": 30,
+    "completed_at": "2026-09-08T13:53:39.210386Z",
+    "core_valid_matches": 26,
+    "current_team_coverage_by_gw": [
+      {
+        "core_valid_fixtures": 9,
+        "expected_fixtures": 10,
+        "gw": 1
+      },
+      {
+        "core_valid_fixtures": 8,
+        "expected_fixtures": 10,
+        "gw": 2
+      },
+      {
+        "core_valid_fixtures": 9,
+        "expected_fixtures": 10,
+        "gw": 3
+      }
+    ],
+    "current_unavailable_fixtures": [
+      {
+        "fixture": 7,
+        "gw": 1
+      },
+      {
+        "fixture": 19,
+        "gw": 2
+      },
+      {
+        "fixture": 20,
+        "gw": 2
+      },
+      {
+        "fixture": 28,
+        "gw": 3
+      }
+    ],
+    "exit_code": 0,
+    "expected_matches": 30,
+    "fpl_capture": {
+      "bootstrap_sha256": "dec2aad83a742a9f53e8e21a269db72fe1d3f4c2b62133d9fe902dc82590c2d8",
+      "capture_id": "8b6fc5e0-f497-4224-9f36-46cc2f4d1fcc",
+      "fixtures_sha256": "3eb485ce8e4eb295440490c32aac07b8df5c1d553e517a4b2308ddba3db92eec",
+      "known_at": "2026-09-08T13:35:11.208041+00:00",
+      "manifest_sha256": "800905164cbbb4346389238e4866738ff52ad7c19de72712ec3b434365ec5312",
+      "official_finished_gameweeks": [
+        1,
+        2,
+        3
+      ],
+      "payloads": 657,
+      "registered_players": 654
+    },
+    "new_match_stat_payload_versions": 0,
+    "revision_requests": 13,
+    "run_id": "20260908T132407.750092Z-7cd8385d",
+    "started_at": "2026-09-08T13:24:07.750092Z"
+  },
+  "scheduler": [
+    {
+      "action": "-m fpl.jobs.daily_pl_sdp --db \"D:\\Personal\\fpl-operations\\data\\operational.duckdb\" --runs \"D:\\Personal\\fpl-operations\\runs\"",
+      "enabled": true,
+      "last_result": 1,
+      "last_run_utc": "2026-09-08T01:51:06.0000000Z",
+      "next_run_utc": "2026-09-09T00:00:00.0000000Z",
+      "state": "Ready",
+      "task": "The Comet FPL - daily SDP",
+      "working_directory": "D:\\Personal\\workspace\\the_comet_fpl\\.worktrees\\sdp_test"
+    },
+    {
+      "action": "-m fpl.jobs.daily_pl_sdp --db \"D:\\Personal\\fpl-operations\\data\\sdp-primary-v2.duckdb\" --runs \"D:\\Personal\\fpl-operations\\sdp-primary-runs\" --workload",
+      "enabled": true,
+      "last_result": 0,
+      "last_run_utc": "2026-09-08T01:51:06.0000000Z",
+      "next_run_utc": "2026-09-09T00:00:00.0000000Z",
+      "state": "Ready",
+      "task": "The Comet FPL - SDP primary V2",
+      "working_directory": "D:\\Personal\\workspace\\the_comet_fpl\\.worktrees\\sdp_test"
+    }
+  ],
+  "schema": "fpl.sdp-gw4-8-readiness/v1",
+  "selection_addendum_sha": "116db25e1d3046a6b6369c736f01d4bc657e5157",
+  "source_reconciliation": {
+    "addendum": {
+      "audit": "independent_raw_observed_sdp_dashboard_reconciliation_addendum_v1",
+      "created_at": "2026-09-08T14:08:33.601506+00:00",
+      "fpl_capture_id": "8b6fc5e0-f497-4224-9f36-46cc2f4d1fcc",
+      "fpl_exposure": {
+        "bands": {
+          "LOW": 185,
+          "VERY_LOW": 469
+        },
+        "definition": "Per stable registered code, sum witnessed FPL player-fixture minutes in current season; any missing minute evidence remains UNKNOWN. These are observed sample-depth bands, not prediction confidence.",
+        "minimum_minutes_players": {
+          "1": 387,
+          "180": 185,
+          "270": 79,
+          "450": 0,
+          "90": 254,
+          "900": 0
+        },
+        "missing_minute_players": 0,
+        "positive_minute_player_fixture_rows": 929,
+        "total_witnessed_player_minutes": 59123,
+        "zero_minute_players": 267
+      },
+      "installed_and_standalone_payloads_equal_excluding_as_of": true,
+      "installed_sidecar_as_of": "2026-09-08T14:04:06.518694+00:00",
+      "installed_sidecar_sha256": "859b49f093a7853351a3d2a6a1e8f25bc5b522208584fbf072759f9b1400e33c",
+      "measured_fields": {
+        "expected_assists": {
+          "measured_positive_minute_rows": 929,
+          "measured_rows": 1890,
+          "missing_rows": 0
+        },
+        "expected_goals": {
+          "measured_positive_minute_rows": 929,
+          "measured_rows": 1890,
+          "missing_rows": 0
+        }
+      },
+      "model_or_outcome_scoring_performed": false,
+      "observed_player_fixture_rows": 1890,
+      "official_bootstrap_current_next_flags": [
+        {
+          "data_checked": true,
+          "deadline_time": "2026-09-04T17:30:00Z",
+          "finished": true,
+          "id": 3,
+          "is_current": true,
+          "is_next": false
+        },
+        {
+          "data_checked": false,
+          "deadline_time": "2026-09-12T12:30:00Z",
+          "finished": false,
+          "id": 4,
+          "is_current": false,
+          "is_next": true
+        }
+      ],
+      "paired_xg_xa_measured_rows": 1890,
+      "parent_receipt": "sdp-raw-observation-reconciliation.json",
+      "parent_receipt_sha256": "56643b34b68fdd5896cea0c4dbdc551de7f7825992c3efc76cd1a796f0671d7e",
+      "partially_completed_gameweeks_by_fixture_count": [],
+      "players_by_fpl_position": {
+        "DEF": 214,
+        "FWD": 78,
+        "GK": 71,
+        "MID": 291
+      },
+      "registered_supported_players": 654,
+      "result": "PASS",
+      "unfinished_official_gameweeks_with_ended_fixtures": []
+    },
+    "all_public_rows_cutoff_eligible": true,
+    "player_samples": 2,
+    "result": "PASS",
+    "team_samples": 2
+  },
+  "starting_sha": "e7b3b3415b5d27e2b7cfc3f987fab022a1dedf0b"
+}

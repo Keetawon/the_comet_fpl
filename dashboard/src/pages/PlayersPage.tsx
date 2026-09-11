@@ -39,6 +39,7 @@ import {
   loadPlayerHorizons,
   loadPlayerProvisionalActuals,
   loadPlayers,
+  loadSummary,
 } from "@/data/load";
 import type { DashboardManifest, NextGwPlan, PlayerHorizonsRecord, PlayerObservedActualsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
@@ -198,8 +199,9 @@ export function PlayersPage() {
       loadPlayerHorizons(),
       loadFixtureMatrix(),
       loadNextGw(),
+      loadSummary(),
     ])
-      .then(([playersData, actualsData, provisionalActuals, horizonsData, teamsData, nextGw]) => {
+      .then(([playersData, actualsData, provisionalActuals, horizonsData, teamsData, nextGw, summary]) => {
         if (cancelled) return;
         // The manifest owns run bounds when present. Without it, the validated horizon
         // vectors are authoritative: fixture arrays omit blank weeks and may be empty.
@@ -224,7 +226,7 @@ export function PlayersPage() {
         const defaultRun = defaultVintageRunId(
           runs,
           nextGw.plans,
-          playersData.manifest?.runs.at(-1)?.run_id ?? null,
+          summary.latest_run?.run_id ?? null,
         );
         const runRecords = playersData.players.filter((p) => p.run_id === defaultRun);
         const defaultRunRecord = runs.find((run) => run.run_id === defaultRun);

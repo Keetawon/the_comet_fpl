@@ -16,6 +16,7 @@ import { SummaryPage } from "@/pages/SummaryPage";
 import { TeamAnalyticsPage } from "@/pages/TeamAnalyticsPage";
 import { TeamForecastVsActualPage } from "@/pages/TeamForecastVsActualPage";
 import { UserDraftPage } from "@/pages/UserDraftPage";
+import { TeamSdpStatsPage } from "@/pages/SdpStatsPage";
 
 const DEFAULT_ROUTE = "summary";
 
@@ -23,6 +24,7 @@ const PAGES: Record<string, React.ComponentType> = {
   summary: SummaryPage,
   fixtures: FixtureMatrixPage,
   "team-analytics": TeamAnalyticsPage,
+  "team-stat-sdp": TeamSdpStatsPage,
   players: PlayersPage,
   "player-analytics": PlayerAnalyticsPage,
   "next-gw": NextGwPage,
@@ -42,7 +44,9 @@ const LOCAL_ONLY_INSIGHTS: Record<string, string> = {
 
 function routeFromHash(): string {
   const fragment = window.location.hash.slice(1);
-  return fragment.split("?", 1)[0] || DEFAULT_ROUTE;
+  const route = fragment.split("?", 1)[0] || DEFAULT_ROUTE;
+  // The retired SDP player view duplicated FPL statistics. Preserve old bookmarks.
+  return route === "players-stat-sdp" ? "players" : route;
 }
 
 function useHashRoute(): [string, (id: string) => void] {

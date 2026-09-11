@@ -2040,7 +2040,19 @@ def _build_summary(
     by_code, by_id = _short_name_maps(team_season)
     names, _ = _player_identity_maps(player_season)
 
-    if runs.height == 0:
+    modes_by_run = _component_modes(runs)
+    # Paired vintages share a registration timestamp. A shadow's hash ordering
+    # must never make it the operational default; all vintages remain selectable.
+    primary_runs = runs.filter(
+        pl.col("run_id").is_in(
+            [
+                key
+                for key, modes in modes_by_run.items()
+                if modes.get("forecast_role") != "shadow_incumbent"
+            ]
+        )
+    )
+    if primary_runs.height == 0:
         return {
             "latest_run": None,
             "roster": {"players": 0, "teams": 0},
@@ -2054,12 +2066,12 @@ def _build_summary(
             "ease_index_formula_version": ease_version,
         }
 
-    ordered = runs.sort(["created_at", "run_id"], nulls_last=True)
+    ordered = primary_runs.sort(["created_at", "run_id"], nulls_last=True)
     latest = ordered.rows(named=True)[-1]
     run_id = latest["run_id"]
     season = latest["season"]
     gw_from, gw_to = latest["gw_from"], latest["gw_to"]
-    modes = _component_modes(runs)[run_id]
+    modes = modes_by_run[run_id]
 
     run_gw = player_gameweek.filter(pl.col("run_id") == run_id)
     first_rows = (

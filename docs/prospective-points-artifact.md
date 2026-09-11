@@ -146,3 +146,15 @@ Before this contract is accepted as an external BI source, harden the reader to 
 timestamps, `bootstrap_known_at <= as_of`, exactly `roster_size` stable codes in every gameweek,
 and the required contract/component identity keys. The current saved artifact satisfies those
 conditions; the remaining work is fail-closed validation for malformed future inputs.
+# SDP architecture provenance addition (2026-09-07)
+
+The [owner-directed adoption](sdp-primary-architecture-decision-2026-09-07.md) reuses this artifact
+schema without redefining any scientific status. `component_modes['football_environment.provenance']`
+contains canonical JSON with actual cutoff/FPL/SDP knowledge times, immutable raw and metadata
+versions/hashes, model and normalization identities, explicit fixture selector reasons, richer
+primary environments, incumbent PMFs, workload evidence, H shadow records and refresh receipt.
+`forecast_role` distinguishes primary from `shadow_incumbent`. The primary additionally binds the
+separate full incumbent shadow file's SHA256; the shadow never overwrites primary points.
+Existing player-component/config/Git/database/seed provenance remains mandatory. An explicitly
+disabled SDP path preserves the pre-adoption artifact behavior. Use only the primary artifact for
+optimizer input. See [operations](sdp-primary-operations.md) for refresh and immutable publication.

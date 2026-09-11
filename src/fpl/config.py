@@ -11,6 +11,7 @@ from __future__ import annotations
 import functools
 import hashlib
 from datetime import date, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self
 from urllib.parse import urlparse
@@ -332,6 +333,44 @@ class DefensiveActionsDump(_Frozen):
     provenance: DefensiveActionsDumpProvenance
 
 
+class PlSdpSource(_Frozen):
+    """Premier League SDP: the undocumented JSON backend behind premierleague.com.
+
+    Provider spellings and ids remain evidence-controlled because this is not a published API.
+    Nothing may be inferred silently: an unmapped season label is *refused* rather than fetched
+    under a guessed provider id, because fetching the wrong year and labelling it correctly is
+    worse than fetching nothing.
+    """
+
+    base_url: str
+    competition: int
+    endpoints: dict[str, str]
+    season_ids: dict[Season, int] = Field(default_factory=dict)
+    probe_season_id_minimum: int = 1
+    probe_season_id_maximum: int = 800
+    min_request_interval_seconds: float = 1.5
+    timeout_seconds: float = 30.0
+    max_retries: int = 4
+    retry_backoff_base_seconds: float = 2.0
+    page_size: int = 100
+    maximum_pages: int = 40
+    minimum_payload_bytes: int = 32
+    metric_dictionary: str = "pl_sdp_metrics.yaml"
+
+    def season_id(self, season: Season) -> int:
+        """Provider season id for a season label, or a diagnostic refusal."""
+        try:
+            return self.season_ids[season]
+        except KeyError:
+            raise KeyError(
+                f"no pl_sdp season id mapped for {season!r}. Verify the provider id from a real "
+                "Premier League match response, optionally with `python -m "
+                "fpl.jobs.audit_pl_sdp --probe --probe-season-id ID`, and record the corroborated "
+                "mapping under `pl_sdp.season_ids` in config/sources.yaml. "
+                "Guessing a provider season id would silently ingest the wrong season."
+            ) from None
+
+
 class SourcesConfig(_Frozen):
     archive: ArchiveSource
     live_api: LiveApiSource
@@ -339,6 +378,8 @@ class SourcesConfig(_Frozen):
     paths: Paths
     # Optional until a B-path dump is committed. Absent => the backfill job needs --csv.
     defensive_actions_dump: DefensiveActionsDump | None = None
+    # Optional so an older config still loads; absent means the V2 SDP path is unconfigured.
+    pl_sdp: PlSdpSource | None = None
 
 
 # --------------------------------------------------------------------------------------
@@ -1783,6 +1824,575 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     if not isinstance(loaded, dict):
         raise ValueError(f"{path} did not parse to a mapping")
     return loaded
+
+
+class SdpMetricType(StrEnum):
+    """How a provider value is interpreted at the staging boundary."""
+
+    INT = "int"
+    FLOAT = "float"
+    # Stored 0-100, never 0-1. Both sides of a match must sum to ~100, which is checkable.
+    PERCENT = "percent"
+
+
+class SdpMetric(_Frozen):
+    """One entry of the SDP metric dictionary.
+
+    `provider_fields` is an ALIAS LIST because upstream spelling can drift. For a metric with
+    verified semantics, the first entry is the independently corroborated live field; later
+    entries remain unverified fallbacks. Two aliases appearing in one payload with different
+    values is an ambiguity and fails closed -- picking one on a genuine disagreement is how a
+    wrong number becomes a permanent record.
+    """
+
+    local_field: str
+    provider_fields: list[str]
+    type: SdpMetricType
+    group: str
+    description: str
+    verified_semantics: bool
+    mirror: str | None = None
+
+    @field_validator("provider_fields")
+    @classmethod
+    def _at_least_one_alias(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("provider_fields must name at least one candidate provider key")
+        return value
+
+
+class SdpDerivedMetric(_Frozen):
+    """A metric computed locally rather than sent by the provider.
+
+    Shares the mart columns with provider metrics because a column must mean one thing
+    regardless of which provider filled it. `provider_fields` is absent by construction: a
+    derived metric that could also arrive from the provider would be two measurements of one
+    concept, and this repository keeps those in separate columns.
+    """
+
+    local_field: str
+    type: SdpMetricType
+    group: str
+    description: str
+    verified_semantics: bool
+    mirror: str | None = None
+
+
+class SdpMetricDictionary(_Frozen):
+    schema_version: int
+    metrics: list[SdpMetric]
+    derived_metrics: list[SdpDerivedMetric] = Field(default_factory=list)
+
+    def all_fields(self) -> list[SdpMetric | SdpDerivedMetric]:
+        """Provider and derived metrics together, in declaration order."""
+        return [*self.metrics, *self.derived_metrics]
+
+    @model_validator(mode="after")
+    def _validate(self) -> SdpMetricDictionary:
+        names = [metric.local_field for metric in self.all_fields()]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"duplicate local_field(s) in the metric dictionary: {duplicates}")
+        known = set(names)
+        # A mirror names the opponent-facing column this metric produces. It is deliberately
+        # NOT required to be a metric in its own right -- `shots_allowed` is derived by pairing
+        # the two sides, it is never a field the provider sends -- but it must not collide with
+        # a real metric name, which would make one column mean two things.
+        for metric in self.all_fields():
+            if metric.mirror is not None and metric.mirror in known:
+                raise ValueError(
+                    f"{metric.local_field}.mirror={metric.mirror!r} collides with a declared "
+                    "metric; a mirror column is derived, not sourced"
+                )
+        aliases: dict[str, str] = {}
+        for metric in self.metrics:
+            for alias in metric.provider_fields:
+                if alias in aliases and aliases[alias] != metric.local_field:
+                    raise ValueError(
+                        f"provider field {alias!r} is claimed by both {aliases[alias]!r} and "
+                        f"{metric.local_field!r}; one provider key cannot feed two metrics"
+                    )
+                aliases[alias] = metric.local_field
+        return self
+
+    def by_local_field(self) -> dict[str, SdpMetric | SdpDerivedMetric]:
+        return {metric.local_field: metric for metric in self.all_fields()}
+
+    def alias_index(self) -> dict[str, str]:
+        """provider field name -> local_field. Every alias of every metric."""
+        return {
+            alias: metric.local_field for metric in self.metrics for alias in metric.provider_fields
+        }
+
+    def mirror_fields(self) -> dict[str, str]:
+        """local_field -> the opponent-facing column derived from it."""
+        return {
+            metric.local_field: metric.mirror
+            for metric in self.all_fields()
+            if metric.mirror is not None
+        }
+
+
+class V2AblationCandidate(_Frozen):
+    """One rung of the V2 signal ablation ladder."""
+
+    name: str
+    signals: list[str]
+    rationale: str
+
+
+class V2Ablation(_Frozen):
+    minimum_signal_coverage: float
+    weight_step: float
+    candidates: list[V2AblationCandidate]
+
+    @model_validator(mode="after")
+    def _nested_ladder(self) -> V2Ablation:
+        """Each rung must EXTEND the one before it.
+
+        A ladder whose rungs merely differ cannot attribute a lift to a signal, because two
+        rungs could differ in two ways at once. Requiring containment is what makes the
+        ablation an ablation rather than a model bake-off.
+        """
+        names = [candidate.name for candidate in self.candidates]
+        if len(set(names)) != len(names):
+            raise ValueError("ablation candidate names must be unique")
+        for previous, candidate in zip(self.candidates, self.candidates[1:], strict=False):
+            if not set(previous.signals) <= set(candidate.signals):
+                raise ValueError(
+                    f"ablation rung {candidate.name!r} does not extend {previous.name!r}: "
+                    f"{sorted(set(previous.signals) - set(candidate.signals))} was dropped. "
+                    "A non-nested ladder cannot attribute a lift to a signal."
+                )
+        return self
+
+
+class V2Population(_Frozen):
+    grain: str
+    source_table: str
+    provider: str
+    target: str
+    gameweeks: Literal["observed_only"]
+    seasons_from_data: bool
+
+
+class V2WalkForward(_Frozen):
+    fold_unit: Literal["observed_gameweek"]
+    cutoff: str
+    minimum_training_observed_gameweeks: int
+    forbid_random_split: Literal[True]
+    forbid_full_dataset_fitting: Literal[True]
+    minimum_team_matches: int = 3
+    inner_holdout_observed_gameweeks: int = 6
+    minimum_inner_training_observed_gameweeks: int = 10
+
+
+class V2Metrics(_Frozen):
+    primary: str
+    reported: list[str]
+    # `randomised_pit` for a count target; `reliability_bins` for a binary one. A raw central
+    # interval is never permitted: Phase 1 amendment 1.1 measured that on a count distribution
+    # it exceeds 0.80 by construction and PREFERS biased models.
+    calibration: Literal["randomised_pit", "reliability_bins"]
+
+
+class V2Promotion(_Frozen):
+    minimum_relative_log_lift: float
+    maximum_crps_relative_regression: float
+    pit_interval_80_maximum_absolute_error: float
+    require_each_reported_season_to_pass: bool
+    promotion_requires_prospective_window: Literal[True]
+
+
+class V2Amendment(_Frozen):
+    version: str
+    date: date
+    candidates_evaluated_before_amendment: int
+    changed: str
+    reason: str
+
+
+class _V2Contract(_Frozen):
+    """Shared amendment discipline: a version bump must carry its record."""
+
+    contract_version: str
+    phase: str
+    status: Literal["development_only"]
+    amendments: list[V2Amendment] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _amendment_recorded(self) -> Self:
+        if self.contract_version != "1.0" and not any(
+            amendment.version == self.contract_version for amendment in self.amendments
+        ):
+            raise ValueError(
+                f"contract_version {self.contract_version!r} has no matching amendment "
+                "record. Amending a pre-registered contract is only legitimate before a "
+                "candidate exists to bias the choice, and only with the reason recorded."
+            )
+        return self
+
+
+class V2TeamEnvironmentContract(_V2Contract):
+    population: V2Population
+    walk_forward: V2WalkForward
+    ablation: V2Ablation
+    baselines: list[str]
+    comparator_note: str
+    metrics: V2Metrics
+    splits: list[str]
+    promotion: V2Promotion
+
+
+class V2RealSotSourcePolicy(_Frozen):
+    """The sole later-captured provider input licensed by this experiment."""
+
+    target_provider: Literal["fpl_archive"]
+    target_field: Literal["goals"]
+    xg_provider: Literal["fpl_archive"]
+    xg_field: Literal["expected_goals"]
+    sot_provider: Literal["pl_sdp"]
+    sot_local_field: Literal["shots_on_target"]
+    sot_provider_field: Literal["ontargetScoringAtt"]
+    version_selection: Literal[
+        "earliest_successful_complete_match_stats_payload_by_fetched_at_then_payload_id"
+    ]
+    version_order: Literal["fetched_at_ascending_then_payload_id"]
+    preserve_original_known_at: Literal[True]
+    later_capture_known_at_permitted: Literal[True]
+    metric_whitelist: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def _sot_only(self) -> Self:
+        if self.metric_whitelist != ("shots_on_target",):
+            raise ValueError("the retrospective experiment licenses shots_on_target only")
+        return self
+
+
+class V2RealSotPopulation(_Frozen):
+    grain: Literal["team_fixture"]
+    gameweeks: Literal["observed_only"]
+    training_seasons: Literal["all_prior_archive_seasons_before_as_of"]
+    scoring_population: Literal["all_goal_observed_team_sides_in_eligible_seasons"]
+    minimum_joint_season_coverage: float = Field(ge=0.95, le=1.0)
+    minimum_eligible_seasons: int = Field(ge=2)
+    eligible_seasons: tuple[Season, ...] = Field(min_length=2)
+    coverage_report: Literal["results/v2_real_sot_retrospective_coverage.json"]
+
+    @model_validator(mode="after")
+    def _coverage_selected_population(self) -> Self:
+        if self.minimum_joint_season_coverage != 0.95:
+            raise ValueError("the pre-registered joint-season coverage threshold is exactly 0.95")
+        if self.minimum_eligible_seasons != 2:
+            raise ValueError("the pre-registered minimum is exactly two eligible seasons")
+        if len(self.eligible_seasons) < self.minimum_eligible_seasons:
+            raise ValueError("fewer than two coverage-eligible seasons cannot support this test")
+        if len(set(self.eligible_seasons)) != len(self.eligible_seasons):
+            raise ValueError("eligible seasons must be unique")
+        if self.eligible_seasons != tuple(sorted(self.eligible_seasons)):
+            raise ValueError("eligible seasons must be chronological")
+        return self
+
+
+class V2RealSotWalkForward(_Frozen):
+    fold_unit: Literal["observed_gameweek"]
+    cutoff: Literal["first_kickoff_of_observed_gameweek"]
+    training_window: Literal["expanding"]
+    history_event_time: Literal["kickoff_time < prediction_as_of"]
+    minimum_training_observed_gameweeks: Literal[8]
+    minimum_team_matches: Literal[3]
+    inner_holdout_observed_gameweeks: Literal[6]
+    minimum_inner_training_observed_gameweeks: Literal[10]
+    same_gameweek_batch_isolation: Literal[True]
+    target_match_observations_forbidden: Literal[True]
+    future_match_observations_forbidden: Literal[True]
+    forbid_random_split: Literal[True]
+    forbid_full_dataset_fitting: Literal[True]
+
+    @model_validator(mode="after")
+    def _inner_history_is_long_enough(self) -> Self:
+        if self.minimum_inner_training_observed_gameweeks < self.inner_holdout_observed_gameweeks:
+            raise ValueError("inner training history cannot be shorter than the holdout")
+        return self
+
+
+class V2RealSotControl(_Frozen):
+    name: Literal["retrospective_goals_xg_control_v1"]
+    signals: tuple[str, ...]
+
+
+class V2RealSotCandidate(_Frozen):
+    name: Literal["retrospective_real_sot_team_environment_v1"]
+    signals: tuple[str, ...]
+
+
+class V2RealSotEngine(_Frozen):
+    estimator: Literal["multisignal_team_environment_v1"]
+    half_life_days: tuple[float | None, ...] = Field(min_length=1)
+    prior_matches: tuple[float, ...] = Field(min_length=1)
+    weight_step: float = Field(gt=0.0, le=1.0)
+    minimum_signal_coverage: float = Field(gt=0.0, le=1.0)
+    promoted_attack_prior: float = Field(gt=0.0)
+    promoted_defence_prior: float = Field(gt=0.0)
+    rate_floor: float = Field(gt=0.0)
+    maximum_goals: int = Field(ge=1)
+    signal_scaling: Literal["fold_local_mean_goals_over_jointly_measured_signal_mean"]
+    fallback: Literal["drop_unavailable_sot_and_renormalise_remaining_weights"]
+
+    @model_validator(mode="after")
+    def _existing_v2_search_space(self) -> Self:
+        expected_half_lives = (40.0, 80.0, 160.0, 320.0, 640.0, None)
+        expected_priors = (2.0, 4.0, 8.0, 16.0, 32.0)
+        if self.half_life_days != expected_half_lives:
+            raise ValueError("half-life grid must remain the existing V2 grid")
+        if self.prior_matches != expected_priors:
+            raise ValueError("prior-match grid must remain the existing V2 grid")
+        if self.weight_step != 0.25 or self.minimum_signal_coverage != 0.25:
+            raise ValueError("V2 weight and signal-coverage settings are frozen at 0.25")
+        if self.promoted_attack_prior != 0.719 or self.promoted_defence_prior != 1.309:
+            raise ValueError("promoted priors must remain the existing V2 values")
+        if self.rate_floor != 0.05 or self.maximum_goals != 10:
+            raise ValueError("V2 rate floor and goal support are frozen at 0.05 and 10")
+        return self
+
+
+class V2RealSotMetrics(_Frozen):
+    primary: Literal["mean_log_score"]
+    reported: tuple[str, ...]
+    calibration: Literal["randomised_pit"]
+
+
+class V2RealSotDevelopmentGate(_Frozen):
+    compare_against: Literal["retrospective_goals_xg_control_v1"]
+    comparison_population: Literal["same_eligible_predictions"]
+    minimum_relative_log_lift: float = Field(ge=0.0)
+    maximum_crps_relative_regression: float = Field(ge=0.0)
+    pit_interval_80_maximum_absolute_error: float = Field(ge=0.0, le=1.0)
+    require_no_season_log_score_regression: Literal[True]
+    require_zero_event_time_leakage: Literal[True]
+    promotion_requires_strict_prospective_confirmation: Literal[True]
+
+
+class V2RealSotReporting(_Frozen):
+    slices: tuple[str, ...]
+    early_season_observed_gameweeks: Literal[6]
+    sot_history_bins: tuple[str, ...]
+
+
+class V2RealSotProvenance(_Frozen):
+    require_clean_worktree: Literal[True]
+    revalidate_before_emit: Literal[True]
+    coverage_report_sha256: Literal[True]
+    database_sha256: Literal[True]
+    source_sha256: Literal[True]
+    sdp_version_manifest_fields: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def _required_version_identity(self) -> Self:
+        if self.sdp_version_manifest_fields != ("capture_id", "known_at", "payload_sha256"):
+            raise ValueError("SDP provenance must retain capture_id, known_at and payload_sha256")
+        return self
+
+
+class V2RealSotRetrospectiveContract(_Frozen):
+    """SOT-only retrospective experiment; never valid as prospective evidence."""
+
+    contract_version: Literal["1.0"]
+    phase: Literal["v2-real-sot-retrospective"]
+    status: Literal["development_only"]
+    evidence_class: Literal["retrospective_backfill_development"]
+    source: V2RealSotSourcePolicy
+    population: V2RealSotPopulation
+    walk_forward: V2RealSotWalkForward
+    baseline: Literal["trailing_goals_attack_defence"]
+    control: V2RealSotControl
+    candidate: V2RealSotCandidate
+    engine: V2RealSotEngine
+    metrics: V2RealSotMetrics
+    development_gate: V2RealSotDevelopmentGate
+    reporting: V2RealSotReporting
+    provenance: V2RealSotProvenance
+    random_seed: Literal[20260904]
+
+    @model_validator(mode="after")
+    def _isolated_sot_hypothesis(self) -> Self:
+        if self.population.eligible_seasons != ("2023-24", "2024-25", "2025-26"):
+            raise ValueError("the coverage-selected scoring seasons are frozen")
+        if self.control.signals != ("goals", "expected_goals"):
+            raise ValueError("the control must contain exactly goals and existing archive xG")
+        if self.candidate.signals != (*self.control.signals, "shots_on_target"):
+            raise ValueError("the candidate must differ from the control only by shots_on_target")
+        required_metrics = {
+            "mean_log_score",
+            "crps",
+            "rps",
+            "pit_interval_80_coverage",
+            "mean_absolute_error",
+            "mean_error",
+            "mean_poisson_deviance",
+            "mean_predictive_variance",
+            "spearman_within_gameweek",
+            "predicted_rate_mean",
+            "predicted_rate_standard_deviation",
+        }
+        if set(self.metrics.reported) != required_metrics:
+            raise ValueError("the retrospective SOT metric suite is frozen")
+        required_slices = {
+            "season",
+            "venue",
+            "promoted_status",
+            "early_season",
+            "sot_history_length",
+            "cold_start",
+        }
+        if set(self.reporting.slices) != required_slices:
+            raise ValueError("the retrospective SOT reporting slices are frozen")
+        if self.reporting.sot_history_bins != ("0", "1-2", "3-5", "6+"):
+            raise ValueError("the SOT history bins are frozen")
+        if self.development_gate.minimum_relative_log_lift != 0.01:
+            raise ValueError("the candidate-vs-control log-score bar is frozen at 1%")
+        if self.development_gate.maximum_crps_relative_regression != 0.0:
+            raise ValueError("CRPS regression is not permitted")
+        if self.development_gate.pit_interval_80_maximum_absolute_error != 0.05:
+            raise ValueError("the PIT-80 absolute-error tolerance is frozen at 0.05")
+        return self
+
+
+class V2GkSavesCandidate(_Frozen):
+    name: str
+    description: str
+    is_baseline: bool = False
+
+
+class V2GkSavesPopulation(_Frozen):
+    grain: str
+    filter: str
+    target: str
+    require_measured: list[str]
+    seasons_from_data: bool
+    gameweeks: Literal["observed_only"]
+
+
+class V2GkSavesContract(_V2Contract):
+    population: V2GkSavesPopulation
+    walk_forward: V2WalkForward
+    candidates: list[V2GkSavesCandidate]
+    metrics: V2Metrics
+    splits: list[str]
+    promotion: V2Promotion
+
+    @model_validator(mode="after")
+    def _exactly_one_baseline(self) -> V2GkSavesContract:
+        baselines = [candidate for candidate in self.candidates if candidate.is_baseline]
+        if len(baselines) != 1:
+            raise ValueError(
+                f"expected exactly one baseline candidate, found {len(baselines)}; a "
+                "comparison without a declared incumbent has no bar"
+            )
+        return self
+
+
+class V2DcPopulation(_Frozen):
+    grain: str
+    positions: list[Position]
+    filter: str
+    target: str
+    require_measured: list[str]
+    seasons_from_data: bool
+    gameweeks: Literal["observed_only"]
+
+    @field_validator("positions")
+    @classmethod
+    def _no_goalkeepers(cls, value: list[Position]) -> list[Position]:
+        """Goalkeepers cannot earn the DC award -- measured maximum count is 0.
+
+        Including them would pad every metric with rows both models trivially score at zero,
+        which flatters whichever model is worse on the population that actually matters.
+        """
+        if Position.GK in value:
+            raise ValueError(
+                "goalkeepers cannot earn the defensive-contribution award and must not be "
+                "in the evaluated population"
+            )
+        return value
+
+
+class V2DcPromotion(_Frozen):
+    minimum_relative_log_lift: float
+    maximum_brier_relative_regression: float
+    require_transferred_slice_to_improve: Literal[True]
+    require_each_reported_season_to_pass: bool
+    promotion_requires_prospective_window: Literal[True]
+
+
+class V2DcLimitations(_Frozen):
+    single_season: str
+    small_transferred_slice: str
+    poisson_shape: str
+    minutes_independence: str
+
+
+class V2DcContract(_V2Contract):
+    population: V2DcPopulation
+    walk_forward: V2WalkForward
+    candidates: list[V2GkSavesCandidate]
+    metrics: V2Metrics
+    splits: list[str]
+    promotion: V2DcPromotion
+    limitations: V2DcLimitations
+
+    @model_validator(mode="after")
+    def _validate(self) -> V2DcContract:
+        baselines = [candidate for candidate in self.candidates if candidate.is_baseline]
+        if len(baselines) != 1:
+            raise ValueError(f"expected exactly one baseline candidate, found {len(baselines)}")
+        if "transferred_player" not in self.splits:
+            raise ValueError(
+                "the transferred-player split is what distinguishes 'V2 is better' from "
+                "'V2 is better BECAUSE the team scale does not travel with the player'; "
+                "only the second is evidence for the architecture"
+            )
+        return self
+
+
+@functools.cache
+def load_v2_dc_evaluation(path: Path | None = None) -> V2DcContract:
+    return V2DcContract.model_validate(_read_yaml(path or config_dir() / "v2_dc_evaluation.yaml"))
+
+
+@functools.cache
+def load_v2_team_environment_evaluation(
+    path: Path | None = None,
+) -> V2TeamEnvironmentContract:
+    return V2TeamEnvironmentContract.model_validate(
+        _read_yaml(path or config_dir() / "v2_team_environment_evaluation.yaml")
+    )
+
+
+@functools.cache
+def load_v2_real_sot_retrospective_evaluation(
+    path: Path | None = None,
+) -> V2RealSotRetrospectiveContract:
+    return V2RealSotRetrospectiveContract.model_validate(
+        _read_yaml(path or config_dir() / "v2_real_sot_retrospective_evaluation.yaml")
+    )
+
+
+@functools.cache
+def load_v2_gk_saves_evaluation(path: Path | None = None) -> V2GkSavesContract:
+    return V2GkSavesContract.model_validate(
+        _read_yaml(path or config_dir() / "v2_gk_saves_evaluation.yaml")
+    )
+
+
+@functools.cache
+def load_sdp_metrics(path: Path | None = None) -> SdpMetricDictionary:
+    """Load the SDP metric dictionary named by `sources.pl_sdp.metric_dictionary`."""
+    if path is None:
+        sources = load_sources()
+        name = sources.pl_sdp.metric_dictionary if sources.pl_sdp else "pl_sdp_metrics.yaml"
+        path = config_dir() / name
+    return SdpMetricDictionary.model_validate(_read_yaml(path))
 
 
 @functools.cache

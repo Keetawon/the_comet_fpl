@@ -1,0 +1,46 @@
+contract_version: '1.0'
+study_id: attacking_role_premium_feasibility_v1
+development_only: true
+phase: coverage_and_feasibility_only
+starting_head: fcf8dc9636edceb8e40133db7a1a82ce756bde47
+inventory_as_of: '2026-09-08T06:34:33Z'
+evidence_policy: strict_known_at
+database_sha256: 538560454f551a48eeaf015c318f7dea0fc6a34fccc56ee7f0e2b117ef7330d6
+role_result_sha256: 6a92fc3e421d3d74de543a080a61077364435545e5dcd7d1ff26068563faf607
+decision: INSUFFICIENT_DATA_FOR_ATTACKING_ROLE_PREMIUM_STUDY
+population:
+  positions: [DEF, MID, FWD]
+  target_registration: exact season-qualified pre-deadline FPL registry and fixture club
+  target_batches: official FPL gameweek deadlines witnessed before each cutoff
+  double_gameweeks: one frozen pre-gameweek history for every fixture leg
+history:
+  kickoff: strictly before prediction cutoff
+  known_at: at or before prediction cutoff
+  revisions: latest whole eligible version per season, fixture and stable player code
+  same_gameweek: excluded
+  archived_statistics: usable after actual witnessed capture, never at earlier historical deadlines
+  missing_or_invalid: null; never inferred zero
+  transfers: stable player code; season-qualified fixture club; no name matching
+feasibility_review:
+  type: bounded source and longitudinal-support assessment, not a promotion gate
+  numerical_promotion_threshold: null
+  limitation: only three completed deadline-eligible gameweeks and two with prior current-season observations
+  optional_context_absence_alone_is_failure: false
+  archive_volume_is_not_historical_knowledge_time_evidence: true
+  score_regime_definition_and_power_analysis: not reached
+formal_evaluation: false
+candidate_preregistration: null
+positional_baseline: null
+score_construction: null
+shrinkage_strength: null
+regime_shift_definition: null
+materiality_gate: null
+named_case_analysis: not reached; no method frozen
+next_task: design a bounded player attacking-stat historical backfill
+prohibited:
+  - model fitting, retuning, evaluation, scoring or promotion after this failed feasibility gate
+  - new capture or historical backfill during this audit
+  - production, optimizer or prospective ledger changes
+  - changes to frozen evidence, main, default branch or Git history
+  - treating team statistics as individual player statistics
+  - using target-match minutes, lineup, formation or attacking statistics as features

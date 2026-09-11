@@ -1,14 +1,16 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadSummary } from "@/data/load";
 import sample from "@/data/sampleFixtureMatrix.json";
-import type { FixtureScheduleOverlay, TeamRecord } from "@/data/types";
+import summarySample from "@/data/sampleSummary.json";
+import type { FixtureScheduleOverlay, SummaryData, TeamRecord } from "@/data/types";
 import { TeamAnalyticsPage } from "./TeamAnalyticsPage";
 
 vi.mock("@/data/load", () => ({
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
+  loadSummary: vi.fn(),
 }));
 
 const teams = sample.teams as unknown as TeamRecord[];
@@ -35,6 +37,7 @@ beforeEach(() => {
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
   vi.mocked(loadNextGw).mockResolvedValue({ plans: [] });
+  vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
 });
 
 describe("TeamAnalyticsPage", () => {

@@ -1,0 +1,359 @@
+{
+  "all_roster_outfield_rows": 19856,
+  "audit_source_sha256": "81be8078fff236b85553b3a9acc834377d037f2d261111e34164857ab2dd2620",
+  "candidate_predictions": 0,
+  "completed": true,
+  "database_read_only": true,
+  "folds": [
+    {
+      "cutoff": "2025-11-08T19:30:00+00:00",
+      "gw": 11,
+      "past_witnessed_transfer_rows": 8,
+      "primary_rows": 282,
+      "prior_measured_gws": 10,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2025-11-22T19:30:00+00:00",
+      "gw": 12,
+      "past_witnessed_transfer_rows": 6,
+      "primary_rows": 283,
+      "prior_measured_gws": 11,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2025-11-29T22:00:00+00:00",
+      "gw": 13,
+      "past_witnessed_transfer_rows": 8,
+      "primary_rows": 284,
+      "prior_measured_gws": 12,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2025-12-03T02:30:00+00:00",
+      "gw": 14,
+      "past_witnessed_transfer_rows": 5,
+      "primary_rows": 285,
+      "prior_measured_gws": 13,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2025-12-06T19:30:00+00:00",
+      "gw": 15,
+      "past_witnessed_transfer_rows": 8,
+      "primary_rows": 290,
+      "prior_measured_gws": 14,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2025-12-13T22:00:00+00:00",
+      "gw": 16,
+      "past_witnessed_transfer_rows": 5,
+      "primary_rows": 281,
+      "prior_measured_gws": 15,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2025-12-20T19:30:00+00:00",
+      "gw": 17,
+      "past_witnessed_transfer_rows": 6,
+      "primary_rows": 282,
+      "prior_measured_gws": 16,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2025-12-27T03:00:00+00:00",
+      "gw": 18,
+      "past_witnessed_transfer_rows": 5,
+      "primary_rows": 273,
+      "prior_measured_gws": 17,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2025-12-31T02:30:00+00:00",
+      "gw": 19,
+      "past_witnessed_transfer_rows": 6,
+      "primary_rows": 274,
+      "prior_measured_gws": 18,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-01-03T19:30:00+00:00",
+      "gw": 20,
+      "past_witnessed_transfer_rows": 5,
+      "primary_rows": 277,
+      "prior_measured_gws": 19,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-01-07T03:00:00+00:00",
+      "gw": 21,
+      "past_witnessed_transfer_rows": 6,
+      "primary_rows": 274,
+      "prior_measured_gws": 20,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-01-17T19:30:00+00:00",
+      "gw": 22,
+      "past_witnessed_transfer_rows": 6,
+      "primary_rows": 271,
+      "prior_measured_gws": 21,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-01-24T19:30:00+00:00",
+      "gw": 23,
+      "past_witnessed_transfer_rows": 9,
+      "primary_rows": 283,
+      "prior_measured_gws": 22,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-01-31T22:00:00+00:00",
+      "gw": 24,
+      "past_witnessed_transfer_rows": 13,
+      "primary_rows": 281,
+      "prior_measured_gws": 23,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-02-07T03:00:00+00:00",
+      "gw": 25,
+      "past_witnessed_transfer_rows": 15,
+      "primary_rows": 283,
+      "prior_measured_gws": 24,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-02-11T02:30:00+00:00",
+      "gw": 26,
+      "past_witnessed_transfer_rows": 15,
+      "primary_rows": 306,
+      "prior_measured_gws": 25,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-02-21T22:00:00+00:00",
+      "gw": 27,
+      "past_witnessed_transfer_rows": 14,
+      "primary_rows": 277,
+      "prior_measured_gws": 26,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-02-28T03:00:00+00:00",
+      "gw": 28,
+      "past_witnessed_transfer_rows": 15,
+      "primary_rows": 281,
+      "prior_measured_gws": 27,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-03-04T02:30:00+00:00",
+      "gw": 29,
+      "past_witnessed_transfer_rows": 15,
+      "primary_rows": 286,
+      "prior_measured_gws": 28,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-03-14T22:00:00+00:00",
+      "gw": 30,
+      "past_witnessed_transfer_rows": 16,
+      "primary_rows": 276,
+      "prior_measured_gws": 29,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-03-21T03:00:00+00:00",
+      "gw": 31,
+      "past_witnessed_transfer_rows": 11,
+      "primary_rows": 227,
+      "prior_measured_gws": 30,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-04-11T02:00:00+00:00",
+      "gw": 32,
+      "past_witnessed_transfer_rows": 16,
+      "primary_rows": 283,
+      "prior_measured_gws": 31,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-04-18T18:30:00+00:00",
+      "gw": 33,
+      "past_witnessed_transfer_rows": 19,
+      "primary_rows": 365,
+      "prior_measured_gws": 32,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-04-25T02:00:00+00:00",
+      "gw": 34,
+      "past_witnessed_transfer_rows": 12,
+      "primary_rows": 191,
+      "prior_measured_gws": 33,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-05-02T02:00:00+00:00",
+      "gw": 35,
+      "past_witnessed_transfer_rows": 14,
+      "primary_rows": 284,
+      "prior_measured_gws": 34,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-05-09T18:30:00+00:00",
+      "gw": 36,
+      "past_witnessed_transfer_rows": 18,
+      "primary_rows": 302,
+      "prior_measured_gws": 35,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-05-16T02:00:00+00:00",
+      "gw": 37,
+      "past_witnessed_transfer_rows": 16,
+      "primary_rows": 286,
+      "prior_measured_gws": 36,
+      "season": "2025-26"
+    },
+    {
+      "cutoff": "2026-05-24T22:00:00+00:00",
+      "gw": 38,
+      "past_witnessed_transfer_rows": 15,
+      "primary_rows": 292,
+      "prior_measured_gws": 37,
+      "season": "2025-26"
+    }
+  ],
+  "measured_at_utc": "2026-09-07T09:59:17.178418+00:00",
+  "model_fits": 0,
+  "network_requests": 0,
+  "outer_folds": 28,
+  "past_witnessed_transfer_rows": 307,
+  "player_coverage": [
+    [
+      "2021-22",
+      25447,
+      0,
+      9722,
+      0
+    ],
+    [
+      "2022-23",
+      26505,
+      0,
+      10575,
+      0
+    ],
+    [
+      "2023-24",
+      29725,
+      0,
+      10608,
+      0
+    ],
+    [
+      "2024-25",
+      27283,
+      0,
+      10796,
+      0
+    ],
+    [
+      "2025-26",
+      29747,
+      29747,
+      10725,
+      10725
+    ]
+  ],
+  "player_coverage_columns": [
+    "season",
+    "rows",
+    "measured_dc",
+    "outfield_appearances",
+    "measured_outfield_appearances"
+  ],
+  "player_semantic_columns": [
+    "position",
+    "rows",
+    "missing_raw_cbirt",
+    "recorded_dc_formula_mismatches"
+  ],
+  "player_semantics": [
+    [
+      "DEF",
+      9733,
+      0,
+      0
+    ],
+    [
+      "FWD",
+      3278,
+      0,
+      0
+    ],
+    [
+      "MID",
+      13309,
+      0,
+      0
+    ]
+  ],
+  "primary_rows": 7859,
+  "prior_dc_rows_within_six_hour_margin": 0,
+  "scope": "2025-26; >=10 prior measured observed GWs; target appearances DEF/MID/FWD with measured DC; prior kickoff+6h<cutoff and whole target-GW excluded",
+  "source_database": "D:\\Personal\\workspace\\the_comet_fpl\\.worktrees\\sdp_test\\data\\fpl.duckdb",
+  "source_database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "target_identity_policy": "sorted (season,gw,fixture,code), compact JSON UTF-8",
+  "target_identity_sha256": "0360247b82d979615df6e1c73974ed53a405555e5720a23ac376e7e5e62d79a4",
+  "team_cbirt_columns": [
+    "team_rows",
+    "value_mismatches",
+    "maximum_missing_summands"
+  ],
+  "team_cbirt_reconciliation": [
+    760,
+    0,
+    0
+  ],
+  "team_coverage": [
+    [
+      "2021-22",
+      760,
+      0
+    ],
+    [
+      "2022-23",
+      760,
+      0
+    ],
+    [
+      "2023-24",
+      760,
+      0
+    ],
+    [
+      "2024-25",
+      760,
+      0
+    ],
+    [
+      "2025-26",
+      760,
+      760
+    ]
+  ],
+  "team_coverage_columns": [
+    "season",
+    "rows",
+    "measured_defensive_actions"
+  ],
+  "team_denominator_semantics": "CBI+tackles+recoveries across all player rows; not sum of heterogeneous position-specific FPL DC; intensity ratio is not conserved share",
+  "transfer_definition": "same-season prior dated FPL roster witness at a different stable club, including DNP; no future-season/full-stint labels"
+}

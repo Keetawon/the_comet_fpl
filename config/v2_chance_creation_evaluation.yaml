@@ -1,0 +1,54 @@
+contract_version: '1.0'
+candidate: retrospective_chance_creation_team_environment_v1
+evidence_class: retrospective_backfill_development
+incumbent: trailing_goals_attack_defence
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+coverage_report: results/v2_chance_target_audit.json
+coverage_sha256: 7d84bfec69b6e6dac1c95d973a723c7e4dbb218432cf5945d5616cb8664fb163
+upstream: results/v2_tactical_numeric_development.json
+upstream_sha256: d52973687d2983c9fc3159365e8dde865ac60a7b1ddb0d0db6e5dc3268efd11c
+eligible_seasons: ['2023-24', '2024-25', '2025-26']
+expected_rows: 2280
+expected_folds: 114
+coverage_threshold: 0.95
+coverage_rule: complete_380_fixtures_paired_goals_archive_xg_sdp_shots_with_prior_complete_season
+tactical_state: frozen_numeric1_oos_predictions_only
+dimensions: [attack_precision, dangerous_territory, control, directness, defensive_suppression]
+recent_weights: [1.0, 0.707, 0.5, 0.354, 0.25]
+shrinkage_matches: 2.0
+style_ridge_penalty: 1.0
+features: own_predicted_five_opponent_predicted_five_venue_log_incumbent_own_opponent
+volume: poisson_log_mean_fold_local_pooled_shot_offset
+quality: fractional_xg_quasi_poisson_log_mean_observed_shot_exposure
+shot_ridge_penalty: 1.0
+quality_ridge_penalty: 1.0
+quality_bounds: [0.000001, 1.0]
+minimum_fit_rows: 160
+minimum_conversion_rows: 160
+conversion: league_pooled_prior_goals_over_prior_oos_predicted_xg
+conversion_prior_xg_units: 20.0
+conversion_prior_mean: 1.0
+hyperparameter_grid: none_fixed_single_setting
+tie_breaking: not_applicable_no_search
+goal_family: poisson
+rate_floor: 0.05
+maximum_goals: 10
+same_gw: one_pre_gw_state_no_within_batch_absorption
+postponed: absorb_only_prior_batch_predictions_with_actual_event_before_cutoff
+fallback: exact_incumbent_when_inputs_or_stage_or_oos_conversion_history_unavailable
+seed: 20260907
+minimum_log_lift: 0.01
+minimum_cs_brier_lift: 0.01
+maximum_crps_regression: 0.0
+maximum_season_log_regression: 0.0
+maximum_season_cs_brier_regression: 0.0
+maximum_pit80_absolute_error: 0.05
+refutation_relative_regression: 0.01
+metrics: [mean_log_score, clean_sheet_brier, crps, pit80, mean_error, mae, predicted_rate_sd, within_gw_spearman]
+slices: [season, GW1-6, GW7+, home, away, promoted, established, cold_start, non_cold_start, confidence_high, confidence_low]
+diagnostics: [shots_vs_trailing_five, quality_vs_pooled_prior, xg_vs_trailing_five_and_incumbent, conversion, rate_ordering, paired_gw_clustered_uncertainty]
+formal_runs: 1
+require_clean_worktree: true
+promotion_permitted: false
+maximum_historical_batches: 189
+maximum_stage_fits: 378

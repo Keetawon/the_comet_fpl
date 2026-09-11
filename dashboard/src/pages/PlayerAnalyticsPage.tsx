@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
+import { loadNextGw, loadPlayerHorizons, loadPlayers, loadSummary } from "@/data/load";
 import type {
   DashboardManifest,
   NextGwPlan,
@@ -203,11 +203,11 @@ export function PlayerAnalyticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadPlayers(), loadPlayerHorizons(), loadNextGw()])
-      .then(([playerData, horizonData, nextGw]) => {
+    Promise.all([loadPlayers(), loadPlayerHorizons(), loadNextGw(), loadSummary()])
+      .then(([playerData, horizonData, nextGw, summary]) => {
         if (cancelled) return;
         const runs = playerData.manifest?.runs ?? deriveRuns(playerData.players, horizonData.players);
-        const fallback = playerData.manifest?.runs.at(-1)?.run_id ?? runs[0]?.run_id ?? null;
+        const fallback = summary.latest_run?.run_id ?? runs[0]?.run_id ?? null;
         const defaultRun = defaultVintageRunId(runs, nextGw.plans, fallback);
         const selected = runs.find((run) => run.run_id === defaultRun) ?? runs[0];
         setState({

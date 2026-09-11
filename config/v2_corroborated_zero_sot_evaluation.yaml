@@ -1,0 +1,14 @@
+# Additive preregistration: source interpretation only; the estimator/search is unchanged.
+contract_version: "1.0"
+candidate: retrospective_corroborated_zero_sot_team_environment_v2
+evidence_class: retrospective_backfill_development
+base_contract: config/v2_real_sot_retrospective_evaluation.yaml
+base_contract_sha256: 73ebf92613b8efb39838079b42b576afea2f2d43c775758372293c4d64edaed0
+policy: config/pl_sdp_sot_zero_interpretation.yaml
+policy_sha256: 52bd6f1ad975f7a683bff6bcca685f32d838c4d1dfd747a33df934860b013347
+coverage_audit: results/pl_sdp_sot_zero_audit.json
+coverage_audit_sha256: 3d662e09e541e924c218fe4edf1cf7f11289d2d13f4577fb0dc2bf56a596cb4a
+signals: [goals, expected_goals, shots_on_target_corroborated]
+formal_outer_runs: 1
+retain_fixture_distributions: true
+promotion_permitted: false
