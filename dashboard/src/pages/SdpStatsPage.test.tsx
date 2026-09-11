@@ -10,10 +10,24 @@ beforeEach(() => { vi.mocked(loadSdpStats).mockResolvedValue(sdpFixture()); });
 const table = () => screen.findByRole("table", { name: "Observed SDP team statistics" });
 
 describe("SDP football observatory", () => {
+  it("shows retained historical measured fields even when core xG coverage is incomplete", async () => {
+    const data = sdpFixture();
+    data.team_matches = data.team_matches.map(row => ({ ...row, season: "2025-26", status: "UNAVAILABLE", dashboard_status: "INCOMPLETE", sdp: { ...row.sdp, expected_goals: null } }));
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />); const grid = await table();
+    expect(screen.getByText(/Some matches lack required SDP fields/)).toBeInTheDocument();
+    expect(screen.getByText(/No clubs have complete xG and opponent xG/)).toBeInTheDocument();
+    expect(within(grid).getAllByRole("row")).toHaveLength(5);
+    expect(within(grid).getAllByTitle(/No measured xg in this range/)).toHaveLength(4);
+    fireEvent.click(within(grid).getByRole("button", { name: "View Arsenal match detail" }));
+    expect(within(screen.getByRole("table", { name: "Arsenal observed match log" })).getAllByText("Incomplete")).toHaveLength(5);
+  });
+
   it("shows league context without letting a search or club selection redefine percentiles", async () => {
     render(<TeamSdpStatsPage />); await table();
     expect(screen.getByRole("heading", { name: "Team stat from SDP" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /Attack meets defence/ })).toBeInTheDocument();
+    expect(screen.getAllByTestId("analytics-point-label").map(label => label.textContent)).toEqual(["ARS", "BHA", "CHE", "EVE"]);
     const before = screen.getByRole("region", { name: "Arsenal profile" }).textContent;
     fireEvent.change(screen.getByRole("textbox", { name: "Search clubs" }), { target: { value: "Arsenal" } });
     expect(within(await table()).getAllByRole("row")).toHaveLength(2);
@@ -21,6 +35,18 @@ describe("SDP football observatory", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Team" }), { target: { value: "1" } });
     expect(screen.getByRole("region", { name: "Arsenal profile" }).textContent).toBe(before);
     expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
+  });
+
+  it("keeps historical xG plots available when an unrelated core statistic is missing", async () => {
+    const data = sdpFixture();
+    data.team_matches = data.team_matches.map(row => ({ ...row, season: "2025-26", status: "UNAVAILABLE", dashboard_status: "INCOMPLETE", sdp: { ...row.sdp, shots_on_target: null } }));
+    const original = JSON.stringify(data);
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />); await table();
+    expect(screen.getAllByTestId("analytics-point")).toHaveLength(4);
+    expect(screen.getAllByTestId("analytics-point-label")).toHaveLength(4);
+    expect(screen.getByRole("region", { name: "Arsenal profile" })).toHaveTextContent("observed matches");
+    expect(JSON.stringify(data)).toBe(original);
   });
 
   it("keeps sorting, comparisons, and match logs usable inside fullscreen and after Escape", async () => {

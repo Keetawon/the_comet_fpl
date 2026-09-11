@@ -13,6 +13,7 @@ import duckdb
 import pytest
 
 from fpl.config import load_sdp_metrics
+from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.jobs.export_sdp_stats import main
 from fpl.publish.sdp_stats import (
     OMITTED_ZERO_POLICY_RECORDED_AT,
@@ -640,6 +641,106 @@ def test_metric_aliases_finite_values_and_semantics() -> None:
     assert metric_value({"first": 4, "second": 5}, conflicting) is None
     assert metric_value({"first": 4, "second": None}, conflicting) is None
     assert metric_value({"first": 4, "second": "4"}, conflicting) == 4
+
+
+@pytest.mark.parametrize("missing", ["ontargetScoringAtt", "expectedGoals"])
+def test_historical_partial_export_keeps_measured_cells_and_core_failure(
+    tmp_path: Path, missing: str
+) -> None:
+    cutoff = CAPTURED + timedelta(days=1)
+    with initialise(tmp_path / "historical.duckdb") as con:
+
+        def omit(payload: Any) -> None:
+            payload[0]["stats"].pop(missing)
+
+        seed(con, change=omit)  # type: ignore[no-untyped-call]
+        # Rebuilt staging identity is later than cutoff. Retained normalized
+        # identity is already eligible; its own timestamps must stay truthful.
+        con.execute(
+            "UPDATE stg_pl_sdp_fixture_crosswalk SET resolved_at=?", [cutoff + timedelta(days=1)]
+        )
+        state = load_sdp_state(con, cutoff=cutoff, season=SEASON)
+        raw_before = raw_at(con, cutoff)
+        first = build_sdp_stats(con, as_of=cutoff, season="2026-27")
+        pair = [r for r in first["team_matches"] if r["fixture"] == 103]
+        assert len(pair) == 2
+        assert all(r["sdp"]["shots"] == 12 for r in pair)
+        assert all(r["provider_match_id"] == 300103 and r["source_version"] for r in pair)
+        assert all(r["dashboard_status"] == "INCOMPLETE" for r in pair)
+        home = next(r for r in pair if r["was_home"])
+        key = "shots_on_target" if missing == "ontargetScoringAtt" else "expected_goals"
+        assert home["sdp"][key] is None
+        assert all(datetime.fromisoformat(r["known_at"]) <= cutoff for r in pair)
+        assert first["coverage"]["team_failures"] == 1
+        assert raw_at(con, cutoff) == raw_before
+        assert load_sdp_state(con, cutoff=cutoff, season=SEASON) == state
+        assert sdp_stats_bytes(
+            build_sdp_stats(con, as_of=cutoff, season="2026-27")
+        ) == sdp_stats_bytes(first)
+
+
+@pytest.mark.parametrize("defect", ["duplicate", "opponent", "future", "hash", "capture", "match"])
+def test_historical_partial_mapping_fails_closed(tmp_path: Path, defect: str) -> None:
+    cutoff = CAPTURED + timedelta(days=1)
+    with initialise(tmp_path / "mapping.duckdb") as con:
+        seed(con)  # type: ignore[no-untyped-call]
+        pair = [
+            r
+            for r in PointInTimeView(FeatureSource(con), AsOf(cutoff))
+            .observed_team_football(
+                providers=["pl_sdp"],
+                columns=[
+                    "season",
+                    "fixture",
+                    "kickoff_time",
+                    "team_code",
+                    "opponent_team_code",
+                    "was_home",
+                    "sdp_match_id",
+                    "capture_id",
+                    "payload_sha256",
+                    "known_at",
+                ],
+            )
+            .to_dicts()
+            if r["fixture"] == 103
+        ]
+        official = {"kickoff": pair[0]["kickoff_time"], "home": 8, "away": 3}
+        assert (
+            _partial_current_stats(
+                con,
+                raw_at(con, cutoff),
+                season=SEASON,
+                fixture=103,
+                official=official,
+                cutoff=cutoff,
+                observed_pair=pair,
+            )
+            is not None
+        )
+        if defect == "duplicate":
+            pair.append(dict(pair[0]))
+        else:
+            field, value = {
+                "opponent": ("opponent_team_code", 999),
+                "future": ("known_at", cutoff + timedelta(seconds=1)),
+                "hash": ("payload_sha256", "b" * 64),
+                "capture": ("capture_id", "unknown"),
+                "match": ("sdp_match_id", 999),
+            }[defect]
+            pair[0][field] = value
+        assert (
+            _partial_current_stats(
+                con,
+                raw_at(con, cutoff),
+                season=SEASON,
+                fixture=103,
+                official=official,
+                cutoff=cutoff,
+                observed_pair=pair,
+            )
+            is None
+        )
 
 
 def _lineup_record() -> dict[str, Any]:

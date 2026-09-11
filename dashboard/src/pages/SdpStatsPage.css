@@ -28,6 +28,22 @@
 .sdp-workspace :is(button, a, select, input, summary):focus-visible { outline: 2px solid var(--sdp-accent); outline-offset: 3px; }
 .sdp-workspace td { padding-top: .65rem; padding-bottom: .65rem; }
 .sdp-workspace tr[data-state="selected"] > td { background: var(--sdp-tint); }
+/* Dense desktop comparison: twenty clubs fit without oversized controls or
+   empty sparklines stretching every row. Touch targets keep their larger size. */
+.sdp-team-table { font-size: .75rem; }
+.sdp-team-table td { padding-top: .125rem; padding-bottom: .125rem; }
+.sdp-team-table th { height: 2.25rem; }
+.sdp-team-table .sdp-sort { min-height: 2rem; }
+.sdp-table-club { min-height: 1.75rem; }
+.sdp-table-compare { width: 1.75rem; height: 1.75rem; }
+.sdp-team-table .sdp-club-mark { width: 1.5rem; height: 1.5rem; border-radius: .35rem; font-size: .5625rem; }
+.sdp-table-body-fullscreen { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.sdp-table-body-fullscreen .sdp-table-details { flex: 0 1 auto; min-height: 0; max-height: 45%; overflow: auto; }
+.sdp-workspace svg[role="group"] { min-width: 0; }
+@media (pointer: coarse) {
+  .sdp-table-club, .sdp-team-table .sdp-sort { min-height: 2.75rem; }
+  .sdp-table-compare { width: 2.75rem; height: 2.75rem; }
+}
 @media (prefers-reduced-motion: no-preference) {
   .sdp-group, .sdp-workspace button { transition: background-color .15s, color .15s; }
 }

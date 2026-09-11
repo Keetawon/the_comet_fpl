@@ -284,6 +284,7 @@ def _partial_current_stats(
     fixture: int,
     official: dict[str, Any],
     cutoff: datetime,
+    observed_pair: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], datetime, str, int, str] | None:
     """Display measured fields of an incomplete core, never license model use.
 
@@ -300,9 +301,32 @@ def _partial_current_stats(
              AND corroborated_kickoff AND corroborated_teams""",
         [season, fixture, cutoff],
     ).fetchall()
-    if len(crosswalk) != 1:
-        return None
-    match_id = crosswalk[0][0]
+    # Historical normalized observations already carry the exact fixture mapping.
+    # The mutable staging crosswalk may have been rebuilt later; never backdate it.
+    if observed_pair is None:
+        if len(crosswalk) != 1:
+            return None
+        match_id = crosswalk[0][0]
+    else:
+        if len(observed_pair) != 2 or {s["was_home"] for s in observed_pair} != {True, False}:
+            return None
+        home, away = sorted(observed_pair, key=lambda s: not s["was_home"])
+        if (
+            any(s["season"] != season or s["fixture"] != fixture for s in observed_pair)
+            or any(s["known_at"] > cutoff for s in observed_pair)
+            or any(s["kickoff_time"] != official["kickoff"] for s in observed_pair)
+            or home["team_code"] != official["home"]
+            or away["team_code"] != official["away"]
+            or home["opponent_team_code"] != away["team_code"]
+            or away["opponent_team_code"] != home["team_code"]
+            or home["sdp_match_id"] != away["sdp_match_id"]
+            or home["capture_id"] != away["capture_id"]
+            or home["payload_sha256"] != away["payload_sha256"]
+        ):
+            return None
+        match_id = home["sdp_match_id"]
+        if crosswalk and (len(crosswalk) != 1 or crosswalk[0][0] != match_id):
+            return None
     stats_versions = [
         r
         for r in raw
@@ -313,6 +337,11 @@ def _partial_current_stats(
     if not stats_versions:
         return None
     capture = stats_versions[-1]
+    if observed_pair is not None and any(
+        s["capture_id"] != capture["payload_id"] or s["payload_sha256"] != capture["sha256"]
+        for s in observed_pair
+    ):
+        return None  # Do not revive an older staged version after a rejected revision.
     metadata = [r for r in raw if r["season"] == season and r["endpoint"] in {"match", "matches"}]
     try:
         for receipt in reversed(metadata):
@@ -364,7 +393,11 @@ def _partial_current_stats(
                         return None
             return (
                 {s.side: dict(s.stats) for s in sides},
-                max(capture["fetched_at"], receipt["fetched_at"]),
+                max(
+                    capture["fetched_at"],
+                    receipt["fetched_at"],
+                    *(s["known_at"] for s in observed_pair or []),
+                ),
                 _version(capture["sha256"], receipt["sha256"]),
                 match_id,
                 capture["sha256"],
@@ -1176,21 +1209,62 @@ def build_sdp_stats(
                     previous["source_version"] if previous is not None else None,
                 ),
             }
-        # Descriptive cells do not have to disappear because another core field
-        # is omitted. Only current, exactly mapped, completed matches can recover
-        # their measured fields here; production rows/health are never changed.
-        for fixture, official in fixtures.items():
-            if state.failures.get((current, fixture)) != "SDP_INCOMPLETE_FALLBACK":
+        # Recover measured cells independently of whole-match core completeness.
+        # Historical identity comes from the retained PIT-normalized pair, never
+        # names, FPL pulse_id, or a retrospectively backdated staging crosswalk.
+        historical_pairs: dict[tuple[str, int], list[dict[str, Any]]] = {}
+        for source_row in view.observed_team_football(
+            providers=["pl_sdp"],
+            columns=[
+                "season",
+                "fixture",
+                "kickoff_time",
+                "team_code",
+                "opponent_team_code",
+                "was_home",
+                "sdp_match_id",
+                "capture_id",
+                "payload_sha256",
+                "known_at",
+            ],
+        ).to_dicts():
+            fixture_key = (source_row["season"], source_row["fixture"])
+            if (
+                fixture_key[0] != current
+                and state.failures.get(fixture_key) == "SDP_INCOMPLETE_FALLBACK"
+            ):
+                historical_pairs.setdefault(fixture_key, []).append(source_row)
+        partial_fixtures = {(current, fixture): official for fixture, official in fixtures.items()}
+        for fixture_key, observed_pair in historical_pairs.items():
+            if len(observed_pair) == 2 and {s["was_home"] for s in observed_pair} == {True, False}:
+                home_row, away_row = sorted(observed_pair, key=lambda s: not s["was_home"])
+                if all(
+                    (fixture_key[0], fixture_key[1], s["team_code"]) in teams for s in observed_pair
+                ):
+                    partial_fixtures[fixture_key] = {
+                        "home": home_row["team_code"],
+                        "away": away_row["team_code"],
+                        "kickoff": home_row["kickoff_time"],
+                    }
+        for (match_season, fixture), official in partial_fixtures.items():
+            if state.failures.get((match_season, fixture)) != "SDP_INCOMPLETE_FALLBACK":
                 continue
             partial = _partial_current_stats(
-                con, raw, season=current, fixture=fixture, official=official, cutoff=cutoff
+                con,
+                raw,
+                season=match_season,
+                fixture=fixture,
+                official=official,
+                cutoff=cutoff,
+                observed_pair=historical_pairs.get((match_season, fixture)),
             )
             if partial is None:
                 continue
             sides, known, version, provider_match_id, stats_sha256 = partial
-            partial_sources[fixture] = (sides, stats_sha256)
+            if match_season == current:
+                partial_sources[fixture] = (sides, stats_sha256)
             for side_label, stats in sides.items():
-                row = teams[current, fixture, official[side_label]]
+                row = teams[match_season, fixture, official[side_label]]
                 opposite = sides["away" if side_label == "home" else "home"]
                 row["sdp"] = {m.local_field: metric_value(stats, m) for m in metrics}
                 for metric_key, original in OPPONENT_METRICS.items():
@@ -1244,7 +1318,7 @@ def build_sdp_stats(
     if failures:
         notes.append(
             f"{failures} fixture(s) lack valid complete SDP core evidence; "
-            "UNAVAILABLE labels core health. Individually measured current-match cells "
+            "UNAVAILABLE labels core health. Individually measured match cells "
             "can be displayed after separate raw/identity checks; raw omitted fields stay NULL."
         )
     if lineup_failures:

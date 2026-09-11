@@ -29,7 +29,9 @@ export function TeamTrend({ entity, metric, compact = false }: { entity: SdpEnti
   const x = (i: number) => pad + i * (width - pad * 2) / Math.max(1, values.length - 1);
   const y = (v: number) => height - pad - (v - min) / (max - min) * (height - pad * 2);
   const label = `${entity.name}: observed ${metric.label} by match`;
-  if (!measured.length) return <p className="py-5 text-xs text-muted-foreground">No measured {metric.label.toLowerCase()} in this range.</p>;
+  if (!measured.length) return compact
+    ? <span className="text-xs text-muted-foreground" title={`No measured ${metric.label.toLowerCase()} in this range.`}>—</span>
+    : <p className="py-5 text-xs text-muted-foreground">No measured {metric.label.toLowerCase()} in this range.</p>;
   return <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} className="w-full text-[var(--sdp-accent)]">
     <title>{label}. Exact values and correction provenance are in the match log.</title>
     <line x1={pad} x2={width - pad} y1={y(0)} y2={y(0)} stroke="currentColor" opacity=".15" />
