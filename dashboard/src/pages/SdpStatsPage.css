@@ -43,9 +43,16 @@
 .sdp-workspace svg[role="group"] { min-width: 0; }
 .sdp-attack-plot { --sdp-plot-accent: oklch(.53 .16 45); --sdp-plot-tint: oklch(.97 .025 65); border-top: 3px solid var(--sdp-plot-accent); }
 .sdp-defence-plot { --sdp-plot-accent: oklch(.48 .14 250); --sdp-plot-tint: oklch(.97 .02 250); border-top: 3px solid var(--sdp-plot-accent); }
+.sdp-finishing-plot { --sdp-plot-accent: oklch(.48 .14 305); --sdp-plot-tint: oklch(.97 .02 305); border-top: 3px solid var(--sdp-plot-accent); }
+.sdp-pattern-plot { --sdp-plot-accent: var(--sdp-accent); --sdp-plot-tint: var(--sdp-tint); --sdp-pattern-open: var(--sdp-accent); --sdp-pattern-set: var(--sdp-series-2); --sdp-pattern-own: var(--sdp-series-3); --sdp-pattern-unknown: var(--muted-foreground); border-top: 3px solid var(--sdp-plot-accent); }
 .dark .sdp-attack-plot { --sdp-plot-accent: oklch(.78 .13 55); --sdp-plot-tint: oklch(.25 .03 55); }
 .dark .sdp-defence-plot { --sdp-plot-accent: oklch(.77 .1 245); --sdp-plot-tint: oklch(.25 .035 250); }
+.dark .sdp-finishing-plot { --sdp-plot-accent: oklch(.8 .1 305); --sdp-plot-tint: oklch(.25 .025 305); }
 .sdp-plot-direction { color: var(--sdp-plot-accent); background: var(--sdp-plot-tint); }
+.sdp-pattern-row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) 3.5rem; align-items: center; gap: .625rem; min-height: 2.75rem; }
+.sdp-pattern-row:hover { background: var(--muted); }
+.sdp-pattern-row[aria-pressed="true"] { background: var(--sdp-plot-tint); outline: 1px solid var(--sdp-plot-accent); outline-offset: -1px; }
+.sdp-pattern-track [data-pattern="unclassified_goals"] { background-image: repeating-linear-gradient(135deg, transparent, transparent 3px, var(--card) 3px, var(--card) 4px); }
 @media (max-width: 639px) {
   .sdp-context-plots svg[role="group"] text { font-size: 16px; }
 }

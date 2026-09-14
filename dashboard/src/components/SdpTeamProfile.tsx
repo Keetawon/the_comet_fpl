@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { assumptionDescription, correctionDescription, finite, isShotBreakdown, metricAssumptions, metricCorrections, metricId, metricRaw, metricValue, metricSupplements, metricSourceLabel, shotShare, supplementDescription } from "@/lib/sdpStats";
 import type { SdpEntity, SdpMode } from "@/lib/sdpStats";
 import { sdpNumber as fmt, teamBenchmark, teamMetricLabel } from "@/lib/sdpTeamAnalysis";
+import { goalPatternDescriptions } from "@/lib/sdpStats";
 
 export function MetricCell({ rows, metric, mode, coverage = true, shots }: { rows: SdpMatch[]; metric: SdpMetric; mode: SdpMode; coverage?: boolean; shots?: SdpMetric }) {
   const value = metricValue(rows, metric, mode);
@@ -14,12 +15,14 @@ export function MetricCell({ rows, metric, mode, coverage = true, shots }: { row
     `${metricSourceLabel(metric)} · ${metric.provider_field ?? metric.key}. ${metric.description ?? "Recorded match statistic."}`,
     `${value.measured}/${value.matches} matches. ${metric.verified_semantics ? "" : "Provider observation; not independently reconciled."}`,
     ...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription), ...metricSupplements(rows, metric).map(supplementDescription),
+    ...goalPatternDescriptions(rows, metric),
   ].join(" ");
   return <span title={title} className="tabular-nums">
     {value.value === null ? <span className="text-muted-foreground">Unavailable</span> : fmt(value.value)}
     {corrections.length > 0 && <sup className="ml-0.5 text-amber-700 dark:text-amber-300" aria-label="owner-confirmed display correction">‡</sup>}
     {assumptions.length > 0 && <sup className="ml-0.5 text-sky-700 dark:text-sky-300" aria-label="owner-directed omitted-count assumption">§</sup>}
     {metricSupplements(rows, metric).length > 0 && <sup className="ml-1 text-xs text-sky-700 dark:text-sky-300" aria-label="FPL archive xG supplement">FPL</sup>}
+    {metric.key === "set_piece_goals" && goalPatternDescriptions(rows, metric).length > 0 && <sup className="ml-1 text-xs text-violet-700 dark:text-violet-300" aria-label="audited goal-pattern classification">†</sup>}
     {showShare && <span className="text-muted-foreground" title="Share of all shots: summed counts / summed shots across the same selected matches. Unavailable if coverage is incomplete, counts conflict, or total shots are zero.">{" "}{share === null ? "(—)" : `(${fmt(share, 1)}%)`}</span>}
     {coverage && <span className="ml-2 text-xs font-normal text-muted-foreground">{value.measured}/{value.matches}</span>}
   </span>;

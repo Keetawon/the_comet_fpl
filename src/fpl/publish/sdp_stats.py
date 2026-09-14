@@ -28,6 +28,12 @@ from fpl.ingest.pl_sdp import (
 from fpl.jobs.competitive_participation_pilot import publish_bytes
 from fpl.publish.fpl_team_xg import TABLES, FplXgSupplement, apply_team_xg_supplements
 from fpl.publish.player_attacking_usage import _raw_capture
+from fpl.publish.sdp_goal_patterns import (
+    DESCRIPTION,
+    apply_goal_patterns,
+    public_evidence_urls,
+    validate_goal_patterns,
+)
 from fpl.storage.sdp_runtime import (
     CORE_FIELDS,
     SdpHealthError,
@@ -49,11 +55,6 @@ OPEN_PLAY_GOALS = SdpMetric(
     group="attack",
     description="Open-play goals as recorded in SDP goalsOpenplay; missing is unavailable.",
     verified_semantics=False,
-)
-SET_PIECE_GOALS_UNAVAILABLE = (
-    "Unavailable: retained SDP has no verified total set-piece-goals field or complete "
-    "goal-pattern event classification. Total goals minus open-play goals is not used. "
-    "Penalty/free-kick goals and set-piece attempts do not establish the complete total."
 )
 DISPLAY_CORRECTIONS_FILE = "sdp_dashboard_display_corrections.yaml"
 OMITTED_ZERO_POLICY_RECORDED_AT = datetime.fromisoformat("2026-09-09T02:47:16.006705+00:00")
@@ -667,8 +668,9 @@ def metric_catalog() -> list[dict[str, Any]]:
             **catalog[-1],
             "key": "set_piece_goals",
             "label": "Set-piece goals",
-            "description": SET_PIECE_GOALS_UNAVAILABLE,
+            "description": DESCRIPTION,
             "provider_field": None,
+            "verified_semantics": True,
         }
     )
     for key, original in OPPONENT_METRICS.items():
@@ -1340,6 +1342,12 @@ def build_sdp_stats(
             for row in pair.values():
                 row["dashboard_status"] = "OWNER_CONFIRMED_VALID"
     team_rows = [teams[k] for k in sorted(teams)]
+    apply_goal_patterns(team_rows, raw)
+    notes.append(
+        "Goal-pattern classifications are a separately dated display audit of pinned raw "
+        "payloads, not new provider captures. Own goals are separate; unresolved origins "
+        "remain unclassified. Revised or unaudited sources receive no classification."
+    )
     notes.extend(apply_team_xg_supplements(con, team_rows, cutoff=cutoff, current=current))
     notes.append(
         "Marked FPL xG supplements sum every recorded player (including GK) with measured xG "
@@ -1378,7 +1386,7 @@ def build_sdp_stats(
         )
     document = {
         "schema": SCHEMA,
-        "json_schema_version": 6,
+        "json_schema_version": 7,
         "as_of": _iso(cutoff),
         "source_status": {
             "team_stats": "UNAVAILABLE" if not valid else "PARTIAL" if failures else "AVAILABLE",
@@ -1424,7 +1432,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             "gameweeks",
         }
         or document["schema"] != SCHEMA
-        or document["json_schema_version"] not in (3, 4, 5, 6)
+        or document["json_schema_version"] not in (3, 4, 5, 6, 7)
     ):
         raise ValueError("invalid SDP sidecar envelope")
     cutoff = AsOf(datetime.fromisoformat(document["as_of"])).ts
@@ -1477,6 +1485,9 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                 fields = fields | {"dashboard_status"}
             if scope == "team" and document["json_schema_version"] >= 6:
                 fields = fields | {"display_supplements"}
+            if scope == "team" and document["json_schema_version"] >= 7:
+                fields = fields | {"goal_patterns"}
+                validate_goal_patterns(row)
             if set(row) != fields:
                 raise ValueError("unexpected public observed-row field")
             if row["status"] not in {"FINAL", "PROVISIONAL", "UNAVAILABLE"}:
@@ -1727,6 +1738,8 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
         ):
             raise ValueError("display correction mirror provenance differs")
 
+    public_urls = public_evidence_urls()
+
     def check_strings(value: Any) -> None:
         if isinstance(value, dict):
             for child in value.values():
@@ -1734,8 +1747,10 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
         elif isinstance(value, list):
             for child in value:
                 check_strings(child)
-        elif isinstance(value, str) and re.search(
-            r"(?i)([a-z]:[/\\]|https?://|file://|\\\\)", value
+        elif (
+            isinstance(value, str)
+            and value not in public_urls
+            and re.search(r"(?i)([a-z]:[/\\]|https?://|file://|\\\\)", value)
         ):
             raise ValueError("public observed data contains a path or URL")
 

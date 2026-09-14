@@ -457,6 +457,7 @@ def test_public_direct_display_correction_has_no_invented_opponent_mirror(
         for team in document["team_matches"]:
             team.pop("dashboard_status")
             team.pop("display_supplements")
+            team.pop("goal_patterns")
         with pytest.raises(ValueError, match="provenance"):
             validate_sdp_stats(document)
         document["json_schema_version"] = 4
