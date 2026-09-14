@@ -696,6 +696,10 @@ export function PlayersPage() {
       : playerMultiFilters.positions.length > 1 || playerMultiFilters.teamCodes.length > 1
         ? "AI explanation is unavailable while multiple positions or teams are selected because the renderer accepts only one of each. Deterministic facts remain available."
         : undefined;
+  const unavailablePlayerInsightReason =
+    playerFilters.hideUnavailable && runPlayers.some((player) => player.availability_status === "u")
+      ? "AI explanation is unavailable while unavailable players are hidden because this display filter is outside the renderer contract. Deterministic facts use the visible players."
+      : undefined;
   const provisionalInsightUnavailableReason = selectedActualsIncludeProvisional
     ? "AI explanation is unavailable while the selected Actual range includes provisional fixtures. Deterministic facts remain available, and prediction monitoring remains finalized-only."
     : undefined;
@@ -768,6 +772,7 @@ export function PlayersPage() {
           unavailableReason: managerSquad
             ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
             : minutesPerGameInsightUnavailableReason ??
+              unavailablePlayerInsightReason ??
               provisionalInsightUnavailableReason ??
               multiSelectInsightUnavailableReason,
           localScopeKey: JSON.stringify({

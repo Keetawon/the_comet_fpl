@@ -448,6 +448,10 @@ export function PlayerAnalyticsPage() {
     view === "past_future" && pastMetric === "xgi_per_90"
       ? "AI explanation is unavailable for derived observed xGI/90 because that selector is not part of the typed public insight contract. Deterministic facts remain available."
       : undefined;
+  const unavailablePlayerInsightReason =
+    filters.hideUnavailable && exactRunPlayers.some((player) => player.availability_status === "u")
+      ? "AI explanation is unavailable while unavailable players are hidden because this display filter is outside the renderer contract. Deterministic facts use the visible players."
+      : undefined;
 
   const changeRun = (nextRunId: string) => {
     setRunId(nextRunId);
@@ -758,7 +762,7 @@ export function PlayerAnalyticsPage() {
                       : playerPastMetricScope(view, pastMetric),
                   include_cold_starts: includeColdStarts,
                 }),
-                unavailableReason: derivedPastMetricInsightUnavailableReason,
+                unavailableReason: unavailablePlayerInsightReason ?? derivedPastMetricInsightUnavailableReason,
                 localScopeKey: JSON.stringify({
                   runId: selectedRun.run_id,
                   gwTo: effectiveGwTo,

@@ -259,6 +259,27 @@ afterEach(() => {
 });
 
 describe("PlayersPage", () => {
+  it("hides unavailable players while keeping injured players, with show and reset controls", async () => {
+    const user = userEvent.setup();
+    const players = playersWithActuals.map((player, index) => ({
+      ...player, availability_status: index === 0 ? "u" : "i",
+    }));
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    const before = JSON.stringify(players);
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Beta")).toBeInTheDocument());
+    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText(/AI explanation is unavailable while unavailable players are hidden/)).toBeInTheDocument();
+    const toggle = screen.getByRole("checkbox", { name: "Hide unavailable" });
+    await user.click(toggle);
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(toggle).toBeChecked();
+    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(JSON.stringify(players)).toBe(before);
+  });
+
   it("renders the pivot: players, form columns, availability overlay, GW chips", async () => {
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
