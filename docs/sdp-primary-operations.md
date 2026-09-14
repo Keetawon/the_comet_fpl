@@ -136,6 +136,15 @@ official gameweek finality and every predicted fixture leg. Missing outcomes rem
 
 ## Descriptive Dashboard xG supplements
 
+Observation refreshes reconcile current FPL fixture rows against the published
+forecast player population using exact `(season, code)` identities. Players added
+to FPL after the retained forecast stay in the descriptive statistics sidecar;
+the build receipt lists their source-only fixture identities separately. They do
+not receive invented forecasts, and their absence from forecast-owned Players
+does not block refreshing everyone else's observations. Missing observations for
+any published current-season forecast player still stop publication. This also
+keeps an observed-data refresh independent of forecast regeneration.
+
 The existing `export_sdp_stats` / Dashboard build now emits schema 6. Where historical
 SDP xG is missing, explicitly marked FPL archive player sums may supplement the
 display after source, identity, exposure and completeness checks. No new CLI/config

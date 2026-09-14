@@ -20,6 +20,7 @@ def test_current_observations_cannot_be_replaced_by_a_freshly_dated_old_base(
     tmp_path: Path, provisional: bool
 ) -> None:
     sidecar: dict[str, Any] = {"gameweeks": [{"season": "2026-27"}]}
+    write(tmp_path / "players.json", {"players": [{"season": "2026-27", "code": 3}]})
     for scope, plural, identity in (("team", "teams", "team_code"), ("player", "players", "code")):
         sidecar[f"{scope}_matches"] = [
             {"season": "2026-27", "fixture": 30, identity: 3, "fpl": {"goals": 0}}
@@ -34,6 +35,31 @@ def test_current_observations_cannot_be_replaced_by_a_freshly_dated_old_base(
     # A new manifest timestamp is not a freshness witness for missing GW3 data.
     for suffix in ("actuals", "provisional_actuals"):
         write(tmp_path / f"player_{suffix}.json", {"players": []})
+    with pytest.raises(ValueError, match="stale player actuals"):
+        refresh.check_observed_freshness(tmp_path, sidecar)
+
+
+def test_source_only_new_players_do_not_require_regenerating_frozen_forecasts(
+    tmp_path: Path,
+) -> None:
+    write(tmp_path / "players.json", {"players": [{"season": "2025-26", "code": 7}]})
+    for scope, plural in (("player", "players"), ("team", "teams")):
+        for suffix in ("actuals", "provisional_actuals"):
+            write(tmp_path / f"{scope}_{suffix}.json", {plural: []})
+    sidecar = {
+        "gameweeks": [{"season": "2026-27"}],
+        "team_matches": [],
+        "player_matches": [{"season": "2026-27", "fixture": 32, "code": 7, "fpl": {"minutes": 12}}],
+    }
+    before = json.dumps(sidecar, sort_keys=True)
+    report = refresh.check_observed_freshness(tmp_path, sidecar)
+    assert report["player"]["matched_current_rows"] == 0
+    assert report["player"]["source_only_rows_outside_forecast_population"] == [("2026-27", 32, 7)]
+    assert json.dumps(sidecar, sort_keys=True) == before
+    assert refresh.check_observed_freshness(tmp_path, sidecar) == report
+    # Once the current season's frozen population includes this code, absent
+    # observations must still fail closed, regardless of the older season.
+    write(tmp_path / "players.json", {"players": [{"season": "2026-27", "code": 7}]})
     with pytest.raises(ValueError, match="stale player actuals"):
         refresh.check_observed_freshness(tmp_path, sidecar)
 

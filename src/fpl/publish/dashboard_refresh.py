@@ -25,8 +25,15 @@ def check_observed_freshness(generation: Path, sidecar: dict[str, Any]) -> dict[
 
     Check identities, not just a new build timestamp. Provisional observations
     can witness display coverage but never become finalized scored outcomes.
+    Established player routes contain only published forecast players. Newly
+    registered source-only players remain in the descriptive sidecar and are
+    reported separately; refreshing observations must not require a new forecast.
     """
     season = max((r["season"] for r in sidecar["gameweeks"]), default=None)
+    forecast_players = {
+        (r["season"], r["code"])
+        for r in json.loads((generation / "players.json").read_bytes())["players"]
+    }
     report: dict[str, Any] = {}
     for scope, plural, identity in (("player", "players", "code"), ("team", "teams", "team_code")):
         available: set[tuple[str, int, int]] = set()
@@ -44,13 +51,23 @@ def check_observed_freshness(generation: Path, sidecar: dict[str, Any]) -> dict[
             and r.get(identity) is not None
             and any(v is not None for v in r.get("fpl", {}).values())
         }
+        source_only = (
+            {key for key in expected if (key[0], key[2]) not in forecast_players}
+            if scope == "player"
+            else set()
+        )
+        expected -= source_only
         missing = expected - available
         if missing:
             raise ValueError(
                 f"stale {scope} actuals: {len(missing)} current FPL fixture rows "
                 f"missing from established routes; examples {sorted(missing)[:3]}"
             )
-        report[scope] = {"season": season, "matched_current_rows": len(expected)}
+        report[scope] = {
+            "season": season,
+            "matched_current_rows": len(expected),
+            "source_only_rows_outside_forecast_population": sorted(source_only),
+        }
     return report
 
 
