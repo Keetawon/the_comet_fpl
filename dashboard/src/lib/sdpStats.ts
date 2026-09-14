@@ -47,6 +47,22 @@ export function metricAssumptions(rows: readonly SdpMatch[], metric: SdpMetric):
   return rows.flatMap(row => metricAssumption(row, metric) ?? []);
 }
 
+export const isShotBreakdown = (metric: SdpMetric) => metric.source === "sdp" && metric.scope === "team" &&
+  ["shots_on_target", "shots_inside_box", "shots_outside_box", "shots_blocked"].includes(metric.key);
+
+// Ratio of matched totals, never an average of match percentages. Display corrections
+// follow the same explicit provenance as the counts; missing evidence stays unavailable.
+export function shotShare(rows: readonly SdpMatch[], metric: SdpMetric, shots: SdpMetric): number | null {
+  if (!isShotBreakdown(metric) || shots.source !== "sdp" || shots.key !== "shots") return null;
+  let numerator = 0, denominator = 0;
+  for (const row of rows) {
+    const part = metricRaw(row, metric), total = metricRaw(row, shots);
+    if (!finite(part) || !finite(total) || part < 0 || total < part) return null;
+    numerator += part; denominator += total;
+  }
+  return finite(numerator) && finite(denominator) && denominator > 0 ? numerator / denominator * 100 : null;
+}
+
 export function metricValue(rows: readonly SdpMatch[], metric: SdpMetric, mode: SdpMode): MetricValue {
   // Per-appearance averages require witnessed actual exposure for every selected row.
   // A missing minute value is not a DNP; unknown exposure keeps the average unavailable.
@@ -115,9 +131,9 @@ const csvCell = (value: unknown) => {
   if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 };
-export function sdpCsv(rows: readonly SdpEntity[], metrics: readonly SdpMetric[], mode: SdpMode): string {
+export function sdpCsv(rows: readonly SdpEntity[], metrics: readonly SdpMetric[], mode: SdpMode, shots?: SdpMetric): string {
   const label = (m: SdpMetric) => `${metricSourceLabel(m)} ${m.label}${m.aggregation === "mean" ? " [per-match mean]" : mode === "per_match" ? " [average per match]" : mode === "per_appearance" ? " [average per appearance; FPL minutes > 0]" : mode === "per90" ? " [per 90 actual minutes]" : ""}${m.verified_semantics ? "" : ` [provider observation; not independently reconciled; ${m.provider_field ?? m.key}]`}`;
-  const header = ["Name", "Stable identity", "Clubs in selected scope", "Season", "First kickoff", "Last kickoff", "Match rows", "Display mode", ...metrics.flatMap(m => [label(m), `${label(m)} displayed ${mode === "per_appearance" ? "appearances" : "matches"}`, `${label(m)} display provenance`])];
-  const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); const assumptions = metricAssumptions(row.rows, m); return [value.value, mode === "per_appearance" && row.rows.some(r => !finite(r.minutes_fpl)) ? "unknown appearances (missing FPL minutes)" : `${value.measured}/${value.matches}${assumptions.length ? ` (${assumptions.length} assumed zero)` : ""}`, [...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription), ...metricSupplements(row.rows, m).map(supplementDescription)].join(" | ")]; })]);
+  const header = ["Name", "Stable identity", "Clubs in selected scope", "Season", "First kickoff", "Last kickoff", "Match rows", "Display mode", ...metrics.flatMap(m => [label(m), ...shots && isShotBreakdown(m) ? [`SDP ${m.label} [% of all shots; matched totals]`] : [], `${label(m)} displayed ${mode === "per_appearance" ? "appearances" : "matches"}`, `${label(m)} display provenance`])];
+  const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); const assumptions = metricAssumptions(row.rows, m); return [value.value, ...shots && isShotBreakdown(m) ? [shotShare(row.rows, m, shots)] : [], mode === "per_appearance" && row.rows.some(r => !finite(r.minutes_fpl)) ? "unknown appearances (missing FPL minutes)" : `${value.measured}/${value.matches}${assumptions.length ? ` (${assumptions.length} assumed zero)` : ""}`, [...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription), ...metricSupplements(row.rows, m).map(supplementDescription)].join(" | ")]; })]);
   return [header, ...records].map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }

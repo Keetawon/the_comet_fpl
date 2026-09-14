@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadSdpStats } from "@/data/sdpStats";
-import { fplSupplement, sdpFixture } from "@/test/sdpFixture";
+import { fplSupplement, sdpFixture, sdpMatch, shooting } from "@/test/sdpFixture";
 import { sdpCsv, selectSdpEntities } from "@/lib/sdpStats";
 import { TeamSdpStatsPage } from "./SdpStatsPage";
 
@@ -10,6 +10,33 @@ beforeEach(() => { vi.mocked(loadSdpStats).mockResolvedValue(sdpFixture()); });
 const table = () => screen.findByRole("table", { name: "Observed SDP team statistics" });
 
 describe("SDP football observatory", () => {
+  it("adds percentage-only shot shares in Attacking and keeps them aligned with filters and fullscreen", async () => {
+    const data = sdpFixture();
+    data.metrics = [shooting, ...["shots_on_target", "shots_inside_box", "shots_outside_box", "shots_blocked"].map(key => ({ ...shooting, key, label: key }))];
+    data.team_matches = [
+      sdpMatch({ sdp: { shots: 4, shots_on_target: 2, shots_inside_box: 2, shots_outside_box: 2, shots_blocked: 0 } }),
+      sdpMatch({ fixture: 2, gw: 2, kickoff_time: "2026-08-29T14:00:00Z", was_home: false, sdp: { shots: 16, shots_on_target: 2, shots_inside_box: 14, shots_outside_box: 2, shots_blocked: 3 } }),
+    ];
+    const before = JSON.stringify(data);
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />); const grid = await table();
+    expect(within(grid).queryByText(/\(\d+%\)/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Attacking" }));
+    expect(within(grid).getAllByText("(20%)")).toHaveLength(2);
+    expect(within(grid).getByText("(80%)").parentElement).toHaveTextContent("8 (80%)");
+    expect(within(grid).getByText("(15%)").parentElement).toHaveTextContent("1.5 (15%)");
+    fireEvent.change(screen.getByRole("combobox", { name: "Display" }), { target: { value: "total" } });
+    expect(within(grid).getByText("(80%)").parentElement).toHaveTextContent("16 (80%)");
+    fireEvent.change(screen.getByRole("combobox", { name: "Venue" }), { target: { value: "home" } });
+    expect(within(grid).getAllByText("(50%)")).toHaveLength(3);
+    expect(within(grid).getByText("(0%)").parentElement).toHaveTextContent("0 (0%)");
+    fireEvent.click(screen.getByRole("button", { name: "Enter SDP team statistics table fullscreen" }));
+    expect(within(await screen.findByRole("dialog")).getAllByText("(50%)")).toHaveLength(3);
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Overview" }));
+    expect(within(grid).queryByText(/\(\d+%\)/)).not.toBeInTheDocument();
+    expect(JSON.stringify(data)).toBe(before);
+  });
   it("labels FPL-derived historical xG in the table, trend, scatter and match log without upgrading SDP health", async () => {
     const data = sdpFixture();
     data.team_matches.forEach(row => {

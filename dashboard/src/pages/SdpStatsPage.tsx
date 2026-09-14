@@ -45,6 +45,7 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
   const filtered = league.filter(team => (filters.team === "all" || String(team.teamCode) === filters.team) && `${team.name} ${team.clubs}`.toLocaleLowerCase().includes(filters.search.trim().toLocaleLowerCase()));
   const category = teamMetricGroups.find(g => g.id === group) ?? teamMetricGroups[0];
   const metrics = relevant.filter(m => group === "all" || m.source === "sdp" && (category.keys as readonly string[]).includes(m.key));
+  const shots = group === "attack" ? relevant.find(m => m.source === "sdp" && m.key === "shots") : undefined;
   const sortMetric = relevant.find(m => metricId(m) === sortKey || m.key === sortKey) ?? null;
   const ordered = sortSdpEntities(filtered, sortMetric, mode, ascending);
   const selected = filtered.find(team => team.id === detail) ?? filtered[0];
@@ -82,7 +83,7 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
   const weekLabel = (gw: number) => `GW${gw}${data.gameweeks.some(row => row.season === filters.season && row.gw === gw && !row.finished) ? " · in progress" : ""}`;
   const chooseComparison = (id: string) => setCompared(current => current.includes(id) ? current.filter(value => value !== id) : [...current.filter(value => filtered.some(row => row.id === value)), id].slice(0, 3));
   const exportCsv = () => {
-    const url = URL.createObjectURL(new Blob([sdpCsv(ordered, metrics, mode)], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([sdpCsv(ordered, metrics, mode, shots)], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = `team-observed-${filters.season}-gw${filters.from}-${filters.to}.csv`; link.click(); URL.revokeObjectURL(url);
   };
   useEffect(() => { if (showLog) logRef.current?.scrollIntoView?.({ block: "nearest" }); }, [showLog, detail]);
@@ -145,7 +146,7 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
                 <TableCell className="sticky left-0 z-10 bg-card"><button className="sdp-table-club flex items-center gap-2 text-left font-medium" onClick={() => { setDetail(team.id); setShowLog(true); }} aria-label={`View ${team.name} match detail`}><span className="sdp-club-mark" aria-hidden="true">{team.clubs}</span><span>{team.name}</span></button></TableCell>
                 <TableCell><label className="sdp-table-compare inline-flex cursor-pointer items-center justify-center"><input className="size-4 accent-[var(--sdp-accent)]" type="checkbox" aria-label={`Compare ${team.name}`} checked={comparisons.some(t => t.id === team.id)} disabled={!comparisons.some(t => t.id === team.id) && comparisons.length >= 3} onChange={() => chooseComparison(team.id)} /></label></TableCell>
                 <TableCell className="text-muted-foreground tabular-nums">{team.rows.length}</TableCell>
-                {metrics.map(metric => <TableCell key={metricId(metric)}><MetricCell rows={team.rows} metric={metric} mode={mode} /></TableCell>)}
+                {metrics.map(metric => <TableCell key={metricId(metric)}><MetricCell rows={team.rows} metric={metric} mode={mode} shots={shots} /></TableCell>)}
                 <TableCell className="min-w-28">{xMetric ? <TeamTrend entity={team} metric={xMetric} compact /> : "Unavailable"}</TableCell>
               </TableRow>)}{!ordered.length && <TableRow><TableCell colSpan={metrics.length + 4} className="py-12 text-center text-muted-foreground">No observed records match these filters. Reset filters to explore the league.</TableCell></TableRow>}</TableBody>
             </Table>

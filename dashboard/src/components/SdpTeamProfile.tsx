@@ -1,12 +1,14 @@
 import { ArrowUpRight, X } from "lucide-react";
 import type { SdpMatch, SdpMetric } from "@/data/sdpStats";
 import { Button } from "@/components/ui/button";
-import { assumptionDescription, correctionDescription, finite, metricAssumptions, metricCorrections, metricId, metricRaw, metricValue, metricSupplements, metricSourceLabel, supplementDescription } from "@/lib/sdpStats";
+import { assumptionDescription, correctionDescription, finite, isShotBreakdown, metricAssumptions, metricCorrections, metricId, metricRaw, metricValue, metricSupplements, metricSourceLabel, shotShare, supplementDescription } from "@/lib/sdpStats";
 import type { SdpEntity, SdpMode } from "@/lib/sdpStats";
 import { sdpNumber as fmt, teamBenchmark, teamMetricLabel } from "@/lib/sdpTeamAnalysis";
 
-export function MetricCell({ rows, metric, mode, coverage = true }: { rows: SdpMatch[]; metric: SdpMetric; mode: SdpMode; coverage?: boolean }) {
+export function MetricCell({ rows, metric, mode, coverage = true, shots }: { rows: SdpMatch[]; metric: SdpMetric; mode: SdpMode; coverage?: boolean; shots?: SdpMetric }) {
   const value = metricValue(rows, metric, mode);
+  const showShare = shots && isShotBreakdown(metric);
+  const share = showShare ? shotShare(rows, metric, shots) : null;
   const corrections = metricCorrections(rows, metric), assumptions = metricAssumptions(rows, metric);
   const title = [
     `${metricSourceLabel(metric)} · ${metric.provider_field ?? metric.key}. ${metric.description ?? "Recorded match statistic."}`,
@@ -18,6 +20,7 @@ export function MetricCell({ rows, metric, mode, coverage = true }: { rows: SdpM
     {corrections.length > 0 && <sup className="ml-0.5 text-amber-700 dark:text-amber-300" aria-label="owner-confirmed display correction">‡</sup>}
     {assumptions.length > 0 && <sup className="ml-0.5 text-sky-700 dark:text-sky-300" aria-label="owner-directed omitted-count assumption">§</sup>}
     {metricSupplements(rows, metric).length > 0 && <sup className="ml-1 text-xs text-sky-700 dark:text-sky-300" aria-label="FPL archive xG supplement">FPL</sup>}
+    {showShare && <span className="text-muted-foreground" title="Share of all shots: summed counts / summed shots across the same selected matches. Unavailable if coverage is incomplete, counts conflict, or total shots are zero.">{" "}{share === null ? "(—)" : `(${fmt(share, 1)}%)`}</span>}
     {coverage && <span className="ml-2 text-xs font-normal text-muted-foreground">{value.measured}/{value.matches}</span>}
   </span>;
 }

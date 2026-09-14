@@ -1,10 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { metricAssumptions, metricCorrections, metricRaw, metricValue, sdpCsv, selectSdpEntities, sortSdpEntities } from "./sdpStats";
+import { isShotBreakdown, metricAssumptions, metricCorrections, metricRaw, metricValue, sdpCsv, selectSdpEntities, shotShare, sortSdpEntities } from "./sdpStats";
 import { fplSupplement, fplXg, possession, sdpFixture, sdpMatch, shooting, xg } from "@/test/sdpFixture";
 import type { SdpFilters } from "./sdpStats";
 
 const filters: SdpFilters = { season: "2026-27", from: 1, to: 6, team: "all", venue: "all", recent: "all", search: "", position: "all", minMinutes: 0 };
 describe("SDP observed descriptive arithmetic", () => {
+  it.each(["shots_on_target", "shots_inside_box", "shots_outside_box", "shots_blocked"])("computes %s share from matched totals and exports the same share", key => {
+    const metric = { ...shooting, key, label: key };
+    const rows = [sdpMatch({ sdp: { shots: 4, [key]: 2 } }), sdpMatch({ fixture: 2, sdp: { shots: 16, [key]: 2 } })];
+    const before = JSON.stringify(rows);
+    // 4/20 = 20%, not mean(2/4, 2/16) = 31.25%.
+    expect(shotShare(rows, metric, shooting)).toBe(20);
+    const entity = { id: "team:3", name: "Arsenal", clubs: "ARS", position: "", code: null, teamCode: 3, rows };
+    expect(sdpCsv([entity], [metric], "per_match", shooting)).toContain('"2","20","2/2"');
+    expect(sdpCsv([entity], [metric], "total", shooting)).toContain('"4","20","2/2"');
+    expect(sdpCsv([entity], [metric], "total", shooting)).toContain("% of all shots; matched totals");
+    expect(sdpCsv([entity], [metric], "total")).not.toContain("% of all shots");
+    expect(shotShare([...rows].reverse(), metric, shooting)).toBe(20);
+    expect(JSON.stringify(rows)).toBe(before);
+  });
+  it("keeps missing, zero-denominator and inconsistent shot shares unavailable", () => {
+    const metric = { ...shooting, key: "shots_on_target" };
+    for (const [part, total] of [[null, 10], [2, null], [0, 0], [5, 4], [-1, 10], [2, Infinity], [NaN, 10]]) {
+      expect(shotShare([sdpMatch({ sdp: { shots_on_target: part, shots: total } })], metric, shooting)).toBeNull();
+    }
+    expect(shotShare([sdpMatch({ sdp: { shots: 10 } })], metric, shooting)).toBeNull();
+    expect(shotShare([], metric, shooting)).toBeNull();
+    expect(shotShare([sdpMatch({ sdp: { shots_on_target: 0, shots: 10 } })], metric, shooting)).toBe(0);
+    expect(isShotBreakdown(xg)).toBe(false);
+    expect(isShotBreakdown(shooting)).toBe(false);
+    expect(isShotBreakdown({ ...metric, source: "fpl" })).toBe(false);
+    expect(isShotBreakdown({ ...metric, scope: "player" })).toBe(false);
+  });
   it("uses labelled FPL supplements consistently for mixed-source averages, sort and CSV without replacing SDP", () => {
     const a = sdpMatch({ sdp: { expected_goals: null }, status: "UNAVAILABLE", dashboard_status: "INCOMPLETE" });
     a.display_supplements = { expected_goals: fplSupplement(a, 2) };
@@ -36,7 +63,7 @@ describe("SDP observed descriptive arithmetic", () => {
     const metric = { ...shooting, key, label: key };
     const row = sdpMatch({
       status: "UNAVAILABLE",
-      sdp: { [key]: null },
+      sdp: { shots: 10, [key]: null },
       display_corrections: {
         [key]: {
           correction_id: "2026-27-f7-team-7-sot",
@@ -58,6 +85,7 @@ describe("SDP observed descriptive arithmetic", () => {
     expect(metricRaw(row, metric)).toBe(0);
     expect(metricValue([row], metric, "total")).toEqual({ value: 0, measured: 1, matches: 1, minutes: null });
     expect(metricCorrections([row], metric)).toHaveLength(1);
+    expect(shotShare([row], metric, shooting)).toBe(providerField === "expectedGoalsOnTarget" ? null : 0);
     const csv = sdpCsv([{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "—", code: null, teamCode: 3, rows: [row] }], [metric], "total");
     expect(csv).toContain("Owner-confirmed display correction");
     expect(csv).toContain(`${providerField} was omitted`);
@@ -88,7 +116,7 @@ describe("SDP observed descriptive arithmetic", () => {
     const row = sdpMatch({
       provider_match_id: 123,
       source_version: "b".repeat(64),
-      sdp: { shots_outside_box: null },
+      sdp: { shots: 10, shots_outside_box: null },
       display_assumptions: {
         shots_outside_box: {
           value: 0,
@@ -105,7 +133,9 @@ describe("SDP observed descriptive arithmetic", () => {
     expect(row.sdp.shots_outside_box).toBeNull();
     expect(metricRaw(row, metric)).toBe(0);
     expect(metricAssumptions([row], metric)).toHaveLength(1);
-    const csv = sdpCsv([{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "—", code: null, teamCode: 3, rows: [row] }], [metric], "total");
+    expect(shotShare([row], metric, shooting)).toBe(0);
+    const csv = sdpCsv([{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "—", code: null, teamCode: 3, rows: [row] }], [metric], "total", shooting);
+    expect(csv).toContain('"0","0","1/1 (1 assumed zero)"');
     expect(csv).toContain("1/1 (1 assumed zero)");
     expect(csv).toContain("not a provider-verified zero");
   });
