@@ -17,6 +17,7 @@ from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.jobs.export_sdp_stats import main
 from fpl.publish.sdp_stats import (
     OMITTED_ZERO_POLICY_RECORDED_AT,
+    OPEN_PLAY_GOALS,
     DisplayCorrection,
     DisplayCorrectionPolicy,
     _add_lineups,
@@ -642,6 +643,41 @@ def test_metric_aliases_finite_values_and_semantics() -> None:
     assert metric_value({"first": 4, "second": 5}, conflicting) is None
     assert metric_value({"first": 4, "second": None}, conflicting) is None
     assert metric_value({"first": 4, "second": "4"}, conflicting) == 4
+
+
+@pytest.mark.parametrize("incomplete", [False, True])
+def test_goal_patterns_are_display_only_and_do_not_invent_set_piece_totals(
+    tmp_path: Path, incomplete: bool
+) -> None:
+    cutoff = CAPTURED + timedelta(days=1)
+    with initialise(tmp_path / "patterns.duckdb") as con:
+
+        def goals(payload: Any) -> None:
+            payload[0]["stats"].update(goalsOpenplay=2, goals=4, attSetpiece=3, attPenGoal=1)
+            payload[1]["stats"].update(goalsOpenplay=0)
+            if incomplete:
+                payload[0]["stats"].pop("ontargetScoringAtt")
+
+        seed(con, change=goals)  # type: ignore[no-untyped-call]
+        state = load_sdp_state(con, cutoff=cutoff, season=SEASON)
+        raw = raw_at(con, cutoff)
+        document = build_sdp_stats(con, as_of=cutoff, season="2026-27")
+        pair = [r for r in document["team_matches"] if r["fixture"] == 103]
+        assert len(pair) == 2
+        assert {r["sdp"]["open_play_goals"] for r in pair} == {0, 2}
+        assert all(r["sdp"]["set_piece_goals"] is None for r in pair)
+        assert all("open_play_goals" not in r["display_assumptions"] for r in pair)
+        assert load_sdp_state(con, cutoff=cutoff, season=SEASON) == state
+        assert raw_at(con, cutoff) == raw
+        assert sdp_stats_bytes(build_sdp_stats(con, as_of=cutoff, season="2026-27")) == (
+            sdp_stats_bytes(document)
+        )
+        pair[0]["sdp"]["set_piece_goals"] = 2
+        with pytest.raises(ValueError, match="set-piece goal classification"):
+            validate_sdp_stats(document)
+    for value in (None, True, -1, 0.5, float("nan")):
+        assert metric_value({"goalsOpenplay": value}, OPEN_PLAY_GOALS) is None
+    assert metric_value({}, OPEN_PLAY_GOALS) is None
 
 
 @pytest.mark.parametrize("missing", ["ontargetScoringAtt", "expectedGoals"])

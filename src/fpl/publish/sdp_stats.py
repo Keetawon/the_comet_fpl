@@ -15,7 +15,7 @@ import duckdb
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from fpl.config import SdpMetric, config_dir, load_sdp_metrics, load_sources
+from fpl.config import SdpMetric, SdpMetricType, config_dir, load_sdp_metrics, load_sources
 from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.ingest.fpl_api import ApiFixture, BootstrapStatic, ElementSummary, detect_season_skew
 from fpl.ingest.live_snapshot import POSITION_BY_TYPE
@@ -41,6 +41,20 @@ from fpl.transform.competitive_participation import uint
 from fpl.transform.pl_sdp import KICKOFF_TOLERANCE_SECONDS
 
 SCHEMA = "fpl.sdp-stats"
+# Reporting-only inventory; the frozen ingestion/model metric dictionary is unchanged.
+OPEN_PLAY_GOALS = SdpMetric(
+    local_field="open_play_goals",
+    provider_fields=["goalsOpenplay"],
+    type=SdpMetricType.INT,
+    group="attack",
+    description="Open-play goals as recorded in SDP goalsOpenplay; missing is unavailable.",
+    verified_semantics=False,
+)
+SET_PIECE_GOALS_UNAVAILABLE = (
+    "Unavailable: retained SDP has no verified total set-piece-goals field or complete "
+    "goal-pattern event classification. Total goals minus open-play goals is not used. "
+    "Penalty/free-kick goals and set-piece attempts do not establish the complete total."
+)
 DISPLAY_CORRECTIONS_FILE = "sdp_dashboard_display_corrections.yaml"
 OMITTED_ZERO_POLICY_RECORDED_AT = datetime.fromisoformat("2026-09-09T02:47:16.006705+00:00")
 # Display-only policy for sparse nonnegative counts. High-volume/core counts,
@@ -626,7 +640,7 @@ def _omitted_zero_assumptions(
 
 def metric_catalog() -> list[dict[str, Any]]:
     catalog: list[dict[str, Any]] = []
-    for metric in load_sdp_metrics().metrics:
+    for metric in [*load_sdp_metrics().metrics, OPEN_PLAY_GOALS]:
         catalog.append(
             {
                 "key": metric.local_field,
@@ -647,6 +661,16 @@ def metric_catalog() -> list[dict[str, Any]]:
                 "omitted_zero_display": metric.local_field in OMITTED_ZERO_DISPLAY_FIELDS,
             }
         )
+    catalog[-1]["label"] = "Open-play goals"
+    catalog.append(
+        {
+            **catalog[-1],
+            "key": "set_piece_goals",
+            "label": "Set-piece goals",
+            "description": SET_PIECE_GOALS_UNAVAILABLE,
+            "provider_field": None,
+        }
+    )
     for key, original in OPPONENT_METRICS.items():
         source = next(m for m in catalog if m["key"] == original)
         catalog.append(
@@ -1095,8 +1119,8 @@ def build_sdp_stats(
     state = load_sdp_state(con, cutoff=cutoff, season=current)
     raw = raw_at(con, cutoff)
     raw_by_id = {r["payload_id"]: r for r in raw}
-    metrics = load_sdp_metrics().metrics
-    team_keys = [m.local_field for m in metrics] + list(OPPONENT_METRICS)
+    metrics = [*load_sdp_metrics().metrics, OPEN_PLAY_GOALS]
+    team_keys = [m.local_field for m in metrics] + list(OPPONENT_METRICS) + ["set_piece_goals"]
     teams: dict[tuple[str, int, int], dict[str, Any]] = {}
     partial_sources: dict[int, tuple[dict[str, dict[str, Any]], str]] = {}
     view = PointInTimeView(FeatureSource(con), AsOf(cutoff))
@@ -1172,7 +1196,10 @@ def build_sdp_stats(
             )
             side = next(p for p in parsed if p.side == ("home" if observed.was_home else "away"))
             opponent = next(p for p in parsed if p.side != side.side)
-            measured = {m.local_field: metric_value(dict(side.stats), m) for m in metrics}
+            measured = {
+                "set_piece_goals": None,
+                **{m.local_field: metric_value(dict(side.stats), m) for m in metrics},
+            }
             for metric_key, original in OPPONENT_METRICS.items():
                 metric = next(m for m in metrics if m.local_field == original)
                 measured[metric_key] = metric_value(dict(opponent.stats), metric)
@@ -1267,7 +1294,10 @@ def build_sdp_stats(
             for side_label, stats in sides.items():
                 row = teams[match_season, fixture, official[side_label]]
                 opposite = sides["away" if side_label == "home" else "home"]
-                row["sdp"] = {m.local_field: metric_value(stats, m) for m in metrics}
+                row["sdp"] = {
+                    "set_piece_goals": None,
+                    **{m.local_field: metric_value(stats, m) for m in metrics},
+                }
                 for metric_key, original in OPPONENT_METRICS.items():
                     metric = next(m for m in metrics if m.local_field == original)
                     row["sdp"][metric_key] = metric_value(opposite, metric)
@@ -1416,7 +1446,11 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
         count = document["coverage"][field]
         if type(count) is not int or count < 0:
             raise ValueError("invalid coverage count")
-    team_fields = {m.local_field for m in load_sdp_metrics().metrics} | set(OPPONENT_METRICS)
+    team_fields = (
+        {m.local_field for m in load_sdp_metrics().metrics}
+        | set(OPPONENT_METRICS)
+        | {"open_play_goals", "set_piece_goals"}
+    )
     for gw in document["gameweeks"]:
         if set(gw) != {
             "season",
@@ -1524,6 +1558,8 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             seen.add(key)
             if set(row["sdp"]) != (team_fields if scope == "team" else set()):
                 raise ValueError("unexpected SDP metric/player allocation")
+            if scope == "team" and row["sdp"]["set_piece_goals"] is not None:
+                raise ValueError("set-piece goal classification is unavailable")
             if scope == "player" and (
                 set(row["fpl"]) != set(FPL_FIELDS)
                 or row["minutes_sdp"] is not None

@@ -10,6 +10,33 @@ beforeEach(() => { vi.mocked(loadSdpStats).mockResolvedValue(sdpFixture()); });
 const table = () => screen.findByRole("table", { name: "Observed SDP team statistics" });
 
 describe("SDP football observatory", () => {
+  it("shows observed open-play averages and honest unavailable set pieces in the table and CSV", async () => {
+    const data = sdpFixture();
+    const open = { ...shooting, key: "open_play_goals", label: "Open-play goals", provider_field: "goalsOpenplay", verified_semantics: false };
+    const setPiece = { ...open, key: "set_piece_goals", label: "Set-piece goals", provider_field: null, description: "Unavailable: no verified total set-piece-goals field." };
+    data.metrics = [shooting, open, setPiece];
+    data.team_matches = [
+      sdpMatch({ sdp: { shots: 10, open_play_goals: 3, set_piece_goals: null } }),
+      sdpMatch({ fixture: 2, gw: 2, kickoff_time: "2026-08-29T14:00:00Z", was_home: false, sdp: { shots: 12, open_play_goals: 0, set_piece_goals: null } }),
+    ];
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />); const grid = await table();
+    fireEvent.click(screen.getByRole("button", { name: "Attacking" }));
+    expect(within(grid).getByRole("button", { name: "Set-piece goals /match" })).toHaveAttribute("title", expect.stringContaining(setPiece.description));
+    expect(within(grid).getByText("1.5")).toHaveTextContent("1.5");
+    expect(within(grid).getByText("Unavailable", { selector: "span" }).parentElement).toHaveAttribute("title", expect.stringContaining(setPiece.description));
+    const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:export");
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    fireEvent.click(screen.getByRole("button", { name: "Export filtered CSV" }));
+    const csv = await new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result as string); reader.readAsText(create.mock.calls[0][0] as Blob); });
+    create.mockRestore(); revoke.mockRestore(); click.mockRestore();
+    expect(csv).toContain("Open-play goals [average per match]");
+    expect(csv).toContain('"1.5","2/2",""');
+    expect(csv).toContain(`"","0/2","${setPiece.description}"`);
+    fireEvent.change(screen.getByRole("combobox", { name: "Venue" }), { target: { value: "away" } });
+    expect(within(grid).getByText("0")).toBeInTheDocument();
+  });
   it("places the themed plots after the table and shares venue, mode and club selection", async () => {
     const data = sdpFixture();
     data.metrics.push(...["shots_on_target", "shots_on_target_allowed"].map(key => ({ ...shooting, key, label: key })));

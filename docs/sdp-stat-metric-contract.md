@@ -1,5 +1,9 @@
 # Observed SDP dashboard metric contract
 
+September 14 additive display update: [Open-play and Set-piece goal columns](sdp-goal-pattern-columns-2026-09-14.md)
+documents the new source-native open-play field and the explicitly unavailable
+set-piece total. The model/ingestion metric dictionary remains frozen.
+
 Version 1, 2026-09-08. This additive reporting contract does not change any model,
 forecast, optimizer, frozen evaluation, or scientific verdict.
 
