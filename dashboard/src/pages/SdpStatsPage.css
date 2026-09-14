@@ -41,6 +41,14 @@
 .sdp-table-body-fullscreen { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
 .sdp-table-body-fullscreen .sdp-table-details { flex: 0 1 auto; min-height: 0; max-height: 45%; overflow: auto; }
 .sdp-workspace svg[role="group"] { min-width: 0; }
+.sdp-attack-plot { --sdp-plot-accent: oklch(.53 .16 45); --sdp-plot-tint: oklch(.97 .025 65); border-top: 3px solid var(--sdp-plot-accent); }
+.sdp-defence-plot { --sdp-plot-accent: oklch(.48 .14 250); --sdp-plot-tint: oklch(.97 .02 250); border-top: 3px solid var(--sdp-plot-accent); }
+.dark .sdp-attack-plot { --sdp-plot-accent: oklch(.78 .13 55); --sdp-plot-tint: oklch(.25 .03 55); }
+.dark .sdp-defence-plot { --sdp-plot-accent: oklch(.77 .1 245); --sdp-plot-tint: oklch(.25 .035 250); }
+.sdp-plot-direction { color: var(--sdp-plot-accent); background: var(--sdp-plot-tint); }
+@media (max-width: 639px) {
+  .sdp-context-plots svg[role="group"] text { font-size: 16px; }
+}
 @media (pointer: coarse) {
   .sdp-table-club, .sdp-team-table .sdp-sort { min-height: 2.75rem; }
   .sdp-table-compare { width: 2.75rem; height: 2.75rem; }

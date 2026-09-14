@@ -41,6 +41,8 @@ export interface AnalyticsScatterPoint {
   radius?: number;
   /** Optional category exposed in the tooltip and accessible point description. */
   groupLabel?: string;
+  /** Optional already-formatted descriptive details; never used as plot coordinates. */
+  details?: readonly { label: string; value: string }[];
 }
 
 export interface AnalyticsScatterProps {
@@ -60,6 +62,9 @@ export interface AnalyticsScatterProps {
   medianY?: number | null;
   emptyMessage?: string;
   className?: string;
+  /** Optional linked selection for descriptive comparisons. Does not change values. */
+  selectedPointId?: string | number | null;
+  onSelectPoint?: (id: string | number) => void;
 }
 
 interface Domain {
@@ -148,6 +153,7 @@ function analyticsPointDescription(
     point.groupLabel,
     `${xAxis.label}: ${point.xDisplay ?? formatX(point.x)}`,
     `${yAxis.label}: ${point.yDisplay ?? formatY(point.y)}`,
+    ...point.details?.map(detail => `${detail.label}: ${detail.value}`) ?? [],
     frontierDescription,
     `vintage ${vintageLabel}`,
     `horizon ${horizonLabel}`,
@@ -181,6 +187,8 @@ export function AnalyticsScatter({
   medianY = null,
   emptyMessage = "No eligible values to plot.",
   className,
+  selectedPointId,
+  onSelectPoint,
 }: AnalyticsScatterProps) {
   const id = useId().replaceAll(":", "");
   const [activeId, setActiveId] = useState<string | number | null>(null);
@@ -361,20 +369,29 @@ export function AnalyticsScatter({
                 <circle
                   key={`${typeof point.id}-${String(point.id)}-${index}`}
                   data-testid="analytics-point"
+                  data-selected={selectedPointId === point.id ? "true" : undefined}
                   data-frontier={hasDecisionDirections ? (point.isFrontier ? "true" : "false") : "not-applicable"}
                   cx={x}
                   cy={y}
                   r={boundedRadius(point.radius)}
                   fill={point.color ?? "var(--chart-2)"}
-                  stroke={hasDecisionDirections && point.isFrontier ? "var(--foreground)" : "var(--background)"}
-                  strokeWidth={hasDecisionDirections && point.isFrontier ? 3 : 1.5}
+                  stroke={selectedPointId === point.id || hasDecisionDirections && point.isFrontier ? "var(--foreground)" : "var(--background)"}
+                  strokeWidth={selectedPointId === point.id || hasDecisionDirections && point.isFrontier ? 3 : 1.5}
                   tabIndex={0}
+                  role={onSelectPoint ? "button" : undefined}
+                  aria-pressed={onSelectPoint ? selectedPointId === point.id : undefined}
                   aria-label={label}
                   aria-describedby={activePoint ? tooltipId : undefined}
                   onFocus={() => setActiveId(point.id)}
                   onBlur={() => setActiveId((current) => (current === point.id ? null : current))}
                   onMouseEnter={() => setActiveId(point.id)}
                   onMouseLeave={() => setActiveId((current) => (current === point.id ? null : current))}
+                  onClick={() => { setActiveId(point.id); onSelectPoint?.(point.id); }}
+                  onKeyDown={event => {
+                    if (onSelectPoint && (event.key === "Enter" || event.key === " ")) {
+                      event.preventDefault(); setActiveId(point.id); onSelectPoint(point.id);
+                    }
+                  }}
                   className="cursor-pointer outline-none focus:stroke-[5px]"
                 />
               );
@@ -424,6 +441,7 @@ export function AnalyticsScatter({
             {frontierText(active, xAxis, yAxis) && (
               <p className="mt-1">{frontierText(active, xAxis, yAxis)}</p>
             )}
+            {!!active.details?.length && <dl className="mt-2 space-y-1 border-t border-current/20 pt-2">{active.details.map(detail => <div key={detail.label} className="flex justify-between gap-3"><dt>{detail.label}</dt><dd className="shrink-0 tabular-nums">{detail.value}</dd></div>)}</dl>}
           </div>
         )}
       </div>

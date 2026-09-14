@@ -4,6 +4,7 @@ import { AnalyticsScatter } from "@/components/AnalyticsScatter";
 import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import { MetricCell, TeamComparison, TeamProfile, TeamTrend } from "@/components/SdpTeamProfile";
+import { SdpFplContextPlots } from "@/components/SdpFplContextPlots";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { loadSdpStats } from "@/data/sdpStats";
@@ -177,6 +178,7 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
       </div>
     </details>
     <InsightSummaryPanel items={[{ id: "scope", statement: `${filtered.length} clubs match ${filters.season} GW${filters.from}–GW${filters.to}. The recent window uses up to ${filters.recent === "all" ? "all selected" : filters.recent} matches per club.` }, { id: "coverage", statement: `${providerValid} season fixtures have complete SDP evidence; ${corrected} more are dashboard-ready with owner-confirmed corrections.` }]} localOnlyReason="Observed descriptive statistics. No AI, forecast or optimizer calculation is called." />
+    <SdpFplContextPlots teams={filtered} league={league} metrics={relevant} filters={filters} asOf={data.as_of} selectedId={selected?.id ?? null} onSelectTeam={id => { setDetail(id); setShowLog(false); }} />
     <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-xs text-muted-foreground"><span className="flex items-center gap-1.5"><Check className="size-3.5" aria-hidden="true" />Observed data · model independent</span><a href="#players" className="inline-flex min-h-10 items-center gap-2 hover:text-foreground">Explore individual players <ArrowRight className="size-3.5" aria-hidden="true" /></a></div>
   </div>;
 }

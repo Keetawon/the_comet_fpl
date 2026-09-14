@@ -10,6 +10,27 @@ beforeEach(() => { vi.mocked(loadSdpStats).mockResolvedValue(sdpFixture()); });
 const table = () => screen.findByRole("table", { name: "Observed SDP team statistics" });
 
 describe("SDP football observatory", () => {
+  it("places the themed plots after the table and shares venue, mode and club selection", async () => {
+    const data = sdpFixture();
+    data.metrics.push(...["shots_on_target", "shots_on_target_allowed"].map(key => ({ ...shooting, key, label: key })));
+    data.team_matches.forEach(row => { row.sdp.shots_on_target = row.was_home ? 2 : 6; row.sdp.shots_on_target_allowed = row.was_home ? 1 : 3; });
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
+    render(<TeamSdpStatsPage />); const grid = await table();
+    const plots = screen.getByRole("region", { name: "Attack and defence FPL context" });
+    expect(grid.compareDocumentPosition(plots) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const defence = within(plots).getByRole("article", { name: "Defence plot panel" });
+    fireEvent.click(within(defence).getByRole("button", { name: /^Chelsea;/ }));
+    expect(within(plots).getAllByRole("button", { name: /^Chelsea;/ }).every(p => p.getAttribute("aria-pressed") === "true")).toBe(true);
+    expect(screen.getByRole("region", { name: "Chelsea profile" })).toBeInTheDocument();
+    const values = within(plots).getAllByTestId("analytics-point").map(p => p.getAttribute("aria-label"));
+    fireEvent.change(screen.getByRole("combobox", { name: "Display" }), { target: { value: "total" } });
+    expect(within(plots).getAllByTestId("analytics-point").map(p => p.getAttribute("aria-label"))).toEqual(values);
+    fireEvent.change(screen.getByRole("combobox", { name: "Venue" }), { target: { value: "home" } });
+    expect(within(defence).getByRole("button", { name: /^Chelsea;/ })).toHaveAccessibleName(/SOT conceded \/match: 1;/);
+    fireEvent.change(screen.getByRole("textbox", { name: "Search clubs" }), { target: { value: "Chelsea" } });
+    expect(within(plots).getAllByTestId("analytics-point")).toHaveLength(2);
+    expect(within(plots).getAllByText(/League median: 4 eligible clubs/, { selector: "p" })).toHaveLength(2);
+  });
   it("adds percentage-only shot shares in Attacking and keeps them aligned with filters and fullscreen", async () => {
     const data = sdpFixture();
     data.metrics = [shooting, ...["shots_on_target", "shots_inside_box", "shots_outside_box", "shots_blocked"].map(key => ({ ...shooting, key, label: key }))];
