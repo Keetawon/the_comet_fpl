@@ -1,5 +1,6 @@
 import type { CompetitiveSchedule } from "@/data/competitiveSchedule";
 import type { FixtureScheduleOverlay } from "@/data/types";
+import type { InternationalBreak } from "@/data/internationalBreaks";
 
 export interface CalendarFixture {
   key: string; teamCode: number; opponent: string; opponentName: string;
@@ -64,7 +65,7 @@ export function visibleCalendar(rows: CalendarFixture[], codes: number[], from: 
 
 export interface CalendarColumn {
   key: string;
-  heading: "Weekend" | "Midweek" | "Cup week";
+  heading: "Weekend" | "Midweek" | "Cup week" | "International break";
   label: string;
   from: string;
   to: string;
@@ -74,7 +75,7 @@ export interface CalendarColumn {
 /** Group PL by official GW (all DGW legs), cups by their UK calendar week.
  * Cup weekends stay separate and are labelled honestly, never forced into a GW.
  */
-export function calendarColumns(rows: CalendarFixture[]): CalendarColumn[] {
+export function calendarColumns(rows: CalendarFixture[], breaks: InternationalBreak[] = []): CalendarColumn[] {
   const groups = new Map<string, CalendarColumn>();
   for (const row of rows) {
     if (!row.kickoff && row.gw === null) continue;
@@ -91,6 +92,11 @@ export function calendarColumns(rows: CalendarFixture[]): CalendarColumn[] {
     group.to = group.to > day ? group.to : day;
     if (row.gw === null) group.label = [...new Set(group.fixtures.map((f) => f.competition))].sort().join(" · ");
     groups.set(key, group);
+  }
+  for (const window of breaks) {
+    const key = `international:${window.from}`;
+    groups.set(key, { key, heading: "International break", label: window.label,
+      from: window.from, to: window.to, fixtures: [] });
   }
   return [...groups.values()].sort((a, b) => (a.from || "9999").localeCompare(b.from || "9999") || a.key.localeCompare(b.key));
 }

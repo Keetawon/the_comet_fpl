@@ -35,7 +35,8 @@ function TooltipContent({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal container={typeof document === "undefined" ? undefined :
+      document.fullscreenElement ?? document.querySelector<HTMLElement>('[data-fullscreen-mode="fallback"]') ?? undefined}>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}

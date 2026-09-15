@@ -14,6 +14,33 @@ A weekend cup tie is labelled **Cup week**, not midweek.
 Headers follow the earliest listed fixture in each period. Empty cup periods
 are omitted. This is a schedule display, not a fatigue estimate or model input.
 
+International windows have a separate yellow column, including when the selected
+date range contains no club fixtures. The 2026/27 windows are 21 September–6 October
+2026, 9–17 November 2026 and 22–30 March 2027, as published by the
+[Premier League](https://www.premierleague.com/en/news/4689113/when-are-the-international-breaks-for-202627)
+on 5 September 2026 and checked on 15 September 2026. The first falls between
+GW5 and GW6. One compact column spans the entire window; its dates, source and
+meaning are exposed in the tooltip, provenance and CSV. These are schedule
+annotations, not player call-ups, workload or confirmed rest. Existing club
+fixtures and DGW legs are never removed if their dates overlap a window.
+No break is inferred from an empty schedule, and no unverified season inherits
+these dates. The three published windows are retained in
+`dashboard/src/data/internationalBreaks.ts`; another season requires verified
+calendar evidence before annotations can be added.
+
+International-window verification: 31 calendar/Fixture Matrix/fullscreen tooltip tests pass,
+including inclusive date filtering, no inferred windows for unsupported seasons,
+unchanged DGW legs, empty club schedules, colour-mode independence and CSV source
+labels. TypeScript/Vite build and frontend lint pass (existing bundle-size and
+nine Fast Refresh warnings remain). Desktop and mobile Chrome checks confirm
+the September and November columns appear between the correct published GWs,
+with no console or request failures. Screenshots and the local browser receipt
+are in `data/artifacts/competitive-calendar-international-20260915/`.
+Browser inspection also found portal tooltips hidden behind the native fullscreen
+layer. The shared tooltip now mounts inside the active native/fallback fullscreen
+container; inline behaviour remains unchanged. Calendar tooltip paragraphs use
+a vertical layout so dates and source notes remain readable.
+
 ## Double and blank gameweeks
 
 Every league leg belongs to its official FPL GW, including midweek games.

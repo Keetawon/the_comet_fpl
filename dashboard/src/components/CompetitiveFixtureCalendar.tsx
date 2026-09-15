@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { loadCompetitiveSchedule, type CompetitiveSchedule } from "@/data/competitiveSchedule";
+import { INTERNATIONAL_BREAK_SOURCE, internationalBreaksForRange } from "@/data/internationalBreaks";
 import type { FixtureScheduleOverlay, TeamRecord } from "@/data/types";
 import { calendarColumns, calendarFixtures, calendarRange, leagueSlot, visibleCalendar, type CalendarFixture } from "@/lib/competitiveCalendar";
 import { BUCKET_CLASSES, FDR_LEGEND, OPPONENT_LEGEND, NULL_BUCKET_CLASS, fdrBucket } from "@/lib/difficulty";
@@ -14,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 const stamp = (value: string) => new Date(value).toLocaleString("en-GB", { timeZone: "Europe/London", dateStyle: "medium", timeStyle: "short" });
 const cupClass = "bg-sky-100 text-sky-950 ring-1 ring-inset ring-sky-200 dark:bg-sky-950 dark:text-sky-100 dark:ring-sky-800";
+const internationalClass = "bg-yellow-100 text-yellow-950 dark:bg-yellow-950 dark:text-yellow-100";
 const venue = (home: boolean | null) => home === null ? "venue TBC" : home ? "H" : "A";
 
 export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
@@ -45,7 +47,8 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
   const selectedGws = new Set((range === null ? eligible : globalRange.rows).filter((f) => f.gw !== null).map((f) => f.gw));
   // Once a GW is selected, keep every leg, even an undated or later DGW leg.
   // Preserve its column when the selected club has a genuine blank.
-  const columns = calendarColumns([...all.filter((f) => f.gw !== null && selectedGws.has(f.gw)), ...visible.rows.filter((f) => f.gw === null)]);
+  const breaks = internationalBreaksForRange(season, from, to);
+  const columns = calendarColumns([...all.filter((f) => f.gw !== null && selectedGws.has(f.gw)), ...visible.rows.filter((f) => f.gw === null)], breaks);
   const displayed = columns.flatMap((c) => c.fixtures).filter((f) => clubs.some((t) => t.team_code === f.teamCode));
   const cells = new Map<string, CalendarFixture[]>();
   for (const column of columns) for (const f of column.fixtures) {
@@ -62,6 +65,7 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
   const exportCsv = () => {
     const cell = (s: string) => `"${(/^[=+@\-\t\r]/.test(s) ? "'" + s : s).replaceAll('"', '""')}"`;
     const lines = [["Team", ...columns.map((c) => `${c.heading} · ${c.label}`)], ...clubs.map((t) => [t.team_name, ...columns.map((c) => {
+      if (c.heading === "International break") return `International break | ${c.from} – ${c.to} | ${INTERNATIONAL_BREAK_SOURCE.url} | National-team window; not confirmed player rest`;
       const slot = slotLabel(t.team_code, c);
       const fixtures = cellFixtures(t.team_code, c.key).map(description).join(" | ");
       return slot === "BGW" || slot === "UNAVAILABLE" ? slot : slot === "DGW" ? `DGW | ${fixtures}` : fixtures;
@@ -98,8 +102,9 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
         </ToggleGroup>
         {legend.map((l) => <span key={l.bucket} className={`rounded px-2 py-1 ${BUCKET_CLASSES[l.bucket]}`}>{l.label}</span>)}
         <span className={`rounded px-2 py-1 ${cupClass}`}>Cup / Europe</span>
+        <span className={`rounded px-2 py-1 ${internationalClass}`}>International break</span>
       </div>
-      <p className="text-xs text-muted-foreground">PL colours use {colour === "opponent" ? `opponent strength from the selected forecast (${teams[0]?.as_of.slice(0, 10)})` : "current official FPL difficulty"}. Blue identifies cup and European matches, not difficulty. A blank cell means no listed fixture, not confirmed rest.</p>
+      <p className="text-xs text-muted-foreground">PL colours use {colour === "opponent" ? `opponent strength from the selected forecast (${teams[0]?.as_of.slice(0, 10)})` : "current official FPL difficulty"}. Blue = cup / Europe; yellow = international break. Neither indicates difficulty or confirmed player rest. A blank cell means no listed fixture.</p>
     </div>
     {loading && <p role="status" className="text-sm text-muted-foreground">Loading retained cup and European schedules…</p>}
     {(error || (data && data.season !== season)) && <p role="alert" className="rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">{error ?? `No competitive schedule for ${season}`}. Only official PL fixtures are shown; cup workload is unknown.</p>}
@@ -115,9 +120,10 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
             <table aria-label="All competitions by period" className="table-fixed border-collapse text-xs tabular-nums" style={{width: 152 + columns.length * 84}}>
               <colgroup><col style={{width:152}} />{columns.map((c) => <col key={c.key} style={{width:84}} />)}</colgroup>
               <thead className="sticky top-0 z-20 bg-muted"><tr><th scope="col" className="sticky left-0 z-30 border-b border-r bg-muted px-3 py-2 text-left">Club</th>
-                {columns.map((c) => <th key={c.key} scope="col" title={`${c.from} – ${c.to} · UK dates`} className={`border-b border-r px-1 py-2 text-center font-medium ${c.heading === "Weekend" ? "" : "bg-sky-50 text-sky-950 dark:bg-sky-950 dark:text-sky-100"}`}><span className="block text-[10px] text-muted-foreground">{c.heading}</span><span className="block text-[11px] leading-tight">{c.label}</span></th>)}</tr></thead>
+                {columns.map((c) => <th key={c.key} scope="col" title={`${c.from} – ${c.to} · UK dates`} className={`border-b border-r px-1 py-2 text-center font-medium ${c.heading === "International break" ? internationalClass : c.heading === "Weekend" ? "" : "bg-sky-50 text-sky-950 dark:bg-sky-950 dark:text-sky-100"}`}><span className="block text-[10px] text-muted-foreground">{c.heading}</span><span className="block text-[11px] leading-tight">{c.label}</span></th>)}</tr></thead>
               <tbody>{clubs.map((t) => <tr key={t.team_code}><th scope="row" className="sticky left-0 z-10 border-b border-r bg-card px-3 py-1.5 text-left font-medium"><span className="flex items-center gap-2 whitespace-nowrap"><TeamBadge teamCode={t.team_code} shortName={t.short_name} size="sm" />{t.team_name}</span></th>
-                {columns.map((c) => <td key={c.key} className="border-b border-r p-0.5 align-middle text-center">
+                {columns.map((c) => <td key={c.key} className={`border-b border-r p-0.5 align-middle text-center ${c.heading === "International break" ? internationalClass : ""}`}>
+                  {c.heading === "International break" && <Tooltip><TooltipTrigger asChild><button type="button" className="w-full rounded px-1 py-2 text-[10px] font-medium" aria-label={`${t.team_name}: International break · ${c.label}`}>INT break</button></TooltipTrigger><TooltipContent className="block max-w-72 space-y-1 p-3 text-xs"><p className="font-semibold">International break · {c.label}</p><p>{c.from} – {c.to} · {INTERNATIONAL_BREAK_SOURCE.name}</p><p>National-team window; individual call-ups, appearances and rest are not established. Club fixtures remain as listed.</p></TooltipContent></Tooltip>}
                   {slotLabel(t.team_code, c) === "BGW" && <span title="No Premier League fixture assigned in the current published schedule; subsequent amendments may change this." className="block rounded border border-dashed px-1 py-2 font-medium text-muted-foreground">BGW<span className="block text-[9px] font-normal">No PL fixture</span></span>}
                   {slotLabel(t.team_code, c) === "UNAVAILABLE" && <span className="text-[10px] text-muted-foreground">Unavailable</span>}
                   {slotLabel(t.team_code, c) === "DGW" && <span className="mb-0.5 block rounded bg-blue-50 text-[9px] font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200">DGW · {cellFixtures(t.team_code, c.key).length} fixtures</span>}
@@ -125,7 +131,7 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
                   const value = colour === "fdr" ? f.fdr : strength.get(f.opponentCode ?? -1)?.index;
                   const bucket = colour === "fdr" ? fdrBucket(value ?? null) : opponentStrengthBucket(value);
                   return <Tooltip key={f.key}><TooltipTrigger asChild><button type="button" className={`block w-full rounded-sm px-2 py-1 leading-tight ${f.gw === null ? cupClass : bucket ? BUCKET_CLASSES[bucket] : NULL_BUCKET_CLASS}`} aria-label={`${t.team_name}: ${description(f)}`}><span className="block font-semibold">{f.opponent} <span className="font-normal">({venue(f.home)})</span></span><span className="text-[10px]">{f.gw === null ? f.competition : `GW${f.gw}`}</span></button></TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-72 space-y-1 p-3 text-xs"><p className="font-semibold">{t.team_name} · {f.opponentName} ({venue(f.home)})</p><p>{f.competitionName}{f.gw !== null ? ` · GW${f.gw}` : ""}</p><p>{f.kickoff ? `${stamp(f.kickoff)} UK` : "Date/time TBC"} · {f.status}</p>{f.gw !== null && <p>{colour === "fdr" ? "Official FDR" : "Opponent strength"}: {value == null ? "Unavailable" : value.toFixed(1)}</p>}<p>{f.source} {f.source === "FPL" ? "schedule export" : "source version"}: {stamp(f.knownAt)} UK</p></TooltipContent>
+                    <TooltipContent side="top" className="block max-w-72 space-y-1 p-3 text-xs"><p className="font-semibold">{t.team_name} · {f.opponentName} ({venue(f.home)})</p><p>{f.competitionName}{f.gw !== null ? ` · GW${f.gw}` : ""}</p><p>{f.kickoff ? `${stamp(f.kickoff)} UK` : "Date/time TBC"} · {f.status}</p>{f.gw !== null && <p>{colour === "fdr" ? "Official FDR" : "Opponent strength"}: {value == null ? "Unavailable" : value.toFixed(1)}</p>}<p>{f.source} {f.source === "FPL" ? "schedule export" : "source version"}: {stamp(f.knownAt)} UK</p></TooltipContent>
                   </Tooltip>;
                 })}</td>)}</tr>)}</tbody>
             </table>
@@ -136,6 +142,7 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
     </>}
     {visible.undated.length > 0 && <details className="rounded border p-3 text-sm"><summary>Date/time to be confirmed · {visible.undated.length} club entries (not assigned to a day)</summary><ul className="mt-2 text-xs space-y-1">{visible.undated.map((f) => <li key={f.key}>{teams.find((t) => t.team_code === f.teamCode)?.team_name}: {description(f)}</li>)}</ul></details>}
     <details className="rounded border p-3 text-xs text-muted-foreground"><summary className="cursor-pointer">Sources & schedule coverage</summary><p className="mt-2">FPL schedule exported {stamp(schedule.export_created_at)} UK. This calendar is separate from immutable prediction vintages and does not change xP, optimizer inputs or player minutes.</p>
+      <p className="mt-2">International breaks: {season === "2026-27" ? <><a href={INTERNATIONAL_BREAK_SOURCE.url} target="_blank" rel="noreferrer" className="underline">{INTERNATIONAL_BREAK_SOURCE.name}</a>, published {INTERNATIONAL_BREAK_SOURCE.publishedOn}; verified {stamp(INTERNATIONAL_BREAK_SOURCE.verifiedAt)} UK. One yellow column covers each published window. Dates are not inferred from missing fixtures; no individual national-team participation is captured here.</> : "No verified international calendar retained for this season."}</p>
       {data?.season === season && <><p>SDP calendar exported {stamp(data.as_of)} UK. Source timestamps below are the retained payload version times; unchanged captures do not advance them. Coverage is the provider’s listed schedule, not proof that all future rounds are known.</p>{data.competitions.map((c) => <div className="mt-2" key={c.competition_id}><strong>{c.name}</strong> · {c.status}{c.issues.length ? ` · ${c.issues.join(", ")}` : ""}<ul>{c.sources.map((s) => <li key={s.payload_id}>{stamp(s.known_at)} UK · SHA256 <code className="break-all">{s.sha256}</code></li>)}</ul></div>)}</>}
     </details>
   </section>;

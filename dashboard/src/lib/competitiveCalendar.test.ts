@@ -2,8 +2,28 @@ import { describe, expect, it } from "vitest";
 import { calendarColumns, calendarFixtures, calendarRange, footballDate, leagueSlot, visibleCalendar } from "./competitiveCalendar";
 
 import { schedule, cups } from "@/data/competitiveSchedule.fixture";
+import { internationalBreaksForRange } from "@/data/internationalBreaks";
 
 describe("descriptive all-competition calendar", () => {
+  it("adds verified international windows without creating fixtures or hiding overlapping DGW legs", () => {
+    const rows = calendarFixtures(schedule, cups, "2026-27");
+    const windows = internationalBreaksForRange("2026-27", "2026-09-01", "2027-05-31");
+    expect(windows.map((w) => [w.from, w.to])).toEqual([
+      ["2026-09-21", "2026-10-06"], ["2026-11-09", "2026-11-17"], ["2027-03-22", "2027-03-30"],
+    ]);
+    const columns = calendarColumns(rows, windows);
+    expect(columns.flatMap((c) => c.fixtures)).toEqual(calendarColumns(rows).flatMap((c) => c.fixtures));
+    expect(columns.filter((c) => c.heading === "International break")).toHaveLength(3);
+    expect(columns.find((c) => c.label === "GW5")?.fixtures).toHaveLength(2);
+    expect(calendarColumns([], internationalBreaksForRange("2026-27", "2026-09-22", "2026-10-01"))).toMatchObject([
+      { heading: "International break", from: "2026-09-21", to: "2026-10-06", fixtures: [] },
+    ]);
+    expect(internationalBreaksForRange("2026-27", "2026-10-06", "2026-10-06")).toHaveLength(1);
+    expect(internationalBreaksForRange("2026-27", "2026-10-07", "2026-11-08")).toEqual([]);
+    expect(internationalBreaksForRange("2027-28", "2026-09-01", "2027-05-31")).toEqual([]);
+    expect(internationalBreaksForRange("2026-27", "", "2026-11-08")).toEqual([]);
+    expect(internationalBreaksForRange("2026-27", "2026-11-08", "2026-09-01")).toEqual([]);
+  });
   it("keeps each DGW leg, adds cup identity without calling its round a GW", () => {
     const before = JSON.stringify([schedule, cups]);
     const rows = calendarFixtures(schedule, cups, "2026-27");
