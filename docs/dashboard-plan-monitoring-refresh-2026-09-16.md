@@ -11,7 +11,10 @@ optimizer algorithms, stored forecasts and frozen research results are unchanged
   a validated current plan to the existing BI emitter. One newest plan per platform
   role is selected consistently for Summary, Next GW and Optimizer audit; immutable
   originals and old generations remain available. Cross-vintage diagnostic comparisons
-  are suppressed, while old diagnostics retain their actual dates.
+  are suppressed, while old diagnostics retain their actual dates. Repeated publication
+  compares the existing public provenance representation (source-body digests and the
+  public rules path), so sanitization does not look like a changed plan. Actual
+  decision/source-hash changes still fail closed.
 - Monitoring intentionally opens the latest *scored* forecast. It now has separate
   latest-scored/latest-published controls plus a manifest-bound freshness receipt.
   A future forecast can be inspected while scores remain pending. GW finality and
@@ -45,7 +48,7 @@ It was generated with the unchanged optimizer from clean commit `667d400`.
 
 ## Verification
 
-- Python: 62 focused refresh/finality/checkpoint tests passed.
+- Python: 63 focused refresh/finality/checkpoint tests passed, plus 14 live-snapshot regressions.
 - Frontend: 56 files / 467 tests passed with two workers.
 - Ruff and changed-Python-file formatting passed; strict mypy passed on four source files.
 - TypeScript/Vite build passed. Frontend lint: zero errors, nine inherited Fast Refresh

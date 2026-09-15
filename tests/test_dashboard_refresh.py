@@ -238,3 +238,30 @@ def test_latest_platform_plan_reaches_all_pages_without_replacing_forecasts(
     write(fresh / "next_gw.json", {"plans": [{**previous, "as_of": "changed"}]})
     with pytest.raises(ValueError, match="immutable optimizer plan changed"):
         refresh.retain_existing_plans(fresh, old, tmp_path / "collision")
+
+
+def test_republication_recognizes_sanitized_plan_and_rejects_changed_digest() -> None:
+    body = '{"retained_source":"identity"}'
+    original = {
+        "optimizer_run_id": "immutable",
+        "forecast_run_id": "forecast",
+        "component_modes": {"football_environment.provenance": body},
+        "provenance": {
+            "squad_rules_path": "D:/private/config/squad_2026_27.yaml",
+            "squad_rules_sha256": "rules",
+        },
+        "decision_sha256": "decision",
+    }
+    public = json.loads(json.dumps(original))
+    public["component_modes"] = {
+        "football_environment.provenance_sha256": hashlib.sha256(body.encode()).hexdigest()
+    }
+    public["provenance"]["squad_rules_path"] = "config/squad_2026_27.yaml"
+    before = json.dumps(original, sort_keys=True)
+    assert refresh._public_plan_identity(original) == refresh._public_plan_identity(public)
+    assert json.dumps(original, sort_keys=True) == before
+    public["decision_sha256"] = "changed"
+    assert refresh._public_plan_identity(original) != refresh._public_plan_identity(public)
+    original["component_modes"]["football_environment.provenance_sha256"] = "wrong"
+    with pytest.raises(ValueError, match="source provenance digest mismatch"):
+        refresh._public_plan_identity(original)

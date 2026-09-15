@@ -18,6 +18,7 @@ from fpl.publish.dashboard_json import (
     validate_dashboard_json,
 )
 from fpl.publish.export import _canonical_json_bytes, _sha256_bytes
+from fpl.publish.public_dashboard import PUBLIC_SQUAD_RULES_PATH
 from fpl.publish.team_form import refresh_team_forms
 
 
@@ -79,6 +80,39 @@ def check_observed_freshness(generation: Path, sidecar: dict[str, Any]) -> dict[
     return report
 
 
+def _public_metadata(value: Any, redacted: set[str]) -> None:
+    if isinstance(value, dict):
+        modes = value.get("component_modes")
+        if isinstance(modes, dict):
+            for key in ("football_environment.provenance", "player_history.provenance"):
+                if key not in modes:
+                    continue
+                body = modes.pop(key)
+                if not isinstance(body, str):
+                    raise ValueError("unexpected serialized source provenance")
+                digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+                existing = modes.get(f"{key}_sha256")
+                if existing is not None and existing != digest:
+                    raise ValueError("source provenance digest mismatch")
+                modes[f"{key}_sha256"] = digest
+                redacted.add(digest)
+        for child in value.values():
+            _public_metadata(child, redacted)
+    elif isinstance(value, list):
+        for child in value:
+            _public_metadata(child, redacted)
+
+
+def _public_plan_identity(plan: dict[str, Any]) -> dict[str, Any]:
+    """Compare internal/public copies using the existing publication transport."""
+    result: dict[str, Any] = json.loads(json.dumps(plan))
+    _public_metadata(result, set())
+    provenance = result.get("provenance")
+    if isinstance(provenance, dict) and "squad_rules_path" in provenance:
+        provenance["squad_rules_path"] = PUBLIC_SQUAD_RULES_PATH
+    return result
+
+
 def retain_existing_plans(fresh: Path, previous: Path, output: Path) -> dict[str, Any]:
     current = validate_dashboard_json(fresh)
     old = validate_dashboard_json(previous)
@@ -101,7 +135,9 @@ def retain_existing_plans(fresh: Path, previous: Path, output: Path) -> dict[str
         merged = {p["optimizer_run_id"]: p for p in document[key]}
         for plan in original:
             identity = plan["optimizer_run_id"]
-            if identity in merged and merged[identity] != plan:
+            if identity in merged and _public_plan_identity(
+                merged[identity]
+            ) != _public_plan_identity(plan):
                 raise ValueError("immutable optimizer plan changed across generations")
             merged[identity] = plan
         # The existing public contract carries one plan per platform role.
@@ -145,30 +181,11 @@ def retain_existing_plans(fresh: Path, previous: Path, output: Path) -> dict[str
     # redaction on a new export; the ledger/source generation remains immutable.
     redacted: set[str] = set()
 
-    def public_metadata(value: Any) -> None:
-        if isinstance(value, dict):
-            modes = value.get("component_modes")
-            if isinstance(modes, dict):
-                for key in ("football_environment.provenance", "player_history.provenance"):
-                    if key not in modes:
-                        continue
-                    body = modes.pop(key)
-                    if not isinstance(body, str):
-                        raise ValueError("unexpected serialized source provenance")
-                    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-                    modes[f"{key}_sha256"] = digest
-                    redacted.add(digest)
-            for child in value.values():
-                public_metadata(child)
-        elif isinstance(value, list):
-            for child in value:
-                public_metadata(child)
-
     for filename in current["files"]:
         document = json.loads((output / filename).read_bytes())
         indent = None if filename == "player_horizons.json" else 2
         original_payload = _canonical_json_bytes(document, indent=indent)
-        public_metadata(document)
+        _public_metadata(document, redacted)
         payload = _canonical_json_bytes(document, indent=indent)
         if payload == original_payload:
             continue
