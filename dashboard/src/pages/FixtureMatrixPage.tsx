@@ -333,7 +333,7 @@ function TeamGwCell({
 }
 
 export function FixtureMatrixPage() {
-  const [layout, setLayout] = useState<"gameweeks" | "calendar">("gameweeks");
+  const [layout, setLayout] = useState<"gameweeks" | "calendar">("calendar");
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [runId, setRunId] = useState<string | null>(null);
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
@@ -861,7 +861,7 @@ export function FixtureMatrixPage() {
         <ToggleGroupItem value="gameweeks">Gameweek matrix</ToggleGroupItem>
         <ToggleGroupItem value="calendar">All competitions</ToggleGroupItem>
       </ToggleGroup>
-      {layout === "calendar" ? <CompetitiveFixtureCalendar key={activeRunId} teams={runTeams} schedule={state.schedule} fromGw={runBounds.from} toGw={runBounds.to} /> : <>
+      {layout === "calendar" ? <CompetitiveFixtureCalendar key={activeRunId} teams={runTeams} schedule={state.schedule} fromGw={runBounds.from} toGw={runBounds.from + 9} /> : <>
       <div className="rounded-lg border bg-card p-2">
         <DifficultyLegend
           colorSource={colorSource}
@@ -1002,7 +1002,7 @@ export function FixtureMatrixPage() {
         )}
       </FilterPanel>
 
-      <DecisionTableFullscreen label="Fixture matrix table">
+      <DecisionTableFullscreen label="Fixture matrix table" captureContext={`${runTeams[0]?.season} · ${colorSource} · ${filters?.view} · GW${filters?.gwFrom}–${filters?.gwTo} · Forecast as of ${activeRun?.as_of ?? "unavailable"}. Schedule may be newer; later cards are display context.`}>
         {({ isFullscreen }) => (
       <div
         className={`${

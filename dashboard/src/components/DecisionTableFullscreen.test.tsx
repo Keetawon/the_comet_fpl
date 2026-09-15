@@ -22,6 +22,19 @@ afterEach(() => {
 });
 
 describe("DecisionTableFullscreen", () => {
+  it("offers Capture and Share beside Expand and reports blocked previews without changing the table", async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    render(<DecisionTableFullscreen label="Filtered players"><table><tbody><tr><td>Beta —</td></tr><tr><td>Alpha 0</td></tr></tbody></table></DecisionTableFullscreen>);
+    await user.click(screen.getByRole("button", { name: "Capture Filtered players" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Allow pop-ups");
+    expect(screen.getByRole("table").textContent).toBe("Beta —Alpha 0");
+    await user.click(screen.getByRole("button", { name: "Share Filtered players" }));
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "Enter Filtered players fullscreen" })).toBeEnabled();
+    open.mockRestore();
+  });
+
   it("enters and exits native fullscreen while preserving child state", async () => {
     const user = userEvent.setup();
     const outside = document.createElement("button");

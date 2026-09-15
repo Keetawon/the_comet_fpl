@@ -635,7 +635,7 @@ function DraftSquadTable({
   };
 
   return (
-    <DecisionTableFullscreen label="Squad Draft players table">
+    <DecisionTableFullscreen label="Squad Draft players table" captureContext={`${selected.length} selected players · GWs ${loadedGws.join(", ")} · Forecast as of ${selected[0]?.as_of ?? "unavailable"} · Manual Squad Draft; raw xP, not a new optimizer result.`}>
       {({ isFullscreen }) => (
         <Table
           containerClassName={cn(isFullscreen && "min-h-0 flex-1 overflow-auto")}

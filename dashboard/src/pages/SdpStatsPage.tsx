@@ -134,7 +134,7 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
           <Control label="Display" value={mode} options={[["per_match", "Average per match"], ["total", "Totals"]]} onChange={value => setMode(value as SdpMode)} />
           <p className="max-w-md text-xs leading-relaxed text-muted-foreground">{category.description} Select up to 3 clubs to compare.</p>
         </div>
-        <DecisionTableFullscreen label="SDP team statistics table" className="rounded-none border-x-0 border-b-0">
+        <DecisionTableFullscreen label="SDP team statistics table" captureContext={`${filters.season} · GW${filters.from}–${filters.to} · ${filters.recent === "all" ? "Full selected range" : `Last ${filters.recent} matches`} · ${filters.venue} · ${category.label} · ${mode === "total" ? "Totals" : "Average per match"}. Observed SDP; marked FPL supplements and display corrections retained. Unavailable is not zero.`} className="rounded-none border-x-0 border-b-0">
           {({ isFullscreen }) => <div className={isFullscreen ? "sdp-table-body sdp-table-body-fullscreen" : "sdp-table-body space-y-4"}>
             <Table aria-label="Observed SDP team statistics" className="sdp-team-table" containerClassName={isFullscreen ? "min-h-0 flex-1 overflow-auto" : "max-h-[680px]"}>
               <TableHeader className="sticky top-0 z-20 bg-muted"><TableRow>

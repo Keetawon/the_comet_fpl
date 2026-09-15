@@ -4,6 +4,30 @@ Static Vite + React + TypeScript + Tailwind + shadcn/ui + @tanstack/react-table 
 renders the **static JSON read models** published by the Python layer and nothing else —
 it never queries DuckDB and never reads Parquet in the browser.
 
+## Table captures and sharing
+
+Fixture matrix opens on **All competitions · Weekly · 10 GWs**; Reset calendar restores
+that range. This is a display horizon, separate from the published prediction horizon.
+
+Tables with an Expand control also offer **Capture** and **Share**. They open a local
+image preview with the current table page, filter results, sorting, expanded rows and
+all scrollable columns. THE COMET branding, visible-scope context and the actual capture
+timestamp are included. Capture time is explicitly not a data refresh or a new forecast.
+The preview offers Download PNG, Actual size/Fit, and user-triggered Share image. A browser
+without file sharing falls back to downloading the PNG to attach manually; pop-up blocking
+is reported. No screenshot, custom squad or manager identifier is uploaded by this feature.
+Review a private draft before choosing to share it. No private URL/query or browser storage
+is added to the image/share payload.
+
+This covers the calendar, gameweek matrix, shared Players/Next-GW tables, Plan Builder's
+result table, Squad Draft, SDP team table/goal-pattern chart and optimizer constraints.
+Paginated tables capture only their current page and label that scope. Large views are
+bounded at 16,000 logical pixels per side / 32 million pixels; narrow filters if needed.
+Blocked external decorative badges may be omitted; table names and values remain.
+`html-to-image` is loaded only on capture, for DOM/CSS-to-PNG rendering; the browser has
+no native full-DOM screenshot export and reimplementing that renderer would be larger.
+This presentation dependency does not enter any Python pipeline or model.
+
 ## 2026-08-26 dashboard program
 
 Schema v9 remains the development-only contract for the ten established read models. Two additive

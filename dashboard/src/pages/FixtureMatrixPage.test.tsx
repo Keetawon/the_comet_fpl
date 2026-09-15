@@ -19,6 +19,8 @@ import type {
 } from "@/data/types";
 import { FixtureMatrixPage } from "./FixtureMatrixPage";
 
+vi.mock("@/data/competitiveSchedule", () => ({ loadCompetitiveSchedule: vi.fn().mockRejectedValue(new Error("No cup snapshot in fixture test")) }));
+
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
 
 const actual = (patch: Partial<TeamActualFixture> = {}): TeamActualFixture => ({
@@ -182,6 +184,19 @@ beforeEach(() => {
 });
 
 describe("FixtureMatrixPage", () => {
+  it("defaults to All competitions, Weekly and 10 GWs, including reset", async () => {
+    const user = userEvent.setup();
+    render(<FixtureMatrixPage />);
+    expect(await screen.findByRole("radio", { name: "All competitions" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Weekly" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "10 GWs" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "5 GWs" }));
+    await user.click(screen.getByRole("radio", { name: "Daily" }));
+    await user.click(screen.getByRole("button", { name: "Reset calendar" }));
+    expect(screen.getByRole("radio", { name: "10 GWs" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Weekly" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Capture Club calendar table" })).toBeInTheDocument();
+  });
   it("shows the current published short-season form and provisional depth without touching future fixtures", async () => {
     const teams = structuredClone(sample.teams);
     const form = teams[0].form!;
@@ -196,6 +211,7 @@ describe("FixtureMatrixPage", () => {
     const before = JSON.stringify(teams);
     vi.mocked(loadFixtureMatrix).mockResolvedValueOnce({ teams, schedule, manifest: null, easeIndexFormulaVersion: "fixture-ease-v1" });
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     const table = await screen.findByRole("table", { name: "Fixture matrix" });
     expect(within(table).getByText("2026-27 GW1–4 · 4 matches · 1 provisional")).toBeInTheDocument();
     expect(within(table).getByText(/W2 D2 L0 · 5:2/)).toBeInTheDocument();
@@ -205,6 +221,7 @@ describe("FixtureMatrixPage", () => {
 
   it("renders one row per club with per-GW chips, blank slots, and all colour sources", async () => {
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     const fullscreenButton = screen.getByRole("button", {
@@ -231,6 +248,7 @@ describe("FixtureMatrixPage", () => {
   it("filters team rows with an OR multi-select and clears back to every club", async () => {
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     const matrix = await screen.findByRole("table", { name: "Fixture matrix" });
 
     const teamFilter = screen.getByRole("button", { name: /^Team filter:/ });
@@ -284,6 +302,7 @@ describe("FixtureMatrixPage", () => {
     });
 
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await screen.findByText("Alpha");
     const teamFilter = screen.getByRole("button", { name: /^Team filter:/ });
     await user.click(teamFilter);
@@ -365,6 +384,7 @@ describe("FixtureMatrixPage", () => {
     });
 
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(screen.getByRole("combobox", { name: "Actual scope" })).toHaveTextContent(
       "Rolling 5",
@@ -395,6 +415,7 @@ describe("FixtureMatrixPage", () => {
 
   it("defaults to opponent-strength colouring: weak opponent green, strong opponent red", async () => {
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     // Beta (model λ: scores little, concedes lots) reads ~90 -> green end
     const alphaGw1 = screen.getAllByTestId("chip").find(
@@ -412,6 +433,7 @@ describe("FixtureMatrixPage", () => {
 
   it("defaults the table to average opponent strength and sorts highest first", async () => {
     const { container } = render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(
       screen.getByRole("columnheader", { name: /Avg Opp str \(GW1-5\)/ }),
@@ -427,6 +449,7 @@ describe("FixtureMatrixPage", () => {
   it("switches the average, card headline, and tier bucket together for every source tab", async () => {
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     await user.click(screen.getByRole("radio", { name: "Attack" }));
@@ -480,6 +503,7 @@ describe("FixtureMatrixPage", () => {
   it("colours later fixtures with explicit proxies and current official FDR", async () => {
     const user = userEvent.setup();
     const { container } = render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     expect(screen.getByRole("columnheader", { name: "GW5" })).toBeInTheDocument();
@@ -568,6 +592,7 @@ describe("FixtureMatrixPage", () => {
   it("keeps every modelled, blank, and schedule-only GW card in identical fixed columns", async () => {
     const user = userEvent.setup();
     const { container } = render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     const expectFixedGameweekLayout = (expectedColumnCount: number) => {
@@ -621,6 +646,7 @@ describe("FixtureMatrixPage", () => {
   it("shows the shared rolling window, DGWs, nulls, and explicit season isolation", async () => {
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     expect(screen.getByRole("combobox", { name: "Actual scope" })).toHaveTextContent("Rolling 5");
@@ -686,6 +712,7 @@ describe("FixtureMatrixPage", () => {
     });
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);
+    await userEvent.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     const alphaRow = screen.getByText("Alpha").closest("tr");
