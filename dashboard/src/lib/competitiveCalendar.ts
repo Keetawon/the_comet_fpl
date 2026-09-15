@@ -9,6 +9,7 @@ export interface CalendarFixture {
   fdr: number | null; status: string; source: "FPL" | "SDP"; knownAt: string;
 }
 const ABBR: Record<number, string> = { 1: "FAC", 2: "LC", 5: "UCL", 6: "UEL", 1125: "UECL" };
+export const MAX_DAILY_DAYS = 366;
 
 /** A fixed UK football calendar, independent of the browser's time zone. */
 export function footballDate(instant: string): string {
@@ -65,11 +66,12 @@ export function visibleCalendar(rows: CalendarFixture[], codes: number[], from: 
 
 export interface CalendarColumn {
   key: string;
-  heading: "Weekend" | "Midweek" | "Cup week" | "International break";
+  heading: "Weekend" | "Midweek" | "Cup week" | "International break" | "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
   label: string;
   from: string;
   to: string;
   fixtures: CalendarFixture[];
+  internationalBreak?: InternationalBreak;
 }
 
 /** Group PL by official GW (all DGW legs), cups by their UK calendar week.
@@ -96,9 +98,51 @@ export function calendarColumns(rows: CalendarFixture[], breaks: InternationalBr
   for (const window of breaks) {
     const key = `international:${window.from}`;
     groups.set(key, { key, heading: "International break", label: window.label,
-      from: window.from, to: window.to, fixtures: [] });
+      from: window.from, to: window.to, fixtures: [], internationalBreak: window });
   }
   return [...groups.values()].sort((a, b) => (a.from || "9999").localeCompare(b.from || "9999") || a.key.localeCompare(b.key));
+}
+
+/** Continuous UK dates: retain empty days so the space between games is visible. */
+export function dailyCalendarColumns(rows: CalendarFixture[], from: string, to: string, breaks: InternationalBreak[] = []): CalendarColumn[] {
+  if (!from || !to || from > to) return [];
+  const date = new Date(`${from}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || !Number.isFinite(Date.parse(`${to}T12:00:00Z`))) return [];
+  if ((Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > MAX_DAILY_DAYS) throw new Error("Daily calendar range exceeds 366 days");
+  const byDay = new Map<string, CalendarFixture[]>();
+  for (const f of rows) {
+    if (!f.kickoff) continue;
+    const day = footballDate(f.kickoff);
+    const matches = byDay.get(day) ?? [];
+    matches.push(f); byDay.set(day, matches);
+  }
+  const columns: CalendarColumn[] = [];
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+  for (; date.toISOString().slice(0, 10) <= to; date.setUTCDate(date.getUTCDate() + 1)) {
+    const day = date.toISOString().slice(0, 10);
+    columns.push({ key: `day:${day}`, heading: weekdays[date.getUTCDay()],
+      label: date.toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short" }),
+      from: day, to: day, fixtures: (byDay.get(day) ?? []).sort((a, b) => Date.parse(a.kickoff!) - Date.parse(b.kickoff!) || a.key.localeCompare(b.key)),
+      internationalBreak: breaks.find((w) => w.from <= day && w.to >= day) });
+  }
+  return columns;
+}
+
+/** Clear calendar dates between listed club fixtures, never physical player rest. */
+export function listedClubGaps(rows: CalendarFixture[]): Map<string, { days: number; previousKickoff: string }> {
+  const gaps = new Map<string, { days: number; previousKickoff: string }>();
+  const unresolved = new Set(rows.filter((r) => !r.kickoff).map((r) => r.teamCode));
+  const previous = new Map<number, CalendarFixture>();
+  for (const f of [...rows].filter((r) => r.kickoff).sort((a, b) => Date.parse(a.kickoff!) - Date.parse(b.kickoff!) || a.key.localeCompare(b.key))) {
+    if (!f.kickoff || unresolved.has(f.teamCode)) continue;
+    const prior = previous.get(f.teamCode);
+    if (prior?.kickoff) {
+      const days = Math.max(0, Math.round((Date.parse(footballDate(f.kickoff)) - Date.parse(footballDate(prior.kickoff))) / 86_400_000) - 1);
+      gaps.set(f.key, { days, previousKickoff: prior.kickoff });
+    }
+    previous.set(f.teamCode, f);
+  }
+  return gaps;
 }
 
 export function leagueSlot(schedule: FixtureScheduleOverlay, season: string, code: number, gw: number): "BGW" | "DGW" | "SINGLE" | "UNAVAILABLE" {

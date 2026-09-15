@@ -12,6 +12,53 @@ const teams = [{run_id: "unchanged", as_of: "2026-09-14T00:00:00Z", season: "202
 
 describe("club calendar interactions", () => {
   beforeEach(() => { vi.mocked(loadCompetitiveSchedule).mockResolvedValue(cups); });
+  it("switches Weekly/Daily without changing fixtures and exports daily dates and listed gaps", async () => {
+    const user = userEvent.setup();
+    const before = JSON.stringify([schedule, cups]);
+    render(<CompetitiveFixtureCalendar teams={teams} schedule={schedule} fromGw={5} toGw={5} />);
+    await screen.findByRole("button", {name: /Arsenal: CUP/});
+    await user.click(screen.getByRole("radio", {name: "Daily"}));
+    const table = screen.getByRole("table", {name: "All competitions by day"});
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(9);
+    expect(screen.getByRole("button", {name: /Arsenal: BHA/})).toHaveTextContent("2d listed gap");
+    expect(screen.getByRole("button", {name: /Arsenal: BHA/})).toHaveTextContent("15:00");
+    expect(within(table).getAllByText("DGW")).toHaveLength(2);
+    expect(screen.getByRole("button", {name: /Arsenal: International break/}).closest("td")?.className).toContain("bg-yellow-100");
+    const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:calendar");
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await user.click(screen.getByRole("button", {name: "CSV"}));
+    const csv = await new Promise<string>((resolve) => {
+      const reader = new FileReader(); reader.onload = () => resolve(reader.result as string);
+      reader.readAsText(create.mock.calls[0][0] as Blob);
+    });
+    expect(csv).toContain("Sat · 2026-09-19");
+    expect(csv).toContain("2d listed gap");
+    expect(csv).toContain("No listed club fixture; rest unconfirmed");
+    expect(csv).toContain("International break");
+    expect(csv).toContain("AVL"); // A club game is retained even inside an international window.
+    create.mockRestore(); click.mockRestore();
+    await user.click(screen.getByRole("radio", {name: "Weekly"}));
+    expect(screen.getByRole("table", {name: "All competitions by period"})).toBeVisible();
+    expect(screen.getByText("DGW · 2 fixtures")).toBeVisible();
+    expect(JSON.stringify([schedule, cups])).toBe(before);
+  });
+  it("clips Daily to exact dates while Weekly retains the whole DGW, and reset restores Weekly", async () => {
+    const user = userEvent.setup();
+    render(<CompetitiveFixtureCalendar teams={teams} schedule={schedule} fromGw={5} toGw={5} />);
+    await screen.findByRole("button", {name: /Arsenal: CUP/});
+    await user.click(screen.getByRole("radio", {name: "Daily"}));
+    await user.clear(screen.getByLabelText("Calendar from"));
+    await user.type(screen.getByLabelText("Calendar from"), "2026-09-19");
+    await user.clear(screen.getByLabelText("Calendar to"));
+    await user.type(screen.getByLabelText("Calendar to"), "2026-09-19");
+    expect(screen.getByRole("button", {name: /Arsenal: BHA/})).toHaveTextContent("2d listed gap");
+    expect(screen.queryByRole("button", {name: /Arsenal: AVL/})).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", {name: "Weekly"}));
+    expect(screen.getByRole("button", {name: /Arsenal: AVL/})).toBeVisible();
+    await user.click(screen.getByRole("radio", {name: "Daily"}));
+    await user.click(screen.getByRole("button", {name: "Reset calendar"}));
+    expect(screen.getByRole("radio", {name: "Weekly"})).toBeChecked();
+  });
   it("shows league difficulty, keeps cup blue, and supports a reversible empty range", async () => {
     const user = userEvent.setup();
     render(<CompetitiveFixtureCalendar teams={teams} schedule={schedule} fromGw={5} toGw={5} />);

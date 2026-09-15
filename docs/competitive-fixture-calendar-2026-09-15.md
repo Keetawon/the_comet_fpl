@@ -6,6 +6,42 @@ The default begins with the cup week before the selected forecast's first GW.
 Quick controls show 5, 10 or 15 GWs; a custom date range remains available.
 Dates and UK kickoff times are in accessible match tooltips and CSV cells.
 
+The **Weekly / Daily** toggle retains the chosen teams, horizon, dates and
+difficulty source. Weekly remains the default. Daily uses continuous 76px UK-date
+columns, including empty dates, with kickoff times on the match cards. Each day
+inside a verified international window is yellow; cup cards stay blue, and any
+overlapping club game remains visible. Club labels and date headers remain sticky;
+horizontal scrolling and fullscreen support longer ranges. A maximum of 366 days
+prevents an accidental huge date range from freezing the browser; the user can
+shorten the range or return to Weekly, with no silent clipping.
+
+Daily's **listed gap** counts clear UK calendar dates between the previous listed
+club fixture and the current one, excluding both match dates. Wednesday to Saturday
+therefore shows `2d listed gap`. It uses the same club's complete retained schedule,
+including fixtures outside the displayed date range, and is unaffected by team
+filters. No previous dated game, or any undated game for that club, leaves the gap
+unavailable. This is schedule spacing, **not physical player rest**: missing cup
+rounds, national-team appearances, training, travel and actual participation are
+not established. It does not compute rest hours or change minutes/forecast inputs.
+
+Daily shows only fixtures on the selected dates. DGW legs retain their official GW
+and a DGW marker even when another leg falls outside the visible dates. Weekly
+continues to retain all selected GW legs and its existing BGW rules. Empty daily
+cells mean no listed club fixture, never a BGW or proven rest. TBC fixtures remain
+in the undated section. CSV follows the active view, with exact daily dates,
+kickoff times, listed-gap wording and international-window provenance; filenames
+include `daily` or `weekly`. Reset returns to the default Weekly view.
+
+Daily verification: 36 calendar/page/fullscreen tests pass, including continuous
+empty dates, DST, deterministic replay, same-day fixtures, out-of-view predecessors,
+undated gaps, daily clipping versus whole-GW retention, and CSV consistency.
+TypeScript/Vite and lint pass with the previously recorded warnings. Actual Chrome
+verification covers Weekly/Daily round trips, a 19-day selection, all 20 clubs in
+1720×1080 fullscreen, 390×844 horizontal scrolling, readable gap tooltips, and a
+completed 20-club CSV download. No JS errors or failed requests were observed.
+Evidence: `data/artifacts/competitive-calendar-daily-20260915/`. Model/configuration,
+published input JSON and frozen prediction/research artifacts were not modified.
+
 League cells use the existing selected-vintage opponent-strength display index,
 or explicitly selected current official FDR. Cup/European cells use blue on
 every weekday, distinct from the neutral grey league-difficulty tier. This colour
