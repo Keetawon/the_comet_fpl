@@ -276,25 +276,6 @@ export function SummaryPage() {
         <VintageSelect options={vintageOptions(state.runs, state.plans)} value={runId ?? state.defaultRunId} onChange={setRunId} />
       </div>
 
-      <InsightSummaryPanel
-        items={localInsightItems}
-        caveats={[
-          "xP totals sum already-published values; probabilities are never combined in the browser.",
-          "Summary ranks describe one immutable forecast vintage.",
-        ]}
-        remote={{
-          page: "summary",
-          provenance: publishedInsightProvenance(state.manifest, {
-            ...view.run,
-            as_of: view.players[0]?.as_of,
-          }),
-          scope: compactInsightScope({ gw_from: view.gwFrom, gw_to: view.gwTo }),
-          localScopeKey: view.run.run_id,
-          unavailableReason: summaryMatchesVisible
-            ? undefined
-            : "AI explanation is unavailable because the visible vintage differs from summary.json.",
-        }}
-      />
 
       <div className="grid gap-3 lg:grid-cols-3">
         <Card title="Next gameweek">
@@ -466,6 +447,25 @@ export function SummaryPage() {
         overlay valid for the next gameweek, never folded into xP; EV is never compared across
         architectures. Chips colour on opponent strength (green = weak opponent, red = strong).
       </p>
+      <InsightSummaryPanel
+        items={localInsightItems}
+        caveats={[
+          "xP totals sum already-published values; probabilities are never combined in the browser.",
+          "Summary ranks describe one immutable forecast vintage.",
+        ]}
+        remote={{
+          page: "summary",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...view.run,
+            as_of: view.players[0]?.as_of,
+          }),
+          scope: compactInsightScope({ gw_from: view.gwFrom, gw_to: view.gwTo }),
+          localScopeKey: view.run.run_id,
+          unavailableReason: summaryMatchesVisible
+            ? undefined
+            : "AI explanation is unavailable because the visible vintage differs from summary.json.",
+        }}
+      />
     </div>
   );
 }

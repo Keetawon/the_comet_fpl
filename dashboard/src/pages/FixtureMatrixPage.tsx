@@ -876,38 +876,6 @@ export function FixtureMatrixPage() {
         </p>
       </div>
 
-      <InsightSummaryPanel
-        items={insightFacts}
-        caveats={insightCaveats}
-        remote={{
-          page: "fixture_matrix",
-          provenance: publishedInsightProvenance(state.manifest, {
-            ...(state.runs.find((run) => run.run_id === activeRunId) ?? {
-              run_id: activeRunId,
-              season: activeRun?.season ?? "",
-            }),
-            as_of: activeRun?.as_of,
-          }),
-          scope: compactInsightScope({
-            gw_from: filters?.gwFrom,
-            gw_to: filters?.gwTo,
-            team_code: selectedTeamCodes.length === 1 ? selectedTeamCodes[0] : undefined,
-            view: filters?.view === "defense" ? "defence" : filters?.view,
-            venue: filters?.venue,
-            form_window: formWindowScope(formWindow),
-          }),
-          localScopeKey: JSON.stringify({
-            runId: activeRunId,
-            filters,
-            horizon,
-            formWindow,
-            colorSource,
-            sorting,
-            selectedTeamCodes,
-          }),
-          unavailableReason: multiTeamInsightUnavailableReason,
-        }}
-      />
 
       <FilterPanel>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -1188,6 +1156,38 @@ export function FixtureMatrixPage() {
         and colour tier, but remain display context rather than later fixture-specific forecasts;
         hover a card for its exact source.
       </p>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "fixture_matrix",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...(state.runs.find((run) => run.run_id === activeRunId) ?? {
+              run_id: activeRunId,
+              season: activeRun?.season ?? "",
+            }),
+            as_of: activeRun?.as_of,
+          }),
+          scope: compactInsightScope({
+            gw_from: filters?.gwFrom,
+            gw_to: filters?.gwTo,
+            team_code: selectedTeamCodes.length === 1 ? selectedTeamCodes[0] : undefined,
+            view: filters?.view === "defense" ? "defence" : filters?.view,
+            venue: filters?.venue,
+            form_window: formWindowScope(formWindow),
+          }),
+          localScopeKey: JSON.stringify({
+            runId: activeRunId,
+            filters,
+            horizon,
+            formWindow,
+            colorSource,
+            sorting,
+            selectedTeamCodes,
+          }),
+          unavailableReason: multiTeamInsightUnavailableReason,
+        }}
+      />
     </div>
   );
 }

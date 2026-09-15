@@ -141,31 +141,6 @@ export function OptimizerAuditPage() {
         </div>
       </div>
 
-      <InsightSummaryPanel
-        items={[
-          {
-            id: "scope.audit",
-            statement: `${state.audit.length} published provenance record${state.audit.length === 1 ? " is" : "s are"} available; this view covers ${plan.season} GW${plan.gw_from}-${plan.gw_to}.`,
-          },
-          {
-            id: "provenance.cleanliness",
-            statement: `Optimizer worktree clean check is ${plan.provenance.optimizer_worktree_clean ? "passing" : "failing"}; decision digest begins ${plan.decision_sha256.slice(0, 12)}.`,
-          },
-          {
-            id: "solver.status",
-            statement: `Solver ${plan.solver.name} reports ${plan.solver.status} with seed ${plan.solver.seed}.`,
-          },
-          {
-            id: "search.bounds",
-            statement: `Declared search uses transfer depth ${policy.transfer_depth}, beam width ${policy.beam_width}, and ${policy.transition_limit_per_state} transitions per state.`,
-          },
-        ]}
-        caveats={[
-          "This panel summarizes published provenance only and is deterministic-only.",
-          "No values from this page are sent to an AI provider.",
-        ]}
-        localOnlyReason="AI explanation is disabled on decision routes; no page state is sent."
-      />
 
       <div className="grid gap-3 lg:grid-cols-2">
         <Card title="Provenance">
@@ -325,6 +300,31 @@ export function OptimizerAuditPage() {
         selling-value model). The initial fixed-squad ILP is exact; the multi-gameweek path is
         optimal only within the declared bounds and makes no global-optimality claim.
       </p>
+      <InsightSummaryPanel
+        items={[
+          {
+            id: "scope.audit",
+            statement: `${state.audit.length} published provenance record${state.audit.length === 1 ? " is" : "s are"} available; this view covers ${plan.season} GW${plan.gw_from}-${plan.gw_to}.`,
+          },
+          {
+            id: "provenance.cleanliness",
+            statement: `Optimizer worktree clean check is ${plan.provenance.optimizer_worktree_clean ? "passing" : "failing"}; decision digest begins ${plan.decision_sha256.slice(0, 12)}.`,
+          },
+          {
+            id: "solver.status",
+            statement: `Solver ${plan.solver.name} reports ${plan.solver.status} with seed ${plan.solver.seed}.`,
+          },
+          {
+            id: "search.bounds",
+            statement: `Declared search uses transfer depth ${policy.transfer_depth}, beam width ${policy.beam_width}, and ${policy.transition_limit_per_state} transitions per state.`,
+          },
+        ]}
+        caveats={[
+          "This panel summarizes published provenance only and is deterministic-only.",
+          "No values from this page are sent to an AI provider.",
+        ]}
+        localOnlyReason="AI explanation is disabled on decision routes; no page state is sent."
+      />
     </div>
   );
 }

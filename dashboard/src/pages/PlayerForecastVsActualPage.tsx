@@ -300,20 +300,6 @@ export function PlayerForecastVsActualPage() {
         emptyMessage="No fully finalized player-gameweek observations exist in this scope."
       />
 
-      <InsightSummaryPanel
-        items={insightFacts}
-        caveats={insightCaveats}
-        remote={{
-          page: "player_forecast_vs_actual",
-          provenance: publishedInsightProvenance(state.data.manifest, run),
-          scope: compactInsightScope({
-            gw_from: gwFilter === "all" ? firstCompletedGw : Number(gwFilter),
-            gw_to: gwFilter === "all" ? lastCompletedGw : Number(gwFilter),
-            view: "overall",
-          }),
-          localScopeKey: JSON.stringify({ runId: run.run_id, gwFilter }),
-        }}
-      />
 
       <section className="space-y-2" aria-labelledby="player-observations-heading">
         <h2 id="player-observations-heading" className="text-sm font-semibold">Exact player observations</h2>
@@ -364,6 +350,20 @@ export function PlayerForecastVsActualPage() {
       <p className="text-xs text-muted-foreground">
         Run {run.run_id} · as of {run.as_of ?? "unknown"} · created {run.created_at ?? "unknown"}. Cross-vintage differences diagnose calibration only; compare every vintage against its own attached outcomes.
       </p>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "player_forecast_vs_actual",
+          provenance: publishedInsightProvenance(state.data.manifest, run),
+          scope: compactInsightScope({
+            gw_from: gwFilter === "all" ? firstCompletedGw : Number(gwFilter),
+            gw_to: gwFilter === "all" ? lastCompletedGw : Number(gwFilter),
+            view: "overall",
+          }),
+          localScopeKey: JSON.stringify({ runId: run.run_id, gwFilter }),
+        }}
+      />
     </div>
   );
 }

@@ -177,9 +177,9 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
         <p>Detailed SDP player statistics are unavailable in retained captures. Their FPL-based duplicate tab has been consolidated into <a className="underline" href="#players">Players</a>. SDP participation evidence remains retained; no player-level shots, passing or box touches are allocated from team totals.</p>
       </div>
     </details>
-    <InsightSummaryPanel items={[{ id: "scope", statement: `${filtered.length} clubs match ${filters.season} GW${filters.from}–GW${filters.to}. The recent window uses up to ${filters.recent === "all" ? "all selected" : filters.recent} matches per club.` }, { id: "coverage", statement: `${providerValid} season fixtures have complete SDP evidence; ${corrected} more are dashboard-ready with owner-confirmed corrections.` }]} localOnlyReason="Observed descriptive statistics. No AI, forecast or optimizer calculation is called." />
     <SdpFplContextPlots teams={filtered} league={league} teamMatches={data.team_matches} metrics={relevant} filters={filters} asOf={data.as_of} selectedId={selected?.id ?? null} onSelectTeam={id => { setDetail(id); setShowLog(false); }} />
     <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-xs text-muted-foreground"><span className="flex items-center gap-1.5"><Check className="size-3.5" aria-hidden="true" />Observed data · model independent</span><a href="#players" className="inline-flex min-h-10 items-center gap-2 hover:text-foreground">Explore individual players <ArrowRight className="size-3.5" aria-hidden="true" /></a></div>
+    <InsightSummaryPanel items={[{ id: "scope", statement: `${filtered.length} clubs match ${filters.season} GW${filters.from}–GW${filters.to}. The recent window uses up to ${filters.recent === "all" ? "all selected" : filters.recent} matches per club.` }, { id: "coverage", statement: `${providerValid} season fixtures have complete SDP evidence; ${corrected} more are dashboard-ready with owner-confirmed corrections.` }]} localOnlyReason="Observed descriptive statistics. No AI, forecast or optimizer calculation is called." />
   </div>;
 }
 

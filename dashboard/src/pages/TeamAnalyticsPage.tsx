@@ -605,7 +605,7 @@ export function TeamAnalyticsPage() {
         </div>
       </FilterPanel>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.7fr)]">
+      <div className="max-w-4xl">
         <div className="space-y-2">
           <AnalyticsScatter
             title={chartTitle(view, pastMetric)}
@@ -673,31 +673,6 @@ export function TeamAnalyticsPage() {
           </div>
         </div>
 
-        <InsightSummaryPanel
-          items={insightFacts}
-          caveats={insightCaveats}
-          remote={{
-            page: "team_analytics",
-            provenance: publishedInsightProvenance(state.manifest, selectedRun),
-            scope: compactInsightScope({
-              gw_from: gwFrom,
-              gw_to: gwTo,
-              view,
-              venue,
-              form_window: formWindowScope(formWindow),
-              past_metric: teamPastMetricScope(view, pastMetric),
-            }),
-            localScopeKey: JSON.stringify({
-              runId: selectedRun.run_id,
-              gwFrom,
-              gwTo,
-              venue,
-              view,
-              formWindow,
-              pastMetric,
-            }),
-          }}
-        />
       </div>
 
       <section className="space-y-2" aria-labelledby="team-analytics-exact-values">
@@ -777,6 +752,31 @@ export function TeamAnalyticsPage() {
           schedule-only rows beyond this vintage never enter this page.
         </p>
       </div>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "team_analytics",
+          provenance: publishedInsightProvenance(state.manifest, selectedRun),
+          scope: compactInsightScope({
+            gw_from: gwFrom,
+            gw_to: gwTo,
+            view,
+            venue,
+            form_window: formWindowScope(formWindow),
+            past_metric: teamPastMetricScope(view, pastMetric),
+          }),
+          localScopeKey: JSON.stringify({
+            runId: selectedRun.run_id,
+            gwFrom,
+            gwTo,
+            venue,
+            view,
+            formWindow,
+            pastMetric,
+          }),
+        }}
+      />
     </div>
   );
 }

@@ -745,47 +745,6 @@ export function PlayersPage() {
         </p>
       </div>
 
-      <InsightSummaryPanel
-        items={insightFacts}
-        caveats={insightCaveats}
-        remote={{
-          page: "players",
-          provenance: publishedInsightProvenance(state.manifest, {
-            ...selectedRun!,
-            as_of: activeRun?.as_of,
-          }),
-          scope: compactInsightScope({
-            gw_from: filters?.gwFrom,
-            gw_to: filters?.gwTo,
-            actual_season_from: actualFrom?.season,
-            actual_gw_from: actualFrom?.gw,
-            actual_season_to: actualTo?.season,
-            actual_gw_to: actualTo?.gw,
-            position: playerPositionScope(playerMultiFilters.positions[0] ?? "all"),
-            team_code: playerMultiFilters.teamCodes[0],
-            view: filters?.view === "defense" ? "defence" : filters?.view,
-            venue: filters?.venue,
-            min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
-            max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
-            availability: playerFilters.availability,
-          }),
-          unavailableReason: managerSquad
-            ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
-            : minutesPerGameInsightUnavailableReason ??
-              unavailablePlayerInsightReason ??
-              provisionalInsightUnavailableReason ??
-              multiSelectInsightUnavailableReason,
-          localScopeKey: JSON.stringify({
-            runId: activeRunId,
-            filters,
-            playerFilters,
-            playerMultiFilters,
-            actualRange,
-            colorSource,
-            managerScope: managerSquad ? "private_manager_squad" : "all_players",
-          }),
-        }}
-      />
 
       <FilterPanel>
         <div className="flex flex-col gap-2">
@@ -1030,6 +989,47 @@ export function PlayersPage() {
         null until the ledger persists them — never 0. Club λ/ease/CS are the primitives behind
         the chip colour.
       </p>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "players",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...selectedRun!,
+            as_of: activeRun?.as_of,
+          }),
+          scope: compactInsightScope({
+            gw_from: filters?.gwFrom,
+            gw_to: filters?.gwTo,
+            actual_season_from: actualFrom?.season,
+            actual_gw_from: actualFrom?.gw,
+            actual_season_to: actualTo?.season,
+            actual_gw_to: actualTo?.gw,
+            position: playerPositionScope(playerMultiFilters.positions[0] ?? "all"),
+            team_code: playerMultiFilters.teamCodes[0],
+            view: filters?.view === "defense" ? "defence" : filters?.view,
+            venue: filters?.venue,
+            min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
+            max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
+            availability: playerFilters.availability,
+          }),
+          unavailableReason: managerSquad
+            ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
+            : minutesPerGameInsightUnavailableReason ??
+              unavailablePlayerInsightReason ??
+              provisionalInsightUnavailableReason ??
+              multiSelectInsightUnavailableReason,
+          localScopeKey: JSON.stringify({
+            runId: activeRunId,
+            filters,
+            playerFilters,
+            playerMultiFilters,
+            actualRange,
+            colorSource,
+            managerScope: managerSquad ? "private_manager_squad" : "all_players",
+          }),
+        }}
+      />
     </div>
   );
 }
