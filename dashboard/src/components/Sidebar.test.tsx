@@ -1,8 +1,29 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 
 describe("Sidebar", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("hides local decision pages only in the public build", () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    const { rerender } = render(<Sidebar active="summary" onNavigate={vi.fn()} />);
+    for (const name of ["Next GW suggestion", "Plan builder", "Squad draft", "Optimizer audit"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole("button", { name: "Team stat from SDP" })).toBeInTheDocument();
+    vi.stubEnv("VITE_HOSTED_STATIC", "false");
+    rerender(<Sidebar active="summary" onNavigate={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Optimizer audit" })).toBeInTheDocument();
+  });
+
+  it("offers an honest support notice without a payment URL", async () => {
+    render(<Sidebar active="summary" onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Buy Me a Coffee" }));
+    expect(await screen.findByText(/Payments are not available yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close support message" }));
+    expect(screen.queryByText(/Payments are not available yet/)).not.toBeInTheDocument();
+  });
   it("keeps the SDP team tab and consolidates duplicate player statistics into Players", () => {
     const onNavigate = vi.fn();
     render(<Sidebar active="team-stat-sdp" onNavigate={onNavigate} />);

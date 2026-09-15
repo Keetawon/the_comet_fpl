@@ -9,6 +9,7 @@ beyond the loopback interface the server itself listens on.
 
 from __future__ import annotations
 
+import http.client
 import json
 import math
 import threading
@@ -352,6 +353,22 @@ class TestValidateManagerPlanRequest:
 
 
 class TestAllowedOrigin:
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "file://localhost",
+            "ftp://127.0.0.1",
+            "http://user@localhost",
+            "http://localhost/path",
+            "http://localhost?query",
+            "http://localhost#fragment",
+            "http://localhost:bad",
+            "null",
+        ],
+    )
+    def test_malformed_origins_are_not_echoed(self, origin: str) -> None:
+        assert _allowed_origin(origin) is False
+
     def test_non_browser_requests_pass(self) -> None:
         assert _allowed_origin(None) is True
 
@@ -1381,6 +1398,67 @@ def loopback_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Threadin
 
 
 class TestHttpSurface:
+    @pytest.mark.parametrize("method", ["GET", "POST", "OPTIONS"])
+    def test_rebinding_host_rejected_without_origin(
+        self, loopback_server: ThreadingHTTPServer, method: str
+    ) -> None:
+        connection = http.client.HTTPConnection(*loopback_server.server_address, timeout=2)
+        try:
+            connection.request(
+                method,
+                "/plan" if method == "POST" else "/status",
+                headers={"Host": "attacker.example"},
+            )
+            assert connection.getresponse().status == 403
+        finally:
+            connection.close()
+
+    @pytest.mark.parametrize(
+        "headers",
+        [
+            {"Content-Type": "text/plain"},
+            {"Content-Type": "application/json", "Content-Length": "invalid"},
+            {"Content-Type": "application/json", "Transfer-Encoding": "chunked"},
+        ],
+    )
+    def test_invalid_body_framing_never_runs_pipeline(
+        self, loopback_server: ThreadingHTTPServer, headers: dict[str, str]
+    ) -> None:
+        connection = http.client.HTTPConnection(*loopback_server.server_address, timeout=2)
+        try:
+            connection.request("POST", "/plan", body=b'{"locks":[],"excludes":[]}', headers=headers)
+            response = connection.getresponse()
+            assert response.status == 409
+            assert "optimizer_run_id" not in response.read().decode()
+        finally:
+            connection.close()
+
+    def test_short_body_fails_closed_and_status_is_not_cached(
+        self, loopback_server: ThreadingHTTPServer
+    ) -> None:
+        import socket
+
+        connection = http.client.HTTPConnection(*loopback_server.server_address, timeout=2)
+        try:
+            connection.request(
+                "POST",
+                "/plan",
+                body=b"{}",
+                headers={
+                    "Content-Type": "application/json",
+                    "Content-Length": "20",
+                },
+            )
+            assert connection.sock is not None
+            connection.sock.shutdown(socket.SHUT_WR)
+            assert connection.getresponse().status == 409
+        finally:
+            connection.close()
+        status, headers, _ = self._request(loopback_server, "/status")
+        assert status == 200
+        assert headers["Cache-Control"] == "no-store"
+        assert headers["X-Content-Type-Options"] == "nosniff"
+
     def _request(
         self,
         server: ThreadingHTTPServer,

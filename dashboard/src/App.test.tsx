@@ -34,23 +34,24 @@ vi.mock("@/pages/TeamForecastVsActualPage", () => ({
 import App from "./App";
 
 describe("App deep-analytics routes", () => {
-  it("keeps the SDP team route and sends retired SDP player bookmarks to Players", () => {
+  it("keeps the SDP team route and sends retired SDP player bookmarks to Players", async () => {
     window.location.hash = "#team-stat-sdp";
     render(<App />);
-    expect(screen.getByRole("heading", { name: "Team stat from SDP" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Team stat from SDP" })).toBeInTheDocument();
     act(() => { window.location.hash = "#players-stat-sdp"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
-    expect(screen.getByRole("heading", { name: "Players route" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Players route" })).toBeInTheDocument();
     expect(screen.getByText("active:players")).toBeInTheDocument();
   });
   afterEach(() => {
     window.location.hash = "";
+    vi.unstubAllEnvs();
   });
 
-  it("renders both deep-analytics pages from their stable hash routes", () => {
+  it("renders both deep-analytics pages from their stable hash routes", async () => {
     window.location.hash = "#player-analytics";
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Player analytics route" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Player analytics route" })).toBeInTheDocument();
     expect(screen.getByText("active:player-analytics")).toBeInTheDocument();
 
     act(() => {
@@ -58,28 +59,28 @@ describe("App deep-analytics routes", () => {
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
 
-    expect(screen.getByRole("heading", { name: "Team analytics route" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Team analytics route" })).toBeInTheDocument();
     expect(screen.getByText("active:team-analytics")).toBeInTheDocument();
   });
 
-  it("renders separate prediction-accuracy routes and keeps the historical player alias", () => {
+  it("renders separate prediction-accuracy routes and keeps the historical player alias", async () => {
     window.location.hash = "#player-forecast-vs-actual";
     render(<App />);
-    expect(screen.getByRole("heading", { name: "Player prediction accuracy route" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Player prediction accuracy route" })).toBeInTheDocument();
     expect(screen.getByText("active:player-forecast-vs-actual")).toBeInTheDocument();
 
     act(() => {
       window.location.hash = "#team-forecast-vs-actual";
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
-    expect(screen.getByRole("heading", { name: "Team prediction accuracy route" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Team prediction accuracy route" })).toBeInTheDocument();
     expect(screen.getByText("active:team-forecast-vs-actual")).toBeInTheDocument();
 
     act(() => {
       window.location.hash = "#forecast-vs-actual";
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
-    expect(screen.getByRole("heading", { name: "Player prediction accuracy route" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Player prediction accuracy route" })).toBeInTheDocument();
     expect(screen.getByText("active:forecast-vs-actual")).toBeInTheDocument();
   });
 
@@ -98,4 +99,22 @@ describe("App deep-analytics routes", () => {
     expect(screen.getByText(/draft workspace remains deterministic and local/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
   });
+
+  it.each(["next-gw", "plan-builder", "squad-draft", "optimizer"])(
+    "rejects direct hosted navigation to %s", async route => {
+      vi.stubEnv("VITE_HOSTED_STATIC", "true");
+      window.location.hash = `#${route}`;
+      render(<App />);
+      expect(await screen.findByRole("heading", { name: "Summary route" })).toBeInTheDocument();
+      expect(screen.getByText("active:summary")).toBeInTheDocument();
+    },
+  );
+
+  it.each(["constructor", "__proto__", "toString", "unknown"])(
+    "safely defaults an unknown/inherited route %s", async route => {
+      window.location.hash = `#${route}`;
+      render(<App />);
+      expect(await screen.findByRole("heading", { name: "Summary route" })).toBeInTheDocument();
+    },
+  );
 });

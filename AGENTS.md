@@ -1,5 +1,15 @@
 # Repository agent instructions
 
+### Public Dashboard scope (2026-09-15)
+
+Hosted builds (`VITE_HOSTED_STATIC=true`) expose analytical pages only. Next GW suggestion,
+Optimizer audit, Plan builder and Squad draft remain local; direct route access, Summary optimizer
+cards and all local plan-server requests are disabled in hosted mode. This is presentation/access
+hardening, not a model change. Keep the existing public-export sanitizer: hiding routes does not
+make their static data private. Buy Me a Coffee currently opens a coming-soon notice; no payment
+link or widget may imply an account exists before the owner supplies their real support URL.
+See `docs/dashboard-public-readiness-security-2026-09-15.md` for the bounded audit and limitations.
+
 These instructions apply to the entire repository and to every agent or sub-agent working in
 it. More specific `AGENTS.md` files may add local guidance, but they must not weaken the data
 correctness rules below.

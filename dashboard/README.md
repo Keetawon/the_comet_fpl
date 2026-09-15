@@ -53,6 +53,15 @@ provider. Deterministic summaries remain available there and the optional action
 Local provider configuration belongs to the trusted Python server environment, never `VITE_*`,
 static JSON, a URL, browser storage, logs, cache records, or Git.
 
+Hosted builds now show analytical pages only: Next GW suggestion, Optimizer audit, Plan builder,
+and Squad draft stay local, and Summary's optimizer cards are hidden. Direct bookmarks cannot
+open these tools in hosted mode. This does not replace public-export sanitization.
+Routes load their code on demand; published forecast data and vintage selection are unchanged.
+
+The sidebar's **Buy Me a Coffee** button opens a coming-soon notice until the owner has a real
+support account. It makes no payment or tracking requests. Local and hosted builds use the same
+accessible notice. See [security/readiness review](../docs/dashboard-public-readiness-security-2026-09-15.md).
+
 ## Generate the data
 
 From the repository root (Windows PowerShell; the venv is `.venv`). A fresh clone has no

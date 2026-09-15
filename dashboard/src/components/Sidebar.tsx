@@ -15,6 +15,8 @@ import {
   Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SupportButton } from "./SupportButton";
+import { isPageAvailable } from "@/lib/pageAccess";
 
 export interface PageDef {
   id: string;
@@ -57,7 +59,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
         </div>
       </div>
       <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto px-1.5 md:px-2">
-        {PAGES.map((page) => {
+        {PAGES.filter((page) => isPageAvailable(page.id)).map((page) => {
           const Icon = page.icon;
           return (
             <li key={page.id}>
@@ -80,6 +82,12 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
           );
         })}
       </ul>
+      <div className="shrink-0 border-t px-1.5 pt-3 pb-2 md:px-3">
+        <SupportButton />
+        <p className="mt-1.5 hidden text-center text-[10px] text-muted-foreground md:block">
+          Support link coming soon
+        </p>
+      </div>
       <p className="hidden px-4 py-3 text-[10px] leading-snug text-muted-foreground md:block">
         Reads only the static JSON read models exported by the publish layer. It never
         queries DuckDB.

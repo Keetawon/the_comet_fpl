@@ -36,6 +36,7 @@ import {
 } from "@/lib/nextGw";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 import { compactInsightScope, publishedInsightProvenance } from "@/lib/insights";
+import { isHostedStatic } from "@/lib/pageAccess";
 
 type PageState =
   | { status: "loading" }
@@ -239,9 +240,10 @@ export function SummaryPage() {
 
   const { summary } = state;
   const first = view.players[0];
-  const officialPlans = platformPlans(state.plans);
-  const customPlans = state.plans.filter((plan) => resolvedPlanKind(plan) === "user_custom");
-  const savedCustomId = savedCustomPlanId();
+  const hosted = isHostedStatic();
+  const officialPlans = hosted ? [] : platformPlans(state.plans);
+  const customPlans = hosted ? [] : state.plans.filter((plan) => resolvedPlanKind(plan) === "user_custom");
+  const savedCustomId = hosted ? null : savedCustomPlanId();
   const customPlan =
     customPlans.find((plan) => plan.optimizer_run_id === savedCustomId) ?? customPlans[0] ?? null;
   const visibleTopNext = view.topNext[0];
@@ -367,7 +369,7 @@ export function SummaryPage() {
             </a>
           </Card>
         )}
-        {!officialPlans.length && (
+        {!hosted && !officialPlans.length && (
           <Card title="Platform optimizer squads">
             <p className="text-xs text-muted-foreground">
               none in this export — rebuild it with --optimizer-plan inputs
