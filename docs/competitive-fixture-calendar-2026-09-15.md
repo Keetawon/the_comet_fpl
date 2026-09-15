@@ -7,8 +7,10 @@ Quick controls show 5, 10 or 15 GWs; a custom date range remains available.
 Dates and UK kickoff times are in accessible match tooltips and CSV cells.
 
 League cells use the existing selected-vintage opponent-strength display index,
-or explicitly selected current official FDR. Cup/European cells remain grey on
-every weekday. A weekend cup tie is labelled **Cup week**, not midweek.
+or explicitly selected current official FDR. Cup/European cells use blue on
+every weekday, distinct from the neutral grey league-difficulty tier. This colour
+was updated after owner review; it indicates competition type, not difficulty.
+A weekend cup tie is labelled **Cup week**, not midweek.
 Headers follow the earliest listed fixture in each period. Empty cup periods
 are omitted. This is a schedule display, not a fatigue estimate or model input.
 

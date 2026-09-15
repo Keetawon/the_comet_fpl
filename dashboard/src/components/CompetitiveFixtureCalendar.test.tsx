@@ -12,16 +12,16 @@ const teams = [{run_id: "unchanged", as_of: "2026-09-14T00:00:00Z", season: "202
 
 describe("club calendar interactions", () => {
   beforeEach(() => { vi.mocked(loadCompetitiveSchedule).mockResolvedValue(cups); });
-  it("shows league difficulty, keeps cup grey, and supports a reversible empty range", async () => {
+  it("shows league difficulty, keeps cup blue, and supports a reversible empty range", async () => {
     const user = userEvent.setup();
     render(<CompetitiveFixtureCalendar teams={teams} schedule={schedule} fromGw={5} toGw={5} />);
     const cup = await screen.findByRole("button", {name: /Arsenal: CUP/});
-    expect(cup.className).toContain("bg-slate-200");
+    expect(cup.className).toContain("bg-sky-100");
     expect(cup.textContent).toContain("LC");
     expect(screen.getByText("DGW · 2 fixtures")).toBeVisible();
     await user.click(screen.getByRole("radio", {name: "Official FDR"}));
     expect(screen.getByRole("button", {name: /Arsenal: BHA/}).className).toContain("red");
-    expect(cup.className).toContain("bg-slate-200");
+    expect(cup.className).toContain("bg-sky-100");
     await user.clear(screen.getByLabelText("Calendar from"));
     await user.type(screen.getByLabelText("Calendar from"), "2027-01-01");
     expect(screen.getByRole("alert")).toHaveTextContent("end date");

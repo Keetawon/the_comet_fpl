@@ -13,7 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const stamp = (value: string) => new Date(value).toLocaleString("en-GB", { timeZone: "Europe/London", dateStyle: "medium", timeStyle: "short" });
-const cupClass = "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100";
+const cupClass = "bg-sky-100 text-sky-950 ring-1 ring-inset ring-sky-200 dark:bg-sky-950 dark:text-sky-100 dark:ring-sky-800";
 const venue = (home: boolean | null) => home === null ? "venue TBC" : home ? "H" : "A";
 
 export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
@@ -99,7 +99,7 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
         {legend.map((l) => <span key={l.bucket} className={`rounded px-2 py-1 ${BUCKET_CLASSES[l.bucket]}`}>{l.label}</span>)}
         <span className={`rounded px-2 py-1 ${cupClass}`}>Cup / Europe</span>
       </div>
-      <p className="text-xs text-muted-foreground">PL colours use {colour === "opponent" ? `opponent strength from the selected forecast (${teams[0]?.as_of.slice(0, 10)})` : "current official FPL difficulty"}. Cup and European matches are always grey, including weekends. A blank cell means no listed fixture, not confirmed rest.</p>
+      <p className="text-xs text-muted-foreground">PL colours use {colour === "opponent" ? `opponent strength from the selected forecast (${teams[0]?.as_of.slice(0, 10)})` : "current official FPL difficulty"}. Blue identifies cup and European matches, not difficulty. A blank cell means no listed fixture, not confirmed rest.</p>
     </div>
     {loading && <p role="status" className="text-sm text-muted-foreground">Loading retained cup and European schedules…</p>}
     {(error || (data && data.season !== season)) && <p role="alert" className="rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">{error ?? `No competitive schedule for ${season}`}. Only official PL fixtures are shown; cup workload is unknown.</p>}
@@ -115,7 +115,7 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
             <table aria-label="All competitions by period" className="table-fixed border-collapse text-xs tabular-nums" style={{width: 152 + columns.length * 84}}>
               <colgroup><col style={{width:152}} />{columns.map((c) => <col key={c.key} style={{width:84}} />)}</colgroup>
               <thead className="sticky top-0 z-20 bg-muted"><tr><th scope="col" className="sticky left-0 z-30 border-b border-r bg-muted px-3 py-2 text-left">Club</th>
-                {columns.map((c) => <th key={c.key} scope="col" title={`${c.from} – ${c.to} · UK dates`} className={`border-b border-r px-1 py-2 text-center font-medium ${c.heading === "Weekend" ? "" : "bg-slate-100 dark:bg-slate-800"}`}><span className="block text-[10px] text-muted-foreground">{c.heading}</span><span className="block text-[11px] leading-tight">{c.label}</span></th>)}</tr></thead>
+                {columns.map((c) => <th key={c.key} scope="col" title={`${c.from} – ${c.to} · UK dates`} className={`border-b border-r px-1 py-2 text-center font-medium ${c.heading === "Weekend" ? "" : "bg-sky-50 text-sky-950 dark:bg-sky-950 dark:text-sky-100"}`}><span className="block text-[10px] text-muted-foreground">{c.heading}</span><span className="block text-[11px] leading-tight">{c.label}</span></th>)}</tr></thead>
               <tbody>{clubs.map((t) => <tr key={t.team_code}><th scope="row" className="sticky left-0 z-10 border-b border-r bg-card px-3 py-1.5 text-left font-medium"><span className="flex items-center gap-2 whitespace-nowrap"><TeamBadge teamCode={t.team_code} shortName={t.short_name} size="sm" />{t.team_name}</span></th>
                 {columns.map((c) => <td key={c.key} className="border-b border-r p-0.5 align-middle text-center">
                   {slotLabel(t.team_code, c) === "BGW" && <span title="No Premier League fixture assigned in the current published schedule; subsequent amendments may change this." className="block rounded border border-dashed px-1 py-2 font-medium text-muted-foreground">BGW<span className="block text-[9px] font-normal">No PL fixture</span></span>}
