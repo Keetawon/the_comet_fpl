@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
 import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
+import { CompetitiveFixtureCalendar } from "@/components/CompetitiveFixtureCalendar";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FixtureChip } from "@/components/FixtureTicker";
@@ -332,6 +333,7 @@ function TeamGwCell({
 }
 
 export function FixtureMatrixPage() {
+  const [layout, setLayout] = useState<"gameweeks" | "calendar">("gameweeks");
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [runId, setRunId] = useState<string | null>(null);
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
@@ -855,6 +857,11 @@ export function FixtureMatrixPage() {
         </div>
       </div>
 
+      <ToggleGroup type="single" value={layout} onValueChange={(v) => { if (v) setLayout(v as typeof layout); }} variant="outline" aria-label="Fixture table view">
+        <ToggleGroupItem value="gameweeks">Gameweek matrix</ToggleGroupItem>
+        <ToggleGroupItem value="calendar">All competitions</ToggleGroupItem>
+      </ToggleGroup>
+      {layout === "calendar" ? <CompetitiveFixtureCalendar key={activeRunId} teams={runTeams} schedule={state.schedule} fromGw={runBounds.from} toGw={runBounds.to} /> : <>
       <div className="rounded-lg border bg-card p-2">
         <DifficultyLegend
           colorSource={colorSource}
@@ -1196,6 +1203,7 @@ export function FixtureMatrixPage() {
           unavailableReason: multiTeamInsightUnavailableReason,
         }}
       />
+      </>}
     </div>
   );
 }

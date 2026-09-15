@@ -150,6 +150,18 @@ Form windows stay within the selected forecast's season and show actual match
 counts; the separately labelled expanded-history scope can cross seasons. See
 [the root cause, verified repair and current totals](current-team-form-repair-2026-09-15.md).
 
+### All-competition calendar (2026-09-15)
+
+The same `build_sdp_dashboard` command now also writes
+`public/sdp/competitive_schedule.json`; preview installation copies it along with
+the existing public exports. The input is the already-retained competitive
+match catalogue from `capture_sdp_workload`, including future listed matches.
+No separate scheduler, fixture model or workload inference is introduced.
+Use **Fixture matrix → All competitions** to inspect Weekend/GW and Midweek
+columns, DGWs/BGWs, exact source coverage and dates. Missing cup catalogues stay
+unavailable, and empty future draws stay not-yet-listed. See the
+[calendar contract and publication instructions](competitive-fixture-calendar-2026-09-15.md).
+
 Observation refreshes reconcile current FPL fixture rows against the published
 forecast player population using exact `(season, code)` identities. Players added
 to FPL after the retained forecast stay in the descriptive statistics sidecar;

@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from fpl.publish.competitive_schedule import export_competitive_schedule
 from fpl.publish.dashboard_json import export_dashboard_json, validate_dashboard_json
 from fpl.publish.dashboard_refresh import check_observed_freshness, retain_existing_plans
 from fpl.publish.export import export_bi, validate_bi_export
@@ -98,6 +99,9 @@ def build(
             output / "dashboard-public-data.zip",
         )
         sidecar = export_sdp_stats(db, output / "public" / "sdp" / "sdp_stats.json", as_of=stamp)
+        calendar = export_competitive_schedule(
+            db, output / "public" / "sdp" / "competitive_schedule.json", as_of=stamp
+        )
         freshness = check_observed_freshness(
             output / "public" / "data",
             json.loads((output / "public" / "sdp" / "sdp_stats.json").read_bytes()),
@@ -122,6 +126,7 @@ def build(
             "statistics_sidecar_refreshed_independently": False,
         },
         "sdp_sidecar": sidecar,
+        "competitive_schedule": calendar,
         "observed_freshness_reconciliation": freshness,
         "forecast_regenerated": False,
         "remote_deployed": False,

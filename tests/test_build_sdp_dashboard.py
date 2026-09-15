@@ -49,6 +49,7 @@ def test_preview_copies_only_intended_public_exports(tmp_path: Path) -> None:
     (generation / "receipt.json").write_text('{"private_path":"retained"}')
     (generation / "public" / "data" / "manifest.json").write_text('{"public":true}')
     (generation / "public" / "sdp" / "sdp_stats.json").write_text('{"observed":true}')
+    (generation / "public" / "sdp" / "competitive_schedule.json").write_text('{"schedule":true}')
     destination = tmp_path / "dashboard" / "public"
     install_preview(generation, destination)
     install_preview(generation, destination)
@@ -56,6 +57,7 @@ def test_preview_copies_only_intended_public_exports(tmp_path: Path) -> None:
         p.relative_to(destination).as_posix() for p in destination.rglob("*") if p.is_file()
     ) == [
         "data/manifest.json",
+        "sdp/competitive_schedule.json",
         "sdp/sdp_stats.json",
     ]
     assert (generation / "before.duckdb").read_bytes() == b"private database"
@@ -99,6 +101,7 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
 
     monkeypatch.setattr(job, "package_public_dashboard", package)
     monkeypatch.setattr(job, "export_sdp_stats", sidecar)
+    monkeypatch.setattr(job, "export_competitive_schedule", sidecar)
     monkeypatch.setattr(job, "check_observed_freshness", lambda *a: {})
     monkeypatch.setattr(job, "retain_existing_plans", lambda *a: {"observations_refreshed": True})
     report = job.build(db, output, base_dashboard=old_base if retained else None)
@@ -107,6 +110,7 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
             "package",
             output / "dashboard-with-retained-plans" if retained else output / "dashboard-retained",
         ),
+        ("sidecar", db),
         ("sidecar", db),
     ]
     assert report["base_dashboard"]["generated_at"] == "new"

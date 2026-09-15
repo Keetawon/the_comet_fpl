@@ -12,6 +12,7 @@ on:
       - "src/fpl/publish/export.py"
       - "src/fpl/publish/public_dashboard.py"
       - "src/fpl/publish/sdp_stats.py"
+      - "src/fpl/publish/competitive_schedule.py"
       - "tests/test_public_dashboard.py"
       - "pyproject.toml"
       - "uv.lock"
@@ -230,32 +231,38 @@ jobs:
           from fpl.publish.sdp_stats import validate_sdp_stats
 
           pin = json.loads(Path('dashboard/public-data-release.json').read_text())
-          companion = pin.get('sdp_asset')
-          if companion is None:
-              print('::notice::No SDP companion pinned; descriptive tabs show unavailable.')
-              raise SystemExit(0)
-          if (
-              not isinstance(companion, dict)
-              or set(companion) != {'name', 'sha256', 'size_bytes'}
-              or companion['name'] != 'sdp_stats.json'
-              or not re.fullmatch(r'[0-9a-f]{64}', str(companion['sha256']))
-              or type(companion['size_bytes']) is not int
-              or not 0 < companion['size_bytes'] <= 100_000_000
-              or pin['repository'] != os.environ['GITHUB_REPOSITORY']
+          from fpl.publish.competitive_schedule import validate_competitive_schedule
+
+          for field, filename, validate in (
+              ('sdp_asset', 'sdp_stats.json', validate_sdp_stats),
+              ('competitive_schedule_asset', 'competitive_schedule.json', validate_competitive_schedule),
           ):
-              raise SystemExit('Invalid immutable SDP companion pin')
-          with tempfile.TemporaryDirectory() as folder:
-              subprocess.run([
-                  'gh', 'release', 'download', pin['release_tag'],
-                  '--repo', pin['repository'], '--pattern', companion['name'], '--dir', folder,
-              ], check=True)
-              body = (Path(folder) / companion['name']).read_bytes()
-          if len(body) != companion['size_bytes'] or hashlib.sha256(body).hexdigest() != companion['sha256']:
-              raise SystemExit('SDP companion content pin mismatch')
-          validate_sdp_stats(json.loads(body))
-          destination = Path('dashboard/public/sdp/sdp_stats.json')
-          destination.parent.mkdir(parents=True, exist_ok=True)
-          destination.write_bytes(body)
+              companion = pin.get(field)
+              if companion is None:
+                  print(f'::notice::No {filename} pinned; its descriptive view shows unavailable.')
+                  continue
+              if (
+                  not isinstance(companion, dict)
+                  or set(companion) != {'name', 'sha256', 'size_bytes'}
+                  or companion['name'] != filename
+                  or not re.fullmatch(r'[0-9a-f]{64}', str(companion['sha256']))
+                  or type(companion['size_bytes']) is not int
+                  or not 0 < companion['size_bytes'] <= 100_000_000
+                  or pin['repository'] != os.environ['GITHUB_REPOSITORY']
+              ):
+                  raise SystemExit('Invalid immutable companion pin')
+              with tempfile.TemporaryDirectory() as folder:
+                  subprocess.run([
+                      'gh', 'release', 'download', pin['release_tag'],
+                      '--repo', pin['repository'], '--pattern', companion['name'], '--dir', folder,
+                  ], check=True)
+                  body = (Path(folder) / companion['name']).read_bytes()
+              if len(body) != companion['size_bytes'] or hashlib.sha256(body).hexdigest() != companion['sha256']:
+                  raise SystemExit('Companion content pin mismatch')
+              validate(json.loads(body))
+              destination = Path('dashboard/public/sdp') / filename
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              destination.write_bytes(body)
           PY
 
       - uses: actions/setup-node@v6
