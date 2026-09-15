@@ -12,6 +12,43 @@ const teams = [{run_id: "unchanged", as_of: "2026-09-14T00:00:00Z", season: "202
 
 describe("club calendar interactions", () => {
   beforeEach(() => { vi.mocked(loadCompetitiveSchedule).mockResolvedValue(cups); });
+  it("expands and collapses daily international dates with keyboard focus, fixtures and CSV preserved", async () => {
+    const user = userEvent.setup();
+    render(<CompetitiveFixtureCalendar teams={teams} schedule={schedule} fromGw={5} toGw={5} />);
+    await screen.findByRole("button", {name: /Arsenal: CUP/});
+    await user.clear(screen.getByLabelText("Calendar to"));
+    await user.type(screen.getByLabelText("Calendar to"), "2026-10-07");
+    await user.click(screen.getByRole("radio", {name: "Daily"}));
+    const expand = screen.getByRole("button", {name: /Expand international break/});
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+    const table = screen.getByRole("table", {name: "All competitions by day"});
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(10);
+    expect(screen.getByRole("button", {name: /Arsenal: AVL/})).toHaveTextContent("21 Sept");
+    expect(screen.getByText(/24 days · 9 columns/)).toBeVisible();
+    const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:calendar");
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await user.click(screen.getByRole("button", {name: "CSV"}));
+    const csv = await new Promise<string>((resolve) => {
+      const reader = new FileReader(); reader.onload = () => resolve(reader.result as string);
+      reader.readAsText(create.mock.calls[0][0] as Blob);
+    });
+    expect(csv).toContain("International break · 2026-09-21 – 2026-10-06");
+    expect(csv).toContain("AVL");
+    expect(csv).toContain("1d listed gap");
+    create.mockRestore(); click.mockRestore();
+    expand.focus(); await user.keyboard("{Enter}");
+    const collapse = screen.getByRole("button", {name: /Collapse international break/});
+    await waitFor(() => expect(collapse).toHaveFocus());
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(25);
+    expect(screen.getByRole("button", {name: /Arsenal: AVL/})).toHaveTextContent("1d listed gap");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByRole("button", {name: /Expand international break/})).toHaveFocus());
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(10);
+    await user.click(screen.getByRole("radio", {name: "Weekly"}));
+    expect(screen.queryByRole("button", {name: /Expand international break/})).not.toBeInTheDocument();
+    expect(screen.getByText("DGW · 2 fixtures")).toBeVisible();
+  });
   it("switches Weekly/Daily without changing fixtures and exports daily dates and listed gaps", async () => {
     const user = userEvent.setup();
     const before = JSON.stringify([schedule, cups]);

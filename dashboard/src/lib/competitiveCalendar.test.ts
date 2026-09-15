@@ -1,10 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { calendarColumns, calendarFixtures, calendarRange, dailyCalendarColumns, listedClubGaps, footballDate, leagueSlot, visibleCalendar } from "./competitiveCalendar";
+import { calendarColumns, calendarFixtures, calendarRange, collapseInternationalDays, dailyCalendarColumns, listedClubGaps, footballDate, leagueSlot, visibleCalendar } from "./competitiveCalendar";
 
 import { schedule, cups } from "@/data/competitiveSchedule.fixture";
 import { internationalBreaksForRange } from "@/data/internationalBreaks";
 
 describe("descriptive all-competition calendar", () => {
+  it("folds each international window independently without hiding games or expanding the date range", () => {
+    const rows = calendarFixtures(schedule, cups, "2026-27");
+    const windows = internationalBreaksForRange("2026-27", "2026-09-20", "2026-11-18");
+    const daily = dailyCalendarColumns(rows, "2026-09-20", "2026-11-18", windows);
+    const before = JSON.stringify(daily);
+    const folded = collapseInternationalDays(daily, []);
+    expect(folded).toHaveLength(daily.length - 15 - 8);
+    expect(folded.filter((c) => c.collapsedDays).map((c) => c.collapsedDays)).toEqual([16, 9]);
+    expect(folded.flatMap((c) => c.fixtures)).toEqual(daily.flatMap((c) => c.fixtures));
+    expect(collapseInternationalDays(daily, ["2026-09-21"])).toHaveLength(daily.length - 8);
+    expect(collapseInternationalDays(daily, windows.map((w) => w.from))).toEqual(daily);
+    expect(collapseInternationalDays(folded, [])).toEqual(folded);
+    const clipped = collapseInternationalDays(dailyCalendarColumns(rows, "2026-09-21", "2026-09-23", windows), []);
+    expect(clipped).toHaveLength(1);
+    expect(clipped[0]).toMatchObject({ from: "2026-09-21", to: "2026-09-23", collapsedDays: 3 });
+    expect(clipped[0].fixtures).toHaveLength(1);
+    expect(JSON.stringify(daily)).toBe(before);
+  });
   it("keeps every daily date, all DGW legs and overlapping international annotations", () => {
     const rows = calendarFixtures(schedule, cups, "2026-27");
     const before = JSON.stringify(rows);

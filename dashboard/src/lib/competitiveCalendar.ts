@@ -72,6 +72,7 @@ export interface CalendarColumn {
   to: string;
   fixtures: CalendarFixture[];
   internationalBreak?: InternationalBreak;
+  collapsedDays?: number;
 }
 
 /** Group PL by official GW (all DGW legs), cups by their UK calendar week.
@@ -126,6 +127,29 @@ export function dailyCalendarColumns(rows: CalendarFixture[], from: string, to: 
       internationalBreak: breaks.find((w) => w.from <= day && w.to >= day) });
   }
   return columns;
+}
+
+/** Fold only verified international dates, preserving every listed club fixture. */
+export function collapseInternationalDays(columns: CalendarColumn[], expanded: readonly string[]): CalendarColumn[] {
+  const folded: CalendarColumn[] = [];
+  for (const column of columns) {
+    const window = column.internationalBreak;
+    if (!window || !column.key.startsWith("day:") || expanded.includes(window.from)) {
+      folded.push(column); continue;
+    }
+    const previous = folded.at(-1);
+    if (previous?.collapsedDays && previous.internationalBreak?.from === window.from) {
+      folded[folded.length - 1] = { ...previous, to: column.to,
+        collapsedDays: previous.collapsedDays + 1, fixtures: [...previous.fixtures, ...column.fixtures] };
+    } else {
+      folded.push({ ...column, key: `collapsed:${window.from}`, heading: "International break", collapsedDays: 1 });
+    }
+  }
+  return folded.map((c) => {
+    if (!c.collapsedDays) return c;
+    const label = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short" });
+    return { ...c, label: c.from === c.to ? label(c.from) : `${label(c.from)}–${label(c.to)}` };
+  });
 }
 
 /** Clear calendar dates between listed club fixtures, never physical player rest. */

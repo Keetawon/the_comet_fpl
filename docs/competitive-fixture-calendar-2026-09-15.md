@@ -32,6 +32,16 @@ in the undated section. CSV follows the active view, with exact daily dates,
 kickoff times, listed-gap wording and international-window provenance; filenames
 include `daily` or `weekly`. Reset returns to the default Weekly view.
 
+International dates in Daily now start **collapsed** into one yellow column per
+verified window. Its header offers **+ Expand / − Collapse**, independently for
+each window and usable with keyboard/touch in fullscreen. Expansion restores the
+individual dates; focus follows the replacement header. Partial date selections
+fold only their included dates. Day counts continue to report the full selected
+duration alongside the number of displayed columns. Every listed club fixture is
+retained when folded, with its match date visible, and CSV retains the folded date
+range plus each game's timestamp. Listed gaps are unchanged. Reset clears expansion
+choices; Weekly retains its existing compact international columns.
+
 Daily verification: 36 calendar/page/fullscreen tests pass, including continuous
 empty dates, DST, deterministic replay, same-day fixtures, out-of-view predecessors,
 undated gaps, daily clipping versus whole-GW retention, and CSV consistency.
@@ -135,6 +145,20 @@ downloaded CSV, public export/replay receipts and source reconciliation are
 retained under `data/artifacts/competitive-calendar-20260915/` (local, ignored).
 
 ## Verification
+
+International-date folding verification (2026-09-15): 38 focused frontend tests
+pass, including independent windows, clipped ranges, retained overlapping club
+fixtures, keyboard focus and CSV timestamps. TypeScript/Vite build and frontend
+lint pass with the existing nine Fast Refresh warnings and bundle-size warning.
+Installed Chrome verified actual desktop (1720×1080) and mobile (390×844)
+rendering, Enter-key and touch expansion/collapse, fullscreen and CSV download.
+The default 50-date range folds to 35 columns; all 135 displayed club fixture
+cards and their listed gaps remain identical after expansion. The CSV contains
+20 club rows plus its header. No JavaScript exceptions or failed requests were
+observed. Screenshots and the browser receipt are retained locally under
+`data/artifacts/competitive-calendar-folded-20260915/`. Model, configuration,
+forecast and source-data paths remain unchanged from
+`2e68806e239a89d05949862c8a6a40670e8952d5`.
 
 - Python: 21 focused schedule/publication/freshness tests pass. Raw hashes,
   revisions, exact cursor selection, identity, future-source exclusion, missing
