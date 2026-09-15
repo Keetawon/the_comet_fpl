@@ -39,6 +39,19 @@ frozen candidate. Any subsequent research needs its own authorization and prereg
 
 ## Mission and current state
 
+### Current descriptive team form (owner repair, 2026-09-15)
+
+Dashboard team `form` must come from the same published finalized/provisional
+ended-match records as its team match logs, joined by season and permanent club
+code. The archive-only form mart is not a current-form fallback. All windows stay
+within the selected season and expose actual fixture counts, provisional counts
+and measured xG/xGC denominators. A short season stays short. Explicit expanded
+cross-season history remains separate. The shared publisher and operational
+freshness gate enforce this across Fixtures, Summary and Team Analytics; legacy
+packages must visibly label their archived anchors. These observed aggregates
+never change forecast inputs, xP, PMFs, opponent strength or optimizer plans.
+See `docs/current-team-form-repair-2026-09-15.md` for the defect and verification.
+
 This project predicts a full Fantasy Premier League (FPL) points distribution per player and
 gameweek. It is a Python 3.12 data and modelling codebase built around DuckDB, Polars, Pydantic,
 HTTPX, YAML configuration, pytest, Ruff, and strict mypy.

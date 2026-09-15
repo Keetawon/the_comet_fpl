@@ -1379,7 +1379,7 @@ def test_unmeasured_values_stay_json_null_never_zero(tmp_path: Path) -> None:
     assert vicario["form"]["windows"]["last_5"]["goals_conceded"] == 4
     assert vicario["form"]["windows"]["last_5"]["saves"] == 11
     assert vicario["form"]["windows"]["last_5"]["expected_goals_conceded"] == 3.4
-    assert alpha["form"]["windows"]["last_5"]["team_xg"] is None
+    assert alpha["form"] is None  # No published ended matches in the forecast season.
 
     payload = render_read_model_files(models)[FIXTURE_MATRIX_FILENAME].decode("utf-8")
     assert '"defence_ease_index": null' in payload
@@ -1476,12 +1476,10 @@ def test_horizon_is_the_vintage_horizon_and_outside_rows_fail_closed(tmp_path: P
         build_dashboard_read_models(export_dir)
 
 
-def test_form_anchor_is_the_latest_season_then_gameweek(tmp_path: Path) -> None:
+def test_club_form_uses_current_logs_and_player_snapshot_stays_unchanged(tmp_path: Path) -> None:
     models = build_dashboard_read_models(_build_source_export(tmp_path))
     alpha = _team(models, 101)
-    assert (alpha["form"]["season"], alpha["form"]["as_at_gw"]) == (PRIOR, 38)
-    assert alpha["form"]["windows"]["season_to_date"]["matches_played"] == 38
-    assert alpha["form"]["windows"]["last_3"]["goals_for"] == 5
+    assert alpha["form"] is None
     assert _team(models, 102)["form"] is None  # never fabricated
 
     vicario = _player(models, 1)
@@ -1962,6 +1960,13 @@ def test_team_actuals_are_current_and_prior_complete_gameweeks_at_fixture_grain(
         for row in models.team_actuals
     )
     assert "actuals" not in _team(models, 101)
+    form = _team(models, 101)["form"]
+    assert (form["season"], form["as_at_gw"]) == (SEASON, 2)
+    assert form["source"] == "published_team_actuals"
+    window = form["windows"]["last_5"]
+    assert window["matches_played"] == 2
+    assert window["observations"]["fixture_ids"] == [102, 101]
+    assert window["team_xg_per_match"] == alpha_current["actuals"][1]["team_xg"]
 
     documents = render_read_model_files(models)
     team_actuals_document = json.loads(documents[TEAM_ACTUALS_FILENAME])

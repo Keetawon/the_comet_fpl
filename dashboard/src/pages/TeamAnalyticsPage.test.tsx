@@ -251,7 +251,7 @@ describe("TeamAnalyticsPage", () => {
     expect(screen.getByText(/may post-date an older run/i)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Exact team analytics values" });
     expect(within(table).getByText("Observed form anchor")).toBeInTheDocument();
-    expect(within(table).getAllByText("2025-26 GW38").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("Archived 2025-26 GW38").length).toBeGreaterThan(0);
   });
 
   it("clears stale horizontal bounds when the analytical scope changes", async () => {

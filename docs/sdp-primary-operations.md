@@ -136,6 +136,20 @@ official gameweek finality and every predicted fixture leg. Missing outcomes rem
 
 ## Descriptive Dashboard xG supplements
 
+### Current club form reconciliation (2026-09-15)
+
+`build_sdp_dashboard` now derives club form from the same finalized/provisional
+match logs it publishes for expanded histories. All team-form consumers share
+that output, including Fixtures, Summary and Team Analytics. Its publication
+gate rejects stale aggregates as well as missing observations. A successful
+capture alone is not a complete dashboard refresh: run the existing export,
+validation and preview/build steps together, then reload the browser to replace
+its session data cache. Never regenerate a forecast merely to update form.
+
+Form windows stay within the selected forecast's season and show actual match
+counts; the separately labelled expanded-history scope can cross seasons. See
+[the root cause, verified repair and current totals](current-team-form-repair-2026-09-15.md).
+
 Observation refreshes reconcile current FPL fixture rows against the published
 forecast player population using exact `(season, code)` identities. Players added
 to FPL after the retained forecast stay in the descriptive statistics sidecar;

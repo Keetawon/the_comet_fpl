@@ -18,6 +18,7 @@ from fpl.publish.dashboard_json import (
     validate_dashboard_json,
 )
 from fpl.publish.export import _canonical_json_bytes, _sha256_bytes
+from fpl.publish.team_form import refresh_team_forms
 
 
 def check_observed_freshness(generation: Path, sidecar: dict[str, Any]) -> dict[str, Any]:
@@ -68,6 +69,13 @@ def check_observed_freshness(generation: Path, sidecar: dict[str, Any]) -> dict[
             "matched_current_rows": len(expected),
             "source_only_rows_outside_forecast_population": sorted(source_only),
         }
+    matrix = json.loads((generation / "fixture_matrix.json").read_bytes())
+    final = json.loads((generation / "team_actuals.json").read_bytes())
+    provisional = json.loads((generation / "team_provisional_actuals.json").read_bytes())
+    refreshed = refresh_team_forms(matrix["teams"], final["teams"], provisional["teams"])
+    if list(refreshed) != matrix["teams"]:
+        raise ValueError("stale team form: summaries disagree with published ended fixtures")
+    report["team_form"] = {"reconciled_rows": len(refreshed), "source": "published_team_actuals"}
     return report
 
 

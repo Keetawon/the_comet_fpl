@@ -15,6 +15,11 @@ def write(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value), encoding="utf-8")
 
 
+@pytest.fixture(autouse=True)
+def empty_fixture_matrix(tmp_path: Path) -> None:
+    write(tmp_path / "fixture_matrix.json", {"teams": []})
+
+
 @pytest.mark.parametrize("provisional", [False, True])
 def test_current_observations_cannot_be_replaced_by_a_freshly_dated_old_base(
     tmp_path: Path, provisional: bool
@@ -27,11 +32,50 @@ def test_current_observations_cannot_be_replaced_by_a_freshly_dated_old_base(
         ]
         for suffix in ("actuals", "provisional_actuals"):
             selected = suffix == ("provisional_actuals" if provisional else "actuals")
-            rows = [{"season": "2026-27", identity: 3, "actuals": [{"fixture": 30}]}]
+            rows = [
+                {
+                    "season": "2026-27",
+                    identity: 3,
+                    "actuals": [
+                        {
+                            "fixture": 30,
+                            "gw": 3,
+                            "kickoff_time": "2026-09-04T19:00:00+00:00",
+                            "goals_for": 0,
+                            "goals_against": 0,
+                            "team_xg": None,
+                            "team_xgc": None,
+                        }
+                    ],
+                }
+            ]
             write(tmp_path / f"{scope}_{suffix}.json", {plural: rows if selected else []})
     assert (
         refresh.check_observed_freshness(tmp_path, sidecar)["player"]["matched_current_rows"] == 1
     )
+    write(
+        tmp_path / "fixture_matrix.json",
+        {
+            "teams": [
+                {
+                    "season": "2026-27",
+                    "team_code": 3,
+                    "form": None,
+                    "fixtures": [],
+                }
+            ]
+        },
+    )
+    with pytest.raises(ValueError, match="stale team form"):
+        refresh.check_observed_freshness(tmp_path, sidecar)
+    matrix = json.loads((tmp_path / "fixture_matrix.json").read_bytes())
+    final = json.loads((tmp_path / "team_actuals.json").read_bytes())
+    provisional_rows = json.loads((tmp_path / "team_provisional_actuals.json").read_bytes())
+    matrix["teams"] = refresh.refresh_team_forms(
+        matrix["teams"], final["teams"], provisional_rows["teams"]
+    )
+    write(tmp_path / "fixture_matrix.json", matrix)
+    assert refresh.check_observed_freshness(tmp_path, sidecar)["team_form"]["reconciled_rows"] == 1
     # A new manifest timestamp is not a freshness witness for missing GW3 data.
     for suffix in ("actuals", "provisional_actuals"):
         write(tmp_path / f"player_{suffix}.json", {"players": []})

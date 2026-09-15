@@ -493,7 +493,7 @@ function TeamWatchList({
                 <span className="font-medium">{team.team_name}</span>
                 {team.form && (
                   <Badge variant="outline" className="text-[9px]">
-                    form {team.form.season} GW{team.form.as_at_gw}
+                    {team.form.source === "published_team_actuals" ? "Observed" : "Archived"} form {team.form.season} GW{team.form.as_at_gw}
                   </Badge>
                 )}
               </span>
@@ -508,6 +508,11 @@ function TeamWatchList({
                     2,
                   )}/m · xGC ${fmt(form.team_xgc_per_match, 2)}/m`
                 : "no form data"}
+              {form?.observations && (
+                <> · {form.matches_played} matches
+                  {form.observations.provisional_matches > 0 && ` · ${form.observations.provisional_matches} provisional`}
+                </>
+              )}
             </p>
             <FixtureTicker
               fixtures={[...team.fixtures].sort(

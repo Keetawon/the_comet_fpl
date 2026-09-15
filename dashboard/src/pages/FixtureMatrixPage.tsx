@@ -94,6 +94,7 @@ import {
   mergeTeamActualRecords,
   teamActualGameweekLabel,
   teamActualDetailsForGameweeks,
+  teamFormLabel,
   type TeamActualFixtureDetail,
 } from "@/lib/teamActuals";
 
@@ -593,7 +594,7 @@ export function FixtureMatrixPage() {
           filtered,
           scheduleOnly,
           form: form ? form.windows[formWindow] : null,
-          formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
+          formLabel: teamFormLabel(form, formWindow),
           horizonMetric: averageMeasured(sourceValues),
           actualDetails: teamActualDetailsForGameweeks(
             actualByTeamCode.get(team.team_code) ?? [],
@@ -656,11 +657,12 @@ export function FixtureMatrixPage() {
           return (
             <span
               className="text-xs tabular-nums"
-              title={`Form anchored ${row.original.formLabel} (last season at GW1)`}
+              title={`${row.original.formLabel}. FPL observed results; xG measured in ${f.observations?.team_xg_matches ?? "unknown"}/${f.matches_played} matches, xGC in ${f.observations?.team_xgc_matches ?? "unknown"}/${f.matches_played}. Current display context, not forecast input.`}
             >
               W{fmt(f.wins, 0)} D{fmt(f.draws, 0)} L{fmt(f.losses, 0)} · {fmt(f.goals_for, 0)}:
               {fmt(f.goals_against, 0)} · xG {fmt(f.team_xg_per_match, 2)}/m · xGC{" "}
               {fmt(f.team_xgc_per_match, 2)}/m
+              <span className="ml-2 text-muted-foreground">{row.original.formLabel}</span>
             </span>
           );
         },
@@ -964,6 +966,12 @@ export function FixtureMatrixPage() {
             </div>
           )}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Form uses up to the selected number of ended matches in {runBounds.season},
+          including explicitly provisional results. It never fills a short current season
+          with older-season matches. Match counts and source coverage are shown per club.
+          This observed context updates independently of the frozen forecast.
+        </p>
         <p className="mt-2 text-xs text-muted-foreground">
           Expanded rows default to a shared rolling window of the latest five ended gameweeks.
           At a season boundary it continues into the immediately preceding season; the season

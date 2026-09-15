@@ -182,6 +182,27 @@ beforeEach(() => {
 });
 
 describe("FixtureMatrixPage", () => {
+  it("shows the current published short-season form and provisional depth without touching future fixtures", async () => {
+    const teams = structuredClone(sample.teams);
+    const form = teams[0].form!;
+    form.season = "2026-27";
+    form.as_at_gw = 4;
+    Object.assign(form, { source: "published_team_actuals" });
+    Object.assign(form.windows.last_5, {
+      matches_played: 4, wins: 2, draws: 2, losses: 0, goals_for: 5, goals_against: 2,
+      observations: { fixture_ids: [33, 25, 13, 4], gw_from: 1, gw_to: 4,
+        provisional_matches: 1, team_xg_matches: 4, team_xgc_matches: 4 },
+    });
+    const before = JSON.stringify(teams);
+    vi.mocked(loadFixtureMatrix).mockResolvedValueOnce({ teams, schedule, manifest: null, easeIndexFormulaVersion: "fixture-ease-v1" });
+    render(<FixtureMatrixPage />);
+    const table = await screen.findByRole("table", { name: "Fixture matrix" });
+    expect(within(table).getByText("2026-27 GW1–4 · 4 matches · 1 provisional")).toBeInTheDocument();
+    expect(within(table).getByText(/W2 D2 L0 · 5:2/)).toBeInTheDocument();
+    expect(within(table).getAllByTestId("chip").length).toBeGreaterThan(0);
+    expect(JSON.stringify(teams)).toBe(before);
+  });
+
   it("renders one row per club with per-GW chips, blank slots, and all colour sources", async () => {
     render(<FixtureMatrixPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());

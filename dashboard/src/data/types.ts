@@ -26,9 +26,19 @@ export interface TeamFormWindow {
   goals_against_per_match: number | null;
   team_xg_per_match: number | null;
   team_xgc_per_match: number | null;
+  /** Display-only lineage from the current finalized/provisional match logs. */
+  observations?: {
+    fixture_ids: number[];
+    gw_from: number;
+    gw_to: number;
+    provisional_matches: number;
+    team_xg_matches: number;
+    team_xgc_matches: number;
+  };
 }
 
 export interface TeamForm {
+  source?: "published_team_actuals";
   season: string;
   as_at_gw: number;
   windows: Record<WindowLabel, TeamFormWindow>;

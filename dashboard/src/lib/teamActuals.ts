@@ -5,7 +5,21 @@ import type {
   TeamObservedActualsRecord,
   TeamObservedFixture,
   TeamProvisionalActualsRecord,
+  TeamForm,
+  WindowLabel,
 } from "@/data/types";
+
+/** A legacy form anchor must never masquerade as the current match-log summary. */
+export function teamFormLabel(form: TeamForm | null, window: WindowLabel): string | null {
+  if (form == null) return null;
+  const selected = form.windows[window];
+  const observed = selected.observations;
+  if (form.source !== "published_team_actuals" || observed == null) {
+    return `Archived ${form.season} GW${form.as_at_gw}`;
+  }
+  return `${form.season} GW${observed.gw_from}–${observed.gw_to} · ${selected.matches_played} matches` +
+    (observed.provisional_matches ? ` · ${observed.provisional_matches} provisional` : "");
+}
 
 type TeamObservedSourceFixture = TeamActualFixture & { outcome_status?: OutcomeStatus };
 type TeamObservedCollection = Omit<TeamActualsRecord, "actuals"> & {

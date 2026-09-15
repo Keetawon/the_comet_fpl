@@ -49,6 +49,7 @@ from fpl.publish.export import (
     _strict_json_loads,
     _strict_manifest_content_sha256,
 )
+from fpl.publish.team_form import refresh_team_forms
 
 DASHBOARD_JSON_SCHEMA: Final[str] = "fpl.dashboard-read-models"
 # v2: the manifest gains the summary, next-gameweek, forecast-vs-actual and
@@ -3160,6 +3161,7 @@ def _build(export_dir: Path, manifest: Mapping[str, Any]) -> DashboardReadModels
         frames["dim_fixture"],
         frames["fact_forecast_team_fixture"],
     )
+    teams = refresh_team_forms(teams, team_actuals, team_provisional_actuals)
     player_horizons = _build_player_horizons(
         frames["fact_forecast_player_gameweek"], frames["dim_forecast_run"]
     )

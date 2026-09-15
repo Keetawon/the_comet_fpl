@@ -600,6 +600,8 @@ export function TeamAnalyticsPage() {
             <p className="text-xs text-muted-foreground">
               Observed form is latest at static export, not frozen at the selected forecast
               vintage, and may post-date an older run. Each exact row shows its own form anchor.
+              FPL match-log form stays within that season; provisional match counts are marked
+              and may change. xG/xGC use only their measured matches.
             </p>
           )}
         </div>
@@ -757,6 +759,13 @@ export function TeamAnalyticsPage() {
         caveats={insightCaveats}
         remote={{
           page: "team_analytics",
+          unavailableReason:
+            view === "past-future" && state.teams.some(
+              (team) => team.run_id === activeRunId &&
+                (team.form?.windows[formWindow].observations?.provisional_matches ?? 0) > 0,
+            )
+              ? "AI explanation is unavailable for provisional observed form; the displayed facts remain usable."
+              : undefined,
           provenance: publishedInsightProvenance(state.manifest, selectedRun),
           scope: compactInsightScope({
             gw_from: gwFrom,
