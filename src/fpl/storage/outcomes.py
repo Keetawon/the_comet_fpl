@@ -199,6 +199,7 @@ def select_finalized_outcomes(
     *,
     as_of: datetime,
     season: str | None = None,
+    skip_pending_live: bool = False,
 ) -> list[LedgerOutcome]:
     """Select finalized historical and current-live player-fixture outcomes."""
     _require_aware(as_of, name="as_of")
@@ -279,6 +280,10 @@ def select_finalized_outcomes(
             raise UnfinalizedOutcomeError(
                 f"live player-fixture {key} has no fixture version known at the cutoff"
             )
+        if finished is False and skip_pending_live:
+            # A daily capture can legitimately contain both final and provisional
+            # fixtures. Skip explicit pending rows; unknown finality still fails.
+            continue
         if finished is not True:
             raise UnfinalizedOutcomeError(
                 f"live player-fixture {key} is not finalized in the latest fixture version"
@@ -602,11 +607,14 @@ def attach_finalized_outcomes(
     as_of: datetime,
     season: str | None = None,
     attached_at: datetime | None = None,
+    skip_pending_live: bool = False,
 ) -> OutcomeAttachmentResult:
     """Validate and atomically append all eligible player and team outcomes."""
     if attached_at is not None:
         _require_aware(attached_at, name="attached_at")
-    selected = select_finalized_outcomes(con, as_of=as_of, season=season)
+    selected = select_finalized_outcomes(
+        con, as_of=as_of, season=season, skip_pending_live=skip_pending_live
+    )
     selected_teams = select_finalized_team_outcomes(con, as_of=as_of, season=season)
     new_outcomes, already_attached = _new_outcomes_only(con, selected)
     new_teams, team_already_attached = _new_team_outcomes_only(con, selected_teams)

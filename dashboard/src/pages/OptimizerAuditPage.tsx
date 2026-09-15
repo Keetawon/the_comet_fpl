@@ -120,28 +120,32 @@ export function OptimizerAuditPage() {
     <div className="flex flex-col gap-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Optimizer audit</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex max-w-full flex-wrap items-center gap-3">
           {state.audit.length > 1 && (
             <Select value={plan.optimizer_run_id} onValueChange={setPlanId}>
-              <SelectTrigger size="sm" className="w-72" aria-label="Plan">
+              <SelectTrigger size="sm" className="w-72 max-w-full" aria-label="Plan">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {state.audit.map((p) => (
                   <SelectItem key={p.optimizer_run_id} value={p.optimizer_run_id}>
-                    {planDisplayLabel(p)}
+                    {planDisplayLabel(p)} · GW{p.gw_from}–{p.gw_to}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
-          <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
+          <Badge variant="outline" className="whitespace-normal border-amber-500 text-amber-700 dark:text-amber-400">
             development-only — not a validated production recommendation
           </Badge>
         </div>
       </div>
 
 
+      <p className="rounded-md border bg-muted/30 p-3 text-sm" aria-label="Selected plan vintage">
+        <strong>Plan GW{plan.gw_from}–{plan.gw_to}</strong> · Forecast as of {plan.as_of ?? "Unavailable"}.
+        Observed-data refreshes keep this forecast unchanged. Historical plans retain their original dates.
+      </p>
       <div className="grid gap-3 lg:grid-cols-2">
         <Card title="Provenance">
           <Row label="optimizer run" value={plan.optimizer_run_id} />

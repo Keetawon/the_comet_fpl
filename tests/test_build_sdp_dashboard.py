@@ -103,6 +103,7 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
     monkeypatch.setattr(job, "export_sdp_stats", sidecar)
     monkeypatch.setattr(job, "export_competitive_schedule", sidecar)
     monkeypatch.setattr(job, "check_observed_freshness", lambda *a: {})
+    monkeypatch.setattr(job, "publication_status", lambda *a: {})
     monkeypatch.setattr(job, "retain_existing_plans", lambda *a: {"observations_refreshed": True})
     report = job.build(db, output, base_dashboard=old_base if retained else None)
     assert calls == [

@@ -119,7 +119,18 @@ def test_only_existing_plan_blocks_are_carried_into_the_fresh_generation(
         ("summary.json", "optimizer_plans"),
     ):
         files[name] = {}
-        write(old / name, {key: [{"forecast_run_id": "frozen", "as_of": "original"}]})
+        write(
+            old / name,
+            {
+                key: [
+                    {
+                        "optimizer_run_id": "old-plan",
+                        "forecast_run_id": "frozen",
+                        "as_of": "original",
+                    }
+                ]
+            },
+        )
         write(
             fresh / name,
             {
@@ -172,3 +183,58 @@ def test_only_existing_plan_blocks_are_carried_into_the_fresh_generation(
     write(old / "next_gw.json", {"plans": [{"forecast_run_id": "different"}]})
     with pytest.raises(ValueError, match="exact forecast vintage"):
         refresh.retain_existing_plans(fresh, old, tmp_path / "refused")
+
+
+def test_latest_platform_plan_reaches_all_pages_without_replacing_forecasts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fresh, old, output = (tmp_path / name for name in ("fresh", "old", "output"))
+    documents = {
+        "next_gw.json": "plans",
+        "optimizer_audit.json": "plans",
+        "summary.json": "optimizer_plans",
+    }
+    previous = {
+        "optimizer_run_id": "old-plan",
+        "forecast_run_id": "gw3",
+        "plan_kind": "platform_default",
+        "as_of": "2026-09-03",
+    }
+    current = {
+        "optimizer_run_id": "new-plan",
+        "forecast_run_id": "gw5",
+        "plan_kind": "platform_default",
+        "as_of": "2026-09-14",
+    }
+    diagnostic = {**previous, "optimizer_run_id": "diagnostic", "plan_kind": "platform_diagnostic"}
+    for name, key in documents.items():
+        write(old / name, {key: [previous, diagnostic]})
+        write(fresh / name, {key: [current]})
+    write(fresh / "players.json", {"frozen": [1, 2, 3]})
+    manifest = {
+        "runs": [{"run_id": r} for r in ("gw3", "gw5")],
+        "files": {k: {} for k in (*documents, "players.json")},
+        "content_sha256": "hash",
+        "generated_at": "now",
+    }
+    monkeypatch.setattr(
+        refresh, "validate_dashboard_json", lambda _: json.loads(json.dumps(manifest))
+    )
+    monkeypatch.setattr(refresh, "_manifest_content_sha256", lambda _: "hash")
+    monkeypatch.setattr(refresh, "_file_row_count", lambda *a: 1)
+    original = {p.name: p.read_bytes() for p in old.iterdir()}
+    refresh.retain_existing_plans(fresh, old, output)
+    for name, key in documents.items():
+        plans = json.loads((output / name).read_bytes())[key]
+        assert {p["optimizer_run_id"] for p in plans} == {"new-plan", "diagnostic"}
+        assert next(p for p in plans if p["plan_kind"] == "platform_default") == current
+    assert (output / "players.json").read_bytes() == (fresh / "players.json").read_bytes()
+    assert {p.name: p.read_bytes() for p in old.iterdir()} == original
+    repeat = tmp_path / "repeat"
+    refresh.retain_existing_plans(fresh, output, repeat)
+    assert {p.name: p.read_bytes() for p in repeat.iterdir()} == {
+        p.name: p.read_bytes() for p in output.iterdir()
+    }
+    write(fresh / "next_gw.json", {"plans": [{**previous, "as_of": "changed"}]})
+    with pytest.raises(ValueError, match="immutable optimizer plan changed"):
+        refresh.retain_existing_plans(fresh, old, tmp_path / "collision")

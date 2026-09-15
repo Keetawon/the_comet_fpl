@@ -13,12 +13,17 @@ import os
 import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 from fpl.publish.competitive_schedule import export_competitive_schedule
 from fpl.publish.dashboard_json import export_dashboard_json, validate_dashboard_json
-from fpl.publish.dashboard_refresh import check_observed_freshness, retain_existing_plans
+from fpl.publish.dashboard_refresh import (
+    check_observed_freshness,
+    publication_status,
+    retain_existing_plans,
+)
 from fpl.publish.export import export_bi, validate_bi_export
 from fpl.publish.public_dashboard import package_public_dashboard
 from fpl.publish.sdp_stats import export_sdp_stats
@@ -65,6 +70,7 @@ def build(
     *,
     preview_public: Path | None = None,
     base_dashboard: Path | None = None,
+    optimizer_plans: tuple[Path, ...] = (),
 ) -> dict[str, Any]:
     if not db.is_file():
         raise ValueError("explicit existing operational database required")
@@ -73,7 +79,10 @@ def build(
     # Keep a read lease throughout the export; a writer must not mix generations.
     with connect(db, read_only=True):
         bi_published = retain_validated_generation(
-            export_bi, db, output / "bi-endpoint", output / "bi-retained"
+            partial(export_bi, optimizer_plan_paths=optimizer_plans),
+            db,
+            output / "bi-endpoint",
+            output / "bi-retained",
         )
         validate_bi_export(output / "bi-retained")
         dashboard_published = retain_validated_generation(
@@ -106,7 +115,15 @@ def build(
             output / "public" / "data",
             json.loads((output / "public" / "sdp" / "sdp_stats.json").read_bytes()),
         )
+        status = publication_status(
+            output / "public" / "data",
+            json.loads((output / "public" / "sdp" / "sdp_stats.json").read_bytes()),
+        )
+        (output / "public" / "sdp" / "publication_status.json").write_text(
+            json.dumps(status, sort_keys=True, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+        )
     report = {
+        "publication_status": status,
         "schema": "fpl.sdp-dashboard-generation/v1",
         "started_at": stamp.isoformat(),
         "completed_at": datetime.now(UTC).isoformat(),
@@ -147,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
         "--output", type=Path, required=True, help="New retained generation directory"
     )
     parser.add_argument("--preview-public", type=Path, help="Existing dashboard/public directory")
+    parser.add_argument("--optimizer-plan", type=Path, action="append", default=[])
     parser.add_argument(
         "--base-dashboard",
         type=Path,
@@ -160,6 +178,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.output,
                 preview_public=args.preview_public,
                 base_dashboard=args.base_dashboard,
+                optimizer_plans=tuple(args.optimizer_plan),
             ),
             sort_keys=True,
         )

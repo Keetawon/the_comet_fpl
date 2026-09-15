@@ -47,20 +47,13 @@ describe("App deep-analytics routes", () => {
     vi.unstubAllEnvs();
   });
 
-  it("renders both deep-analytics pages from their stable hash routes", async () => {
+  it("keeps paused analytics bookmarks on the summary page", async () => {
     window.location.hash = "#player-analytics";
     render(<App />);
-
-    expect(await screen.findByRole("heading", { name: "Player analytics route" })).toBeInTheDocument();
-    expect(screen.getByText("active:player-analytics")).toBeInTheDocument();
-
-    act(() => {
-      window.location.hash = "#team-analytics";
-      window.dispatchEvent(new HashChangeEvent("hashchange"));
-    });
-
-    expect(await screen.findByRole("heading", { name: "Team analytics route" })).toBeInTheDocument();
-    expect(screen.getByText("active:team-analytics")).toBeInTheDocument();
+    expect(await screen.findByText("active:summary")).toBeInTheDocument();
+    act(() => { window.location.hash = "#team-analytics"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    expect(screen.getByText("active:summary")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /analytics route/ })).not.toBeInTheDocument();
   });
 
   it("renders separate prediction-accuracy routes and keeps the historical player alias", async () => {

@@ -1,3 +1,5 @@
+import { PublicationStatus } from "@/components/PublicationStatus";
+import { AccuracyObservationTable, AccuracyDelta } from "@/components/AccuracyObservationTable";
 import { useEffect, useMemo, useState } from "react";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import {
@@ -258,14 +260,20 @@ export function TeamForecastVsActualPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h1 className="text-lg font-semibold">Team prediction vs actual</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">Diagnose recorded team attack, defence, and clean-sheet forecasts against immutable reciprocal fixture outcomes. Historical residuals never become future club-selection signals.</p></div>
         <div className="flex flex-wrap gap-2">
-          <label className="text-xs text-muted-foreground">Forecast vintage<select aria-label="Team forecast vintage" className="ml-2 h-8 rounded-md border bg-background px-2 text-sm text-foreground" value={run.run_id} onChange={(event) => { setRunId(event.target.value); setGwFilter("all"); }}>
+          <label className="text-xs text-muted-foreground">Forecast vintage<select aria-label="Team forecast vintage" className="mt-1 block h-9 w-full max-w-[min(32rem,75vw)] rounded-md border bg-background px-2 text-sm text-foreground" value={run.run_id} onChange={(event) => { setRunId(event.target.value); setGwFilter("all"); }}>
             {runOptions.map((candidate) => <option key={candidate.run_id} value={candidate.run_id}>{accuracyRunLabel(candidate)}</option>)}
           </select></label>
-          <label className="text-xs text-muted-foreground">Finalized scope<select aria-label="Completed team gameweek" className="ml-2 h-8 rounded-md border bg-background px-2 text-sm text-foreground" value={gwFilter} onChange={(event) => setGwFilter(event.target.value)}>
+          <label className="text-xs text-muted-foreground">Finalized scope<select aria-label="Completed team gameweek" className="mt-1 block h-9 w-full max-w-[min(32rem,75vw)] rounded-md border bg-background px-2 text-sm text-foreground" value={gwFilter} onChange={(event) => setGwFilter(event.target.value)}>
             <option value="all">All scored fixtures</option>{completedGws.map((gw) => <option key={gw} value={gw}>GW{gw}</option>)}
           </select></label>
         </div>
       </div>
+
+      <div className="flex flex-wrap gap-2 text-sm" aria-label="Monitoring vintage shortcuts">
+        <button className="rounded-md border px-3 py-2" onClick={() => { setRunId(defaultAccuracyRun(runOptions)?.run_id ?? ""); setGwFilter("all"); }}>Latest scored forecast</button>
+        <button className="rounded-md border px-3 py-2" onClick={() => { const latest = runOptions.find((r) => r.component_modes?.["football_environment.primary"] === "sdp_v2") ?? runOptions[0]; if (latest) setRunId(latest.run_id); setGwFilter("all"); }}>Latest published forecast · may be pending</button>
+      </div>
+      <PublicationStatus manifestHash={state.data.manifest?.content_sha256 ?? ""} />
 
       <p
         aria-label="Selected team forecast provenance"
@@ -311,15 +319,39 @@ export function TeamForecastVsActualPage() {
       />
 
 
-      <section className="space-y-2" aria-labelledby="club-residuals-heading"><h2 id="club-residuals-heading" className="text-sm font-semibold">Cumulative club residuals in selected scope</h2><p className="text-xs text-muted-foreground">Expected clean sheets is the sum of published per-fixture probabilities, an expected count—not P(at least one clean sheet).</p><div className="overflow-x-auto rounded-md border"><Table aria-label="Cumulative club prediction residuals"><TableHeader><TableRow><TableHead>Club</TableHead><TableHead>Rows</TableHead><TableHead>Attack forecast / actual / residual</TableHead><TableHead>Defence forecast / actual / residual</TableHead><TableHead>Expected / actual clean sheets</TableHead></TableRow></TableHeader><TableBody>{clubs.map((club) => <TableRow key={club.teamId}><TableCell>{club.teamName} ({club.shortName})</TableCell><TableCell>{club.rows}</TableCell><TableCell className="tabular-nums">{fmt(club.attackForecast)} / {fmt(club.attackActual, 0)} / {signed(club.attackResidual)}</TableCell><TableCell className="tabular-nums">{fmt(club.defenceForecast)} / {fmt(club.defenceActual, 0)} / {signed(club.defenceResidual)} <span className="text-xs text-muted-foreground">(positive worse)</span></TableCell><TableCell className="tabular-nums">{fmt(club.expectedCleanSheets)} / {club.actualCleanSheets}</TableCell></TableRow>)}</TableBody></Table></div></section>
+      <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Cumulative club totals · selected scope</summary>      <section className="space-y-2" aria-labelledby="club-residuals-heading"><h2 id="club-residuals-heading" className="text-sm font-semibold">Cumulative club residuals in selected scope</h2><p className="text-xs text-muted-foreground">Expected clean sheets is the sum of published per-fixture probabilities, an expected count—not P(at least one clean sheet).</p><div className="overflow-x-auto rounded-md border"><Table aria-label="Cumulative club prediction residuals"><TableHeader><TableRow><TableHead>Club</TableHead><TableHead>Rows</TableHead><TableHead>Attack forecast / actual / residual</TableHead><TableHead>Defence forecast / actual / residual</TableHead><TableHead>Expected / actual clean sheets</TableHead></TableRow></TableHeader><TableBody>{clubs.map((club) => <TableRow key={club.teamId}><TableCell>{club.teamName} ({club.shortName})</TableCell><TableCell>{club.rows}</TableCell><TableCell className="tabular-nums">{fmt(club.attackForecast)} / {fmt(club.attackActual, 0)} / {signed(club.attackResidual)}</TableCell><TableCell className="tabular-nums">{fmt(club.defenceForecast)} / {fmt(club.defenceActual, 0)} / {signed(club.defenceResidual)} <span className="text-xs text-muted-foreground">(positive worse)</span></TableCell><TableCell className="tabular-nums">{fmt(club.expectedCleanSheets)} / {club.actualCleanSheets}</TableCell></TableRow>)}</TableBody></Table></div></section>
 
-      <section className="space-y-2" aria-labelledby="team-observations-heading"><h2 id="team-observations-heading" className="text-sm font-semibold">Exact team-fixture observations</h2><div className="overflow-x-auto rounded-md border"><Table aria-label="Exact team prediction observations"><TableHeader><TableRow><TableHead>GW / fixture</TableHead><TableHead>Team</TableHead><TableHead>Opponent</TableHead><TableHead>Venue</TableHead><TableHead>λ for / actual / residual</TableHead><TableHead>λ against / actual / residual</TableHead><TableHead>P(CS) / actual / Brier</TableHead><TableHead>Attack / defence CRPS</TableHead><TableHead>Fallback</TableHead></TableRow></TableHeader><TableBody>{observations.map((row) => <TableRow key={`${row.fixture}-${row.team_id}`}><TableCell>GW{row.gw} / {row.fixture}</TableCell><TableCell>{row.team_name} ({row.team_short_name})</TableCell><TableCell>{row.opponent_team_name} ({row.opponent_team_short_name})</TableCell><TableCell>{row.was_home ? "Home" : "Away"}</TableCell><TableCell>{fmt(row.lambda_for)} / {row.actual_goals_for} / {signed(row.attack_residual)}</TableCell><TableCell>{fmt(row.lambda_against)} / {row.actual_goals_against} / {signed(row.defence_residual)} <span className="text-xs">(positive worse)</span></TableCell><TableCell>{pct(row.probability_clean_sheet)} / {row.actual_clean_sheet ? "yes" : "no"} / {fmt(row.clean_sheet_brier)}</TableCell><TableCell>{fmt(row.attack_crps)} / {fmt(row.defence_crps)}</TableCell><TableCell>{row.stage_a_league_average_team ? "yes" : "no"}</TableCell></TableRow>)}{!observations.length && <TableRow><TableCell colSpan={9} className="text-muted-foreground">No scored observations; missing is not zero.</TableCell></TableRow>}</TableBody></Table></div></section>
+      </details>
 
+      <AccuracyObservationTable
+        key={`${run.run_id}-${gwFilter}-${view}`}
+        title="Exact team prediction observations"
+        rows={observations}
+        rowKey={r => `${r.fixture}-${r.team_id}`}
+        searchText={r => `${r.team_name} ${r.team_short_name} ${r.opponent_team_name} GW${r.gw}`}
+        context={`${run.season} · ${scopeLabel} · ${view} · forecast as of ${run.as_of}`}
+        columns={[
+          { key: "gw", label: "GW", value: r => r.gw },
+          { key: "team", label: "Club", value: r => r.team_name },
+          { key: "opponent", label: "Opponent", value: r => r.opponent_team_short_name },
+          { key: "venue", label: "Venue", value: r => r.was_home ? "Home" : "Away" },
+          { key: "forecast", label: view === "clean_sheet" ? "Forecast P(CS)" : "Forecast goals", value: r => view === "attack" ? r.lambda_for : view === "defence" ? r.lambda_against : r.probability_clean_sheet, render: r => <strong className="text-sky-700 dark:text-sky-300">{view === "clean_sheet" ? pct(r.probability_clean_sheet) : fmt(view === "attack" ? r.lambda_for : r.lambda_against, 2)}</strong> },
+          { key: "actual", label: view === "clean_sheet" ? "Actual CS" : "Actual goals", value: r => view === "attack" ? r.actual_goals_for : view === "defence" ? r.actual_goals_against : Number(r.actual_clean_sheet), render: r => <strong>{view === "clean_sheet" ? r.actual_clean_sheet ? "Yes" : "No" : view === "attack" ? r.actual_goals_for : r.actual_goals_against}</strong> },
+          { key: "delta", label: view === "clean_sheet" ? "Brier ↓" : "Δ Actual − forecast", value: r => view === "attack" ? r.attack_residual : view === "defence" ? r.defence_residual : r.clean_sheet_brier, render: r => view === "clean_sheet" ? fmt(r.clean_sheet_brier) : <AccuracyDelta value={view === "attack" ? r.attack_residual : r.defence_residual} /> },
+          { key: "error", label: view === "clean_sheet" ? "CS error ↓" : "Abs error", value: r => view === "attack" ? Math.abs(r.attack_residual) : view === "defence" ? Math.abs(r.defence_residual) : r.clean_sheet_brier, render: r => fmt(view === "attack" ? Math.abs(r.attack_residual) : view === "defence" ? Math.abs(r.defence_residual) : r.clean_sheet_brier, 2) },
+          { key: "crps", label: "CRPS ↓", value: r => view === "attack" ? r.attack_crps : view === "defence" ? r.defence_crps : null, render: r => fmt(view === "attack" ? r.attack_crps : view === "defence" ? r.defence_crps : null), advanced: true },
+          { key: "fallback", label: "League-average prior", value: r => r.stage_a_league_average_team ? "Yes" : "No", advanced: true },
+        ]}
+      />
+
+      <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Calibration and breakdowns · full selected vintage</summary>
       <section className="space-y-2" aria-labelledby="team-calibration-heading"><h2 id="team-calibration-heading" className="text-sm font-semibold">Published reliability · full run</h2><p className="text-xs text-muted-foreground">Goal events come from exact stored team PMFs; clean-sheet values are published. The browser does not compute probabilities, CRPS, calibration, or buckets.</p><div className="overflow-x-auto rounded-md border"><Table aria-label="Team forecast calibration"><TableHeader><TableRow><TableHead>Event</TableHead><TableHead>Bucket</TableHead><TableHead>Rows</TableHead><TableHead>Predicted mean</TableHead><TableHead>Observed rate</TableHead></TableRow></TableHeader><TableBody>{run.calibration.map((row, index) => <TableRow key={`${row.event}-${row.threshold}-${row.bucket}-${index}`}><TableCell>{row.event === "clean_sheet" ? "P(clean sheet)" : `P(goals ≥ ${row.threshold})`}</TableCell><TableCell>{row.bucket}</TableCell><TableCell>{row.rows}</TableCell><TableCell>{pct(row.predicted_mean)}</TableCell><TableCell>{pct(row.observed_rate)}</TableCell></TableRow>)}</TableBody></Table></div></section>
 
       <div className="grid gap-4 xl:grid-cols-2"><SliceTable title="Scores by finalized gameweek" rows={sliceGw} view={view} /><SliceTable title="Scores by club" rows={sliceTeam} view={view} /><SliceTable title="Scores by venue" rows={sliceVenue} view={view} /><SliceTable title="Scores by Stage A fallback" rows={sliceFallback} view={view} /></div>
 
-      <p className="text-xs text-muted-foreground">Run {run.run_id} · as of {run.as_of ?? "unknown"} · created {run.created_at ?? "unknown"}. Attack and defence CRPS were published from exact stored PMFs; defence uses the opponent’s recorded goals-for PMF, never a browser reconstruction from λ against.</p>
+      </details>
+
+      <p className="break-all text-xs text-muted-foreground">Run {run.run_id} · as of {run.as_of ?? "unknown"} · created {run.created_at ?? "unknown"}. Attack and defence CRPS were published from exact stored PMFs; defence uses the opponent’s recorded goals-for PMF, never a browser reconstruction from λ against.</p>
       <InsightSummaryPanel
         items={insightFacts}
         caveats={insightCaveats}

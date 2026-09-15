@@ -33,16 +33,10 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Players" }));
     expect(onNavigate).toHaveBeenCalledWith("players");
   });
-  it("exposes both deep-analytics routes and navigates by stable route id", () => {
-    const onNavigate = vi.fn();
-    render(<Sidebar active="team-analytics" onNavigate={onNavigate} />);
-
-    expect(screen.getByRole("button", { name: "Team analytics" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Player analytics" }));
-    expect(onNavigate).toHaveBeenCalledWith("player-analytics");
+  it("hides both paused analytics pages in local and hosted navigation", () => {
+    render(<Sidebar active="summary" onNavigate={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Team analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Player analytics" })).not.toBeInTheDocument();
   });
 
   it("exposes separate player and team prediction-accuracy routes", () => {

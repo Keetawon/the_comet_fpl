@@ -86,6 +86,7 @@ def retain_existing_plans(fresh: Path, previous: Path, output: Path) -> dict[str
     old_runs = {row["run_id"]: row for row in old["runs"]}
     shutil.copytree(fresh, output)
     retained: list[str] = []
+    selected_platform: set[str] = set()
     for filename, key in (
         ("next_gw.json", "plans"),
         ("optimizer_audit.json", "plans"),
@@ -97,9 +98,30 @@ def retain_existing_plans(fresh: Path, previous: Path, output: Path) -> dict[str
             if run_id not in old_runs or current_runs.get(run_id) != old_runs[run_id]:
                 raise ValueError("retained plan's exact forecast vintage is absent or changed")
         document = json.loads((fresh / filename).read_bytes())
-        if document[key] and document[key] != original:
-            raise ValueError("fresh plans differ; explicit plan-vintage selection required")
-        document[key] = original
+        merged = {p["optimizer_run_id"]: p for p in document[key]}
+        for plan in original:
+            identity = plan["optimizer_run_id"]
+            if identity in merged and merged[identity] != plan:
+                raise ValueError("immutable optimizer plan changed across generations")
+            merged[identity] = plan
+        # The existing public contract carries one plan per platform role.
+        # Pick from next_gw once, then use the exact same identities in all three
+        # documents. Original artifacts and previous generations remain intact.
+        if filename == "next_gw.json":
+            selected_platform = {
+                max(
+                    (p for p in merged.values() if p.get("plan_kind") == kind),
+                    key=lambda p: (p["as_of"], p["optimizer_run_id"]),
+                )["optimizer_run_id"]
+                for kind in ("platform_default", "platform_diagnostic")
+                if any(p.get("plan_kind") == kind for p in merged.values())
+            }
+        document[key] = [
+            merged[k]
+            for k in sorted(merged)
+            if merged[k].get("plan_kind") not in ("platform_default", "platform_diagnostic")
+            or k in selected_platform
+        ]
         payload = _canonical_json_bytes(document, indent=2)
         (output / filename).write_bytes(payload)
         current["files"][filename] = {
@@ -163,4 +185,67 @@ def retain_existing_plans(fresh: Path, previous: Path, output: Path) -> dict[str
         "observations_refreshed": True,
         "forecasts_regenerated": False,
         "internal_provenance_digests": sorted(redacted),
+    }
+
+
+def publication_status(generation: Path, sidecar: dict[str, Any]) -> dict[str, Any]:
+    """Small public freshness receipt; no outcomes, PMFs, paths or private plan data."""
+    manifest = validate_dashboard_json(generation)
+    players = json.loads((generation / "player_forecast_vs_actual.json").read_bytes())
+    teams = json.loads((generation / "team_forecast_vs_actual.json").read_bytes())
+    plans = json.loads((generation / "next_gw.json").read_bytes())["plans"]
+    runs = players["runs"]
+    primary = [
+        r
+        for r in runs
+        if (r.get("component_modes") or {}).get("football_environment.primary") == "sdp_v2"
+    ]
+    latest = max(primary or runs, key=lambda r: (r["as_of"], r["run_id"]), default=None)
+    season = (
+        latest["season"]
+        if latest
+        else max((r["season"] for r in sidecar["gameweeks"]), default=None)
+    )
+    gws = [r for r in sidecar["gameweeks"] if r["season"] == season]
+    current_plans = [
+        p
+        for p in plans
+        if p.get("plan_kind") == "platform_default"
+        and latest
+        and p["forecast_run_id"] == latest["run_id"]
+    ]
+    next_fixture_gw = min(
+        (r["gw"] for r in gws if r["fixtures_total"] > r["fixtures_completed"]), default=None
+    )
+    score_status = {}
+    for name, document in (("player", players), ("team", teams)):
+        score_status[name] = max(
+            (s["gw"] for r in document["runs"] if r["season"] == season for s in r["by_gw"]),
+            default=None,
+        )
+    return {
+        "schema": "fpl.dashboard-publication-status/v1",
+        "data_manifest_sha256": manifest["content_sha256"],
+        "exported_at": manifest["generated_at"],
+        "season": season,
+        "source_known_at": max((r["source_known_at"] for r in gws), default=None),
+        "latest_finalized_gw": max((r["gw"] for r in gws if r["finished"]), default=None),
+        "awaiting_finality": [
+            {k: r[k] for k in ("gw", "fixtures_completed", "fixtures_total")}
+            for r in gws
+            if not r["finished"] and r["fixtures_completed"]
+        ],
+        "latest_forecast": {k: latest[k] for k in ("run_id", "as_of", "gw_from", "gw_to")}
+        if latest
+        else None,
+        "current_platform_plan": bool(current_plans),
+        "next_fixture_gw": next_fixture_gw,
+        "forecast_rollover_required": bool(
+            latest and next_fixture_gw is not None and latest["gw_from"] != next_fixture_gw
+        ),
+        "latest_scored_gw": score_status,
+        "meaning": (
+            "Capture, forecast, plan and finalized scores have independent timestamps. "
+            "No forecast regenerated."
+        ),
     }

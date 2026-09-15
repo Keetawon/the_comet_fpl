@@ -4,5 +4,6 @@ export function isHostedStatic(): boolean {
 }
 
 export function isPageAvailable(id: string): boolean {
+  if (["team-analytics", "player-analytics"].includes(id)) return false;
   return !isHostedStatic() || !["next-gw", "plan-builder", "squad-draft", "optimizer"].includes(id);
 }

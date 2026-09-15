@@ -8,7 +8,10 @@ param(
     [string]$At = '07:00',
     [string]$TaskName = 'The Comet FPL - daily SDP',
     [switch]$RawOnly,
-    [switch]$Workload
+    [switch]$Workload,
+    [string]$DashboardPublic,
+    [string]$ForecastDirectory,
+    [string]$PlanStore
 )
 $ErrorActionPreference = 'Stop'
 $python = (Resolve-Path -LiteralPath $PythonPath).Path
@@ -25,6 +28,16 @@ $clock = [TimeSpan]::ParseExact($At, 'hh\:mm', [Globalization.CultureInfo]::Inva
 $arguments = '-m fpl.jobs.daily_pl_sdp --db "{0}" --runs "{1}"' -f $database, $runs
 if ($RawOnly) { $arguments += ' --raw-only' }
 if ($Workload) { $arguments += ' --workload' }
+if ($DashboardPublic -or $ForecastDirectory -or $PlanStore) {
+    if (-not ($DashboardPublic -and $ForecastDirectory -and $PlanStore) -or $RawOnly) {
+        throw 'Dashboard flow requires DashboardPublic, ForecastDirectory and PlanStore; RawOnly is incompatible.'
+    }
+    $public = (Resolve-Path -LiteralPath $DashboardPublic).Path
+    $forecasts = (Resolve-Path -LiteralPath $ForecastDirectory).Path
+    $plans = [IO.Path]::GetFullPath($PlanStore)
+    $arguments = '-m fpl.jobs.refresh_dashboard --db "{0}" --runs "{1}" --forecast-dir "{2}" --preview-public "{3}" --plan-store "{4}"' -f $database, $runs, $forecasts, $public, $plans
+}
+
 # pythonw prevents an unwanted console window during an interactive-user scheduled run.
 $pythonw = Join-Path (Split-Path -Parent $python) 'pythonw.exe'
 if (-not (Test-Path -LiteralPath $pythonw -PathType Leaf)) {

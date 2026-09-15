@@ -177,3 +177,59 @@ display after source, identity, exposure and completeness checks. No new CLI/con
 is required. Raw SDP, provider core validity and prediction selection are unchanged.
 See [the source contract and verified coverage](sdp-fpl-xg-display-supplement-2026-09-11.md)
 for capture-time semantics, remaining gaps, CSV provenance and publication commands.
+
+### Complete current-plan and monitoring refresh (2026-09-15)
+
+Use the single existing-host flow instead of capture alone:
+
+```powershell
+& D:/Personal/fpl-operations/.venv/Scripts/python.exe -m fpl.jobs.refresh_dashboard `
+  --db D:/Personal/fpl-operations/data/sdp-primary-v2.duckdb `
+  --runs D:/Personal/fpl-operations/dashboard-runs `
+  --forecast-dir D:/Personal/fpl-operations/predictions `
+  --preview-public dashboard/public `
+  --plan-store D:/Personal/fpl-operations/dashboard-plans
+```
+
+Run in the V2 checkout with its existing Node dependencies. This calls the bounded
+FPL/SDP/workload capture **with full player history**, attaches final outcomes under
+the existing lock and new backup, selects the latest **registered primary by hash**,
+reuses or creates its unchanged optimizer plan, rebuilds all read models, validates
+and installs public assets, and runs the dashboard build. It never invokes player
+inference or replaces a forecast. `--skip-capture` uses retained source timestamps;
+`--optimizer-plan PATH` can seed an already verified platform plan without a solve.
+
+The public contract still carries one plan per platform role. Newest plans are
+selected consistently across suggestion, summary and optimizer audit. A diagnostic
+from another cutoff/horizon stays labelled with its original range and cannot be
+used in the default-vs-diagnostic comparison. Original artifacts and prior export
+generations remain immutable.
+
+The daily attachment path skips only live fixtures explicitly marked
+`finished=false`. The attachment API's strict default remains unchanged. Missing
+identity, unknown finality, missing components and conflicting finalized outcomes
+still fail. Player scores require the **entire official GW and every DGW leg**.
+Fully played but not-yet-final GWs remain pending.
+
+`public/sdp/publication_status.json` is an independently versioned receipt bound
+to the public manifest hash. It separates source freshness, ended-but-unfinalized
+GWs, latest scored GWs, forecast horizon and plan presence. A rollover warning
+appears when the first GW with remaining fixtures differs from the registered
+forecast start. Use the existing `pre_deadline_forecast` job with a **new** output
+path when a new forecast vintage is due, then this same refresh command. Never
+regenerate a forecast just to attach outcomes.
+
+Each unique `dashboard-runs/dashboard-*` retains a receipt, backup and build/optimizer
+logs; reusable plan artifacts live in `dashboard-plans`. Do not remove locks/WALs
+to force a run. Capture or validation failures are explicit and do not relabel old
+source evidence. Windows symlink failures remain accurately reported; validated
+copies use the established publication fallback.
+
+For new task registrations, `register_daily_pl_sdp.ps1` accepts `-DashboardPublic`,
+`-ForecastDirectory` and `-PlanStore` together. It still refuses to overwrite an
+existing task. Update an existing action explicitly, keeping its trigger/principal
+and retry settings. The owner machine must be running. No cloud runtime is added.
+
+Reload the browser after a refresh to replace its session cache. Vite preview
+serves rebuilt `dashboard/dist`; changing DuckDB or public JSON alone is not enough.
+Production publication remains a separate review.
