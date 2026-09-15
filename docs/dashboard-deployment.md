@@ -14,9 +14,9 @@ optimizer, and local plan server are never deployed.
   Plan Builder, and Squad Draft, including direct hash navigation. Summary hides optimizer
   squad cards. The local build retains these tools; exact solves remain a trusted-machine workflow.
   Every local-server client request also fails closed in hosted mode.
-- Buy Me a Coffee currently opens a clearly labelled coming-soon notice. There is no payment
-  URL, embedded payment widget, or third-party payment request. Enable an external support link
-  only after the owner provides their real account URL.
+- Buy Me a Coffee opens the owner-provided `https://buymeacoffee.com/thecomet` in a new tab
+  with `noopener noreferrer`. Payment handling stays on that external site; there is no embedded
+  payment widget or third-party script in the Dashboard.
 - Every route includes its implemented network-free deterministic insight summary. The seven public
   renderer-eligible routes are Summary, Fixture matrix, Players, Player analytics, Team analytics,
   Player prediction vs actual, and Team prediction vs actual. Next GW suggestion, Optimizer audit,

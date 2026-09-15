@@ -58,9 +58,10 @@ and Squad draft stay local, and Summary's optimizer cards are hidden. Direct boo
 open these tools in hosted mode. This does not replace public-export sanitization.
 Routes load their code on demand; published forecast data and vintage selection are unchanged.
 
-The sidebar's **Buy Me a Coffee** button opens a coming-soon notice until the owner has a real
-support account. It makes no payment or tracking requests. Local and hosted builds use the same
-accessible notice. See [security/readiness review](../docs/dashboard-public-readiness-security-2026-09-15.md).
+The sidebar's **Buy Me a Coffee** button opens the owner-provided
+https://buymeacoffee.com/thecomet in a new tab with `noopener noreferrer`. It uses a normal link,
+without an embedded payment widget or tracking script, in both local and hosted builds.
+See [security/readiness review](../docs/dashboard-public-readiness-security-2026-09-15.md).
 
 ## Generate the data
 

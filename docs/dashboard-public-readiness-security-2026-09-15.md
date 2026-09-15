@@ -3,6 +3,12 @@
 Date: 2026-09-15. Starting code: `eddf9b345cb002736abbea71bcbb68d343f3475d` on
 `claude/comet-fpl-v2-architecture-mqrj8f`. This is application/readiness work, not model work.
 
+Owner-link follow-up: the owner subsequently supplied `https://buymeacoffee.com/thecomet`.
+The button now opens that exact destination in a new tab with `noopener noreferrer`, replacing
+the notice without an embedded widget. The original audit below records the earlier placeholder
+state; its test results and security findings are preserved. This change does not verify payouts
+or perform a payment.
+
 ## Delivered behavior
 
 The sidebar has a **Buy Me a Coffee** button on desktop and mobile. The owner has no support

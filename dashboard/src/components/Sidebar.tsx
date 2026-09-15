@@ -84,9 +84,6 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
       </ul>
       <div className="shrink-0 border-t px-1.5 pt-3 pb-2 md:px-3">
         <SupportButton />
-        <p className="mt-1.5 hidden text-center text-[10px] text-muted-foreground md:block">
-          Support link coming soon
-        </p>
       </div>
       <p className="hidden px-4 py-3 text-[10px] leading-snug text-muted-foreground md:block">
         Reads only the static JSON read models exported by the publish layer. It never

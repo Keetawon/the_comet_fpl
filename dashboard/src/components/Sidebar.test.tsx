@@ -16,13 +16,14 @@ describe("Sidebar", () => {
     expect(screen.getByRole("button", { name: "Optimizer audit" })).toBeInTheDocument();
   });
 
-  it("offers an honest support notice without a payment URL", async () => {
+  it.each(["false", "true"])("links to the owner's support page safely when hosted=%s", hosted => {
+    vi.stubEnv("VITE_HOSTED_STATIC", hosted);
     render(<Sidebar active="summary" onNavigate={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Buy Me a Coffee" }));
-    expect(await screen.findByText(/Payments are not available yet/)).toBeInTheDocument();
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Close support message" }));
-    expect(screen.queryByText(/Payments are not available yet/)).not.toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "Buy Me a Coffee (opens in a new tab)" });
+    expect(link).toHaveAttribute("href", "https://buymeacoffee.com/thecomet");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.queryByText(/coming soon|Payments are not available yet/i)).not.toBeInTheDocument();
   });
   it("keeps the SDP team tab and consolidates duplicate player statistics into Players", () => {
     const onNavigate = vi.fn();
