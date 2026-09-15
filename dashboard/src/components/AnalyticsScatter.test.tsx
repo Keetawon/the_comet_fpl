@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
   AnalyticsScatter,
@@ -99,19 +99,17 @@ describe("AnalyticsScatter", () => {
     expect(beta.getAttribute("aria-label")).toContain("not on Pareto frontier");
   });
 
-  it("shows a concise, edge-aware tooltip while preserving the full accessible name", () => {
+  it("shows a readable, dismissible tooltip while preserving the full accessible name", async () => {
     render(<AnalyticsScatter {...props} />);
     const alpha = screen.getAllByTestId("analytics-point")[0];
 
     fireEvent.focus(alpha);
     const tooltip = screen.getByRole("tooltip");
-    expect(tooltip.parentElement).toHaveClass("overflow-visible");
-    expect(tooltip).toHaveTextContent("Deadline price: £6.5m");
+    expect(tooltip).toHaveClass("w-80", "max-w-[calc(100vw-1.5rem)]", "overflow-y-auto");
+    expect(tooltip).toHaveTextContent("Deadline price£6.5m");
     expect(tooltip).toHaveTextContent("Efficient frontier");
     expect(tooltip).not.toHaveTextContent("run-abc123");
     expect(tooltip).not.toHaveTextContent("GW2–GW6");
-    expect(tooltip).toHaveAttribute("data-horizontal-placement", "start");
-    expect(tooltip).toHaveAttribute("data-vertical-placement", "below");
     expect(alpha).toHaveAccessibleName(/vintage run-abc123; horizon GW2–GW6/);
     expect(alpha).toHaveAttribute("aria-describedby", tooltip.id);
 
@@ -120,13 +118,40 @@ describe("AnalyticsScatter", () => {
     fireEvent.mouseEnter(alpha);
     expect(screen.getByRole("tooltip")).toHaveTextContent("Efficient frontier");
     fireEvent.mouseLeave(alpha);
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
 
     const beta = screen.getAllByTestId("analytics-point")[1];
     fireEvent.focus(beta);
-    expect(screen.getByRole("tooltip")).toHaveAttribute("data-horizontal-placement", "end");
-    expect(screen.getByRole("tooltip")).toHaveAttribute("data-vertical-placement", "above");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Beta");
     expect(beta).toHaveAccessibleName(/vintage run-abc123; horizon GW2–GW6/);
+    fireEvent.keyDown(beta, { key: "Escape" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("preserves every long detail, source qualifier and missing value in aligned metric rows", () => {
+    const data = [{ ...points[0], details: [
+      { label: "SOT conceded / all shots conceded · SDP", value: "25% ‡" },
+      { label: "xGA /shot · SDP / marked FPL", value: "0.076 [FPL]" },
+      { label: "Saves /match · SDP", value: "—" },
+    ] }];
+    const before = JSON.stringify(data);
+    render(<AnalyticsScatter {...props} points={data} />);
+    const point = screen.getByTestId("analytics-point");
+    const coordinates = [point.getAttribute("cx"), point.getAttribute("cy"), point.getAttribute("aria-label")];
+    fireEvent.mouseEnter(point);
+    const tooltip = screen.getByRole("tooltip");
+    for (const detail of data[0].details) {
+      const value = within(tooltip).getByText(detail.value);
+      expect(value.tagName).toBe("DD");
+      expect(value).toHaveClass("whitespace-nowrap", "text-right");
+      expect(value.parentElement).toHaveTextContent(detail.label);
+      expect(value.parentElement).toHaveClass("grid-cols-[minmax(0,1fr)_auto]");
+    }
+    fireEvent.mouseLeave(point);
+    fireEvent.mouseEnter(tooltip); // It remains reachable across the point-to-card gap.
+    expect(screen.getByRole("tooltip")).toBe(tooltip);
+    expect([point.getAttribute("cx"), point.getAttribute("cy"), point.getAttribute("aria-label")]).toEqual(coordinates);
+    expect(JSON.stringify(data)).toBe(before);
   });
 
   it("supports concise visible axis and provenance labels without weakening accessibility", () => {
@@ -147,6 +172,17 @@ describe("AnalyticsScatter", () => {
     expect(group.querySelector("desc")).toHaveTextContent(
       /Deadline price \(lower is better\); Cumulative xP \(higher is better\).*run-abc123/,
     );
+  });
+
+  it("lets touch users explicitly close the card and select another point", () => {
+    render(<AnalyticsScatter {...props} />);
+    const [alpha, beta] = screen.getAllByTestId("analytics-point");
+    fireEvent.click(alpha);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Alpha");
+    fireEvent.click(screen.getByRole("button", { name: "Close chart tooltip" }));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.click(beta);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Beta");
   });
 
   it("renders an optional concise chart-reading note", () => {

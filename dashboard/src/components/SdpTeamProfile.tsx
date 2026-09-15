@@ -45,7 +45,7 @@ export function TeamTrend({ entity, metric, compact = false }: { entity: SdpEnti
     {values.map((value, i) => value === null ? null : <g key={entity.rows[i].fixture}>
       {i > 0 && values[i - 1] !== null && <line x1={x(i - 1)} y1={y(values[i - 1]!)} x2={x(i)} y2={y(value)} stroke="currentColor" strokeWidth={compact ? 3 : 2} />}
       <circle cx={x(i)} cy={y(value)} r={compact ? 3 : 4} fill="currentColor">
-        <title>GW{entity.rows[i].gw} · {entity.rows[i].opponent_short_name} ({entity.rows[i].was_home ? "H" : "A"}): {fmt(value)}{metricSupplements([entity.rows[i]], metric).map(s => ` | ${supplementDescription(s)}`).join("")}{metricCorrections([entity.rows[i]], metric).length ? " · owner-confirmed" : ""}{metricAssumptions([entity.rows[i]], metric).length ? " · assumed zero" : ""}</title>
+        <title>{entity.rows[i].season} GW{entity.rows[i].gw} · {entity.rows[i].opponent_short_name} ({entity.rows[i].was_home ? "H" : "A"}){"\n"}{metric.label}: {fmt(value)} · {metricSupplements([entity.rows[i]], metric).length ? "FPL archive supplement" : metricSourceLabel(metric)}{metricCorrections([entity.rows[i]], metric).length ? " · owner-confirmed" : ""}{metricAssumptions([entity.rows[i]], metric).length ? " · assumed zero" : ""}{"\n"}Full source details in the match log.</title>
       </circle>
     </g>)}
   </svg>;

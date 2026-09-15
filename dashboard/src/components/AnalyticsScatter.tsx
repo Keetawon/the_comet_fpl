@@ -1,5 +1,6 @@
-import { useId, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Popover } from "radix-ui";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ParetoDirection } from "@/lib/pareto";
 
@@ -171,6 +172,14 @@ function frontierText(
   return point.isFrontier ? "Efficient frontier" : "Outside efficient frontier";
 }
 
+function TooltipMetric({ label, value }: { label: string; value: string }) {
+  const [name, ...source] = label.split(" · ");
+  return <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 py-1">
+    <dt className="min-w-0 leading-relaxed text-muted-foreground">{name}{source.length > 0 && <span className="text-[10px]"> · {source.join(" · ")}</span>}</dt>
+    <dd className="whitespace-nowrap text-right font-semibold tabular-nums">{value}</dd>
+  </div>;
+}
+
 export function AnalyticsScatter({
   title,
   description,
@@ -192,6 +201,17 @@ export function AnalyticsScatter({
 }: AnalyticsScatterProps) {
   const id = useId().replaceAll(":", "");
   const [activeId, setActiveId] = useState<string | number | null>(null);
+  const anchor = useRef<SVGCircleElement | null>(null);
+  const plot = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelClose = () => { if (closeTimer.current !== null) clearTimeout(closeTimer.current); };
+  const activate = (pointId: string | number, element: SVGCircleElement) => {
+    cancelClose(); anchor.current = element; setActiveId(pointId);
+  };
+  const close = () => { cancelClose(); setActiveId(null); };
+  // Allow the pointer to cross the small gap and read/scroll a long tooltip.
+  const scheduleClose = () => { cancelClose(); closeTimer.current = setTimeout(() => setActiveId(null), 150); };
+  useEffect(() => () => { if (closeTimer.current !== null) clearTimeout(closeTimer.current); }, []);
   const eligible = useMemo(
     () => points.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
     [points],
@@ -237,14 +257,6 @@ export function AnalyticsScatter({
   const hasDecisionDirections =
     xAxis.direction !== "explanatory" && yAxis.direction !== "explanatory";
   const active = eligible.find((point) => point.id === activeId) ?? null;
-  const activeX = active ? scale(active.x, xDomain, MARGIN.left, MARGIN.left + PLOT_WIDTH) : 0;
-  const activeY = active ? scale(active.y, yDomain, MARGIN.top + PLOT_HEIGHT, MARGIN.top) : 0;
-  const activeHorizontalPlacement = activeX < WIDTH * 0.34
-    ? "start"
-    : activeX > WIDTH * 0.66
-      ? "end"
-      : "center";
-  const activeVerticalPlacement = activeY < HEIGHT * 0.24 ? "below" : "above";
   // Keep abbreviated labels inside the plot and try alternate positions when
   // neighbours coincide. Coordinates and values of the points never move.
   const occupied: { x: number; y: number; width: number }[] = [];
@@ -279,7 +291,7 @@ export function AnalyticsScatter({
         {provenanceLabel} {vintageDisplayLabel} · {horizonDisplayLabel}
       </p>
 
-      <div className="relative mt-2 w-full overflow-visible">
+      <div ref={plot} className="relative mt-2 w-full overflow-visible">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="block h-auto w-full min-w-[32rem]"
@@ -382,14 +394,16 @@ export function AnalyticsScatter({
                   aria-pressed={onSelectPoint ? selectedPointId === point.id : undefined}
                   aria-label={label}
                   aria-describedby={activePoint ? tooltipId : undefined}
-                  onFocus={() => setActiveId(point.id)}
-                  onBlur={() => setActiveId((current) => (current === point.id ? null : current))}
-                  onMouseEnter={() => setActiveId(point.id)}
-                  onMouseLeave={() => setActiveId((current) => (current === point.id ? null : current))}
-                  onClick={() => { setActiveId(point.id); onSelectPoint?.(point.id); }}
+                  onFocus={event => activate(point.id, event.currentTarget)}
+                  onBlur={event => {
+                    if (!(event.relatedTarget instanceof Element && event.relatedTarget.closest("[data-chart-tooltip]"))) close();
+                  }}
+                  onMouseEnter={event => activate(point.id, event.currentTarget)}
+                  onMouseLeave={scheduleClose}
+                  onClick={event => { activate(point.id, event.currentTarget); onSelectPoint?.(point.id); }}
                   onKeyDown={event => {
                     if (onSelectPoint && (event.key === "Enter" || event.key === " ")) {
-                      event.preventDefault(); setActiveId(point.id); onSelectPoint(point.id);
+                      event.preventDefault(); activate(point.id, event.currentTarget); onSelectPoint(point.id);
                     }
                   }}
                   className="cursor-pointer outline-none focus:stroke-[5px]"
@@ -405,45 +419,39 @@ export function AnalyticsScatter({
           </g>
         </svg>
 
-        {active && (
-          <div
-            id={`${id}-tooltip-${eligible.indexOf(active)}`}
-            role="tooltip"
-            data-horizontal-placement={activeHorizontalPlacement}
-            data-vertical-placement={activeVerticalPlacement}
-            className={cn(
-              "pointer-events-none absolute z-10 max-w-72 rounded-md bg-foreground px-3 py-2 text-xs text-background shadow-md",
-              activeHorizontalPlacement === "start"
-                ? "translate-x-0"
-                : activeHorizontalPlacement === "end"
-                  ? "-translate-x-full"
-                  : "-translate-x-1/2",
-              activeVerticalPlacement === "below"
-                ? "translate-y-2"
-                : "-translate-y-[calc(100%+0.5rem)]",
-            )}
-            style={
-              {
-                left: `${(activeX / WIDTH) * 100}%`,
-                top: `${(activeY / HEIGHT) * 100}%`,
-              } as CSSProperties
-            }
-          >
-            <p className="font-medium">
-              {active.label}{active.groupLabel ? ` · ${active.groupLabel}` : ""}
-            </p>
-            <p className="mt-1">
-              {xAxis.displayLabel ?? xAxis.label}: {active.xDisplay ?? formatX(active.x)}
-            </p>
-            <p>
-              {yAxis.displayLabel ?? yAxis.label}: {active.yDisplay ?? formatY(active.y)}
-            </p>
-            {frontierText(active, xAxis, yAxis) && (
-              <p className="mt-1">{frontierText(active, xAxis, yAxis)}</p>
-            )}
-            {!!active.details?.length && <dl className="mt-2 space-y-1 border-t border-current/20 pt-2">{active.details.map(detail => <div key={detail.label} className="flex justify-between gap-3"><dt>{detail.label}</dt><dd className="shrink-0 tabular-nums">{detail.value}</dd></div>)}</dl>}
-          </div>
-        )}
+        <Popover.Root open={active !== null} onOpenChange={open => { if (!open) close(); }}>
+          <Popover.Anchor virtualRef={anchor} />
+          <Popover.Portal container={plot.current}>
+            {active && <Popover.Content
+              id={`${id}-tooltip-${eligible.indexOf(active)}`} role="tooltip" data-chart-tooltip=""
+              side="top" sideOffset={10} collisionPadding={12} sticky="always" updatePositionStrategy="always"
+              onOpenAutoFocus={event => event.preventDefault()} onCloseAutoFocus={event => event.preventDefault()}
+              onInteractOutside={event => {
+                const target = event.detail.originalEvent.target;
+                if (target instanceof Element && target.closest('[data-testid="analytics-point"]')) event.preventDefault();
+              }}
+              onMouseEnter={cancelClose} onMouseLeave={scheduleClose}
+              className="z-50 w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto overscroll-contain rounded-xl border bg-popover p-4 text-xs text-popover-foreground shadow-xl outline-none"
+              style={{ maxHeight: "min(32rem, var(--radix-popover-content-available-height))" }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold leading-snug">{active.label}</p>
+                  {active.groupLabel && <p className="mt-0.5 text-[11px] text-muted-foreground">{active.groupLabel}</p>}
+                </div>
+                <Popover.Close aria-label="Close chart tooltip" className="-mr-1 -mt-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+                  <X className="size-4" aria-hidden="true" />
+                </Popover.Close>
+              </div>
+              <dl className="mt-3 rounded-lg bg-muted/60 px-2.5 py-1">
+                <TooltipMetric label={xAxis.displayLabel ?? xAxis.label} value={active.xDisplay ?? formatX(active.x)} />
+                <TooltipMetric label={yAxis.displayLabel ?? yAxis.label} value={active.yDisplay ?? formatY(active.y)} />
+              </dl>
+              {frontierText(active, xAxis, yAxis) && <p className="mt-2">{frontierText(active, xAxis, yAxis)}</p>}
+              {!!active.details?.length && <dl className="mt-2 divide-y divide-border/60">{active.details.map(detail => <TooltipMetric key={detail.label} {...detail} />)}</dl>}
+            </Popover.Content>}
+          </Popover.Portal>
+        </Popover.Root>
       </div>
     </section>
   );
