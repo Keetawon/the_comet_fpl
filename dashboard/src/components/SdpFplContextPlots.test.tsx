@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SdpMatch } from "@/data/sdpStats";
 import { fplSupplement, sdpMatch, shooting, xg } from "@/test/sdpFixture";
@@ -53,7 +54,7 @@ describe("four observed team context plots", () => {
     expect(f).toHaveAccessibleName(/SDP \/ marked FPL xG \/match: 1; FPL Goals \/match: 2/);
     expect(f).toHaveAccessibleName(/xG total · SDP \/ marked FPL: 2; Goals total · FPL: 4; Goals minus xG · observed total: 2/);
     expect(finishing).toHaveTextContent("does not predict future finishing");
-    expect(within(patterns).getByRole("button")).toHaveAccessibleName(/2 matched observations; Open play: 1; Set piece \(confirmed\): 1; Opponent own goal: 1; Unclassified: 1; Total goals: 4/);
+    expect(within(patterns).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/2 matched observations; Open play: 1; Set piece \(confirmed\): 1; Opponent own goal: 1; Unclassified: 1; Total goals: 4/);
     expect([...patterns.querySelectorAll("[data-pattern]")].map(segment => segment.getAttribute("data-count"))).toEqual(["1", "1", "1", "1"]);
     expect(JSON.stringify(props)).toBe(before);
   });
@@ -66,11 +67,11 @@ describe("four observed team context plots", () => {
     fireEvent.keyDown(points[1], { key: "Enter" }); expect(props.onSelectTeam).toHaveBeenCalledTimes(2);
     fireEvent.keyDown(points[1], { key: " " }); expect(props.onSelectTeam).toHaveBeenCalledTimes(3);
     const patterns = screen.getByRole("article", { name: "Goal patterns plot panel" });
-    fireEvent.click(within(patterns).getByRole("button")); expect(props.onSelectTeam).toHaveBeenCalledTimes(4);
+    fireEvent.click(within(patterns).getByRole("button", { name: /^Arsenal;/ })); expect(props.onSelectTeam).toHaveBeenCalledTimes(4);
     rerender(<SdpFplContextPlots {...props} />);
     expect(screen.getAllByTestId("analytics-point").every(p => p.getAttribute("aria-pressed") === "true")).toBe(true);
     expect(screen.getAllByTestId("analytics-point").map(p => [p.getAttribute("cx"), p.getAttribute("cy"), p.getAttribute("r")])).toEqual(coordinates);
-    expect(within(patterns).getByRole("button")).toHaveAttribute("aria-pressed", "true");
+    expect(within(patterns).getByRole("button", { name: /^Arsenal;/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("excludes incomplete pairs separately, preserves zero observations and labels FPL supplements", () => {
@@ -105,7 +106,7 @@ describe("four observed team context plots", () => {
     rerender(<SdpFplContextPlots {...props} teams={[]} />);
     expect(screen.getAllByText(/0\/0 visible clubs.*League median: 1 eligible clubs/, { selector: "p" })).toHaveLength(3);
     expect(screen.queryByTestId("analytics-point")).not.toBeInTheDocument();
-    expect(within(screen.getByRole("article", { name: "Goal patterns plot panel" })).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Goal patterns plot panel" })).queryByRole("button", { name: /matched observations/ })).not.toBeInTheDocument();
     rerender(<SdpFplContextPlots {...props} />);
     expect(screen.getAllByTestId("analytics-point")).toHaveLength(3);
   });
@@ -120,7 +121,7 @@ describe("four observed team context plots", () => {
     const finishing = screen.getByRole("article", { name: "Goals vs xG plot panel" });
     const patterns = screen.getByRole("article", { name: "Goal patterns plot panel" });
     expect(within(finishing).getByTestId("analytics-point")).toHaveAccessibleName(/xG \/match: 0; FPL Goals \/match: 0/);
-    expect(within(patterns).getByRole("button")).toHaveAccessibleName(/Open play: 0; Set piece \(confirmed\): 0; Opponent own goal: 0; Unclassified: 0; Total goals: 0/);
+    expect(within(patterns).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/Open play: 0; Set piece \(confirmed\): 0; Opponent own goal: 0; Unclassified: 0; Total goals: 0/);
     expect([...patterns.querySelectorAll<HTMLElement>("[data-pattern]")].every(segment => segment.style.width === "0%")).toBe(true);
     props.teams[0].rows[0].sdp.expected_goals = null;
     props.teams[0].rows[1].fpl!.goals_scored = null;
@@ -130,7 +131,7 @@ describe("four observed team context plots", () => {
     rerender(<SdpFplContextPlots {...props} />);
     expect(within(finishing).queryByTestId("analytics-point")).not.toBeInTheDocument();
     expect(within(finishing).getByRole("status")).toHaveTextContent("Missing observations remain unavailable");
-    expect(within(patterns).getByRole("button")).toHaveAccessibleName(/Unavailable: 1\/2 match receipts/);
+    expect(within(patterns).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/Unavailable: 1\/2 match receipts/);
     expect(patterns.querySelector("[data-pattern]")).toBeNull();
   });
 
@@ -141,7 +142,49 @@ describe("four observed team context plots", () => {
     render(<SdpFplContextPlots {...props} teams={teams} filters={{ ...props.filters, to: 1, venue: "home" }} />);
     expect(screen.getAllByTestId("analytics-point").every(point => point.getAttribute("aria-label")?.includes("1 matched observations"))).toBe(true);
     expect(within(screen.getByRole("article", { name: "Goals vs xG plot panel" })).getByTestId("analytics-point")).toHaveAccessibleName(/xG \/match: 1; FPL Goals \/match: 1/);
-    expect(within(screen.getByRole("article", { name: "Goal patterns plot panel" })).getByRole("button")).toHaveAccessibleName(/1 matched observations; Open play: 1; Set piece \(confirmed\): 0; Opponent own goal: 0; Unclassified: 0; Total goals: 1/);
+    expect(within(screen.getByRole("article", { name: "Goal patterns plot panel" })).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/1 matched observations; Open play: 1; Set piece \(confirmed\): 0; Opponent own goal: 0; Unclassified: 0; Total goals: 1/);
     expect(JSON.stringify(props)).toBe(before);
+  });
+
+  it("sorts observed totals descending, keeps zero before missing and breaks ties consistently", () => {
+    const props = inputs();
+    const teams = [
+      { name: "Missing", goals: null }, { name: "Zero", goals: 0 },
+      { name: "Zulu", goals: 4 }, { name: "Most", goals: 12 }, { name: "Alpha", goals: 4 },
+    ].map(({ name, goals }, i) => ({ ...props.teams[0], id: `team:${i}`, name,
+      rows: [sdpMatch({ goal_patterns: goals === null ? null : receipt(goals, 0, 0, 0) })],
+    }));
+    const before = JSON.stringify(teams);
+    const { rerender } = render(<SdpFplContextPlots {...props} teams={teams} />);
+    const order = () => within(screen.getByRole("group", { name: /Observed goal-pattern totals/ }))
+      .getAllByRole("button").map(row => row.getAttribute("aria-label")!.split(";")[0]);
+    expect(order()).toEqual(["Most", "Alpha", "Zulu", "Zero", "Missing"]);
+    rerender(<SdpFplContextPlots {...props} teams={[...teams].reverse()} />);
+    expect(order()).toEqual(["Most", "Alpha", "Zulu", "Zero", "Missing"]);
+    expect(JSON.stringify(teams)).toBe(before);
+  });
+
+  it("expands the same chart, preserves selection and scope, and returns with Escape", async () => {
+    const user = userEvent.setup();
+    const props = inputs();
+    const { rerender } = render(<SdpFplContextPlots {...props} />);
+    const rows = screen.getByRole("group", { name: /Observed goal-pattern totals/ });
+    const before = rows.innerHTML;
+    expect(rows).toHaveClass("max-h-80");
+    await user.click(screen.getByRole("button", { name: "Enter Goal patterns chart fullscreen" }));
+    const dialog = screen.getByRole("dialog", { name: "Goal patterns chart fullscreen" });
+    expect(within(dialog).getByRole("group", { name: /Observed goal-pattern totals/ })).toBe(rows);
+    expect(rows).not.toHaveClass("max-h-80");
+    expect(rows.innerHTML).toBe(before);
+    await user.click(within(dialog).getByRole("button", { name: /^Arsenal;/ }));
+    expect(props.onSelectTeam).toHaveBeenLastCalledWith("team:3");
+    expect(within(dialog).getByRole("button", { name: /^Arsenal;/ })).toHaveAttribute("aria-pressed", "true");
+    const teams = props.teams.map(team => ({ ...team, rows: team.rows.slice(0, 1) }));
+    rerender(<SdpFplContextPlots {...props} teams={teams} filters={{ ...props.filters, to: 1 }} />);
+    expect(within(dialog).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/1 matched observations.*Total goals: 1.*GW1–1/);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(rows).toHaveClass("max-h-80");
+    expect(screen.getByRole("button", { name: "Enter Goal patterns chart fullscreen" })).toHaveFocus();
   });
 });

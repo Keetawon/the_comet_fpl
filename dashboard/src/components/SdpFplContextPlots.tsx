@@ -1,5 +1,6 @@
 import { ChartNoAxesCombined, Flame, Shield, Target } from "lucide-react";
 import { AnalyticsScatter, type AnalyticsScatterPoint } from "@/components/AnalyticsScatter";
+import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import type { SdpMetric } from "@/data/sdpStats";
 import { finite, metricAssumptions, metricCorrections, metricRaw, metricSourceLabel, metricSupplements, metricValue, shotShare } from "@/lib/sdpStats";
 import type { SdpEntity, SdpFilters } from "@/lib/sdpStats";
@@ -90,7 +91,9 @@ export function SdpFplContextPlots({ teams, league, metrics, filters, asOf, sele
       { label: "Goals minus xG · observed total", value: fmt(goals !== null && xg !== null ? goals - xg : null) },
     ];
   };
-  const patterns = teams.map(team => ({ team, ...patternTotals(team) }));
+  const patterns = teams.map(team => ({ team, ...patternTotals(team) })).sort((a, b) =>
+    (b.totals?.total_goals ?? -1) - (a.totals?.total_goals ?? -1) ||
+    a.team.name.localeCompare(b.team.name) || a.team.id.localeCompare(b.team.id));
   const maxGoals = Math.max(1, ...patterns.flatMap(row => row.totals ? [row.totals.total_goals] : []));
   const selectedPattern = patterns.find(row => row.team.id === selectedId);
   const horizonLabel = `${filters.season} GW${filters.from}–${filters.to}; ${filters.recent}; ${filters.venue}`;
@@ -134,29 +137,33 @@ export function SdpFplContextPlots({ teams, league, metrics, filters, asOf, sele
         </article>;
       })}
       <article className="sdp-panel sdp-pattern-plot min-w-0 p-4 sm:p-5" aria-label="Goal patterns plot panel">
-        <div className="sdp-plot-direction mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"><ChartNoAxesCombined className="size-4 shrink-0" aria-hidden="true" />Goal patterns · how the goals were scored</div>
-        <h2 className="text-sm font-semibold">Goal patterns · Observed goals</h2>
-        <p className="mt-1 text-xs text-muted-foreground">{patterns.filter(row => row.totals !== null).length}/{teams.length} visible clubs with receipts for every selected match.</p>
-        <p role="note" className="mt-2 rounded-md bg-muted/60 px-2.5 py-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">How to read: </span>Bar length is total goals in the selected matches. Set piece includes penalties and shows confirmed goals only; unclassified goals remain separate. Compare match counts alongside totals.</p>
-        <p className="mt-1 text-[11px] text-muted-foreground" title={`Observed export ${asOf}; ${horizonLabel}`}>Observed audited receipts · {horizonDisplayLabel}</p>
-        <ul className="my-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-muted-foreground" aria-label="Goal pattern legend">{goalPatterns.map(pattern => <li key={pattern.key} className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm" style={{ background: pattern.color }} aria-hidden="true" />{pattern.label}</li>)}</ul>
-        {!patterns.length && <p role="status" className="mt-4 text-sm text-muted-foreground">No clubs in this range.</p>}
-        <div className="sdp-pattern-rows max-h-80 space-y-1 overflow-y-auto" role="group" aria-label={`Observed goal-pattern totals; export ${asOf}; ${horizonLabel}`}>
-          {patterns.map(({ team, measured, totals }) => {
-            const summary = totals ? `${goalPatterns.map(pattern => `${pattern.label}: ${totals[pattern.key]}`).join("; ")}; Total goals: ${totals.total_goals}` : `Unavailable: ${measured}/${team.rows.length} match receipts`;
-            return <button type="button" key={team.id} className="sdp-pattern-row w-full rounded-lg px-2 py-2 text-left" aria-pressed={selectedId === team.id}
-              onClick={() => onSelectTeam(team.id)} aria-label={`${team.name}; ${team.rows.length} matched observations; ${summary}; observed export ${asOf}; ${horizonLabel}`} title={`${team.name} · ${team.rows.length} matches · ${summary}`}>
-              <span className="truncate text-xs font-semibold">{team.rows.at(-1)?.team_short_name ?? team.name}</span>
-              <span className="min-w-0">{totals ? <span className="sdp-pattern-track flex h-4 w-full overflow-hidden rounded-sm bg-muted/60" aria-hidden="true">{goalPatterns.map(pattern => <span key={pattern.key} data-pattern={pattern.key} data-count={totals[pattern.key]} style={{ width: `${totals[pattern.key] / maxGoals * 100}%`, backgroundColor: pattern.color }} />)}</span> : <span className="text-[11px] text-muted-foreground">Unavailable · {measured}/{team.rows.length} match receipts</span>}</span>
-              <span className="text-right text-xs tabular-nums">{totals ? totals.total_goals : "—"}<span className="block text-[10px] text-muted-foreground">{team.rows.length} matches</span></span>
-            </button>;
-          })}
-        </div>
-        {selectedPattern?.totals && <div className="mt-4 rounded-lg border bg-muted/30 p-3" aria-label={`${selectedPattern.team.name} goal-pattern detail`}>
-          <p className="text-xs font-semibold">{selectedPattern.team.name} · {selectedPattern.team.rows.length} matches · {selectedPattern.totals.total_goals} goals</p>
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">{goalPatterns.map(pattern => <div key={pattern.key}><dt className="text-muted-foreground">{pattern.label}</dt><dd className="font-medium tabular-nums">{selectedPattern.totals![pattern.key]}</dd></div>)}</dl>
-        </div>}
-        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">Missing match receipts leave a club unavailable. Categories come from published audit receipts and describe past goals only.</p>
+        <DecisionTableFullscreen label="Goal patterns chart" className="rounded-none border-0" contentClassName="overflow-y-auto">
+          {({ isFullscreen }) => <div className={isFullscreen ? "p-4 sm:p-6" : ""}>
+            <div className="sdp-plot-direction mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"><ChartNoAxesCombined className="size-4 shrink-0" aria-hidden="true" />Goal patterns · how the goals were scored</div>
+            <h2 className="text-sm font-semibold">Goal patterns · Observed goals</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{patterns.filter(row => row.totals !== null).length}/{teams.length} visible clubs with receipts for every selected match.</p>
+            <p role="note" className="mt-2 rounded-md bg-muted/60 px-2.5 py-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">How to read: </span>Bar length is total goals in the selected matches, sorted highest first. Set piece includes penalties and shows confirmed goals only; unclassified goals remain separate. Compare match counts alongside totals.</p>
+            <p className="mt-1 text-[11px] text-muted-foreground" title={`Observed export ${asOf}; ${horizonLabel}`}>Observed audited receipts · {horizonDisplayLabel}</p>
+            <ul className="my-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-muted-foreground" aria-label="Goal pattern legend">{goalPatterns.map(pattern => <li key={pattern.key} className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm" style={{ background: pattern.color }} aria-hidden="true" />{pattern.label}</li>)}</ul>
+            {!patterns.length && <p role="status" className="mt-4 text-sm text-muted-foreground">No clubs in this range.</p>}
+            <div className={`sdp-pattern-rows space-y-1${isFullscreen ? "" : " max-h-80 overflow-y-auto"}`} role="group" aria-label={`Observed goal-pattern totals; export ${asOf}; ${horizonLabel}`}>
+              {patterns.map(({ team, measured, totals }) => {
+                const summary = totals ? `${goalPatterns.map(pattern => `${pattern.label}: ${totals[pattern.key]}`).join("; ")}; Total goals: ${totals.total_goals}` : `Unavailable: ${measured}/${team.rows.length} match receipts`;
+                return <button type="button" key={team.id} className="sdp-pattern-row w-full rounded-lg px-2 py-2 text-left" aria-pressed={selectedId === team.id}
+                  onClick={() => onSelectTeam(team.id)} aria-label={`${team.name}; ${team.rows.length} matched observations; ${summary}; observed export ${asOf}; ${horizonLabel}`} title={`${team.name} · ${team.rows.length} matches · ${summary}`}>
+                  <span className="truncate text-xs font-semibold">{team.rows.at(-1)?.team_short_name ?? team.name}</span>
+                  <span className="min-w-0">{totals ? <span className="sdp-pattern-track flex h-4 w-full overflow-hidden rounded-sm bg-muted/60" aria-hidden="true">{goalPatterns.map(pattern => <span key={pattern.key} data-pattern={pattern.key} data-count={totals[pattern.key]} style={{ width: `${totals[pattern.key] / maxGoals * 100}%`, backgroundColor: pattern.color }} />)}</span> : <span className="text-[11px] text-muted-foreground">Unavailable · {measured}/{team.rows.length} match receipts</span>}</span>
+                  <span className="text-right text-xs tabular-nums">{totals ? totals.total_goals : "—"}<span className="block text-[10px] text-muted-foreground">{team.rows.length} matches</span></span>
+                </button>;
+              })}
+            </div>
+            {selectedPattern?.totals && <div className="mt-4 rounded-lg border bg-muted/30 p-3" aria-label={`${selectedPattern.team.name} goal-pattern detail`}>
+              <p className="text-xs font-semibold">{selectedPattern.team.name} · {selectedPattern.team.rows.length} matches · {selectedPattern.totals.total_goals} goals</p>
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">{goalPatterns.map(pattern => <div key={pattern.key}><dt className="text-muted-foreground">{pattern.label}</dt><dd className="font-medium tabular-nums">{selectedPattern.totals![pattern.key]}</dd></div>)}</dl>
+            </div>}
+            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">Missing match receipts leave a club unavailable. Categories come from published audit receipts and describe past goals only.</p>
+          </div>}
+        </DecisionTableFullscreen>
       </article>
     </div>
     <p className="text-xs leading-relaxed text-muted-foreground">‡ Owner-confirmed · § Assumed omitted zero · [FPL] Historical xG supplement. These are observed, unadjusted match statistics; recent opponents and sample size matter. Team clean sheets are match outcomes, not player clean-sheet points or future probabilities. Provider observation qualifiers remain in the metric table; model forecasts are unchanged.</p>
