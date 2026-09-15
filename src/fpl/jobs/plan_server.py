@@ -863,7 +863,18 @@ def _allowed_origin(origin: str | None) -> bool:
     if not origin:
         return True  # not a browser (curl, tests): no Origin header
     try:
-        host = urlparse(origin).hostname or ""
+        parsed = urlparse(origin)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+        ):
+            return False
+        _ = parsed.port  # Reject malformed ports before echoing an Origin.
+        host = parsed.hostname or ""
     except ValueError:
         return False
     if host in {"localhost", "127.0.0.1", "::1"}:
@@ -899,11 +910,21 @@ def _peer_authenticated(peer_host: str, supplied_token: str | None, expected_tok
 
 def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
     class PlanRequestHandler(BaseHTTPRequestHandler):
+        def _allowed_host(self) -> bool:
+            # Never resolve request hostnames: a rebinding name must not reach the
+            # loopback no-token path, even when the browser omits Origin on GET.
+            hosts = self.headers.get_all("Host", [])
+            return len(hosts) == 1 and bool(hosts[0]) and _allowed_origin(f"http://{hosts[0]}")
+
         def _authorized(self) -> bool:
-            return _allowed_origin(self.headers.get("Origin")) and _peer_authenticated(
-                self.client_address[0],
-                self.headers.get(ACCESS_TOKEN_HEADER),
-                state.access_token,
+            return (
+                self._allowed_host()
+                and _allowed_origin(self.headers.get("Origin"))
+                and _peer_authenticated(
+                    self.client_address[0],
+                    self.headers.get(ACCESS_TOKEN_HEADER),
+                    state.access_token,
+                )
             )
 
         def _respond(self, status: int, payload: dict[str, Any]) -> None:
@@ -912,6 +933,8 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
             # Echo the allowed same-machine origin; no wildcard so other sites cannot trigger runs.
             if origin and _allowed_origin(origin):
                 self.send_header("Access-Control-Allow-Origin", origin)
@@ -921,7 +944,7 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
 
         def do_OPTIONS(self) -> None:
             origin = self.headers.get("Origin")
-            if origin and not _allowed_origin(origin):
+            if not self._allowed_host() or not _allowed_origin(origin):
                 self._respond(403, {"error": "origin not allowed"})
                 return
             self.send_response(204)
@@ -930,6 +953,27 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
             self.send_header("Access-Control-Allow-Headers", f"Content-Type, {ACCESS_TOKEN_HEADER}")
             self.send_header("Content-Length", "0")
             self.end_headers()
+
+        def _read_body(self, limit: int) -> bytes:
+            lengths = self.headers.get_all("Content-Length", [])
+            if (
+                len(lengths) != 1
+                or self.headers.get("Transfer-Encoding") is not None
+                or self.headers.get_content_type() != "application/json"
+            ):
+                raise ValueError("expected a length-delimited JSON request")
+            length = int(lengths[0])
+            if length <= 0 or length > limit:
+                raise ValueError("missing or oversized request body")
+            previous_timeout = self.connection.gettimeout()
+            try:
+                self.connection.settimeout(5.0)
+                payload = self.rfile.read(length)
+            finally:
+                self.connection.settimeout(previous_timeout)
+            if len(payload) != length:
+                raise ValueError("short request body")
+            return payload
 
         def do_GET(self) -> None:
             route = urlparse(self.path).path
@@ -965,17 +1009,7 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                 return
             if route == "/insights/summary":
                 try:
-                    length = int(self.headers.get("Content-Length") or 0)
-                    if length <= 0 or length > MAX_INSIGHT_BODY_BYTES:
-                        raise ValueError("missing or oversized insight request body")
-                    previous_timeout = self.connection.gettimeout()
-                    try:
-                        self.connection.settimeout(5.0)
-                        payload = self.rfile.read(length)
-                    finally:
-                        self.connection.settimeout(previous_timeout)
-                    if len(payload) != length:
-                        raise ValueError("short insight request body")
+                    payload = self._read_body(MAX_INSIGHT_BODY_BYTES)
                     request = parse_insight_request_bytes(payload)
                     insight_response = state.insight_service.generate(
                         request, dashboard_data_dir=state.dashboard_data_dir
@@ -1005,10 +1039,10 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                     self._respond_insight_error(InsightErrorCode.PROVIDER_UNAVAILABLE, 502)
                 return
             try:
-                length = int(self.headers.get("Content-Length") or 0)
-                if length <= 0 or length > MAX_BODY_BYTES:
-                    raise RequestError("missing or oversized request body")
-                body = json.loads(self.rfile.read(length).decode("utf-8"))
+                try:
+                    body = json.loads(self._read_body(MAX_BODY_BYTES).decode("utf-8"))
+                except (TimeoutError, ValueError) as exc:
+                    raise RequestError("invalid or incomplete JSON request body") from exc
                 if not isinstance(body, dict):
                     raise RequestError("request body must be a JSON object")
                 if route == "/plan":

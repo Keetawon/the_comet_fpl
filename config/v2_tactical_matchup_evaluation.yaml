@@ -1,0 +1,42 @@
+contract_version: '1.0'
+candidate: retrospective_tactical_matchup_team_environment_v1
+incumbent: trailing_goals_attack_defence
+evidence_class: retrospective_backfill_development
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+coverage_report: results/v2_tactical_metric_audit.json
+coverage_sha256: 66a7364de7af030361640db56c922e963ebf8e2853ab500e2ca0d124f4ad0f92
+reference: results/v2_corroborated_zero_sot_development.json
+reference_sha256: e8d1a5c0fcce42946d3bf8e798f52e208ac79168c2453e4c0840c1be65c009c5
+eligible_seasons: ['2023-24', '2025-26']
+expected_rows: 1520
+expected_folds: 76
+coverage_threshold: 0.95
+coverage_rule: complete_season_both_sides_all_five_dimensions_and_one_prior_full_season
+dimensions: [attack_precision, dangerous_territory, control, directness, defensive_suppression]
+provider_fields: [ontargetScoringAtt, totalScoringAtt, touchesInOppBox, possessionPercentage, fwdPass, totalPass]
+version_policy: earliest_successful_complete_match_stats_payload_by_fetched_at_then_payload_id
+recent_weights: [1.0, 0.707, 0.5, 0.354, 0.25]
+shrinkage_matches: 2.0
+season_carryover: none_recent_state_league_prior_expands
+style_ridge_penalty: 1.0
+minimum_fit_rows: 160
+goal_penalties: [null, 10.0, 1.0, 0.1]
+inner_holdout_gameweeks: 6
+minimum_inner_training_gameweeks: 10
+tie_tolerance: 1.0e-12
+maximum_log_correction: 0.5
+rate_floor: 0.05
+maximum_goals: 10
+interactions: [own_precision_x_opponent_suppression, own_territory_x_opponent_suppression, own_directness_x_opponent_control]
+diagnostics: [recent_state_only_no_interactions, predicted_state_no_interactions]
+diagnostic_selection: reuse_primary_selected_penalty_no_independent_search_or_gate
+seed: 20260904
+minimum_log_lift: 0.01
+minimum_cs_brier_lift: 0.01
+maximum_crps_regression: 0.0
+maximum_season_log_regression: 0.0
+maximum_season_cs_brier_regression: 0.0
+maximum_pit80_absolute_error: 0.05
+formal_runs: 1
+require_clean_worktree: true
+promotion_permitted: false

@@ -1,0 +1,540 @@
+{
+  "all_scores_and_slices_independently_recomputed": true,
+  "audit_source_sha256": "a3dce0a9b08e0495b0dd948f2b28407d8b98e6a6993ffd6fe6f45d255842d20f",
+  "checks": 5214137,
+  "completed": true,
+  "database_read_only": true,
+  "direct_price_proxy_rows": 821,
+  "ended_at_utc": "2026-09-07T09:50:25.178537+00:00",
+  "evaluation_sha": "54d9ffee89e161f6a57f4e35d4b93b4de2893b54",
+  "failure_count": 0,
+  "failures": [],
+  "folds": 114,
+  "formal_candidate_reruns": 0,
+  "gate_results": {
+    "calibration": true,
+    "joint_lift_vs_incumbent": true,
+    "joint_lift_vs_position": true,
+    "proxy_population": true,
+    "red_brier": false,
+    "red_log": false,
+    "same_population": true,
+    "season_joint": true,
+    "yellow_brier": true,
+    "yellow_log_lift": true,
+    "zero_leakage": true
+  },
+  "maximum_numeric_difference": 1.9290125052862095e-15,
+  "model_fits": 0,
+  "overall": {
+    "candidate": {
+      "calibration": {
+        "red": {
+          "bias": -0.00028826576178198743,
+          "mean_probability": 0.0014868480645104452,
+          "observed_rate": 0.0017751138262924327,
+          "reliability": {
+            "buckets": [
+              {
+                "lower": 0.0,
+                "mean_predicted": 0.0014868480645104632,
+                "n": 86755,
+                "observed_rate": 0.0017751138262924327,
+                "upper": 0.1
+              },
+              {
+                "lower": 0.1,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.2
+              },
+              {
+                "lower": 0.2,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.3
+              },
+              {
+                "lower": 0.3,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.4
+              },
+              {
+                "lower": 0.4,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.5
+              },
+              {
+                "lower": 0.5,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.6
+              },
+              {
+                "lower": 0.6,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.7
+              },
+              {
+                "lower": 0.7,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.8
+              },
+              {
+                "lower": 0.8,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.9
+              },
+              {
+                "lower": 0.9,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 1.0
+              }
+            ]
+          }
+        },
+        "yellow": {
+          "bias": -0.004006706918361638,
+          "mean_probability": 0.04858968522041999,
+          "observed_rate": 0.052596392138781624,
+          "reliability": {
+            "buckets": [
+              {
+                "lower": 0.0,
+                "mean_predicted": 0.03016405147018861,
+                "n": 70790,
+                "observed_rate": 0.02986297499646843,
+                "upper": 0.1
+              },
+              {
+                "lower": 0.1,
+                "mean_predicted": 0.1296870652818801,
+                "n": 15845,
+                "observed_rate": 0.15291890186178606,
+                "upper": 0.2
+              },
+              {
+                "lower": 0.2,
+                "mean_predicted": 0.2099449027623377,
+                "n": 120,
+                "observed_rate": 0.21666666666666667,
+                "upper": 0.3
+              },
+              {
+                "lower": 0.3,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.4
+              },
+              {
+                "lower": 0.4,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.5
+              },
+              {
+                "lower": 0.5,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.6
+              },
+              {
+                "lower": 0.6,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.7
+              },
+              {
+                "lower": 0.7,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.8
+              },
+              {
+                "lower": 0.8,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.9
+              },
+              {
+                "lower": 0.9,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 1.0
+              }
+            ]
+          }
+        }
+      },
+      "joint_log": 0.1830695159403432,
+      "red_average_precision": 0.005024884433812203,
+      "red_brier": 0.001768280548994889,
+      "red_log": 0.011827157519642589,
+      "yellow_brier": 0.04653209345556699,
+      "yellow_log": 0.1714726301812744
+    },
+    "incumbent_zero": {
+      "calibration": {
+        "red": {
+          "bias": -0.0017751138262924327,
+          "mean_probability": 0.0,
+          "observed_rate": 0.0017751138262924327,
+          "reliability": {
+            "buckets": [
+              {
+                "lower": 0.0,
+                "mean_predicted": 0.0,
+                "n": 86755,
+                "observed_rate": 0.0017751138262924327,
+                "upper": 0.1
+              },
+              {
+                "lower": 0.1,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.2
+              },
+              {
+                "lower": 0.2,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.3
+              },
+              {
+                "lower": 0.3,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.4
+              },
+              {
+                "lower": 0.4,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.5
+              },
+              {
+                "lower": 0.5,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.6
+              },
+              {
+                "lower": 0.6,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.7
+              },
+              {
+                "lower": 0.7,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.8
+              },
+              {
+                "lower": 0.8,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.9
+              },
+              {
+                "lower": 0.9,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 1.0
+              }
+            ]
+          }
+        },
+        "yellow": {
+          "bias": -0.052596392138781624,
+          "mean_probability": 0.0,
+          "observed_rate": 0.052596392138781624,
+          "reliability": {
+            "buckets": [
+              {
+                "lower": 0.0,
+                "mean_predicted": 0.0,
+                "n": 86755,
+                "observed_rate": 0.052596392138781624,
+                "upper": 0.1
+              },
+              {
+                "lower": 0.1,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.2
+              },
+              {
+                "lower": 0.2,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.3
+              },
+              {
+                "lower": 0.3,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.4
+              },
+              {
+                "lower": 0.4,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.5
+              },
+              {
+                "lower": 0.5,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.6
+              },
+              {
+                "lower": 0.6,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.7
+              },
+              {
+                "lower": 0.7,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.8
+              },
+              {
+                "lower": 0.8,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.9
+              },
+              {
+                "lower": 0.9,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 1.0
+              }
+            ]
+          }
+        }
+      },
+      "joint_log": 1.5023402294257961,
+      "red_average_precision": 0.0017751138262924327,
+      "red_brier": 0.0017751138262924327,
+      "red_log": 0.049048207617462924,
+      "yellow_brier": 0.052596392138781624,
+      "yellow_log": 1.4532920218083334
+    },
+    "position_control": {
+      "calibration": {
+        "red": {
+          "bias": -0.00027781553714492635,
+          "mean_probability": 0.0014972982891475065,
+          "observed_rate": 0.0017751138262924327,
+          "reliability": {
+            "buckets": [
+              {
+                "lower": 0.0,
+                "mean_predicted": 0.0014972982891475713,
+                "n": 86755,
+                "observed_rate": 0.0017751138262924327,
+                "upper": 0.1
+              },
+              {
+                "lower": 0.1,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.2
+              },
+              {
+                "lower": 0.2,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.3
+              },
+              {
+                "lower": 0.3,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.4
+              },
+              {
+                "lower": 0.4,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.5
+              },
+              {
+                "lower": 0.5,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.6
+              },
+              {
+                "lower": 0.6,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.7
+              },
+              {
+                "lower": 0.7,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.8
+              },
+              {
+                "lower": 0.8,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.9
+              },
+              {
+                "lower": 0.9,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 1.0
+              }
+            ]
+          }
+        },
+        "yellow": {
+          "bias": -0.003997427259659247,
+          "mean_probability": 0.04859896487912238,
+          "observed_rate": 0.052596392138781624,
+          "reliability": {
+            "buckets": [
+              {
+                "lower": 0.0,
+                "mean_predicted": 0.029259471322461733,
+                "n": 68880,
+                "observed_rate": 0.030589430894308944,
+                "upper": 0.1
+              },
+              {
+                "lower": 0.1,
+                "mean_predicted": 0.12312228326696498,
+                "n": 17875,
+                "observed_rate": 0.1373986013986014,
+                "upper": 0.2
+              },
+              {
+                "lower": 0.2,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.3
+              },
+              {
+                "lower": 0.3,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.4
+              },
+              {
+                "lower": 0.4,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.5
+              },
+              {
+                "lower": 0.5,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.6
+              },
+              {
+                "lower": 0.6,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.7
+              },
+              {
+                "lower": 0.7,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.8
+              },
+              {
+                "lower": 0.8,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 0.9
+              },
+              {
+                "lower": 0.9,
+                "mean_predicted": null,
+                "n": 0,
+                "observed_rate": null,
+                "upper": 1.0
+              }
+            ]
+          }
+        }
+      },
+      "joint_log": 0.18518336444356648,
+      "red_average_precision": 0.005279843805506509,
+      "red_brier": 0.0017680906424515429,
+      "red_log": 0.011812451757518437,
+      "yellow_brier": 0.046917416285793226,
+      "yellow_log": 0.1735839791206924
+    }
+  },
+  "result_path": "D:\\Personal\\fpl-operations\\verification\\disciplinary-development-20260907T094700Z\\result.json",
+  "result_sha256": "e2348f5ae4dddc623a4c55a5d9d0864cd61d6ba691929ade52b6b49993de3b3b",
+  "retained_verdict": "INCONCLUSIVE",
+  "rows": 86755,
+  "started_at_utc": "2026-09-07T09:49:53.758918+00:00"
+}

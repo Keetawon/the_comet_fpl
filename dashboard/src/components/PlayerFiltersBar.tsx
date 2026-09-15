@@ -23,6 +23,7 @@ export interface PlayerFilters {
   maxPrice: string; // £m, "" = unbounded
   minMinutes: string; // L5 in shared routes; selected-Actual Min/g on Players; "" = unbounded
   availability: "all" | "available" | "flagged";
+  hideUnavailable: boolean;
   formWindow: WindowLabel;
 }
 
@@ -33,6 +34,7 @@ export const INITIAL_PLAYER_FILTERS: PlayerFilters = {
   maxPrice: "",
   minMinutes: "",
   availability: "all",
+  hideUnavailable: true,
   formWindow: "last_5",
 };
 
@@ -53,6 +55,7 @@ export const FORM_WINDOW_LABEL: Record<WindowLabel, string> = {
 };
 
 export function matchesPlayerFilters(p: PlayerRecord, f: PlayerFilters): boolean {
+  if (f.hideUnavailable && p.availability_status === "u") return false;
   const minPrice = f.minPrice === "" ? null : Number(f.minPrice) * 10;
   const maxPrice = f.maxPrice === "" ? null : Number(f.maxPrice) * 10;
   const minMinutes = f.minMinutes === "" ? null : Number(f.minMinutes);
@@ -251,6 +254,18 @@ export function PlayerFiltersBar({
         <ToggleGroupItem value="available">Available</ToggleGroupItem>
         <ToggleGroupItem value="flagged">Flagged</ToggleGroupItem>
       </ToggleGroup>
+      <label
+        className="flex cursor-pointer items-center gap-2"
+        title="Hide only FPL status u (unavailable), such as players who left the league. Injured, doubtful, suspended and unknown statuses remain visible. Uses the selected forecast's published status; does not change xP or squad decisions."
+      >
+        <input
+          type="checkbox"
+          className="size-4 accent-primary"
+          checked={filters.hideUnavailable}
+          onChange={(event) => set({ hideUnavailable: event.target.checked })}
+        />
+        Hide unavailable
+      </label>
       {showFormWindow && (
         <div className="flex items-center gap-2">
           <span>Past form window</span>

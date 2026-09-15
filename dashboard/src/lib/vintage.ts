@@ -47,18 +47,19 @@ export function vintageOptions(runs: RunLike[], plans: PlanLike[]): VintageOptio
 }
 
 /**
- * The run the pages open on: the default-architecture run an optimizer plan references,
- * else the caller's fallback (e.g. summary.json's latest_run), else the first run.
+ * The run the exploratory pages open on: the caller's explicit latest published run,
+ * else the default-architecture run an optimizer plan references, else the first run.
+ * Old optimizer plans remain selectable but must not pin weekly fixture views to a stale horizon.
  */
 export function defaultVintageRunId(
   runs: RunLike[],
   plans: PlanLike[],
   fallback: string | null = null,
 ): string | null {
+  if (fallback && runs.some((r) => r.run_id === fallback)) return fallback;
   const withPlan = plans.find((p) => resolvedPlanKind(p) === "platform_default");
   if (withPlan && runs.some((r) => r.run_id === withPlan.forecast_run_id)) {
     return withPlan.forecast_run_id;
   }
-  if (fallback && runs.some((r) => r.run_id === fallback)) return fallback;
   return runs[0]?.run_id ?? null;
 }

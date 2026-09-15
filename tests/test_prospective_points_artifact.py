@@ -217,3 +217,14 @@ def test_atomic_replace_failure_preserves_old_artifact_and_cleans_temp(
 
     assert path.read_text(encoding="utf-8") == "previous\n"
     assert list(tmp_path.glob(".forecast.jsonl.*.tmp")) == []
+
+
+def test_immutable_publication_refuses_existing_vintage(tmp_path: Path) -> None:
+    path = tmp_path / "forecast.jsonl"
+    artifact = _artifact()
+    write_artifact_atomic(path, artifact, overwrite=False)
+    original = path.read_bytes()
+    with pytest.raises(FileExistsError):
+        write_artifact_atomic(path, artifact, overwrite=False)
+    assert path.read_bytes() == original == artifact_bytes(artifact)
+    assert list(tmp_path.glob(".forecast.jsonl.*.tmp")) == []

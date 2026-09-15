@@ -455,16 +455,16 @@ export function NextGwPage() {
             Builder.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3 text-sm text-muted-foreground">
           {state.plans.length > 1 && (
             <Select value={plan.optimizer_run_id} onValueChange={setPlanId}>
-              <SelectTrigger size="sm" className="w-80" aria-label="Platform model">
+              <SelectTrigger size="sm" className="w-full min-w-0 max-w-full overflow-hidden sm:w-80 [&_[data-slot=select-value]]:min-w-0" aria-label="Platform model">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {state.plans.map((p) => (
                   <SelectItem key={p.optimizer_run_id} value={p.optimizer_run_id}>
-                    {planDisplayLabel(p)}
+                    {planDisplayLabel(p)} · GW{p.gw_from}–{p.gw_to}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -496,31 +496,6 @@ export function NextGwPage() {
         </div>
       </div>
 
-      <InsightSummaryPanel
-        items={[
-          {
-            id: "scope.plan",
-            statement: `${state.plans.length} formal platform output${state.plans.length === 1 ? " is" : "s are"} published; this view shows ${planDisplayLabel(plan)} for GW${plan.gw_from}-${plan.gw_to}.`,
-          },
-          {
-            id: "sum.first_week_xp",
-            statement: `The published GW${week.gw} player xP values sum to ${firstWeekXp.toFixed(3)} before captain multiplication and hit costs.`,
-          },
-          {
-            id: "roles.captain",
-            statement: `Captain is ${captain?.web_name ?? week.captain_code}; vice-captain is ${viceCaptain?.web_name ?? week.vice_captain_code}.`,
-          },
-          {
-            id: "coverage.horizon_changes",
-            statement: `${horizonTransfers} incoming change${horizonTransfers === 1 ? " is" : "s are"} published across the ${plan.weeks.length}-gameweek horizon; GW${week.gw} hit cost is ${week.hit_points} points.`,
-          },
-        ]}
-        caveats={[
-          "This panel is deterministic-only because the route contains decision material.",
-          "No values from this page are sent to an AI provider.",
-        ]}
-        localOnlyReason="AI explanation is disabled on decision routes; no page state is sent."
-      />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>
@@ -534,6 +509,10 @@ export function NextGwPage() {
         </span>
       </div>
 
+      <p className="rounded-md border bg-muted/30 p-3 text-sm" aria-label="Selected plan vintage">
+        <strong>Plan GW{plan.gw_from}–{plan.gw_to}</strong> · Forecast as of {plan.as_of ?? "Unavailable"}.
+        Observed-data refreshes keep this forecast unchanged. Historical plans retain their original dates.
+      </p>
       <XiBlock week={week} />
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -567,7 +546,7 @@ export function NextGwPage() {
 
       <FilterPanel>
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <ToggleGroup
               type="single"
               value={squadOnly}
@@ -649,6 +628,31 @@ export function NextGwPage() {
         as of {plan.as_of?.replace("T", " ").slice(0, 16)} UTC. Availability is a reported
         overlay valid for GW{plan.gw_from} only; its later-GW reuse is a scenario assumption.
       </p>
+      <InsightSummaryPanel
+        items={[
+          {
+            id: "scope.plan",
+            statement: `${state.plans.length} formal platform output${state.plans.length === 1 ? " is" : "s are"} published; this view shows ${planDisplayLabel(plan)} for GW${plan.gw_from}-${plan.gw_to}.`,
+          },
+          {
+            id: "sum.first_week_xp",
+            statement: `The published GW${week.gw} player xP values sum to ${firstWeekXp.toFixed(3)} before captain multiplication and hit costs.`,
+          },
+          {
+            id: "roles.captain",
+            statement: `Captain is ${captain?.web_name ?? week.captain_code}; vice-captain is ${viceCaptain?.web_name ?? week.vice_captain_code}.`,
+          },
+          {
+            id: "coverage.horizon_changes",
+            statement: `${horizonTransfers} incoming change${horizonTransfers === 1 ? " is" : "s are"} published across the ${plan.weeks.length}-gameweek horizon; GW${week.gw} hit cost is ${week.hit_points} points.`,
+          },
+        ]}
+        caveats={[
+          "This panel is deterministic-only because the route contains decision material.",
+          "No values from this page are sent to an AI provider.",
+        ]}
+        localOnlyReason="AI explanation is disabled on decision routes; no page state is sent."
+      />
     </div>
   );
 }

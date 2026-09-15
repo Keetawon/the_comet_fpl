@@ -15,6 +15,8 @@ import {
   Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SupportButton } from "./SupportButton";
+import { isPageAvailable } from "@/lib/pageAccess";
 
 export interface PageDef {
   id: string;
@@ -26,6 +28,7 @@ const PAGES: readonly PageDef[] = [
   { id: "summary", label: "Summary", icon: LayoutDashboard },
   { id: "fixtures", label: "Fixture matrix", icon: CalendarDays },
   { id: "team-analytics", label: "Team analytics", icon: Goal },
+  { id: "team-stat-sdp", label: "Team stat from SDP", icon: Goal },
   { id: "players", label: "Players", icon: Users },
   { id: "player-analytics", label: "Player analytics", icon: ScatterChart },
   { id: "next-gw", label: "Next GW suggestion", icon: ClipboardList },
@@ -55,8 +58,8 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
           <div className="text-xs text-muted-foreground">FPL decision dashboard</div>
         </div>
       </div>
-      <ul className="flex-1 space-y-1 px-1.5 md:px-2">
-        {PAGES.map((page) => {
+      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto px-1.5 md:px-2">
+        {PAGES.filter((page) => isPageAvailable(page.id)).map((page) => {
           const Icon = page.icon;
           return (
             <li key={page.id}>
@@ -79,6 +82,9 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
           );
         })}
       </ul>
+      <div className="shrink-0 border-t px-1.5 pt-3 pb-2 md:px-3">
+        <SupportButton />
+      </div>
       <p className="hidden px-4 py-3 text-[10px] leading-snug text-muted-foreground md:block">
         Reads only the static JSON read models exported by the publish layer. It never
         queries DuckDB.

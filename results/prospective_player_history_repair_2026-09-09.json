@@ -1,0 +1,402 @@
+{
+  "added_rows": 0,
+  "canonical_artifact_replay": true,
+  "cases": [
+    {
+      "code": 475168,
+      "consumed_appeared_latest5": [
+        {
+          "code": 475168,
+          "fixture": 355,
+          "gw": 36,
+          "minutes": 90,
+          "season": "2025-26"
+        },
+        {
+          "code": 475168,
+          "fixture": 378,
+          "gw": 38,
+          "minutes": 90,
+          "season": "2025-26"
+        },
+        {
+          "code": 475168,
+          "fixture": 10,
+          "gw": 1,
+          "minutes": 90,
+          "season": "2026-27"
+        },
+        {
+          "code": 475168,
+          "fixture": 16,
+          "gw": 2,
+          "minutes": 90,
+          "season": "2026-27"
+        },
+        {
+          "code": 475168,
+          "fixture": 29,
+          "gw": 3,
+          "minutes": 90,
+          "season": "2026-27"
+        }
+      ],
+      "consumed_latest5": [
+        {
+          "code": 475168,
+          "fixture": 365,
+          "gw": 37,
+          "minutes": 0,
+          "season": "2025-26"
+        },
+        {
+          "code": 475168,
+          "fixture": 378,
+          "gw": 38,
+          "minutes": 90,
+          "season": "2025-26"
+        },
+        {
+          "code": 475168,
+          "fixture": 10,
+          "gw": 1,
+          "minutes": 90,
+          "season": "2026-27"
+        },
+        {
+          "code": 475168,
+          "fixture": 16,
+          "gw": 2,
+          "minutes": 90,
+          "season": "2026-27"
+        },
+        {
+          "code": 475168,
+          "fixture": 29,
+          "gw": 3,
+          "minutes": 90,
+          "season": "2026-27"
+        }
+      ],
+      "gameweeks": [
+        {
+          "gw": 4,
+          "new_bonus": 1.02,
+          "new_xp": 5.1659999999999995,
+          "old_bonus": 0.61,
+          "old_xp": 3.5829999999999997
+        },
+        {
+          "gw": 5,
+          "new_bonus": 0.843,
+          "new_xp": 4.4325,
+          "old_bonus": 0.4345,
+          "old_xp": 3.1135
+        },
+        {
+          "gw": 6,
+          "new_bonus": 0.976,
+          "new_xp": 5.0440000000000005,
+          "old_bonus": 0.558,
+          "old_xp": 3.43
+        },
+        {
+          "gw": 7,
+          "new_bonus": 0.805,
+          "new_xp": 4.352,
+          "old_bonus": 0.4505,
+          "old_xp": 3.029
+        },
+        {
+          "gw": 8,
+          "new_bonus": 1.026,
+          "new_xp": 5.2435,
+          "old_bonus": 0.572,
+          "old_xp": 3.5645000000000002
+        }
+      ],
+      "name": "Jo\u00e3o Pedro"
+    },
+    {
+      "code": 224117,
+      "consumed_appeared_latest5": [
+        {
+          "code": 224117,
+          "fixture": 341,
+          "gw": 35,
+          "minutes": 63,
+          "season": "2025-26"
+        },
+        {
+          "code": 224117,
+          "fixture": 360,
+          "gw": 36,
+          "minutes": 90,
+          "season": "2025-26"
+        },
+        {
+          "code": 224117,
+          "fixture": 361,
+          "gw": 37,
+          "minutes": 17,
+          "season": "2025-26"
+        },
+        {
+          "code": 224117,
+          "fixture": 373,
+          "gw": 38,
+          "minutes": 7,
+          "season": "2025-26"
+        },
+        {
+          "code": 224117,
+          "fixture": 29,
+          "gw": 3,
+          "minutes": 12,
+          "season": "2026-27"
+        }
+      ],
+      "consumed_latest5": [
+        {
+          "code": 224117,
+          "fixture": 361,
+          "gw": 37,
+          "minutes": 17,
+          "season": "2025-26"
+        },
+        {
+          "code": 224117,
+          "fixture": 373,
+          "gw": 38,
+          "minutes": 7,
+          "season": "2025-26"
+        },
+        {
+          "code": 224117,
+          "fixture": 1,
+          "gw": 1,
+          "minutes": 0,
+          "season": "2026-27"
+        },
+        {
+          "code": 224117,
+          "fixture": 20,
+          "gw": 2,
+          "minutes": 0,
+          "season": "2026-27"
+        },
+        {
+          "code": 224117,
+          "fixture": 29,
+          "gw": 3,
+          "minutes": 12,
+          "season": "2026-27"
+        }
+      ],
+      "gameweeks": [
+        {
+          "gw": 4,
+          "new_bonus": 0.4325,
+          "new_xp": 2.813,
+          "old_bonus": 0.5255,
+          "old_xp": 3.3275
+        },
+        {
+          "gw": 5,
+          "new_bonus": 0.464,
+          "new_xp": 2.939,
+          "old_bonus": 0.548,
+          "old_xp": 3.488
+        },
+        {
+          "gw": 6,
+          "new_bonus": 0.5545,
+          "new_xp": 3.3955,
+          "old_bonus": 0.697,
+          "old_xp": 4.354
+        },
+        {
+          "gw": 7,
+          "new_bonus": 0.415,
+          "new_xp": 2.6765,
+          "old_bonus": 0.488,
+          "old_xp": 3.287
+        },
+        {
+          "gw": 8,
+          "new_bonus": 0.491,
+          "new_xp": 2.993,
+          "old_bonus": 0.639,
+          "old_xp": 3.8195
+        }
+      ],
+      "name": "Gy\u00f6keres"
+    }
+  ],
+  "changed_xp_rows": 3182,
+  "common_player_gw_rows": 3270,
+  "contracts_seeds_draws_unchanged": true,
+  "current_history_by_gw": [
+    {
+      "gw": 1,
+      "len": 610,
+      "season": "2026-27"
+    },
+    {
+      "gw": 2,
+      "len": 626,
+      "season": "2026-27"
+    },
+    {
+      "gw": 3,
+      "len": 654,
+      "season": "2026-27"
+    }
+  ],
+  "dashboard": {
+    "browser_execution": "unavailable: in-app browser setup raised No browser is available; discovery returned []",
+    "horizon": [
+      4,
+      8
+    ],
+    "latest_primary_run_id": "660302216bdfac866003ef50e8077953bb297ff87412252bc796f27c8adbdd2f",
+    "matched_player_fixture_xp": 3270,
+    "old_new_team_forecast_rows_equal": true,
+    "old_plans_regenerated": false,
+    "plan_server_restart": "automatic approval review rejected restart command: blocked by policy; previous server unchanged",
+    "preview_url": "http://127.0.0.1:4173/#players",
+    "served_file_hashes": {
+      "fixture_matrix.json": "41f8c07f23c71b0727e03a9d7f47ae4cd4f08827aec0460760b18f9e7669eb18",
+      "manifest.json": "4731f0838f3a0da899ff253c796e8b9164450d5f7a74b4e0110711338f0da692",
+      "players.json": "d52e74cf11ec6ae2cbf5e85e0bccd93605b7305b713eecd68db02f2ffbf4180f",
+      "summary.json": "23b5dfdd2413de04b8ac59e0246d9fcd7485de292d01e85156e57f8c98e397be"
+    }
+  },
+  "emitter_commit": "78753019e109f25ddb030325eff1010e63af8c52",
+  "external_receipts_root": "D:\\Personal\\fpl-operations\\verification\\player-history-repair-20260909",
+  "fixtures": 50,
+  "history": {
+    "as_of": "2026-09-09T05:52:47.485385+00:00",
+    "contract": "prospective_archive_live_player_history/v1",
+    "latest_live_known_at": "2026-09-09T05:41:30.018462+00:00",
+    "live_captures": [
+      "161dba4a-44b3-45b0-b7ee-ec94ff0d5fcc"
+    ],
+    "live_row_count": 1890,
+    "live_versions_sha256": "725a2cd538b00f0d7c2177a678cf170d2cf22e152d50a2dcd1772b12aff4fe86",
+    "observations_sha256": "8f59ae9d739212d9f3ca7bc1ecb6e33c85507d5d23844a6d3328d60b9871fe20",
+    "prior_season_appearance": "archive-only completed-season prior; unchanged",
+    "row_count": 140597
+  },
+  "minutes_trace": [
+    {
+      "code": 475168,
+      "minutes_bins": [
+        0.12162112081389775,
+        0.14867430566543574,
+        0.10040902382622181,
+        0.6292955496944447
+      ],
+      "p60": 0.7297045735206665,
+      "p_any": 0.8783788791861022,
+      "prior": [
+        0.9210526315789473,
+        38
+      ],
+      "recent": [
+        [
+          0.22119320973053622,
+          0.1318207456196212,
+          0.08902676443296155,
+          0.557959280216881
+        ],
+        5
+      ]
+    },
+    {
+      "code": 224117,
+      "minutes_bins": [
+        0.13849418582937756,
+        0.6316555508544195,
+        0.11600385130543386,
+        0.11384641201076916
+      ],
+      "p60": 0.229850263316203,
+      "p_any": 0.8615058141706224,
+      "prior": [
+        0.9473684210526315,
+        38
+      ],
+      "recent": [
+        [
+          0.3388402685540656,
+          0.4847619220902094,
+          0.08902676443296155,
+          0.08737104492276342
+        ],
+        5
+      ]
+    }
+  ],
+  "new_as_of": "2026-09-09T05:52:47.485385+00:00",
+  "old_as_of": "2026-09-08T03:52:24.844595+00:00",
+  "operations": {
+    "completed_gameweeks": [
+      1,
+      2,
+      3
+    ],
+    "core_invalid_current_fixtures": [
+      7,
+      19,
+      20,
+      28
+    ],
+    "fixed_origin_checkpoint_pair_unchanged": "0cca9d810d3f984f30f53d37a8ad3a494f20266d910e4acc1ec161bce582fafb",
+    "owner_display_corrections_change_provider_health": false,
+    "provider_core_valid_matches": 26,
+    "retained_completed_fixtures": 30
+  },
+  "pair": {
+    "as_of": "2026-09-09 05:52:47.485385+00",
+    "created_at": "2026-09-09 05:53:48.660523+00",
+    "deadline_evidence": "{\"capture_id\":\"161dba4a-44b3-45b0-b7ee-ec94ff0d5fcc\",\"captured_at\":\"2026-09-09T05:41:30.018462+00:00\",\"deadlines\":{\"4\":\"2026-09-12T12:30:00+00:00\",\"5\":\"2026-09-18T17:30:00+00:00\",\"6\":\"2026-10-10T10:00:00+00:00\",\"7\":\"2026-10-17T10:00:00+00:00\",\"8\":\"2026-10-23T17:30:00+00:00\"},\"payload_sha256\":\"f4753cb884875c15a4fc3022ac7a5746ce18dc561c0ac17c76ae48f1ac74cf8a\",\"rule\":\"created_at (actual record entry instant) <= the official deadline of every included gameweek, and every predicted kickoff strictly future; deadlines witnessed from the cutoff-known bootstrap-static payload the runs consumed, with the retained raw bytes re-hashed\",\"source\":\"snapshot_payload/snapshot_capture bootstrap-static\"}",
+    "prediction_id": "3c7f1f8b86e5972f74db07116d2d13cc86461c248e79a6a680bfdf8fbc29efb9",
+    "primary_artifact_sha256": "3a7aca22fbdb3b55227d30b4e427255792f4b0aaeddba808389ec9d5e11811f4",
+    "primary_run_id": "660302216bdfac866003ef50e8077953bb297ff87412252bc796f27c8adbdd2f",
+    "shadow_artifact_sha256": "6eac960a24d9b00bd792765d74051119c01ccfdd65015eacebed10ef1c9ebae9",
+    "shadow_run_id": "025dc87e9e6d70c05c0cbf8a780643345473aaa216c83210d665aa1d835356ab"
+  },
+  "player_fixture_rows": 3270,
+  "player_gw_rows": 3270,
+  "removed_rows": 0,
+  "roster": 654,
+  "schema": "fpl.prospective-player-history-repair/v1",
+  "selector_counts": {
+    "SDP_INCOMPLETE_FALLBACK": 29,
+    "SDP_PRIMARY": 21
+  },
+  "source_database_sha256": "915561bdc110beeebb1978010e43cf78becb74745f38f7478c33fd7726624d83",
+  "status": "forward_source_repair_validation_not_predictive_evaluation",
+  "team_fixture_rows": 100,
+  "verification": {
+    "changed_frozen_config_or_model_estimator_files": 0,
+    "dashboard_python_deselected": 4,
+    "dashboard_python_passed": 83,
+    "dashboard_python_skipped": 3,
+    "focused_pytest_passed": 56,
+    "formal_historical_audits_rerun": false,
+    "format": "5 changed files pass; two pre-existing dashboard files retain inherited formatting failures outside edited blocks",
+    "frontend_passed": 45,
+    "global_ruff": "PASS",
+    "large_suite": "1339 passed, 149 deselected; stopped after one freeze-hash failure and two inherited reference-fixture setup errors",
+    "large_suite_failure_attribution": {
+      "freeze_hash": "test_audit_json expects the old orchestration bytes; that source intentionally changed under owner authorization. Old recorded digest remains unmodified.",
+      "reference_fixture": "test_development_reference_components expects one minutes fit but automatic incumbent shadow invokes two; reproduced on pre-repair b47ce77 source using synthetic inputs."
+    },
+    "preserved_frozen_files_and_artifacts": 348,
+    "relevant_broader_pytest_passed": 231,
+    "strict_mypy": "PASS (229 source files)",
+    "vite_build": "PASS; existing chunk-size warning"
+  }
+}

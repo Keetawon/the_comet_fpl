@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "execution_failure",
+  "emitted_by": "post_failure_handoff_not_successful_formal_runner",
+  "candidate": "retrospective_tactical_matchup_team_environment_v1",
+  "incumbent": "trailing_goals_attack_defence",
+  "evidence_class": "retrospective_backfill_development",
+  "development_only": true,
+  "promotion_permitted": false,
+  "completed": false,
+  "verdict": "INCONCLUSIVE",
+  "verdict_reason": "Numerical execution failure before complete scoring; not a measured materiality failure or scientific refutation.",
+  "scientific_performance_verdict_available": false,
+  "formal_attempts_claimed": 1,
+  "normal_runner_result_published": false,
+  "candidate_metrics": null,
+  "candidate_fixture_predictions": null,
+  "style_forecast_diagnostics": null,
+  "candidate_fold_diagnostics": null,
+  "paired_uncertainty": null,
+  "relative_goal_log_lift": null,
+  "relative_clean_sheet_brier_lift": null,
+  "planned_population": {
+    "eligible_seasons": ["2023-24", "2025-26"],
+    "fixtures": 760,
+    "team_sides": 1520,
+    "outer_folds": 76,
+    "historical_prequential_batches": 189
+  },
+  "failure": {
+    "exit_code": 1,
+    "exception_class": "ValueError",
+    "message": "Poisson Newton backtracking failed to find a safe descent step",
+    "last_started_historical_batch": 123,
+    "season": "2024-25",
+    "gameweek": 10,
+    "last_progress_time_utc": "2026-09-07T04:33:18.312+00:00",
+    "location": "src/fpl/validate/tactical_math.py:227",
+    "call_path": [
+      "dev_v2_tactical_matchup.run_formal:658",
+      "tactical_matchup.run_tactical_walk_forward:351",
+      "tactical_matchup._goal_fit:170",
+      "tactical_math.fit_poisson_offset:227"
+    ],
+    "failed_layer": "primary_13_feature_poisson_offset_fit",
+    "backtracking_trials_exhausted": 30,
+    "failing_penalty": null,
+    "failing_iteration": null,
+    "exact_numerical_cause_established": false,
+    "partial_predictions_persisted": false,
+    "completed_outer_row_count_established": false,
+    "successful_normal_runner_postflight": false,
+    "real_data_refit_after_failure": false,
+    "restart_permitted": false
+  },
+  "incumbent_reproduction": {
+    "completed_before_candidate_claim": true,
+    "rows": 1520,
+    "folds": 76,
+    "retained_reference_checked": true,
+    "actual_prospective_adapter_checked": true,
+    "identities_outcomes_cutoffs_match": true,
+    "maximum_absolute_pmf_difference": 0.0,
+    "absolute_tolerance": 1e-12,
+    "mean_log_score": 1.4976075134626126,
+    "crps": 0.6309287474700235,
+    "rps": 0.6309287474700235,
+    "pit_interval_80_coverage": 0.8105263157894737,
+    "mean_absolute_error": 0.9283510477669025,
+    "mean_error": -0.06878436807403207,
+    "predicted_rate_mean": 1.4384524740312312,
+    "predicted_rate_standard_deviation": 0.4968152952641397,
+    "spearman_within_gameweek": 0.30992478169306303
+  },
+  "independent_stored_incumbent_arithmetic": {
+    "source": "results/v2_corroborated_zero_sot_development.json",
+    "method": "read_only_reciprocal_PMF_zero_mass_and_recorded_opponent_goals_no_model_fit",
+    "overall": {
+      "rows": 1520,
+      "mean_log_score": 1.4976075134626126,
+      "crps": 0.6309287474700235,
+      "clean_sheet_brier": 0.1700257027333172
+    },
+    "2023-24": {
+      "rows": 760,
+      "mean_log_score": 1.5483525624393155,
+      "crps": 0.6659456544106771,
+      "clean_sheet_brier": 0.16034483299294514
+    },
+    "2025-26": {
+      "rows": 760,
+      "mean_log_score": 1.44686246448591,
+      "crps": 0.5959118405293697,
+      "clean_sheet_brier": 0.17970657247368924
+    }
+  },
+  "attempt_provenance": {
+    "git_head": "672a36d9d6fc446bb7492eb89eebd63f15bee860",
+    "clean_worktree_before_claim": true,
+    "claimed_at_utc": "2026-09-07T04:31:55.882994+00:00",
+    "claim_sha256": "ef89aa2b510d35ea34fadc18db18999e22ba366c322dbc9f76c73d8f3a6c1733",
+    "config_sha256": "a640ff31f6d1701df12ee9ba3267636ea2856a49cd1496ef68d658b60317c781",
+    "database_path": "D:\\Personal\\workspace\\the_comet_fpl\\.worktrees\\sdp_test\\data\\fpl.duckdb",
+    "database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+    "coverage_sha256": "66a7364de7af030361640db56c922e963ebf8e2853ab500e2ca0d124f4ad0f92",
+    "sdp_capture_manifest_sha256": "f12a915d14e2f8d3c8ca718b242b91c41c3d3c6d3546383d319c7692f878835d",
+    "sdp_version_policy": "earliest_successful_complete_match_stats_payload_by_fetched_at_then_payload_id",
+    "known_at_rewritten": false,
+    "seed": 20260904,
+    "python": "3.12.14",
+    "python_executable": "D:\\Personal\\fpl-operations\\.venv\\Scripts\\python.exe",
+    "model_source_sha256": {
+      "src/fpl/validate/tactical_math.py": "3aa8ab5907b234321d2a3b38ad0fd9b127af85e74593b5f72647422999898ed4",
+      "src/fpl/validate/tactical_matchup.py": "3034d2daa65fc36e8ee634f9dae936ad06a98a821fe89db9e1360c1cb358f4c5",
+      "src/fpl/validate/dev_v2_tactical_matchup.py": "fc08bd8022657aaf70e4d92c79e7aa105e7422ce7f4e3cfa9741a71d68035784"
+    },
+    "log_path": "D:\\Personal\\fpl-operations\\verification\\tactical-20260907\\formal-once.log",
+    "log_sha256": "319534fd65bbb7803042b898a3663948de23ff672b67f2d38f84f120a6c93bca"
+  },
+  "independent_post_failure_verification": {
+    "report_path": "D:\\Personal\\fpl-operations\\verification\\tactical-20260907\\independent-failure-verification.json",
+    "source_and_config_unchanged": true,
+    "research_database_hash_unchanged": true,
+    "original_root_database_hash_unchanged": true,
+    "prior_result_files_preserved": 18,
+    "normal_result_absence_verified_before_this_failure_record": true,
+    "full_worktree_clean_before_handoff_was_observed": true,
+    "this_record_is_not_a_successful_runner_postflight": true
+  },
+  "next_execution_requires": "Separate explicit authorization and a preregistered numerical-method amendment; preserve this failed attempt and do not restart V1."
+}

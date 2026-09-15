@@ -1,14 +1,16 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadSummary } from "@/data/load";
 import sample from "@/data/sampleFixtureMatrix.json";
-import type { FixtureScheduleOverlay, TeamRecord } from "@/data/types";
+import summarySample from "@/data/sampleSummary.json";
+import type { FixtureScheduleOverlay, SummaryData, TeamRecord } from "@/data/types";
 import { TeamAnalyticsPage } from "./TeamAnalyticsPage";
 
 vi.mock("@/data/load", () => ({
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
+  loadSummary: vi.fn(),
 }));
 
 const teams = sample.teams as unknown as TeamRecord[];
@@ -35,6 +37,7 @@ beforeEach(() => {
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
   vi.mocked(loadNextGw).mockResolvedValue({ plans: [] });
+  vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
 });
 
 describe("TeamAnalyticsPage", () => {
@@ -248,7 +251,7 @@ describe("TeamAnalyticsPage", () => {
     expect(screen.getByText(/may post-date an older run/i)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Exact team analytics values" });
     expect(within(table).getByText("Observed form anchor")).toBeInTheDocument();
-    expect(within(table).getAllByText("2025-26 GW38").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("Archived 2025-26 GW38").length).toBeGreaterThan(0);
   });
 
   it("clears stale horizontal bounds when the analytical scope changes", async () => {

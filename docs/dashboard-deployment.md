@@ -6,13 +6,17 @@ optimizer, and local plan server are never deployed.
 
 ## What the hosted site can do
 
-- Summary, fixtures, players, platform Next-GW suggestion, separate player/team
-  prediction-versus-actual, and optimizer audit read one validated static JSON generation.
+- Summary, fixtures, players, SDP team statistics, and separate player/team
+  prediction-versus-actual read one validated static JSON generation.
 - Player/team deep analytics remain static: they filter, sum published expectations, and draw
   presentation geometry over that same generation.
-- Squad Draft remains browser-local. A friend's selections stay in that browser's local storage.
-- Plan Builder can review rules, but the hosted build does not probe or expose the Python/PuLP
-  service. Exact solves remain a trusted-machine workflow.
+- Hosted builds (`VITE_HOSTED_STATIC=true`) hide Next GW suggestion, Optimizer audit,
+  Plan Builder, and Squad Draft, including direct hash navigation. Summary hides optimizer
+  squad cards. The local build retains these tools; exact solves remain a trusted-machine workflow.
+  Every local-server client request also fails closed in hosted mode.
+- Buy Me a Coffee opens the owner-provided `https://buymeacoffee.com/thecomet` in a new tab
+  with `noopener noreferrer`. Payment handling stays on that external site; there is no embedded
+  payment widget or third-party script in the Dashboard.
 - Every route includes its implemented network-free deterministic insight summary. The seven public
   renderer-eligible routes are Summary, Fixture matrix, Players, Player analytics, Team analytics,
   Player prediction vs actual, and Team prediction vs actual. Next GW suggestion, Optimizer audit,
@@ -27,6 +31,11 @@ The public package therefore removes every `user_custom` plan, converts workstat
 provenance paths to their safe repository-relative form, rejects secret-like fields and absolute
 local paths, rebuilds all manifest hashes, and re-runs `validate_dashboard_json`. The canonical
 internal generation is read-only input and is never rewritten by packaging.
+
+Hiding a page is not access control for downloadable files. The unchanged public-generation
+contract still carries reviewed formal plan metadata for vintage identity. Never publish a local
+`dashboard/public/data` directory directly: use the existing sanitized release workflow.
+See [public-readiness security review](dashboard-public-readiness-security-2026-09-15.md).
 
 ## One-time setup
 

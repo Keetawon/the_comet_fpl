@@ -1,0 +1,131 @@
+{
+  "all_failures_windows_export_symlink_privilege": true,
+  "collected": 2964,
+  "failures": [
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.207638514a14475fbd0752f8824fb2f4' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_export_writes_complete_co0\\\\.published.pointer.2ab1cd30e1a342ad9ceb78a0cb9be24b.tmp'",
+      "node": "tests.test_bi_export::test_export_writes_complete_contract_and_preserves_nulls",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.ea17cc98d7fd42aaa2f682bee41f4491' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_team_fixture_ease_indices0\\\\.published.pointer.09c4f51ee94245c4ad8a274890736ba6.tmp'",
+      "node": "tests.test_bi_export::test_team_fixture_ease_indices_are_directed_and_keep_raw_lambdas",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.03af7f35c03447b7bc01a819a4168f1a' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_append_only_player_and_te0\\\\.published.pointer.6a2d4dc18f874b49be3215cc640fc850.tmp'",
+      "node": "tests.test_bi_export::test_append_only_player_and_team_outcomes_export_as_separate_vintage_free_facts",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.low-published.generation.838eaecde00f45689dc6edda02eb136e' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_low_coverage_and_non_posi0\\\\.low-published.pointer.e245420dab874c60afa6be755d372e36.tmp'",
+      "node": "tests.test_bi_export::test_low_coverage_and_non_positive_denominators_publish_real_nulls",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.first-fdr.generation.7d41e0206ad04ca1aa45a380461c0653' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_official_fdr_is_separate_0\\\\.first-fdr.pointer.066f371941144963aadb7f0eded9b90a.tmp'",
+      "node": "tests.test_bi_export::test_official_fdr_is_separate_and_cannot_change_ease_indices",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.fa5c7e6877a54f7c980cd72faa92f317' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_genuinely_unavailable_off0\\\\.published.pointer.889ff4fe43f14c57b96824685c1739a0.tmp'",
+      "node": "tests.test_bi_export::test_genuinely_unavailable_official_fdr_stays_null",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.a41cce8f39534a26ab7389f56dfcf942' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_zero_recorded_runs_is_a_c0\\\\.published.pointer.b01828edd38543c4b6b1d612114bbe02.tmp'",
+      "node": "tests.test_bi_export::test_zero_recorded_runs_is_a_complete_export",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.36703ed057d14e13a364dc968d9ef365' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_legacy_v1_vintage_with_no0\\\\.published.pointer.1ad15a080f4e4fd2b60ce816c00d7f25.tmp'",
+      "node": "tests.test_bi_export::test_legacy_v1_vintage_with_no_fixture_rows_is_still_complete",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.b3733933813e44519c12e93b4eafe270' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_export_rejects_season_sco0\\\\.published.pointer.131b6baca4024c91a82672861099a6aa.tmp'",
+      "node": "tests.test_bi_export::test_export_rejects_season_scoped_referential_integrity_violation",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.0497752c155348aabad77fd3296457c2' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_source_schema_drift_clean0\\\\.published.pointer.c0cfc70a3b7c48b4b2c2d089fd2b7608.tmp'",
+      "node": "tests.test_bi_export::test_source_schema_drift_cleans_temporary_export_and_keeps_previous_publish",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.first.generation.b2edb00ea38c43e5be1a4fbd1b72873e' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_exports_are_byte_determin0\\\\.first.pointer.82daa02dfdf348e79e3429f61b4a48b5.tmp'",
+      "node": "tests.test_bi_export::test_exports_are_byte_deterministic_except_manifest_created_at",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.c217cef2a7a2416ba04204067a5e5fa9' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_concurrent_writer_is_refu0\\\\.published.pointer.c3d8955bec6145cc9335a86f22fdb9d0.tmp'",
+      "node": "tests.test_bi_export::test_concurrent_writer_is_refused_without_clobbering",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.published.generation.365e67e02ec54b2e8e2e0f21e944a788' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_live_season_dimensions_ar0\\\\.published.pointer.0c1091bf49b04c3095aecfa624dac902.tmp'",
+      "node": "tests.test_bi_export::test_live_season_dimensions_are_sourced_from_the_snapshot_registry",
+      "type": "failure",
+      "winerror1314": true
+    },
+    {
+      "message": "OSError: [WinError 1314] A required privilege is not held by the client: '.archive-export.generation.330fbe47c35d495ea8222b290182a484' -> 'D:\\\\Personal\\\\fpl-operations\\\\verification\\\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0\\\\test_archive_database_exports_0\\\\.archive-export.pointer.ae2a0b3fd7bd462cadfe86d1c10f7f39.tmp'",
+      "node": "tests.test_bi_export::test_archive_database_exports_the_complete_contract",
+      "type": "failure",
+      "winerror1314": true
+    }
+  ],
+  "full_gate_green": false,
+  "new_guard_cases_separate_passes": 13,
+  "passed": 2946,
+  "skips": [
+    {
+      "message": "directory-symlink publication needs a privilege this shell lacks (WinError 1314)",
+      "node": "tests.test_dashboard_json::test_publication_is_reproducible_and_validates"
+    },
+    {
+      "message": "directory-symlink publication needs a privilege this shell lacks (WinError 1314)",
+      "node": "tests.test_dashboard_json::test_concurrent_writer_is_refused_and_unmanaged_targets_are_never_clobbered"
+    },
+    {
+      "message": "directory-symlink publication needs a privilege this shell lacks (WinError 1314)",
+      "node": "tests.test_dashboard_json::test_tampered_source_leaves_the_published_endpoint_intact"
+    },
+    {
+      "message": "directory-symlink publication needs a privilege this shell lacks (WinError 1314)",
+      "node": "tests.test_dashboard_json::test_archive_parquet_export_feeds_valid_read_models"
+    }
+  ],
+  "source_xml": "D:\\Personal\\fpl-operations\\verification\\football-amendment-broad-e4512cd7be5f461595eebada8de04df0-pytest.xml",
+  "source_xml_sha256": "4e41c2687be63e23b05448ccc439db9b8ed69558cf1ede9f221f2294996e87cd",
+  "suites": [
+    {
+      "errors": "0",
+      "failures": "14",
+      "hostname": "P-5CG53231SL",
+      "name": "pytest",
+      "skipped": "4",
+      "tests": "2964",
+      "time": "351.307",
+      "timestamp": "2026-09-07T15:21:39.408028+07:00"
+    }
+  ],
+  "union_note": "Broad collected the ten earlier cache tests; latest 23-test cache run adds thirteen unique guards. Do not add all23 to broad pass count. No reruns in this audit.",
+  "unique_union": {
+    "failed": 14,
+    "passed": 2959,
+    "skipped": 4
+  }
+}

@@ -1,0 +1,95 @@
+contract_version: '1.0'
+registration_status: REGISTERED
+candidate: retrospective_player_points_synthesis_v1
+evidence_class: retrospective_competitive_backfill_and_archive_price_proxy_development
+comparator: retrospective_current_component_proxy_v1_joint_full_points
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+seasons: ['2025-26']
+coverage_rule: 100_percent_all_measured_full_points_components_on_fixed_reference_roster
+expected_rows: 29747
+expected_folds: 38
+expected_fixtures: 380
+expected_direct_proxy_rows: 270
+original_registry_gap_rows: 821
+target_identity_sha256: bbad5f15f9969568af0fc078c80e1725ffaf2b0be661b6831f553cd7c4063566
+target_ruleset: '2026_27'
+target: replayed_full_points_including_recorded_bonus
+support: [0, 34]
+proper_target: min_34_max_0_signed_target
+raw_signed_target_retained: true
+log_floor: 1.0e-12
+draws: 2000
+seed: 202627
+seed_policy: unchanged_existing_per_fixture_sha256_seed
+component_fits: 0
+parameters_selected: none_saved_upstream_fits_only
+tie_breaking: no_selection_fixed_canonical_fixture_and_code_order
+current_comparator_pmf_tolerance: 0.0
+comparator_reproduction: both_unmodified_reference_and_empty_wrapper_every_fixture_before_claim
+acceptance_rule: full_gate_passed_successor_else_incumbent
+accepted_replacements: [saves]
+missing_policy: never_fill_source_NULL_or_select_component_by_actual_appearance
+same_gw_policy: unchanged_whole_GW_prior_state
+cutoff: retained_first_kickoff_proxy_not_true_historical_deadline
+role_confidence: prior_measured_start_then_max_frozen_probability_ge_0_75_else_low_or_unavailable
+rotation_risk: incumbent_p60_lt_0_75
+workload_slices: positive_witnessed_nominal_7d_lower_bound_gt90_le90_or_unavailable_not_exact_rest
+proxy_sensitivity: fixed_all_rows_primary_direct_proxy_exclusion_diagnostic_only
+minimum_log_lift: 0.01
+maximum_position_log_regression: 0.01
+maximum_ranking_regression: 0.01
+maximum_pit80_error: 0.05
+maximum_crps_regression: 0.0
+refutation_relative_regression: 0.01
+uncertainty: player_fixture_paired_GW_clustered_SE_normal_95_interval
+cross_season_robustness: unavailable_one_eligible_season
+clean_worktree_required: true
+one_run: true
+external_write_once: true
+allow_dirty_or_resume: false
+promotion_permitted: false
+external_inputs:
+  minutes_manifest: 5b813d58b71bad97a5c81774aaf70c0bca5f4e0e3bcd518e6f26e0acfea19bac
+  component_manifest: c76bb1936b332b05bd8e3970af3dbd5b3e95c428d1005783c59d82b88d8f04b9
+  roles: c330d44a227ff6ff10cce1d5813f582d48dadfa181816c9333d6389358940809
+  role_versions: 90710c30bae506dc1b4612a9954e48e53a0b29f2bb185bbe4e9c6986074acd29
+  workload: 9c66f48d7879654b7edca33aceadc124bb6cd6ec64cef5c45744c5ab130e364d
+  saves: 79e61b51951e04795c8acb34a3e17db6e1fa417ed3717f7014b40d71ecf39ed2
+  chance: f4cc595384102112ba2c41f118396d4176a6f7000a6f3c1753b5edf1a1ae952f
+component_results:
+  team:
+    file: results/v2_chance_creation_development.json
+    sha256: f4cc595384102112ba2c41f118396d4176a6f7000a6f3c1753b5edf1a1ae952f
+    candidate: retrospective_chance_creation_team_environment_v1
+    incumbent: trailing_goals_attack_defence
+  minutes:
+    file: results/player_workload_minutes_development.json
+    sha256: 9c66f48d7879654b7edca33aceadc124bb6cd6ec64cef5c45744c5ab130e364d
+    candidate: retrospective_workload_role_minutes_offset_v1
+    incumbent: retrospective_current_minutes_proxy_v1
+  goals:
+    file: results/player_opportunity_goals_development.json
+    sha256: 2ae0a4aa06acd0b883b60f5b14151b25f0f506b3260a5bf6d5f2bc70bc402485
+    candidate: retrospective_role_exposure_player_goals_v1
+    incumbent: current_coupled_minutes_gated_goals
+  assists:
+    file: results/player_opportunity_assists_development.json
+    sha256: 0e168375f6928b7245816c77cb0e2de135dcc5ed92984d132d3a18cbf9c74a0b
+    candidate: retrospective_role_exposure_player_assists_v1
+    incumbent: current_coupled_assists
+  cards:
+    file: results/player_disciplinary_development.json
+    sha256: e2348f5ae4dddc623a4c55a5d9d0864cd61d6ba691929ade52b6b49993de3b3b
+    candidate: retrospective_exposure_pooled_disciplinary_v1
+    incumbent: absent_optional_disciplinary_component
+  dc:
+    file: results/v2_dc_predicted_environment_development.json
+    sha256: a54ae95ca7a9111278fbc33b499021fa5bfc2cd6f0dbe788518d7de4157273f3
+    candidate: retrospective_predicted_environment_gamma_poisson_dc_v1
+    incumbent: current_dc_v1
+  saves:
+    file: results/player_saves_opportunity_development.json
+    sha256: 79e61b51951e04795c8acb34a3e17db6e1fa417ed3717f7014b40d71ecf39ed2
+    candidate: retrospective_oos_shot_opportunity_gk_saves_v1
+    incumbent: current_gk_saves_v1
+

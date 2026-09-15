@@ -1,0 +1,1958 @@
+{
+  "artifact": "D:\\Personal\\fpl-operations\\predictions\\sdp-primary-v2-20260907-gw4-8-r2.jsonl",
+  "artifact_sha256": "413e817eb965b328af3b4cd99102584bd4f8b51eb283c418c76e8f37ca7f0be9",
+  "counts": {
+    "FALLBACK": 29,
+    "SDP_PRIMARY": 21,
+    "fixable_now": 0,
+    "legitimate": 29
+  },
+  "cutoff": "2026-09-07 15:20:00.757039+00:00",
+  "database": "D:\\Personal\\fpl-operations\\sdp-primary-runs\\20260908T015110.930266Z-18ecafdb\\before.duckdb",
+  "database_sha256": "b0803710312565d70015adedc5f223a9acc84c04e46578908157037a511437b5",
+  "fixtures": [
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 14,
+        "last_valid_kickoff": "2026-08-29 11:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Nott'm Forest",
+        "team_code": 17
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        },
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        },
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 31,
+      "home": {
+        "blocking_history_fixtures": [
+          20,
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 1,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 25,
+        "last_valid_kickoff": "2026-09-05 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Aston Villa",
+        "team_code": 7
+      },
+      "kickoff": "2026-09-12 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 24,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Fulham",
+        "team_code": 54
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 35,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 21,
+        "last_valid_kickoff": "2026-09-04 19:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Liverpool",
+        "team_code": 14
+      },
+      "kickoff": "2026-09-12 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          20
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 29,
+        "last_valid_kickoff": "2026-09-06 15:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Arsenal",
+        "team_code": 3
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        },
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 36,
+      "home": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 22,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Sunderland",
+        "team_code": 56
+      },
+      "kickoff": "2026-09-12 19:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 30,
+        "last_valid_kickoff": "2026-09-06 13:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Everton",
+        "team_code": 11
+      },
+      "blocking_sources": {
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 37,
+      "home": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 15,
+        "last_valid_kickoff": "2026-08-29 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Spurs",
+        "team_code": 6
+      },
+      "kickoff": "2026-09-12 16:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 23,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Brighton",
+        "team_code": 36
+      },
+      "blocking_sources": {
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 38,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 26,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Coventry City",
+        "team_code": 9
+      },
+      "kickoff": "2026-09-13 13:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          20
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 29,
+        "last_valid_kickoff": "2026-09-06 15:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Arsenal",
+        "team_code": 3
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        },
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 42,
+      "home": {
+        "blocking_history_fixtures": [
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 23,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Brighton",
+        "team_code": 36
+      },
+      "kickoff": "2026-09-19 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 22,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Sunderland",
+        "team_code": 56
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 45,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 26,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Man City",
+        "team_code": 43
+      },
+      "kickoff": "2026-09-20 13:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 26,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Coventry City",
+        "team_code": 9
+      },
+      "blocking_sources": {
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 47,
+      "home": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 14,
+        "last_valid_kickoff": "2026-08-29 11:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Nott'm Forest",
+        "team_code": 17
+      },
+      "kickoff": "2026-09-19 16:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          20,
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 1,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 25,
+        "last_valid_kickoff": "2026-09-05 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Aston Villa",
+        "team_code": 7
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        },
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        },
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 48,
+      "home": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 15,
+        "last_valid_kickoff": "2026-08-29 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Spurs",
+        "team_code": 6
+      },
+      "kickoff": "2026-09-19 11:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 30,
+        "last_valid_kickoff": "2026-09-06 13:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Man Utd",
+        "team_code": 1
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 50,
+      "home": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 24,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Fulham",
+        "team_code": 54
+      },
+      "kickoff": "2026-09-20 15:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 23,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Leeds",
+        "team_code": 2
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 51,
+      "home": {
+        "blocking_history_fixtures": [
+          20
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 29,
+        "last_valid_kickoff": "2026-09-06 15:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Arsenal",
+        "team_code": 3
+      },
+      "kickoff": "2026-10-10 11:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 22,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Brentford",
+        "team_code": 94
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        },
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 52,
+      "home": {
+        "blocking_history_fixtures": [
+          20,
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 1,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 25,
+        "last_valid_kickoff": "2026-09-05 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Aston Villa",
+        "team_code": 7
+      },
+      "kickoff": "2026-10-10 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 14,
+        "last_valid_kickoff": "2026-08-29 11:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Nott'm Forest",
+        "team_code": 17
+      },
+      "blocking_sources": {
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 55,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 24,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Crystal Palace",
+        "team_code": 31
+      },
+      "kickoff": "2026-10-11 13:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 24,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Fulham",
+        "team_code": 54
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 57,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 21,
+        "last_valid_kickoff": "2026-09-04 19:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Ipswich Town",
+        "team_code": 40
+      },
+      "kickoff": "2026-10-10 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 15,
+        "last_valid_kickoff": "2026-08-29 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Spurs",
+        "team_code": 6
+      },
+      "blocking_sources": {
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 59,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 30,
+        "last_valid_kickoff": "2026-09-06 13:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Man Utd",
+        "team_code": 1
+      },
+      "kickoff": "2026-10-10 16:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 23,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Brighton",
+        "team_code": 36
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        },
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 60,
+      "home": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 22,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Sunderland",
+        "team_code": 56
+      },
+      "kickoff": "2026-10-10 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 22,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Sunderland",
+        "team_code": 56
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 61,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 27,
+        "last_valid_kickoff": "2026-09-05 11:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Bournemouth",
+        "team_code": 91
+      },
+      "kickoff": "2026-10-18 13:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 24,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Crystal Palace",
+        "team_code": 31
+      },
+      "blocking_sources": {
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 63,
+      "home": {
+        "blocking_history_fixtures": [
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 23,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Brighton",
+        "team_code": 36
+      },
+      "kickoff": "2026-10-18 13:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 25,
+        "last_valid_kickoff": "2026-09-05 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Hull City",
+        "team_code": 88
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 65,
+      "home": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 24,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Fulham",
+        "team_code": 54
+      },
+      "kickoff": "2026-10-17 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          20,
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 1,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 25,
+        "last_valid_kickoff": "2026-09-05 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Aston Villa",
+        "team_code": 7
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        },
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 68,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 27,
+        "last_valid_kickoff": "2026-09-05 11:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Newcastle",
+        "team_code": 4
+      },
+      "kickoff": "2026-10-17 16:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          20
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 29,
+        "last_valid_kickoff": "2026-09-06 15:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Arsenal",
+        "team_code": 3
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        },
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 69,
+      "home": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 14,
+        "last_valid_kickoff": "2026-08-29 11:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Nott'm Forest",
+        "team_code": 17
+      },
+      "kickoff": "2026-10-18 15:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 26,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Coventry City",
+        "team_code": 9
+      },
+      "blocking_sources": {
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 70,
+      "home": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 15,
+        "last_valid_kickoff": "2026-08-29 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Spurs",
+        "team_code": 6
+      },
+      "kickoff": "2026-10-19 19:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 30,
+        "last_valid_kickoff": "2026-09-06 13:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Everton",
+        "team_code": 11
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 71,
+      "home": {
+        "blocking_history_fixtures": [
+          20
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 29,
+        "last_valid_kickoff": "2026-09-06 15:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Arsenal",
+        "team_code": 3
+      },
+      "kickoff": "2026-10-24 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 26,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Man City",
+        "team_code": 43
+      },
+      "blocking_sources": {
+        "20": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+              "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+              "provider_match_id": 2645206
+            }
+          ]
+        },
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 72,
+      "home": {
+        "blocking_history_fixtures": [
+          20,
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 1,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 25,
+        "last_valid_kickoff": "2026-09-05 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Aston Villa",
+        "team_code": 7
+      },
+      "kickoff": "2026-10-24 11:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 15,
+        "last_valid_kickoff": "2026-08-29 16:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Spurs",
+        "team_code": 6
+      },
+      "blocking_sources": {
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 73,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 29,
+        "last_valid_kickoff": "2026-09-06 15:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Chelsea",
+        "team_code": 8
+      },
+      "kickoff": "2026-10-24 16:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 24,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Fulham",
+        "team_code": 54
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 74,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 26,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Coventry City",
+        "team_code": 9
+      },
+      "kickoff": "2026-10-24 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          28
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 14,
+        "last_valid_kickoff": "2026-08-29 11:30:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Nott'm Forest",
+        "team_code": 17
+      },
+      "blocking_sources": {
+        "28": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 6
+                }
+              ],
+              "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+              "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+              "provider_match_id": 2645224
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 77,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 21,
+        "last_valid_kickoff": "2026-09-04 19:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Ipswich Town",
+        "team_code": 40
+      },
+      "kickoff": "2026-10-23 19:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [
+          7
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 23,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Brighton",
+        "team_code": 36
+      },
+      "blocking_sources": {
+        "7": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 7
+                }
+              ],
+              "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+              "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+              "provider_match_id": 2645201
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 78,
+      "home": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 21,
+        "last_valid_kickoff": "2026-09-04 19:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Liverpool",
+        "team_code": 14
+      },
+      "kickoff": "2026-10-25 14:00:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    },
+    {
+      "action": "Refresh required incomplete provider rows; accept only a genuine valid new version at its actual known_at. Keep this historical cutoff unchanged.",
+      "away": {
+        "blocking_history_fixtures": [],
+        "cold_start": false,
+        "eligible_recent_count": 3,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 23,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Leeds",
+        "team_code": 2
+      },
+      "blocking_sources": {
+        "19": {
+          "reason": "SDP_INCOMPLETE_FALLBACK",
+          "sources": [
+            {
+              "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+              "known_at": "2026-09-07 15:09:28.407423+00:00",
+              "missing_fields": [
+                {
+                  "field": "ontargetScoringAtt",
+                  "team_code": 54
+                }
+              ],
+              "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+              "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+              "provider_match_id": 2645213
+            }
+          ]
+        }
+      },
+      "classification": "LEGITIMATE FAIL-CLOSED",
+      "cutoff": "2026-09-07 15:20:00.757039+00:00",
+      "fixture": 80,
+      "home": {
+        "blocking_history_fixtures": [
+          19
+        ],
+        "cold_start": false,
+        "eligible_recent_count": 2,
+        "frozen_prior_available": true,
+        "last_valid_fixture": 22,
+        "last_valid_kickoff": "2026-09-05 14:00:00+00:00",
+        "last_valid_source_known_at": "2026-09-07T15:09:28.407423+00:00",
+        "maximum_window": 5,
+        "required_recent_count": 3,
+        "team": "Sunderland",
+        "team_code": 56
+      },
+      "kickoff": "2026-10-25 16:30:00+00:00",
+      "reason": "SDP_INCOMPLETE",
+      "selector": "SDP_INCOMPLETE_FALLBACK"
+    }
+  ],
+  "frozen_prior_note": "Frozen Tactical State shrinkage procedure has cutoff-eligible league history; it does not waive an incomplete required match.",
+  "invalid_history": {
+    "19": {
+      "reason": "SDP_INCOMPLETE_FALLBACK",
+      "sources": [
+        {
+          "fetched_at": "2026-09-04 17:47:22.418236+00:00",
+          "known_at": "2026-09-07 15:09:28.407423+00:00",
+          "missing_fields": [
+            {
+              "field": "ontargetScoringAtt",
+              "team_code": 54
+            }
+          ],
+          "payload_id": "885b004a31f5c4fd5f5c12ba72246014a448931294ca1b4f270fce49bbda0ee6",
+          "payload_sha256": "b6c485618dfa6165ff6849e95d68de2dae233bad2f775c12c4f1f6f03cfdebef",
+          "provider_match_id": 2645213
+        }
+      ]
+    },
+    "20": {
+      "reason": "SDP_INCOMPLETE_FALLBACK",
+      "sources": [
+        {
+          "fetched_at": "2026-09-04 16:17:39.555102+00:00",
+          "known_at": "2026-09-07 15:09:28.407423+00:00",
+          "missing_fields": [
+            {
+              "field": "ontargetScoringAtt",
+              "team_code": 7
+            }
+          ],
+          "payload_id": "6b19442d537ef54537bc27450a576ae2e5efec52c1678576d5507213d5065ae8",
+          "payload_sha256": "328b8ab5eee372a245efa70c0ba2f6e721fb057e07f2207cd5fab9eb2829c9d5",
+          "provider_match_id": 2645206
+        }
+      ]
+    },
+    "28": {
+      "reason": "SDP_INCOMPLETE_FALLBACK",
+      "sources": [
+        {
+          "fetched_at": "2026-09-07 14:37:57.266972+00:00",
+          "known_at": "2026-09-07 15:09:28.407423+00:00",
+          "missing_fields": [
+            {
+              "field": "ontargetScoringAtt",
+              "team_code": 6
+            }
+          ],
+          "payload_id": "4d5c29df5c67c61b2bd5b9ac848cbd17585fb864b79bcc90558e586022f0d15b",
+          "payload_sha256": "cac3509c55c5a096c7dbd53ca2f75fa1874562f71fe11d5fad38f8061620d786",
+          "provider_match_id": 2645224
+        }
+      ]
+    },
+    "7": {
+      "reason": "SDP_INCOMPLETE_FALLBACK",
+      "sources": [
+        {
+          "fetched_at": "2026-09-04 17:47:07.612331+00:00",
+          "known_at": "2026-09-07 15:09:28.407423+00:00",
+          "missing_fields": [
+            {
+              "field": "ontargetScoringAtt",
+              "team_code": 7
+            }
+          ],
+          "payload_id": "68b0ccb6d8efbe0afe597b4dc28e6060f41f41cc7c86f7660e2183d9814f8ad3",
+          "payload_sha256": "2881fa9e793ee417aa672ea68bb69272677de7ccadb86f75c71239fbcbe34baf",
+          "provider_match_id": 2645201
+        }
+      ]
+    }
+  }
+}

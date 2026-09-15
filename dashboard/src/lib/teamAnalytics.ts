@@ -1,4 +1,5 @@
 import type { TeamRecord, WindowLabel } from "@/data/types";
+import { teamFormLabel } from "@/lib/teamActuals";
 import {
   classifyPareto,
   type ParetoDirection,
@@ -165,7 +166,7 @@ export function buildTeamAnalyticsRows(
       fallbackFixtureCount: fixtures.filter(
         (fixture) => fixture.stage_a_league_average_team,
       ).length,
-      formLabel: team.form ? `${team.form.season} GW${team.form.as_at_gw}` : null,
+      formLabel: teamFormLabel(team.form, scope.formWindow),
       past: {
         xgForPerMatch: finiteOrNull(form?.team_xg_per_match),
         goalsForPerMatch: finiteOrNull(form?.goals_for_per_match),

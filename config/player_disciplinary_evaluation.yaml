@@ -1,0 +1,64 @@
+contract_version: '1.0'
+candidate: retrospective_exposure_pooled_disciplinary_v1
+evidence_class: retrospective_archive_price_proxy_development
+incumbent: current_composer_zero_disciplinary_component
+informative_control: fold_local_position_exposure_pooled_disciplinary
+minutes_comparator: retrospective_current_minutes_proxy_v1
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+eligible_seasons: ['2023-24', '2024-25', '2025-26']
+expected_folds: 114
+expected_rows: 86755
+expected_direct_price_proxy_rows: 821
+minutes_manifest_sha256: 5b813d58b71bad97a5c81774aaf70c0bca5f4e0e3bcd518e6f26e0acfea19bac
+population: exact_all_player_fixture_rows_in_shared_minutes_reference
+coverage_threshold: 1.0
+target: archive_fpl_scored_disciplinary_outcome
+states: [none, yellow_only, red_outcome]
+encoding: [[0, 0], [1, 0], [0, 1]]
+unexpected_joint_encoding: fail_before_formal_claim_and_reaudit_never_recode_silently
+physical_yellow_red_mutual_exclusion_claim: false
+second_yellow_vs_straight_red: unidentifiable_in_archive_target_diagnostic_only_if_validated_events
+predictors: [prior_player_position_card_counts, prior_player_position_minutes, prior_position_counts, prior_league_counts, shared_predicted_minutes_pmf]
+role_tactical_workload_inputs: none_first_bounded_disciplinary_component
+position_prior_minutes: 4500.0
+player_yellow_prior_minutes: 4500.0
+player_red_prior_minutes: 45000.0
+global_pseudocount_per_cause: 0.5
+global_prior_minutes: 90.0
+player_history: expanding_same_permanent_code_and_observed_position_all_prior_appearances
+transfer: preserve_stable_code_not_club_specific_card_skill
+bin_exposure: fold_local_mean_played_minutes_per_current_four_bin_contract
+empty_bin_exposure_fallback: [0, 59, 89, 90]
+conditional_pmf: competing_cause_hazards_one_none_yellow_red_categorical_per_minutes_bin
+zero_minutes_prediction: exact_none_owner_authorized_on_pitch_approximation
+zero_minutes_observed_cards: retain_and_score_never_erase_bench_card_targets
+null_policy: unavailable_not_zero_no_average_provider_field_imputation
+hyperparameter_grid: none_fixed_single_setting
+tie_breaking: not_applicable_no_search
+same_gw: entire_target_season_gw_excluded_even_if_staggered
+event_cutoff: strictly_before_first_target_kickoff_proxy
+source_completion_margin_hours: 6
+completion_margin_semantics: conservative_exclusion_not_verified_whistle
+future_postponed_source: unavailable_until_event_before_cutoff
+target_roster: inherited_unversioned_archive_roster_proxy_not_deadline_registry
+primary: joint_card_negative_log_score
+metrics: [yellow_log_loss, yellow_brier, red_log_loss, red_brier, joint_card_log_score, red_average_precision, calibration]
+log_probability_floor: 1.0e-12
+reliability_bins: 10
+minimum_joint_lift_vs_incumbent: 0.01
+minimum_joint_lift_vs_informative_control: 0.01
+minimum_yellow_log_lift_vs_informative_control: 0.01
+maximum_yellow_brier_relative_regression: 0.0
+maximum_red_log_relative_regression: 0.0
+maximum_red_brier_relative_regression: 0.0
+maximum_season_joint_log_relative_regression: 0.0
+maximum_marginal_calibration_absolute_bias: 0.02
+refutation_relative_joint_regression: 0.01
+slices: [overall, season, position, home, away, GW1-6, GW7+, direct_price_proxy, non_proxy, cold_start, established, actual_zero_minutes, appeared, actual_minutes_bin]
+sensitivity: same_full_population_primary_and_diagnostic_exclusion_of_821_proxy_rows_no_reselection
+uncertainty: paired_loss_difference_gw_clustered_95_percent_normal_interval
+seed: 20260907
+maximum_fits: 114
+require_clean_worktree: true
+formal_runs: 1
+promotion_permitted: false

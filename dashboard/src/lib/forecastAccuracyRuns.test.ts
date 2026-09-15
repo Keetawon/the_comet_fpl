@@ -134,3 +134,15 @@ describe("forecast accuracy run selection", () => {
     );
   });
 });
+
+
+it("labels incumbent shadow separately and opens its scored primary counterpart", () => {
+  const primary = run("primary", "2026-09-09T06:00:00Z",
+    {...modes("v3", "coupled"), forecast_role: "primary", "football_environment.primary": "sdp_v2"}, 654);
+  const shadow = run("shadow", "2026-09-09T06:01:00Z",
+    {...modes("v3", "coupled"), forecast_role: "shadow_incumbent"}, 654);
+  expect(defaultAccuracyRun([shadow, primary])?.run_id).toBe("primary");
+  expect(accuracyRunLabel(shadow)).toContain("Incumbent shadow");
+  expect(accuracyRunLabel(primary)).toContain("SDP V2 + fallback");
+  expect(defaultAccuracyRun([shadow])?.run_id).toBe("shadow");
+});

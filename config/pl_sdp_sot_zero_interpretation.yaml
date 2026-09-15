@@ -1,0 +1,36 @@
+# Coverage/semantics only. No model is fitted when this policy is audited.
+policy: corroborated_omitted_sot_zero_v1
+evidence_class: retrospective_backfill_development
+reviewed_at: "2026-09-05T19:57:37+00:00"
+definition_source: https://www.statsperform.com/opta-event-definitions/
+independent_zeros:
+  - season: 2024-25
+    fixture: 124
+    team_code: 4
+    sdp_match_id: 2444593
+    source_url: https://www.premierleague.com/en/news/4177908
+    evidence: Newcastle had no shot on target at Palace; their goal was an own goal.
+  - season: 2024-25
+    fixture: 190
+    team_code: 21
+    sdp_match_id: 2444659
+    source_url: https://www.premierleague.com/en/news/4205597
+    evidence: The official report explicitly records no West Ham shot on target.
+  - season: 2024-25
+    fixture: 242
+    team_code: 8
+    sdp_match_id: 2444711
+    source_url: https://www.chelseafc.com/en/news/article/match-report-brighton-3-0-chelsea
+    evidence: Chelsea's own match report explicitly records zero shots on target.
+  - season: 2024-25
+    fixture: 269
+    team_code: 4
+    sdp_match_id: 2444738
+    source_url: https://www.tntsports.co.uk/football/premier-league/2024-2025/live-liverpool-newcastle-united_mtc1524011/live-commentary.shtml
+    evidence: The broadcaster's full-time match coverage explicitly records no Newcastle shot on target.
+  - season: 2025-26
+    fixture: 200
+    team_code: 21
+    sdp_match_id: 2562094
+    source_url: https://www.premierleague.com/en/news/4516523/wolves-3-westham-0-match-report-3-january-2026
+    evidence: The official report explicitly records no West Ham shot on target; shot subcounts conflict.

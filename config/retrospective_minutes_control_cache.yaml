@@ -1,0 +1,21 @@
+contract_version: '1.0'
+identity: retrospective_current_minutes_proxy_cache_v1
+comparator: retrospective_current_minutes_proxy_v1
+evidence_class: retrospective_archive_price_proxy_development
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+seasons: ['2023-24', '2024-25', '2025-26']
+population: unchanged_archive_nonnull_minutes_player_fixture_roster_proxy
+cutoff: first_observed_gameweek_kickoff_proxy
+history: all_prior_nonnull_minutes_actual_kickoff_strictly_before_cutoff
+raw_minutes: concentration_adaptive_shrinkage_player_minutes_v3
+selector: exact_current_prospective_seasonal_math_with_explicit_cold_price_proxy
+fit_policy: one_unmodified_incumbent_fit_per_gameweek_shared_across_later_components
+model_candidate_scoring: false
+expected_folds: 114
+expected_rows: 86755
+expected_direct_proxy_rows: 821
+clean_start_required: true
+clean_end_required: true
+write_once: true
+prior_results_immutable: true
+promotion_permitted: false

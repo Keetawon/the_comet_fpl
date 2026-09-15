@@ -1,0 +1,152 @@
+# V2 team-environment evaluation and ablation contract.
+#
+# Written BEFORE any V2 candidate has been scored, for the same reason
+# config/phase1_evaluation.yaml was: a candidate must not be able to choose its folds,
+# baselines, metrics or gate after seeing its own result.
+#
+# This contract is NEW. It does not amend, reinterpret, re-run or re-judge Phase 1, and no
+# number in config/phase1_evaluation.yaml changes. The V1 Stage A model
+# `trailing_goals_attack_defence` remains the incumbent; nothing here promotes anything.
+
+contract_version: "1.0"
+phase: "v2-football-engine"
+status: development_only
+
+amendments: []
+
+# --------------------------------------------------------------------------------------
+# Population
+# --------------------------------------------------------------------------------------
+population:
+  # One prediction per team per fixture -- both sides scored, as in Phase 1.
+  grain: "team_fixture"
+  source_table: "mart_fact_team_match_stats_v2"
+  # Which provider's rows the run reads. `fpl_archive` is available for every season;
+  # `pl_sdp` requires a capture and, until one exists, a pl_sdp run has an empty population
+  # rather than a silently archive-backed one.
+  provider: "fpl_archive"
+  target: "goals"
+  # Iterated from the values present in the facts, never range(1, 39): 2022-23 has no GW7.
+  gameweeks: "observed_only"
+  seasons_from_data: true
+
+# --------------------------------------------------------------------------------------
+# Walk-forward
+# --------------------------------------------------------------------------------------
+walk_forward:
+  # One fold per observed gameweek: train on everything kicked off before the gameweek's
+  # first kickoff, predict every team-fixture in it, advance.
+  fold_unit: "observed_gameweek"
+  cutoff: "first_kickoff_of_gameweek"
+  # Counted across seasons because the window is expanding. Counting within a season would
+  # drop every season's opening gameweeks -- exactly the cold-start regime being tested.
+  minimum_training_observed_gameweeks: 8
+  minimum_team_matches: 3
+  # Hyperparameters are selected on a holdout INSIDE the training window. Every fold refits.
+  inner_holdout_observed_gameweeks: 6
+  minimum_inner_training_observed_gameweeks: 10
+  # Forbidden, and asserted by the runner rather than trusted:
+  #   * any random or stratified split;
+  #   * any transform fitted across the full dataset;
+  #   * any promoted-team prior drawn from a future promoted cohort;
+  #   * any final league table position;
+  #   * any provider capture whose known_at exceeds the fold cutoff.
+  forbid_random_split: true
+  forbid_full_dataset_fitting: true
+
+# --------------------------------------------------------------------------------------
+# Ablation ladder
+# --------------------------------------------------------------------------------------
+#
+# Each candidate is the SAME estimator with a different signal set, so a difference between
+# two rungs is attributable to the signal rather than to the model. A signal whose coverage
+# in a fold's training window is below `minimum_signal_coverage` does not participate in that
+# fold; that is recorded, not silently ignored.
+ablation:
+  minimum_signal_coverage: 0.25
+  weight_step: 0.25
+  candidates:
+    - name: "v2_env_a_goals"
+      signals: ["goals"]
+      rationale: >-
+        The floor. One signal, so the blend is degenerate and this isolates the estimator
+        itself against the Phase 1 baselines.
+    - name: "v2_env_b_goals_xg"
+      signals: ["goals", "expected_goals"]
+      rationale: >-
+        Adds the chance-quality signal. Approximately V1's information set, so a lift over
+        rung A restates the archive's measured xG finding under the V2 estimator, and the
+        gap between B and V1 measures the blend against V1's row-level xG substitution.
+    - name: "v2_env_c_goals_xg_sot"
+      signals: ["goals", "expected_goals", "shots_on_target"]
+      rationale: >-
+        Adds shot volume on target. Requires the pl_sdp provider; on fpl_archive this rung
+        is expected to reduce to B, which the runner records rather than hides.
+    - name: "v2_env_d_goals_xg_sot_territory"
+      signals:
+        ["goals", "expected_goals", "shots_on_target", "touches_in_opposition_box"]
+      rationale: >-
+        Adds territorial pressure. Requires pl_sdp. Included so the ladder is declared in
+        full before any of it can be scored.
+
+# --------------------------------------------------------------------------------------
+# Baselines
+# --------------------------------------------------------------------------------------
+#
+# The Phase 1 baselines are re-run on identical rows rather than compared against their
+# frozen Phase 1 numbers. Those numbers were produced on a different population definition
+# and quoting them here would be a cross-contract comparison.
+baselines:
+  - "league_average"
+  - "trailing_goals_attack_defence"
+  - "trailing_xg_attack_defence"
+comparator_note: >-
+  `trailing_goals_attack_defence` is the incumbent Stage A model at mean log score 1.5003
+  over its own Phase 1 population. That figure is NOT the bar here: this contract's
+  population and folds differ, so the bar is whatever the baselines score on these rows.
+
+# --------------------------------------------------------------------------------------
+# Metrics
+# --------------------------------------------------------------------------------------
+metrics:
+  primary: "mean_log_score"
+  reported:
+    - "mean_log_score"
+    - "crps"
+    - "rps"
+    - "pit_interval_80_coverage"
+    - "mean_absolute_error"
+    - "mean_error"
+  # The raw central-interval coverage of a count distribution exceeds 0.80 by construction
+  # and prefers biased models; the randomised PIT of a correct model is exactly Uniform(0,1).
+  # This repeats the Phase 1 amendment 1.1 finding rather than rediscovering it.
+  calibration: "randomised_pit"
+
+# --------------------------------------------------------------------------------------
+# Required splits
+# --------------------------------------------------------------------------------------
+#
+# A pooled figure has misled this repository three times -- xG coverage, home advantage, and
+# the Stage A Poisson zero -- so every result must be reported split before it is discussed.
+splits:
+  - "season"
+  - "venue"
+  - "promoted_club"
+  - "early_season"
+  - "signal_coverage_regime"
+
+# --------------------------------------------------------------------------------------
+# Gate
+# --------------------------------------------------------------------------------------
+promotion:
+  # Same 1% aggregate bar as Phase 1, for the same reason: a smaller lift is not
+  # distinguishable from fold noise on ~3,600 team-fixture predictions.
+  minimum_relative_log_lift: 0.01
+  maximum_crps_relative_regression: 0.0
+  pit_interval_80_maximum_absolute_error: 0.05
+  require_each_reported_season_to_pass: true
+  # Even a passing candidate is NOT promoted by this contract. Promotion additionally
+  # requires a prospective, real-deadline validation window, because the historical target
+  # roster and first-kickoff cutoff are unversioned proxies -- the same caveat that keeps
+  # every Stage B and Stage C candidate development-only.
+  promotion_requires_prospective_window: true

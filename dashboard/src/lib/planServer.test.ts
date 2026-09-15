@@ -79,11 +79,23 @@ function response(payload: unknown): Response {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   window.location.hash = "";
   window.localStorage.clear();
 });
 
 describe("plan server token transport", () => {
+  it("never contacts the local server from a hosted static build", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await Promise.allSettled([
+      fetchPlanStatus(), fetchInsightStatus(),
+      solvePlan({ locks: [], excludes: [], minBenchAppearance: 0 }),
+      fetchManagerTeam(123),
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("sends a trimmed token as a header on status and never in the URL", async () => {
     const fetchMock = vi.fn().mockResolvedValue(response(status));
     vi.stubGlobal("fetch", fetchMock);

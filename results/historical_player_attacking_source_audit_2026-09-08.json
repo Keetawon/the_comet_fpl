@@ -1,0 +1,1408 @@
+{
+  "accepted_evidence_class": "ARCHIVED_AS_OF",
+  "accepted_season": "2023-24",
+  "audit_id": "historical_player_attacking_source_audit_v1",
+  "backfill_execution_manifest": "results/historical_player_attacking_backfill_manifest_2026-09-08.json",
+  "bounded_backfill_source_authorized": true,
+  "commit_history": {
+    "2023-24": {
+      "author_committer_disagreements": [
+        {
+          "author": "2024-04-27T08:17:47Z",
+          "committer": "2024-04-27T08:18:04Z",
+          "sha": "6f1e864e5a5bb58a0ad92a257e86df7a7d4816db"
+        },
+        {
+          "author": "2023-09-20T09:22:25Z",
+          "committer": "2023-09-20T09:22:37Z",
+          "sha": "b9122f8c98f10a8217e5fb67bc4de447f6c685d5"
+        }
+      ],
+      "chronology": [
+        {
+          "author_date": "2024-05-27T18:05:02Z",
+          "commit_sha": "204c134d8e90e2b6e69ec252aa3ef6f10f21e73c",
+          "committer_date": "2024-05-27T18:05:02Z",
+          "message": "Add GW38 data",
+          "parent_shas": [
+            "5218c9f360c0415d7272775239f88ab0eb15e91d"
+          ],
+          "tree_sha": "cff93939d33f37229d18c4263372c6689a6616a7"
+        },
+        {
+          "author_date": "2024-05-19T02:36:03Z",
+          "commit_sha": "5218c9f360c0415d7272775239f88ab0eb15e91d",
+          "committer_date": "2024-05-19T02:36:03Z",
+          "message": "Add DGW37 data",
+          "parent_shas": [
+            "2981ebc1630d6e0211c5847731c8fb79cecba785"
+          ],
+          "tree_sha": "afd4d7fecb7e0d5e503298d4e85bb1d84b4194e1"
+        },
+        {
+          "author_date": "2024-05-09T13:15:25Z",
+          "commit_sha": "2981ebc1630d6e0211c5847731c8fb79cecba785",
+          "committer_date": "2024-05-09T13:15:25Z",
+          "message": "Add DGW36 data",
+          "parent_shas": [
+            "8f5194d666f608200916f2b62f8976e8c8beff87"
+          ],
+          "tree_sha": "5a22f03dddf579c860bb4755f6d6895e457481c6"
+        },
+        {
+          "author_date": "2024-05-03T08:34:20Z",
+          "commit_sha": "8f5194d666f608200916f2b62f8976e8c8beff87",
+          "committer_date": "2024-05-03T08:34:20Z",
+          "message": "Add DGW35data",
+          "parent_shas": [
+            "6f1e864e5a5bb58a0ad92a257e86df7a7d4816db"
+          ],
+          "tree_sha": "0878e0841d99d8bd4f3eef7ecffd502299ff78ec"
+        },
+        {
+          "author_date": "2024-04-27T08:17:47Z",
+          "commit_sha": "6f1e864e5a5bb58a0ad92a257e86df7a7d4816db",
+          "committer_date": "2024-04-27T08:18:04Z",
+          "message": "Add DGW34 data",
+          "parent_shas": [
+            "721ee8dea60eee580662c8782a0e4dca6f32a85b"
+          ],
+          "tree_sha": "d6acffd39a0d28530a0f1a16b34e0098df2e6925"
+        },
+        {
+          "author_date": "2024-04-16T08:22:40Z",
+          "commit_sha": "d7e0beda3436c5051116e1aeef652e96119ebf92",
+          "committer_date": "2024-04-16T08:22:40Z",
+          "message": "Add GW33 data",
+          "parent_shas": [
+            "436f1ff2d306783d3e3892dc3d3ce21712cbc08e"
+          ],
+          "tree_sha": "de7d807808f32e45363f954c7d4a986de89df015"
+        },
+        {
+          "author_date": "2024-04-08T10:31:08Z",
+          "commit_sha": "436f1ff2d306783d3e3892dc3d3ce21712cbc08e",
+          "committer_date": "2024-04-08T10:31:08Z",
+          "message": "Add GW32 data",
+          "parent_shas": [
+            "7d6f6aafa94a937116f308a2393fb12e86c5771f"
+          ],
+          "tree_sha": "7c60e34b53d52ba68646b04bb236291613f1a47a"
+        },
+        {
+          "author_date": "2024-04-05T12:24:10Z",
+          "commit_sha": "7d6f6aafa94a937116f308a2393fb12e86c5771f",
+          "committer_date": "2024-04-05T12:24:10Z",
+          "message": "Add GW31 data",
+          "parent_shas": [
+            "4e6447daccfb053a496e4aebd37d264dfa949676"
+          ],
+          "tree_sha": "8be7bb9b5ebc96c0931b472de835fe3fdcb52b6a"
+        },
+        {
+          "author_date": "2024-04-01T08:08:41Z",
+          "commit_sha": "4e6447daccfb053a496e4aebd37d264dfa949676",
+          "committer_date": "2024-04-01T08:08:41Z",
+          "message": "Add GW30 data",
+          "parent_shas": [
+            "288c341ae1f28b260786e862b8917c865d953815"
+          ],
+          "tree_sha": "3dc612ce221c4be0aa6ace3efa01f113fdd92698"
+        },
+        {
+          "author_date": "2024-03-20T17:01:19Z",
+          "commit_sha": "288c341ae1f28b260786e862b8917c865d953815",
+          "committer_date": "2024-03-20T17:01:19Z",
+          "message": "Add missin gw26 data",
+          "parent_shas": [
+            "cbf39345fdfa826870e37b1b2c777b543fed56d2"
+          ],
+          "tree_sha": "090bc52a110a32c6f6bf15346e4f6752d28e1926"
+        },
+        {
+          "author_date": "2024-03-20T16:55:33Z",
+          "commit_sha": "cbf39345fdfa826870e37b1b2c777b543fed56d2",
+          "committer_date": "2024-03-20T16:55:33Z",
+          "message": "Add BGW29 data",
+          "parent_shas": [
+            "8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40"
+          ],
+          "tree_sha": "160cbc484596539eff4db7d7305692aadcc6fee9"
+        },
+        {
+          "author_date": "2024-03-15T13:56:21Z",
+          "commit_sha": "8a90a7cbf8dd336676a5d599605fe4fd5f9bcc40",
+          "committer_date": "2024-03-15T13:56:21Z",
+          "message": "Add DGW28 data",
+          "parent_shas": [
+            "446af195d2ee324a1217f34a5a2b591189efc983"
+          ],
+          "tree_sha": "97ae6db638319370d0ff1dbcb799807272e8a7fd"
+        },
+        {
+          "author_date": "2024-03-07T16:57:57Z",
+          "commit_sha": "446af195d2ee324a1217f34a5a2b591189efc983",
+          "committer_date": "2024-03-07T16:57:57Z",
+          "message": "Add GW27 data",
+          "parent_shas": [
+            "f061aafa88a921dd70fd2b0f72b8020889d8e589"
+          ],
+          "tree_sha": "ff0250aa90e31452fb148cf76f531ccba7a1e6b4"
+        },
+        {
+          "author_date": "2024-02-22T10:23:39Z",
+          "commit_sha": "f061aafa88a921dd70fd2b0f72b8020889d8e589",
+          "committer_date": "2024-02-22T10:23:39Z",
+          "message": "ADd DGW25 data",
+          "parent_shas": [
+            "73cf14c852c5bbafde20ba11ebc5acd6eff965aa"
+          ],
+          "tree_sha": "d482ce1290ead823a42eaf073d411922cbe75105"
+        },
+        {
+          "author_date": "2024-02-14T10:42:14Z",
+          "commit_sha": "73cf14c852c5bbafde20ba11ebc5acd6eff965aa",
+          "committer_date": "2024-02-14T10:42:14Z",
+          "message": "Add GW24 data",
+          "parent_shas": [
+            "5f49140e78b2052634abae57ce15e40f41dc32f7"
+          ],
+          "tree_sha": "6687fd3e28adda1e56f1f8905bd9b324c9883472"
+        },
+        {
+          "author_date": "2024-02-06T13:02:04Z",
+          "commit_sha": "5f49140e78b2052634abae57ce15e40f41dc32f7",
+          "committer_date": "2024-02-06T13:02:04Z",
+          "message": "Add GW23 data",
+          "parent_shas": [
+            "8a0d23451ea7c07699ba903feb364e8fe0085c0e"
+          ],
+          "tree_sha": "0311b3f77050b20de09079f8cda66ee87b338331"
+        },
+        {
+          "author_date": "2024-02-02T20:53:13Z",
+          "commit_sha": "8a0d23451ea7c07699ba903feb364e8fe0085c0e",
+          "committer_date": "2024-02-02T20:53:13Z",
+          "message": "Add GW22 data",
+          "parent_shas": [
+            "546143eb5d0ae6d250e074374152e8be4b15719b"
+          ],
+          "tree_sha": "f254dd34946cd7dceb6de506de71d24dec9afbd0"
+        },
+        {
+          "author_date": "2024-01-23T13:01:20Z",
+          "commit_sha": "546143eb5d0ae6d250e074374152e8be4b15719b",
+          "committer_date": "2024-01-23T13:01:20Z",
+          "message": "Add GW21 data",
+          "parent_shas": [
+            "15783a5630abadb309ff4c3edbb3dc32e6a2b426"
+          ],
+          "tree_sha": "0acd30e06273a82ce1bc2171d49923039ab21ee3"
+        },
+        {
+          "author_date": "2024-01-03T08:57:32Z",
+          "commit_sha": "15783a5630abadb309ff4c3edbb3dc32e6a2b426",
+          "committer_date": "2024-01-03T08:57:32Z",
+          "message": "Add GW20 data",
+          "parent_shas": [
+            "2f06c2ae70511a7075d02913784ec77a5fb21aa1"
+          ],
+          "tree_sha": "cc55efe91a88f53b096a298fa6b70b329fd0e7e9"
+        },
+        {
+          "author_date": "2023-12-29T05:12:14Z",
+          "commit_sha": "2f06c2ae70511a7075d02913784ec77a5fb21aa1",
+          "committer_date": "2023-12-29T05:12:14Z",
+          "message": "Add GW19 data",
+          "parent_shas": [
+            "d8a6fc58722beaa625195de9d51a0333dcb46439"
+          ],
+          "tree_sha": "9502af566e33e4d7db018a4d612445bdf70ae2ad"
+        },
+        {
+          "author_date": "2023-12-25T11:59:17Z",
+          "commit_sha": "d8a6fc58722beaa625195de9d51a0333dcb46439",
+          "committer_date": "2023-12-25T11:59:17Z",
+          "message": "Add GW18 data",
+          "parent_shas": [
+            "62f7b7c0b2d897834613475b15d6dc3301f13e70"
+          ],
+          "tree_sha": "53ce114116e68bd36c892b90b886d1c403829ddb"
+        },
+        {
+          "author_date": "2023-12-21T04:22:57Z",
+          "commit_sha": "62f7b7c0b2d897834613475b15d6dc3301f13e70",
+          "committer_date": "2023-12-21T04:22:57Z",
+          "message": "Add GW17 data",
+          "parent_shas": [
+            "392588ec1664432358f9481b81c3a8c1d53a60a3"
+          ],
+          "tree_sha": "9b82362994263819b0f04e66ca0b26b427af7e2e"
+        },
+        {
+          "author_date": "2023-12-11T13:35:55Z",
+          "commit_sha": "392588ec1664432358f9481b81c3a8c1d53a60a3",
+          "committer_date": "2023-12-11T13:35:55Z",
+          "message": "Add GW16 data",
+          "parent_shas": [
+            "d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8"
+          ],
+          "tree_sha": "981267c49c2e6c53d58208506d4d486446c7fd67"
+        },
+        {
+          "author_date": "2023-12-08T08:31:20Z",
+          "commit_sha": "d54ac4c7b35ccca5fcf2d46ee62362a67efa45e8",
+          "committer_date": "2023-12-08T08:31:20Z",
+          "message": "Add GW15 data",
+          "parent_shas": [
+            "c4f66ee30ef026bb7e8b7184b2427f9708c77d74"
+          ],
+          "tree_sha": "d8311367f585aed0a0379a355dcfd7838c69755a"
+        },
+        {
+          "author_date": "2023-12-04T13:04:03Z",
+          "commit_sha": "c4f66ee30ef026bb7e8b7184b2427f9708c77d74",
+          "committer_date": "2023-12-04T13:04:03Z",
+          "message": "Add GW14 data",
+          "parent_shas": [
+            "acee0e28f8b201062270d709a7d72e4787680872"
+          ],
+          "tree_sha": "0834a8411570000a3851c525487e123af4cd82b9"
+        },
+        {
+          "author_date": "2023-11-30T15:40:47Z",
+          "commit_sha": "acee0e28f8b201062270d709a7d72e4787680872",
+          "committer_date": "2023-11-30T15:40:47Z",
+          "message": "Add GW13 data",
+          "parent_shas": [
+            "caf799bb68f58fb26ac80d8cb762c353891232f5"
+          ],
+          "tree_sha": "124bdd264da55be7a3eee4c8e7ad6c22563d70d7"
+        },
+        {
+          "author_date": "2023-11-24T13:22:14Z",
+          "commit_sha": "caf799bb68f58fb26ac80d8cb762c353891232f5",
+          "committer_date": "2023-11-24T13:22:14Z",
+          "message": "Add GW12 data",
+          "parent_shas": [
+            "028f925c32fabb34798e416c569070d0cae329a2"
+          ],
+          "tree_sha": "8f7aaf78105e8b152a7e2674feb00c9f01226b1b"
+        },
+        {
+          "author_date": "2023-11-09T20:03:21Z",
+          "commit_sha": "028f925c32fabb34798e416c569070d0cae329a2",
+          "committer_date": "2023-11-09T20:03:21Z",
+          "message": "ADd GW11 data",
+          "parent_shas": [
+            "e92d9881f2ef025a7a1093e47fdf02d9aa2f8655"
+          ],
+          "tree_sha": "e15c3ac3e99eaa5223858ffd767475010108c229"
+        },
+        {
+          "author_date": "2023-11-02T14:43:56Z",
+          "commit_sha": "e92d9881f2ef025a7a1093e47fdf02d9aa2f8655",
+          "committer_date": "2023-11-02T14:43:56Z",
+          "message": "Add GW10 data",
+          "parent_shas": [
+            "615da45c450fb13993b7e8da4c8388d7e2f57703"
+          ],
+          "tree_sha": "9198ad9f100450766eaaf24268cda3a15b9a095f"
+        },
+        {
+          "author_date": "2023-10-27T08:27:07Z",
+          "commit_sha": "615da45c450fb13993b7e8da4c8388d7e2f57703",
+          "committer_date": "2023-10-27T08:27:07Z",
+          "message": "Add GW9 data",
+          "parent_shas": [
+            "32184fc221871431d8215c5dc8385af0eda7bdde"
+          ],
+          "tree_sha": "cd6f5d300ddb4c0486b8a190969f01c37df31c4b"
+        },
+        {
+          "author_date": "2023-10-19T20:26:02Z",
+          "commit_sha": "32184fc221871431d8215c5dc8385af0eda7bdde",
+          "committer_date": "2023-10-19T20:26:02Z",
+          "message": "ADd GW8 data",
+          "parent_shas": [
+            "96fbc38ee6e36e3a7250081a787b65a1a27c944d"
+          ],
+          "tree_sha": "a842b2d94926f4fe0bad86efdf8c78c1510c114c"
+        },
+        {
+          "author_date": "2023-10-05T14:38:47Z",
+          "commit_sha": "96fbc38ee6e36e3a7250081a787b65a1a27c944d",
+          "committer_date": "2023-10-05T14:38:47Z",
+          "message": "Add DGW7 data",
+          "parent_shas": [
+            "61abef7dd3988bde4371710a622cead74498ffb0"
+          ],
+          "tree_sha": "ce75443476602ef8887fac7ccb83c82398e0ad6f"
+        },
+        {
+          "author_date": "2023-09-25T15:34:01Z",
+          "commit_sha": "8b05861fb33ee89bae34c2b6d06564449a5885db",
+          "committer_date": "2023-09-25T15:34:01Z",
+          "message": "Add GW6 data",
+          "parent_shas": [
+            "b9122f8c98f10a8217e5fb67bc4de447f6c685d5"
+          ],
+          "tree_sha": "26e083bf17fe30ecb88949724f01b9ab796487da"
+        },
+        {
+          "author_date": "2023-09-20T09:22:25Z",
+          "commit_sha": "b9122f8c98f10a8217e5fb67bc4de447f6c685d5",
+          "committer_date": "2023-09-20T09:22:37Z",
+          "message": "Add GW5 data",
+          "parent_shas": [
+            "92f8ef76148f1afd5c535441aedc60cb8fe24806"
+          ],
+          "tree_sha": "8fb01db80534f49d0215906a7916ae03fde20896"
+        },
+        {
+          "author_date": "2023-09-06T11:00:38Z",
+          "commit_sha": "b0ec80fec6916117225a6fbee11c35d8773c6f94",
+          "committer_date": "2023-09-06T11:00:38Z",
+          "message": "Add GW4 data",
+          "parent_shas": [
+            "2abff9370632b3b36bbdfa0870805b60fb392ef0"
+          ],
+          "tree_sha": "436dd280978be7b373ff9acc8b681d39cab4aff0"
+        },
+        {
+          "author_date": "2023-08-28T10:02:21Z",
+          "commit_sha": "2abff9370632b3b36bbdfa0870805b60fb392ef0",
+          "committer_date": "2023-08-28T10:02:21Z",
+          "message": "Add GW3 data",
+          "parent_shas": [
+            "66deb80fbcbacb517549acad47f4c72f19c4b287"
+          ],
+          "tree_sha": "1ca68dd0ee0ea4f199ff8cf0fb8430a617ef888b"
+        },
+        {
+          "author_date": "2023-08-23T13:08:45Z",
+          "commit_sha": "2749a5964950b3b34992cebde0351ac9e09fb54f",
+          "committer_date": "2023-08-23T13:08:45Z",
+          "message": "Add BGW2 data",
+          "parent_shas": [
+            "e5d69eea2e7b32952e26d765d3a769af1db7540e"
+          ],
+          "tree_sha": "e01182853e888a50ef218088fa1fab5882fad97c"
+        },
+        {
+          "author_date": "2023-08-16T02:35:27Z",
+          "commit_sha": "be15e285f106d1becc6f24c0c470ec9ada8c935a",
+          "committer_date": "2023-08-16T02:35:27Z",
+          "message": "Add GW1 data",
+          "parent_shas": [
+            "a5fe899bd3104fd0f197a2e5f9cef7121a792a21"
+          ],
+          "tree_sha": "94e10219c417d7dca26e4ceabe2ac1457ff64f4d"
+        }
+      ],
+      "file_history_commits": 38
+    },
+    "2024-25": {
+      "author_committer_disagreements": [
+        {
+          "author": "2025-01-02T18:47:50Z",
+          "committer": "2025-01-02T18:49:42Z",
+          "sha": "e369a3a0943eb6c7cb240053c0e2827f91b57eaa"
+        },
+        {
+          "author": "2024-09-23T21:15:31Z",
+          "committer": "2024-09-23T21:15:45Z",
+          "sha": "f42ed38d279afc705448ebc2b89e48838a0fdfba"
+        },
+        {
+          "author": "2024-08-26T08:10:06Z",
+          "committer": "2024-08-26T08:10:14Z",
+          "sha": "ec2a907dae6e97f76406c742a15e56653f3d170e"
+        },
+        {
+          "author": "2024-08-20T08:45:55Z",
+          "committer": "2024-08-20T08:46:13Z",
+          "sha": "403e10b7b661252698745d1101d1086cec31e0f1"
+        }
+      ],
+      "chronology": [
+        {
+          "author_date": "2026-01-02T07:35:49Z",
+          "commit_sha": "a59a43a8343d960a58cbe7a1f9fba2d2ce431856",
+          "committer_date": "2026-01-02T07:35:49Z",
+          "message": "fix: Handle schema drift in merged_gw.csv when API adds new columns (#221)\n\nFixes #203 - FALSE instead of 0 in saves column\n\nThe issue occurred because:\n1. FPL API added 7 new mng_* columns mid-season (GW22)\n2. merge_gw() appended new data without updating the header\n3. This caused column misalignment (data shifted by 7 positions)\n\nChanges:\n- Rewrote merge_gw() to detect and handle schema changes\n- Added regenerate_merged_gw() to rebuild merged file from scratch\n- Updated main() with proper CLI interface and backwards compatibility\n- Regenerated data/2024-25/gws/merged_gw.csv with correct schema\n\nNew columns properly handled:\n- mng_clean_sheets, mng_draw, mng_goals_scored\n- mng_loss, mng_underdog_draw, mng_underdog_win, mng_win\n\nUsage:\n  python collector.py regenerate data/2024-25/gws\n  python collector.py merge 38 data/2024-25/gws\n\nCo-authored-by: Mr-Neutr0n <neutr0n.git@gmail.com>",
+          "parent_shas": [
+            "c74b0af8b4c4782452e6d8424585ecd16a3879a6"
+          ],
+          "tree_sha": "1c4a65da70e36969a7925a97ffc3af1d4b1ffb24"
+        },
+        {
+          "author_date": "2025-06-04T15:20:23Z",
+          "commit_sha": "59c767596750f554ba464de94cf4fce8664a6cbe",
+          "committer_date": "2025-06-04T15:20:23Z",
+          "message": "Add GW38 data",
+          "parent_shas": [
+            "a7089bab28e2a6012cde62b4fbd692f975792a55"
+          ],
+          "tree_sha": "4667f34f3322fd17dfa05b7fc6d8d35c16c47347"
+        },
+        {
+          "author_date": "2025-05-24T12:26:14Z",
+          "commit_sha": "a7089bab28e2a6012cde62b4fbd692f975792a55",
+          "committer_date": "2025-05-24T12:26:14Z",
+          "message": "Add GW37 data",
+          "parent_shas": [
+            "e3a961c6b47342884268f59d6cb1730b3be194b2"
+          ],
+          "tree_sha": "165facd423dc4eadd99426f2e73d11392a3b67e5"
+        },
+        {
+          "author_date": "2025-05-16T09:44:44Z",
+          "commit_sha": "e3a961c6b47342884268f59d6cb1730b3be194b2",
+          "committer_date": "2025-05-16T09:44:44Z",
+          "message": "Add gw36 data",
+          "parent_shas": [
+            "3558a3310103f24e17f02d684479067a2de099c5"
+          ],
+          "tree_sha": "970c94f56895b530f27d2dbcad4e36df8216d5b1"
+        },
+        {
+          "author_date": "2025-05-10T00:37:19Z",
+          "commit_sha": "3558a3310103f24e17f02d684479067a2de099c5",
+          "committer_date": "2025-05-10T00:37:19Z",
+          "message": "Add DGW34, GW35 data",
+          "parent_shas": [
+            "761d80463ce8b7a74e1e67f7763910b4c4e14a10"
+          ],
+          "tree_sha": "dc755cc6fd8c1a3e3b8dfeb2cb1e2b01994bd883"
+        },
+        {
+          "author_date": "2025-04-26T00:07:50Z",
+          "commit_sha": "761d80463ce8b7a74e1e67f7763910b4c4e14a10",
+          "committer_date": "2025-04-26T00:07:50Z",
+          "message": "add dgw 33 data",
+          "parent_shas": [
+            "29e6c2f4590b1a03f218552ca676b9495539cfdc"
+          ],
+          "tree_sha": "9e06426ba86a1a3bb33aa556511c8c7b0eaf8d82"
+        },
+        {
+          "author_date": "2025-04-11T12:32:01Z",
+          "commit_sha": "29e6c2f4590b1a03f218552ca676b9495539cfdc",
+          "committer_date": "2025-04-11T12:32:01Z",
+          "message": "Add GW31 data",
+          "parent_shas": [
+            "c6f14b56fd810fcde3e9faec1c858c659142b99e"
+          ],
+          "tree_sha": "61f5566db0baf182a130ea0586fa80b6220f1626"
+        },
+        {
+          "author_date": "2025-04-05T08:21:22Z",
+          "commit_sha": "c6f14b56fd810fcde3e9faec1c858c659142b99e",
+          "committer_date": "2025-04-05T08:21:22Z",
+          "message": "Add gw30 data",
+          "parent_shas": [
+            "f89612e6799fb3f8c91939aed87a998078dfb4b6"
+          ],
+          "tree_sha": "d21fcf5adbb2830f33127068769ef68a8c19e9ce"
+        },
+        {
+          "author_date": "2025-03-24T14:05:08Z",
+          "commit_sha": "f89612e6799fb3f8c91939aed87a998078dfb4b6",
+          "committer_date": "2025-03-24T14:05:08Z",
+          "message": "Add GW29 data",
+          "parent_shas": [
+            "58de8250c856e3476d45557422b257a3659b2b26"
+          ],
+          "tree_sha": "1e4457773c5fbb1c76a38d335b9e4ff702c121f6"
+        },
+        {
+          "author_date": "2025-03-11T11:53:12Z",
+          "commit_sha": "58de8250c856e3476d45557422b257a3659b2b26",
+          "committer_date": "2025-03-11T11:53:12Z",
+          "message": "Add GW28 data",
+          "parent_shas": [
+            "a8fce2b6ef72a5f44639e2c0f9333e86c827db58"
+          ],
+          "tree_sha": "7f7f80ef97255f3a54244784a31952966610582a"
+        },
+        {
+          "author_date": "2025-03-05T08:47:03Z",
+          "commit_sha": "a8fce2b6ef72a5f44639e2c0f9333e86c827db58",
+          "committer_date": "2025-03-05T08:47:03Z",
+          "message": "Add GW27 data",
+          "parent_shas": [
+            "814519241dbac0cf82eafa6ce227821e705f652b"
+          ],
+          "tree_sha": "87803c1a1582ee82daadfa10ec9836de5a7cfedc"
+        },
+        {
+          "author_date": "2025-02-24T11:50:55Z",
+          "commit_sha": "814519241dbac0cf82eafa6ce227821e705f652b",
+          "committer_date": "2025-02-24T11:50:55Z",
+          "message": "Add gw26 data",
+          "parent_shas": [
+            "a0b8a68297efcf2a9b13b9e132a70913d590b246"
+          ],
+          "tree_sha": "ddeabcf106bfdbd4a96f4d836ed755148220cfb5"
+        },
+        {
+          "author_date": "2025-02-20T21:00:55Z",
+          "commit_sha": "a0b8a68297efcf2a9b13b9e132a70913d590b246",
+          "committer_date": "2025-02-20T21:00:55Z",
+          "message": "Add DGW25 data",
+          "parent_shas": [
+            "58e46cd9b9fe439d875ed56bd1a398c69b08b570"
+          ],
+          "tree_sha": "db60352e6ddc54bee04451aa7681e5c04dfc4b30"
+        },
+        {
+          "author_date": "2025-02-13T12:56:35Z",
+          "commit_sha": "58e46cd9b9fe439d875ed56bd1a398c69b08b570",
+          "committer_date": "2025-02-13T12:56:35Z",
+          "message": "Add DGW24 data",
+          "parent_shas": [
+            "48bd0a1b0b4de3afd436f2e07e1a3ebb698c8f90"
+          ],
+          "tree_sha": "4a8997b7d0e46b6582c5299b216b9b0e2ccd3276"
+        },
+        {
+          "author_date": "2025-01-30T22:44:45Z",
+          "commit_sha": "48bd0a1b0b4de3afd436f2e07e1a3ebb698c8f90",
+          "committer_date": "2025-01-30T22:44:45Z",
+          "message": "Add missing gw22 data (xP.csv not available)",
+          "parent_shas": [
+            "2a5e8a55d0db1bc55f6df644f7a9c8798a4e2834"
+          ],
+          "tree_sha": "ab0a0639a5ed14c88c2395bd2ad1144d06846412"
+        },
+        {
+          "author_date": "2025-01-30T09:22:46Z",
+          "commit_sha": "0f5da695398c293dca037c36c703fce88a161195",
+          "committer_date": "2025-01-30T09:22:46Z",
+          "message": "Add GW23 data",
+          "parent_shas": [
+            "b9618a5d9eebce9bc5ab0e6683bfb8fc420ac848"
+          ],
+          "tree_sha": "c828d4e104d3eb8234d7299eb74535fece800eed"
+        },
+        {
+          "author_date": "2025-01-18T05:15:44Z",
+          "commit_sha": "b9618a5d9eebce9bc5ab0e6683bfb8fc420ac848",
+          "committer_date": "2025-01-18T05:15:44Z",
+          "message": "Add GW21 data",
+          "parent_shas": [
+            "c56971db31bd27acbc0ec3a96bc00da7870d68a7"
+          ],
+          "tree_sha": "bd83107ea0a444467f2384c1e1c96dd353d6b4cf"
+        },
+        {
+          "author_date": "2025-01-07T11:11:38Z",
+          "commit_sha": "c56971db31bd27acbc0ec3a96bc00da7870d68a7",
+          "committer_date": "2025-01-07T11:11:38Z",
+          "message": "Add GW20 data",
+          "parent_shas": [
+            "e369a3a0943eb6c7cb240053c0e2827f91b57eaa"
+          ],
+          "tree_sha": "39774e90a2f458b07bd3d7104bffaef1822c96dc"
+        },
+        {
+          "author_date": "2025-01-02T18:47:50Z",
+          "commit_sha": "e369a3a0943eb6c7cb240053c0e2827f91b57eaa",
+          "committer_date": "2025-01-02T18:49:42Z",
+          "message": "Add gw19 data",
+          "parent_shas": [
+            "40d5141cbc15affc9b4ef0edecfd889a2596d59c"
+          ],
+          "tree_sha": "6987cfda1a07f174949f688f5c578b4f31dd3129"
+        },
+        {
+          "author_date": "2024-12-28T15:07:20Z",
+          "commit_sha": "36f07bb50c876ac49255650fd4478c856f086735",
+          "committer_date": "2024-12-28T15:07:20Z",
+          "message": "Add GW18 data",
+          "parent_shas": [
+            "c9a593826e077670fa300e825022b2979282d069"
+          ],
+          "tree_sha": "2c18c931bd86d1d84fa119a78cfc4e90c400c77f"
+        },
+        {
+          "author_date": "2024-12-23T09:00:23Z",
+          "commit_sha": "c9a593826e077670fa300e825022b2979282d069",
+          "committer_date": "2024-12-23T09:00:23Z",
+          "message": "Add GW17 data",
+          "parent_shas": [
+            "74d804715f821380314efc128bc3e1037750f23f"
+          ],
+          "tree_sha": "2605d60a54c214ec265597f3d96543b5660800a5"
+        },
+        {
+          "author_date": "2024-12-20T09:04:53Z",
+          "commit_sha": "74d804715f821380314efc128bc3e1037750f23f",
+          "committer_date": "2024-12-20T09:04:53Z",
+          "message": "Add GW16 data",
+          "parent_shas": [
+            "dfdae0e489f8520228a4ffeae11fc70d6aef7804"
+          ],
+          "tree_sha": "db3521a8ea38af4078d1484b451082ddee3c685c"
+        },
+        {
+          "author_date": "2024-12-13T03:23:48Z",
+          "commit_sha": "dfdae0e489f8520228a4ffeae11fc70d6aef7804",
+          "committer_date": "2024-12-13T03:23:48Z",
+          "message": "Add GW15 data",
+          "parent_shas": [
+            "651e9adea9e420416fdde96faf920de232383036"
+          ],
+          "tree_sha": "3adbde61c8e8b97e6251c8c7d98aa9a9a171c662"
+        },
+        {
+          "author_date": "2024-12-07T01:35:27Z",
+          "commit_sha": "651e9adea9e420416fdde96faf920de232383036",
+          "committer_date": "2024-12-07T01:35:27Z",
+          "message": "Add GW14 data",
+          "parent_shas": [
+            "bc76591d36196c0ef59b34db42d0167867686298"
+          ],
+          "tree_sha": "30286347df3ebcafbdaa7f3645deb00fe5d84a6e"
+        },
+        {
+          "author_date": "2024-12-02T03:53:51Z",
+          "commit_sha": "bc76591d36196c0ef59b34db42d0167867686298",
+          "committer_date": "2024-12-02T03:53:51Z",
+          "message": "Add gw 13 data",
+          "parent_shas": [
+            "46505fbeb0a4507c8d0ed483e92c76e451ab4327"
+          ],
+          "tree_sha": "7f81aa83b7da342f30ef8467aa57b86cf75cdae9"
+        },
+        {
+          "author_date": "2024-11-29T03:47:49Z",
+          "commit_sha": "27c87bd13ef72dd8ed2ad6584a0d8d20f070f559",
+          "committer_date": "2024-11-29T03:47:49Z",
+          "message": "Add Gw12 data",
+          "parent_shas": [
+            "e3135daf0fcb706cc41f237e5c691517bd3432c1"
+          ],
+          "tree_sha": "a2e0e9a2cba1ef1033b18b519da5fbc1ee8ff1ae"
+        },
+        {
+          "author_date": "2024-11-20T00:44:27Z",
+          "commit_sha": "e3135daf0fcb706cc41f237e5c691517bd3432c1",
+          "committer_date": "2024-11-20T00:44:27Z",
+          "message": "Add GW11 data",
+          "parent_shas": [
+            "d7a9ea76d98e7453bdca8893224da894b9b55e28"
+          ],
+          "tree_sha": "9c0b7bf80ea17d0a561a31313c8f66a08301bfea"
+        },
+        {
+          "author_date": "2024-11-08T17:52:02Z",
+          "commit_sha": "d7a9ea76d98e7453bdca8893224da894b9b55e28",
+          "committer_date": "2024-11-08T17:52:02Z",
+          "message": "Add GW10 data",
+          "parent_shas": [
+            "2840028eaea97d5255e96620ad2e06942cc8fe90"
+          ],
+          "tree_sha": "cc0c4a707e1641b24d675dc2ccff37a9f1010f39"
+        },
+        {
+          "author_date": "2024-10-28T14:54:39Z",
+          "commit_sha": "2840028eaea97d5255e96620ad2e06942cc8fe90",
+          "committer_date": "2024-10-28T14:54:39Z",
+          "message": "Add GW9 data",
+          "parent_shas": [
+            "80b1a9fd9efc30dab63fb4aba8afe3f1c6273e75"
+          ],
+          "tree_sha": "965800c9abbe239aef98ea8bb1d620947db6e098"
+        },
+        {
+          "author_date": "2024-10-24T08:59:52Z",
+          "commit_sha": "80b1a9fd9efc30dab63fb4aba8afe3f1c6273e75",
+          "committer_date": "2024-10-24T08:59:52Z",
+          "message": "Add GW8 data",
+          "parent_shas": [
+            "872d76fd0becdba5aa21a1701bc27282c5282e7e"
+          ],
+          "tree_sha": "2afd53ada81002600d25ed88f7e0a18384c87fea"
+        },
+        {
+          "author_date": "2024-10-07T09:02:25Z",
+          "commit_sha": "d0f7342e2f5f7176d507badb10ee2db76f564409",
+          "committer_date": "2024-10-07T09:02:25Z",
+          "message": "Add GW7 data",
+          "parent_shas": [
+            "57caf7e165ba47b48de9f307785aac79cb03b8af"
+          ],
+          "tree_sha": "1d711258ffa68ad26853a9fdacd96275893b1f4d"
+        },
+        {
+          "author_date": "2024-10-01T08:56:28Z",
+          "commit_sha": "57caf7e165ba47b48de9f307785aac79cb03b8af",
+          "committer_date": "2024-10-01T08:56:28Z",
+          "message": "Add GW6 data",
+          "parent_shas": [
+            "f42ed38d279afc705448ebc2b89e48838a0fdfba"
+          ],
+          "tree_sha": "3dfc145bc6e3a316a5d9cb6be8be8c1e16d6f29f"
+        },
+        {
+          "author_date": "2024-09-23T21:15:31Z",
+          "commit_sha": "f42ed38d279afc705448ebc2b89e48838a0fdfba",
+          "committer_date": "2024-09-23T21:15:45Z",
+          "message": "Add GW5 data",
+          "parent_shas": [
+            "d2fc5120f2df9e2d8124e3d1987e0bbfe708f650"
+          ],
+          "tree_sha": "9cfa6d6005f24a2fdbb8e3629e77296e147dde25"
+        },
+        {
+          "author_date": "2024-09-16T13:52:04Z",
+          "commit_sha": "3c76203d2997a89f0735d2591e76e7c849a2f491",
+          "committer_date": "2024-09-16T13:52:04Z",
+          "message": "Add GW4 data",
+          "parent_shas": [
+            "9d4b5d89af45f85be8c9215f713000072bdbe3dd"
+          ],
+          "tree_sha": "32fd73cdd3d646537809c4381da88b4dee0695b1"
+        },
+        {
+          "author_date": "2024-09-06T13:50:27Z",
+          "commit_sha": "9d4b5d89af45f85be8c9215f713000072bdbe3dd",
+          "committer_date": "2024-09-06T13:50:27Z",
+          "message": "Add GW3 data",
+          "parent_shas": [
+            "ec2a907dae6e97f76406c742a15e56653f3d170e"
+          ],
+          "tree_sha": "caac1c82c0088d4b4d3e79032cb483a886deb8ac"
+        },
+        {
+          "author_date": "2024-08-26T08:10:06Z",
+          "commit_sha": "ec2a907dae6e97f76406c742a15e56653f3d170e",
+          "committer_date": "2024-08-26T08:10:14Z",
+          "message": "Add GW2 data",
+          "parent_shas": [
+            "8b381c266c4ab97514ddbe43afdf42701a5a936e"
+          ],
+          "tree_sha": "0c558188e166e4c7f192be90deeb2d7a0f99c528"
+        },
+        {
+          "author_date": "2024-08-20T08:45:55Z",
+          "commit_sha": "403e10b7b661252698745d1101d1086cec31e0f1",
+          "committer_date": "2024-08-20T08:46:13Z",
+          "message": "Add GW1 data",
+          "parent_shas": [
+            "9c0b808330c4e7d56d0d54ed99a9d3b69b54800f"
+          ],
+          "tree_sha": "257abf57d23f6506da3e685af400d7bc8f2be8de"
+        }
+      ],
+      "file_history_commits": 37
+    },
+    "2025-26": {
+      "author_committer_disagreements": [],
+      "chronology": [
+        {
+          "author_date": "2026-06-17T12:19:44Z",
+          "commit_sha": "f9ed3e8839b0f970e0d5d4a83c5628f6eaee755a",
+          "committer_date": "2026-06-17T12:19:44Z",
+          "message": "Final 2025-26 update",
+          "parent_shas": [
+            "a8337d50698de908f92e8d1905142d968384a2ca"
+          ],
+          "tree_sha": "0c9a91ee3cc1705f3c42fa8827a57f77740d3b9e"
+        },
+        {
+          "author_date": "2026-06-17T12:07:17Z",
+          "commit_sha": "a8337d50698de908f92e8d1905142d968384a2ca",
+          "committer_date": "2026-06-17T12:07:17Z",
+          "message": "Add gw38 data",
+          "parent_shas": [
+            "81980c1d597a1eab8764e3f5189b3a6f20939da8"
+          ],
+          "tree_sha": "87d001534b149d9dd8cccecf0e3c1f95a168588c"
+        },
+        {
+          "author_date": "2026-03-13T01:04:19Z",
+          "commit_sha": "77ab48216404b0f49f55fa724c520af25b32ddae",
+          "committer_date": "2026-03-13T01:04:19Z",
+          "message": "update data till gw29",
+          "parent_shas": [
+            "2c43a95002e0a3ec0700b725da76fdd5fefcd1a6"
+          ],
+          "tree_sha": "3508cc4b0041cbfd28486dce0da52e28363c6478"
+        },
+        {
+          "author_date": "2026-02-05T08:00:25Z",
+          "commit_sha": "2c43a95002e0a3ec0700b725da76fdd5fefcd1a6",
+          "committer_date": "2026-02-05T08:00:25Z",
+          "message": "Mid-season output",
+          "parent_shas": [
+            "a59a43a8343d960a58cbe7a1f9fba2d2ce431856"
+          ],
+          "tree_sha": "8169b50d48abf21930bc132a029382c40ac822f2"
+        },
+        {
+          "author_date": "2025-11-01T00:11:46Z",
+          "commit_sha": "d8f2ea3f56d1e6c25cfc1ed2773fbd945241fb93",
+          "committer_date": "2025-11-01T00:11:46Z",
+          "message": "Add gw9 data",
+          "parent_shas": [
+            "c0b610997ff299a1077f88ed09dc453ac5c00ebe"
+          ],
+          "tree_sha": "c4147afa0dd2c5ecf1cfcb6b3781f9502d910287"
+        },
+        {
+          "author_date": "2025-10-24T09:01:31Z",
+          "commit_sha": "c0b610997ff299a1077f88ed09dc453ac5c00ebe",
+          "committer_date": "2025-10-24T09:01:31Z",
+          "message": "Add gw8 data",
+          "parent_shas": [
+            "cd74fdea7d792f816e96e9ada4551f443d0e82c9"
+          ],
+          "tree_sha": "374c683c414f14ab4277b02508445b53ec1af206"
+        },
+        {
+          "author_date": "2025-09-30T20:29:48Z",
+          "commit_sha": "cd74fdea7d792f816e96e9ada4551f443d0e82c9",
+          "committer_date": "2025-09-30T20:29:48Z",
+          "message": "Add gw6 data (#217)",
+          "parent_shas": [
+            "8db66f4fe0b8afc1a4bcf6aaee2255f56bfd29a4"
+          ],
+          "tree_sha": "ea9ae4b7ed26679866eea25904ffaca8efdb94b4"
+        },
+        {
+          "author_date": "2025-09-24T22:45:24Z",
+          "commit_sha": "8db66f4fe0b8afc1a4bcf6aaee2255f56bfd29a4",
+          "committer_date": "2025-09-24T22:45:24Z",
+          "message": "Add gw5 data (#216)",
+          "parent_shas": [
+            "45cb8d6210b4009c25980fb22426787902c5dac8"
+          ],
+          "tree_sha": "f0e391421f455840f34749286a5e50ee927c8309"
+        },
+        {
+          "author_date": "2025-09-18T12:07:27Z",
+          "commit_sha": "45cb8d6210b4009c25980fb22426787902c5dac8",
+          "committer_date": "2025-09-18T12:07:27Z",
+          "message": "Add gw4 data (#213)",
+          "parent_shas": [
+            "d3c4e74a63dda374972a7c98bb00bd7d7f0dd639"
+          ],
+          "tree_sha": "7fe418f7709902de5eece2ed31bf53a6598a1d74"
+        },
+        {
+          "author_date": "2025-09-08T09:23:37Z",
+          "commit_sha": "19b31c9cbf7f7a329123ead3720b24594ac46abe",
+          "committer_date": "2025-09-08T09:23:37Z",
+          "message": "Add gw3 data",
+          "parent_shas": [
+            "20f6d05bc6ca02aa02fa241291a088e90bb3b46e"
+          ],
+          "tree_sha": "3644437585f0e500890681ade1a1042cfda45f31"
+        },
+        {
+          "author_date": "2025-08-28T16:42:42Z",
+          "commit_sha": "20f6d05bc6ca02aa02fa241291a088e90bb3b46e",
+          "committer_date": "2025-08-28T16:42:42Z",
+          "message": "Add gw2 data",
+          "parent_shas": [
+            "e930bb766ff82d6dff6a47f40eefd4e65bba29ef"
+          ],
+          "tree_sha": "5d4c0e7a0ee27c49f37be1aee0ebb7b2ecc10de7"
+        },
+        {
+          "author_date": "2025-08-20T07:59:03Z",
+          "commit_sha": "e930bb766ff82d6dff6a47f40eefd4e65bba29ef",
+          "committer_date": "2025-08-20T07:59:03Z",
+          "message": "update gw1 data (#208)",
+          "parent_shas": [
+            "46277afda009b340e738336dabc4b0822dd80c57"
+          ],
+          "tree_sha": "1a0896b77d2d783e5501c09e1a303fd47ffa32a4"
+        }
+      ],
+      "file_history_commits": 12
+    }
+  },
+  "content_evidence": {
+    "archive_known_at_policy": "maximum evidenced commit author/committer UTC timestamp, bounded content chronology audited",
+    "capture_known_at_policy": "actual response receipt UTC, retained without rewriting",
+    "collector": "getters.py calls FPL bootstrap/fixtures/element-summary; collector.py joins numeric element and appends GW rows; global_scraper.py discards event deadlines",
+    "first_two_snapshot_fixture_identity_failures": 0,
+    "gw20_changed_or_removed_prior_rows": 0,
+    "gw20_retained_prior_rows": 1253,
+    "gw2_added_rows": 595,
+    "gw2_changed_or_removed_prior_rows": 0,
+    "gw2_parent_equals_gw1_bytes": true,
+    "initial_gw1_rows": 658,
+    "initial_gw2_rows": 1253,
+    "midseason_gw20_rows": 14487,
+    "provider_publication_date": null,
+    "same_version_identity_and_position_failures": 0
+  },
+  "created_at": "2026-09-08T07:28:12.106675+00:00",
+  "historical_deadline_replay_proven": false,
+  "kind": "source_availability_investigation_no_model",
+  "model_fitting": false,
+  "next_task": "design the smallest scientifically defensible Attacking Role Premium experiment supported by available fields/seasons",
+  "predictive_evaluation": false,
+  "prior_feasibility_sha256": "65b950bfb95c965f4c776964f4b18074fa60aa74e4b7224b355ef969e0e31ed7",
+  "prior_feasibility_verdict": "D. INSUFFICIENT DATA remains frozen",
+  "probe_requests": 22,
+  "raw_source_probe_responses": [
+    {
+      "bytes": 5830,
+      "captured_at_utc": "2026-09-08T07:12:58.401502+00:00",
+      "headers": {
+        "cache-control": "public, max-age=60, s-maxage=60",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "W/\"95fa4677a5af954355aaf36f85acf9aee7b2482f8a7ad299a7159efbcc6b8b1e\"",
+        "last-modified": "Mon, 07 Sep 2026 09:07:50 GMT",
+        "server": "github.com"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0001-92a95c8c8119629e6b8229493ab45a7ea96f1d048862f2647adc19cbc25c44b8.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0001.json",
+      "sequence": 1,
+      "sha256": "92a95c8c8119629e6b8229493ab45a7ea96f1d048862f2647adc19cbc25c44b8",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://api.github.com/repos/vaastav/Fantasy-Premier-League"
+    },
+    {
+      "bytes": 125369,
+      "captured_at_utc": "2026-09-08T07:13:00.186482+00:00",
+      "headers": {
+        "cache-control": "public, max-age=60, s-maxage=60",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "W/\"9cc305f0c30ca4a479fdc1a0efa002b302ed01ccb599e9a4ed47c54a31d22e51\"",
+        "last-modified": "Fri, 02 Jan 2026 07:35:49 GMT",
+        "server": "github.com"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0002-1b1e1079c83873fb8cd6cd79e768793c743de0f7a3ab55b252189fc863ee7eee.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0002.json",
+      "sequence": 2,
+      "sha256": "1b1e1079c83873fb8cd6cd79e768793c743de0f7a3ab55b252189fc863ee7eee",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://api.github.com/repos/vaastav/Fantasy-Premier-League/commits?path=data/2024-25/gws/merged_gw.csv&per_page=100"
+    },
+    {
+      "bytes": 125749,
+      "captured_at_utc": "2026-09-08T07:13:01.346297+00:00",
+      "headers": {
+        "cache-control": "public, max-age=60, s-maxage=60",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "W/\"5be0145a153693764697ac2769e10d50611c2d1958a7712fa0639954cd565b1e\"",
+        "last-modified": "Mon, 27 May 2024 18:05:02 GMT",
+        "server": "github.com"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0003-6bfcb288aa4de18ef67c53d21d8560fe68f1d87e70473b0ec245018f77f42165.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0003.json",
+      "sequence": 3,
+      "sha256": "6bfcb288aa4de18ef67c53d21d8560fe68f1d87e70473b0ec245018f77f42165",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://api.github.com/repos/vaastav/Fantasy-Premier-League/commits?path=data/2023-24/gws/merged_gw.csv&per_page=100"
+    },
+    {
+      "bytes": 49645,
+      "captured_at_utc": "2026-09-08T07:13:02.846716+00:00",
+      "headers": {
+        "cache-control": "public, max-age=60, s-maxage=60",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "W/\"6dfd7420c494d30c13d2a2d902554b97d27a9286da61c9aafce12844943693a9\"",
+        "last-modified": "Wed, 17 Jun 2026 12:19:44 GMT",
+        "server": "github.com"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0004-a0eaa85401d073585bd525b1ca14847d7ef559d79c0c5d4acbf5eefda903fa0f.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0004.json",
+      "sequence": 4,
+      "sha256": "a0eaa85401d073585bd525b1ca14847d7ef559d79c0c5d4acbf5eefda903fa0f",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://api.github.com/repos/vaastav/Fantasy-Premier-League/commits?path=data/2025-26/gws/merged_gw.csv&per_page=100"
+    },
+    {
+      "bytes": 10588,
+      "captured_at_utc": "2026-09-08T07:13:04.383219+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"8b5a519ac6b98ebd68ffb18242a06d33e651475c6c76c0d32a9c78351aa09a80\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0005-f4c7e230ea03b3dbf74d6e2d4dc2ce510bbb041e1301c7ad53cf41bbe5818689.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0005.json",
+      "sequence": 5,
+      "sha256": "f4c7e230ea03b3dbf74d6e2d4dc2ce510bbb041e1301c7ad53cf41bbe5818689",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/README.md"
+    },
+    {
+      "bytes": 1193,
+      "captured_at_utc": "2026-09-08T07:13:05.752519+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"349b81843bd496565e2314524ab71c732749393c84d01ed0c086b13245a98a7b\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0006-f9b9b3b49e6701261d482d2900d1cf3d769904505deeab528fc73fb4c8c441bf.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-01\\response-0006.json",
+      "sequence": 6,
+      "sha256": "f9b9b3b49e6701261d482d2900d1cf3d769904505deeab528fc73fb4c8c441bf",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/LICENSE"
+    },
+    {
+      "bytes": 1169,
+      "captured_at_utc": "2026-09-08T07:14:45.896634+00:00",
+      "headers": {
+        "cache-control": "public, max-age=60, s-maxage=60",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "W/\"5cde491b11ae86067bb494ac63841c8e45f7b4b53d6a6a410699daf73ee5ec1d\"",
+        "last-modified": "Wed, 16 Aug 2023 02:35:27 GMT",
+        "server": "github.com"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0001-9b7607202b865b9801d407b7752cc39c41a8afc38cde48c3378b3cf397d838a3.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0001.json",
+      "sequence": 1,
+      "sha256": "9b7607202b865b9801d407b7752cc39c41a8afc38cde48c3378b3cf397d838a3",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://api.github.com/repos/vaastav/Fantasy-Premier-League/git/commits/be15e285f106d1becc6f24c0c470ec9ada8c935a"
+    },
+    {
+      "bytes": 8381,
+      "captured_at_utc": "2026-09-08T07:14:47.290215+00:00",
+      "headers": {
+        "cache-control": "public, max-age=60, s-maxage=60",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "\"94e10219c417d7dca26e4ceabe2ac1457ff64f4d\"",
+        "last-modified": "Mon, 07 Sep 2026 09:07:50 GMT",
+        "server": "github.com"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0002-b6b369fb0ab3ee72325d0d48bd4be1d3e576a2756eef17e03204ad24f5401c88.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0002.json",
+      "sequence": 2,
+      "sha256": "b6b369fb0ab3ee72325d0d48bd4be1d3e576a2756eef17e03204ad24f5401c88",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://api.github.com/repos/vaastav/Fantasy-Premier-League/contents/data/2023-24?ref=be15e285f106d1becc6f24c0c470ec9ada8c935a"
+    },
+    {
+      "bytes": 104670,
+      "captured_at_utc": "2026-09-08T07:14:48.983498+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"2b519feb5180787880ece4b43c6241eb390a0d0ad39d32d346154206c6710bf6\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0003-53a22379f865e4fbac55e46778e68455f88ae88d1b2a89edf24ca3290e8cd493.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0003.json",
+      "sequence": 3,
+      "sha256": "53a22379f865e4fbac55e46778e68455f88ae88d1b2a89edf24ca3290e8cd493",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/gws/merged_gw.csv"
+    },
+    {
+      "bytes": 219353,
+      "captured_at_utc": "2026-09-08T07:14:50.353861+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"3c07fec9f71f7446bbd3b759e476f4ad2d8435de3f05b461d90f944c71369065\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0004-7a81e3845349c55fc89ce3ae8dfda07e78a0675d2297477612eeaee20572bb77.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0004.json",
+      "sequence": 4,
+      "sha256": "7a81e3845349c55fc89ce3ae8dfda07e78a0675d2297477612eeaee20572bb77",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/players_raw.csv"
+    },
+    {
+      "bytes": 49844,
+      "captured_at_utc": "2026-09-08T07:14:51.790641+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"f5470a37903c1c6f57d765bb66199e9bd2ff3a9f92de7476ef6085a7be1222c2\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0005-1966ce5b29a9e7934a731d16e147a6e1f2f37e778b474d16f1ef0ff4d133aabc.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0005.json",
+      "sequence": 5,
+      "sha256": "1966ce5b29a9e7934a731d16e147a6e1f2f37e778b474d16f1ef0ff4d133aabc",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/fixtures.csv"
+    },
+    {
+      "bytes": 1715,
+      "captured_at_utc": "2026-09-08T07:14:53.305558+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"41c9edce9b3cce1e4b396228bf9315e87a95a6868eab0da7bcbc2bc339975cff\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0006-9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0006.json",
+      "sequence": 6,
+      "sha256": "9bd4edda58ddf9de4363ee918215bc29fdf7ce25f160be9264137cb04fca3646",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/data/2023-24/teams.csv"
+    },
+    {
+      "bytes": 2327,
+      "captured_at_utc": "2026-09-08T07:14:54.847002+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"712cd7d792b14f00c41b8bc6da80bf8f077833379aeaf58de940e2e7f0fc6e2e\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0007-5806e9d4d8473f95ad76235a6b77230d195625a1ad5982f29ea69925788a6623.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-02\\response-0007.json",
+      "sequence": 7,
+      "sha256": "5806e9d4d8473f95ad76235a6b77230d195625a1ad5982f29ea69925788a6623",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/global_scraper.py"
+    },
+    {
+      "bytes": 1170,
+      "captured_at_utc": "2026-09-08T07:19:39.289559+00:00",
+      "headers": {
+        "cache-control": "public, max-age=60, s-maxage=60",
+        "content-type": "application/json; charset=utf-8",
+        "etag": "W/\"0205de5d750c50b223012474804be189d1615776615c0c769b8ace90bb520772\"",
+        "last-modified": "Wed, 23 Aug 2023 13:08:45 GMT",
+        "server": "github.com"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0001-766258463656eb60177d9ae51820c8c28c0f27f99ac0b7e5e57f1d561063c219.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0001.json",
+      "sequence": 1,
+      "sha256": "766258463656eb60177d9ae51820c8c28c0f27f99ac0b7e5e57f1d561063c219",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://api.github.com/repos/vaastav/Fantasy-Premier-League/git/commits/2749a5964950b3b34992cebde0351ac9e09fb54f"
+    },
+    {
+      "bytes": 205314,
+      "captured_at_utc": "2026-09-08T07:19:40.967317+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"b8e2c13ba09b1b7891074d3c8a8b1a64a085e1932bc31ac10783ecf087466748\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0002-32e84407d5ff88ca4f9b8fd54cf6aa1e4691c69a5446995afcfa9d77248838bc.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0002.json",
+      "sequence": 2,
+      "sha256": "32e84407d5ff88ca4f9b8fd54cf6aa1e4691c69a5446995afcfa9d77248838bc",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/gws/merged_gw.csv"
+    },
+    {
+      "bytes": 225715,
+      "captured_at_utc": "2026-09-08T07:19:42.275162+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"cfb17b99a14032893960aa2cbe23880816dbde864871b9f782c42c8203e13e2e\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0003-c02546cd5d9039a0fd17e9f4c21a900f422473afc5cc4fa5a5b3ac5a3f4966e9.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0003.json",
+      "sequence": 3,
+      "sha256": "c02546cd5d9039a0fd17e9f4c21a900f422473afc5cc4fa5a5b3ac5a3f4966e9",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/players_raw.csv"
+    },
+    {
+      "bytes": 66483,
+      "captured_at_utc": "2026-09-08T07:19:43.748699+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"b5d369428d2b9dabf1372bacc20099d803c381993561fcecd13cac06403958e6\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0004-5b4aef2aa20f4f1062936d92004ee10311727fae5326608ba650e46ba7dc6035.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0004.json",
+      "sequence": 4,
+      "sha256": "5b4aef2aa20f4f1062936d92004ee10311727fae5326608ba650e46ba7dc6035",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/2749a5964950b3b34992cebde0351ac9e09fb54f/data/2023-24/fixtures.csv"
+    },
+    {
+      "bytes": 104670,
+      "captured_at_utc": "2026-09-08T07:19:45.247861+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"2b519feb5180787880ece4b43c6241eb390a0d0ad39d32d346154206c6710bf6\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0005-53a22379f865e4fbac55e46778e68455f88ae88d1b2a89edf24ca3290e8cd493.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0005.json",
+      "sequence": 5,
+      "sha256": "53a22379f865e4fbac55e46778e68455f88ae88d1b2a89edf24ca3290e8cd493",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/e5d69eea2e7b32952e26d765d3a769af1db7540e/data/2023-24/gws/merged_gw.csv"
+    },
+    {
+      "bytes": 4278,
+      "captured_at_utc": "2026-09-08T07:19:46.740826+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"44e0cbe6ceca98c3c21695d39001d535c82ae4872de0c4f202cc6cb9fc091c7c\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0006-9965dc7483b2e22688d2ab402e4aa51bd33fec76f30ec9e63d48c2018946dba4.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0006.json",
+      "sequence": 6,
+      "sha256": "9965dc7483b2e22688d2ab402e4aa51bd33fec76f30ec9e63d48c2018946dba4",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/collector.py"
+    },
+    {
+      "bytes": 4226,
+      "captured_at_utc": "2026-09-08T07:19:48.258616+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"de4c7e9a08483b8e30d59771b1f060c8f93f5126a1b71ad7c02ef977d10bd3e6\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0007-242a7706459b1313b9b2b195391d217df23650461d43404894b2fe67a103d255.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0007.json",
+      "sequence": 7,
+      "sha256": "242a7706459b1313b9b2b195391d217df23650461d43404894b2fe67a103d255",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/be15e285f106d1becc6f24c0c470ec9ada8c935a/getters.py"
+    },
+    {
+      "bytes": 2435771,
+      "captured_at_utc": "2026-09-08T07:19:50.072890+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"d522135eeffa47b01142ce3330bd0e7af818968db872f7e1ac944d96719b3563\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0008-ae656d5e04dfc3692008ce355e76bdb0efd12ab28b28192e5c7e49c9d7bf0953.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0008.json",
+      "sequence": 8,
+      "sha256": "ae656d5e04dfc3692008ce355e76bdb0efd12ab28b28192e5c7e49c9d7bf0953",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/15783a5630abadb309ff4c3edbb3dc32e6a2b426/data/2023-24/gws/merged_gw.csv"
+    },
+    {
+      "bytes": 277859,
+      "captured_at_utc": "2026-09-08T07:19:51.565937+00:00",
+      "headers": {
+        "cache-control": "max-age=300",
+        "content-type": "text/plain; charset=utf-8",
+        "etag": "W/\"1c8fec83fa8208145bd436f3402a3a8c6f7f3ee97ba3ab91dfbab7138fad3dd2\"",
+        "via": "1.1 varnish",
+        "x-cache": "MISS"
+      },
+      "raw_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0009-5b9fbd630edf53935bacdece09dabbd0fe19c33ea390c1b8478e547e779b8dd1.raw",
+      "receipt_file": "D:\\Personal\\fpl-operations\\verification\\historical-player-attacking-20260908T070723Z\\archive-probe-03\\response-0009.json",
+      "sequence": 9,
+      "sha256": "5b9fbd630edf53935bacdece09dabbd0fe19c33ea390c1b8478e547e779b8dd1",
+      "status": 200,
+      "unchanged_from_prior_response_in_this_run": false,
+      "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/15783a5630abadb309ff4c3edbb3dc32e6a2b426/data/2023-24/players_raw.csv"
+    }
+  ],
+  "schema_version": 1,
+  "scope_limitations": [
+    "Official historical FPL deadline timestamps are not retained by this source.",
+    "Source-snapshot cutoffs before whole future gameweeks are defensible; do not invent official deadlines.",
+    "Current capture is distinct from historical public-source availability.",
+    "No rewrite/backdating evidence in inspected content chronology; global absence of rewriting is not provable.",
+    "Player shots/SOT/box/keypass and individual openplay/setpiece are not established at historical fixture grain."
+  ],
+  "sources": [
+    {
+      "earliest_actual_capture": "2026-07-26T15:44:50.846978Z",
+      "evidence_class": "RETROSPECTIVE_DEVELOPMENT",
+      "files": 20,
+      "historical_publication_witness": null,
+      "latest_raw_ingest": "2026-08-19T09:00:51.396626Z",
+      "measured_xg_xa_rows": 93138,
+      "outfield_rows": 123297,
+      "seasons": [
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25",
+        "2025-26"
+      ],
+      "source": "retained THE COMET FPL archive"
+    },
+    {
+      "capture_count": 56,
+      "evidence_class": "CURRENT_PROSPECTIVE",
+      "exact_cutoff_identity_rows": 1654,
+      "outfield_rows": 1682,
+      "season": "2026-27",
+      "source": "retained current FPL snapshots"
+    },
+    {
+      "acquisition_season": "2023-24",
+      "candidate_seasons": [
+        "2023-24",
+        "2024-25",
+        "2025-26"
+      ],
+      "evidence_class": "ARCHIVED_AS_OF",
+      "identity": "same-version (season,element)->registry.id/code; source position verified with element_type; fixture club through fixtures/teams",
+      "old_missing_gw26_import": "2024-03-20T17:01:19Z; never backdate to GW26 event",
+      "revision_policy": "retain each captured raw version; normalize first and changed football observations; research selector uses earliest eligible version",
+      "source": "immutable vaastav/Fantasy-Premier-League commit snapshots"
+    },
+    {
+      "player_fixture_opportunity_source_established": false,
+      "probe_findings_sha256": "dd8b7879993150d371e73292bb8c9d0abc0e83d78da749639090569e4ee70b23",
+      "prospective_revision_audit_sha256": "8687a888b0b6b82249acfcb7aec5368208d9cea24428f18382964b51da921327",
+      "source": "SDP retained team/lineup/event endpoints plus two source-evidenced probes"
+    }
+  ],
+  "starting_head": "266a71f29767562005aa3d518d6501bcfa4f4ba1",
+  "verdict": "B. HISTORICAL PIT SOURCE PARTIAL"
+}

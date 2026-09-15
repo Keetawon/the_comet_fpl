@@ -39,6 +39,7 @@ import {
   loadPlayerHorizons,
   loadPlayerProvisionalActuals,
   loadPlayers,
+  loadSummary,
 } from "@/data/load";
 import type { DashboardManifest, NextGwPlan, PlayerHorizonsRecord, PlayerObservedActualsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
@@ -198,8 +199,9 @@ export function PlayersPage() {
       loadPlayerHorizons(),
       loadFixtureMatrix(),
       loadNextGw(),
+      loadSummary(),
     ])
-      .then(([playersData, actualsData, provisionalActuals, horizonsData, teamsData, nextGw]) => {
+      .then(([playersData, actualsData, provisionalActuals, horizonsData, teamsData, nextGw, summary]) => {
         if (cancelled) return;
         // The manifest owns run bounds when present. Without it, the validated horizon
         // vectors are authoritative: fixture arrays omit blank weeks and may be empty.
@@ -224,7 +226,7 @@ export function PlayersPage() {
         const defaultRun = defaultVintageRunId(
           runs,
           nextGw.plans,
-          playersData.manifest?.runs.at(-1)?.run_id ?? null,
+          summary.latest_run?.run_id ?? null,
         );
         const runRecords = playersData.players.filter((p) => p.run_id === defaultRun);
         const defaultRunRecord = runs.find((run) => run.run_id === defaultRun);
@@ -694,6 +696,10 @@ export function PlayersPage() {
       : playerMultiFilters.positions.length > 1 || playerMultiFilters.teamCodes.length > 1
         ? "AI explanation is unavailable while multiple positions or teams are selected because the renderer accepts only one of each. Deterministic facts remain available."
         : undefined;
+  const unavailablePlayerInsightReason =
+    playerFilters.hideUnavailable && runPlayers.some((player) => player.availability_status === "u")
+      ? "AI explanation is unavailable while unavailable players are hidden because this display filter is outside the renderer contract. Deterministic facts use the visible players."
+      : undefined;
   const provisionalInsightUnavailableReason = selectedActualsIncludeProvisional
     ? "AI explanation is unavailable while the selected Actual range includes provisional fixtures. Deterministic facts remain available, and prediction monitoring remains finalized-only."
     : undefined;
@@ -739,46 +745,6 @@ export function PlayersPage() {
         </p>
       </div>
 
-      <InsightSummaryPanel
-        items={insightFacts}
-        caveats={insightCaveats}
-        remote={{
-          page: "players",
-          provenance: publishedInsightProvenance(state.manifest, {
-            ...selectedRun!,
-            as_of: activeRun?.as_of,
-          }),
-          scope: compactInsightScope({
-            gw_from: filters?.gwFrom,
-            gw_to: filters?.gwTo,
-            actual_season_from: actualFrom?.season,
-            actual_gw_from: actualFrom?.gw,
-            actual_season_to: actualTo?.season,
-            actual_gw_to: actualTo?.gw,
-            position: playerPositionScope(playerMultiFilters.positions[0] ?? "all"),
-            team_code: playerMultiFilters.teamCodes[0],
-            view: filters?.view === "defense" ? "defence" : filters?.view,
-            venue: filters?.venue,
-            min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
-            max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
-            availability: playerFilters.availability,
-          }),
-          unavailableReason: managerSquad
-            ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
-            : minutesPerGameInsightUnavailableReason ??
-              provisionalInsightUnavailableReason ??
-              multiSelectInsightUnavailableReason,
-          localScopeKey: JSON.stringify({
-            runId: activeRunId,
-            filters,
-            playerFilters,
-            playerMultiFilters,
-            actualRange,
-            colorSource,
-            managerScope: managerSquad ? "private_manager_squad" : "all_players",
-          }),
-        }}
-      />
 
       <FilterPanel>
         <div className="flex flex-col gap-2">
@@ -1023,6 +989,47 @@ export function PlayersPage() {
         null until the ledger persists them — never 0. Club λ/ease/CS are the primitives behind
         the chip colour.
       </p>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "players",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...selectedRun!,
+            as_of: activeRun?.as_of,
+          }),
+          scope: compactInsightScope({
+            gw_from: filters?.gwFrom,
+            gw_to: filters?.gwTo,
+            actual_season_from: actualFrom?.season,
+            actual_gw_from: actualFrom?.gw,
+            actual_season_to: actualTo?.season,
+            actual_gw_to: actualTo?.gw,
+            position: playerPositionScope(playerMultiFilters.positions[0] ?? "all"),
+            team_code: playerMultiFilters.teamCodes[0],
+            view: filters?.view === "defense" ? "defence" : filters?.view,
+            venue: filters?.venue,
+            min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
+            max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
+            availability: playerFilters.availability,
+          }),
+          unavailableReason: managerSquad
+            ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
+            : minutesPerGameInsightUnavailableReason ??
+              unavailablePlayerInsightReason ??
+              provisionalInsightUnavailableReason ??
+              multiSelectInsightUnavailableReason,
+          localScopeKey: JSON.stringify({
+            runId: activeRunId,
+            filters,
+            playerFilters,
+            playerMultiFilters,
+            actualRange,
+            colorSource,
+            managerScope: managerSquad ? "private_manager_squad" : "all_players",
+          }),
+        }}
+      />
     </div>
   );
 }

@@ -105,3 +105,11 @@ describe("diffPlans", () => {
     expect(diffPlans(plans[0], shifted)).toBeNull();
   });
 });
+
+it("selects the newest platform default and refuses comparisons to a different vintage", () => {
+  const latest = { ...plans[0], optimizer_run_id: "new", as_of: "2026-09-14T00:00:00Z", gw_from: 5, gw_to: 9 };
+  expect(defaultPlan([...plans, latest])).toBe(latest);
+  expect(platformComparisonPlans([...plans, latest])).toBeNull();
+  const pairedDiagnostic = { ...plans[1], as_of: latest.as_of, gw_from: 5, gw_to: 9 };
+  expect(platformComparisonPlans([...plans, latest, pairedDiagnostic])?.diagnosticPlan).toBe(pairedDiagnostic);
+});

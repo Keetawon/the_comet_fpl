@@ -1,0 +1,757 @@
+{
+  "branch": "claude/comet-fpl-v2-architecture-mqrj8f",
+  "coverage": {
+    "completed_gameweeks": [
+      1,
+      2,
+      3
+    ],
+    "exposure_buckets": {
+      "LOW": 165,
+      "VERY_LOW": 418
+    },
+    "measured_xg_xa_rows": 1682,
+    "missing_minute_players": 0,
+    "observed_gameweeks": [
+      1,
+      2,
+      3
+    ],
+    "outfield_players": 583,
+    "player_fixture_rows": 1682,
+    "players_by_minimum_minutes": {
+      "180": 165,
+      "360": 0,
+      "450": 0,
+      "90": 232,
+      "900": 0
+    },
+    "position_players": {
+      "DEF": 214,
+      "FWD": 78,
+      "MID": 291
+    },
+    "position_rows": {
+      "DEF": 623,
+      "FWD": 224,
+      "MID": 835
+    },
+    "positive_minute_rows": 869,
+    "zero_history_players": 218
+  },
+  "external_receipts_root": "D:\\Personal\\fpl-operations\\verification\\player-attacking-usage-scouting-20260908T090901Z",
+  "formal_evaluation_rerun": false,
+  "frozen_files_unchanged": true,
+  "frozen_files_verified": 181,
+  "frozen_scientific_verdict": "C_REFUTED",
+  "frozen_sha256": {
+    "AGENTS.md": "54f8ed3f5e9fd2dc4d796f984834fa25c24f6acf761715e81eafe0e8ae7d9024",
+    "config/attacking_role_premium_study.yaml": "5a3ca31aa9e655f897b1c2f2670efc950e94a2402aaf55ede60860a9df64a903",
+    "config/attacking_role_premium_v1.yaml": "08589200d0285309fcfd0ef3620509d06f24c5b422e3dd629428d39657f040b7",
+    "config/competitive_participation_pilot.yaml": "d3bb9b7880db5d61cc1ee7c3b74aa86bf65e3d24bddb10ebfc8504b55c1047fa",
+    "config/competitive_participation_v2.yaml": "59678e9a1fc547b7417f48282222a593ab937f7f75bbab62ff423cdf2db4128a",
+    "config/competitive_participation_v3.yaml": "a447ec483b092cacd99a3805833fc49c1dae4dd503be0148d1d8992f0722f719",
+    "config/competitive_workload_capture.yaml": "ee04244486dd53feef03b03c821e8660dfa7ea9dcec3e14a66b22442f8e8b64c",
+    "config/competitive_workload_staging.yaml": "83819ef04783c268233e8baeff4b951ddc6c03b7344fd610e3f72e98f3d695b8",
+    "config/data_quality.yaml": "7a038c4c041bf80c899bb23f9df195705de01321b4c6eca63e0396ea67ceeba0",
+    "config/dc_predicted_environment_evaluation.yaml": "dd62d5db901d10e1004d7750763c7caaa97adf7e8b9820eaeba2220c209b02e4",
+    "config/football_environment.yaml": "71af0308c3f2d6ce961db5124404966dab29dd76024560e48ab24fbea814d9fe",
+    "config/historical_player_attacking_backfill.yaml": "2403c87e9de6e284801b97b450f5841606177f03ee30593fbd3de642c444f72a",
+    "config/phase1_evaluation.yaml": "afd79d3f82dbb00f3d9d13bb370db1beece4fcb65f3c9e21aedda9eccb67649d",
+    "config/phase2_evaluation.yaml": "5ac5e76610799d870e8efcd86ad83b67978c7682de31234fbbda5291e0576d6a",
+    "config/phase3_evaluation.yaml": "662e29657ad4fd616653c35165b3dd28382952187b06dc7c234a64ea251f8ef2",
+    "config/phase3_stage_c_assists_evaluation.yaml": "1816a0f1bfa1c89ccedd2693e0e5a4a7f06d854b4363afdcf5f1b7f605e87b4e",
+    "config/phase4_ev_backtest_evaluation.yaml": "2e486daba785910c727c90f44d6d946d6802e33c2ae8699237fb52c1db2bd251",
+    "config/pl_sdp_metrics.yaml": "993240a0d55c4a2aef5adf8ccaf671b532a11a93bf9a3a863a746fb143f67bbe",
+    "config/pl_sdp_sot_zero_interpretation.yaml": "52bd6f1ad975f7a683bff6bcca685f32d838c4d1dfd747a33df934860b013347",
+    "config/player_disciplinary_evaluation.yaml": "698572ded8ca4477482baca215717a88e229add0f319d285080df29b6ce32b6f",
+    "config/player_opportunity_evaluation.yaml": "958df33180b85215db9d2b336d051f5d5d0510d3aebe38cc96e2b48d7ecce16f",
+    "config/player_points_synthesis_evaluation.yaml": "32f4fb23282e2081897060701446252fb40a75cf450e363b25937f5c58fb7047",
+    "config/player_role_history_evaluation.yaml": "03ef03ab8d9724f9239c4517fa193d81cfb4179c975f7ad7506f14d4cb0827f3",
+    "config/player_role_history_v1.yaml": "8b4867483f242f71a0762fb55d1efd06bc5216dadbce2cc95679aecc485ed48b",
+    "config/player_role_source_audit.yaml": "a695452fbc12fd1d414d1d64b44c02addee53626c17cd06d4b66093ded7ead5a",
+    "config/player_saves_opportunity_evaluation.yaml": "cf777d6b4dce3d5c43891ceefdda0b6f8936c8f177ffbbbc617b2bae20ffd900",
+    "config/player_workload_minutes_evaluation.yaml": "6d483e21d2a55015b75d7378551fe80fb2fa0d7c1a36b02babe182cfe7ac97ba",
+    "config/retrospective_current_minutes_proxy_v1.yaml": "a151d89743a23d057897bd172945ab6ae3fee35ca78f439f6f01bcb6f3e32578",
+    "config/retrospective_minutes_control_cache.yaml": "044a405c03fde988fc6035b97e028fe3f195fec20fae06d8dbad471d1f193cb9",
+    "config/scoring_2025_26.yaml": "218ae2baa6b1cf4846f3ba91a2205df653ddbccd32529b9fef628a370991a281",
+    "config/scoring_2026_27.yaml": "953c0eb685f011a465f074f333daa2f07976dd0c2af20e3f53283036a99ccc24",
+    "config/sdp_gk_shadow_parameters.json": "2e03ba5d38a93aaea3f0abd4b34ff79b48565c06ad4f1e1e67952c0f6e82a638",
+    "config/sdp_v2_frozen_parameters.json": "043ae6ab2afef1064ce7a3d8544552b7f4fae247216daff6556257fe01f1526b",
+    "config/sources.yaml": "c19b24151c373a1a70bfdd1f5fa7e96cb8343ebb018a98d00a261ccc4e63d89b",
+    "config/squad_2026_27.yaml": "07f6df03b8821388add8f2a80c42a0063da084e8af5d03640fb7ef3ad34b3410",
+    "config/v2_chance_creation_evaluation.yaml": "3edb29cd29cbe7b3ab42e11eda9ab53dc061c7902602dd16ce7893f9b8640728",
+    "config/v2_corroborated_zero_sot_evaluation.yaml": "ef0bc8a6068931a13b0331451abaa728eba7936c314228bca76bd4622aeaf8d0",
+    "config/v2_dc_evaluation.yaml": "20e4f4c4131f338a52ac20d169e9093d0bb0251de9777d85f10678e5dd8c6c55",
+    "config/v2_gk_saves_evaluation.yaml": "045f40011cc056d5260807bdef51121a4de6bd48822f269a87fa9e361b8544d3",
+    "config/v2_real_sot_retrospective_evaluation.yaml": "73ebf92613b8efb39838079b42b576afea2f2d43c775758372293c4d64edaed0",
+    "config/v2_tactical_matchup_evaluation.yaml": "a640ff31f6d1701df12ee9ba3267636ea2856a49cd1496ef68d658b60317c781",
+    "config/v2_tactical_numeric_evaluation.yaml": "9493b01638a0d1cbe65e154aefcda1b96ebacf0461be787878efc8bb915480b4",
+    "config/v2_team_environment_evaluation.yaml": "dd94440cd27b8c0f01ee34d7e6fa5a8dc72874b482466ca9940e0c7bb0f69b82",
+    "config/v2_weekly_inner_selection_evaluation.yaml": "4d485f961a69b8064dc4b8dc968f34b440cde1ff27c8cc51cec768259bbee929",
+    "config/v2_weekly_sot_evaluation.yaml": "5fe7fa8e8682db1fae45d1d45e8a8dba516f33f66fae1179b65150e4332622d7",
+    "docs/attacking-role-premium-feasibility-2026-09-08.md": "3a13dd6531d265010427d0dee52b5f0225aa34c48f5fdffd25f0ea406a2b4ea6",
+    "docs/attacking-role-premium-v1-development-2026-09-08.md": "9952427089d44fa72041758396cbe957d235acdb7fa5940bd592f80a4f4391ac",
+    "docs/attacking-role-premium-v1-preregistration-2026-09-08.md": "cd715d021049b9d975c9ba9def7f12c4bb56d5c96470ab0b464b5cc4c0635ece",
+    "docs/historical-player-attacking-source-audit-2026-09-08.md": "5332f09d5c0078f43521d0bfa39037c15d6172a3dab9eafbb11def797903b72f",
+    "results/attacking_role_premium_feasibility_2026-09-08.json": "65b950bfb95c965f4c776964f4b18074fa60aa74e4b7224b355ef969e0e31ed7",
+    "results/attacking_role_premium_v1_cases_2026-09-08.json": "3ddf2f7c7b61862195b2b61ba89bfd8d6f2e54aece44c22dc951a21c18f3c3e4",
+    "results/attacking_role_premium_v1_development_2026-09-08.json": "de2bd6839de4ca246554010cad337445fc30faa9d89d408147d3dce41cec9e08",
+    "results/attacking_role_premium_v1_diagnostics_2026-09-08.json": "c0830c2d4420c984aa8bbcc974c7df01c0c652baffa4778a2e7a712c111bc26d",
+    "results/attacking_role_premium_v1_independent_audit_2026-09-08.json": "2c5774577a918ac6313d3dc2e6df3f37d1879e63434ab883e07edf4deda02297",
+    "results/attacking_role_premium_v1_population_2026-09-08.json": "1cff23498587cbbaccabad008a490c81dc7c4678f679703809ae296054f13533",
+    "results/attacking_role_premium_v1_verification_2026-09-08.json": "3fc72e75e5216753967e6d204426aeb70b94d1b78a1c9f770e62ee65474e9a36",
+    "results/competitive_participation_pilot_development.json": "f34b0c978b6de9454bbd1bb52cb2d2faabee6347b8baa16403bca773b56bf411",
+    "results/competitive_participation_pilot_independent_audit.json": "84568a52959f87151c6419ac6c85985d868179e959edde32453abfd8fe5409a2",
+    "results/competitive_participation_v2_development.json": "fb9a9ef9d1a55b4a4c867aacbf7d89e1e880e0a64bd251bb2e318f14192c15ab",
+    "results/competitive_participation_v2_extended_prior_check.json": "ec322e57df3335decbc3a18da504ce32b04b35ba118ebc68c585689559cd64cc",
+    "results/competitive_participation_v2_independent_audit.json": "6ed44ca3c917a88515043c29d2ce686f7bcc3bf9d4f668fce7cfc8512384bb24",
+    "results/competitive_straight_red_source_audit.json": "654ac36d91d57ed163b5006b0704728a58eb423e79c913a515ba949d9cc3930e",
+    "results/competitive_workload_raw_capture_2025.json": "d24f10c864fcfd7ff22433f34df163c35fe399a54a9f54d1f9ee6a5796ade47c",
+    "results/competitive_workload_staging_v2.json": "a41152f86e382f12797cd9e688b149c065996773a05ef984bdc899606686d8a8",
+    "results/competitive_workload_staging_v2_independent_audit.json": "46f0605e60b00a44fdad43a2349bb1fc82b7d300723df0e5650a1eb59603e004",
+    "results/competitive_workload_staging_v3.json": "2df5d126c466edb2cf3e6f78e4bf3df9a24c350a44f47d2fc890d31ec3bf46c9",
+    "results/competitive_workload_staging_v3_independent_audit.json": "82094c15ce3260585a3f72e74df259f90423e1e821c4d23bb517b9f895de51de",
+    "results/current_component_proxy_cache_manifest.json": "c76bb1936b332b05bd8e3970af3dbd5b3e95c428d1005783c59d82b88d8f04b9",
+    "results/dc_predicted_environment_coverage.json": "a5e6ffb4e523bb887f5822964a901550d83be58eb86800cbee61836053af3c85",
+    "results/ev_backtest_2025_26_gw29_38.json": "cdfb7f284a31b9b1ee287f12cd830e6c9009af7b23cc7fcdc8e3358c55ff0e5b",
+    "results/football_evidence_amendment_gate_20260907.json": "3cb1943be60635735a1a0220cca3382150edfb6f2eeb2256abf6dac28c0d5940",
+    "results/football_program_completion_verification.json": "dce87121d6ce3988d68a6de5b12f6e7259750d36012a90daf0394bb15854009a",
+    "results/football_program_pre_v3_stage_gate.json": "f8b814c4bdabe11504e150085d8e672a70e65fb2da28e5796a9726a212aa094b",
+    "results/football_program_prerequisite_audit_20260907.json": "4ce06df4d5581c8abd53b1b1e74f15992fde02d161d958493c59d1e5fa3ecf78",
+    "results/gw1_2026_27_forecast_vs_actual_development.json": "29a42dd2a18bb3e3eb0a488ab5d782e8ab9d90c77623444a4109a8e590d78df0",
+    "results/historical_player_attacking_backfill_independent_audit_2026-09-08.json": "146a7209c412e20fbebb63c3c8377097d95b1cd711baf5cf465cb78da4edb409",
+    "results/historical_player_attacking_backfill_manifest_2026-09-08.json": "56da2a8c52f96c2d7d4b68586d86d9eeee3fc4011ae17235ddcf940b58dcf03c",
+    "results/historical_player_attacking_source_audit_2026-09-08.json": "1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952",
+    "results/newcomer_priors_and_style_audit_development.json": "48d29ae1ae751aeee4cfe7ce1e4982a2f85400ea3fd69483cfe8a2dc1af88af4",
+    "results/pl_sdp_coverage.json": "205123c7666fdb887a232a40fbf83ae02f1062c85f9be254bc4115f26af44a7d",
+    "results/pl_sdp_identity_audit.json": "105917e688af2bd1a4e6c8c8a4f0dd9024e23dcc7661bb2f09450bd134d68c74",
+    "results/pl_sdp_metric_inventory.json": "db00a8a06c6026724d96b3578075c9f175e93c7d37d1c96d2b273fb62cefe7e3",
+    "results/pl_sdp_reconciliation.json": "f4c0914c5276cc6d58888a5966d598281b059c4a8355518e96a09acaa442e820",
+    "results/pl_sdp_sot_zero_audit.json": "3d662e09e541e924c218fe4edf1cf7f11289d2d13f4577fb0dc2bf56a596cb4a",
+    "results/player_disciplinary_development.json": "e2348f5ae4dddc623a4c55a5d9d0864cd61d6ba691929ade52b6b49993de3b3b",
+    "results/player_disciplinary_independent_audit.json": "1eac52fc8e58061355f4dab6e0a2474218b0b90ca3099562546784a1b53f1d49",
+    "results/player_disciplinary_target_audit.json": "89acf83a4c664a77d5b30591f823f8ef5ef7397d3c15f2ea4d50dd2806e3fea6",
+    "results/player_opportunity_assists_development.json": "0e168375f6928b7245816c77cb0e2de135dcc5ed92984d132d3a18cbf9c74a0b",
+    "results/player_opportunity_assists_independent_audit.json": "af90ff6f95540b81f3114ea2144f98311f4049a00e9a4a09fac86751962b53fa",
+    "results/player_opportunity_goals_development.json": "2ae0a4aa06acd0b883b60f5b14151b25f0f506b3260a5bf6d5f2bc70bc402485",
+    "results/player_opportunity_goals_independent_audit.json": "a780d6b3c81fc3129a89efb9022483f446cff68b44c43e53cb343e7189cc3a2a",
+    "results/player_points_synthesis_development.json": "0d3599fd5d95a9e301c8f4ea465e71bf235499446f318a3c22403f5d9328543d",
+    "results/player_points_synthesis_independent_audit.json": "358badbf26be931377075518fe4b9bca2204d63e6950bf78127e55c6da187b94",
+    "results/player_role_coverage_finality_amendment_audit.json": "8fda8dab87fdd450d13d46c16dcecb6ec2bca04d787ece5158cdda1071fc2986",
+    "results/player_role_coverage_initial_finality_filter.json": "799d45e902ce979170fce741455b91a38889393b6bc767e2c7f4d33e801a971e",
+    "results/player_role_coverage_v1.json": "48c01dac3d94f4dfb3dc3c66d6fd2c954ca21d50b9338420143215caa500aed1",
+    "results/player_role_history_development.json": "c330d44a227ff6ff10cce1d5813f582d48dadfa181816c9333d6389358940809",
+    "results/player_role_history_independent_audit.json": "d895d8ad359b31da06f8a90ed6bdf95e0c47b87660bed16e70f4bb53cb52fadf",
+    "results/player_role_source_audit_2026-09-08.json": "6a92fc3e421d3d74de543a080a61077364435545e5dcd7d1ff26068563faf607",
+    "results/player_saves_opportunity_coverage.json": "1287970afc12eab0c37b734e4bd1584fae5490a7d786acf2f637297e035309c6",
+    "results/player_saves_opportunity_development.json": "79e61b51951e04795c8acb34a3e17db6e1fa417ed3717f7014b40d71ecf39ed2",
+    "results/player_saves_opportunity_independent_audit.json": "2c18fddb6d49751231a905bbca28a1d489ea5b31f29b75ca0d14e9ffb4813527",
+    "results/player_workload_minutes_coverage.json": "770206f0c151694501cc06b95631b554b172b956e8cfe10363481f474f3cf982",
+    "results/player_workload_minutes_development.json": "9c66f48d7879654b7edca33aceadc124bb6cd6ec64cef5c45744c5ab130e364d",
+    "results/player_workload_minutes_feature_audit.json": "99871bdfbd353b7240e3df1f5844253939ab2e319d6acf1f2163912f13510671",
+    "results/player_workload_minutes_independent_audit.json": "aa43e7208d7ef5cf6b42b668e3545c24d87442b7a67420b0b34578b0eb132f7b",
+    "results/player_workload_minutes_synthetic_runtime_audit.json": "e0356ef7bf26def1ae483451d78a41a4181c91b42449aa4a02c0736233464f0d",
+    "results/retrospective_minutes_proxy_cache_manifest.json": "5b813d58b71bad97a5c81774aaf70c0bca5f4e0e3bcd518e6f26e0acfea19bac",
+    "results/retrospective_minutes_proxy_independent_audit.json": "5a672fbfaee246ad049569e1c6e78ecc675b2b8e536294700b375d16d997e89f",
+    "results/stage_c_assists_candidate_v2_development.json": "a7895ee21fead294381dd5f49845e7e21326c25120ecae106157dd37fe171116",
+    "results/stage_c_goals_candidate_v4_development.json": "c2f4f1e1780c30a356bb2da78bf0e35a6311bb4fdc51fd01d84645aa7f44e0eb",
+    "results/v2_chance_creation_development.json": "f4cc595384102112ba2c41f118396d4176a6f7000a6f3c1753b5edf1a1ae952f",
+    "results/v2_chance_creation_independent_audit.json": "8220902300a2dc75820bbd44565c3f7fa5471fc96bbd16b5a1e141eb35709f0e",
+    "results/v2_chance_target_audit.json": "7d84bfec69b6e6dac1c95d973a723c7e4dbb218432cf5945d5616cb8664fb163",
+    "results/v2_corroborated_zero_sot_development.json": "e8d1a5c0fcce42946d3bf8e798f52e208ac79168c2453e4c0840c1be65c009c5",
+    "results/v2_dc_development.json": "ebae1d1aac84107eea2c443c7262b6a2444622e0ae926c56085dd4447302ac45",
+    "results/v2_dc_predicted_environment_development.json": "a54ae95ca7a9111278fbc33b499021fa5bfc2cd6f0dbe788518d7de4157273f3",
+    "results/v2_dc_predicted_environment_independent_audit.json": "3ecca83fea49514328cb29a8d0cea79174aacf713338bb2c7612aa44df978dd5",
+    "results/v2_real_sot_capture_manifest.json": "084137d2e03babbf9d8361e49be0f23ba19ae3baed34c5d9d0605264ea37057f",
+    "results/v2_real_sot_development.json": "32a3332dd92e30b160a632d6ad68ee268cbfd3367a27340e365583c2e9ca7e7d",
+    "results/v2_real_sot_retrospective_coverage.json": "7b37ce3998f1f252a6b1d7ea7978b1f916f7bf414eb8c942eae87e2bc50c5a6d",
+    "results/v2_tactical_matchup_development.json": "726e513660045f0e34cce9909d7e8e4ac9c0a3999d8a23630866550159bdd8ed",
+    "results/v2_tactical_metric_audit.json": "66a7364de7af030361640db56c922e963ebf8e2853ab500e2ca0d124f4ad0f92",
+    "results/v2_tactical_numeric_development.json": "d52973687d2983c9fc3159365e8dde865ac60a7b1ddb0d0db6e5dc3268efd11c",
+    "results/v2_team_environment_development.json": "bb80b26f88a01f8aee803b1e0eff61b55cc1712625357d3444dd73b297bad6ac",
+    "results/v2_weekly_inner_selection_development.json": "79f3a0815271a95cd0e39874aaa20fa89d3b1df0875a5e780c0317a961424d35",
+    "results/v2_weekly_sot_development.json": "c94cf71a52e926970656733e746d8a0b661c050152647e5de78bde9b0cd8227f",
+    "src/fpl/artifacts/__init__.py": "4e2610432b2620b1807bbe772d4e754dbaf119a2cc8315ac227e5db485f0c39d",
+    "src/fpl/artifacts/decision_comparison.py": "b8df3155b9b748bea47df6437de32e00f3c23f78f00283721c9795b472d40ce2",
+    "src/fpl/artifacts/fixture_environment.py": "d24030156a844dfae90db781b82bfe738625ac74faec1b49998697a32eb6b5a0",
+    "src/fpl/artifacts/optimizer_plan.py": "fc11fbe47c5126b465f8d8491bd631274369a7a52002dd2b9fc32ddce626d894",
+    "src/fpl/artifacts/prospective_points.py": "04274ab66b22c086a7bcf1db90d3f03ffefcf1255e022f5fdbce9151b24485e7",
+    "src/fpl/features/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "src/fpl/features/attacking_role_premium_v1.py": "0b291668aea4c06e0d3066687dcca41475406c4ba0b54b8429d1be646512fae1",
+    "src/fpl/features/pit.py": "c024fb1e276615c0fc6b004234feb31677dbfd2c7e76d7b6b2c2d0f6809e0bf7",
+    "src/fpl/features/sdp_workload.py": "a681c2cffd5ff07bad1d2e4b48f431fd283ed485c65734b4590a0851906cf4b0",
+    "src/fpl/jobs/prospective_points_v1.py": "0e5e28550d38b3e67ca29e8a7d2246371d1bce6ee0e5684dc0ee9377d00e4056",
+    "src/fpl/models/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "src/fpl/models/attacking_assists_baselines.py": "e4c97567d1dc38958a5834012db950532f623136b5706661ffd8b267c222b476",
+    "src/fpl/models/attacking_assists_comparator.py": "16c6272066aa25b6636c3c0aee4c5b0a12fe908cf21a4eb973dd04500c9fba40",
+    "src/fpl/models/attacking_assists_v1.py": "912fcad6287efd60ce860db9a328f1e9e1b400ec2e04abdab94e6c6680b74362",
+    "src/fpl/models/attacking_assists_v2.py": "e157360e8a1fa20301e8ece96e2b8053b2eaa075010aab2e5630ccacd4bdff60",
+    "src/fpl/models/attacking_baselines.py": "ab1977b79426b4df17542bfbcd2155621eaf0eefee0c9340b5e953ac9bc14133",
+    "src/fpl/models/attacking_exposure.py": "e8571b6c7122b837a90e77206239ba96c1a0c8087d054ffe58666089612797f4",
+    "src/fpl/models/attacking_v1.py": "ade49fca1a9626a40fe162c4f593ad45093b6f380c451769773f6b5f3e0bd575",
+    "src/fpl/models/attacking_v2.py": "3d1e61d90b3a9a4762255cf17c4651becbead291c76a4939d20dd85e7d40a8e9",
+    "src/fpl/models/attacking_v3.py": "0b677aedc2a11467c1c2c204a09dc0f9c117485b209cb1be46de998684b0565b",
+    "src/fpl/models/attacking_v4.py": "130ea6047cb943778a254ba66867a50929281768b15e3ead2f8da2a59fe3f068",
+    "src/fpl/models/bps_bonus.py": "26f05c18e8a00183963b8cc53785d08f25a31cdbb9d128e38c664cb16ef2bc8a",
+    "src/fpl/models/component_engine_v2.py": "beee04983e284881a9fa287166feb36db8e28fc2086f04640824c385c7f40855",
+    "src/fpl/models/defensive_contribution_v1.py": "c11a37b0c9208dd03b88c9af54a9a0e6e65b05549e4a0afc84719458a31dff18",
+    "src/fpl/models/defensive_environment_v2.py": "bd18eabc51aec7f2beb00dba57c49d5d3a29a5559b52d0addfac4d1c018bdf9b",
+    "src/fpl/models/defensive_environment_v3.py": "5b23bdd6f4964b79f7c99448b2ee558bc191a94ebbba5654dbb28bef71103eb3",
+    "src/fpl/models/disciplinary_development.py": "f4e0214105580b68cee3c71448ed0d396ec2b0e1301616ff3c2d7f2d31b7b2c5",
+    "src/fpl/models/dynamic_team_goals.py": "ddc3bbdf5547ddd5ddcf6ca2ee0f8ada4eed07ecaf193d517948445821f138f7",
+    "src/fpl/models/dynamic_team_goals_v4.py": "f2b9fd88bea758920898ac7322a00c2236723f5d606d39ec37eb6b88cfe88064",
+    "src/fpl/models/football_engine_v2.py": "753623857f6663aab1b7967779c5e65d649c8a4c920d435eb43f8eee5a1e54f4",
+    "src/fpl/models/gk_saves_v1.py": "f8a5db9d312b11e90e045ad6ae86df24a4fc7c4e111e92b0731d3b45343069d8",
+    "src/fpl/models/gk_saves_v2.py": "41244aab3c8f9d71c0e1d30c029ac5abb0d3c2fb114d83e511ff01611124326e",
+    "src/fpl/models/minutes_shrinkage.py": "634a3b2f03db1c8e73517b558f236ffed47ad28f5b14e09518d97ee31b78d52c",
+    "src/fpl/models/minutes_v1.py": "53851d4d6faf2ed0bfceb02948f9327393677f115efb55d36433aacc62540dc2",
+    "src/fpl/models/minutes_v2.py": "29bac69462e3db17ed82f909ab72915e9028f940cf68f1d5492f05b0929a3a12",
+    "src/fpl/models/minutes_v3.py": "b169a7fa90d6eb9af0fec313349688f6801c4f227ced87604c3f71093c819e3e",
+    "src/fpl/models/points_composition.py": "4eeb7b273c1ec8551f6b6b221365044cc5b554b3ffe5c648d999ad40885ac3e2",
+    "src/fpl/models/price_starter_prior.py": "2cf5fc05c253c6ed1dc9e3ab522eee2415a8f5dffabb739635a9eddd988af616",
+    "src/fpl/models/scoring.py": "db4d102ecb1605ad6684fd9f8d2e4adf34034f9da1c2098ac494819ba6f8e301",
+    "src/fpl/models/sdp_environment.py": "425365df9c5e2215ccb5705869f8777a0fe45a5780b7e49234918b6f249dd985",
+    "src/fpl/models/team_goals.py": "a7869af9d7bbaa421c352f20b1424d75ddc12464258392d263bce1a4ea334840",
+    "src/fpl/optimize/__init__.py": "9070b8b1a3eae9895592876d01620de7b071c16baa94583f2bc2a65904468a06",
+    "src/fpl/optimize/rules.py": "1585a3d724ad77f58cd61c9ca273dcf9f194c20f3906a9b4b8d1ef849b01ee70",
+    "src/fpl/optimize/squad.py": "171bbf7d9969acb1bd2d781935cb5c1fea54f5aef73fafc7d1bb2c9fd97c15ea",
+    "src/fpl/optimize/transfers.py": "5157beb509dcb8ad72735f169d1386604ef45f6171624024acaa8e537818db32",
+    "src/fpl/storage/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "src/fpl/storage/competitive_workload.py": "a137f40788353737e989c93a589123990b3d404e68f711b5c618d64c092f45c5",
+    "src/fpl/storage/db.py": "0251cc73ccdc4748b95ced9aa586335de3374141aea66065df9282a5729626e5",
+    "src/fpl/storage/ledger.py": "2fb1c811fe03d3171ffc1ce49dc709d14d3f485ed592856d1590a5e954cffcd4",
+    "src/fpl/storage/outcomes.py": "0678af7dc3ba68a665b7aa41064b58bbbda3337ecbf572b329b0d2e017c889ba",
+    "src/fpl/storage/schema.sql": "55fc1366392c810bc5fd8ed0838b5c8b20f15a4c543c76e7bf16ab8cb8f19ee2",
+    "src/fpl/storage/sdp_diagnostics.py": "2df19c6ddd7aff1964dfeed2f654b30ee9f6ea844da68b744e70d9b871ed83d6",
+    "src/fpl/storage/sdp_evidence.py": "6a50ad90de59afcbde813b9f7fb157071b2e1fdb08fedc0439fea949171b97e5",
+    "src/fpl/storage/sdp_runtime.py": "138782d0308d1cd8363b62be6eb9af99c64b0d4da84191497774c88d9d0df7b8"
+  },
+  "handoff_state": {
+    "legitimate_staged_files": 9,
+    "remote_main_advanced_externally": true,
+    "remote_main_observed_at_sequential_handoff": "6827ad85ceaeab4a10703d7219277740054fde1b",
+    "remote_v2_head": "35417a32d39dd165fa99a3f3d09f8215ed3eadd6",
+    "unpushed_commits_at_sequential_handoff": 0
+  },
+  "implementation_sha": "dad1f87f63f131db13b568194d987d46f7ea4aa4",
+  "model_integration": false,
+  "production_isolation": {
+    "added_tracked_source_config_files": [
+      "src/fpl/features/player_attacking_usage.py",
+      "src/fpl/jobs/build_player_attacking_usage.py",
+      "src/fpl/publish/player_attacking_usage.py"
+    ],
+    "after_git_head": "dad1f87f63f131db13b568194d987d46f7ea4aa4",
+    "after_receipt_sha256": "beb11895a00b8c6a15ee984761a428867e057c1fe41a4de0e8f65f60f73ed6a7",
+    "all_preexisting_tracked_source_config_files_unchanged": true,
+    "audit": "exact_production_forecast_optimizer_noninterference",
+    "before_git_head": "35417a32d39dd165fa99a3f3d09f8215ed3eadd6",
+    "before_receipt_sha256": "16863a1e552a468e458ece92f21d36810515e4815673c2201fd9c351f7106f3c",
+    "captain_vice_transfer_checks": [
+      {
+        "captain": {
+          "code": 424876,
+          "web_name": "Szoboszlai"
+        },
+        "gw": 4,
+        "transfers_in": [],
+        "transfers_out": [],
+        "vice_captain": {
+          "code": 97032,
+          "web_name": "Virgil"
+        }
+      },
+      {
+        "captain": {
+          "code": 222531,
+          "web_name": "Gibbs-White"
+        },
+        "gw": 5,
+        "transfers_in": [
+          {
+            "code": 215379,
+            "web_name": "Anderson"
+          }
+        ],
+        "transfers_out": [
+          {
+            "code": 243298,
+            "web_name": "Gakpo"
+          }
+        ],
+        "vice_captain": {
+          "code": 17761,
+          "web_name": "Tarkowski"
+        }
+      }
+    ],
+    "cutoff": "2026-09-08T03:52:24.844595+00:00",
+    "excluded_forecast_metadata": [
+      "manifest.commit_sha",
+      "manifest.component_modes.football_environment.provenance.shadow_incumbent_artifact_sha256"
+    ],
+    "excluded_optimizer_metadata": [
+      "run_id",
+      "provenance.optimizer_commit_sha",
+      "provenance.forecast.commit_sha",
+      "provenance.forecast.path",
+      "provenance.forecast.sha256"
+    ],
+    "finished_at": "2026-09-08T09:39:21.913177+00:00",
+    "forecasts": [
+      {
+        "after_file_sha256": "581994b68ece47224dc857befd1e210ba878ac8fd5fa8ba63a8319e5db714959",
+        "artifact": "forecast-gw4-5.jsonl",
+        "before_file_sha256": "ca14b3e67709f899866b1864bcb823827e25684af18aaa6dac326530135ac149",
+        "forecast_record_bytes_identical": true,
+        "forecast_record_bytes_sha256": "fcd7194f93139abcfe475e6ade97e5f65e04f682029aca8d50237bfbbea11162",
+        "full_file_bytes_identical": false,
+        "manifest_except_explicit_metadata_identical": true,
+        "manifest_semantics_sha256": "d1a2a4d48de96100618f421365ec5d04848a441b0b697bcd3475de0b0f29fd84",
+        "record_counts": {
+          "forecast": 1308,
+          "player_fixture": 1308,
+          "team_fixture": 40
+        },
+        "truthful_changed_metadata": {
+          "after": {
+            "commit_sha": "dad1f87f63f131db13b568194d987d46f7ea4aa4",
+            "shadow_incumbent_artifact_sha256": "1c88f9684dd8520bf84be226e0955a448b00effef994b72d42990aab34c2bc0c"
+          },
+          "before": {
+            "commit_sha": "35417a32d39dd165fa99a3f3d09f8215ed3eadd6",
+            "shadow_incumbent_artifact_sha256": "c4c5eca756ee0e47d16ad33ea50ae182ee20f3550b1f3a3f610d1a1b6123cd27"
+          }
+        }
+      },
+      {
+        "after_file_sha256": "1c88f9684dd8520bf84be226e0955a448b00effef994b72d42990aab34c2bc0c",
+        "artifact": "forecast-gw4-5.shadow-incumbent.jsonl",
+        "before_file_sha256": "c4c5eca756ee0e47d16ad33ea50ae182ee20f3550b1f3a3f610d1a1b6123cd27",
+        "forecast_record_bytes_identical": true,
+        "forecast_record_bytes_sha256": "17e04c738485089f1b607dd0af20ab97dad3f90a68ce1730e5abbda1a1f10e21",
+        "full_file_bytes_identical": false,
+        "manifest_except_explicit_metadata_identical": true,
+        "manifest_semantics_sha256": "5f9f72b21e94c9cd2cc251c58c5a3c6372ca0fdf662e9e01a27b7de1eaa9a982",
+        "record_counts": {
+          "forecast": 1308,
+          "player_fixture": 1308,
+          "team_fixture": 40
+        },
+        "truthful_changed_metadata": {
+          "after": {
+            "commit_sha": "dad1f87f63f131db13b568194d987d46f7ea4aa4"
+          },
+          "before": {
+            "commit_sha": "35417a32d39dd165fa99a3f3d09f8215ed3eadd6"
+          }
+        }
+      }
+    ],
+    "interpretation": "Representative exact default GW4-5 replay on retained inputs. No source refresh, ledger write, prospective prediction claim, scientific evaluation, tuning, or promotion.",
+    "no_tolerance_used": true,
+    "optimizer_decision_bytes_identical": true,
+    "optimizer_decision_sha256": "89afd1edd6a44ab332bd542c0eab6c1b1e3fcd757d48b105fcc5a6de781e9c14",
+    "optimizer_semantics_sha256": "ef0a9e4c8695342778fe3c483b4517fab166d560966552b911ebf70e8089d4f8",
+    "optimizer_truthful_changed_metadata": {
+      "after": {
+        "forecast_commit_sha": "dad1f87f63f131db13b568194d987d46f7ea4aa4",
+        "forecast_path": "D:\\Personal\\fpl-operations\\verification\\player-attacking-usage-scouting-20260908T090901Z\\production-noninterference\\after\\forecast-gw4-5.jsonl",
+        "forecast_sha256": "581994b68ece47224dc857befd1e210ba878ac8fd5fa8ba63a8319e5db714959",
+        "optimizer_commit_sha": "dad1f87f63f131db13b568194d987d46f7ea4aa4",
+        "run_id": "8294ef33f8f5a553d4bb088c233026a8345e84eaaed53793731a1b76d62b54a6"
+      },
+      "before": {
+        "forecast_commit_sha": "35417a32d39dd165fa99a3f3d09f8215ed3eadd6",
+        "forecast_path": "D:\\Personal\\fpl-operations\\verification\\player-attacking-usage-scouting-20260908T090901Z\\production-noninterference\\before\\forecast-gw4-5.jsonl",
+        "forecast_sha256": "ca14b3e67709f899866b1864bcb823827e25684af18aaa6dac326530135ac149",
+        "optimizer_commit_sha": "35417a32d39dd165fa99a3f3d09f8215ed3eadd6",
+        "run_id": "1ec4bf7ad4cb1d4affe49b383a73c4c09b9c112ff936e5ce85841c860c0e4601"
+      }
+    },
+    "preexisting_tracked_source_config_files": 256,
+    "script_sha256": "f348a98d8f8aeb6d74ad03344dac129ff662636ffb574cadc625dad0ddf5b158",
+    "selector_counts_player_fixture_predictions": {
+      "SDP_INCOMPLETE_FALLBACK": 654,
+      "SDP_PRIMARY": 654
+    },
+    "selector_counts_team_predictions": {
+      "SDP_INCOMPLETE_FALLBACK": 20,
+      "SDP_PRIMARY": 20
+    },
+    "source_database_unchanged": true,
+    "started_at": "2026-09-08T09:39:21.773304+00:00",
+    "team_environment_including_selectors_workload_and_gk_shadow_identical": true,
+    "team_environment_semantics_sha256": "b49de183551d8853532b57b894ecd4d9a63ec444ba4d49086850b08a95c55cb5"
+  },
+  "production_isolation_receipt_sha256": "dfb64648f1fd0bee159477b9664c6e0530166240dad420c203040b3c8e30239a",
+  "purpose": "DESCRIPTIVE_SCOUTING_ONLY",
+  "schema_version": 1,
+  "scope": {
+    "ledger_writes": false,
+    "main_modified": false,
+    "network_capture": false,
+    "operational_db_writes": false,
+    "pr_opened": false,
+    "production_source_config_unchanged": 256
+  },
+  "scouting_export_replay": {
+    "as_of": "2026-09-08T09:09:01.847981+00:00",
+    "first": {
+      "coverage": {
+        "completed_gameweeks": [
+          1,
+          2,
+          3
+        ],
+        "exposure_buckets": {
+          "LOW": 165,
+          "VERY_LOW": 418
+        },
+        "measured_xg_xa_rows": 1682,
+        "missing_minute_players": 0,
+        "observed_gameweeks": [
+          1,
+          2,
+          3
+        ],
+        "outfield_players": 583,
+        "player_fixture_rows": 1682,
+        "players_by_minimum_minutes": {
+          "180": 165,
+          "360": 0,
+          "450": 0,
+          "90": 232,
+          "900": 0
+        },
+        "position_players": {
+          "DEF": 214,
+          "FWD": 78,
+          "MID": 291
+        },
+        "position_rows": {
+          "DEF": 623,
+          "FWD": 224,
+          "MID": 835
+        },
+        "positive_minute_rows": 869,
+        "zero_history_players": 218
+      },
+      "csv_rows": 165,
+      "defender_watchlist_count": 4,
+      "files": {
+        "README.txt": "f5b487d2f6a74270f4e5c596416565c5a346a29d93fee9a66127048efdb544a9",
+        "player_attacking_usage.csv": "f87f16ba592fe894ee8278e8676caba05ec1251d29bbeb42ea884d7aeec46125",
+        "player_attacking_usage.json": "8ae95450f79b11d8d35aa79e286e28f340ed87c75427716a82df422ac810d67a"
+      },
+      "output_dir": "D:\\Personal\\fpl-operations\\verification\\player-attacking-usage-scouting-20260908T090901Z\\current-export-final",
+      "source_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da"
+    },
+    "replay_data_files_byte_identical": true,
+    "second": {
+      "coverage": {
+        "completed_gameweeks": [
+          1,
+          2,
+          3
+        ],
+        "exposure_buckets": {
+          "LOW": 165,
+          "VERY_LOW": 418
+        },
+        "measured_xg_xa_rows": 1682,
+        "missing_minute_players": 0,
+        "observed_gameweeks": [
+          1,
+          2,
+          3
+        ],
+        "outfield_players": 583,
+        "player_fixture_rows": 1682,
+        "players_by_minimum_minutes": {
+          "180": 165,
+          "360": 0,
+          "450": 0,
+          "90": 232,
+          "900": 0
+        },
+        "position_players": {
+          "DEF": 214,
+          "FWD": 78,
+          "MID": 291
+        },
+        "position_rows": {
+          "DEF": 623,
+          "FWD": 224,
+          "MID": 835
+        },
+        "positive_minute_rows": 869,
+        "zero_history_players": 218
+      },
+      "csv_rows": 165,
+      "defender_watchlist_count": 4,
+      "files": {
+        "README.txt": "f5b487d2f6a74270f4e5c596416565c5a346a29d93fee9a66127048efdb544a9",
+        "player_attacking_usage.csv": "f87f16ba592fe894ee8278e8676caba05ec1251d29bbeb42ea884d7aeec46125",
+        "player_attacking_usage.json": "8ae95450f79b11d8d35aa79e286e28f340ed87c75427716a82df422ac810d67a"
+      },
+      "output_dir": "D:\\Personal\\fpl-operations\\verification\\player-attacking-usage-scouting-20260908T090901Z\\current-export-final-replay",
+      "source_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da"
+    },
+    "source_db_before_after_sha256": "8738283606848d37105629b9b98404df3720d4471953b120eeefd37d0f6a0660"
+  },
+  "source_as_of": "2026-09-08T09:09:01.847981+00:00",
+  "source_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+  "source_known_at": "2026-09-08T03:37:39.610696+00:00",
+  "source_manifest_sha256": "60a69282830fca5f757bddd11a10f51ec074ead4fed8aacad20f825c31c2c526",
+  "starting_sha": "35417a32d39dd165fa99a3f3d09f8215ed3eadd6",
+  "tests": {
+    "bi_export_source_contract_subset": {
+      "deselected": 25,
+      "passed": 16
+    },
+    "changed_python_format": {
+      "files": 6,
+      "result": "PASS"
+    },
+    "dashboard_json": {
+      "passed": 81,
+      "skip_reason": "Inherited Windows directory-symlink privilege limitation",
+      "skipped": 4
+    },
+    "feature_source_pit_and_frozen_arithmetic_regressions": {
+      "note": "Earlier combined run includes 72 new tests; no formal evaluation.",
+      "passed": 148
+    },
+    "git_diff_check": "PASS",
+    "inherited_limitations": [
+      "Existing synthetic optimizer population can choose different equally-valued XI/bench optima across identical solves. Reproduced without scouting. New isolation fixture uses unique synthetic utilities; no production optimizer change or relaxed decision assertion. Real full-registry before/after decisions match exactly.",
+      "Unrestricted strict type-checking imported legacy test fixtures exposed 26 existing errors in test_prospective_points_v1.py/test_squad_optimizer.py. Production src strict check passes. New tests pass with imported legacy fixture bodies silent.",
+      "Earlier agent broad test attempt hit default Windows pytest temp-directory WinError5. Explicit dedicated basetemp runs passed; four dashboard symlink tests remain skipped.",
+      "Inherited global formatting failures were not rerun; changed-file formatting passes. PuLP deprecation warnings remain."
+    ],
+    "new_export_tests": {
+      "passed": 28
+    },
+    "new_feature_tests": {
+      "passed": 46
+    },
+    "new_production_isolation_tests": {
+      "passed": 3
+    },
+    "ruff_check_repository": "PASS",
+    "strict_mypy_src": {
+      "result": "PASS",
+      "source_files": 214
+    },
+    "strict_mypy_src_and_new_tests": {
+      "follow_imports": "silent for inherited test fixture modules",
+      "result": "PASS",
+      "source_files": 217
+    }
+  },
+  "verified_at": "2026-09-08T09:40:49.771171+00:00",
+  "watchlist": [
+    {
+      "as_of": "2026-09-08T09:09:01.847981+00:00",
+      "available_at": "2026-09-08T03:37:39.610696+00:00",
+      "delta_usage_percentile": 0.0,
+      "delta_xa90": 0.0,
+      "delta_xg90": 0.0,
+      "delta_xgi90": 0.0,
+      "exposure_bucket": "LOW",
+      "fpl_position": "DEF",
+      "historical_appearances": 3,
+      "historical_meaningful_appearances": 3,
+      "historical_minutes": 247.0,
+      "historical_starts": 3,
+      "history_sha256": "d59faa9c4ebfae42db1b9bb2213d692e4cf82fea14469b43a45ea21bed8f2125",
+      "long_peer_count": 136,
+      "long_profile_status": "AVAILABLE",
+      "long_usage_bucket": "HIGH",
+      "long_usage_percentile": 0.9264705882352942,
+      "long_xa90": 0.08768351367914126,
+      "long_xa_percentile": 0.8933823529411765,
+      "long_xg90": 0.12961155215975217,
+      "long_xg_percentile": 0.9595588235294118,
+      "long_xgi90": 0.21729506583889344,
+      "measured_minutes": 247.0,
+      "player_code": 166477,
+      "population_history_sha256": "8c13f0d5ed77e9aefce8ba2715d41c6a1470e5cef45d67ad8833a86a2d80ee33",
+      "recent_measured_minutes": 247.0,
+      "recent_peer_count": 136,
+      "recent_profile_status": "AVAILABLE",
+      "recent_usage_bucket": "HIGH",
+      "recent_usage_percentile": 0.9264705882352942,
+      "recent_window_minutes": 247.0,
+      "recent_xa90": 0.08768351367914126,
+      "recent_xa_percentile": 0.8933823529411765,
+      "recent_xg90": 0.12961155215975217,
+      "recent_xg_percentile": 0.9595588235294118,
+      "recent_xgi90": 0.21729506583889344,
+      "registry_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+      "season": "2026-27",
+      "source_known_at": "2026-09-08T03:37:39.610696+00:00",
+      "source_versions": [
+        [
+          "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+          "2026-09-08T03:37:39.610696+00:00",
+          "2cfe5628e5f64b929dd732bf9415c0f8412a7613c654a7ae9d0b5fb3ad83beae"
+        ]
+      ],
+      "team_code": 54,
+      "web_name": "Castagne"
+    },
+    {
+      "as_of": "2026-09-08T09:09:01.847981+00:00",
+      "available_at": "2026-09-08T03:37:39.610696+00:00",
+      "delta_usage_percentile": 0.0,
+      "delta_xa90": 0.0,
+      "delta_xg90": 0.0,
+      "delta_xgi90": 0.0,
+      "exposure_bucket": "LOW",
+      "fpl_position": "DEF",
+      "historical_appearances": 3,
+      "historical_meaningful_appearances": 3,
+      "historical_minutes": 270.0,
+      "historical_starts": 3,
+      "history_sha256": "ef69a02555ba5eb7a349e0d5713d5487c08f12ab507ca16a39d6507be0e81c81",
+      "long_peer_count": 136,
+      "long_profile_status": "AVAILABLE",
+      "long_usage_bucket": "HIGH",
+      "long_usage_percentile": 0.9301470588235294,
+      "long_xa90": 0.08613251254772426,
+      "long_xa_percentile": 0.8786764705882353,
+      "long_xg90": 0.15297118313242675,
+      "long_xg_percentile": 0.9816176470588235,
+      "long_xgi90": 0.239103695680151,
+      "measured_minutes": 270.0,
+      "player_code": 209036,
+      "population_history_sha256": "8c13f0d5ed77e9aefce8ba2715d41c6a1470e5cef45d67ad8833a86a2d80ee33",
+      "recent_measured_minutes": 270.0,
+      "recent_peer_count": 136,
+      "recent_profile_status": "AVAILABLE",
+      "recent_usage_bucket": "HIGH",
+      "recent_usage_percentile": 0.9301470588235294,
+      "recent_window_minutes": 270.0,
+      "recent_xa90": 0.08613251254772426,
+      "recent_xa_percentile": 0.8786764705882353,
+      "recent_xg90": 0.15297118313242675,
+      "recent_xg_percentile": 0.9816176470588235,
+      "recent_xgi90": 0.239103695680151,
+      "registry_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+      "season": "2026-27",
+      "source_known_at": "2026-09-08T03:37:39.610696+00:00",
+      "source_versions": [
+        [
+          "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+          "2026-09-08T03:37:39.610696+00:00",
+          "9e044fd2d14975edd52859370033e6b1ce7e9b74a6de8c0a8063cf088831255b"
+        ]
+      ],
+      "team_code": 43,
+      "web_name": "Guéhi"
+    },
+    {
+      "as_of": "2026-09-08T09:09:01.847981+00:00",
+      "available_at": "2026-09-08T03:37:39.610696+00:00",
+      "delta_usage_percentile": 0.0,
+      "delta_xa90": 0.0,
+      "delta_xg90": 0.0,
+      "delta_xgi90": 0.0,
+      "exposure_bucket": "LOW",
+      "fpl_position": "DEF",
+      "historical_appearances": 3,
+      "historical_meaningful_appearances": 3,
+      "historical_minutes": 243.0,
+      "historical_starts": 3,
+      "history_sha256": "84f30a5138fa288ec8f874cfff77d23d12a5e7f9a71e6b065d5502a10caab390",
+      "long_peer_count": 136,
+      "long_profile_status": "AVAILABLE",
+      "long_usage_bucket": "HIGH",
+      "long_usage_percentile": 0.9558823529411764,
+      "long_xa90": 0.09208572732231092,
+      "long_xa_percentile": 0.9154411764705882,
+      "long_xg90": 0.2381518785791447,
+      "long_xg_percentile": 0.9963235294117647,
+      "long_xgi90": 0.3302376059014556,
+      "measured_minutes": 243.0,
+      "player_code": 465730,
+      "population_history_sha256": "8c13f0d5ed77e9aefce8ba2715d41c6a1470e5cef45d67ad8833a86a2d80ee33",
+      "recent_measured_minutes": 243.0,
+      "recent_peer_count": 136,
+      "recent_profile_status": "AVAILABLE",
+      "recent_usage_bucket": "HIGH",
+      "recent_usage_percentile": 0.9558823529411764,
+      "recent_window_minutes": 243.0,
+      "recent_xa90": 0.09208572732231092,
+      "recent_xa_percentile": 0.9154411764705882,
+      "recent_xg90": 0.2381518785791447,
+      "recent_xg_percentile": 0.9963235294117647,
+      "recent_xgi90": 0.3302376059014556,
+      "registry_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+      "season": "2026-27",
+      "source_known_at": "2026-09-08T03:37:39.610696+00:00",
+      "source_versions": [
+        [
+          "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+          "2026-09-08T03:37:39.610696+00:00",
+          "583cdc8c9b07226c508031e38cb14bf6a60c18b9dfa5d22bba394b3765fe1bcb"
+        ]
+      ],
+      "team_code": 36,
+      "web_name": "De Cuyper"
+    },
+    {
+      "as_of": "2026-09-08T09:09:01.847981+00:00",
+      "available_at": "2026-09-08T03:37:39.610696+00:00",
+      "delta_usage_percentile": 0.0,
+      "delta_xa90": 0.0,
+      "delta_xg90": 0.0,
+      "delta_xgi90": 0.0,
+      "exposure_bucket": "LOW",
+      "fpl_position": "DEF",
+      "historical_appearances": 3,
+      "historical_meaningful_appearances": 3,
+      "historical_minutes": 236.0,
+      "historical_starts": 3,
+      "history_sha256": "c1ef42d7e2e9674b0c9329d0253410655191b8b715b3b878ec804a81e5268cd4",
+      "long_peer_count": 136,
+      "long_profile_status": "AVAILABLE",
+      "long_usage_bucket": "HIGH",
+      "long_usage_percentile": 0.9411764705882353,
+      "long_xa90": 0.11664053795096424,
+      "long_xa_percentile": 0.9595588235294118,
+      "long_xg90": 0.11463447792324673,
+      "long_xg_percentile": 0.9227941176470589,
+      "long_xgi90": 0.23127501587421095,
+      "measured_minutes": 236.0,
+      "player_code": 466075,
+      "population_history_sha256": "8c13f0d5ed77e9aefce8ba2715d41c6a1470e5cef45d67ad8833a86a2d80ee33",
+      "recent_measured_minutes": 236.0,
+      "recent_peer_count": 136,
+      "recent_profile_status": "AVAILABLE",
+      "recent_usage_bucket": "HIGH",
+      "recent_usage_percentile": 0.9411764705882353,
+      "recent_window_minutes": 236.0,
+      "recent_xa90": 0.11664053795096424,
+      "recent_xa_percentile": 0.9595588235294118,
+      "recent_xg90": 0.11463447792324673,
+      "recent_xg_percentile": 0.9227941176470589,
+      "recent_xgi90": 0.23127501587421095,
+      "registry_capture_id": "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+      "season": "2026-27",
+      "source_known_at": "2026-09-08T03:37:39.610696+00:00",
+      "source_versions": [
+        [
+          "1bfb3d92-6d5e-48bf-a665-1f489dc6c1da",
+          "2026-09-08T03:37:39.610696+00:00",
+          "8d436f4a12db46e38068c48478b580eeff258e466082f41088c18628d4fd015a"
+        ]
+      ],
+      "team_code": 3,
+      "web_name": "Calafiori"
+    }
+  ]
+}

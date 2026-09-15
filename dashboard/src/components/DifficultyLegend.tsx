@@ -5,6 +5,12 @@
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   BUCKET_CLASSES,
   EASE_LEGEND,
   FDR_LEGEND,
@@ -34,6 +40,14 @@ export function DifficultyLegend({
   easeIndexFormulaVersion,
   defenceScaleNote,
 }: DifficultyLegendProps) {
+  const descriptions: Record<ColorSource, string> = {
+    opponent:
+      "Opponent strength from the vintage's model λ (100 = average club, higher = stronger opponent; display-time derivation, never blended into ease or FDR).",
+    ease:
+      `Ease index: 100 = league average, higher = easier (formula ${easeIndexFormulaVersion}). ` +
+      (defenceScaleNote ?? "Defence view uses the club defence ease index."),
+    fdr: "Official FDR, 1 = easiest … 5 = hardest; never blended into the model index.",
+  };
   const legend =
     colorSource === "ease" ? EASE_LEGEND : colorSource === "fdr" ? FDR_LEGEND : OPPONENT_LEGEND;
   const direction =
@@ -42,22 +56,29 @@ export function DifficultyLegend({
       : "Green = easier · Red = harder";
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-      <ToggleGroup
-        type="single"
-        value={colorSource}
-        onValueChange={(value) => {
-          if (value) onColorSourceChange(value as ColorSource);
-        }}
-        variant="outline"
-        size="sm"
-        aria-label="Colour source"
-      >
-        {SOURCE_ORDER.map((source) => (
-          <ToggleGroupItem key={source} value={source}>
-            {SOURCE_LABEL[source]}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <TooltipProvider delayDuration={250}>
+        <ToggleGroup
+          type="single"
+          value={colorSource}
+          onValueChange={(value) => {
+            if (value) onColorSourceChange(value as ColorSource);
+          }}
+          variant="outline"
+          size="sm"
+          aria-label="Colour source"
+        >
+          {SOURCE_ORDER.map((source) => (
+            <Tooltip key={source}>
+              <ToggleGroupItem value={source} asChild>
+                <TooltipTrigger>{SOURCE_LABEL[source]}</TooltipTrigger>
+              </ToggleGroupItem>
+              <TooltipContent side="bottom" sideOffset={8} className="leading-relaxed">
+                {descriptions[source]}
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </ToggleGroup>
+      </TooltipProvider>
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="font-medium">{direction}</span>
         {legend.map(({ bucket, label }) => (
@@ -69,21 +90,6 @@ export function DifficultyLegend({
           </span>
         ))}
       </div>
-      {colorSource === "opponent" ? (
-        <span>
-          Opponent strength from the vintage's model λ (100 = average club, higher =
-          stronger opponent; display-time derivation, never blended into ease or FDR).
-        </span>
-      ) : colorSource === "ease" ? (
-        <span>
-          Ease index: 100 = league average, higher = easier (formula{" "}
-          {easeIndexFormulaVersion}).{" "}
-          {defenceScaleNote ??
-            "Defence view uses the club defence ease index."}
-        </span>
-      ) : (
-        <span>Official FDR, 1 = easiest … 5 = hardest; never blended into the model index.</span>
-      )}
     </div>
   );
 }

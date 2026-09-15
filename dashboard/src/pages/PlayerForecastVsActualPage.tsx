@@ -1,3 +1,5 @@
+import { PublicationStatus } from "@/components/PublicationStatus";
+import { AccuracyObservationTable, AccuracyDelta } from "@/components/AccuracyObservationTable";
 import { useEffect, useMemo, useState } from "react";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import {
@@ -227,7 +229,7 @@ export function PlayerForecastVsActualPage() {
             Forecast vintage
             <select
               aria-label="Player forecast vintage"
-              className="ml-2 h-8 rounded-md border bg-background px-2 text-sm text-foreground"
+              className="mt-1 block h-9 w-full max-w-[min(32rem,75vw)] rounded-md border bg-background px-2 text-sm text-foreground"
               value={run.run_id}
               onChange={(event) => {
                 setRunId(event.target.value);
@@ -245,7 +247,7 @@ export function PlayerForecastVsActualPage() {
             Finalized scope
             <select
               aria-label="Completed player gameweek"
-              className="ml-2 h-8 rounded-md border bg-background px-2 text-sm text-foreground"
+              className="mt-1 block h-9 w-full max-w-[min(32rem,75vw)] rounded-md border bg-background px-2 text-sm text-foreground"
               value={gwFilter}
               onChange={(event) => setGwFilter(event.target.value)}
             >
@@ -255,6 +257,12 @@ export function PlayerForecastVsActualPage() {
           </label>
         </div>
       </div>
+
+      <div className="flex flex-wrap gap-2 text-sm" aria-label="Monitoring vintage shortcuts">
+        <button className="rounded-md border px-3 py-2" onClick={() => { setRunId(defaultAccuracyRun(runOptions)?.run_id ?? ""); setGwFilter("all"); }}>Latest scored forecast</button>
+        <button className="rounded-md border px-3 py-2" onClick={() => { const latest = runOptions.find((r) => r.component_modes?.["football_environment.primary"] === "sdp_v2") ?? runOptions[0]; if (latest) setRunId(latest.run_id); setGwFilter("all"); }}>Latest published forecast · may be pending</button>
+      </div>
+      <PublicationStatus manifestHash={state.data.manifest?.content_sha256 ?? ""} />
 
       <p
         aria-label="Selected player forecast provenance"
@@ -300,46 +308,29 @@ export function PlayerForecastVsActualPage() {
         emptyMessage="No fully finalized player-gameweek observations exist in this scope."
       />
 
-      <InsightSummaryPanel
-        items={insightFacts}
-        caveats={insightCaveats}
-        remote={{
-          page: "player_forecast_vs_actual",
-          provenance: publishedInsightProvenance(state.data.manifest, run),
-          scope: compactInsightScope({
-            gw_from: gwFilter === "all" ? firstCompletedGw : Number(gwFilter),
-            gw_to: gwFilter === "all" ? lastCompletedGw : Number(gwFilter),
-            view: "overall",
-          }),
-          localScopeKey: JSON.stringify({ runId: run.run_id, gwFilter }),
-        }}
+
+      <AccuracyObservationTable
+        key={`${run.run_id}-${gwFilter}`}
+        title="Exact player prediction observations"
+        rows={observations}
+        rowKey={(r) => `${r.gw}-${r.code}`}
+        searchText={(r) => `${r.web_name} ${r.team_short_name} ${r.position} GW${r.gw}`}
+        context={`${run.season} · ${scopeLabel} · forecast as of ${run.as_of}`}
+        columns={[
+          { key: "gw", label: "GW", value: r => r.gw },
+          { key: "player", label: "Player", value: r => r.web_name },
+          { key: "position", label: "Pos", value: r => r.position },
+          { key: "team", label: "Club", value: r => r.team_short_name },
+          { key: "forecast", label: "Forecast xP", value: r => r.forecast_xp, render: r => <strong className="text-sky-700 dark:text-sky-300">{fmt(r.forecast_xp, 2)}</strong> },
+          { key: "actual", label: "Actual pts", value: r => r.actual_points, render: r => <strong>{fmt(r.actual_points, 0)}</strong> },
+          { key: "delta", label: "Δ Actual − forecast", value: r => r.residual, render: r => <AccuracyDelta value={r.residual} /> },
+          { key: "error", label: "Abs error", value: r => r.absolute_error, render: r => fmt(r.absolute_error, 2) },
+          { key: "crps", label: "CRPS ↓", value: r => r.crps, render: r => fmt(r.crps), advanced: true },
+          ...([{key: "p_le_2", label: "P(total ≤ 2)"}, {key: "p_ge_2", label: "P(total ≥ 2)"}, {key: "p_ge_6", label: "P(total ≥ 6)"}, {key: "p_ge_10", label: "P(total ≥ 10)"}] as const).map(c => ({ ...c, value: (r: PlayerForecastObservation) => r[c.key], render: (r: PlayerForecastObservation) => pct(r[c.key]), advanced: true })),
+        ]}
       />
 
-      <section className="space-y-2" aria-labelledby="player-observations-heading">
-        <h2 id="player-observations-heading" className="text-sm font-semibold">Exact player observations</h2>
-        <div className="overflow-x-auto rounded-md border">
-          <Table aria-label="Exact player prediction observations">
-            <TableHeader>
-              <TableRow>
-                <TableHead>GW</TableHead><TableHead>Player</TableHead><TableHead>Position</TableHead><TableHead>Team</TableHead>
-                <TableHead>Forecast xP</TableHead><TableHead>Actual</TableHead><TableHead>Residual (actual − forecast)</TableHead><TableHead>Absolute error</TableHead><TableHead>CRPS</TableHead>
-                <TableHead>P(total ≤ 2)</TableHead><TableHead>P(total ≥ 2)</TableHead><TableHead>P(total ≥ 6)</TableHead><TableHead>P(total ≥ 10)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {observations.map((observation) => (
-                <TableRow key={`${observation.gw}-${observation.code}`}>
-                  <TableCell>GW{observation.gw}</TableCell><TableCell className="font-medium">{observation.web_name}</TableCell><TableCell>{observation.position}</TableCell><TableCell>{observation.team_short_name}</TableCell>
-                  <TableCell className="tabular-nums">{fmt(observation.forecast_xp, 2)}</TableCell><TableCell className="tabular-nums">{fmt(observation.actual_points, 0)}</TableCell><TableCell className="tabular-nums">{signed(observation.residual)}</TableCell><TableCell className="tabular-nums">{fmt(observation.absolute_error)}</TableCell><TableCell className="tabular-nums">{fmt(observation.crps)}</TableCell>
-                  <TableCell className="tabular-nums">{pct(observation.p_le_2)}</TableCell><TableCell className="tabular-nums">{pct(observation.p_ge_2)}</TableCell><TableCell className="tabular-nums">{pct(observation.p_ge_6)}</TableCell><TableCell className="tabular-nums">{pct(observation.p_ge_10)}</TableCell>
-                </TableRow>
-              ))}
-              {!observations.length && <TableRow><TableCell colSpan={13} className="text-muted-foreground">No scored observations in this scope; missing is not zero.</TableCell></TableRow>}
-            </TableBody>
-          </Table>
-        </div>
-      </section>
-
+      <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Calibration and breakdowns · full selected vintage</summary>
       <section className="space-y-2" aria-labelledby="player-calibration-heading">
         <h2 id="player-calibration-heading" className="text-sm font-semibold">Published threshold reliability · full run</h2>
         <p className="text-xs text-muted-foreground">Inclusive events only. These probabilities and buckets were computed by the static Python emitter; the browser does not reconstruct or recalibrate them.</p>
@@ -361,9 +352,25 @@ export function PlayerForecastVsActualPage() {
         <ScoreSplitTable title="Scores by forecast-time team" rows={teamRows} />
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      </details>
+
+      <p className="break-all text-xs text-muted-foreground">
         Run {run.run_id} · as of {run.as_of ?? "unknown"} · created {run.created_at ?? "unknown"}. Cross-vintage differences diagnose calibration only; compare every vintage against its own attached outcomes.
       </p>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "player_forecast_vs_actual",
+          provenance: publishedInsightProvenance(state.data.manifest, run),
+          scope: compactInsightScope({
+            gw_from: gwFilter === "all" ? firstCompletedGw : Number(gwFilter),
+            gw_to: gwFilter === "all" ? lastCompletedGw : Number(gwFilter),
+            view: "overall",
+          }),
+          localScopeKey: JSON.stringify({ runId: run.run_id, gwFilter }),
+        }}
+      />
     </div>
   );
 }

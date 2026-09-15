@@ -1,0 +1,180 @@
+import type { CompetitiveSchedule } from "@/data/competitiveSchedule";
+import type { FixtureScheduleOverlay } from "@/data/types";
+import type { InternationalBreak } from "@/data/internationalBreaks";
+
+export interface CalendarFixture {
+  key: string; teamCode: number; opponent: string; opponentName: string;
+  opponentCode: number | null; home: boolean | null; kickoff: string | null;
+  competition: string; competitionName: string; gw: number | null;
+  fdr: number | null; status: string; source: "FPL" | "SDP"; knownAt: string;
+}
+const ABBR: Record<number, string> = { 1: "FAC", 2: "LC", 5: "UCL", 6: "UEL", 1125: "UECL" };
+export const MAX_DAILY_DAYS = 366;
+
+/** A fixed UK football calendar, independent of the browser's time zone. */
+export function footballDate(instant: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(instant));
+}
+
+export function calendarFixtures(schedule: FixtureScheduleOverlay, cups: CompetitiveSchedule | null, season: string): CalendarFixture[] {
+  const rows: CalendarFixture[] = [];
+  const seen = new Set<string>();
+  for (const team of schedule.teams.filter((t) => t.season === season)) {
+    for (const f of team.fixtures) {
+      const key = `fpl:${f.fixture}:${team.team_code}`;
+      if (seen.has(key)) throw new Error("Duplicate official fixture side");
+      seen.add(key);
+      rows.push({ key, teamCode: team.team_code, opponent: f.opponent_short_name,
+        opponentName: schedule.teams.find((t) => t.season === season && t.team_code === f.opponent_team_code)?.team_name ?? f.opponent_short_name,
+        opponentCode: f.opponent_team_code, home: f.was_home, kickoff: f.kickoff_time,
+        competition: "PL", competitionName: "Premier League", gw: f.gw, fdr: f.official_fdr ?? null,
+        status: "Official schedule", source: "FPL", knownAt: schedule.export_created_at });
+    }
+  }
+  if (cups?.season === season) for (const comp of cups.competitions) {
+    for (const m of comp.matches) for (const home of [true, false]) {
+      const teamCode = home ? m.home_team_code : m.away_team_code;
+      if (teamCode === null) continue;
+      const key = `sdp:${comp.competition_id}:${m.provider_match_id}:${teamCode}`;
+      if (seen.has(key)) throw new Error("Duplicate competitive fixture side");
+      seen.add(key);
+      rows.push({ key, teamCode, opponent: home ? m.away_short : m.home_short,
+        opponentName: home ? m.away_name : m.home_name, opponentCode: home ? m.away_team_code : m.home_team_code,
+        home, kickoff: m.kickoff_time, competition: ABBR[comp.competition_id] ?? comp.name,
+        competitionName: comp.name, gw: null, fdr: null, status: m.status, source: "SDP",
+        knownAt: comp.sources.find((s) => s.payload_id === m.source_payload_id)!.known_at });
+    }
+  }
+  return rows.sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? "") || a.key.localeCompare(b.key));
+}
+
+export function calendarRange(rows: CalendarFixture[], fromGw: number, toGw: number): [string, string] {
+  const days = rows.filter((r) => r.gw !== null && r.gw >= fromGw && r.gw <= toGw && r.kickoff)
+    .map((r) => footballDate(r.kickoff!)).sort();
+  if (!days.length) return ["", ""];
+  const first = new Date(`${days[0]}T12:00:00Z`);
+  first.setUTCDate(first.getUTCDate() - (first.getUTCDay() + 6) % 7);
+  return [first.toISOString().slice(0, 10), days.at(-1)!];
+}
+
+export function visibleCalendar(rows: CalendarFixture[], codes: number[], from: string, to: string) {
+  const selected = rows.filter((r) => codes.includes(r.teamCode));
+  const dated = selected.filter((r) => r.kickoff && footballDate(r.kickoff) >= from && footballDate(r.kickoff) <= to);
+  return { rows: dated, dates: [...new Set(dated.map((r) => footballDate(r.kickoff!)))].sort(),
+    undated: selected.filter((r) => r.kickoff === null) };
+}
+
+export interface CalendarColumn {
+  key: string;
+  heading: "Weekend" | "Midweek" | "Cup week" | "International break" | "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
+  label: string;
+  from: string;
+  to: string;
+  fixtures: CalendarFixture[];
+  internationalBreak?: InternationalBreak;
+  collapsedDays?: number;
+}
+
+/** Group PL by official GW (all DGW legs), cups by their UK calendar week.
+ * Cup weekends stay separate and are labelled honestly, never forced into a GW.
+ */
+export function calendarColumns(rows: CalendarFixture[], breaks: InternationalBreak[] = []): CalendarColumn[] {
+  const groups = new Map<string, CalendarColumn>();
+  for (const row of rows) {
+    if (!row.kickoff && row.gw === null) continue;
+    const day = row.kickoff ? footballDate(row.kickoff) : "";
+    const monday = new Date(`${day || "2000-01-03"}T12:00:00Z`);
+    const weekday = monday.getUTCDay();
+    monday.setUTCDate(monday.getUTCDate() - (weekday + 6) % 7);
+    const key = row.gw !== null ? `gw:${row.gw}` : `cups:${monday.toISOString().slice(0, 10)}`;
+    const group: CalendarColumn = groups.get(key) ?? {key, heading: row.gw !== null ? "Weekend" : "Midweek",
+      label: row.gw !== null ? `GW${row.gw}` : "", from: day, to: day, fixtures: []};
+    if (row.gw === null && (weekday < 2 || weekday > 4)) group.heading = "Cup week";
+    group.fixtures.push(row);
+    group.from = group.from && (!day || group.from < day) ? group.from : day;
+    group.to = group.to > day ? group.to : day;
+    if (row.gw === null) group.label = [...new Set(group.fixtures.map((f) => f.competition))].sort().join(" · ");
+    groups.set(key, group);
+  }
+  for (const window of breaks) {
+    const key = `international:${window.from}`;
+    groups.set(key, { key, heading: "International break", label: window.label,
+      from: window.from, to: window.to, fixtures: [], internationalBreak: window });
+  }
+  return [...groups.values()].sort((a, b) => (a.from || "9999").localeCompare(b.from || "9999") || a.key.localeCompare(b.key));
+}
+
+/** Continuous UK dates: retain empty days so the space between games is visible. */
+export function dailyCalendarColumns(rows: CalendarFixture[], from: string, to: string, breaks: InternationalBreak[] = []): CalendarColumn[] {
+  if (!from || !to || from > to) return [];
+  const date = new Date(`${from}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || !Number.isFinite(Date.parse(`${to}T12:00:00Z`))) return [];
+  if ((Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > MAX_DAILY_DAYS) throw new Error("Daily calendar range exceeds 366 days");
+  const byDay = new Map<string, CalendarFixture[]>();
+  for (const f of rows) {
+    if (!f.kickoff) continue;
+    const day = footballDate(f.kickoff);
+    const matches = byDay.get(day) ?? [];
+    matches.push(f); byDay.set(day, matches);
+  }
+  const columns: CalendarColumn[] = [];
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+  for (; date.toISOString().slice(0, 10) <= to; date.setUTCDate(date.getUTCDate() + 1)) {
+    const day = date.toISOString().slice(0, 10);
+    columns.push({ key: `day:${day}`, heading: weekdays[date.getUTCDay()],
+      label: date.toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short" }),
+      from: day, to: day, fixtures: (byDay.get(day) ?? []).sort((a, b) => Date.parse(a.kickoff!) - Date.parse(b.kickoff!) || a.key.localeCompare(b.key)),
+      internationalBreak: breaks.find((w) => w.from <= day && w.to >= day) });
+  }
+  return columns;
+}
+
+/** Fold only verified international dates, preserving every listed club fixture. */
+export function collapseInternationalDays(columns: CalendarColumn[], expanded: readonly string[]): CalendarColumn[] {
+  const folded: CalendarColumn[] = [];
+  for (const column of columns) {
+    const window = column.internationalBreak;
+    if (!window || !column.key.startsWith("day:") || expanded.includes(window.from)) {
+      folded.push(column); continue;
+    }
+    const previous = folded.at(-1);
+    if (previous?.collapsedDays && previous.internationalBreak?.from === window.from) {
+      folded[folded.length - 1] = { ...previous, to: column.to,
+        collapsedDays: previous.collapsedDays + 1, fixtures: [...previous.fixtures, ...column.fixtures] };
+    } else {
+      folded.push({ ...column, key: `collapsed:${window.from}`, heading: "International break", collapsedDays: 1 });
+    }
+  }
+  return folded.map((c) => {
+    if (!c.collapsedDays) return c;
+    const label = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short" });
+    return { ...c, label: c.from === c.to ? label(c.from) : `${label(c.from)}–${label(c.to)}` };
+  });
+}
+
+/** Clear calendar dates between listed club fixtures, never physical player rest. */
+export function listedClubGaps(rows: CalendarFixture[]): Map<string, { days: number; previousKickoff: string }> {
+  const gaps = new Map<string, { days: number; previousKickoff: string }>();
+  const unresolved = new Set(rows.filter((r) => !r.kickoff).map((r) => r.teamCode));
+  const previous = new Map<number, CalendarFixture>();
+  for (const f of [...rows].filter((r) => r.kickoff).sort((a, b) => Date.parse(a.kickoff!) - Date.parse(b.kickoff!) || a.key.localeCompare(b.key))) {
+    if (!f.kickoff || unresolved.has(f.teamCode)) continue;
+    const prior = previous.get(f.teamCode);
+    if (prior?.kickoff) {
+      const days = Math.max(0, Math.round((Date.parse(footballDate(f.kickoff)) - Date.parse(footballDate(prior.kickoff))) / 86_400_000) - 1);
+      gaps.set(f.key, { days, previousKickoff: prior.kickoff });
+    }
+    previous.set(f.teamCode, f);
+  }
+  return gaps;
+}
+
+export function leagueSlot(schedule: FixtureScheduleOverlay, season: string, code: number, gw: number): "BGW" | "DGW" | "SINGLE" | "UNAVAILABLE" {
+  // The published overlay contract is the complete scheduled season; a missing
+  // team record is unavailable, never a blank gameweek. Unscheduled dates still
+  // count as fixtures and therefore cannot create a false BGW.
+  const team = schedule.teams.find((t) => t.season === season && t.team_code === code);
+  if (!team || !schedule.teams.some((t) => t.season === season && t.fixtures.some((f) => f.gw === gw))) return "UNAVAILABLE";
+  const count = team.fixtures.filter((f) => f.gw === gw).length;
+  return count === 0 ? "BGW" : count > 1 ? "DGW" : "SINGLE";
+}

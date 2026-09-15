@@ -582,3 +582,25 @@ def test_historical_keys_suppress_matching_live_copies() -> None:
         assert {(row.team_id, row.goals_for) for row in teams} == {(1, 4), (2, 1)}
     finally:
         con.close()
+
+
+def test_daily_attachment_skips_pending_live_but_keeps_strict_default_and_finalized_rows() -> None:
+    con = _con()
+    try:
+        _insert_fixture(con, fixture=100)
+        _insert_target(con, code=10, fixture=100, recorded=-1, replayed=-1)
+        _insert_live_outcome_sources(con, finished=False)
+        with pytest.raises(UnfinalizedOutcomeError):
+            attach_finalized_outcomes(con, as_of=AS_OF)
+        result = attach_finalized_outcomes(con, as_of=AS_OF, skip_pending_live=True)
+        assert result.selected == 1
+        assert result.attached == 1
+        assert con.execute(
+            "SELECT total_points_as_recorded FROM ledger_outcome_player_fixture"
+        ).fetchall() == [(-1,)]
+        assert attach_finalized_outcomes(con, as_of=AS_OF, skip_pending_live=True).attached == 0
+        con.execute("UPDATE stg_live_fixture_version SET finished = NULL")
+        with pytest.raises(UnfinalizedOutcomeError):
+            attach_finalized_outcomes(con, as_of=AS_OF, skip_pending_live=True)
+    finally:
+        con.close()

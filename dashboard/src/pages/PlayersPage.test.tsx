@@ -6,11 +6,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayerProvisionalActuals, loadPlayers } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerHorizons, loadPlayerProvisionalActuals, loadPlayers, loadSummary } from "@/data/load";
 import playersSample from "@/data/samplePlayers.json";
 import teamsSample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
 import horizonsSample from "@/data/samplePlayerHorizons.json";
+import summarySample from "@/data/sampleSummary.json";
 import type {
   NextGwPlan,
   PlayerActualFixture,
@@ -19,6 +20,7 @@ import type {
   PlayerHorizonsData,
   PlayerProvisionalActualFixture,
   PlayerRecord,
+  SummaryData,
   TeamRecord,
 } from "@/data/types";
 import { PLAYER_HORIZON_FIELDS } from "@/data/types";
@@ -60,6 +62,7 @@ vi.mock("@/data/load", () => ({
   loadPlayerHorizons: vi.fn(),
   loadFixtureMatrix: vi.fn(),
   loadNextGw: vi.fn(),
+  loadSummary: vi.fn(),
 }));
 
 vi.mock("@/lib/planServer", async () => {
@@ -248,6 +251,7 @@ beforeEach(() => {
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
+  vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
 });
 
 afterEach(() => {
@@ -255,6 +259,27 @@ afterEach(() => {
 });
 
 describe("PlayersPage", () => {
+  it("hides unavailable players while keeping injured players, with show and reset controls", async () => {
+    const user = userEvent.setup();
+    const players = playersWithActuals.map((player, index) => ({
+      ...player, availability_status: index === 0 ? "u" : "i",
+    }));
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    const before = JSON.stringify(players);
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Beta")).toBeInTheDocument());
+    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText(/AI explanation is unavailable while unavailable players are hidden/)).toBeInTheDocument();
+    const toggle = screen.getByRole("checkbox", { name: "Hide unavailable" });
+    await user.click(toggle);
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(toggle).toBeChecked();
+    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(JSON.stringify(players)).toBe(before);
+  });
+
   it("renders the pivot: players, form columns, availability overlay, GW chips", async () => {
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());

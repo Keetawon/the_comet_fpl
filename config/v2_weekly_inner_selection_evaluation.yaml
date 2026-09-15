@@ -1,0 +1,24 @@
+# Additive procedural experiment: unchanged goals+xG, weekly inner refits only.
+contract_version: "1.0"
+candidate: retrospective_goals_xg_weekly_inner_selection_v1
+control: retrospective_goals_xg_control_v1
+evidence_class: retrospective_archive_development
+base_contract: config/v2_real_sot_retrospective_evaluation.yaml
+base_contract_sha256: 73ebf92613b8efb39838079b42b576afea2f2d43c775758372293c4d64edaed0
+control_reference: results/v2_corroborated_zero_sot_development.json
+control_reference_sha256: e8d1a5c0fcce42946d3bf8e798f52e208ac79168c2453e4c0840c1be65c009c5
+signals: [goals, expected_goals]
+provider: fpl_archive
+selection_schedule: weekly_refit
+search_stages: goals_decay_prior_then_blend_weights
+inner_aggregation: mean_over_scored_team_fixture_rows
+tie_breaking: exact_equal_keep_first_in_explicit_configured_order
+inner_prior_context: unchanged_outer_prediction_season
+expected_rows: 2280
+expected_folds: 114
+control_absolute_tolerance: 1.0e-12
+uncertainty: row_weighted_gw_cluster_sandwich_finite_sample_correction
+formal_outer_runs: 1
+retain_fixture_distributions: true
+require_clean_worktree: true
+promotion_permitted: false

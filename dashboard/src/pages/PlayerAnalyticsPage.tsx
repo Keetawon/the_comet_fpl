@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
+import { loadNextGw, loadPlayerHorizons, loadPlayers, loadSummary } from "@/data/load";
 import type {
   DashboardManifest,
   NextGwPlan,
@@ -203,11 +203,11 @@ export function PlayerAnalyticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadPlayers(), loadPlayerHorizons(), loadNextGw()])
-      .then(([playerData, horizonData, nextGw]) => {
+    Promise.all([loadPlayers(), loadPlayerHorizons(), loadNextGw(), loadSummary()])
+      .then(([playerData, horizonData, nextGw, summary]) => {
         if (cancelled) return;
         const runs = playerData.manifest?.runs ?? deriveRuns(playerData.players, horizonData.players);
-        const fallback = playerData.manifest?.runs.at(-1)?.run_id ?? runs[0]?.run_id ?? null;
+        const fallback = summary.latest_run?.run_id ?? runs[0]?.run_id ?? null;
         const defaultRun = defaultVintageRunId(runs, nextGw.plans, fallback);
         const selected = runs.find((run) => run.run_id === defaultRun) ?? runs[0];
         setState({
@@ -447,6 +447,10 @@ export function PlayerAnalyticsPage() {
   const derivedPastMetricInsightUnavailableReason =
     view === "past_future" && pastMetric === "xgi_per_90"
       ? "AI explanation is unavailable for derived observed xGI/90 because that selector is not part of the typed public insight contract. Deterministic facts remain available."
+      : undefined;
+  const unavailablePlayerInsightReason =
+    filters.hideUnavailable && exactRunPlayers.some((player) => player.availability_status === "u")
+      ? "AI explanation is unavailable while unavailable players are hidden because this display filter is outside the renderer contract. Deterministic facts use the visible players."
       : undefined;
 
   const changeRun = (nextRunId: string) => {
@@ -690,7 +694,7 @@ export function PlayerAnalyticsPage() {
 
       {analytics && (
         <>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.7fr)]">
+          <div className="max-w-4xl">
             <AnalyticsScatter
               title={PLAYER_ANALYTICS_VIEW_LABEL[view]}
               description={VIEW_DESCRIPTION[view]}
@@ -730,45 +734,6 @@ export function PlayerAnalyticsPage() {
                     ? "No plotted player reaches the current chart focus."
                   : "Every filtered player is missing at least one selected axis value."
               }
-            />
-            <InsightSummaryPanel
-              items={insightFacts}
-              caveats={insightCaveats}
-              remote={{
-                page: "player_analytics",
-                provenance: publishedInsightProvenance(state.manifest, {
-                  ...selectedRun,
-                  as_of: selectedRun.as_of ?? exactRunPlayers[0]?.as_of,
-                }),
-                scope: compactInsightScope({
-                  gw_from: selectedRun.gw_from,
-                  gw_to: effectiveGwTo,
-                  position: playerPositionScope(filters.position),
-                  team_code: filters.teamCode === "all" ? undefined : Number(filters.teamCode),
-                  view,
-                  form_window: formWindowScope(filters.formWindow),
-                  threshold: view === "upside_downside" ? haulThreshold : undefined,
-                  min_price_tenths: minPriceTenthsScope(filters.minPrice),
-                  max_price_tenths: maxPriceTenthsScope(filters.maxPrice),
-                  min_avg_minutes_l5: minAverageMinutesScope(filters.minMinutes),
-                  availability: filters.availability,
-                  past_metric:
-                    pastMetric === "xgi_per_90"
-                      ? undefined
-                      : playerPastMetricScope(view, pastMetric),
-                  include_cold_starts: includeColdStarts,
-                }),
-                unavailableReason: derivedPastMetricInsightUnavailableReason,
-                localScopeKey: JSON.stringify({
-                  runId: selectedRun.run_id,
-                  gwTo: effectiveGwTo,
-                  view,
-                  haulThreshold,
-                  pastMetric,
-                  filters,
-                  includeColdStarts,
-                }),
-              }}
             />
 
           </div>
@@ -860,6 +825,45 @@ export function PlayerAnalyticsPage() {
             backend-published, and raw: the reported availability multiplier is not applied. The
             frontier compares these two axes only and is not an optimizer, squad, or transfer plan.
           </p>
+          <InsightSummaryPanel
+            items={insightFacts}
+            caveats={insightCaveats}
+            remote={{
+              page: "player_analytics",
+              provenance: publishedInsightProvenance(state.manifest, {
+                ...selectedRun,
+                as_of: selectedRun.as_of ?? exactRunPlayers[0]?.as_of,
+              }),
+              scope: compactInsightScope({
+                gw_from: selectedRun.gw_from,
+                gw_to: effectiveGwTo,
+                position: playerPositionScope(filters.position),
+                team_code: filters.teamCode === "all" ? undefined : Number(filters.teamCode),
+                view,
+                form_window: formWindowScope(filters.formWindow),
+                threshold: view === "upside_downside" ? haulThreshold : undefined,
+                min_price_tenths: minPriceTenthsScope(filters.minPrice),
+                max_price_tenths: maxPriceTenthsScope(filters.maxPrice),
+                min_avg_minutes_l5: minAverageMinutesScope(filters.minMinutes),
+                availability: filters.availability,
+                past_metric:
+                  pastMetric === "xgi_per_90"
+                    ? undefined
+                    : playerPastMetricScope(view, pastMetric),
+                include_cold_starts: includeColdStarts,
+              }),
+              unavailableReason: unavailablePlayerInsightReason ?? derivedPastMetricInsightUnavailableReason,
+              localScopeKey: JSON.stringify({
+                runId: selectedRun.run_id,
+                gwTo: effectiveGwTo,
+                view,
+                haulThreshold,
+                pastMetric,
+                filters,
+                includeColdStarts,
+              }),
+            }}
+          />
         </>
       )}
     </div>

@@ -3,11 +3,14 @@
 // process to run the SAME fail-closed jobs (optimizer + publish chain) and republish the
 // static read models; the page then refetches them like any other reload.
 
+import { isHostedStatic } from "./pageAccess";
+
 export const PLAN_SERVER_PORT = 8765;
 export const PLAN_SERVER_START_COMMAND =
   ".\\.venv\\Scripts\\python.exe -m fpl.jobs.plan_server";
 
 export function planServerUrl(): string {
+  if (isHostedStatic()) throw new Error("The public dashboard cannot access the local plan server.");
   // hostname-relative so it works from localhost dev AND the LAN preview on a phone.
   return `http://${window.location.hostname}:${PLAN_SERVER_PORT}`;
 }

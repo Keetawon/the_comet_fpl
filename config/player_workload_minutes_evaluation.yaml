@@ -1,0 +1,61 @@
+{
+  "policy": {
+    "candidate": "retrospective_workload_role_minutes_offset_v1",
+    "evidence_class": "retrospective_workload_role_and_archive_price_proxy_development",
+    "control": "retrospective_current_minutes_proxy_v1",
+    "seasons": [
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "folds": 114,
+    "rows": 86755,
+    "price_proxy_rows": 821,
+    "workload_season": "2025-26",
+    "workload_folds": 38,
+    "feature_active_rows": 9551,
+    "role_arm": "frozen_transition_candidate",
+    "target": "unchanged_four_minutes_bins_include_DNP",
+    "cutoff": "complete_GW_first_kickoff_proxy",
+    "completion_margin_hours": 6,
+    "same_gw": "whole_target_season_gw_excluded",
+    "features": "min(observed_positive_nominal_minutes_168h/180,1)*four_transition_role_probabilities",
+    "ridge_on_mean_loss": 1,
+    "step_size": 0.6666666666666666,
+    "max_iterations": 200,
+    "gradient_tolerance": 1.0e-10,
+    "minimum_prior_batches": 8,
+    "minimum_prior_rows": 200,
+    "parameters_selected": "none_fixed_strong_ridge",
+    "seed": 202627,
+    "minimum_relative_log_lift_vs_current": 0.01,
+    "stage_b_gate": "unchanged_phase2_v1.4_best_metric_and_ranking_181_folds",
+    "current_guardrails": "RPS_Brier_any_Brier_60_Spearman_and_each_season_no_regression",
+    "slices": [
+      "season",
+      "position",
+      "venue",
+      "early_later",
+      "cold_start",
+      "price_proxy",
+      "transfer_status",
+      "player_history_cohort",
+      "feature_active"
+    ],
+    "population_rule": "all114_reference_folds_86755_rows_no_feature_based_exclusion",
+    "full_gate_eligible": false,
+    "promotion_permitted": false,
+    "synthesis_eligible": false,
+    "one_run": "shared_git_common_dir_claim_before_any_candidate_fit_no_retry"
+  },
+  "pins": {
+    "database_sha256": "a8584ce79f421e0bd43057f3a8f63bac03e30b59cc1c2407b8a7c28387a35021",
+    "archive_database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+    "stage_report_sha256": "2df5d126c466edb2cf3e6f78e4bf3df9a24c350a44f47d2fc890d31ec3bf46c9",
+    "role_result_sha256": "c330d44a227ff6ff10cce1d5813f582d48dadfa181816c9333d6389358940809",
+    "minutes_manifest_sha256": "5b813d58b71bad97a5c81774aaf70c0bca5f4e0e3bcd518e6f26e0acfea19bac",
+    "coverage_report_sha256": "770206f0c151694501cc06b95631b554b172b956e8cfe10363481f474f3cf982",
+    "model_source_sha256": "b653fea1818d71c6795dcc24f58e36e9f9ba0d31d0042c9f865b36edd70a7169",
+    "stage_b_contract_sha256": "5ac5e76610799d870e8efcd86ad83b67978c7682de31234fbbda5291e0576d6a"
+  }
+}

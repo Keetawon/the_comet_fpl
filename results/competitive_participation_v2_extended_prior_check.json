@@ -1,0 +1,49 @@
+{
+  "all_fixture_roster_exposure_known": false,
+  "audited_at_utc": "2026-09-07T08:33:03.191364+00:00",
+  "checks": 4157,
+  "completed": true,
+  "counts": {
+    "explicit_formation_sides": 24,
+    "fallback_formation_sides": 2,
+    "matches": 13,
+    "pl_matches": 8,
+    "roster_rows": 535,
+    "selected_club_rows": 266,
+    "sides": 26
+  },
+  "database_read_only": true,
+  "database_sha256_after": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "database_sha256_before": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "duration_mae": 0.23140495867768596,
+  "duration_rows": 121,
+  "duration_within_two_minutes": 1.0,
+  "errors": [
+    "prior fixture team fails 2561926/448104",
+    "prior fixture team fails 2561929/651426",
+    "prior fixture team fails 2561929/660392"
+  ],
+  "git_head": "eea2381c8395af0b136782c515d0e34181cc462c",
+  "model_fits": 0,
+  "network_requests": 0,
+  "original_result_sha256": "f34b0c978b6de9454bbd1bb52cb2d2faabee6347b8baa16403bca773b56bf411",
+  "passed": false,
+  "pl_pairs": 160,
+  "raw_bodies_rehashed": 39,
+  "repository_edits": false,
+  "result_sha256": "fb9a9ef9d1a55b4a4c867aacbf7d89e1e880e0a64bd251bb2e318f14192c15ab",
+  "scope": "independent raw/version/identity/paired arithmetic audit, not a parser rerun or global participation completeness claim",
+  "signed_difference_counts": {
+    "-1": 2,
+    "0": 93,
+    "1": 26
+  },
+  "source_inputs_rehashed": 137,
+  "unknown_rows": [
+    {
+      "match": 2603048,
+      "player": 108801,
+      "team": 103
+    }
+  ]
+}

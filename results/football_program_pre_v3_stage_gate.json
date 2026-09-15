@@ -1,0 +1,37 @@
+{
+  "identity": "football_program_pre_v3_stage_gate_20260907",
+  "model_evaluation": false,
+  "observed_at_utc": "2026-09-07T09:44:30+00:00",
+  "focused_pytest": {
+    "passed": 359,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 43.97,
+    "junit_xml": "D:/Personal/fpl-operations/verification/pytest-player-program-20260907T094300Z.xml",
+    "scope": [
+      "test_competitive_participation_v2.py", "test_competitive_participation_v3.py",
+      "test_competitive_workload_staging.py", "test_competitive_workload_view.py",
+      "test_player_role_history.py", "test_player_role_runner.py",
+      "test_player_workload_minutes.py", "test_disciplinary_development.py",
+      "test_disciplinary_target_audit.py", "test_points_composition_disciplinary.py",
+      "test_dev_player_disciplinary.py", "test_development_reference_components.py",
+      "test_point_in_time.py"
+    ]
+  },
+  "separate_composer_reference_regression": {"passed": 64, "failed": 0, "seconds": 40.59},
+  "ruff_check_src_tests": "passed",
+  "mypy_strict_src": {"passed": true, "source_files": 174},
+  "changed_python_format_check": {"passed": true, "files": 14},
+  "global_format_src_tests": {"passed": false, "preexisting_unformatted_files": 11, "formatted_files": 300},
+  "earlier_broad_pytest": {
+    "passed": 2946,
+    "failed": 14,
+    "skipped": 4,
+    "failure_class": "preexisting Windows symlink WinError 1314 in test_bi_export.py",
+    "unchanged_failure_evidence": "results/football_evidence_amendment_gate_20260907.json"
+  },
+  "whole_repository_gate_green": false,
+  "formal_player_candidates_scored": 0,
+  "role_formal_registration": "blocked_pending_measured_V3_coverage_and_exact_config_pins",
+  "production_defaults_changed": false
+}

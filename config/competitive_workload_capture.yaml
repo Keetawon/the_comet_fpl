@@ -1,0 +1,44 @@
+contract_version: '1.0'
+capture: competitive_workload_2025_raw_v1
+purpose: capture_only_no_participation_interpretation_or_modeling
+evidence_class: retrospective_backfill_development
+season: '2025-26'
+provider_season_id: 2025
+provider_base_url: https://sdp-prem-prod.premier-league-prod.pulselive.com
+retained_report: results/competitive_participation_pilot_development.json
+retained_report_sha256: f34b0c978b6de9454bbd1bb52cb2d2faabee6347b8baa16403bca773b56bf411
+catalogue_records_sha256: 8dba3f3aa1cb9caac4e14d3bf6a68c5a699435e9c4e956add1b40e9bae313865
+selected_match_ids_sha256: 3a405cc3a55666305e2fe547926578e9bed4d424bc1a8a6d2c679a59a84b2421
+pl_match_ids_sha256: c8d650e0c5dddf751880895bc6104ba93dd9ffdf8f472bb9bccbcc9a2ac1a0a9
+provider_club_ids: [1, 2, 3, 4, 6, 7, 8, 11, 14, 17, 21, 31, 36, 39, 43, 54, 56, 90, 91, 94]
+catalogue_counts: {'8': 380, '1': 123, '2': 93, '5': 189, '6': 189, '1125': 153}
+selected_counts: {'8': 380, '1': 43, '2': 38, '5': 69, '6': 29, '1125': 15}
+expected_metadata_pages: 13
+expected_catalogue_matches: 1127
+expected_selected_matches: 574
+expected_reused_matches: 13
+expected_reused_endpoints: 26
+expected_missing_endpoints: 1122
+maximum_distinct_provider_requests: 1122
+maximum_consecutive_failed_endpoints: 5
+endpoints: [lineups, events]
+endpoint_paths:
+  lineups: /api/v3/matches/{match_id}/lineups
+  events: /api/v1/matches/{match_id}/events
+network_policy: inherit_config_sources_pl_sdp_bounded_sequential_policy
+collection_order: kickoff_utc_then_match_id_lineups_then_events
+catalogue_policy: pinned_complete_retained_six_competition_vintage_no_network_discovery
+version_policy: retain_pinned_prior_bytes_and_every_new_response_no_revision_replacement
+unsupported_status_policy: capture_raw_without_interpreting_Aggregate_AfterExtraTime_or_other_status
+known_ambiguous_match: 2603048
+ambiguity_policy: preserve_raw_affected_workload_windows_unknown_not_global_blocker
+missing_policy: unavailable_not_zero
+output: new_explicit_external_persistent_directory_write_once
+resume_in_place: false
+database_access: none
+parsing_participation_permitted: false
+model_fitting_permitted: false
+forecasting_permitted: false
+production_promotion_permitted: false
+require_clean_worktree: true
+branch: claude/comet-fpl-v2-architecture-mqrj8f

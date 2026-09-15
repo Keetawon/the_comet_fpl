@@ -1,0 +1,65 @@
+.sdp-workspace {
+  --sdp-accent: oklch(0.44 0.09 175);
+  --sdp-series-1: var(--sdp-accent);
+  --sdp-series-2: oklch(0.5 0.14 265);
+  --sdp-series-3: oklch(0.52 0.12 55);
+  --sdp-tint: oklch(0.97 0.013 170);
+}
+.dark .sdp-workspace {
+  --sdp-accent: oklch(0.8 0.11 175);
+  --sdp-series-2: oklch(0.75 0.1 265);
+  --sdp-series-3: oklch(0.8 0.12 70);
+  --sdp-tint: oklch(0.23 0.02 175);
+}
+.sdp-hero { background: linear-gradient(110deg, var(--card) 55%, var(--sdp-tint)); }
+.sdp-panel { border: 1px solid var(--border); border-radius: 1rem; background: var(--card); }
+.sdp-profile-heading { background: var(--sdp-tint); }
+.sdp-eyebrow { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.13em; text-transform: uppercase; color: var(--sdp-accent); }
+.sdp-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .6rem; border: 1px solid var(--border); border-radius: .4rem; background: var(--card); font-size: .6875rem; line-height: 1.4; }
+.sdp-club-mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: .7rem; background: var(--sdp-tint); color: var(--sdp-accent); font-size: .6875rem; font-weight: 700; letter-spacing: .025em; }
+.sdp-control { display: flex; flex-direction: column; gap: .4rem; min-width: 0; font-size: .75rem; color: var(--muted-foreground); }
+.sdp-control select, .sdp-control input { min-width: 0; width: 100%; height: 2.75rem; border: 1px solid var(--input); border-radius: .5rem; background: var(--background); color: var(--foreground); padding: .5rem .7rem; font-size: .8125rem; }
+.sdp-group { cursor: pointer; min-height: 2.75rem; border-radius: .5rem; padding: .5rem .9rem; font-size: .8125rem; font-weight: 500; color: var(--muted-foreground); }
+.sdp-group:hover { color: var(--foreground); background: var(--muted); }
+.sdp-group[aria-pressed="true"] { background: var(--sdp-tint); color: var(--sdp-accent); }
+.sdp-sort { display: flex; cursor: pointer; min-height: 2.75rem; align-items: center; gap: .3rem; text-align: left; font-size: .75rem; }
+.sdp-workspace button { cursor: pointer; }
+.sdp-workspace button:disabled { cursor: not-allowed; }
+.sdp-workspace :is(button, a, select, input, summary):focus-visible { outline: 2px solid var(--sdp-accent); outline-offset: 3px; }
+.sdp-workspace td { padding-top: .65rem; padding-bottom: .65rem; }
+.sdp-workspace tr[data-state="selected"] > td { background: var(--sdp-tint); }
+/* Keep row height independent of fullscreen column width: fluid SVG sparklines
+   otherwise grow with their cells. Touch targets keep their larger size. */
+.sdp-team-table { font-size: .75rem; line-height: 1.25; }
+.sdp-team-table td { padding-top: .0625rem; padding-bottom: .0625rem; }
+.sdp-team-table th { height: 2.25rem; }
+.sdp-team-table .sdp-sort { min-height: 2rem; }
+.sdp-table-club { min-height: 1.5rem; }
+.sdp-table-compare { display: flex; width: 1.5rem; height: 1.5rem; }
+.sdp-team-table .sdp-club-mark { width: 1.5rem; height: 1.5rem; border-radius: .35rem; font-size: .5625rem; }
+.sdp-team-table svg[role="img"] { display: block; width: 6rem; height: 1.5rem; }
+.sdp-table-body-fullscreen { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.sdp-table-body-fullscreen .sdp-table-details { flex: 0 1 auto; min-height: 0; max-height: 45%; overflow: auto; }
+.sdp-workspace svg[role="group"] { min-width: 0; }
+.sdp-attack-plot { --sdp-plot-accent: oklch(.53 .16 45); --sdp-plot-tint: oklch(.97 .025 65); border-top: 3px solid var(--sdp-plot-accent); }
+.sdp-defence-plot { --sdp-plot-accent: oklch(.48 .14 250); --sdp-plot-tint: oklch(.97 .02 250); border-top: 3px solid var(--sdp-plot-accent); }
+.sdp-finishing-plot { --sdp-plot-accent: oklch(.48 .14 305); --sdp-plot-tint: oklch(.97 .02 305); border-top: 3px solid var(--sdp-plot-accent); }
+.sdp-pattern-plot { --sdp-plot-accent: var(--sdp-accent); --sdp-plot-tint: var(--sdp-tint); --sdp-pattern-open: var(--sdp-accent); --sdp-pattern-set: var(--sdp-series-2); --sdp-pattern-own: var(--sdp-series-3); --sdp-pattern-unknown: var(--muted-foreground); border-top: 3px solid var(--sdp-plot-accent); }
+.dark .sdp-attack-plot { --sdp-plot-accent: oklch(.78 .13 55); --sdp-plot-tint: oklch(.25 .03 55); }
+.dark .sdp-defence-plot { --sdp-plot-accent: oklch(.77 .1 245); --sdp-plot-tint: oklch(.25 .035 250); }
+.dark .sdp-finishing-plot { --sdp-plot-accent: oklch(.8 .1 305); --sdp-plot-tint: oklch(.25 .025 305); }
+.sdp-plot-direction { color: var(--sdp-plot-accent); background: var(--sdp-plot-tint); }
+.sdp-pattern-row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) 3.5rem; align-items: center; gap: .625rem; min-height: 2.75rem; }
+.sdp-pattern-row:hover { background: var(--muted); }
+.sdp-pattern-row[aria-pressed="true"] { background: var(--sdp-plot-tint); outline: 1px solid var(--sdp-plot-accent); outline-offset: -1px; }
+.sdp-pattern-track [data-pattern="unclassified_goals"] { background-image: repeating-linear-gradient(135deg, transparent, transparent 3px, var(--card) 3px, var(--card) 4px); }
+@media (max-width: 639px) {
+  .sdp-context-plots svg[role="group"] text { font-size: 16px; }
+}
+@media (pointer: coarse) {
+  .sdp-table-club, .sdp-team-table .sdp-sort { min-height: 2.75rem; }
+  .sdp-table-compare { width: 2.75rem; height: 2.75rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sdp-group, .sdp-workspace button { transition: background-color .15s, color .15s; }
+}
