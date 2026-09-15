@@ -5,6 +5,19 @@ import type { SdpFilters } from "./sdpStats";
 
 const filters: SdpFilters = { season: "2026-27", from: 1, to: 6, team: "all", venue: "all", recent: "all", search: "", position: "all", minMinutes: 0 };
 describe("SDP observed descriptive arithmetic", () => {
+  it("uses only matched conceded-shot denominators and preserves missing and observed zero", () => {
+    const sot = { ...shooting, key: "shots_on_target_allowed" }, shots = { ...shooting, key: "shots_allowed" };
+    const rows = [sdpMatch({ sdp: { shots_on_target_allowed: 2, shots_allowed: 4 } }),
+      sdpMatch({ fixture: 2, sdp: { shots_on_target_allowed: 2, shots_allowed: 16 } })];
+    expect(shotShare(rows, sot, shots)).toBe(20);
+    expect(shotShare(rows, sot, shooting)).toBeNull();
+    expect(shotShare(rows, { ...sot, source: "fpl" }, shots)).toBeNull();
+    for (const [part, total] of [[null, 10], [2, null], [0, 0], [5, 4], [-1, 10], [2, Infinity]]) {
+      expect(shotShare([sdpMatch({ sdp: { shots_on_target_allowed: part, shots_allowed: total } })], sot, shots)).toBeNull();
+    }
+    expect(shotShare([sdpMatch({ sdp: { shots_on_target_allowed: 0, shots_allowed: 10 } })], sot, shots)).toBe(0);
+    expect(isShotBreakdown(sot)).toBe(false); // Existing attacking-table/CSV columns are unchanged.
+  });
   it.each(["shots_on_target", "shots_inside_box", "shots_outside_box", "shots_blocked"])("computes %s share from matched totals and exports the same share", key => {
     const metric = { ...shooting, key, label: key };
     const rows = [sdpMatch({ sdp: { shots: 4, [key]: 2 } }), sdpMatch({ fixture: 2, sdp: { shots: 16, [key]: 2 } })];

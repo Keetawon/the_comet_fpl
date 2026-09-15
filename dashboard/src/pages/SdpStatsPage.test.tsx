@@ -39,8 +39,8 @@ describe("SDP football observatory", () => {
   });
   it("places the themed plots after the table and shares venue, mode and club selection", async () => {
     const data = sdpFixture();
-    data.metrics.push(...["shots_on_target", "shots_on_target_allowed"].map(key => ({ ...shooting, key, label: key })));
-    data.team_matches.forEach(row => { row.sdp.shots_on_target = row.was_home ? 2 : 6; row.sdp.shots_on_target_allowed = row.was_home ? 1 : 3; });
+    data.metrics.push(...["shots_on_target", "shots_on_target_allowed", "shots_allowed"].map(key => ({ ...shooting, key, label: key })));
+    data.team_matches.forEach(row => { row.sdp.shots_on_target = row.was_home ? 2 : 6; row.sdp.shots_on_target_allowed = row.was_home ? 1 : 3; row.sdp.shots_allowed = 10; });
     vi.mocked(loadSdpStats).mockResolvedValue(data);
     render(<TeamSdpStatsPage />); const grid = await table();
     const plots = screen.getByRole("region", { name: "Attack and defence FPL context" });
@@ -53,7 +53,7 @@ describe("SDP football observatory", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Display" }), { target: { value: "total" } });
     expect(within(plots).getAllByTestId("analytics-point").map(p => p.getAttribute("aria-label"))).toEqual(values);
     fireEvent.change(screen.getByRole("combobox", { name: "Venue" }), { target: { value: "home" } });
-    expect(within(defence).getByRole("button", { name: /^Chelsea;/ })).toHaveAccessibleName(/SOT conceded \/match: 1;/);
+    expect(within(defence).getByRole("button", { name: /^Chelsea;/ })).toHaveAccessibleName(/SOT conceded \/ all shots conceded \(%\): 10%;/);
     fireEvent.change(screen.getByRole("textbox", { name: "Search clubs" }), { target: { value: "Chelsea" } });
     expect(within(plots).getAllByTestId("analytics-point")).toHaveLength(2);
     expect(within(plots).getAllByText(/League median: 4 eligible clubs/, { selector: "p" })).toHaveLength(2);

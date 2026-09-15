@@ -106,3 +106,40 @@ def test_revision_and_identity_changes_do_not_inherit_audited_classification() -
     row["team_code"] = 99999
     apply_goal_patterns([row], [source])
     assert row["goal_patterns"] is None
+
+
+def test_brighton_throw_in_corroboration_is_bound_to_its_own_review_time() -> None:
+    import json
+
+    from fpl.config import config_dir
+    from fpl.publish.sdp_goal_patterns import AUDIT_FILE
+
+    audit = json.loads((config_dir() / AUDIT_FILE).read_text(encoding="utf-8"))
+    evidence = next(r for r in audit["rows"] if r["fixture"] == 16 and r["team_code"] == 36)
+    row = {
+        **evidence,
+        "source_version": "a" * 64,
+        "known_at": audit["source_cutoff"],
+        "sdp": {"open_play_goals": 0, "set_piece_goals": None},
+        "fpl": {"goals_scored": 3},
+    }
+    source = {
+        "endpoint": "match_stats",
+        "season": evidence["season"],
+        "sdp_match_id": evidence["provider_match_id"],
+        "sha256": evidence["raw_payload_sha256"],
+        "fetched_at": datetime(2026, 9, 5, tzinfo=UTC),
+    }
+    before = deepcopy(source)
+    apply_goal_patterns([row], [source])
+    receipt = row["goal_patterns"]
+    assert receipt["set_piece_goals"] == receipt["confirmed_set_piece_goals"] == 2
+    assert receipt["unclassified_goals"] == receipt["open_play_goals"] == 0
+    assert receipt["own_goals_received"] == 1
+    assert receipt["audited_at"] == evidence["audited_at"] != audit["audited_at"]
+    assert any("sahadan.com" in url for url in receipt["evidence_urls"])
+    assert receipt["source_known_at"] == source["fetched_at"].isoformat()
+    assert row["sdp"]["set_piece_goals"] is None and source == before
+    source["sha256"] = "c" * 64
+    apply_goal_patterns([row], [source])
+    assert row["goal_patterns"] is None

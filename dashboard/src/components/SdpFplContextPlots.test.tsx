@@ -20,14 +20,74 @@ function inputs() {
   ];
   const teams: SdpEntity[] = [{ id: "team:3", name: "Arsenal", clubs: "ARS", position: "", code: null, teamCode: 3, rows }];
   const metrics = [shooting, xg,
-    ...["shots_on_target", "shots_allowed", "shots_on_target_allowed", "expected_goals_allowed", "saves"].map(key => ({ ...shooting, key, label: key })),
+    ...["shots_on_target", "shots_inside_box", "shots_allowed", "shots_on_target_allowed", "expected_goals_allowed", "saves"].map(key => ({ ...shooting, key, label: key })),
     ...["goals_scored", "goals_conceded"].map(key => ({ ...shooting, key, label: key, source: "fpl" as const })),
   ];
   const filters: SdpFilters = { season: "2026-27", from: 1, to: 2, recent: "all", team: "all", search: "", venue: "all", position: "all", minMinutes: 0 };
-  return { teams, league: teams, metrics, filters, asOf: "2026-09-14T03:00:00Z", selectedId: "team:3", onSelectTeam: vi.fn() };
+  return { teams, league: teams, teamMatches: rows, metrics, filters, asOf: "2026-09-14T03:00:00Z", selectedId: "team:3", onSelectTeam: vi.fn() };
 }
 
 describe("four observed team context plots", () => {
+  it("switches axes independently with matched shot shares and exact opponent box-shot counts", async () => {
+    const user = userEvent.setup(); const props = inputs();
+    props.teams[0].rows[1].sdp.shots_on_target = 2;
+    props.teams[0].rows.forEach((row, i) => { row.sdp.shots_inside_box = 2 + i * 4; });
+    const other = props.teamMatches.map((row, i) => ({ ...row, team_code: row.opponent_team_code,
+      opponent_team_code: row.team_code, was_home: !row.was_home, sdp: { shots_inside_box: 1 + i * 2 } }));
+    // Opponents remain outside the visible home-only population; prior-season IDs cannot collide.
+    props.teamMatches = [...props.teamMatches, ...other, { ...other[0], season: "2025-26", sdp: { shots_inside_box: 99 } }];
+    const before = JSON.stringify(props);
+    render(<SdpFplContextPlots {...props} filters={{ ...props.filters, venue: "home" }} />);
+    const attack = screen.getByRole("article", { name: "Attack plot panel" });
+    const defence = screen.getByRole("article", { name: "Defence plot panel" });
+    const a = () => within(attack).getByTestId("analytics-point");
+    const d = () => within(defence).getByTestId("analytics-point");
+    expect(a()).toHaveAccessibleName(/SOT \/ all shots \(%\): 20%;/); // 4/20, not mean(2/4, 2/16).
+    await user.selectOptions(screen.getByRole("combobox", { name: "Attack X-axis" }), "volume");
+    expect(a()).toHaveAccessibleName(/SOT \/match: 2;.*xG \/match: 1/);
+    expect(d()).toHaveAccessibleName(/SOT conceded \/ all shots conceded \(%\): 40%;/);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Attack X-axis" }), "box");
+    expect(a()).toHaveAccessibleName(/Shots inside box \/match: 4;.*xG \/match: 1/);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Defence X-axis" }), "box");
+    expect(d()).toHaveAccessibleName(/Shots inside box conceded \/match: 2;.*xGA \/match: 0.5/);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Defence X-axis" }), "volume");
+    expect(d()).toHaveAccessibleName(/SOT conceded \/match: 2;.*xGA \/match: 0.5/);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Attack X-axis" }), "share");
+    expect(a()).toHaveAccessibleName(/SOT \/ all shots \(%\): 20%;/);
+    expect(JSON.stringify(props)).toBe(before);
+  });
+
+  it.each(["missing", "duplicate", "wrong-team", "wrong-venue", "wrong-gw", "wrong-kickoff", "wrong-provider", "missing-stat"])(
+    "keeps conceded box shots unavailable on %s reciprocal evidence", (fault) => {
+      const props = inputs();
+      const other = props.teamMatches.map(row => ({ ...row, team_code: row.opponent_team_code,
+        opponent_team_code: row.team_code, was_home: !row.was_home, sdp: { shots_inside_box: 3 as number | null } }));
+      if (fault === "missing") other.pop();
+      if (fault === "duplicate") other.push({ ...other[0] });
+      if (fault === "wrong-team") other[0].opponent_team_code = 999;
+      if (fault === "wrong-venue") other[0].was_home = !other[0].was_home;
+      if (fault === "wrong-gw") other[0].gw = 99;
+      if (fault === "wrong-kickoff") other[0].kickoff_time = "2026-08-23T14:00:00Z";
+      if (fault === "wrong-provider") other[0].provider_match_id = 999;
+      if (fault === "missing-stat") other[0].sdp.shots_inside_box = null;
+      render(<SdpFplContextPlots {...props} teamMatches={[...props.teamMatches, ...other]} />);
+      fireEvent.change(screen.getByRole("combobox", { name: "Defence X-axis" }), { target: { value: "box" } });
+      const defence = screen.getByRole("article", { name: "Defence plot panel" });
+      expect(within(defence).queryByTestId("analytics-point")).not.toBeInTheDocument();
+      expect(within(defence).getByRole("status")).toHaveTextContent("Missing observations remain unavailable");
+      expect(within(screen.getByRole("article", { name: "Attack plot panel" })).getByTestId("analytics-point")).toBeInTheDocument();
+    });
+
+  it("keeps zero-denominator percentages unavailable while allowing observed zero volumes", () => {
+    const props = inputs();
+    props.teams[0].rows.forEach(row => { row.sdp.shots = 0; row.sdp.shots_on_target = 0; });
+    render(<SdpFplContextPlots {...props} />);
+    const attack = screen.getByRole("article", { name: "Attack plot panel" });
+    expect(within(attack).queryByTestId("analytics-point")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Attack X-axis" }), { target: { value: "volume" } });
+    expect(within(attack).getByTestId("analytics-point")).toHaveAccessibleName(/SOT \/match: 0;/);
+  });
+
   it("uses consistent matched observations and source-labelled details across four panels", () => {
     const props = inputs(); const before = JSON.stringify(props);
     render(<SdpFplContextPlots {...props} />);
@@ -39,17 +99,22 @@ describe("four observed team context plots", () => {
     expect(attack).toHaveClass("sdp-attack-plot"); expect(defence).toHaveClass("sdp-defence-plot");
     expect(finishing).toHaveClass("sdp-finishing-plot"); expect(patterns).toHaveClass("sdp-pattern-plot");
     const a = within(attack).getByTestId("analytics-point"), d = within(defence).getByTestId("analytics-point");
-    expect(a).toHaveAccessibleName(/SDP SOT \/match: 5; SDP \/ marked FPL xG \/match: 1/);
-    expect(d).toHaveAccessibleName(/SDP SOT conceded \/match: 2; SDP \/ marked FPL xGA \/match: 0.5/);
+    expect(a).toHaveAccessibleName(/SDP SOT \/ all shots \(%\): 50%; SDP \/ marked FPL xG \/match: 1/);
+    expect(d).toHaveAccessibleName(/SDP SOT conceded \/ all shots conceded \(%\): 40%; SDP \/ marked FPL xGA \/match: 0.5/);
     expect(a).toHaveAttribute("r", "5"); expect(d).toHaveAttribute("r", "5");
     fireEvent.focus(a);
     const tooltip = within(attack).getByRole("tooltip");
     expect(tooltip).toHaveTextContent("Goals /match · FPL2");
     expect(tooltip).toHaveTextContent("SOT / all shots · SDP50%");
+    expect(tooltip).toHaveTextContent("Shots /match · SDP10");
+    expect(tooltip).toHaveTextContent("SOT /match · SDP5");
     expect(tooltip).toHaveTextContent("xG /shot · SDP / marked FPL0.1");
     fireEvent.blur(a); fireEvent.focus(d);
     expect(within(defence).getByRole("tooltip")).toHaveTextContent("Team clean sheets / matches · FPL1/2");
     expect(within(defence).getByRole("tooltip")).toHaveTextContent("Saves /match · SDP—");
+    expect(within(defence).getByRole("tooltip")).toHaveTextContent("SOT conceded / all shots conceded · SDP40%");
+    expect(within(defence).getByRole("tooltip")).toHaveTextContent("Shots conceded /match · SDP5");
+    expect(within(defence).getByRole("tooltip")).toHaveTextContent("SOT conceded /match · SDP2");
     const f = within(finishing).getByTestId("analytics-point");
     expect(f).toHaveAccessibleName(/SDP \/ marked FPL xG \/match: 1; FPL Goals \/match: 2/);
     expect(f).toHaveAccessibleName(/xG total · SDP \/ marked FPL: 2; Goals total · FPL: 4; Goals minus xG · observed total: 2/);
@@ -92,7 +157,7 @@ describe("four observed team context plots", () => {
     const original = JSON.stringify(props);
     render(<SdpFplContextPlots {...props} />);
     const a = within(screen.getByRole("article", { name: "Attack plot panel" })).getByTestId("analytics-point");
-    expect(a).toHaveAccessibleName(/SOT \/match: 0 ‡; SDP \/ marked FPL xG \/match: 2 \[FPL\]/);
+    expect(a).toHaveAccessibleName(/SOT \/ all shots \(%\): 0% ‡; SDP \/ marked FPL xG \/match: 2 \[FPL\]/);
     expect(within(screen.getByRole("article", { name: "Goals vs xG plot panel" })).getByTestId("analytics-point")).toHaveAccessibleName(/SDP \/ marked FPL xG \/match: 2 \[FPL\]; FPL Goals \/match: 2/);
     const defence = screen.getByRole("article", { name: "Defence plot panel" });
     expect(within(defence).queryByTestId("analytics-point")).not.toBeInTheDocument();

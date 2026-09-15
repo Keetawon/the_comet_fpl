@@ -1,7 +1,8 @@
+import { useMemo, useState } from "react";
 import { ChartNoAxesCombined, Flame, Shield, Target } from "lucide-react";
 import { AnalyticsScatter, type AnalyticsScatterPoint } from "@/components/AnalyticsScatter";
 import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
-import type { SdpMetric } from "@/data/sdpStats";
+import type { SdpMatch, SdpMetric } from "@/data/sdpStats";
 import { finite, metricAssumptions, metricCorrections, metricRaw, metricSourceLabel, metricSupplements, metricValue, shotShare } from "@/lib/sdpStats";
 import type { SdpEntity, SdpFilters } from "@/lib/sdpStats";
 import { sdpNumber as fmt, teamBenchmark } from "@/lib/sdpTeamAnalysis";
@@ -9,6 +10,7 @@ import { sdpNumber as fmt, teamBenchmark } from "@/lib/sdpTeamAnalysis";
 interface Props {
   teams: readonly SdpEntity[];
   league: readonly SdpEntity[];
+  teamMatches: readonly SdpMatch[];
   metrics: readonly SdpMetric[];
   filters: SdpFilters;
   asOf: string;
@@ -21,6 +23,38 @@ const views = [
   { id: "defence", panel: "Defence", title: "Defence · Clean-sheet exposure", icon: Shield, x: "shots_on_target_allowed", y: "expected_goals_allowed", ySource: "sdp", xLabel: "SOT conceded /match", yLabel: "xGA /match", direction: "Chance prevention · look lower left ↙", note: "Lower left: less chance value and fewer shots on target conceded. More shots faced can mean more goalkeeper work, alongside clean-sheet risk." },
   { id: "finishing", panel: "Goals vs xG", title: "Goals vs xG · Observed finishing", icon: Target, x: "expected_goals", y: "goals_scored", ySource: "fpl", xLabel: "xG /match", yLabel: "Goals /match", direction: "Finishing · observed goals and chance value", note: "Compare goals with xG over the same matches. Team goals include opponent own goals. A difference describes this sample; it does not predict future finishing." },
 ] as const;
+
+type ShotAxis = "share" | "volume" | "box";
+const shotAxes = [
+  { value: "share", attack: "SOT / all shots (%)", defence: "SOT conceded / all shots conceded (%)" },
+  { value: "volume", attack: "SOT /match", defence: "SOT conceded /match" },
+  { value: "box", attack: "Shots inside box /match", defence: "Shots inside box conceded /match" },
+] as const;
+
+// An opponent's observed box shots are this club's box shots conceded. Look up
+// exact reciprocal match sides before applying venue/team display filters.
+function opponentLookup(rows: readonly SdpMatch[]) {
+  const key = (row: SdpMatch, team = row.team_code) => `${row.season}:${row.fixture}:${team}`;
+  const index = new Map<string, SdpMatch | null>();
+  for (const row of rows) index.set(key(row), index.has(key(row)) ? null : row);
+  return (rows: readonly SdpMatch[]): SdpMatch[] | null => {
+    const opponents: SdpMatch[] = [];
+    for (const row of rows) {
+      const other = index.get(key(row, row.opponent_team_code));
+      if (!index.get(key(row)) || !other || other.opponent_team_code !== row.team_code ||
+          other.was_home === row.was_home || other.gw !== row.gw ||
+          Date.parse(other.kickoff_time) !== Date.parse(row.kickoff_time) ||
+          other.provider_match_id !== row.provider_match_id) return null;
+      opponents.push(other);
+    }
+    return opponents;
+  };
+}
+
+function median(values: number[]) {
+  values.sort((a, b) => a - b);
+  return values.length ? (values[Math.floor((values.length - 1) / 2)] + values[Math.floor(values.length / 2)]) / 2 : null;
+}
 
 const goalPatterns = [
   { key: "open_play_goals", label: "Open play", color: "var(--sdp-pattern-open)" },
@@ -44,7 +78,10 @@ function marks(team: SdpEntity, metric: SdpMetric) {
   return `${metricCorrections(team.rows, metric).length ? " ‡" : ""}${metricAssumptions(team.rows, metric).length ? " §" : ""}${metricSupplements(team.rows, metric).length ? " [FPL]" : ""}`;
 }
 
-export function SdpFplContextPlots({ teams, league, metrics, filters, asOf, selectedId, onSelectTeam }: Props) {
+export function SdpFplContextPlots({ teams, league, teamMatches, metrics, filters, asOf, selectedId, onSelectTeam }: Props) {
+  const [attackAxis, setAttackAxis] = useState<ShotAxis>("share");
+  const [defenceAxis, setDefenceAxis] = useState<ShotAxis>("share");
+  const opponents = useMemo(() => opponentLookup(teamMatches), [teamMatches]);
   const find = (key: string, source: "sdp" | "fpl" = "sdp") => metrics.find(metric => metric.key === key && metric.source === source);
   const average = (team: SdpEntity, metric: SdpMetric | undefined) => metric ? `${fmt(metricValue(team.rows, metric, "per_match").value)}${marks(team, metric)}` : "—";
   const perShot = (team: SdpEntity, chance: SdpMetric | undefined, shots: SdpMetric | undefined) => {
@@ -56,17 +93,18 @@ export function SdpFplContextPlots({ teams, league, metrics, filters, asOf, sele
   };
   const details = (team: SdpEntity, attack: boolean): AnalyticsScatterPoint["details"] => {
     const shotMetric = find(attack ? "shots" : "shots_allowed");
+    const sot = find(attack ? "shots_on_target" : "shots_on_target_allowed");
+    const share = sot && shotMetric ? shotShare(team.rows, sot, shotMetric) : null;
     const xgMetric = find(attack ? "expected_goals" : "expected_goals_allowed");
     const rows = [
       { label: `${attack ? "Goals" : "Goals conceded"} /match · FPL`, value: average(team, find(attack ? "goals_scored" : "goals_conceded", "fpl")) },
       { label: `${attack ? "Shots" : "Shots conceded"} /match · SDP`, value: average(team, shotMetric) },
+      { label: `${attack ? "SOT" : "SOT conceded"} /match · SDP`, value: average(team, sot) },
+      { label: `${attack ? "SOT / all shots" : "SOT conceded / all shots conceded"} · SDP`, value: share === null ? "—" : `${fmt(share, 1)}%${marks(team, sot!)}${marks(team, shotMetric!)}` },
       { label: `${attack ? "xG" : "xGA"} /shot · SDP / marked FPL`, value: perShot(team, xgMetric, shotMetric) },
     ];
     if (attack) {
-      const sot = find("shots_on_target");
-      const share = sot && shotMetric ? shotShare(team.rows, sot, shotMetric) : null;
       rows.push(
-        { label: "SOT / all shots · SDP", value: share === null ? "—" : `${fmt(share, 1)}%${marks(team, sot!)}${marks(team, shotMetric!)}` },
         { label: "Box touches /match · SDP", value: average(team, find("touches_in_opposition_box")) },
         { label: "xGOT /match · SDP", value: average(team, find("expected_goals_on_target")) },
       );
@@ -103,10 +141,17 @@ export function SdpFplContextPlots({ teams, league, metrics, filters, asOf, sele
     <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="sdp-eyebrow">Four views of the game</p><h2 className="mt-1 text-xl font-semibold tracking-tight">Attack, defence & goals</h2></div><p className="text-xs text-muted-foreground">Click a club to highlight it across all four charts.</p></div>
     <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2">
       {views.map(view => {
-        const xMetric = find(view.x), yMetric = find(view.y, view.ySource);
+        const axis = view.id === "attack" ? attackAxis : view.id === "defence" ? defenceAxis : "volume";
+        const percentage = axis === "share";
+        const xLabel = view.id === "finishing" ? view.xLabel : shotAxes.find(option => option.value === axis)![view.id];
+        const xMetric = find(axis === "box" ? "shots_inside_box" : view.x), yMetric = find(view.y, view.ySource);
+        const shotMetric = find(view.id === "defence" ? "shots_allowed" : "shots");
+        const xRows = (team: SdpEntity) => view.id === "defence" && axis === "box" ? opponents(team.rows) : team.rows;
         const coordinates = (team: SdpEntity) => {
           if (!xMetric || !yMetric) return null;
-          const x = metricValue(team.rows, xMetric, "per_match").value;
+          const rows = xRows(team);
+          if (!rows) return null;
+          const x = percentage ? shotMetric ? shotShare(rows, xMetric, shotMetric) : null : metricValue(rows, xMetric, "per_match").value;
           const y = metricValue(team.rows, yMetric, "per_match").value;
           return x !== null && y !== null && x >= 0 && y >= 0 ? { x, y } : null;
         };
@@ -116,24 +161,31 @@ export function SdpFplContextPlots({ teams, league, metrics, filters, asOf, sele
           const pair = coordinates(team);
           if (!pair || !xMetric || !yMetric) return [];
           return [{ id: team.id, label: team.name, shortLabel: team.rows.at(-1)?.team_short_name,
-            ...pair, xDisplay: average(team, xMetric), yDisplay: average(team, yMetric),
+            ...pair, xDisplay: `${fmt(pair.x, percentage ? 1 : 2)}${percentage ? "%" : ""}${marks({ ...team, rows: xRows(team)! }, xMetric)}${percentage && shotMetric ? marks(team, shotMetric) : ""}`, yDisplay: average(team, yMetric),
             groupLabel: `${team.rows.length} matched observations`, details: view.id === "finishing" ? finishingDetails(team) : details(team, view.id === "attack"),
             color: "var(--sdp-plot-accent)", radius: 5,
           }];
         });
         return <article key={view.id} className={`sdp-panel sdp-${view.id}-plot min-w-0 p-4 sm:p-5`} aria-label={`${view.panel} plot panel`}>
           <div className="sdp-plot-direction mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"><view.icon className="size-4 shrink-0" aria-hidden="true" />{view.direction}</div>
+          {view.id !== "finishing" && <label className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            X-axis
+            <select className="sdp-control min-w-0 max-w-full flex-1" aria-label={`${view.panel} X-axis`} value={axis}
+              onChange={event => (view.id === "attack" ? setAttackAxis : setDefenceAxis)(event.target.value as ShotAxis)}>
+              {shotAxes.map(option => <option key={option.value} value={option.value} title={option[view.id as "attack" | "defence"]}>{view.id === "defence" && option.value === "share" ? "SOT conceded (%)" : view.id === "defence" && option.value === "box" ? "Box shots conceded /match" : option[view.id as "attack" | "defence"]}</option>)}
+            </select>
+          </label>}
           <AnalyticsScatter title={view.title} className="border-0 p-0 shadow-none"
             description={`${points.length}/${teams.length} visible clubs with complete paired coverage. League median: ${eligibleLeague.length} eligible clubs.`}
-            readingNote={view.note} points={points}
-            xAxis={{ label: `${xMetric ? metricSourceLabel(xMetric) : "SDP"} ${view.xLabel}`, displayLabel: view.xLabel, direction: "explanatory", bounds: { min: 0 } }}
+            readingNote={percentage ? `${view.id === "attack" ? "Upper right: higher xG and a larger share of shots on target." : "Lower left: lower xGA and a smaller share of opposing shots on target."} SOT % = total SOT / total shots across the same matches. Check shot volume in the tooltip; this is accuracy, not shot location.` : axis === "box" ? `${view.id === "attack" ? "Upper right: higher xG and more shots from inside the box." : "Lower left: lower xGA and fewer opponent shots from inside the box. Conceded counts use the exact opponent's SDP match row."} Shot location is separate from shots on target.` : view.note} points={points}
+            xAxis={{ label: `${xMetric ? metricSourceLabel(xMetric) : "SDP"} ${xLabel}`, displayLabel: xLabel, direction: "explanatory", bounds: { min: 0, ...percentage ? { max: 100 } : {} }, ...percentage ? { format: (value: number) => `${fmt(value, 1)}%` } : {} }}
             yAxis={{ label: `${yMetric ? metricSourceLabel(yMetric) : view.ySource === "fpl" ? "FPL" : "SDP / marked FPL"} ${view.yLabel}`, displayLabel: view.yLabel, direction: "explanatory", bounds: { min: 0 } }}
-            medianX={xMetric ? teamBenchmark(eligibleLeague, xMetric, "per_match", null).median : null}
+            medianX={median(eligibleLeague.map(team => coordinates(team)!.x))}
             medianY={yMetric ? teamBenchmark(eligibleLeague, yMetric, "per_match", null).median : null}
             selectedPointId={selectedId} onSelectPoint={id => onSelectTeam(String(id))}
             vintageLabel={`Observed export ${asOf}`} vintageDisplayLabel="SDP / marked FPL" provenanceLabel="Observed"
             horizonLabel={horizonLabel} horizonDisplayLabel={horizonDisplayLabel}
-            emptyMessage={`No clubs have complete ${view.xLabel} and ${view.yLabel} in this range. Missing observations remain unavailable.`} />
+            emptyMessage={`No clubs have complete ${xLabel} and ${view.yLabel} in this range${percentage ? " with a positive shot denominator" : ""}. Missing observations remain unavailable.`} />
         </article>;
       })}
       <article className="sdp-panel sdp-pattern-plot min-w-0 p-4 sm:p-5" aria-label="Goal patterns plot panel">

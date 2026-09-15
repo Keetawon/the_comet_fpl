@@ -57,7 +57,10 @@ export const isShotBreakdown = (metric: SdpMetric) => metric.source === "sdp" &&
 // Ratio of matched totals, never an average of match percentages. Display corrections
 // follow the same explicit provenance as the counts; missing evidence stays unavailable.
 export function shotShare(rows: readonly SdpMatch[], metric: SdpMetric, shots: SdpMetric): number | null {
-  if (!isShotBreakdown(metric) || shots.source !== "sdp" || shots.key !== "shots") return null;
+  const attackingPair = isShotBreakdown(metric) && shots.key === "shots";
+  const concededPair = metric.source === "sdp" && metric.scope === "team" &&
+    metric.key === "shots_on_target_allowed" && shots.key === "shots_allowed";
+  if (shots.source !== "sdp" || (!attackingPair && !concededPair)) return null;
   let numerator = 0, denominator = 0;
   for (const row of rows) {
     const part = metricRaw(row, metric), total = metricRaw(row, shots);

@@ -69,7 +69,8 @@ def apply_goal_patterns(rows: list[dict[str, Any]], raw: list[dict[str, Any]]) -
             },
             "source_version": row["source_version"],
             "source_known_at": source["fetched_at"].isoformat(),
-            "audited_at": audit["audited_at"],
+            # A newly corroborated match side does not redate unrelated interpretations.
+            "audited_at": e.get("audited_at", audit["audited_at"]),
             "method": METHOD,
         }
         validate_goal_patterns(row)

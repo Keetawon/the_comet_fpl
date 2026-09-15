@@ -685,16 +685,18 @@
       "total_goals": 3,
       "open_play_goals": 0,
       "own_goals_received": 1,
-      "confirmed_set_piece_goals": 1,
-      "set_piece_goals": null,
-      "unclassified_goals": 1,
+      "confirmed_set_piece_goals": 2,
+      "set_piece_goals": 2,
+      "unclassified_goals": 0,
+      "audited_at": "2026-09-15T02:52:32+00:00",
       "raw_penalty_goals": 0,
       "raw_direct_free_kick_goals": 0,
       "evidence_urls": [
         "https://www.chelseafc.com/en/news/article/match-report-chelsea-4-3-brighton",
-        "https://www.brightonandhovealbion.com/media-article/mft-match-report-chebha-pl--report"
+        "https://www.brightonandhovealbion.com/media-article/mft-match-report-chebha-pl--report",
+        "https://www.sahadan.com/en/match/chelsea-vs-brighton/40c1vmb9vw5uej4dtni094jro/commentary"
       ],
-      "evidence_note": "Gross: late set-piece header. Yalcouye: initial restart insufficiently corroborated; one unclassified goal. Joao Pedro own goal is separate."
+      "evidence_note": "Yalcouye 35: Sahadan commentary explicitly describes a quick right-wing throw-in, pass to Kostoulas, saved shot and Yalcouye rebound; Brighton's official report corroborates the pass/save/rebound. Gross 90+6: long-throw header. Both meet the existing throw-in-phase display definition. Joao Pedro own goal 63 remains separate despite its corner origin. Re-audited 2026-09-15; not a new provider value."
     },
     {
       "season": "2026-27",
