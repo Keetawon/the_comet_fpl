@@ -8,7 +8,10 @@ beforeEach(() => {
     this.setAttribute("src", value);
     if (value) queueMicrotask(() => this.dispatchEvent(new Event("load")));
   });
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    drawImage: vi.fn(), save: vi.fn(), translate: vi.fn(), rotate: vi.fn(),
+    fillText: vi.fn(), restore: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(callback => callback(new Blob(["png"], { type: "image/png" })));
 });
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.useRealTimers(); });

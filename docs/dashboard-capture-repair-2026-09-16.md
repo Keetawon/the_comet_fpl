@@ -62,3 +62,11 @@ Blocked decorative CDN images may be omitted; names and numbers are retained.
 Local preview remains `http://127.0.0.1:4173/`. Hard-refresh before trying Capture
 again; already-open Preparing windows belong to the previous page code. This
 does not claim a production deployment or ownership of the mock watermark domain.
+
+## Center watermark follow-up
+
+The owner additionally requested a faint mark that remains when the image's header
+is cropped. All table captures now burn `www.thecometfpl.com` directly into the
+PNG's center, tilted 15 degrees at 12% opacity. The text scales with the image;
+no logo upload or extra resource request is needed. The same marked PNG is used
+for preview, download and sharing. The live table and its values are unchanged.

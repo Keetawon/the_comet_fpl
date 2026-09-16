@@ -96,6 +96,16 @@ export async function captureSvgToPng(svg: string, width: number, height: number
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Image capture is unavailable in this browser.");
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  // Burn the mark into the PNG itself, so cropping the header/footer retains it.
+  context.save();
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate(-Math.PI / 12);
+  context.font = `700 ${Math.min(canvas.width / 18, canvas.height / 3)}px Arial,sans-serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillStyle = "rgba(180, 83, 9, 0.12)";
+  context.fillText("www.thecometfpl.com", 0, 0);
+  context.restore();
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => {
       canvas.width = canvas.height = 0;
