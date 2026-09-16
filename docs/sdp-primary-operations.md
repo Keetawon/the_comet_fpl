@@ -233,3 +233,57 @@ and retry settings. The owner machine must be running. No cloud runtime is added
 Reload the browser after a refresh to replace its session cache. Vite preview
 serves rebuilt `dashboard/dist`; changing DuckDB or public JSON alone is not enough.
 Production publication remains a separate review.
+
+### Owner machine: every four hours and at sign-in (2026-09-16)
+
+The owner authorized changing the timing of the existing
+`The Comet FPL - SDP primary V2` task. It is enabled and Ready, with:
+
+- An indefinite four-hour trigger anchored at 2026-09-16 11:00 Asia/Bangkok:
+  **03:00, 07:00, 11:00, 15:00, 19:00, 23:00** local time.
+- An owner-only Windows sign-in trigger delayed by two minutes for startup/network
+  initialization. This runs after signing in, not before sign-in at unattended boot.
+  Locking the screen while remaining signed in does not disable the task.
+- The unchanged `refresh_dashboard` action and explicit operational paths above:
+  FPL/SDP/workload capture, normalization, final outcomes, dashboard exports/build.
+  New forecasts remain a separate pre-deadline operation.
+- Existing `StartWhenAvailable`, `IgnoreNew`, two retries spaced 30 minutes apart,
+  two-hour execution limit, battery support and database locks/backups retained.
+  It does not wake a sleeping PC. Missed schedules are eligible for catch-up when
+  Windows can run the task; offline/network failures retain the existing retry policy.
+
+Only the two triggers changed: action, principal, settings and registration
+metadata were compared against the exported XML and remained identical. Windows
+normalized the trigger's account SID into an account name; resolving that name
+back to its SID verified the same owner. The other `daily SDP` task, which uses a
+different database, was unchanged. No additional task, credentials or service
+account were created.
+
+Configuration was verified at 2026-09-16T03:47:38Z through both ScheduledTasks and
+the native Task Scheduler interface. Next firing: 11:00 Bangkok. The preceding
+scheduled run's result is 0; a future automatic four-hour/sign-in firing has not
+yet been observed. No extra full capture was launched just to test registration.
+
+Exact before/after XML and verification receipts are retained locally in
+`data/artifacts/scheduler-four-hour-20260916T034531Z/`. `before.xml` is the rollback
+definition; preserve it. To inspect timing and the last completion:
+
+```powershell
+$name = 'The Comet FPL - SDP primary V2'
+Get-ScheduledTask -TaskName $name | Select-Object TaskName, State, Triggers
+Get-ScheduledTaskInfo -TaskName $name |
+  Select-Object LastRunTime, LastTaskResult, NextRunTime
+```
+
+To restore the previous schedule, first check that the task is not running and
+that its action has not changed since this backup, then restore that exact XML:
+
+```powershell
+$backup = 'data/artifacts/scheduler-four-hour-20260916T034531Z/before.xml'
+Register-ScheduledTask -TaskName 'The Comet FPL - SDP primary V2' `
+  -Xml ([IO.File]::ReadAllText((Resolve-Path -LiteralPath $backup).Path)) -Force
+```
+
+The registration helper still defaults to a daily schedule for **new** tasks;
+rerunning it is neither required nor allowed to overwrite this existing task.
+This schedule change does not modify pipeline/model code or frozen evidence.
