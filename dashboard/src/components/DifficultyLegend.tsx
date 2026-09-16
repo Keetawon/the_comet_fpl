@@ -65,6 +65,7 @@ export function DifficultyLegend({
           }}
           variant="outline"
           size="sm"
+          className="max-w-full flex-wrap"
           aria-label="Colour source"
         >
           {SOURCE_ORDER.map((source) => (

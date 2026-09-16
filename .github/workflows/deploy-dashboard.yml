@@ -9,6 +9,7 @@ on:
       - "src/fpl/jobs/package_public_dashboard.py"
       - "src/fpl/publish/contract.py"
       - "src/fpl/publish/dashboard_json.py"
+      - "src/fpl/publish/dashboard_refresh.py"
       - "src/fpl/publish/export.py"
       - "src/fpl/publish/public_dashboard.py"
       - "src/fpl/publish/sdp_stats.py"
@@ -263,6 +264,24 @@ jobs:
               destination = Path('dashboard/public/sdp') / filename
               destination.parent.mkdir(parents=True, exist_ok=True)
               destination.write_bytes(body)
+          PY
+
+      - name: Bind public freshness to the pinned generation
+        run: |
+          uv run python - <<'PY'
+          import json
+          from pathlib import Path
+          from fpl.publish.dashboard_refresh import publication_status
+
+          sdp = Path('dashboard/public/sdp/sdp_stats.json')
+          if sdp.is_file():
+              status = publication_status(Path('dashboard/public/data'), json.loads(sdp.read_bytes()))
+              sdp.with_name('publication_status.json').write_text(
+                  json.dumps(status, indent=2, sort_keys=True, allow_nan=False) + '\n',
+                  encoding='utf-8',
+              )
+          else:
+              print('::notice::No SDP companion pinned; publication freshness is unavailable.')
           PY
 
       - uses: actions/setup-node@v6

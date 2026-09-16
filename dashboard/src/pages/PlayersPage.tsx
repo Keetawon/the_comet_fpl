@@ -858,7 +858,7 @@ export function PlayersPage() {
               }}
             />
             {actualGameweeks.length > 0 && actualRange != null && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 text-sm text-muted-foreground sm:flex">
                 <span>Actual from</span>
                 <Select
                   value={String(actualRange.fromIndex)}

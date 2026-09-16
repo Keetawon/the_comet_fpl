@@ -113,6 +113,18 @@ asset-dependent hosted build and deploy are skipped.
 
 ## Refresh and rollback
 
+- The local four-hour/sign-in `refresh_dashboard` task refreshes local data and the preview;
+  it does **not** upload a release, change this public pin, or deploy Pages. Public deployment
+  remains a reviewed release + pin on `main`. A domain is not required: the existing
+  `https://keetawon.github.io/the_comet_fpl/` URL remains usable.
+- Include the validated `sdp_stats.json` and `competitive_schedule.json` from the **same completed
+  generation** as separate assets on the same release. Pin them as `sdp_asset` and
+  `competitive_schedule_asset`, each with `name`, `sha256` and `size_bytes`. They do not belong in
+  the ZIP's exact root-file allowlist. Missing companions deliberately show unavailable views.
+- After downloading and verifying the companions, CI reuses `publication_status` to derive the
+  small freshness receipt from the pinned public manifest and SDP gameweek metadata. This binds
+  dates to the deployed generation, separates observation freshness from forecast as-of, and
+  requires no database, capture, inference, or optimizer execution.
 - Refresh: create a new sanitized release under a new tag, then commit a new exact pin. Do not use
   `latest`, an Actions artifact with an expiry, or a mutable URL.
 - Rollback: restore a previously reviewed release pin and commit it. CI re-verifies the old asset
@@ -120,8 +132,11 @@ asset-dependent hosted build and deploy are skipped.
 - If the pin is intentionally removed, restore all nullable fields and set `status` back to
   `unpublished`; the workflow will stop deploying.
 
-The current roughly 43 MiB static generation, including the roughly 40 MiB `players.json`, is
-within GitHub Pages' 1 GiB published-site limit and GitHub Releases' 2 GiB per-asset limit. Standard
+The September 16 review generation is about 189 MB uncompressed, including a roughly 123 MB
+`players.json`; the sanitized ZIP is 14,890,953 bytes. This is within GitHub Pages' 1 GiB
+published-site limit and GitHub Releases' 2 GiB per-asset limit, but a large player download
+still affects first-load performance. Moving the files to object storage alone would not fix that.
+Standard
 GitHub-hosted runners are free for public repositories. See the official
 [Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits),
 [Release limits](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases),

@@ -20,10 +20,10 @@ interface VintageSelectProps {
 export function VintageSelect({ options, value, onChange }: VintageSelectProps) {
   if (options.length <= 1) return null;
   return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className="flex max-w-full flex-wrap items-center gap-2 text-sm text-muted-foreground">
       <span>Vintage</span>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger size="sm" className="w-64" aria-label="Forecast vintage">
+        <SelectTrigger size="sm" className="w-64 max-w-full" aria-label="Forecast vintage">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
