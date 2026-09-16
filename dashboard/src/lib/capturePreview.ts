@@ -22,7 +22,7 @@ export function openCapturePreview(info: TableCaptureInfo, preferShare: boolean)
   const status = doc.createElement("p");
   status.setAttribute("role", "status");
   status.style.cssText = "padding:0 20px;";
-  status.textContent = "Preparing your current table view…";
+  status.textContent = "Expanding your table for a full-height capture…";
   const gallery = doc.createElement("main");
   gallery.style.cssText = "padding:0 20px 24px;overflow:auto;";
   doc.body.append(toolbar, status, gallery);
@@ -30,6 +30,7 @@ export function openCapturePreview(info: TableCaptureInfo, preferShare: boolean)
   let url: string | null = null;
   preview.addEventListener("pagehide", () => { if (url) URL.revokeObjectURL(url); }, { once: true });
   return {
+    progress(message: string) { if (!preview.closed) status.textContent = message; },
     fail(message: string) { if (!preview.closed) status.textContent = message; },
     ready(capture: TableCapture) {
       if (preview.closed) return;
@@ -39,7 +40,7 @@ export function openCapturePreview(info: TableCaptureInfo, preferShare: boolean)
       image.alt = `THE COMET · ${info.title} · current table capture`;
       image.style.cssText = "display:block;max-width:100%;height:auto;margin:0 auto;box-shadow:0 4px 20px #0001;";
       gallery.append(image);
-      status.textContent = "Review before sharing. Includes only this table page and its expanded rows. Capture time is not data freshness. Blocked decorative badges may be omitted.";
+      status.textContent = "Full table width and height · current page, filters and row order · www.thecometfpl.com watermark. Review before sharing. Capture time is not data freshness. Blocked decorative badges may be omitted.";
       const style = "border:1px solid #d4d4d8;border-radius:8px;background:white;color:#18181b;padding:10px 14px;font:inherit;cursor:pointer;text-decoration:none;";
       const download = doc.createElement("a");
       download.textContent = "Download PNG";

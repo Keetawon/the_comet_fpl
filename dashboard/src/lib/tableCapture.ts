@@ -22,8 +22,13 @@ export function cloneCaptureContent(source: HTMLElement): HTMLElement {
   const copies = [clone, ...clone.querySelectorAll<HTMLElement | SVGElement>("*")];
   originals.forEach((element, index) => {
     const copy = copies[index];
+    if (copy !== clone && !clone.contains(copy)) return;
     const style = getComputedStyle(element);
-    for (const key of Array.from(style)) copy.style.setProperty(key, style.getPropertyValue(key));
+    // Computed longhands already resolve theme variables. Copying the complete
+    // theme again on every cell bloats large tables; assign resolved styles once.
+    copy.style.cssText = Array.from(style)
+      .filter(key => !key.startsWith("--"))
+      .map(key => `${key}:${style.getPropertyValue(key)};`).join("");
     copy.removeAttribute("id");
     copy.removeAttribute("autofocus");
     for (const attr of Array.from(copy.attributes)) {
@@ -69,7 +74,39 @@ export function cloneCaptureContent(source: HTMLElement): HTMLElement {
   return clone;
 }
 
-export async function captureTable(source: HTMLElement, info: TableCaptureInfo): Promise<TableCapture> {
+/** Canvas conversion must not wait for requestAnimationFrame: opening the preview
+ * can hide the source tab and suspend its animation callbacks indefinitely.
+ */
+export async function captureSvgToPng(svg: string, width: number, height: number, signal: AbortSignal): Promise<Blob> {
+  const image = new Image();
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => { image.onload = null; image.onerror = null; signal.removeEventListener("abort", abort); };
+    const abort = () => { cleanup(); image.src = ""; reject(signal.reason); };
+    image.onload = () => { cleanup(); resolve(); };
+    image.onerror = () => { cleanup(); reject(new Error("The browser could not render this image. Try a smaller table view.")); };
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) { abort(); return; }
+    image.src = svg;
+  });
+  signal.throwIfAborted();
+  const canvas = document.createElement("canvas");
+  const ratio = Math.min(2, Math.sqrt(16_000_000 / (width * height)));
+  canvas.width = Math.ceil(width * ratio);
+  canvas.height = Math.ceil(height * ratio);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Image capture is unavailable in this browser.");
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      canvas.width = canvas.height = 0;
+      if (blob?.size) resolve(blob);
+      else reject(new Error("The browser could not encode this image. Try a smaller table view."));
+    }, "image/png");
+  });
+}
+
+export async function captureTable(source: HTMLElement, info: TableCaptureInfo, progress: (message: string) => void = () => {}): Promise<TableCapture> {
+  progress("1/3 · Expanding the full table width and height…");
   // Freeze the DOM before any await: changing a filter during export cannot mix views.
   const content = cloneCaptureContent(source);
   const stage = document.createElement("div");
@@ -83,7 +120,7 @@ export async function captureTable(source: HTMLElement, info: TableCaptureInfo):
   const heading = document.createElement("header");
   heading.style.cssText = "border-bottom:3px solid #b45309;padding:0 0 16px;margin-bottom:16px;max-width:1100px;";
   const brand = document.createElement("div");
-  brand.textContent = "THE COMET · FPL DASHBOARD";
+  brand.textContent = "THE COMET · www.thecometfpl.com";
   brand.style.cssText = "font-size:22px;font-weight:800;letter-spacing:2px;color:#b45309;";
   const title = document.createElement("h1");
   title.textContent = info.title;
@@ -94,13 +131,22 @@ export async function captureTable(source: HTMLElement, info: TableCaptureInfo):
   heading.append(brand, title, context);
   const footer = document.createElement("footer");
   footer.style.cssText = "border-top:1px solid #b45309;padding-top:12px;margin-top:18px;font-size:12px;line-height:1.6;";
-  footer.textContent = `THE COMET · Captured ${info.capturedAt} · Image capture time, not a data refresh. Current table page; filters and order preserved.`;
+  footer.textContent = `www.thecometfpl.com · Captured ${info.capturedAt} · Image capture time, not a data refresh. Full table width and height; current page, filters and order preserved.`;
   sheet.append(heading, content, footer);
   stage.append(sheet);
   document.body.append(stage);
-  try {
-    const { toBlob } = await import("html-to-image");
-    await document.fonts.ready;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error("Capture took too long. Narrow the table filters and try again; no data was changed.");
+      controller.abort(error);
+      reject(error);
+    }, 20000);
+  });
+  const render = async () => {
+    const { toSvg } = await import("html-to-image");
+    controller.signal.throwIfAborted();
     // Size the whole branded sheet around the expanded table, including its right
     // padding; otherwise an overflowed table could end flush against the PNG edge.
     sheet.style.width = `${Math.max(592, content.scrollWidth) + 48}px`;
@@ -110,17 +156,26 @@ export async function captureTable(source: HTMLElement, info: TableCaptureInfo):
     if (width > 16000 || height > 16000 || width * height > 32_000_000) {
       throw new Error("This view is too large for a readable image. Narrow the filters or date range and capture again.");
     }
-    const blob = await toBlob(sheet, {
+    progress("2/3 · Creating the image with www.thecometfpl.com watermark…");
+    const svg = await toSvg(sheet, {
       width, height,
-      pixelRatio: Math.min(2, Math.sqrt(16_000_000 / (width * height))),
+      // The snapshot already has complete inline computed styles. Do not copy
+      // every CSS property a second time for thousands of table elements.
+      includeStyleProperties: [],
       preferredFontFormat: "woff2",
       // A blocked decorative CDN badge must not hide the table's text or statistics.
       imagePlaceholder: "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E",
-      fetchRequestInit: { credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(15000) },
+      fetchRequestInit: { credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]) },
     });
-    if (!blob || blob.size === 0) throw new Error("The browser could not render this image. Try a smaller table view.");
+    controller.signal.throwIfAborted();
+    progress("3/3 · Preparing your PNG for download and sharing…");
+    const blob = await captureSvgToPng(svg, width, height, controller.signal);
     return { blob, width, height, filename: `the-comet-${info.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${info.capturedAt.slice(0, 10)}.png` };
+  };
+  try {
+    return await Promise.race([render(), deadline]);
   } finally {
+    clearTimeout(timer);
     stage.remove();
   }
 }

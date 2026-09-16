@@ -197,7 +197,7 @@ export function DecisionTableFullscreen({
     try {
       preview = openCapturePreview(info, preferShare);
       setCapturing(true);
-      preview.ready(await captureTable(contentRef.current, info));
+      preview.ready(await captureTable(contentRef.current, info, preview.progress));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Capture failed. Please try again.";
       setCaptureError(message);
@@ -241,7 +241,7 @@ export function DecisionTableFullscreen({
           )}
         </Button>
         <Button type="button" variant="ghost" size="sm" className="h-10" disabled={capturing}
-          aria-label={`Capture ${label}`} title="Capture the current table page with THE COMET watermark"
+          aria-label={`Capture ${label}`} title="Capture the full table width and height with www.thecometfpl.com watermark (current page)"
           onClick={() => void capture(false)}>
           {capturing ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Camera className="size-4" aria-hidden />}
           <span className="hidden sm:inline">Capture</span>

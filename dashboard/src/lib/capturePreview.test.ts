@@ -25,7 +25,10 @@ describe("capture preview", () => {
     const popup = previewWindow();
     const controller = openCapturePreview(info, false);
     expect(popup.opener).toBeNull();
+    controller.progress("2/3 · Creating the image");
+    expect(popup.document.body.textContent).toContain("2/3 · Creating the image");
     controller.ready(capture);
+    expect(popup.document.body.textContent).toContain("www.thecometfpl.com watermark");
     expect(popup.document.querySelector("script")).toBeNull();
     expect(popup.document.querySelector("a")!.download).toBe("players.png");
     const buttons = [...popup.document.querySelectorAll("button")];
