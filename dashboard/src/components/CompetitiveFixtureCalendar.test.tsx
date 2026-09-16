@@ -100,14 +100,14 @@ describe("club calendar interactions", () => {
     const user = userEvent.setup();
     render(<CompetitiveFixtureCalendar teams={teams} schedule={schedule} fromGw={5} toGw={5} />);
     const cup = await screen.findByRole("button", {name: /Arsenal: CUP/});
-    expect(cup.className).toContain("bg-sky-100");
+    expect(cup.className).toContain("bg-blue-100");
     expect(cup.textContent).toContain("LC");
     const international = screen.getByRole("button", { name: /Arsenal: International break/ });
     expect(international.closest("td")?.className).toContain("bg-yellow-100");
     expect(screen.getByText("DGW · 2 fixtures")).toBeVisible();
     await user.click(screen.getByRole("radio", {name: "Official FDR"}));
     expect(screen.getByRole("button", {name: /Arsenal: BHA/}).className).toContain("red");
-    expect(cup.className).toContain("bg-sky-100");
+    expect(cup.className).toContain("bg-blue-100");
     expect(international.closest("td")?.className).toContain("bg-yellow-100");
     await user.clear(screen.getByLabelText("Calendar from"));
     await user.type(screen.getByLabelText("Calendar from"), "2027-01-01");

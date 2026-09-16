@@ -146,6 +146,23 @@ retained under `data/artifacts/competitive-calendar-20260915/` (local, ignored).
 
 ## Verification
 
+Cup colour update (2026-09-16): both Weekly and Daily use the same blue scale,
+darkest to lightest: UCL, UEL, UECL, FA Cup (FAC), League Cup (LC). These are
+competition identifiers, not opponent-strength or workload estimates. The
+legend names each competition, and capture/share context preserves the scale.
+PL difficulty colours, yellow international windows, fixture populations and
+CSV values are unchanged. Unknown competition codes retain a generic light blue.
+The same scale remains legible in light and dark themes.
+
+The 32 existing calendar/Fixture Matrix tests pass, TypeScript/Vite build passes,
+and frontend lint has zero errors with the nine existing Fast Refresh warnings.
+Actual Chrome checks at desktop and mobile widths verified all 51 visible cup
+cards against the legend, stable colours when changing difficulty source and
+Weekly/Daily mode, and no JavaScript exceptions or failed requests. Screenshots
+and the browser receipt are local under `data/artifacts/cup-colours-20260916/`.
+FA Cup is represented in the legend; no fixture is invented when its schedule
+is not yet published.
+
 International-date folding verification (2026-09-15): 38 focused frontend tests
 pass, including independent windows, clipped ranges, retained overlapping club
 fixtures, keyboard focus and CSV timestamps. TypeScript/Vite build and frontend

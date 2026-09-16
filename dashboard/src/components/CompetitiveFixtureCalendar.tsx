@@ -15,7 +15,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 const stamp = (value: string) => new Date(value).toLocaleString("en-GB", { timeZone: "Europe/London", dateStyle: "medium", timeStyle: "short" });
 const kickoffTime = (value: string) => new Date(value).toLocaleTimeString("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit" });
-const cupClass = "bg-sky-100 text-sky-950 ring-1 ring-inset ring-sky-200 dark:bg-sky-950 dark:text-sky-100 dark:ring-sky-800";
+const CUP_COLOURS = [
+  { code: "UCL", name: "Champions League", classes: "bg-blue-950 text-white" },
+  { code: "UEL", name: "Europa League", classes: "bg-blue-800 text-white" },
+  { code: "UECL", name: "Conference League", classes: "bg-blue-600 text-white" },
+  { code: "FAC", name: "FA Cup", classes: "bg-blue-300 text-blue-950" },
+  { code: "LC", name: "League Cup", classes: "bg-blue-100 text-blue-950" },
+] as const;
+const cupColour = (competition: string) => CUP_COLOURS.find((c) => c.code === competition)?.classes ?? "bg-sky-100 text-sky-950";
 const internationalClass = "bg-yellow-100 text-yellow-950 dark:bg-yellow-950 dark:text-yellow-100";
 const venue = (home: boolean | null) => home === null ? "venue TBC" : home ? "H" : "A";
 
@@ -121,10 +128,12 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
           <ToggleGroupItem value="opponent">Opponent strength</ToggleGroupItem><ToggleGroupItem value="fdr">Official FDR</ToggleGroupItem>
         </ToggleGroup>
         {legend.map((l) => <span key={l.bucket} className={`rounded px-2 py-1 ${BUCKET_CLASSES[l.bucket]}`}>{l.label}</span>)}
-        <span className={`rounded px-2 py-1 ${cupClass}`}>Cup / Europe</span>
+        <span className="flex flex-wrap items-center gap-1" aria-label="Cup colours, darkest to lightest">
+          {CUP_COLOURS.map((c) => <span key={c.code} title={c.name} className={`rounded px-2 py-1 ${c.classes}`}>{c.code}</span>)}
+        </span>
         <span className={`rounded px-2 py-1 ${internationalClass}`}>International break</span>
       </div>
-      <p className="text-xs text-muted-foreground">PL colours use {colour === "opponent" ? `opponent strength from the selected forecast (${teams[0]?.as_of.slice(0, 10)})` : "current official FPL difficulty"}. Blue = cup / Europe; yellow = international break. Neither indicates difficulty or confirmed player rest. A blank cell means no listed fixture.</p>
+      <p className="text-xs text-muted-foreground">PL colours use {colour === "opponent" ? `opponent strength from the selected forecast (${teams[0]?.as_of.slice(0, 10)})` : "current official FPL difficulty"}. Blue runs darkest to lightest: Champions League → Europa League → Conference League → FA Cup → League Cup. Shades identify competitions, not opponent difficulty. Yellow = international break, not confirmed player rest. A blank cell means no listed fixture.</p>
       {view === "daily" && <p className="text-xs text-muted-foreground">Listed gap = clear calendar days between the club’s previous and next listed games, excluding both match dates. This is not player recovery time: appearances, training, travel and national-team games are unknown. Missing cup schedules can hide games; an undated club fixture makes the gap unavailable.</p>}
       {view === "daily" && breaks.length > 0 && <p className="text-xs text-muted-foreground">International dates are folded by default. Use + Expand / − Collapse in a yellow column header to inspect individual days. Listed club games remain visible in either view.</p>}
     </div>
@@ -136,7 +145,7 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
     </div>}
     {invalidRange ? <p role="alert">{dailyTooWide ? "Daily view supports up to 366 days. Shorten the date range or use Weekly." : "Choose both dates, with the end date on or after the start date."}</p> : <>
       <p className="text-xs text-muted-foreground">{clubs.length} clubs · {view === "daily" ? `${dailyColumns.length} days · ${columns.length} columns` : `${columns.length} periods`} · {new Set(displayed.map((r) => r.key.slice(0, r.key.lastIndexOf(":")))).size} listed fixtures. {view === "daily" ? "Only games on the selected dates are shown; DGW legs keep their official GW. Empty days are not BGWs. Use Weekly for the complete GW/BGW view." : "Weekend columns include all official GW legs, including weekday games. DGW = multiple PL fixtures; BGW = no PL fixture in the published schedule."} Missing schedules stay unavailable.</p>
-      <DecisionTableFullscreen label="Club calendar table" captureContext={`${season} · All competitions · ${view} · ${from} to ${to} · ${clubs.length} clubs · ${colour === "opponent" ? "Opponent strength" : "Official FDR"}. Blue: cup/Europe; yellow: international break. Forecast as of ${teams[0]?.as_of ?? "unavailable"}; schedule exported ${schedule.export_created_at ?? "unavailable"}. Missing cup schedules remain unknown.`}>
+      <DecisionTableFullscreen label="Club calendar table" captureContext={`${season} · All competitions · ${view} · ${from} to ${to} · ${clubs.length} clubs · ${colour === "opponent" ? "Opponent strength" : "Official FDR"}. Blue darkest to lightest: UCL > UEL > UECL > FAC > LC (competition, not difficulty); yellow: international break. Forecast as of ${teams[0]?.as_of ?? "unavailable"}; schedule exported ${schedule.export_created_at ?? "unavailable"}. Missing cup schedules remain unknown.`}>
         {({isFullscreen}) => <div className={`${isFullscreen ? "min-h-0 flex-1" : "max-h-[72vh]"} overflow-auto overscroll-contain`}>
           <TooltipProvider delayDuration={200}>
             <table aria-label={view === "daily" ? "All competitions by day" : "All competitions by period"} className="table-fixed border-collapse text-xs tabular-nums" style={{width: 152 + columns.length * columnWidth}}>
@@ -162,7 +171,7 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
                   {cellFixtures(t.team_code, c.key).map((f) => {
                   const value = colour === "fdr" ? f.fdr : strength.get(f.opponentCode ?? -1)?.index;
                   const bucket = colour === "fdr" ? fdrBucket(value ?? null) : opponentStrengthBucket(value);
-                  return <Tooltip key={f.key}><TooltipTrigger asChild><button type="button" className={`block w-full rounded-sm px-1 leading-tight ${view === "daily" ? "py-0.5" : "py-1"} ${f.gw === null ? cupClass : bucket ? BUCKET_CLASSES[bucket] : NULL_BUCKET_CLASS}`} aria-label={`${t.team_name}: ${description(f)}`}><span className="block font-semibold">{f.opponent} <span className="font-normal">({venue(f.home)})</span></span>{c.collapsedDays && f.kickoff && <span className="block text-[9px]">{new Date(f.kickoff).toLocaleDateString("en-GB", { timeZone: "Europe/London", day: "numeric", month: "short" })}</span>}<span className="block text-[10px]">{f.gw === null ? f.competition : `GW${f.gw}`}{view === "daily" && f.kickoff ? ` · ${kickoffTime(f.kickoff)}` : ""}</span>{view === "daily" && <><span className="block text-[9px]">{gapText(f)}</span>{f.gw !== null && leagueSlot(schedule, season, f.teamCode, f.gw) === "DGW" && <span className="block text-[9px] font-semibold">DGW</span>}</>}</button></TooltipTrigger>
+                  return <Tooltip key={f.key}><TooltipTrigger asChild><button type="button" className={`block w-full rounded-sm px-1 leading-tight ${view === "daily" ? "py-0.5" : "py-1"} ${f.gw === null ? cupColour(f.competition) : bucket ? BUCKET_CLASSES[bucket] : NULL_BUCKET_CLASS}`} aria-label={`${t.team_name}: ${description(f)}`}><span className="block font-semibold">{f.opponent} <span className="font-normal">({venue(f.home)})</span></span>{c.collapsedDays && f.kickoff && <span className="block text-[9px]">{new Date(f.kickoff).toLocaleDateString("en-GB", { timeZone: "Europe/London", day: "numeric", month: "short" })}</span>}<span className="block text-[10px]">{f.gw === null ? f.competition : `GW${f.gw}`}{view === "daily" && f.kickoff ? ` · ${kickoffTime(f.kickoff)}` : ""}</span>{view === "daily" && <><span className="block text-[9px]">{gapText(f)}</span>{f.gw !== null && leagueSlot(schedule, season, f.teamCode, f.gw) === "DGW" && <span className="block text-[9px] font-semibold">DGW</span>}</>}</button></TooltipTrigger>
                     <TooltipContent side="top" className="block max-w-72 space-y-1 p-3 text-xs"><p className="font-semibold">{t.team_name} · {f.opponentName} ({venue(f.home)})</p><p>{f.competitionName}{f.gw !== null ? ` · GW${f.gw}` : ""}</p><p>{f.kickoff ? `${stamp(f.kickoff)} UK` : "Date/time TBC"} · {f.status}</p>{view === "daily" && <p>{gapText(f)}{gaps.has(f.key) ? ` since ${stamp(gaps.get(f.key)!.previousKickoff)} UK. Counts clear dates between listed club games; not confirmed player rest.` : ": no previous dated game, or an undated club fixture remains."}</p>}{f.gw !== null && <p>{colour === "fdr" ? "Official FDR" : "Opponent strength"}: {value == null ? "Unavailable" : value.toFixed(1)}</p>}<p>{f.source} {f.source === "FPL" ? "schedule export" : "source version"}: {stamp(f.knownAt)} UK</p></TooltipContent>
                   </Tooltip>;
                 })}</td>)}</tr>)}</tbody>
