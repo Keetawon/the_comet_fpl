@@ -4,6 +4,7 @@ import type {
 } from "@/data/types";
 
 export type AccuracyRunRole =
+  | "incumbent_shadow"
   | "prospective_default"
   | "diagnostic_comparator"
   | "recorded_sensitivity"
@@ -53,6 +54,7 @@ export function accuracyRunRole(
   ) {
     return "unclassified";
   }
+  if (modes.forecast_role === "shadow_incumbent") return "incumbent_shadow";
   if (matchesModes(modes, DEFAULT_MODES)) return "prospective_default";
   if (matchesModes(modes, DIAGNOSTIC_MODES)) return "diagnostic_comparator";
   return "recorded_sensitivity";
@@ -60,6 +62,8 @@ export function accuracyRunRole(
 
 export function accuracyRunRoleLabel(role: AccuracyRunRole): string {
   switch (role) {
+    case "incumbent_shadow":
+      return "Incumbent shadow";
     case "prospective_default":
       return "Prospective default";
     case "diagnostic_comparator":
@@ -76,6 +80,7 @@ export function accuracyComponentLabel(modes: ComponentModes | null): string {
     `goals ${modes?.attacking_mode ?? "?"}`,
     `assists ${modes?.assists_mode ?? "?"}`,
     `appearance ${modes?.appearance_mode ?? "?"}`,
+    ...(modes?.["football_environment.primary"] === "sdp_v2" ? ["SDP V2 + fallback"] : []),
   ].join(" · ");
 }
 

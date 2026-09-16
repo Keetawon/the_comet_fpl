@@ -1,0 +1,300 @@
+{
+  "allow_dirty": false,
+  "baseline": "trailing_dc_threshold_hit_bernoulli_v1",
+  "by_season": {
+    "team_environment_share_dc_threshold_v2": {
+      "2025-26": {
+        "auc": 0.880099,
+        "brier_score": 0.100514,
+        "mean_log_score": 0.349936,
+        "mean_predicted": 0.05593,
+        "model": "team_environment_share_dc_threshold_v2",
+        "observed_rate": 0.138694,
+        "rows": 7859
+      }
+    },
+    "trailing_dc_threshold_hit_bernoulli_v1": {
+      "2025-26": {
+        "auc": 0.775464,
+        "brier_score": 0.104163,
+        "mean_log_score": 0.342468,
+        "mean_predicted": 0.132808,
+        "model": "trailing_dc_threshold_hit_bernoulli_v1",
+        "observed_rate": 0.138694,
+        "rows": 7859
+      }
+    }
+  },
+  "by_slice": {
+    "team_environment_share_dc_threshold_v2": {
+      "not_transferred": {
+        "auc": 0.87715,
+        "brier_score": 0.103744,
+        "mean_log_score": 0.360301,
+        "mean_predicted": 0.057818,
+        "model": "not_transferred",
+        "observed_rate": 0.14341,
+        "rows": 7496
+      },
+      "position_DEF": {
+        "auc": 0.834276,
+        "brier_score": 0.142669,
+        "mean_log_score": 0.4434,
+        "mean_predicted": 0.109707,
+        "model": "position_DEF",
+        "observed_rate": 0.213475,
+        "rows": 2909
+      },
+      "position_FWD": {
+        "auc": 0.954774,
+        "brier_score": 0.008054,
+        "mean_log_score": 0.04565,
+        "mean_predicted": 0.000659,
+        "model": "position_FWD",
+        "observed_rate": 0.008257,
+        "rows": 1090
+      },
+      "position_MID": {
+        "auc": 0.880161,
+        "brier_score": 0.094853,
+        "mean_log_score": 0.365426,
+        "mean_predicted": 0.03101,
+        "model": "position_MID",
+        "observed_rate": 0.119171,
+        "rows": 3860
+      },
+      "transferred": {
+        "auc": 0.922989,
+        "brier_score": 0.033807,
+        "mean_log_score": 0.13591,
+        "mean_predicted": 0.016949,
+        "model": "transferred",
+        "observed_rate": 0.041322,
+        "rows": 363
+      }
+    },
+    "trailing_dc_threshold_hit_bernoulli_v1": {
+      "not_transferred": {
+        "auc": 0.771329,
+        "brier_score": 0.107337,
+        "mean_log_score": 0.351622,
+        "mean_predicted": 0.135957,
+        "model": "not_transferred",
+        "observed_rate": 0.14341,
+        "rows": 7496
+      },
+      "position_DEF": {
+        "auc": 0.686524,
+        "brier_score": 0.154601,
+        "mean_log_score": 0.478169,
+        "mean_predicted": 0.210432,
+        "model": "position_DEF",
+        "observed_rate": 0.213475,
+        "rows": 2909
+      },
+      "position_FWD": {
+        "auc": 0.630024,
+        "brier_score": 0.007855,
+        "mean_log_score": 0.062088,
+        "mean_predicted": 0.00592,
+        "model": "position_FWD",
+        "observed_rate": 0.008257,
+        "rows": 1090
+      },
+      "position_MID": {
+        "auc": 0.725078,
+        "brier_score": 0.093347,
+        "mean_log_score": 0.319375,
+        "mean_predicted": 0.110139,
+        "model": "position_MID",
+        "observed_rate": 0.119171,
+        "rows": 3860
+      },
+      "transferred": {
+        "auc": 0.770115,
+        "brier_score": 0.038621,
+        "mean_log_score": 0.153426,
+        "mean_predicted": 0.067768,
+        "model": "transferred",
+        "observed_rate": 0.041322,
+        "rows": 363
+      }
+    }
+  },
+  "contract_version": "1.0",
+  "generated_at": "2026-09-04T14:31:06.787653+00:00",
+  "git": {
+    "clean_worktree": true,
+    "head": "ea8e012cd06c4b891cbd4df1d64119a3d64c863b"
+  },
+  "lift_against_baseline": {
+    "team_environment_share_dc_threshold_v2": {
+      "brier_score": 0.035032,
+      "mean_log_score": -0.021806
+    },
+    "trailing_dc_threshold_hit_bernoulli_v1": {
+      "brier_score": 0.0,
+      "mean_log_score": 0.0
+    }
+  },
+  "limitations": {
+    "minutes_independence": "V1 estimates its hit rate over appearances without conditioning on the minutes bin. V2 thins linearly by expected minutes exposure. Neither is conditioned on the bin the composer later draws.",
+    "poisson_shape": "V2 converts an expected DC count into a threshold probability through a Poisson, which understates the probability for a player well below the threshold and overstates it well above, because real defensive actions cluster. Correcting it needs a measured over-dispersion parameter, which one season cannot support.",
+    "single_season": "DC exists in 2025-26 only, so there is no cross-season generalisation evidence available from this archive at all, whatever the result.",
+    "small_transferred_slice": "Measured 242 transfer stints across five seasons, so roughly 48 in one season, and only the post-transfer appearances of those players are informative. The transferred slice will be small and its confidence interval wide; report the row count beside every figure and do not treat a narrow margin on it as decided."
+  },
+  "not_a_promotion": "The contract declares promotion_requires_prospective_window, and DC exists in one archived season, so this result cannot promote anything.",
+  "overall": {
+    "team_environment_share_dc_threshold_v2": {
+      "auc": 0.880099,
+      "brier_score": 0.100514,
+      "mean_log_score": 0.349936,
+      "mean_predicted": 0.05593,
+      "model": "team_environment_share_dc_threshold_v2",
+      "observed_rate": 0.138694,
+      "rows": 7859
+    },
+    "trailing_dc_threshold_hit_bernoulli_v1": {
+      "auc": 0.775464,
+      "brier_score": 0.104163,
+      "mean_log_score": 0.342468,
+      "mean_predicted": 0.132808,
+      "model": "trailing_dc_threshold_hit_bernoulli_v1",
+      "observed_rate": 0.138694,
+      "rows": 7859
+    }
+  },
+  "population": {
+    "rows_scored": 7859,
+    "seasons": [
+      "2025-26"
+    ],
+    "thresholds": {
+      "DEF": 10,
+      "FWD": 12,
+      "MID": 12
+    },
+    "transferred_rows": 363
+  },
+  "reliability": {
+    "team_environment_share_dc_threshold_v2": [
+      {
+        "bin_high": 0.1,
+        "bin_low": 0.0,
+        "mean_predicted": 0.013545,
+        "observed_rate": 0.066261,
+        "rows": 6414
+      },
+      {
+        "bin_high": 0.2,
+        "bin_low": 0.1,
+        "mean_predicted": 0.14424,
+        "observed_rate": 0.339706,
+        "rows": 680
+      },
+      {
+        "bin_high": 0.3,
+        "bin_low": 0.2,
+        "mean_predicted": 0.244342,
+        "observed_rate": 0.464567,
+        "rows": 381
+      },
+      {
+        "bin_high": 0.4,
+        "bin_low": 0.3,
+        "mean_predicted": 0.343362,
+        "observed_rate": 0.602094,
+        "rows": 191
+      },
+      {
+        "bin_high": 0.5,
+        "bin_low": 0.4,
+        "mean_predicted": 0.437809,
+        "observed_rate": 0.706897,
+        "rows": 116
+      },
+      {
+        "bin_high": 0.6,
+        "bin_low": 0.5,
+        "mean_predicted": 0.543203,
+        "observed_rate": 0.735849,
+        "rows": 53
+      },
+      {
+        "bin_high": 0.7,
+        "bin_low": 0.6,
+        "mean_predicted": 0.65373,
+        "observed_rate": 0.833333,
+        "rows": 18
+      },
+      {
+        "bin_high": 0.8,
+        "bin_low": 0.7,
+        "mean_predicted": 0.728715,
+        "observed_rate": 1.0,
+        "rows": 4
+      },
+      {
+        "bin_high": 0.9,
+        "bin_low": 0.8,
+        "mean_predicted": 0.827907,
+        "observed_rate": 1.0,
+        "rows": 2
+      }
+    ],
+    "trailing_dc_threshold_hit_bernoulli_v1": [
+      {
+        "bin_high": 0.1,
+        "bin_low": 0.0,
+        "mean_predicted": 0.040507,
+        "observed_rate": 0.040616,
+        "rows": 3767
+      },
+      {
+        "bin_high": 0.2,
+        "bin_low": 0.1,
+        "mean_predicted": 0.128537,
+        "observed_rate": 0.137255,
+        "rows": 1989
+      },
+      {
+        "bin_high": 0.3,
+        "bin_low": 0.2,
+        "mean_predicted": 0.228402,
+        "observed_rate": 0.239006,
+        "rows": 1046
+      },
+      {
+        "bin_high": 0.4,
+        "bin_low": 0.3,
+        "mean_predicted": 0.324151,
+        "observed_rate": 0.375602,
+        "rows": 623
+      },
+      {
+        "bin_high": 0.5,
+        "bin_low": 0.4,
+        "mean_predicted": 0.416288,
+        "observed_rate": 0.401316,
+        "rows": 304
+      },
+      {
+        "bin_high": 0.6,
+        "bin_low": 0.5,
+        "mean_predicted": 0.511329,
+        "observed_rate": 0.433628,
+        "rows": 113
+      },
+      {
+        "bin_high": 0.7,
+        "bin_low": 0.6,
+        "mean_predicted": 0.605833,
+        "observed_rate": 0.529412,
+        "rows": 17
+      }
+    ]
+  },
+  "schema_version": 1,
+  "status": "development_only",
+  "transferred_slice_log_lift": 0.114166
+}

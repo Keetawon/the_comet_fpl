@@ -9,8 +9,11 @@ on:
       - "src/fpl/jobs/package_public_dashboard.py"
       - "src/fpl/publish/contract.py"
       - "src/fpl/publish/dashboard_json.py"
+      - "src/fpl/publish/dashboard_refresh.py"
       - "src/fpl/publish/export.py"
       - "src/fpl/publish/public_dashboard.py"
+      - "src/fpl/publish/sdp_stats.py"
+      - "src/fpl/publish/competitive_schedule.py"
       - "tests/test_public_dashboard.py"
       - "pyproject.toml"
       - "uv.lock"
@@ -212,6 +215,74 @@ jobs:
           set -euo pipefail
           uv run python -c \
             "from pathlib import Path; from fpl.publish.dashboard_json import validate_dashboard_json; manifest = validate_dashboard_json(Path('dashboard/public/data')); assert manifest['content_sha256'] == '${EXPECTED_MANIFEST_SHA256}', 'manifest pin mismatch'"
+
+      - name: Load optional immutable SDP statistics companion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          uv run python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+          import tempfile
+          from pathlib import Path
+          from fpl.publish.sdp_stats import validate_sdp_stats
+
+          pin = json.loads(Path('dashboard/public-data-release.json').read_text())
+          from fpl.publish.competitive_schedule import validate_competitive_schedule
+
+          for field, filename, validate in (
+              ('sdp_asset', 'sdp_stats.json', validate_sdp_stats),
+              ('competitive_schedule_asset', 'competitive_schedule.json', validate_competitive_schedule),
+          ):
+              companion = pin.get(field)
+              if companion is None:
+                  print(f'::notice::No {filename} pinned; its descriptive view shows unavailable.')
+                  continue
+              if (
+                  not isinstance(companion, dict)
+                  or set(companion) != {'name', 'sha256', 'size_bytes'}
+                  or companion['name'] != filename
+                  or not re.fullmatch(r'[0-9a-f]{64}', str(companion['sha256']))
+                  or type(companion['size_bytes']) is not int
+                  or not 0 < companion['size_bytes'] <= 100_000_000
+                  or pin['repository'] != os.environ['GITHUB_REPOSITORY']
+              ):
+                  raise SystemExit('Invalid immutable companion pin')
+              with tempfile.TemporaryDirectory() as folder:
+                  subprocess.run([
+                      'gh', 'release', 'download', pin['release_tag'],
+                      '--repo', pin['repository'], '--pattern', companion['name'], '--dir', folder,
+                  ], check=True)
+                  body = (Path(folder) / companion['name']).read_bytes()
+              if len(body) != companion['size_bytes'] or hashlib.sha256(body).hexdigest() != companion['sha256']:
+                  raise SystemExit('Companion content pin mismatch')
+              validate(json.loads(body))
+              destination = Path('dashboard/public/sdp') / filename
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              destination.write_bytes(body)
+          PY
+
+      - name: Bind public freshness to the pinned generation
+        run: |
+          uv run python - <<'PY'
+          import json
+          from pathlib import Path
+          from fpl.publish.dashboard_refresh import publication_status
+
+          sdp = Path('dashboard/public/sdp/sdp_stats.json')
+          if sdp.is_file():
+              status = publication_status(Path('dashboard/public/data'), json.loads(sdp.read_bytes()))
+              sdp.with_name('publication_status.json').write_text(
+                  json.dumps(status, indent=2, sort_keys=True, allow_nan=False) + '\n',
+                  encoding='utf-8',
+              )
+          else:
+              print('::notice::No SDP companion pinned; publication freshness is unavailable.')
+          PY
 
       - uses: actions/setup-node@v6
         with:

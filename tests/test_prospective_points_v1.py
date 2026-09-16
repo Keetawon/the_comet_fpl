@@ -1059,3 +1059,201 @@ def test_stage_a_league_average_flag_is_false_when_both_clubs_have_history() -> 
             assert record.stage_a_league_average_team is False
     finally:
         con.close()
+
+
+# Source-wiring repair tests use synthetic evidence, never historical scored outcomes.
+def _live_usage_row(
+    con,
+    *,
+    fixture=800,
+    code=1001,
+    minutes=0,
+    xg=0.0,
+    xa=0.0,
+    known_at=CAPTURED_AT,
+    kickoff=None,
+    capture="usage-a",
+    team=1,
+):
+    con.execute(
+        """INSERT INTO mart_fact_player_fixture_live
+        (season, gw, fixture, kickoff_time, code, position, team_id, opponent_team_id,
+         was_home, minutes, starts, expected_goals, expected_assists, goals_scored,
+         assists, influence, creativity, threat, known_at, capture_id)
+        VALUES ('2026-27', 1, ?, ?, ?, 'MID', ?, 2, true, ?, 0, ?, ?, 0, 0,
+                2.0, 3.0, 4.0, ?, ?)""",
+        [
+            fixture,
+            kickoff or AS_OF - timedelta(days=1),
+            code,
+            team,
+            minutes,
+            xg,
+            xa,
+            known_at,
+            capture,
+        ],
+    )
+
+
+def _usage_db():
+    return _basic_db(
+        players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 2)],
+        fixtures=[_fixture(501, 1, 2, event=2)],
+        history=[(1001, "MID", 1, 2, True), (1002, "FWD", 2, 1, False)],
+    )
+
+
+def test_current_history_reaches_all_trailing_consumers():
+    from fpl.jobs.prospective_points_v1 import appeared_assist_signals
+    from fpl.validate.prospective_player_history import load_player_history
+
+    con = _usage_db()
+    try:
+        prior = prior_season_appearance_rate(con, AS_OF, current_club={1001: 101})
+        for i in range(3):
+            _live_usage_row(
+                con,
+                fixture=800 + i,
+                minutes=0 if i < 2 else 12,
+                xg=None,
+                xa=0.0,
+                kickoff=AS_OF - timedelta(days=3 - i),
+            )
+        frame = load_player_history(con, AS_OF)
+        assert frame.filter(frame["code"] == 1001)["minutes"].tail(5).to_list() == [
+            60,
+            90,
+            0,
+            0,
+            12,
+        ]
+        dist, n = trailing5_minute_bins(
+            con,
+            AS_OF,
+            MinuteBins.from_config(load_phase2_evaluation()),
+            alpha=0,
+            current_club={1001: 101},
+            history=frame,
+        )[1001]
+        assert n == 5
+        assert dist == pytest.approx((0.4, 0.2, 0.2, 0.2))
+        assert prior_season_appearance_rate(con, AS_OF, current_club={1001: 101}) == prior
+        goals, _ = appeared_attack_signals(
+            con, AS_OF, kind="expected_goals", current_club={1001: 101}
+        )
+        assists, _ = appeared_assist_signals(
+            con, AS_OF, kind="expected_assists", current_club={1001: 101}
+        )
+        assert goals[1001][-1][1] is None
+        assert assists[1001][-1][1] == 0
+        assert len(goals[1001]) == 15  # DNP is excluded only from appeared attack history.
+        assert trailing_ict(con, AS_OF, current_club={1001: 101})[1001][0] == pytest.approx(
+            (sum(20 + g for g in range(1, 15)) + 6) / 17
+        )
+        _live_usage_row(con, code=9999, minutes=60)
+        assert last_team_code(con, AS_OF, current_club={9999: 101})[9999] == 101
+    finally:
+        con.close()
+
+
+def test_history_revisions_future_truncation_and_null_not_duplicates():
+    from fpl.validate.prospective_player_history import history_provenance, load_player_history
+
+    con = _usage_db()
+    try:
+        _live_usage_row(con, minutes=12)
+        before = load_player_history(con, AS_OF)
+        receipt = history_provenance(con, before, AS_OF)
+        _live_usage_row(
+            con, minutes=90, capture="future-revision", known_at=AS_OF + timedelta(seconds=1)
+        )
+        _live_usage_row(con, fixture=801, minutes=90, kickoff=AS_OF + timedelta(days=2))
+        _live_usage_row(con, fixture=802, minutes=90, kickoff=AS_OF)
+        assert load_player_history(con, AS_OF).write_json() == before.write_json()
+        assert history_provenance(con, load_player_history(con, AS_OF), AS_OF) == receipt
+        con.execute(
+            """INSERT INTO mart_fact_player_fixture
+        (season,gw,fixture,kickoff_time,code,position,team_id,opponent_team_id,was_home,minutes)
+        VALUES ('2026-27',1,800,?,1001,'MID',1,2,true,90)""",
+            [AS_OF - timedelta(days=1)],
+        )
+        assert load_player_history(con, AS_OF).write_json() == before.write_json()
+        _live_usage_row(con, capture="known-null", known_at=AS_OF, minutes=None)
+        frame = load_player_history(con, AS_OF)
+        assert frame.filter((frame["season"] == "2026-27") & (frame["fixture"] == 800)).is_empty()
+    finally:
+        con.close()
+
+
+def test_current_transfer_preserves_fixture_club_and_rejects_contradiction():
+    from fpl.validate.prospective_player_history import load_player_history
+
+    con = _usage_db()
+    try:
+        _live_usage_row(con, minutes=90, team=2)
+        assert last_team_code(con, AS_OF, current_club={1001: 101})[1001] == 102
+        con.execute(
+            "INSERT INTO mart_dim_team (season,team_id,team_code,team_name,short_name) "
+            "VALUES ('2026-27',2,999,'wrong','WRG')"
+        )
+        with pytest.raises(ValueError, match="contradictory"):
+            load_player_history(con, AS_OF)
+    finally:
+        con.close()
+
+
+def test_live_history_changes_forward_forecast_and_future_rows_do_not():
+    con = _usage_db()
+    try:
+
+        def predict():
+            return predict_prospective_points(
+                con,
+                as_of=AS_OF,
+                gw_from=2,
+                gw_to=2,
+                draws=100,
+                football_environment_primary="disabled",
+            )
+
+        old = predict()
+        for i in range(5):
+            _live_usage_row(con, fixture=800 + i, minutes=0, kickoff=AS_OF - timedelta(days=5 - i))
+        new = predict()
+        assert new.records != old.records
+        assert new.player_history_provenance["live_row_count"] == 5
+        _live_usage_row(
+            con, fixture=9000, minutes=90, xg=9, xa=9, kickoff=AS_OF + timedelta(days=3)
+        )
+        _live_usage_row(
+            con,
+            fixture=800,
+            minutes=90,
+            xg=9,
+            xa=9,
+            capture="too-late",
+            known_at=AS_OF + timedelta(seconds=1),
+        )
+        repeat = predict()
+        assert repeat.records == new.records
+        assert repeat.team_records == new.team_records == old.team_records
+        assert repeat.player_history_provenance == new.player_history_provenance
+    finally:
+        con.close()
+
+
+def test_shared_bps_projection_preserves_archive_and_skips_missing_labels():
+    from fpl.validate.points_harness_v3 import _residual_training_rows
+    from fpl.validate.prospective_player_history import load_player_history, residual_training_rows
+
+    con = _usage_db()
+    try:
+        frame = load_player_history(con, AS_OF)
+        assert residual_training_rows(frame) == _residual_training_rows(con, AS_OF)
+        _live_usage_row(con, minutes=12)
+        assert residual_training_rows(load_player_history(con, AS_OF)) == residual_training_rows(
+            frame
+        )
+    finally:
+        con.close()

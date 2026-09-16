@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table";
 import { DifficultyLegend } from "@/components/DifficultyLegend";
 import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
+import { CompetitiveFixtureCalendar } from "@/components/CompetitiveFixtureCalendar";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FixtureChip } from "@/components/FixtureTicker";
@@ -45,6 +46,7 @@ import { VintageSelect } from "@/components/VintageSelect";
 import {
   loadFixtureMatrix,
   loadNextGw,
+  loadSummary,
   loadTeamActuals,
   loadTeamProvisionalActuals,
 } from "@/data/load";
@@ -93,6 +95,7 @@ import {
   mergeTeamActualRecords,
   teamActualGameweekLabel,
   teamActualDetailsForGameweeks,
+  teamFormLabel,
   type TeamActualFixtureDetail,
 } from "@/lib/teamActuals";
 
@@ -330,6 +333,7 @@ function TeamGwCell({
 }
 
 export function FixtureMatrixPage() {
+  const [layout, setLayout] = useState<"gameweeks" | "calendar">("calendar");
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [runId, setRunId] = useState<string | null>(null);
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
@@ -348,8 +352,9 @@ export function FixtureMatrixPage() {
       loadNextGw(),
       loadTeamActuals(),
       loadTeamProvisionalActuals(),
+      loadSummary(),
     ])
-      .then(([fixtureData, nextGw, teamActuals, provisionalActuals]) => {
+      .then(([fixtureData, nextGw, teamActuals, provisionalActuals, summary]) => {
         if (cancelled) return;
         const seen = new Map<string, { run_id: string; season: string; gw_from: number; gw_to: number }>();
         for (const t of fixtureData.teams) {
@@ -371,7 +376,7 @@ export function FixtureMatrixPage() {
         const defaultRun = defaultVintageRunId(
           runs,
           nextGw.plans,
-          fixtureData.manifest?.runs.at(-1)?.run_id ?? null,
+          summary.latest_run?.run_id ?? null,
         );
         const first =
           fixtureData.teams.find((t) => t.run_id === defaultRun) ?? fixtureData.teams[0];
@@ -591,7 +596,7 @@ export function FixtureMatrixPage() {
           filtered,
           scheduleOnly,
           form: form ? form.windows[formWindow] : null,
-          formLabel: form ? `${form.season} · GW${form.as_at_gw}` : null,
+          formLabel: teamFormLabel(form, formWindow),
           horizonMetric: averageMeasured(sourceValues),
           actualDetails: teamActualDetailsForGameweeks(
             actualByTeamCode.get(team.team_code) ?? [],
@@ -654,11 +659,12 @@ export function FixtureMatrixPage() {
           return (
             <span
               className="text-xs tabular-nums"
-              title={`Form anchored ${row.original.formLabel} (last season at GW1)`}
+              title={`${row.original.formLabel}. FPL observed results; xG measured in ${f.observations?.team_xg_matches ?? "unknown"}/${f.matches_played} matches, xGC in ${f.observations?.team_xgc_matches ?? "unknown"}/${f.matches_played}. Current display context, not forecast input.`}
             >
               W{fmt(f.wins, 0)} D{fmt(f.draws, 0)} L{fmt(f.losses, 0)} · {fmt(f.goals_for, 0)}:
               {fmt(f.goals_against, 0)} · xG {fmt(f.team_xg_per_match, 2)}/m · xGC{" "}
               {fmt(f.team_xgc_per_match, 2)}/m
+              <span className="ml-2 text-muted-foreground">{row.original.formLabel}</span>
             </span>
           );
         },
@@ -851,6 +857,11 @@ export function FixtureMatrixPage() {
         </div>
       </div>
 
+      <ToggleGroup type="single" value={layout} onValueChange={(v) => { if (v) setLayout(v as typeof layout); }} variant="outline" aria-label="Fixture table view">
+        <ToggleGroupItem value="gameweeks">Gameweek matrix</ToggleGroupItem>
+        <ToggleGroupItem value="calendar">All competitions</ToggleGroupItem>
+      </ToggleGroup>
+      {layout === "calendar" ? <CompetitiveFixtureCalendar key={activeRunId} teams={runTeams} schedule={state.schedule} fromGw={runBounds.from} toGw={runBounds.from + 9} /> : <>
       <div className="rounded-lg border bg-card p-2">
         <DifficultyLegend
           colorSource={colorSource}
@@ -874,38 +885,6 @@ export function FixtureMatrixPage() {
         </p>
       </div>
 
-      <InsightSummaryPanel
-        items={insightFacts}
-        caveats={insightCaveats}
-        remote={{
-          page: "fixture_matrix",
-          provenance: publishedInsightProvenance(state.manifest, {
-            ...(state.runs.find((run) => run.run_id === activeRunId) ?? {
-              run_id: activeRunId,
-              season: activeRun?.season ?? "",
-            }),
-            as_of: activeRun?.as_of,
-          }),
-          scope: compactInsightScope({
-            gw_from: filters?.gwFrom,
-            gw_to: filters?.gwTo,
-            team_code: selectedTeamCodes.length === 1 ? selectedTeamCodes[0] : undefined,
-            view: filters?.view === "defense" ? "defence" : filters?.view,
-            venue: filters?.venue,
-            form_window: formWindowScope(formWindow),
-          }),
-          localScopeKey: JSON.stringify({
-            runId: activeRunId,
-            filters,
-            horizon,
-            formWindow,
-            colorSource,
-            sorting,
-            selectedTeamCodes,
-          }),
-          unavailableReason: multiTeamInsightUnavailableReason,
-        }}
-      />
 
       <FilterPanel>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -995,6 +974,12 @@ export function FixtureMatrixPage() {
           )}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
+          Form uses up to the selected number of ended matches in {runBounds.season},
+          including explicitly provisional results. It never fills a short current season
+          with older-season matches. Match counts and source coverage are shown per club.
+          This observed context updates independently of the frozen forecast.
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
           Expanded rows default to a shared rolling window of the latest five ended gameweeks.
           At a season boundary it continues into the immediately preceding season; the season
           options isolate either season. Double-gameweek legs stay separate, and clubs are never
@@ -1017,7 +1002,7 @@ export function FixtureMatrixPage() {
         )}
       </FilterPanel>
 
-      <DecisionTableFullscreen label="Fixture matrix table">
+      <DecisionTableFullscreen label="Fixture matrix table" captureContext={`${runTeams[0]?.season} · ${colorSource} · ${filters?.view} · GW${filters?.gwFrom}–${filters?.gwTo} · Forecast as of ${activeRun?.as_of ?? "unavailable"}. Schedule may be newer; later cards are display context.`}>
         {({ isFullscreen }) => (
       <div
         className={`${
@@ -1186,6 +1171,39 @@ export function FixtureMatrixPage() {
         and colour tier, but remain display context rather than later fixture-specific forecasts;
         hover a card for its exact source.
       </p>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "fixture_matrix",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...(state.runs.find((run) => run.run_id === activeRunId) ?? {
+              run_id: activeRunId,
+              season: activeRun?.season ?? "",
+            }),
+            as_of: activeRun?.as_of,
+          }),
+          scope: compactInsightScope({
+            gw_from: filters?.gwFrom,
+            gw_to: filters?.gwTo,
+            team_code: selectedTeamCodes.length === 1 ? selectedTeamCodes[0] : undefined,
+            view: filters?.view === "defense" ? "defence" : filters?.view,
+            venue: filters?.venue,
+            form_window: formWindowScope(formWindow),
+          }),
+          localScopeKey: JSON.stringify({
+            runId: activeRunId,
+            filters,
+            horizon,
+            formWindow,
+            colorSource,
+            sorting,
+            selectedTeamCodes,
+          }),
+          unavailableReason: multiTeamInsightUnavailableReason,
+        }}
+      />
+      </>}
     </div>
   );
 }

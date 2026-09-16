@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { loadFixtureMatrix, loadNextGw } from "@/data/load";
+import { loadFixtureMatrix, loadNextGw, loadSummary } from "@/data/load";
 import type { DashboardManifest, NextGwPlan, TeamRecord, WindowLabel } from "@/data/types";
 import { WINDOW_LABELS } from "@/data/types";
 import {
@@ -167,8 +167,8 @@ export function TeamAnalyticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadFixtureMatrix(), loadNextGw()])
-      .then(([fixtureData, nextGw]) => {
+    Promise.all([loadFixtureMatrix(), loadNextGw(), loadSummary()])
+      .then(([fixtureData, nextGw, summary]) => {
         if (cancelled) return;
         const runs = fixtureData.manifest?.runs?.length
           ? fixtureData.manifest.runs.map((run) => ({
@@ -182,7 +182,7 @@ export function TeamAnalyticsPage() {
         const defaultRun = defaultVintageRunId(
           runs,
           nextGw.plans,
-          fixtureData.manifest?.runs.at(-1)?.run_id ?? null,
+          summary.latest_run?.run_id ?? null,
         );
         const selected = runs.find((run) => run.run_id === defaultRun) ?? runs[0];
         setState({
@@ -600,12 +600,14 @@ export function TeamAnalyticsPage() {
             <p className="text-xs text-muted-foreground">
               Observed form is latest at static export, not frozen at the selected forecast
               vintage, and may post-date an older run. Each exact row shows its own form anchor.
+              FPL match-log form stays within that season; provisional match counts are marked
+              and may change. xG/xGC use only their measured matches.
             </p>
           )}
         </div>
       </FilterPanel>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.7fr)]">
+      <div className="max-w-4xl">
         <div className="space-y-2">
           <AnalyticsScatter
             title={chartTitle(view, pastMetric)}
@@ -673,31 +675,6 @@ export function TeamAnalyticsPage() {
           </div>
         </div>
 
-        <InsightSummaryPanel
-          items={insightFacts}
-          caveats={insightCaveats}
-          remote={{
-            page: "team_analytics",
-            provenance: publishedInsightProvenance(state.manifest, selectedRun),
-            scope: compactInsightScope({
-              gw_from: gwFrom,
-              gw_to: gwTo,
-              view,
-              venue,
-              form_window: formWindowScope(formWindow),
-              past_metric: teamPastMetricScope(view, pastMetric),
-            }),
-            localScopeKey: JSON.stringify({
-              runId: selectedRun.run_id,
-              gwFrom,
-              gwTo,
-              venue,
-              view,
-              formWindow,
-              pastMetric,
-            }),
-          }}
-        />
       </div>
 
       <section className="space-y-2" aria-labelledby="team-analytics-exact-values">
@@ -777,6 +754,38 @@ export function TeamAnalyticsPage() {
           schedule-only rows beyond this vintage never enter this page.
         </p>
       </div>
+      <InsightSummaryPanel
+        items={insightFacts}
+        caveats={insightCaveats}
+        remote={{
+          page: "team_analytics",
+          unavailableReason:
+            view === "past-future" && state.teams.some(
+              (team) => team.run_id === activeRunId &&
+                (team.form?.windows[formWindow].observations?.provisional_matches ?? 0) > 0,
+            )
+              ? "AI explanation is unavailable for provisional observed form; the displayed facts remain usable."
+              : undefined,
+          provenance: publishedInsightProvenance(state.manifest, selectedRun),
+          scope: compactInsightScope({
+            gw_from: gwFrom,
+            gw_to: gwTo,
+            view,
+            venue,
+            form_window: formWindowScope(formWindow),
+            past_metric: teamPastMetricScope(view, pastMetric),
+          }),
+          localScopeKey: JSON.stringify({
+            runId: selectedRun.run_id,
+            gwFrom,
+            gwTo,
+            venue,
+            view,
+            formWindow,
+            pastMetric,
+          }),
+        }}
+      />
     </div>
   );
 }

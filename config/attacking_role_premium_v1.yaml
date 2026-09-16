@@ -1,0 +1,147 @@
+contract_version: '1.0'
+study_id: attacking_role_premium_v1
+development_only: true
+expected_branch: claude/comet-fpl-v2-architecture-mqrj8f
+starting_sha: 4fd1c5fdf271aef329d196a22236f8f9310254d7
+evidence_class: ARCHIVED_AS_OF
+season: 2023-24
+frozen_inputs:
+  results/attacking_role_premium_feasibility_2026-09-08.json: 65b950bfb95c965f4c776964f4b18074fa60aa74e4b7224b355ef969e0e31ed7
+  config/attacking_role_premium_study.yaml: 5a3ca31aa9e655f897b1c2f2670efc950e94a2402aaf55ede60860a9df64a903
+  results/historical_player_attacking_source_audit_2026-09-08.json: 1d42aeb5481b0b224d68bb498e2350c7a9fc54c2b06656c3fdb96f915db29952
+  results/historical_player_attacking_backfill_manifest_2026-09-08.json: 56da2a8c52f96c2d7d4b68586d86d9eeee3fc4011ae17235ddcf940b58dcf03c
+  results/historical_player_attacking_backfill_independent_audit_2026-09-08.json: 146a7209c412e20fbebb63c3c8377097d95b1cd711baf5cf465cb78da4edb409
+  config/historical_player_attacking_backfill.yaml: 2403c87e9de6e284801b97b450f5841606177f03ee30593fbd3de642c444f72a
+  config/data_quality.yaml: 7a038c4c041bf80c899bb23f9df195705de01321b4c6eca63e0396ea67ceeba0
+  results/attacking_role_premium_v1_population_2026-09-08.json: 1cff23498587cbbaccabad008a490c81dc7c4678f679703809ae296054f13533
+  docs/attacking-role-premium-v1-preregistration-2026-09-08.md: cd715d021049b9d975c9ba9def7f12c4bb56d5c96470ab0b464b5cc4c0635ece
+inputs:
+  manifest: results/historical_player_attacking_backfill_manifest_2026-09-08.json
+  availability_audit: results/historical_player_attacking_backfill_independent_audit_2026-09-08.json
+  backfill_scope: config/historical_player_attacking_backfill.yaml
+  observations: D:/Personal/fpl-operations/verification/historical-player-attacking-20260908T070723Z/backfill-v1/observations.jsonl
+  observations_sha256: 0d699021537dc7e636f0dfb8e4484f98fc57263663806631c5c8e075b0c5cefc
+population:
+  target_gws: 36
+  target_rows: 24947
+  players: 763
+  positions:
+    DEF: 9106
+    MID: 12185
+    FWD: 3656
+  exclusions:
+    GW17_schedule_rows: 607
+    NO_CUTOFF_REGISTRY: 165
+    CUTOFF_CLUB_MISMATCH: 11
+  cutoffs: exact audited archived-snapshot cutoffs; official deadlines unavailable
+  primary_minute_slice_rows: 7403
+  target_identity_sha256: f2467d7fc5a66df79c6d2d8c33b7adcca0085143d2ba0c2884bfce07624743ec
+features:
+  allowed_observations:
+  - minutes
+  - starts
+  - xg
+  - xa
+  - historical_fpl_position
+  control: all eligible current-season paired-measured prior player minutes
+  candidate_recent_minutes: 360.0
+  prior_strength_minutes: 450.0
+  prior: pooled same-position eligible historical opportunity / minutes; includes
+    player
+  partial_boundary: prorate oldest aggregate xG/xA by used_minutes / observed_minutes;
+    no event timing inference
+  missing: known minutes consume window; only paired-measured exposure contributes
+    rate; unknown window minutes fail closed
+  peers: one candidate state per positive-exposure historical same-position player;
+    includes self, excludes future roster information
+  percentile: midrank empirical CDF (less + 0.5*equal)/N
+  premium_weights:
+    xg: 0.5
+    xa: 0.5
+  previous_season: false
+  fixture_environment: false
+  formation: false
+evaluation:
+  primary_minimum_target_minutes: 45
+  primary_target: xgi90 = 90*(target_xg + target_xa)/target_minutes
+  primary_metric: pooled player-fixture MAE
+  interpretation: conditional attacking-usage persistence; not unconditional EV
+  bootstrap_draws: 10000
+  bootstrap_seed: 20260908
+  bootstrap_interval:
+  - 0.025
+  - 0.975
+  bootstrap_unit: whole GW; paired arms; original player-row weighting
+  whole_gw_isolation: true
+gates:
+  minimum_xgi_mae_lift: 0.01
+  maximum_component_regression: 0.005
+  minimum_guardrail_position_rows: 100
+  maximum_absolute_bias_increase: 0.05
+  maximum_position_mae_regression: 0.05
+  def_nonnegative: true
+  support_requires_bootstrap_lower_above_zero: true
+  refuted: primary relative lift <= -0.01 AND bootstrap upper < 0; otherwise failed
+    support is INCONCLUSIVE
+  zero_control_mae: undefined relative lift; cannot pass supported/refuted direction
+    gate
+  support_requires_all_bootstrap_draws_defined: true
+diagnostics:
+  positive_shift:
+    candidate_control_ratio: 1.25
+    minimum_absolute_xgi90_delta: 0.05
+    minimum_recent_minutes: 180
+  persistence: target_xgi90 >= control_xgi90*1.25 AND target-control >=0.05 on primary
+    rate slice
+  high_premium_def_thresholds:
+  - 0.9
+  - 0.975
+  history_buckets:
+  - '0'
+  - 1-89
+  - 90-269
+  - 270-449
+  - 450-899
+  - 900+
+  season_thirds:
+  - - 1
+    - 13
+  - - 14
+    - 26
+  - - 27
+    - 38
+  top_decile: ceil(0.1*N) within target GW/position among conditional scored rows;
+    prediction desc, code thenfixture asc
+  case_selection: 'after formal result: all-target DEF premium descending first5;
+    closest to0.5 first5; lowestfirst5; deterministic GW/code/fixture ties; no outcome
+    selection'
+  named_cases: source names only after formal result; no fuzzy identity or newdata
+prohibitions:
+- network_source_requests
+- new_backfill
+- hyperparameter_search
+- production_mutation
+- post_result_retuning
+- same_target_gw_history
+- target_stats_as_features
+runtime:
+  python: 3.12.14
+  packages:
+    duckdb: 1.5.5
+    polars: 1.43.0
+    pydantic: 2.13.4
+    httpx: 0.28.1
+    PyYAML: 6.0.3
+implementation_files:
+- src/fpl/features/attacking_role_premium_v1.py
+- src/fpl/validate/attacking_role_premium_v1.py
+- src/fpl/validate/attacking_role_premium_v1_metrics.py
+- src/fpl/jobs/evaluate_attacking_role_premium_v1.py
+- src/fpl/features/pit.py
+- src/fpl/validate/metrics.py
+- src/fpl/jobs/backfill_historical_player_attacking.py
+- src/fpl/validate/historical_player_attacking.py
+- src/fpl/jobs/competitive_participation_pilot.py
+- src/fpl/validate/development_program_provenance.py
+- src/fpl/config.py
+- src/fpl/storage/db.py

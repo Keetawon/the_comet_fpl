@@ -200,6 +200,7 @@ export function PlanSquadTable({ plan }: { plan: NextGwPlan }) {
   return (
     <DecisionTableFullscreen
       label={`GW${firstWeek.gw} custom plan players table`}
+      captureContext={`${plan.season} · GW${plan.gw_from}–${plan.gw_to} · Forecast as of ${plan.as_of ?? "unavailable"} · Custom plan; displayed captain, bench and transfers. Display order only; no new solve.`}
       className="shadow-sm"
     >
       {({ isFullscreen }) => (

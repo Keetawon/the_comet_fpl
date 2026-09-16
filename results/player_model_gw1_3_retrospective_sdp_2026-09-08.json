@@ -1,0 +1,94 @@
+{
+  "audit_id": "player_model_gw1_3_20260908_v1",
+  "cause": "Audit metadata serializer changes integer object-key sort order after JSON roundtrip; byte-replay guard stopped before forecasts/outcomes.",
+  "components": null,
+  "current_vs_incumbent": null,
+  "diagnostic_verdict": "INVALID",
+  "evidence_class": "RETROSPECTIVE_FROZEN_DIAGNOSTIC",
+  "executed_selector_counts": null,
+  "expected_strict_selector_policy": null,
+  "forecast_batches_generated": 0,
+  "forensic_misses": null,
+  "formal_attempts": 1,
+  "input_evidence_policy": "retrospective SDP source-availability counterfactual; truthful timestamps retained",
+  "input_preflight": [
+    {
+      "as_of": "2026-08-21T17:30:00+00:00",
+      "bootstrap_capture_id": "file-858950223a33ab8404ce0fd30f3000c419d30b618dcf5d28f6ed68ceed9ce5f2",
+      "bootstrap_known_at": "2026-08-21T06:41:56+00:00",
+      "fixture_count": 10,
+      "gw": 1,
+      "history_capture_ids": [],
+      "history_rows": 0,
+      "promoted_team_codes": [
+        9,
+        40,
+        88
+      ],
+      "registry_players": 599
+    },
+    {
+      "as_of": "2026-08-28T17:30:00+00:00",
+      "bootstrap_capture_id": "file-321c1e26c9312efb39ee229e524d7d3a20386ecc59d93befe81e18e3d7a60098",
+      "bootstrap_known_at": "2026-08-27T17:19:42+00:00",
+      "fixture_count": 10,
+      "gw": 2,
+      "history_capture_ids": [
+        "file-9ae9ec83222c4a58f3dd6b274ee9ffe7d8ce7ad51bb4bf6e488a2ef7d80edf45"
+      ],
+      "history_rows": 610,
+      "promoted_team_codes": [
+        9,
+        40,
+        88
+      ],
+      "registry_players": 616
+    },
+    {
+      "as_of": "2026-09-04T17:30:00+00:00",
+      "bootstrap_capture_id": "77b836c9-84c6-4481-b709-8249dce1228d",
+      "bootstrap_known_at": "2026-09-04T11:05:54.219177+00:00",
+      "fixture_count": 10,
+      "gw": 3,
+      "history_capture_ids": [
+        "0a71ceff-f3fe-4b69-b797-b652c97aeda9"
+      ],
+      "history_rows": 1236,
+      "promoted_team_codes": [
+        9,
+        40,
+        88
+      ],
+      "registry_players": 652
+    }
+  ],
+  "invalid_run_receipt": {
+    "bytes": 39671,
+    "path": "D:\\Personal\\fpl-operations\\verification\\player-model-gw1-3-audit-20260908T095300Z\\formal-v1\\invalid-run.json",
+    "sha256": "a0690b4bf7a1627278b38cbe95cf1ed4bddf5b5aa8b7727d8036c8a9b86867ee"
+  },
+  "invalidation": "INVALIDATED_BY_IMPLEMENTATION_BUG",
+  "lane": "retrospective_sdp",
+  "model_freeze_sha": "17cfa2267ce4d7c89f96842220f40471b81152d2",
+  "model_or_harness_repaired": false,
+  "not_model_performance_evidence": true,
+  "official_outcome_reader_invoked": false,
+  "preregistration_sha": "0a7c7640288ae785003075fbcec1c63772f6e203",
+  "rerun": false,
+  "resume_permitted": false,
+  "runtime": {
+    "packages": {
+      "PyYAML": "6.0.3",
+      "duckdb": "1.5.5",
+      "polars": "1.43.0",
+      "pulp": "3.3.2",
+      "pydantic": "2.13.4"
+    },
+    "python": "3.12.14"
+  },
+  "schema_version": 1,
+  "scorecard": null,
+  "scored_player_fixtures": 0,
+  "source_database_sha256": "538560454f551a48eeaf015c318f7dea0fc6a34fccc56ee7f0e2b117ef7330d6",
+  "status": "UNAVAILABLE"
+}

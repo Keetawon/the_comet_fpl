@@ -1,11 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadNextGw, loadPlayerHorizons, loadPlayers } from "@/data/load";
+import { loadNextGw, loadPlayerHorizons, loadPlayers, loadSummary } from "@/data/load";
 import nextGwSample from "@/data/sampleNextGw.json";
 import horizonsSample from "@/data/samplePlayerHorizons.json";
 import playersSample from "@/data/samplePlayers.json";
-import type { NextGwPlan, PlayerHorizonsData, PlayerRecord } from "@/data/types";
+import summarySample from "@/data/sampleSummary.json";
+import type { NextGwPlan, PlayerHorizonsData, PlayerRecord, SummaryData } from "@/data/types";
 import { PLAYER_HORIZON_FIELDS } from "@/data/types";
 import { PlayerAnalyticsPage } from "./PlayerAnalyticsPage";
 
@@ -13,6 +14,7 @@ vi.mock("@/data/load", () => ({
   loadPlayers: vi.fn(),
   loadPlayerHorizons: vi.fn(),
   loadNextGw: vi.fn(),
+  loadSummary: vi.fn(),
 }));
 
 const plans = nextGwSample.plans as unknown as NextGwPlan[];
@@ -53,6 +55,7 @@ beforeEach(() => {
   });
   vi.mocked(loadPlayerHorizons).mockResolvedValue(horizons);
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
+  vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
 });
 
 describe("PlayerAnalyticsPage", () => {

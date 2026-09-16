@@ -1,0 +1,43 @@
+contract_id: player_role_source_structure_audit_v1
+development_only: true
+rules_frozen_at: '2026-09-08T04:49:16Z'
+starting_head: 8ac78b1c4afdcff57bb63b38decfd683332c4b04
+sample:
+  original_pilot_bundles: 13
+  operational_source: pre-deadline-20260908T032637.982207Z/forecast-source.duckdb
+  operational_selection: all distinct retained completed lineup/event matches in that immutable database
+  additional_network_requests: 0
+identity:
+  join: season-qualified exact FPL opta_code equals p{provider_player_id}
+  ambiguous_or_contradictory: null
+  names_as_join_keys: false
+structure:
+  membership: competitive_participation_formation_precedence_v2
+  formation_indices: zero_based_source_order
+  preserve_nested_lineup: true
+  absent_formation: retain validated membership fallback; structural indices remain null
+  malformed_present_formation: reject
+  annotation: validate line sizes against explicit formation string, with separate initial goalkeeper row
+  within_line_semantics: unvalidated unless independent source evidence establishes them
+  substitute_role_inherits_player_off_role: false
+  observed_role_family: not emitted without independently corroborated tactical semantics
+oop:
+  identity_required: true
+  minimum_evidence: independently corroborated material functional advancement or depth
+  broad_position_or_formation_line_alone: UNKNOWN
+  insufficient_evidence: UNKNOWN
+  tuned_score: false
+controls:
+  selection: first six unique exactly mapped starters ordered by season, match id, team id, provider player id
+  names_in_classifier: false
+pit:
+  source_known_at: provider publication time only if explicitly witnessed; otherwise null
+  capture_known_at: latest actual retained metadata, lineup and event receipt time
+  interpretation_known_at: actual initial execution of this interpretation
+  available_at: maximum of nonnull source, capture, interpretation and identity evidence times
+  historical_capture_is_historical_deadline_evidence: false
+  target_match_observation_as_same_match_predictor: forbidden
+prohibited:
+  - model fitting, tuning, backtesting, evaluation or promotion
+  - production scoring or optimizer integration
+  - edits to frozen role research or other historical evidence

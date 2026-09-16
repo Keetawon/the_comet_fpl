@@ -1,3 +1,4 @@
+import { defaultPlan } from "@/lib/nextGw";
 // Plan builder (the wizard, v2). A screen-per-step wizard per the design record
 // (docs/manager-team-suggestions.md): Start (import vs scratch) -> Set your rules (the imported
 // 15 first, then an optional market-wide avoid list; scratch mode keeps the full lock/exclude
@@ -856,7 +857,7 @@ export function PlanBuilderPage() {
       .then(([playersData, nextGw, audit]) => {
         if (cancelled) return;
         const defaultRun =
-          nextGw.plans.find((p) => resolvedPlanKind(p) === "platform_default")
+          defaultPlan(nextGw.plans)
             ?.forecast_run_id ??
           playersData.manifest?.runs.at(-1)?.run_id ??
           playersData.players[0]?.run_id ??

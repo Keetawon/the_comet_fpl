@@ -23,7 +23,7 @@ from pathlib import Path
 from fpl.config import available_rulesets, load_data_quality, load_sources
 from fpl.ingest.archive import download_archive, land_raw
 from fpl.storage.db import default_db_path, initialise, record_build_metadata
-from fpl.transform import crosswalk, facts, quality
+from fpl.transform import crosswalk, facts, football_v2, quality
 
 logger = logging.getLogger("fpl.build_db")
 
@@ -81,6 +81,23 @@ def build(
 
             logger.info("building mart layer")
             counts = facts.build_all(con)
+
+            # V2 football layer. Runs after the component marts because the `fpl_archive`
+            # provider is derived from them, and after the SDP staging (if any) because the
+            # `pl_sdp` provider joins through the measured fixture crosswalk. Both providers
+            # are optional: with no SDP captures the layer is archive-only and still complete.
+            logger.info("building V2 football layer")
+            football_counts = football_v2.build_all(con)
+            if football_counts.skipped_reason is not None:
+                logger.warning("V2 football layer skipped: %s", football_counts.skipped_reason)
+            else:
+                logger.info(
+                    "mart_fact_team_match_stats_v2=%d mart_fact_team_tactical_form_v2=%d "
+                    "providers=%s",
+                    football_counts.team_match_stats_rows,
+                    football_counts.tactical_form_rows,
+                    ",".join(football_counts.providers) or "none",
+                )
             logger.info(
                 "mart_fact_player_fixture=%d mart_fact_team_match=%d mart_target_player_fixture=%d "
                 "mart_fact_player_form=%d mart_fact_team_form=%d",
@@ -97,6 +114,13 @@ def build(
             record_build_metadata(con, "team_match_rows", str(counts.team_match_rows))
             record_build_metadata(con, "player_form_rows", str(counts.player_form_rows))
             record_build_metadata(con, "team_form_rows", str(counts.team_form_rows))
+            record_build_metadata(
+                con, "team_match_stats_v2_rows", str(football_counts.team_match_stats_rows)
+            )
+            record_build_metadata(
+                con, "team_tactical_form_v2_rows", str(football_counts.tactical_form_rows)
+            )
+            record_build_metadata(con, "football_v2_providers", ",".join(football_counts.providers))
             record_build_metadata(con, "anomaly_checks_triggered", str(len(anomalies)))
         finally:
             con.close()

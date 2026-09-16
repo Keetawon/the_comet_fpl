@@ -1,0 +1,39 @@
+{
+  "candidate_scored": false,
+  "coverage_passed": true,
+  "database_sha256": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "eligible_rows": 2313,
+  "minimum_joint_coverage": 0.95,
+  "model_fitted": false,
+  "seasons": {
+    "2023-24": {
+      "eligible_keeper_appearances": 776,
+      "folds": 38,
+      "joint_coverage": 0.9921052631578947,
+      "joint_shots_sot": 754,
+      "sot_explicit_zero": 0,
+      "sot_missing": 6,
+      "team_sides": 760
+    },
+    "2024-25": {
+      "eligible_keeper_appearances": 770,
+      "folds": 38,
+      "joint_coverage": 0.9736842105263158,
+      "joint_shots_sot": 740,
+      "sot_explicit_zero": 0,
+      "sot_missing": 20,
+      "team_sides": 760
+    },
+    "2025-26": {
+      "eligible_keeper_appearances": 767,
+      "folds": 38,
+      "joint_coverage": 0.9789473684210527,
+      "joint_shots_sot": 744,
+      "sot_explicit_zero": 0,
+      "sot_missing": 16,
+      "team_sides": 760
+    }
+  },
+  "target_identity_sha256": "d88d3f4a6ba9537a900df9989ca27c251c9e3ee0464067dd8604634adf89832f",
+  "upstream_sha256": "f4cc595384102112ba2c41f118396d4176a6f7000a6f3c1753b5edf1a1ae952f"
+}

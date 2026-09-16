@@ -36,6 +36,7 @@ import {
 } from "@/lib/nextGw";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 import { compactInsightScope, publishedInsightProvenance } from "@/lib/insights";
+import { isHostedStatic } from "@/lib/pageAccess";
 
 type PageState =
   | { status: "loading" }
@@ -239,9 +240,10 @@ export function SummaryPage() {
 
   const { summary } = state;
   const first = view.players[0];
-  const officialPlans = platformPlans(state.plans);
-  const customPlans = state.plans.filter((plan) => resolvedPlanKind(plan) === "user_custom");
-  const savedCustomId = savedCustomPlanId();
+  const hosted = isHostedStatic();
+  const officialPlans = hosted ? [] : platformPlans(state.plans);
+  const customPlans = hosted ? [] : state.plans.filter((plan) => resolvedPlanKind(plan) === "user_custom");
+  const savedCustomId = hosted ? null : savedCustomPlanId();
   const customPlan =
     customPlans.find((plan) => plan.optimizer_run_id === savedCustomId) ?? customPlans[0] ?? null;
   const visibleTopNext = view.topNext[0];
@@ -276,25 +278,6 @@ export function SummaryPage() {
         <VintageSelect options={vintageOptions(state.runs, state.plans)} value={runId ?? state.defaultRunId} onChange={setRunId} />
       </div>
 
-      <InsightSummaryPanel
-        items={localInsightItems}
-        caveats={[
-          "xP totals sum already-published values; probabilities are never combined in the browser.",
-          "Summary ranks describe one immutable forecast vintage.",
-        ]}
-        remote={{
-          page: "summary",
-          provenance: publishedInsightProvenance(state.manifest, {
-            ...view.run,
-            as_of: view.players[0]?.as_of,
-          }),
-          scope: compactInsightScope({ gw_from: view.gwFrom, gw_to: view.gwTo }),
-          localScopeKey: view.run.run_id,
-          unavailableReason: summaryMatchesVisible
-            ? undefined
-            : "AI explanation is unavailable because the visible vintage differs from summary.json.",
-        }}
-      />
 
       <div className="grid gap-3 lg:grid-cols-3">
         <Card title="Next gameweek">
@@ -386,7 +369,7 @@ export function SummaryPage() {
             </a>
           </Card>
         )}
-        {!officialPlans.length && (
+        {!hosted && !officialPlans.length && (
           <Card title="Platform optimizer squads">
             <p className="text-xs text-muted-foreground">
               none in this export — rebuild it with --optimizer-plan inputs
@@ -466,6 +449,25 @@ export function SummaryPage() {
         overlay valid for the next gameweek, never folded into xP; EV is never compared across
         architectures. Chips colour on opponent strength (green = weak opponent, red = strong).
       </p>
+      <InsightSummaryPanel
+        items={localInsightItems}
+        caveats={[
+          "xP totals sum already-published values; probabilities are never combined in the browser.",
+          "Summary ranks describe one immutable forecast vintage.",
+        ]}
+        remote={{
+          page: "summary",
+          provenance: publishedInsightProvenance(state.manifest, {
+            ...view.run,
+            as_of: view.players[0]?.as_of,
+          }),
+          scope: compactInsightScope({ gw_from: view.gwFrom, gw_to: view.gwTo }),
+          localScopeKey: view.run.run_id,
+          unavailableReason: summaryMatchesVisible
+            ? undefined
+            : "AI explanation is unavailable because the visible vintage differs from summary.json.",
+        }}
+      />
     </div>
   );
 }
@@ -493,7 +495,7 @@ function TeamWatchList({
                 <span className="font-medium">{team.team_name}</span>
                 {team.form && (
                   <Badge variant="outline" className="text-[9px]">
-                    form {team.form.season} GW{team.form.as_at_gw}
+                    {team.form.source === "published_team_actuals" ? "Observed" : "Archived"} form {team.form.season} GW{team.form.as_at_gw}
                   </Badge>
                 )}
               </span>
@@ -508,6 +510,11 @@ function TeamWatchList({
                     2,
                   )}/m · xGC ${fmt(form.team_xgc_per_match, 2)}/m`
                 : "no form data"}
+              {form?.observations && (
+                <> · {form.matches_played} matches
+                  {form.observations.provisional_matches > 0 && ` · ${form.observations.provisional_matches} provisional`}
+                </>
+              )}
             </p>
             <FixtureTicker
               fixtures={[...team.fixtures].sort(

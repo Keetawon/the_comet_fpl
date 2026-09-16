@@ -1,0 +1,38 @@
+{
+  "at_utc": "2026-09-07T08:46:22.572289+00:00",
+  "audit_end_head": "0113de369175351588b1d014be0d2996d6df92bb",
+  "audit_end_status": "M src/fpl/validate/competitive_workload_view.py",
+  "audit_start_head": "0113de369175351588b1d014be0d2996d6df92bb",
+  "audit_start_status": "M src/fpl/validate/competitive_workload_view.py",
+  "cache_git_head": "eea2381c8395af0b136782c515d0e34181cc462c",
+  "candidate_scoring": false,
+  "checks": 1132168,
+  "completed": true,
+  "counts": {
+    "2023-24": 29725,
+    "2024-25": 27283,
+    "2025-26": 29747,
+    "nonproxy_rows": 85934,
+    "price_lineage_uses": 2673,
+    "proxy_rows": 821,
+    "retained_price_source_legs": 2801,
+    "rows": 86755
+  },
+  "database_read_only": true,
+  "database_sha256_after": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "database_sha256_before": "0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8",
+  "errors": [],
+  "folds": 114,
+  "maximum_pmf_mass_error": 2.220446049250313e-16,
+  "model_fits": 0,
+  "network_requests": 0,
+  "passed": true,
+  "routes": {
+    "current_club_filtered_shrunk_equal_weight_trailing5": 84108,
+    "current_cold_price_prior_with_explicit_archive_proxy": 821,
+    "raw_v3_sparse_history": 1826
+  },
+  "selector_reproduction": "exact_float_equality_on_all_rows",
+  "source_manifest_sha256": "5b813d58b71bad97a5c81774aaf70c0bca5f4e0e3bcd518e6f26e0acfea19bac",
+  "v3_fit_reproduction": "not_rerun_cached_V3_distributions_used_as_frozen_inputs"
+}

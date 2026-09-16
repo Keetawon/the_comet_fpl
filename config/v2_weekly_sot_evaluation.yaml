@@ -1,0 +1,20 @@
+# Additive, development-only preregistration. No historical candidate is rerun.
+contract_version: '1.0'
+candidate: retrospective_goals_xg_sot_weekly_inner_selection_v1
+control: retrospective_goals_xg_weekly_inner_selection_v1
+evidence_class: retrospective_backfill_development
+base_contract: config/v2_real_sot_retrospective_evaluation.yaml
+base_contract_sha256: 73ebf92613b8efb39838079b42b576afea2f2d43c775758372293c4d64edaed0
+sot_contract: config/v2_corroborated_zero_sot_evaluation.yaml
+sot_contract_sha256: ef0bc8a6068931a13b0331451abaa728eba7936c314228bca76bd4622aeaf8d0
+control_reference: results/v2_weekly_inner_selection_development.json
+control_reference_sha256: 79f3a0815271a95cd0e39874aaa20fa89d3b1df0875a5e780c0317a961424d35
+signals: [goals, expected_goals, shots_on_target_corroborated]
+selection_schedule: weekly_refit
+expected_rows: 2280
+expected_folds: 114
+control_absolute_tolerance: 1.0e-12
+formal_outer_runs: 1
+retain_fixture_distributions: true
+require_clean_worktree: true
+promotion_permitted: false

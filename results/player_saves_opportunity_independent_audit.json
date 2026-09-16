@@ -1,0 +1,18 @@
+{
+  "completed": true,
+  "checks": 175108,
+  "failures": [],
+  "failure_count": 0,
+  "result_sha256": "79e61b51951e04795c8acb34a3e17db6e1fa417ed3717f7014b40d71ecf39ed2",
+  "audit_source_sha256": "9471bf3c8f5928a94c6c0b376e5dd734bea82eda991f1ae8938afd754818ec09",
+  "evaluated_head": "f0c52fe1e5546dd21e8f37b75bb8022c2d9c8bae",
+  "models_fitted": 0,
+  "candidate_reruns": 0,
+  "rows": 2313,
+  "folds": 114,
+  "independent_poisson_and_metrics": true,
+  "original_capture_and_whole_gw_certificates_verified": true,
+  "prior_audit_sha256": "fa0ac703f57aac9be53bc81209ee155545abc7c9ad192a392ee21256a3d24454",
+  "audit_only_correction": "Compare parsed aware cutoffs, not ISO T versus space serialization; initial audit and script preserved. No model/data change or refit.",
+  "checked_at_utc": "2026-09-07T10:46:16.446497+00:00"
+}

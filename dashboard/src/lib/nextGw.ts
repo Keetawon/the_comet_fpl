@@ -14,6 +14,9 @@ export interface ComponentModes {
 
 /** Anything plan-shaped that carries component modes (next-GW plans and audit plans). */
 export interface ModeCarrier {
+  as_of?: string | null;
+  gw_from?: number;
+  gw_to?: number;
   component_modes: ComponentModes | null;
   plan_kind?: PlanKind;
   display_label?: string;
@@ -69,10 +72,11 @@ export function planDisplayLabel(plan: ModeCarrier): string {
 
 /** The plan the page opens on: the default architecture if present, else the first. */
 export function defaultPlan<T extends ModeCarrier>(plans: T[]): T | null {
+  const newest = [...plans].sort((a, b) => (b.as_of ?? "").localeCompare(a.as_of ?? ""));
   return (
-    plans.find((p) => resolvedPlanKind(p) === "platform_default") ??
-    plans.find((p) => resolvedPlanKind(p) === "platform_diagnostic") ??
-    plans.find((p) => resolvedPlanKind(p) === "user_custom") ??
+    newest.find((p) => resolvedPlanKind(p) === "platform_default") ??
+    newest.find((p) => resolvedPlanKind(p) === "platform_diagnostic") ??
+    newest.find((p) => resolvedPlanKind(p) === "user_custom") ??
     null
   );
 }
@@ -81,8 +85,9 @@ export function defaultPlan<T extends ModeCarrier>(plans: T[]): T | null {
 export function platformComparisonPlans<T extends ModeCarrier>(
   plans: T[],
 ): { defaultPlan: T; diagnosticPlan: T } | null {
-  const platformDefault = plans.find((p) => resolvedPlanKind(p) === "platform_default");
-  const diagnostic = plans.find((p) => resolvedPlanKind(p) === "platform_diagnostic");
+  const platformDefault = defaultPlan(plans.filter((p) => resolvedPlanKind(p) === "platform_default"));
+  const diagnostic = plans.find((p) => resolvedPlanKind(p) === "platform_diagnostic" &&
+    p.as_of === platformDefault?.as_of && p.gw_from === platformDefault?.gw_from && p.gw_to === platformDefault?.gw_to);
   return platformDefault && diagnostic
     ? { defaultPlan: platformDefault, diagnosticPlan: diagnostic }
     : null;

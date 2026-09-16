@@ -1,0 +1,26 @@
+{
+  "audit_recorded_at_utc": "2026-09-07 10:42:44 UTC",
+  "synthetic_row_count": 9551,
+  "gradient_calls": 3,
+  "gradient_seconds": 0.036984333341630794,
+  "conservative_38_times_201_gradient_seconds": 282.486338063376,
+  "synthetic_features": [
+    0.1,
+    0.2,
+    0.3,
+    0.4
+  ],
+  "synthetic_control": [
+    0.4,
+    0.2,
+    0.2,
+    0.2
+  ],
+  "synthetic_labels": "row_index modulo 4",
+  "coefficients": "zero; no optimization",
+  "real_candidate_fitting": false,
+  "real_candidate_scoring": false,
+  "real_target_values_read": false,
+  "scope": "arithmetic only; excludes baseline/source validation and I/O; not a total wall-clock guarantee",
+  "static_verification": "Role lookup and provenance JSON occur once per prior row before iterations, not inside gradient iterations"
+}

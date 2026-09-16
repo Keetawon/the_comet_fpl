@@ -63,3 +63,59 @@ defensive_actions_dump:
     pulled_with: "soccerdata (FBref match logs: defense + misc) -- see recipe"
     # ISO date the operator pulled it; null until a dump is actually committed.
     pulled_on: null
+
+# --------------------------------------------------------------------------------------
+# Premier League SDP (V2 football data layer).
+#
+# The JSON backend behind premierleague.com. It is undocumented private infrastructure, not
+# a published API. Real match-list and match-stats responses were first observed on 2026-09-04;
+# fixture identity and metric meanings remain unverified until `fpl.jobs.audit_pl_sdp` stages and
+# reconciles the retained payloads.
+#
+# Consequences that are designed for rather than hoped away:
+#   * response envelopes may be a bare list or a paged container -- the client tries an
+#     ordered list of container keys and raises rather than guessing;
+#   * the configured seasons endpoint currently returns HTTP 400 because it is not enabled for
+#     API access. The mappings below were instead confirmed from real Premier League match-list
+#     responses and their August kickoff dates. An unmapped season still fails closed;
+#   * additive field changes are tolerated (the tall metric store keeps everything);
+#     incompatible ones fail visibly.
+#
+# Pacing is deliberately slower than the FPL client: this is someone else's website backend.
+pl_sdp:
+  base_url: "https://sdp-prem-prod.premier-league-prod.pulselive.com"
+  competition: 8
+  endpoints:
+    seasons: "/api/v2/competitions/{competition}/seasons"
+    matches: "/api/v2/matches"
+    match: "/api/v2/matches/{match_id}"
+    match_stats: "/api/v3/matches/{match_id}/stats"
+    match_lineups: "/api/v3/matches/{match_id}/lineups"
+    match_events: "/api/v1/matches/{match_id}/events"
+  # Season label -> provider season id. Confirmed on 2026-09-04 from real match-list records
+  # carrying competitionId `8`, competition `Premier League`, and matching August kickoffs.
+  # An unmapped label is refused rather than guessed.
+  season_ids:
+    "2021-22": 2021
+    "2022-23": 2022
+    "2023-24": 2023
+    "2024-25": 2024
+    "2025-26": 2025
+    "2026-27": 2026
+  # Candidate provider season ids used only by an explicit discovery probe for an unmapped era.
+  probe_season_id_minimum: 1
+  probe_season_id_maximum: 800
+  # ~1 request per 1.5s. Conservative on purpose.
+  min_request_interval_seconds: 1.5
+  timeout_seconds: 30.0
+  max_retries: 4
+  retry_backoff_base_seconds: 2.0
+  # Real pagination is cursor-based: `_limit` bounds a page and the response's opaque
+  # `pagination._next` token advances it. The legacy `page` / `pageSize` parameters were observed
+  # to be ignored. `maximum_pages` remains the fail-closed runaway bound.
+  page_size: 100
+  maximum_pages: 40
+  # A stats payload smaller than this is treated as an error, not as an empty match.
+  minimum_payload_bytes: 32
+  # Metric dictionary, relative to config/.
+  metric_dictionary: "pl_sdp_metrics.yaml"

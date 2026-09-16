@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Camera, LoaderCircle, Maximize2, Minimize2, Share2 } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
@@ -9,6 +9,8 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { captureTable } from "@/lib/tableCapture";
+import { openCapturePreview } from "@/lib/capturePreview";
 
 type FullscreenMode = "inline" | "native" | "fallback";
 
@@ -23,6 +25,7 @@ interface DecisionTableFullscreenProps {
     | ((state: DecisionTableFullscreenState) => ReactNode);
   className?: string;
   contentClassName?: string;
+  captureContext?: string;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -62,9 +65,13 @@ export function DecisionTableFullscreen({
   children,
   className,
   contentClassName,
+  captureContext,
 }: DecisionTableFullscreenProps) {
   const [mode, setMode] = useState<FullscreenMode>("inline");
   const rootRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const priorFocusRef = useRef<HTMLElement | null>(null);
   const modeRef = useRef(mode);
@@ -182,6 +189,24 @@ export function DecisionTableFullscreen({
     }
   };
 
+  const capture = async (preferShare: boolean) => {
+    if (!contentRef.current || capturing) return;
+    setCaptureError(null);
+    const info = { title: label, context: captureContext, capturedAt: new Date().toISOString() };
+    let preview: ReturnType<typeof openCapturePreview> | undefined;
+    try {
+      preview = openCapturePreview(info, preferShare);
+      setCapturing(true);
+      preview.ready(await captureTable(contentRef.current, info, preview.progress));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Capture failed. Please try again.";
+      setCaptureError(message);
+      preview?.fail(message);
+    } finally {
+      setCapturing(false);
+    }
+  };
+
   return (
     <div
       ref={rootRef}
@@ -198,7 +223,7 @@ export function DecisionTableFullscreen({
         className,
       )}
     >
-      <div className="flex shrink-0 items-center justify-end border-b bg-background/95 p-1.5">
+      <div className="flex shrink-0 items-center justify-end gap-1 border-b bg-background/95 p-1.5">
         <Button
           ref={triggerRef}
           type="button"
@@ -215,8 +240,21 @@ export function DecisionTableFullscreen({
             <Maximize2 className="size-4" aria-hidden="true" />
           )}
         </Button>
+        <Button type="button" variant="ghost" size="sm" className="h-10" disabled={capturing}
+          aria-label={`Capture ${label}`} title="Capture the full table width and height with www.thecometfpl.com watermark (current page)"
+          onClick={() => void capture(false)}>
+          {capturing ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Camera className="size-4" aria-hidden />}
+          <span className="hidden sm:inline">Capture</span>
+        </Button>
+        <Button type="button" variant="ghost" size="sm" className="h-10" disabled={capturing}
+          aria-label={`Share ${label}`} title="Preview and share the current table as an image"
+          onClick={() => void capture(true)}>
+          <Share2 className="size-4" aria-hidden /><span className="hidden sm:inline">Share</span>
+        </Button>
       </div>
+      {captureError && <p role="alert" className="px-3 py-2 text-sm text-destructive">{captureError}</p>}
       <div
+        ref={contentRef}
         className={cn(
           "min-h-0 min-w-0",
           isFullscreen && "flex flex-1 flex-col overflow-hidden",

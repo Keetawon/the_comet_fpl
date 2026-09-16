@@ -19,6 +19,25 @@ evidence-bound insight summaries. Its implementation and automated gates are com
 responsive in-browser visual verification remains pending where recorded in P2.5. No model default
 or frozen evaluation changed. P2.5 owns any later post-deadline work.
 
+## Owner-authorized data prerequisites (2026-09-06)
+
+Before the next new model experiment, complete and verify revision-stable strict football PIT
+and durable local daily capture. Keep latest-only reporting facts separate from retained
+stats/metadata versions; tactical PIT must select one eligible revision per fixture BEFORE
+rolling. Exact old-cutoff frames must survive revision capture/rebuild, with new cutoffs
+seeing the correction. Include late metadata changes, missing metadata, NULL and A→B→A.
+
+`jobs.daily_pl_sdp` supplies explicit operational paths, single-writer exclusion, consistent
+backups, missing-current-season and seven-day-revision passes, staging, and actual PIT/freshness
+checks. Raw-only mode remains available during migration. The local registration helper
+uses persistent Python/storage; schedules do not imply a default dashboard/optimizer switch.
+Runbook and measured regression: `docs/pl-sdp-revision-pit-and-local-daily.md`.
+
+New model development is owner-authorized after these prerequisites and does not require an
+earlier model to clear 1%. Preserve all old experiments/gates. Before a NEW outer evaluation,
+separately name/preregister its hypothesis, comparison, evidence regime and suitable gate,
+then establish clean committed provenance. No automatic promotion or historical rerun.
+
 ## Owner goals
 
 1. Produce an auditable, legal GW1 squad, starting XI, captain, vice-captain, and bench before the
@@ -1294,6 +1313,190 @@ Only after the ordered dashboard program above, unless an operational blocker re
 These were not GW1 blockers. The post-deadline implementation remains separate and changes no
 frozen forecast or evaluation.
 
+## P3: V2 — the football-first prediction engine
+
+Status: Milestones A-I implemented development-only, 2026-09-04. Milestone J deferred.
+Authoritative description: `docs/v2-architecture.md`. This section is delivery sequencing;
+`AGENTS.md` owns the correctness and model-history record.
+
+**P3 does not displace P0 or P2.5, and it changes no default.** V1 is untouched, no frozen
+evaluation was re-run or re-judged, and both V2 candidates failed their pre-registered gates and
+are left as committed.
+
+### Delivered
+
+| milestone | content | state |
+| --- | --- | --- |
+| A | SDP source, raw capture, measured fixture-identity audit | implemented |
+| B | typed staging, provider-tagged V2 team-match mart, coverage reporting | implemented |
+| C | strict V2 access + separately bounded retrospective SDP evaluation | implemented / SOT inconclusive |
+| D | `FixtureEnvironment` contract + multi-signal football engine | implemented |
+| E | GK Saves V2 | implemented, **evaluated, refuted** |
+| F | DC environment V2 | implemented, **evaluated**: gate missed, mechanism confirmed |
+| G | composer integration via `component_engine_v2` | implemented |
+| H | V2 prospective football forecast (`prospective_environment_v2`) | implemented |
+| I | optimizer compatibility | free — the composer input type is unchanged |
+| J | dashboard / analytics exposure of V2 team profiles | **not started** |
+
+### Measured outcome, and what it forbids
+
+* Harness validation: the incumbent scores **1.50030** under the V2 harness against Phase 1's
+  frozen **1.5003**, on 181 folds and 3,640 predictions in both.
+* Team environment: **+0.2867%** against a 1% gate, with 2021-22 regressing **-0.21%**. Failed.
+* GK Saves V2: pooled **+0.168%** log, but per season **+1.37%, +2.28%, -1.10%, -1.24%, -0.27%**.
+  Failed, and refuted in the well-informed regime.
+* DC V2: **-2.18%** log against a 1% gate, so it fails -- but its pre-registered mechanism
+  test passes, with the transferred-player slice at **+11.42%** log / **+12.46%** Brier and AUC
+  0.770 -> 0.923. The failure is a calibration defect with a measured cause: DC counts are
+  ~2x over-dispersed relative to a Poisson (variance/mean 1.88 / 2.12 / 1.61 by position), so
+  the Poisson threshold conversion under-predicts, worst for midfielders -- which is V2's worst
+  slice. See `docs/v2-dc-development.md`.
+* None may be retuned or re-run. `results/v2_team_environment_development.json` and
+  `results/v2_dc_development.json` are immutable.
+
+### Remaining work, in dependency order
+
+1. **Real SDP capture and provider validation completed, 2026-09-05.** The owner machine retained
+   1,921 match-stat payloads across six confirmed seasons, reconciled all 2,280 fixtures, and
+   populated the V2 marts. FPL `pulse_id == SDP matchId` was measured at 0/1,900; the exact
+   season/kickoff/team fallback resolved every fixture without ambiguity. See
+   `docs/pl-sdp-real-provider-validation-2026-09-05.md` and the four coverage-first reports.
+2. **Metric inventory and conservative semantics audit completed.** All 246 observed fields are
+   enumerated; 42 are mapped and 203 unmapped numeric fields remain losslessly available. Only
+   goals, xG, and SOT cleared the independent-reconciliation rule. Missing provider values remain
+   NULL and are never inferred as zero.
+3. **The retrospective SOT-only evaluation is complete and inconclusive.** Historical
+   payloads were first captured in September 2026, so strict `PointInTimeView` and the existing
+   `pl_sdp` mart loader remain fail-closed. The separate validation-only reader selects the earliest
+   successful complete payload per match, retains its real `known_at`/content identity, and enforces
+   event time at each fold. On the coverage-selected 2023-24 through 2025-26 population (2,280
+   team-sides / 114 folds), SOT improves log score just 0.0374% beyond the exact goals+xG control,
+   misses the 1% gate, and regresses slightly in two seasons; CRPS improves 0.0833% and PIT-80 is
+   unchanged. Do not preregister territory/box touches on this evidence. Accumulate strict-
+   prospective SOT instead. See `docs/v2-real-sot-development.md`.
+   Owner-authorized 2026-09-06 follow-up first audits the missing SOT semantics. That coverage-only
+   audit resolves all 42 scored-season omissions with corroborating evidence, never raw zero-fill
+   or team averages. Execute only the separately preregistered
+   `retrospective_corroborated_zero_sot_team_environment_v2` after implementation/tests are
+   committed cleanly. Its unchanged goals+xG control, grid and one-run protocol isolate the
+   interpreted zeros; see `docs/v2-corroborated-zero-sot-design.md`. The first result stays frozen,
+   and this session does not authorize DC, territory, promotion or prospective changes.
+   This successor is now complete and **INCONCLUSIVE**: +0.0612% log lift over the unchanged
+   goals+xG control on the same 2,280 rows / 114 folds, with a small 2024-25 regression.
+   CRPS improves 0.1298%; PIT-80 improves slightly; the 1% gate still fails. Preserve its new
+   result and all prior evidence. The next recommendation is a separately authorized
+   weekly-inner-selection comparison on goals+xG, not a territory expansion; see
+   `docs/v2-corroborated-zero-sot-development.md`. No second candidate was implemented.
+4. **An over-dispersed DC threshold model**, as a separately named candidate with its own
+   amendment. This is the best-evidenced next model experiment in the repository: the
+   allocation is already shown to rank well (AUC +13.5%) and the defect is isolated to the
+   count distribution. The dispersion parameter must be fitted inside each fold -- the measured
+   variance/mean figures in `AGENTS.md` come from the evaluation population and using them
+   directly would be leakage.
+5. **Milestone J** — expose the V2 team profiles (attack/defence quality, dominance, pressing,
+   low-block tendency, directness, width, duel profile) through the semantic export and dashboard.
+   Deferred deliberately: publishing a tactical profile derived from a provider whose field
+   semantics are unverified would put an unbacked claim in front of a user.
+
+### Explicitly out of scope until a gate is cleared
+
+Wiring V2 into `jobs/prospective_points_v1.py`, changing the prospective default, or presenting a
+V2 number as a recommendation. `jobs/prospective_environment_v2.py` exists precisely so the
+football forecast is available for analysis without any decision path consuming an ungated
+candidate.
+
+## Weekly inner-selection procedural amendment (2026-09-06)
+
+Owner authorization now permits one narrow goals+xG selection-schedule experiment before the
+deferred next-model directions above. Source inspection confirms a frozen six-GW inner holdout
+fit versus weekly outer refits. The separate validation-only selector retains staged search,
+signals, grids, priors, population and Poisson outputs; no SDP/SOT feature is licensed here.
+See `docs/v2-weekly-inner-selection-diagnostic.md` and
+`docs/v2-weekly-inner-selection-design.md`.
+
+Delivery order: finish offline implementation/tests and preregistration; commit cleanly; reproduce
+the unchanged control including all fixture PMFs and fold settings; reserve the one-run claim;
+score `retrospective_goals_xg_weekly_inner_selection_v1` once; retain failed or passed development
+evidence without tuning; document and push only to the V2 branch. The new 1% gate is against the
+exact goals+xG control, not trailing goals. Keep frozen results and prospective defaults unchanged.
+Normal snapshot-only main synchronization is authorized for this branch; no rebase or merge back
+to main. Existing Windows symlink/format failures must remain separately reported, not called green.
+
+This amendment is now **complete, INCONCLUSIVE, development-only**: one clean run at `507c3d2`,
+2,280 team-sides / 114 folds, +0.1870% log lift against the exactly reproduced goals+xG control,
+short of 1%; all three full seasons and CRPS improve. Early aggregate improves, but early
+2025-26 regresses. Retain full fixture PMFs, measured inner/outer guards and parameter diagnostics
+in `results/v2_weekly_inner_selection_development.json`; see the matching development doc.
+No retuning or promotion. The single next recommendation is a separately authorized SOT
+incremental experiment on the frozen weekly-inner control, not territory or automatic deployment.
+
+## Weekly-inner SOT incremental follow-up (2026-09-07)
+
+Owner-authorized after revision-PIT/local daily verification. Follow
+`docs/v2-weekly-sot-design.md`: retain archive goals+xG and the exact weekly-inner control,
+add only SOT with the frozen corroborated-zero interpretation. No territory or new model
+family. Use the original hash-pinned historical database read-only, not the daily writer DB.
+
+Delivery: commit infrastructure; finish additive implementation/tests/preregistration;
+commit cleanly; reproduce weekly control at 1e-12; reserve new-name one-run claim; evaluate
+once; retain result and read-only diagnostics. >=1% relative log lift and existing guards
+remain the predeclared development bar. A miss keeps existing defaults; a pass still needs
+prospective confirmation and separate authorization. Do not delete new-source evidence.
+Local commits only, no push, merge/main changes, prior-result rewrite or second experiment.
+
+Completed once at clean `fd514cf`: **INCONCLUSIVE**, +0.066134% log lift over exactly
+reproduced weekly goals+xG, missing 1% and regressing in 2024-25. Preserve the new result
+and `docs/v2-weekly-sot-development.md`. No promotion or territory expansion; keep existing
+defaults and the already-installed strict-prospective data/revision collection. No new
+candidate may be inferred from this result.
+
+## Structural Tactical Matchup V1 (owner-authorized 2026-09-07)
+
+One new architecture, not another signal ladder. Preserve the weekly-SOT result and incumbent
+defaults. `v2-tactical-state-design.md`, `v2-next-match-style-forecaster-design.md` and
+`v2-tactical-matchup-design.md` freeze continuous last-five recency-weighted state, explicit
+pooling, opponent/venue delta forecasts and a sequential-OOS Poisson offset correction.
+Coverage-only paired95% rule selects2023-24/2025-26,1520sides/76folds. Exact CURRENT prospective
+trailing-goals incumbent is primary; both goal log and reciprocal CS Brier require1% lift.
+No retrospective result is production evidence. No player role, DC or default changes.
+
+Delivery order: metric audit -> source/state/stacking tests -> clean preregistration commit ->
+incumbent reproduction -> durable one-run claim -> single outer experiment -> read-only
+diagnostics and honest verdict -> additive result/docs commit -> push same V2 branch.
+Do not rerun a disappointing or interrupted claimed candidate. Two fixed diagnostic-only
+arms are not a candidate search. Keep original databases and previous artifacts byte-frozen.
+Competitive cup/Europe workload exploration is separate data-only evidence; direct minutes
+and cross-provider player identity need a later validated ingestion contract.
+
+Retained attempt outcome: **INCONCLUSIVE / incomplete numerical execution**, not scored
+underperformance. Preregistration/evaluation `672a36d`; incumbent1520/76 exact reproduction
+passed, then Poisson backtracking failed at historical2024-25GW10 (123/189). No complete
+tactical result exists. Preserve the explicitly tagged failure artifact and local claim;
+do not restart, retune or infer promotion. The only recommended model direction is a
+separately authorized numerical-method amendment for the same tactical hypothesis, with
+failure-state diagnostics and regression tests BEFORE any newly preregistered execution.
+No such amendment/fix/re-execution is implemented here. Full evidence and environmental
+test failures: `docs/v2-tactical-matchup-development.md`, `docs/v2-tactical-matchup-verification.md`.
+
+## Tactical numerical amendment (authorized continuation, 2026-09-07)
+
+The owner's continuation now licenses ONE separately named numerical-only amendment of the
+same tactical hypothesis, not a restart of the consumed V1 attempt. Freeze inherited source/
+config/failure hashes and unchanged statistical pins; implement stable objective-difference
+arithmetic, final-gradient/undamped-step checks, rich fit context and complete-GW checkpoints.
+See `docs/v2-tactical-numerical-amendment.md`. Complete synthetic and integration tests, commit
+cleanly, reproduce incumbent, reserve the new claim, run ONCE, retain success or failure, then
+document and push additive V2 commits. No automatic retry, new features, gate/default changes
+or production promotion. The previous failure report remains immutable prior evidence.
+
+Completed once at clean `e76a54b`, **INCONCLUSIVE**: +0.274885% goal-NLL lift and
++0.483597% CS-Brier lift over the exact incumbent, both below 1%. 1,520 sides/76 folds,
+zero temporal violations, 636 converged fits, 58,268 independent checks pass. Retain full PMFs,
+189 historical checkpoints, original failure and all prior results; keep incumbent/defaults.
+No tactical expansion or rerun. `docs/v2-tactical-numeric-development.md` records performance,
+uncertainty, weak interaction value and the recommendation for ONE future shot-creation-to-goals
+model with pooled conversion, requiring its own authorization and preregistration.
+
 ## Required gate and handoff
 
 Run jobs sequentially. Before any implementation handoff:
@@ -1324,3 +1527,209 @@ Report changed files, tests and exact results, output schemas with one sample re
 constants for any non-trivial policy, unresolved assumptions, generated run IDs/hashes, and the
 chosen GW1 squad/lineup/captain when the final run is authorized. Commit and push only when the
 owner explicitly requests it.
+
+## Additive authorized football-process program — 2026-09-07
+
+The owner has now explicitly authorized sequential research commits/pushes on the V2 branch,
+without promotion, main merge-back or a PR. Earlier frozen delivery and research records stand.
+
+1. Preregister and score ONE chance-volume × chance-quality × pooled-conversion candidate against
+   exact prospective trailing goals. Coverage-only record `results/v2_chance_target_audit.json`
+   qualifies three full seasons /2280sides/114folds. See `docs/v2-chance-creation-design.md`.
+2. Independently validate the bounded competitive-participation pilot before workload/role use.
+3. Only with reliable identities/participation, develop observed/predicted role separation and
+   separately preregister minutes, player opportunity, cards, DC and GK successors.
+4. Compose development-only passed successors, otherwise exact incumbents, then preregister a
+   single full-player PMF comparison on a genuinely reproducible common population.
+
+Each formal phase freezes its own contract before scoring; no retuning, false green unavailable
+gates or automatic promotion. A hard identity/PIT/comparator/data blocker stops the affected
+dependent chain and is reported with retained evidence, not filled by guesses. No candidate has
+been evaluated as part of this new program at the time of its first preregistration.
+
+### Retained execution / hard stop — 2026-09-07
+
+Phase A completed ONCE, `retrospective_chance_creation_team_environment_v1`: **INCONCLUSIVE**,
+NLL lift+0.4583%,CS Brier+0.7591%, below both1% gates; early-season and2025-26CS weaknesses
+remain. Exact incumbent PMFs reproduce with difference0; independent117,195 checks/zero failures.
+Leave this result and every prior result frozen. Incumbent team behavior remains installed.
+
+Phase B collection completed13matches/39HTTP200requests; valid interpretation12/13 fails the
+fixed100% pilot gate because Palace–Millwall2603048 lists two Millwall starting keepers.
+Validated PL subset counts must not conceal that contradiction. No workload/role mart is licensed.
+Historical current-default minutes/full-points reproduction also lacks exact deadline registries
+for821price-sensitive cold rows; do not silently use archive prices or exclude the affected rows.
+These are hard prerequisite blockers, not model gate failures. C–J remain unrun; no production
+promotion, synthesis, schedule, main merge-back or PR. See
+`docs/football-program-blocked-2026-09-07.md` for the bounded completed work and evidence needed next.
+
+### Subsequent owner evidence amendment — 2026-09-07
+
+The owner now explicitly authorizes the separately named retrospective price-proxy comparator
+and additive independent lineup-source resolution. The preceding hard-stop record and both
+frozen results remain accurate as dated evidence. See
+`docs/football-program-evidence-amendment-2026-09-07.md` for the new boundary.
+
+Continue data capture/interpretation and workload coverage first; then separately preregister
+each dependent player experiment. Archive fixture prices are licensed only for missing
+price-sensitive cold-start inputs, with matched candidate/control inputs and proxy sensitivity
+slices. An unresolved competitive fixture makes affected workload windows unavailable, not zero,
+and does not invalidate independently complete windows. No new model has yet been scored under
+this amendment. Phase A remains INCONCLUSIVE and the incumbent remains unchanged.
+
+The independently source-resolved V2 participation pilot and shared minutes-proxy reference
+are now retained from clean `eea2381`:13fixtures/266mapped selected-club rows and
+114folds/86,755PMFs/821direct proxy rows respectively. Neither is a new candidate score.
+See `docs/competitive-participation-v2-development.md` and
+`docs/retrospective-minutes-proxy-reference.md`. Raw574-match acquisition is a separate ongoing
+data-only run; no full workload mart is yet claimed. Next: validate its coverage and store
+participation versions in an isolated operational copy, then preregister coarse role/player
+experiments. Unknown registration/rest must remain unknown. Keep the181-fold Stage B eligibility
+shortfall explicit; no metric gate is relaxed and no successor/default has been selected.
+
+Acquisition is now complete:574matches/1,148retained lineup-event endpoints,1,122newHTTP200
+responses. The [capture record](docs/competitive-workload-capture-development.md) pins exact
+source evidence and the new isolated staging boundary. The reference adapter additionally
+matches actual prospective component/composer arithmetic in synthetic tests, while historical
+rows retain explicit archive-roster/price proxies. The independent minutes-selector audit
+reproduces every86,755PMF with zero differences. Next: execute clean operational staging,
+audit broad-role/workload coverage, then finish each separate formal runner/preregistration.
+Card source semantics and a restrained disciplinary algorithm are designed but unscored.
+Both Stage B and Stage C goals/assists retain their181-fold eligibility requirement; the smaller
+historical program does not meet it and must not automatically accept those successors.
+
+Clean operational staging is complete and independently audited:574retained versions,
+21,036roster rows,1,161raw receipts;32,015checks with zero integrity failures. V2 role coverage
+is90% of all8,360FPL starters, so no role experiment runs yet. Next resolve only independently
+corroborated interpretation aliases in a new version, preserving this snapshot, unknown
+actors and duration outliers. See `docs/competitive-workload-staging-v2-development.md`.
+No new player candidate has been scored.
+
+Subsequently, clean V3 restaging recovers43valid matches, retains every old/raw version and
+raises PL role coverage to97.63%. Finalize the competitive finality filter and new coverage
+snapshot before the role preregistration; preserve the initial scaffold's incomplete source
+selection audit. See `docs/competitive-workload-staging-v3-development.md`.
+
+Phase F's single independent disciplinary run is retained **INCONCLUSIVE**: joint log+1.1415%
+vs informative position control, but both red-card guardrails fail. No retune, yellow-only
+selection or activation; synthesis retains incumbent disciplinary behavior. Independent
+5,214,137checks pass. See `docs/player-disciplinary-development.md`. Continue the other
+authorized phases with separate clean preregistrations, not this frozen card candidate.
+
+Broad-role V1 final coverage-only preregistration is now frozen in
+`docs/player-role-evaluation-v1-preregistration.md`:38whole-GW batches,29,747forecast rows,
+8,162measured starter labels,574completed competitive source bundles. Next run this candidate
+once from the clean registration commit, independently verify its retained probabilities and
+only then consume the event-time OOS role cache in separately registered player experiments.
+The newly tested one-GW workload memoization changes no observed-reader semantics.
+
+The single broad-role result is now independently retained:primary gate passes, while
+matched persistence beats the transition candidate. See `docs/player-role-development.md`;
+retain both findings and the preregistered transition OOS covariate without posthoc switching.
+Proceed with independently registered workload-minutes, player opportunity, DC and saves
+experiments; existing181-fold Stage B/C eligibility and all production defaults stay fixed.
+
+Next execute the separately preregistered predicted-environment Gamma-Poisson DC
+and OOS-shot-opportunity GK-saves candidates once from a clean commit, alongside a
+write-once unchanged current-component reference cache. Independently audit each
+retained result before downstream acceptance. Workload/minutes and role-conditioned
+opportunity runners remain separately unregistered until their complete contracts
+and tests are committed. Full-points coverage has already fixed the final synthesis
+cohort to 2025-26 only (29,747 rows/38 folds); absent older DC cannot become zero.
+See `docs/full-player-pmf-population-audit.md`. This is no permission to alter gates,
+switch role arms, rerun Phase A, or change any default.
+
+Pre-run integration gate:847 focused program/PIT/composer tests pass with zero
+failures or skips (69.33s); global Ruff passes, strict mypy passes184source files,
+and all16new Python files pass format. The full-format check still reports11
+pre-existing unrelated files (451formatted); the earlier broader-suite14Windows
+symlink-privilege failures remain environmental evidence, not a green full gate.
+An additional external-cache postflight corruption test raises its focused subset
+from31to32passing tests; the postflight rechecks every minutes-fold hash before
+publishing a completed current-component reference. Global Ruff/mypy still pass.
+
+GK-saves H is independently retained SUPPORTED for development synthesis only:
++2.22404%NLL and+4.20264%CRPS, with all three seasonal guards passing. This does not
+authorize any default/promotion change; see `docs/player-saves-opportunity-development.md`.
+The shared current-component reference is complete from the same clean `f0c52fe`:
+114folds/86,755rows/821direct proxies, no minutes refit or challenger fit or points draws.
+Workload minutes and the two independent opportunity contracts can now proceed once
+their final preregistrations/tests are cleanly committed. Full Stage B/C181-fold
+eligibility remains unmet even if a scoped numeric result improves.
+
+DC G is retained INCONCLUSIVE after7,358,810independent checks: overall NLL+3.56515%
+but transfer NLL-1.53959%; keep CURRENT, not the posthoc Poisson diagnostic. See
+`docs/v2-dc-predicted-environment-development.md`. Next run the separately registered
+workload-minutes and two opportunity identities once from this clean preregistration.
+Fixed coverage/runtime receipts and all source hashes precede scoring. Each must
+retain its114-versus181full-gate ineligibility and all821price-proxy rows. No source
+metric or current default is changed by these development-only evaluations.
+
+Final D/E preregistration gate:208focused tests pass, zero failures/skips(46.76s),
+including actual-type synthetic end-to-end runners and shared baseline components;
+global Ruff and strict mypy185source files pass, changed4Python files pass format.
+Unfinished synthesis drafts are preserved externally during these clean formal runs.
+Known pre-existing full-format and Windows symlink limitations are unchanged.
+
+### 2026-09-07: D/E once-only results retained
+
+The separate workload-minutes, goals-opportunity and assists-opportunity evaluations
+are complete from clean `9f9e32d` (the `cb11a64` preregistered code/config unchanged).
+All use the exact frozen CURRENT controls on 114 folds / 86,755 rows, keeping all
+821 direct archive-price proxy rows unchanged. Workload minutes is INCONCLUSIVE
+(+0.00353654% NLL, below 1%); goals is scoped INCONCLUSIVE (+4.23577% vs CURRENT,
+required best-baseline primary/season checks fail); assists is scoped SUPPORTED
+(+2.75623%, all numeric diagnostics pass). The D independent audits pass 12,349,170
+checks; each E audit passes 9,758,661 checks, all with zero final failures.
+
+Every D/E full gate remains INELIGIBLE: 114 rather than 181 required folds, with
+only 38 new-source folds. The older all-fallback seasons cannot hide that shortfall.
+Retain CURRENT minutes, goals and assists in synthesis/defaults; no post-result
+retuning, formal rerun, role-only attribution or promotion is authorized. Results
+and independent receipts are retained byte-for-byte; see
+`docs/player-workload-minutes-development.md` and `docs/player-opportunity-development.md`.
+Proceed only with separately preregistered synthesis over components whose own
+full development gates permit inclusion. Preserve all proxy and knowledge-time
+limits and every earlier dated registration/evaluation record.
+
+### 2026-09-07: final full-points synthesis preregistration
+
+`retrospective_player_points_synthesis_v1` now freezes the full-gate-passed-
+successor-else-incumbent rule: H saves only. See `docs/full-player-pmf-design.md`
+and `config/player_points_synthesis_evaluation.yaml`. The exact current-selector
+proxy reference will be reproduced at zero PMF tolerance over all380fixtures
+before the exclusive candidate claim. There are no upstream fits or parameter
+selection; fixed2000joint draws/seed202627 and loaded2026/27rules remain unchanged.
+The signed full-points labels and legacy support limitations remain explicit.
+Data-only preflight passes728,434checks and the corrected focused gate180tests;
+Ruff/mypy189sources pass. Retain known broader format/Windows limitations, the
+initial order-dependent test failure and its deterministic test-only correction.
+No formal full-points result exists at this preregistration commit.
+
+### 2026-09-07: full authorized development program retained
+
+The separately claimed H-only points synthesis completed ONCE from clean
+`e716ec1`; every incumbent fixture reproduced before the claim. NLL improves
+0.0570413% (1.088996402 -> 1.088375224), below the 1% bar; CRPS slightly regresses.
+Verdict **INCONCLUSIVE**. Independent 4,297,806 checks reconcile all 29,747 rows,
+38 GWs, 380 fixtures, source/claim hashes and saved GK projections without model
+fits or Monte Carlo replay. See `docs/full-player-pmf-development.md` and the
+complete phase-by-phase `docs/football-program-completion-2026-09-07.md`.
+
+The preregistered mechanical synthesis accepted only H saves. All other components
+remain incumbent, including D/E's unchanged full-gate ineligibility at 114/181
+folds. Retain original 821 price-proxy-dependent rows (270 in synthesis), known
+historical/participation gaps, legacy signed-score support limits and all frozen
+failed results. The final pipeline is NOT promoted and no next experiment is run.
+
+Corrected broad Python partition: 3,572 passed / four skipped / zero failures
+(417.82s), excluding `tests/test_bi_export.py` with its inherited Windows privilege
+failures. Focused gate: 180 passed. Ruff and strict mypy (189 files) pass; changed
+Python formatting passes, but eleven unrelated pre-existing formatting failures
+remain. Preserve the initial order-dependent test failure and test-only fix as
+evidence, not an undocumented full-green claim. No UI/default behavior changed.
+
+The single recommended next direction is prospective shadow validation of the
+accepted GK-saves opportunity chain and its points consequences, while preserving
+the incumbent. This is a recommendation only, not an activated schedule or a
+license to retune any completed candidate.

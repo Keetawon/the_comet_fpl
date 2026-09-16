@@ -6,13 +6,17 @@ optimizer, and local plan server are never deployed.
 
 ## What the hosted site can do
 
-- Summary, fixtures, players, platform Next-GW suggestion, separate player/team
-  prediction-versus-actual, and optimizer audit read one validated static JSON generation.
+- Summary, fixtures, players, SDP team statistics, and separate player/team
+  prediction-versus-actual read one validated static JSON generation.
 - Player/team deep analytics remain static: they filter, sum published expectations, and draw
   presentation geometry over that same generation.
-- Squad Draft remains browser-local. A friend's selections stay in that browser's local storage.
-- Plan Builder can review rules, but the hosted build does not probe or expose the Python/PuLP
-  service. Exact solves remain a trusted-machine workflow.
+- Hosted builds (`VITE_HOSTED_STATIC=true`) hide Next GW suggestion, Optimizer audit,
+  Plan Builder, and Squad Draft, including direct hash navigation. Summary hides optimizer
+  squad cards. The local build retains these tools; exact solves remain a trusted-machine workflow.
+  Every local-server client request also fails closed in hosted mode.
+- Buy Me a Coffee opens the owner-provided `https://buymeacoffee.com/thecomet` in a new tab
+  with `noopener noreferrer`. Payment handling stays on that external site; there is no embedded
+  payment widget or third-party script in the Dashboard.
 - Every route includes its implemented network-free deterministic insight summary. The seven public
   renderer-eligible routes are Summary, Fixture matrix, Players, Player analytics, Team analytics,
   Player prediction vs actual, and Team prediction vs actual. Next GW suggestion, Optimizer audit,
@@ -27,6 +31,11 @@ The public package therefore removes every `user_custom` plan, converts workstat
 provenance paths to their safe repository-relative form, rejects secret-like fields and absolute
 local paths, rebuilds all manifest hashes, and re-runs `validate_dashboard_json`. The canonical
 internal generation is read-only input and is never rewritten by packaging.
+
+Hiding a page is not access control for downloadable files. The unchanged public-generation
+contract still carries reviewed formal plan metadata for vintage identity. Never publish a local
+`dashboard/public/data` directory directly: use the existing sanitized release workflow.
+See [public-readiness security review](dashboard-public-readiness-security-2026-09-15.md).
 
 ## One-time setup
 
@@ -104,6 +113,18 @@ asset-dependent hosted build and deploy are skipped.
 
 ## Refresh and rollback
 
+- The local four-hour/sign-in `refresh_dashboard` task refreshes local data and the preview;
+  it does **not** upload a release, change this public pin, or deploy Pages. Public deployment
+  remains a reviewed release + pin on `main`. A domain is not required: the existing
+  `https://keetawon.github.io/the_comet_fpl/` URL remains usable.
+- Include the validated `sdp_stats.json` and `competitive_schedule.json` from the **same completed
+  generation** as separate assets on the same release. Pin them as `sdp_asset` and
+  `competitive_schedule_asset`, each with `name`, `sha256` and `size_bytes`. They do not belong in
+  the ZIP's exact root-file allowlist. Missing companions deliberately show unavailable views.
+- After downloading and verifying the companions, CI reuses `publication_status` to derive the
+  small freshness receipt from the pinned public manifest and SDP gameweek metadata. This binds
+  dates to the deployed generation, separates observation freshness from forecast as-of, and
+  requires no database, capture, inference, or optimizer execution.
 - Refresh: create a new sanitized release under a new tag, then commit a new exact pin. Do not use
   `latest`, an Actions artifact with an expiry, or a mutable URL.
 - Rollback: restore a previously reviewed release pin and commit it. CI re-verifies the old asset
@@ -111,8 +132,11 @@ asset-dependent hosted build and deploy are skipped.
 - If the pin is intentionally removed, restore all nullable fields and set `status` back to
   `unpublished`; the workflow will stop deploying.
 
-The current roughly 43 MiB static generation, including the roughly 40 MiB `players.json`, is
-within GitHub Pages' 1 GiB published-site limit and GitHub Releases' 2 GiB per-asset limit. Standard
+The September 16 review generation is about 189 MB uncompressed, including a roughly 123 MB
+`players.json`; the sanitized ZIP is 14,890,953 bytes. This is within GitHub Pages' 1 GiB
+published-site limit and GitHub Releases' 2 GiB per-asset limit, but a large player download
+still affects first-load performance. Moving the files to object storage alone would not fix that.
+Standard
 GitHub-hosted runners are free for public repositories. See the official
 [Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits),
 [Release limits](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases),

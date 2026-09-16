@@ -1,0 +1,17 @@
+schema_version: 1
+checkpoint_id: sdp_fixed_origin_gw4_8_20260908_v1
+season: 2026-27
+gameweeks: [4, 5, 6, 7, 8]
+vintage_policy: fixed_origin
+prediction_id: 0cca9d810d3f984f30f53d37a8ad3a494f20266d910e4acc1ec161bce582fafb
+primary_artifact_sha256: 566fe684a14ce2edc707286968d470891e7854e7e1ac44733fc0ab3d17d4914a
+shadow_artifact_sha256: d1e48736d869a697f79e9b383a0d627f7a3632e1b4b18321c933dc421385361e
+model_freeze_sha: 17cfa2267ce4d7c89f96842220f40471b81152d2
+forecast_emitter_sha: 2a96e91ee49604e152f77e47ff6e1bcf9d7037af
+selection_registered_at: '2026-09-08T13:23:50.1346117+00:00'
+scoring:
+  signed_target: total_points_as_recorded
+  proper_target: sum_individually_coarsened_fixture_targets
+  fixture_support_max: 34
+  log_floor: 1.0e-12
+qualitative_policy: no_numeric_promotion_gate_continue_frozen_prospective_monitoring

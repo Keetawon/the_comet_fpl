@@ -1,0 +1,61 @@
+# The Comet FPL - SDP primary daily capture (V2 branch, pinned commit).
+#
+# One locked, backed-up cycle of fpl.jobs.daily_pl_sdp: official FPL refresh, missing and
+# five-day-lookback SDP stats, workload capture, staging and strict PIT checks. No forecast,
+# no optimizer, no research evaluation runs here.
+
+[Unit]
+Description=The Comet FPL - SDP primary daily capture (pinned V2 commit)
+Documentation=file:/opt/comet-fpl/checkout/docs/sdp-primary-remote-runtime.md
+Wants=network-online.target
+After=network-online.target
+# Bounded retries: the initial start plus two restarts, 30 minutes apart, within four
+# hours. After that the unit stays failed until the next timer fire or manual reset.
+StartLimitIntervalSec=4h
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+User=comet-fpl
+Group=comet-fpl
+UMask=0027
+# Fail closed when the env file is missing; every variable in it must be set.
+EnvironmentFile=/etc/default/comet-fpl-sdp
+# Daily capture also invokes git for provenance as this unprivileged service user.
+# Keep the root-owned checkout trusted narrowly for this process and its children.
+Environment=GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=/opt/comet-fpl/checkout
+WorkingDirectory=/opt/comet-fpl/checkout
+ExecStartPre=/bin/sh /usr/local/sbin/comet-fpl-verify-pin /opt/comet-fpl/checkout
+ExecStart=/opt/comet-fpl/venv/bin/python -m fpl.jobs.daily_pl_sdp --db ${SDP_DB} --runs ${SDP_RUNS} --lookback-days 5 --workload
+# Bounded start time, matching the registered Windows task's two-hour execution limit.
+# For Type=oneshot the start phase is bounded by TimeoutStartSec, not RuntimeMaxSec.
+# KillSignal=SIGINT asks the interpreter to raise KeyboardInterrupt so the daily wrapper
+# can record a failed receipt and release its lock WHEN cleanup is possible; this is
+# best-effort, not a guarantee. After TimeoutStopSec the process is SIGKILLed, which
+# leaves the sidecar lock and any WAL for explicit manual recovery. Nothing is ever
+# deleted automatically.
+TimeoutStartSec=7200
+TimeoutStopSec=120
+KillSignal=SIGINT
+Restart=on-failure
+RestartSec=30min
+# Unprivileged, network-capable, filesystem-locked hardening. The only writable path is
+# the operational state directory; /tmp is private; the checkout and venv are read-only.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/comet-fpl
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=

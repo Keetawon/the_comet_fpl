@@ -1,0 +1,3005 @@
+{
+  "archive": {
+    "by_season_position": [
+      {
+        "appeared_rows": 3572,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "creativity": {
+            "field_present_rows": 8620,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 8620,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "expected_assists": {
+            "field_present_rows": 8620,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "expected_goals": {
+            "field_present_rows": 8620,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "minutes": {
+            "field_present_rows": 8620,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 8620,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "starts": {
+            "field_present_rows": 8620,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 8620
+          },
+          "threat": {
+            "field_present_rows": 8620,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 8620,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 247,
+        "position": "DEF",
+        "rows": 8620,
+        "season": "2021-22",
+        "total_measured_minutes": 284998
+      },
+      {
+        "appeared_rows": 1403,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "creativity": {
+            "field_present_rows": 3398,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3398,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "expected_assists": {
+            "field_present_rows": 3398,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "expected_goals": {
+            "field_present_rows": 3398,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "minutes": {
+            "field_present_rows": 3398,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3398,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "starts": {
+            "field_present_rows": 3398,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3398
+          },
+          "threat": {
+            "field_present_rows": 3398,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3398,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 98,
+        "position": "FWD",
+        "rows": 3398,
+        "season": "2021-22",
+        "total_measured_minutes": 87155
+      },
+      {
+        "appeared_rows": 4747,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "creativity": {
+            "field_present_rows": 10519,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 10519,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "expected_assists": {
+            "field_present_rows": 10519,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "expected_goals": {
+            "field_present_rows": 10519,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "minutes": {
+            "field_present_rows": 10519,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 10519,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "starts": {
+            "field_present_rows": 10519,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 10519
+          },
+          "threat": {
+            "field_present_rows": 10519,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 10519,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 309,
+        "position": "MID",
+        "rows": 10519,
+        "season": "2021-22",
+        "total_measured_minutes": 308916
+      },
+      {
+        "appeared_rows": 3776,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9183
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9183
+          },
+          "creativity": {
+            "field_present_rows": 9183,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9183,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9183
+          },
+          "expected_assists": {
+            "field_present_rows": 9183,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 6141,
+            "null_or_absent_rows": 3042
+          },
+          "expected_goals": {
+            "field_present_rows": 9183,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 6141,
+            "null_or_absent_rows": 3042
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9183
+          },
+          "minutes": {
+            "field_present_rows": 9183,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9183,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9183
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9183
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9183
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9183
+          },
+          "starts": {
+            "field_present_rows": 9183,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9183,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 9183,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9183,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 37,
+        "players": 262,
+        "position": "DEF",
+        "rows": 9183,
+        "season": "2022-23",
+        "total_measured_minutes": 277646
+      },
+      {
+        "appeared_rows": 1477,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3113
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3113
+          },
+          "creativity": {
+            "field_present_rows": 3113,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3113,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3113
+          },
+          "expected_assists": {
+            "field_present_rows": 3113,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 2188,
+            "null_or_absent_rows": 925
+          },
+          "expected_goals": {
+            "field_present_rows": 3113,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 2188,
+            "null_or_absent_rows": 925
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3113
+          },
+          "minutes": {
+            "field_present_rows": 3113,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3113,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3113
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3113
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3113
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3113
+          },
+          "starts": {
+            "field_present_rows": 3113,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3113,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 3113,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3113,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 37,
+        "players": 93,
+        "position": "FWD",
+        "rows": 3113,
+        "season": "2022-23",
+        "total_measured_minutes": 77647
+      },
+      {
+        "appeared_rows": 5322,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 11418
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 11418
+          },
+          "creativity": {
+            "field_present_rows": 11418,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 11418,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 11418
+          },
+          "expected_assists": {
+            "field_present_rows": 11418,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 7763,
+            "null_or_absent_rows": 3655
+          },
+          "expected_goals": {
+            "field_present_rows": 11418,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 7763,
+            "null_or_absent_rows": 3655
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 11418
+          },
+          "minutes": {
+            "field_present_rows": 11418,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 11418,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 11418
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 11418
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 11418
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 11418
+          },
+          "starts": {
+            "field_present_rows": 11418,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 11418,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 11418,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 11418,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 37,
+        "players": 338,
+        "position": "MID",
+        "rows": 11418,
+        "season": "2022-23",
+        "total_measured_minutes": 325426
+      },
+      {
+        "appeared_rows": 3843,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9611
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9611
+          },
+          "creativity": {
+            "field_present_rows": 9611,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9611,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9611
+          },
+          "expected_assists": {
+            "field_present_rows": 9611,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9611,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 9611,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9611,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9611
+          },
+          "minutes": {
+            "field_present_rows": 9611,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9611,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9611
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9611
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9611
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9611
+          },
+          "starts": {
+            "field_present_rows": 9611,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9611,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 9611,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9611,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 278,
+        "position": "DEF",
+        "rows": 9611,
+        "season": "2023-24",
+        "total_measured_minutes": 282218
+      },
+      {
+        "appeared_rows": 1445,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3854
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3854
+          },
+          "creativity": {
+            "field_present_rows": 3854,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3854,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3854
+          },
+          "expected_assists": {
+            "field_present_rows": 3854,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3854,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 3854,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3854,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3854
+          },
+          "minutes": {
+            "field_present_rows": 3854,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3854,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3854
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3854
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3854
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3854
+          },
+          "starts": {
+            "field_present_rows": 3854,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3854,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 3854,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3854,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 113,
+        "position": "FWD",
+        "rows": 3854,
+        "season": "2023-24",
+        "total_measured_minutes": 79071
+      },
+      {
+        "appeared_rows": 5320,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12847
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12847
+          },
+          "creativity": {
+            "field_present_rows": 12847,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12847,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12847
+          },
+          "expected_assists": {
+            "field_present_rows": 12847,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12847,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 12847,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12847,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12847
+          },
+          "minutes": {
+            "field_present_rows": 12847,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12847,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12847
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12847
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12847
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12847
+          },
+          "starts": {
+            "field_present_rows": 12847,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12847,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 12847,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12847,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 374,
+        "position": "MID",
+        "rows": 12847,
+        "season": "2023-24",
+        "total_measured_minutes": 318949
+      },
+      {
+        "appeared_rows": 3787,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9146
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9146
+          },
+          "creativity": {
+            "field_present_rows": 9146,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9146,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9146
+          },
+          "expected_assists": {
+            "field_present_rows": 9146,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9146,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 9146,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9146,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9146
+          },
+          "minutes": {
+            "field_present_rows": 9146,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9146,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9146
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9146
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9146
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9146
+          },
+          "starts": {
+            "field_present_rows": 9146,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9146,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 9146,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9146,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 268,
+        "position": "DEF",
+        "rows": 9146,
+        "season": "2024-25",
+        "total_measured_minutes": 275820
+      },
+      {
+        "appeared_rows": 1271,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3018
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3018
+          },
+          "creativity": {
+            "field_present_rows": 3018,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3018,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3018
+          },
+          "expected_assists": {
+            "field_present_rows": 3018,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3018,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 3018,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3018,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3018
+          },
+          "minutes": {
+            "field_present_rows": 3018,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3018,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3018
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3018
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3018
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3018
+          },
+          "starts": {
+            "field_present_rows": 3018,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3018,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 3018,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3018,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 87,
+        "position": "FWD",
+        "rows": 3018,
+        "season": "2024-25",
+        "total_measured_minutes": 69456
+      },
+      {
+        "appeared_rows": 5738,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12250
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12250
+          },
+          "creativity": {
+            "field_present_rows": 12250,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12250,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12250
+          },
+          "expected_assists": {
+            "field_present_rows": 12250,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12250,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 12250,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12250,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12250
+          },
+          "minutes": {
+            "field_present_rows": 12250,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12250,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12250
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12250
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12250
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 12250
+          },
+          "starts": {
+            "field_present_rows": 12250,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12250,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 12250,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 12250,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 347,
+        "position": "MID",
+        "rows": 12250,
+        "season": "2024-25",
+        "total_measured_minutes": 334791
+      },
+      {
+        "appeared_rows": 3950,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9733
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9733
+          },
+          "creativity": {
+            "field_present_rows": 9733,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9733,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9733
+          },
+          "expected_assists": {
+            "field_present_rows": 9733,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9733,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 9733,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9733,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9733
+          },
+          "minutes": {
+            "field_present_rows": 9733,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9733,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9733
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9733
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9733
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 9733
+          },
+          "starts": {
+            "field_present_rows": 9733,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9733,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 9733,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 9733,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 270,
+        "position": "DEF",
+        "rows": 9733,
+        "season": "2025-26",
+        "total_measured_minutes": 285121
+      },
+      {
+        "appeared_rows": 1428,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3278
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3278
+          },
+          "creativity": {
+            "field_present_rows": 3278,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3278,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3278
+          },
+          "expected_assists": {
+            "field_present_rows": 3278,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3278,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 3278,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3278,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3278
+          },
+          "minutes": {
+            "field_present_rows": 3278,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3278,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3278
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3278
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3278
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 3278
+          },
+          "starts": {
+            "field_present_rows": 3278,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3278,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 3278,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 3278,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 95,
+        "position": "FWD",
+        "rows": 3278,
+        "season": "2025-26",
+        "total_measured_minutes": 75713
+      },
+      {
+        "appeared_rows": 5347,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 13309
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 13309
+          },
+          "creativity": {
+            "field_present_rows": 13309,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 13309,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 13309
+          },
+          "expected_assists": {
+            "field_present_rows": 13309,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 13309,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 13309,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 13309,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 13309
+          },
+          "minutes": {
+            "field_present_rows": 13309,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 13309,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 13309
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 13309
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 13309
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 13309
+          },
+          "starts": {
+            "field_present_rows": 13309,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 13309,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 13309,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 13309,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 380,
+        "gameweeks": 38,
+        "players": 379,
+        "position": "MID",
+        "rows": 13309,
+        "season": "2025-26",
+        "total_measured_minutes": 319323
+      }
+    ],
+    "conservative_current_raw_known_at": "2026-08-19T09:00:51.396626+00:00",
+    "historical_deadline_known_evidence": false,
+    "ingest_receipts": [
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2021-22",
+        "source_table": "raw_fixtures"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2021-22",
+        "source_table": "raw_merged_gw"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2021-22",
+        "source_table": "raw_players"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2021-22",
+        "source_table": "raw_teams"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2022-23",
+        "source_table": "raw_fixtures"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2022-23",
+        "source_table": "raw_merged_gw"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2022-23",
+        "source_table": "raw_players"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2022-23",
+        "source_table": "raw_teams"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2023-24",
+        "source_table": "raw_fixtures"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2023-24",
+        "source_table": "raw_merged_gw"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2023-24",
+        "source_table": "raw_players"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2023-24",
+        "source_table": "raw_teams"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2024-25",
+        "source_table": "raw_fixtures"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2024-25",
+        "source_table": "raw_merged_gw"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2024-25",
+        "source_table": "raw_players"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2024-25",
+        "source_table": "raw_teams"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2025-26",
+        "source_table": "raw_fixtures"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2025-26",
+        "source_table": "raw_merged_gw"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2025-26",
+        "source_table": "raw_players"
+      },
+      {
+        "distinct_source_hashes": 1,
+        "first_ingested_at_us": 1785080690846978,
+        "last_ingested_at_us": 1787130051396626,
+        "season": "2025-26",
+        "source_table": "raw_teams"
+      }
+    ],
+    "overall": {
+      "appeared_rows": 52426,
+      "fields": {
+        "box_touches": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 123297
+        },
+        "chances_created": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 123297
+        },
+        "creativity": {
+          "field_present_rows": 123297,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 123297,
+          "null_or_absent_rows": 0
+        },
+        "crosses": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 123297
+        },
+        "expected_assists": {
+          "field_present_rows": 123297,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 93138,
+          "null_or_absent_rows": 30159
+        },
+        "expected_goals": {
+          "field_present_rows": 123297,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 93138,
+          "null_or_absent_rows": 30159
+        },
+        "key_passes": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 123297
+        },
+        "minutes": {
+          "field_present_rows": 123297,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 123297,
+          "null_or_absent_rows": 0
+        },
+        "non_penalty_expected_goals": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 123297
+        },
+        "penalty_area_entries": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 123297
+        },
+        "shots": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 123297
+        },
+        "shots_on_target": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 123297
+        },
+        "starts": {
+          "field_present_rows": 123297,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 100760,
+          "null_or_absent_rows": 22537
+        },
+        "threat": {
+          "field_present_rows": 123297,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 123297,
+          "null_or_absent_rows": 0
+        }
+      },
+      "fixtures": 1900,
+      "gameweeks": 189,
+      "players": 1577,
+      "rows": 123297,
+      "total_measured_minutes": 3402250
+    }
+  },
+  "contract_version": "1.0",
+  "development_only": true,
+  "feasibility": {
+    "attacking_role_premium": null,
+    "batches_with_prior_current_season_history": 2,
+    "completed_strict_deadline_batches": 3,
+    "formation_incremental_value": null,
+    "historical_archive_has_real_capture_but_not_earlier_deadline_knowledge": true,
+    "named_case_classification": null,
+    "numerical_promotion_threshold": null,
+    "optional_context_absence_alone_is_failure": false,
+    "predictive_metrics": null,
+    "regime_shift_count": null,
+    "review_limitation": "Only three completed deadline batches and two current-season updates; longitudinal usage-change validity is unassessed.",
+    "review_not_a_numeric_promotion_gate": true,
+    "shrinkage_strength": null,
+    "status": "INSUFFICIENT_DATA_FOR_ATTACKING_ROLE_PREMIUM_STUDY",
+    "verdict": "D. INSUFFICIENT DATA"
+  },
+  "formal_evaluation": false,
+  "formation_support": {
+    "eligible_in_completed_live_batches": 0,
+    "interpretation_known_at": "2026-09-08T05:08:40.015047+00:00",
+    "optional_not_a_prerequisite": true,
+    "retained_sample_matches": 23
+  },
+  "git_head": "45da5448e7895e24ea6bfd29ec013e20b3008ca9",
+  "inventory_as_of": "2026-09-08T06:34:33+00:00",
+  "live": {
+    "by_season_position": [
+      {
+        "appeared_rows": 330,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 623
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 623
+          },
+          "creativity": {
+            "field_present_rows": 623,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 623,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 623
+          },
+          "expected_assists": {
+            "field_present_rows": 623,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 623,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 623,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 623,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 623
+          },
+          "minutes": {
+            "field_present_rows": 623,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 623,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 623
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 623
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 623
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 623
+          },
+          "starts": {
+            "field_present_rows": 623,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 623,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 623,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 623,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 30,
+        "gameweeks": 3,
+        "players": 214,
+        "position": "DEF",
+        "rows": 623,
+        "season": "2026-27",
+        "total_measured_minutes": 23311
+      },
+      {
+        "appeared_rows": 105,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 224
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 224
+          },
+          "creativity": {
+            "field_present_rows": 224,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 224,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 224
+          },
+          "expected_assists": {
+            "field_present_rows": 224,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 224,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 224,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 224,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 224
+          },
+          "minutes": {
+            "field_present_rows": 224,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 224,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 224
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 224
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 224
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 224
+          },
+          "starts": {
+            "field_present_rows": 224,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 224,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 224,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 224,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 30,
+        "gameweeks": 3,
+        "players": 78,
+        "position": "FWD",
+        "rows": 224,
+        "season": "2026-27",
+        "total_measured_minutes": 5572
+      },
+      {
+        "appeared_rows": 434,
+        "fields": {
+          "box_touches": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 835
+          },
+          "chances_created": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 835
+          },
+          "creativity": {
+            "field_present_rows": 835,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 835,
+            "null_or_absent_rows": 0
+          },
+          "crosses": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 835
+          },
+          "expected_assists": {
+            "field_present_rows": 835,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 835,
+            "null_or_absent_rows": 0
+          },
+          "expected_goals": {
+            "field_present_rows": 835,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 835,
+            "null_or_absent_rows": 0
+          },
+          "key_passes": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 835
+          },
+          "minutes": {
+            "field_present_rows": 835,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 835,
+            "null_or_absent_rows": 0
+          },
+          "non_penalty_expected_goals": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 835
+          },
+          "penalty_area_entries": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 835
+          },
+          "shots": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 835
+          },
+          "shots_on_target": {
+            "field_present_rows": 0,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 0,
+            "null_or_absent_rows": 835
+          },
+          "starts": {
+            "field_present_rows": 835,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 835,
+            "null_or_absent_rows": 0
+          },
+          "threat": {
+            "field_present_rows": 835,
+            "invalid_numeric_rows": 0,
+            "measured_valid_rows": 835,
+            "null_or_absent_rows": 0
+          }
+        },
+        "fixtures": 30,
+        "gameweeks": 3,
+        "players": 291,
+        "position": "MID",
+        "rows": 835,
+        "season": "2026-27",
+        "total_measured_minutes": 24840
+      }
+    ],
+    "completed_gameweek_batches": [
+      {
+        "cold_no_positive_measured_history": 104,
+        "cold_no_retained_history": 88,
+        "cutoff_registry_identity_mismatch": 1,
+        "deadline_snapshot_capture_id": "file-858950223a33ab8404ce0fd30f3000c419d30b618dcf5d28f6ed68ceed9ce5f2",
+        "deadline_snapshot_known_at": "2026-08-21T06:41:56+00:00",
+        "gw": 1,
+        "history_support_by_position": {
+          "DEF": {
+            "cold_no_positive_measured_history": 47,
+            "cold_no_retained_history": 36,
+            "current_season_measured_minutes_ge_180": 0,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 0,
+            "current_season_prior_appearance_present": 0,
+            "current_season_prior_rows_present": 0,
+            "eligible_target_rows": 197,
+            "last_measured_club_differs_from_cutoff_club": 14,
+            "last_measured_position_differs_from_cutoff_position": 3,
+            "last_retained_club_differs_from_cutoff_club": 16,
+            "prior_measured_minutes_ge_180": 133,
+            "prior_measured_minutes_ge_360": 129,
+            "prior_measured_minutes_ge_720": 120,
+            "prior_measured_minutes_ge_90": 143,
+            "prior_measured_starts": 6921,
+            "prior_paired_measured_minutes": 617370,
+            "prior_paired_measured_rows": 8239
+          },
+          "FWD": {
+            "cold_no_positive_measured_history": 14,
+            "cold_no_retained_history": 14,
+            "current_season_measured_minutes_ge_180": 0,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 0,
+            "current_season_prior_appearance_present": 0,
+            "current_season_prior_rows_present": 0,
+            "eligible_target_rows": 72,
+            "last_measured_club_differs_from_cutoff_club": 7,
+            "last_measured_position_differs_from_cutoff_position": 2,
+            "last_retained_club_differs_from_cutoff_club": 6,
+            "prior_measured_minutes_ge_180": 45,
+            "prior_measured_minutes_ge_360": 40,
+            "prior_measured_minutes_ge_720": 39,
+            "prior_measured_minutes_ge_90": 49,
+            "prior_measured_starts": 1827,
+            "prior_paired_measured_minutes": 164881,
+            "prior_paired_measured_rows": 2935
+          },
+          "MID": {
+            "cold_no_positive_measured_history": 43,
+            "cold_no_retained_history": 38,
+            "current_season_measured_minutes_ge_180": 0,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 0,
+            "current_season_prior_appearance_present": 0,
+            "current_season_prior_rows_present": 0,
+            "eligible_target_rows": 262,
+            "last_measured_club_differs_from_cutoff_club": 33,
+            "last_measured_position_differs_from_cutoff_position": 7,
+            "last_retained_club_differs_from_cutoff_club": 35,
+            "prior_measured_minutes_ge_180": 190,
+            "prior_measured_minutes_ge_360": 188,
+            "prior_measured_minutes_ge_720": 173,
+            "prior_measured_minutes_ge_90": 199,
+            "prior_measured_starts": 9082,
+            "prior_paired_measured_minutes": 806965,
+            "prior_paired_measured_rows": 12986
+          }
+        },
+        "identity_eligible_by_position": {
+          "DEF": 197,
+          "FWD": 72,
+          "MID": 262
+        },
+        "identity_eligible_observed_target_rows": 531,
+        "identity_exclusions": [
+          {
+            "code": 523700,
+            "fixture": 8,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 524180,
+            "fixture": 5,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 547686,
+            "fixture": 10,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 553746,
+            "fixture": 9,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 569577,
+            "fixture": 7,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 571380,
+            "fixture": 7,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 592740,
+            "fixture": 6,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 611695,
+            "fixture": 7,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 611917,
+            "fixture": 2,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 612855,
+            "fixture": 7,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 643970,
+            "fixture": 6,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 199798,
+            "fixture": 1,
+            "reason": "CUTOFF_REGISTRY_IDENTITY_MISMATCH",
+            "season": "2026-27"
+          }
+        ],
+        "measured_history_exposure_bins": {
+          "180": 368,
+          "360": 357,
+          "720": 332,
+          "90": 391
+        },
+        "missing_cutoff_registry": 11,
+        "observed_identity_crosscheck_only_not_a_target_derived_prediction_roster": true,
+        "observed_target_rows": 543,
+        "prediction_as_of": "2026-08-21T17:30:00+00:00",
+        "prior_archive_outfield_rows": 123297,
+        "prior_live_gameweeks": 0,
+        "prior_live_outfield_rows": 0,
+        "season": "2026-27"
+      },
+      {
+        "cold_no_positive_measured_history": 67,
+        "cold_no_retained_history": 4,
+        "cutoff_registry_identity_mismatch": 6,
+        "deadline_snapshot_capture_id": "file-321c1e26c9312efb39ee229e524d7d3a20386ecc59d93befe81e18e3d7a60098",
+        "deadline_snapshot_known_at": "2026-08-27T17:19:42+00:00",
+        "gw": 2,
+        "history_support_by_position": {
+          "DEF": {
+            "cold_no_positive_measured_history": 31,
+            "cold_no_retained_history": 2,
+            "current_season_measured_minutes_ge_180": 0,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 65,
+            "current_season_prior_appearance_present": 108,
+            "current_season_prior_rows_present": 200,
+            "eligible_target_rows": 203,
+            "last_measured_club_differs_from_cutoff_club": 6,
+            "last_measured_position_differs_from_cutoff_position": 1,
+            "last_retained_club_differs_from_cutoff_club": 1,
+            "prior_measured_minutes_ge_180": 133,
+            "prior_measured_minutes_ge_360": 130,
+            "prior_measured_minutes_ge_720": 120,
+            "prior_measured_minutes_ge_90": 152,
+            "prior_measured_starts": 7099,
+            "prior_paired_measured_minutes": 633190,
+            "prior_paired_measured_rows": 8438
+          },
+          "FWD": {
+            "cold_no_positive_measured_history": 9,
+            "cold_no_retained_history": 0,
+            "current_season_measured_minutes_ge_180": 0,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 10,
+            "current_season_prior_appearance_present": 35,
+            "current_season_prior_rows_present": 70,
+            "eligible_target_rows": 70,
+            "last_measured_club_differs_from_cutoff_club": 3,
+            "last_measured_position_differs_from_cutoff_position": 0,
+            "last_retained_club_differs_from_cutoff_club": 0,
+            "prior_measured_minutes_ge_180": 42,
+            "prior_measured_minutes_ge_360": 38,
+            "prior_measured_minutes_ge_720": 36,
+            "prior_measured_minutes_ge_90": 49,
+            "prior_measured_starts": 1723,
+            "prior_paired_measured_minutes": 156328,
+            "prior_paired_measured_rows": 2820
+          },
+          "MID": {
+            "cold_no_positive_measured_history": 27,
+            "cold_no_retained_history": 2,
+            "current_season_measured_minutes_ge_180": 0,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 37,
+            "current_season_prior_appearance_present": 147,
+            "current_season_prior_rows_present": 267,
+            "eligible_target_rows": 269,
+            "last_measured_club_differs_from_cutoff_club": 14,
+            "last_measured_position_differs_from_cutoff_position": 3,
+            "last_retained_club_differs_from_cutoff_club": 2,
+            "prior_measured_minutes_ge_180": 189,
+            "prior_measured_minutes_ge_360": 187,
+            "prior_measured_minutes_ge_720": 173,
+            "prior_measured_minutes_ge_90": 203,
+            "prior_measured_starts": 9148,
+            "prior_paired_measured_minutes": 812844,
+            "prior_paired_measured_rows": 13097
+          }
+        },
+        "identity_eligible_by_position": {
+          "DEF": 203,
+          "FWD": 70,
+          "MID": 269
+        },
+        "identity_eligible_observed_target_rows": 542,
+        "identity_exclusions": [
+          {
+            "code": 119090,
+            "fixture": 20,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 218543,
+            "fixture": 18,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 490884,
+            "fixture": 13,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 519324,
+            "fixture": 16,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 554054,
+            "fixture": 11,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 613804,
+            "fixture": 17,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 616069,
+            "fixture": 19,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 616288,
+            "fixture": 11,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 220362,
+            "fixture": 11,
+            "reason": "CUTOFF_REGISTRY_IDENTITY_MISMATCH",
+            "season": "2026-27"
+          },
+          {
+            "code": 231065,
+            "fixture": 13,
+            "reason": "CUTOFF_REGISTRY_IDENTITY_MISMATCH",
+            "season": "2026-27"
+          },
+          {
+            "code": 438234,
+            "fixture": 15,
+            "reason": "CUTOFF_REGISTRY_IDENTITY_MISMATCH",
+            "season": "2026-27"
+          },
+          {
+            "code": 463034,
+            "fixture": 14,
+            "reason": "CUTOFF_REGISTRY_IDENTITY_MISMATCH",
+            "season": "2026-27"
+          },
+          {
+            "code": 465694,
+            "fixture": 15,
+            "reason": "CUTOFF_REGISTRY_IDENTITY_MISMATCH",
+            "season": "2026-27"
+          },
+          {
+            "code": 517052,
+            "fixture": 20,
+            "reason": "CUTOFF_REGISTRY_IDENTITY_MISMATCH",
+            "season": "2026-27"
+          }
+        ],
+        "measured_history_exposure_bins": {
+          "180": 364,
+          "360": 355,
+          "720": 329,
+          "90": 404
+        },
+        "missing_cutoff_registry": 8,
+        "observed_identity_crosscheck_only_not_a_target_derived_prediction_roster": true,
+        "observed_target_rows": 556,
+        "prediction_as_of": "2026-08-28T17:30:00+00:00",
+        "prior_archive_outfield_rows": 123297,
+        "prior_live_gameweeks": 1,
+        "prior_live_outfield_rows": 543,
+        "season": "2026-27"
+      },
+      {
+        "cold_no_positive_measured_history": 79,
+        "cold_no_retained_history": 21,
+        "cutoff_registry_identity_mismatch": 0,
+        "deadline_snapshot_capture_id": "77b836c9-84c6-4481-b709-8249dce1228d",
+        "deadline_snapshot_known_at": "2026-09-04T11:05:54.219177+00:00",
+        "gw": 3,
+        "history_support_by_position": {
+          "DEF": {
+            "cold_no_positive_measured_history": 32,
+            "cold_no_retained_history": 4,
+            "current_season_measured_minutes_ge_180": 46,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 91,
+            "current_season_prior_appearance_present": 127,
+            "current_season_prior_rows_present": 207,
+            "eligible_target_rows": 214,
+            "last_measured_club_differs_from_cutoff_club": 10,
+            "last_measured_position_differs_from_cutoff_position": 2,
+            "last_retained_club_differs_from_cutoff_club": 5,
+            "prior_measured_minutes_ge_180": 147,
+            "prior_measured_minutes_ge_360": 136,
+            "prior_measured_minutes_ge_720": 126,
+            "prior_measured_minutes_ge_90": 163,
+            "prior_measured_starts": 7407,
+            "prior_paired_measured_minutes": 661093,
+            "prior_paired_measured_rows": 8804
+          },
+          "FWD": {
+            "cold_no_positive_measured_history": 11,
+            "cold_no_retained_history": 4,
+            "current_season_measured_minutes_ge_180": 8,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 20,
+            "current_season_prior_appearance_present": 43,
+            "current_season_prior_rows_present": 73,
+            "eligible_target_rows": 78,
+            "last_measured_club_differs_from_cutoff_club": 4,
+            "last_measured_position_differs_from_cutoff_position": 0,
+            "last_retained_club_differs_from_cutoff_club": 1,
+            "prior_measured_minutes_ge_180": 47,
+            "prior_measured_minutes_ge_360": 42,
+            "prior_measured_minutes_ge_720": 40,
+            "prior_measured_minutes_ge_90": 55,
+            "prior_measured_starts": 1889,
+            "prior_paired_measured_minutes": 170515,
+            "prior_paired_measured_rows": 3049
+          },
+          "MID": {
+            "cold_no_positive_measured_history": 36,
+            "cold_no_retained_history": 13,
+            "current_season_measured_minutes_ge_180": 22,
+            "current_season_measured_minutes_ge_360": 0,
+            "current_season_measured_minutes_ge_720": 0,
+            "current_season_measured_minutes_ge_90": 92,
+            "current_season_prior_appearance_present": 172,
+            "current_season_prior_rows_present": 276,
+            "eligible_target_rows": 289,
+            "last_measured_club_differs_from_cutoff_club": 17,
+            "last_measured_position_differs_from_cutoff_position": 2,
+            "last_retained_club_differs_from_cutoff_club": 5,
+            "prior_measured_minutes_ge_180": 193,
+            "prior_measured_minutes_ge_360": 188,
+            "prior_measured_minutes_ge_720": 176,
+            "prior_measured_minutes_ge_90": 215,
+            "prior_measured_starts": 9267,
+            "prior_paired_measured_minutes": 823466,
+            "prior_paired_measured_rows": 13280
+          }
+        },
+        "identity_eligible_by_position": {
+          "DEF": 214,
+          "FWD": 78,
+          "MID": 289
+        },
+        "identity_eligible_observed_target_rows": 581,
+        "identity_exclusions": [
+          {
+            "code": 595480,
+            "fixture": 26,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          },
+          {
+            "code": 629068,
+            "fixture": 30,
+            "reason": "NO_CUTOFF_REGISTRY",
+            "season": "2026-27"
+          }
+        ],
+        "measured_history_exposure_bins": {
+          "180": 387,
+          "360": 366,
+          "720": 342,
+          "90": 433
+        },
+        "missing_cutoff_registry": 2,
+        "observed_identity_crosscheck_only_not_a_target_derived_prediction_roster": true,
+        "observed_target_rows": 583,
+        "prediction_as_of": "2026-09-04T17:30:00+00:00",
+        "prior_archive_outfield_rows": 123297,
+        "prior_live_gameweeks": 2,
+        "prior_live_outfield_rows": 1099,
+        "season": "2026-27"
+      }
+    ],
+    "first_known_at_by_gameweek": [
+      {
+        "first_known_at_us": 1787673195572138,
+        "gw": 1,
+        "player_fixture_rows": 543,
+        "season": "2026-27"
+      },
+      {
+        "first_known_at_us": 1788227321593805,
+        "gw": 2,
+        "player_fixture_rows": 556,
+        "season": "2026-27"
+      },
+      {
+        "first_known_at_us": 1788793540829517,
+        "gw": 3,
+        "player_fixture_rows": 583,
+        "season": "2026-27"
+      }
+    ],
+    "latest_current_season_exposure_bins": {
+      "players_with_at_least_180_minutes": 165,
+      "players_with_at_least_360_minutes": 0,
+      "players_with_at_least_720_minutes": 0,
+      "players_with_at_least_90_minutes": 232
+    },
+    "overall": {
+      "appeared_rows": 869,
+      "fields": {
+        "box_touches": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 1682
+        },
+        "chances_created": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 1682
+        },
+        "creativity": {
+          "field_present_rows": 1682,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 1682,
+          "null_or_absent_rows": 0
+        },
+        "crosses": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 1682
+        },
+        "expected_assists": {
+          "field_present_rows": 1682,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 1682,
+          "null_or_absent_rows": 0
+        },
+        "expected_goals": {
+          "field_present_rows": 1682,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 1682,
+          "null_or_absent_rows": 0
+        },
+        "key_passes": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 1682
+        },
+        "minutes": {
+          "field_present_rows": 1682,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 1682,
+          "null_or_absent_rows": 0
+        },
+        "non_penalty_expected_goals": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 1682
+        },
+        "penalty_area_entries": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 1682
+        },
+        "shots": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 1682
+        },
+        "shots_on_target": {
+          "field_present_rows": 0,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 0,
+          "null_or_absent_rows": 1682
+        },
+        "starts": {
+          "field_present_rows": 1682,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 1682,
+          "null_or_absent_rows": 0
+        },
+        "threat": {
+          "field_present_rows": 1682,
+          "invalid_numeric_rows": 0,
+          "measured_valid_rows": 1682,
+          "null_or_absent_rows": 0
+        }
+      },
+      "fixtures": 30,
+      "gameweeks": 3,
+      "players": 583,
+      "rows": 1682,
+      "total_measured_minutes": 53723
+    },
+    "snapshot_captures": [
+      {
+        "captures": 56,
+        "earliest_capture_at_us": 1785145710000000,
+        "latest_capture_at_us": 1788838659610696,
+        "season": "2026-27"
+      }
+    ]
+  },
+  "model_fitting": false,
+  "network_requests": 0,
+  "production_mutations": false,
+  "raw_inventory": {
+    "archive_mart_player_columns": [
+      "season",
+      "gw",
+      "fixture",
+      "pulse_id",
+      "kickoff_time",
+      "code",
+      "position",
+      "team_id",
+      "opponent_team_id",
+      "was_home",
+      "minutes",
+      "starts",
+      "goals_scored",
+      "assists",
+      "clean_sheets",
+      "goals_conceded",
+      "saves",
+      "penalties_saved",
+      "penalties_missed",
+      "own_goals",
+      "yellow_cards",
+      "red_cards",
+      "bonus",
+      "bps",
+      "expected_goals",
+      "expected_assists",
+      "expected_goals_conceded",
+      "defensive_contribution",
+      "tackles",
+      "recoveries",
+      "clearances_blocks_interceptions",
+      "value",
+      "selected",
+      "transfers_in",
+      "transfers_out",
+      "threat",
+      "creativity",
+      "influence"
+    ],
+    "archive_raw_player_columns": [
+      "season",
+      "_ingested_at",
+      "name",
+      "position",
+      "team",
+      "xP",
+      "assists",
+      "bonus",
+      "bps",
+      "clean_sheets",
+      "creativity",
+      "element",
+      "fixture",
+      "goals_conceded",
+      "goals_scored",
+      "ict_index",
+      "influence",
+      "kickoff_time",
+      "minutes",
+      "opponent_team",
+      "own_goals",
+      "penalties_missed",
+      "penalties_saved",
+      "red_cards",
+      "round",
+      "saves",
+      "selected",
+      "team_a_score",
+      "team_h_score",
+      "threat",
+      "total_points",
+      "transfers_balance",
+      "transfers_in",
+      "transfers_out",
+      "value",
+      "was_home",
+      "yellow_cards",
+      "GW",
+      "expected_assists",
+      "expected_goal_involvements",
+      "expected_goals",
+      "expected_goals_conceded",
+      "starts",
+      "mng_clean_sheets",
+      "mng_draw",
+      "mng_goals_scored",
+      "mng_loss",
+      "mng_underdog_draw",
+      "mng_underdog_win",
+      "mng_win",
+      "modified",
+      "clearances_blocks_interceptions",
+      "defensive_contribution",
+      "recoveries",
+      "tackles"
+    ],
+    "fpl_element_summary_payloads": 5671,
+    "fpl_history_field_presence": {
+      "assists": 11180,
+      "bonus": 11180,
+      "bps": 11180,
+      "clean_sheets": 11180,
+      "clearances_blocks_interceptions": 11180,
+      "creativity": 11180,
+      "defensive_contribution": 11180,
+      "element": 11180,
+      "expected_assists": 11180,
+      "expected_goal_involvements": 11180,
+      "expected_goals": 11180,
+      "expected_goals_conceded": 11180,
+      "fixture": 11180,
+      "goals_conceded": 11180,
+      "goals_scored": 11180,
+      "ict_index": 11180,
+      "influence": 11180,
+      "kickoff_time": 11180,
+      "minutes": 11180,
+      "modified": 11180,
+      "opponent_team": 11180,
+      "own_goals": 11180,
+      "penalties_missed": 11180,
+      "penalties_saved": 11180,
+      "recoveries": 11180,
+      "red_cards": 11180,
+      "round": 11180,
+      "saves": 11180,
+      "selected": 11180,
+      "starts": 11180,
+      "tackles": 11180,
+      "team_a_score": 11180,
+      "team_h_score": 11180,
+      "threat": 11180,
+      "total_points": 11180,
+      "transfers_balance": 11180,
+      "transfers_in": 11180,
+      "transfers_out": 11180,
+      "value": 11180,
+      "was_home": 11180,
+      "yellow_cards": 11180
+    },
+    "fpl_history_versions_all_positions": 11180,
+    "fpl_source_versions_sha256": "7138c771bc2aac36f7d25f355605c25955c4056b5ec257bf5655ed439ba8ebc6",
+    "player_open_play_set_piece_separation_available": false,
+    "sdp_endpoint_versions": {
+      "competitive_matches": 13,
+      "match_events": 10,
+      "match_lineups": 10,
+      "match_stats": 1931,
+      "matches": 27
+    },
+    "sdp_non_speed_nested_stat_objects": 0,
+    "sdp_player_attacking_stat_grain_available": false,
+    "sdp_source_versions_sha256": "f2222269bddfcde2ca92eca3cbc15691fdc794e13c7730835eae66ae3c9600f1",
+    "sdp_team_stat_field_presence": {
+      "accurateBackZonePass": 3862,
+      "accurateChippedPass": 3862,
+      "accurateCornersIntobox": 2705,
+      "accurateCross": 3757,
+      "accurateCrossNocorner": 3552,
+      "accurateFlickOn": 2679,
+      "accurateFreekickCross": 1153,
+      "accurateFwdZonePass": 3862,
+      "accurateGoalKicks": 3810,
+      "accurateKeeperSweeper": 1507,
+      "accurateKeeperThrows": 3767,
+      "accurateLaunches": 3532,
+      "accurateLayoffs": 3738,
+      "accurateLongBalls": 3862,
+      "accuratePass": 3862,
+      "accuratePullBack": 891,
+      "accurateThroughBall": 1830,
+      "accurateThrows": 3862,
+      "aerialLost": 3862,
+      "aerialWon": 3862,
+      "attAssistOpenplay": 3844,
+      "attAssistSetplay": 2561,
+      "attBxCentre": 3769,
+      "attBxLeft": 2657,
+      "attBxRight": 2586,
+      "attCmissHigh": 915,
+      "attCmissHighLeft": 231,
+      "attCmissHighRight": 274,
+      "attCmissLeft": 1357,
+      "attCmissRight": 1471,
+      "attCorner": 3140,
+      "attFastbreak": 1720,
+      "attFreekickGoal": 896,
+      "attFreekickMiss": 428,
+      "attFreekickPost": 59,
+      "attFreekickTarget": 340,
+      "attFreekickTotal": 1232,
+      "attGoalHighCentre": 1110,
+      "attGoalHighLeft": 1189,
+      "attGoalHighRight": 1165,
+      "attGoalLowCentre": 1537,
+      "attGoalLowLeft": 1904,
+      "attGoalLowRight": 1805,
+      "attHdGoal": 1460,
+      "attHdMiss": 2537,
+      "attHdPost": 224,
+      "attHdTarget": 1524,
+      "attHdTotal": 3331,
+      "attIboxBlocked": 3253,
+      "attIboxGoal": 2963,
+      "attIboxMiss": 3570,
+      "attIboxOwnGoal": 201,
+      "attIboxPost": 657,
+      "attIboxTarget": 3308,
+      "attLfGoal": 1923,
+      "attLfTarget": 2367,
+      "attLfTotal": 3707,
+      "attLgCentre": 190,
+      "attLgLeft": 19,
+      "attLgRight": 20,
+      "attMissHigh": 2476,
+      "attMissHighLeft": 1324,
+      "attMissHighRight": 1465,
+      "attMissLeft": 2726,
+      "attMissRight": 2685,
+      "attOboxBlocked": 2815,
+      "attOboxGoal": 1350,
+      "attOboxMiss": 3029,
+      "attOboxOwnGoal": 2,
+      "attOboxPost": 249,
+      "attOboxTarget": 2318,
+      "attObpGoal": 859,
+      "attObxCentre": 3721,
+      "attObxLeft": 61,
+      "attObxRight": 57,
+      "attObxdLeft": 113,
+      "attObxdRight": 62,
+      "attOneOnOne": 709,
+      "attOpenplay": 3853,
+      "attPenGoal": 1137,
+      "attPenMiss": 13,
+      "attPenPost": 10,
+      "attPenTarget": 61,
+      "attPostHigh": 381,
+      "attPostLeft": 295,
+      "attPostRight": 266,
+      "attRfGoal": 2351,
+      "attRfTarget": 2982,
+      "attRfTotal": 3831,
+      "attSetpiece": 1905,
+      "attSvHighCentre": 1220,
+      "attSvHighLeft": 617,
+      "attSvHighRight": 568,
+      "attSvLowCentre": 2575,
+      "attSvLowLeft": 1842,
+      "attSvLowRight": 1707,
+      "attemptedTackleFoul": 3849,
+      "attemptsConcededIbox": 3853,
+      "attemptsConcededObox": 3742,
+      "attemptsIbox": 3853,
+      "attemptsObox": 3742,
+      "backwardPass": 3862,
+      "ballRecovery": 3862,
+      "bigChanceCreated": 2995,
+      "bigChanceMissed": 2695,
+      "bigChanceScored": 2176,
+      "blockedCross": 2739,
+      "blockedPass": 3857,
+      "blockedScoringAtt": 3623,
+      "challengeLost": 3848,
+      "cleanSheet": 965,
+      "clearanceOffLine": 456,
+      "contentiousDecision": 705,
+      "cornerTaken": 3779,
+      "crosses18yard": 3830,
+      "crosses18yardplus": 3675,
+      "defenderGoals": 1265,
+      "dispossessed": 3860,
+      "divingSave": 2850,
+      "duelLost": 3862,
+      "duelWon": 3862,
+      "effectiveBlockedCross": 2739,
+      "effectiveClearance": 3862,
+      "effectiveHeadClearance": 3856,
+      "errorLeadToGoal": 625,
+      "errorLeadToShot": 1197,
+      "expectedAssists": 1178,
+      "expectedGoals": 1178,
+      "expectedGoalsFreekick": 353,
+      "expectedGoalsOnTarget": 1141,
+      "expectedGoalsOnTargetConceded": 1146,
+      "fastestPlayer": 3862,
+      "fiftyFifty": 1518,
+      "finalThirdEntries": 3862,
+      "fkFoulLost": 3862,
+      "fkFoulWon": 3862,
+      "forwardGoals": 1573,
+      "foulThrowIn": 154,
+      "fouledFinalThird": 3264,
+      "freekickCross": 2690,
+      "freekickTotal": 1232,
+      "fwdPass": 3862,
+      "goalAssist": 2386,
+      "goalAssistDeadball": 373,
+      "goalAssistIntentional": 2048,
+      "goalAssistOpenplay": 2059,
+      "goalAssistSetplay": 704,
+      "goalFastbreak": 400,
+      "goalKicks": 3854,
+      "goals": 3114,
+      "goalsConceded": 3114,
+      "goalsConcededIbox": 2963,
+      "goalsConcededObox": 1350,
+      "goalsOpenplay": 2697,
+      "goodHighClaim": 1985,
+      "handBall": 1160,
+      "headClearance": 3856,
+      "hitWoodwork": 1122,
+      "interception": 3859,
+      "interceptionWon": 3859,
+      "interceptionsInBox": 2311,
+      "keeperGoals": 836,
+      "keeperThrows": 3771,
+      "leftsidePass": 3862,
+      "longPassOwnToOpp": 3862,
+      "longPassOwnToOppSuccess": 3862,
+      "lostCorners": 3779,
+      "midfielderGoals": 1984,
+      "offtargetAttAssist": 3688,
+      "ontargetAttAssist": 3820,
+      "ontargetScoringAtt": 3773,
+      "openPlayPass": 3862,
+      "outfielderBlock": 3625,
+      "overrun": 2514,
+      "ownGoals": 989,
+      "passesLeft": 3862,
+      "passesRight": 3862,
+      "penAreaEntries": 3862,
+      "penGoalsConceded": 382,
+      "penaltyConceded": 474,
+      "penaltyFaced": 459,
+      "penaltySave": 61,
+      "penaltyWon": 474,
+      "possLostAll": 3862,
+      "possLostCtrl": 3862,
+      "possWonAtt3rd": 3736,
+      "possWonDef3rd": 3862,
+      "possWonMid3rd": 3862,
+      "possessionPercentage": 3862,
+      "postScoringAtt": 855,
+      "ptsDroppedWinningPos": 699,
+      "ptsGainedLosingPos": 699,
+      "punches": 1362,
+      "putThrough": 3862,
+      "redCard": 3862,
+      "rescindedRedCard": 1,
+      "rightsidePass": 3862,
+      "savedIbox": 3308,
+      "savedObox": 2318,
+      "saves": 3597,
+      "secondYellow": 102,
+      "shieldBallOop": 1714,
+      "shotFastbreak": 1720,
+      "shotOffTarget": 3784,
+      "sixYardBlock": 1213,
+      "subsGoals": 1196,
+      "subsMade": 3849,
+      "successfulFiftyFifty": 1518,
+      "successfulFinalThirdPasses": 3862,
+      "successfulOpenPlayPass": 3862,
+      "successfulPutThrough": 3855,
+      "totalAttAssist": 3860,
+      "totalBackZonePass": 3862,
+      "totalChippedPass": 3862,
+      "totalClearance": 3862,
+      "totalContest": 3862,
+      "totalCornersIntobox": 3724,
+      "totalCross": 3862,
+      "totalCrossNocorner": 3862,
+      "totalDistance": 1216,
+      "totalFastbreak": 1720,
+      "totalFinalThirdPasses": 3862,
+      "totalFlickOn": 3700,
+      "totalFwdZonePass": 3862,
+      "totalHighClaim": 2150,
+      "totalKeeperSweeper": 1553,
+      "totalLaunches": 3857,
+      "totalLayoffs": 3777,
+      "totalLongBalls": 3862,
+      "totalOffside": 3012,
+      "totalPass": 3862,
+      "totalPullBack": 1882,
+      "totalRedCard": 3862,
+      "totalScoringAtt": 3862,
+      "totalTackle": 3862,
+      "totalThroughBall": 2741,
+      "totalThrows": 3862,
+      "totalYelCard": 3862,
+      "touches": 3862,
+      "touchesInOppBox": 3861,
+      "unsuccessfulTouch": 3862,
+      "winningGoal": 836,
+      "wonContest": 3848,
+      "wonCorners": 3779,
+      "wonTackle": 3861,
+      "yellowCard": 3862
+    },
+    "sdp_team_stat_sides": 3862,
+    "team_statistics_must_not_be_substituted_for_player_statistics": true
+  },
+  "source_hashes_unchanged": true,
+  "source_sha256": {
+    "auditor": "78db628281f8aa82e486edd4268be838cd1f6ffb5f8c99344cfa67080f3226a9",
+    "config": "5a3ca31aa9e655f897b1c2f2670efc950e94a2402aaf55ede60860a9df64a903",
+    "database": "538560454f551a48eeaf015c318f7dea0fc6a34fccc56ee7f0e2b117ef7330d6",
+    "publication_helpers": "67d1bba737046ae385ca810dff6d3e956d35dab4cdc0d0c3aa83890b4b7ed1fc",
+    "role_result": "6a92fc3e421d3d74de543a080a61077364435545e5dcd7d1ff26068563faf607"
+  },
+  "study_id": "attacking_role_premium_feasibility_v1"
+}

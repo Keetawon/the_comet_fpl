@@ -990,7 +990,7 @@ export function PlayerStatTable({
   const pageIndex = table.getState().pagination.pageIndex;
 
   return (
-    <DecisionTableFullscreen label={fullscreenLabel}>
+    <DecisionTableFullscreen label={fullscreenLabel} captureContext={`${view} · GW${gwFrom}–${gwTo} · Page ${pageIndex + 1}/${Math.max(1, pageCount)} · ${rows.length} filtered players · Forecast as of ${rows[0]?.player.as_of ?? "unavailable"}. ${formScopeLabel ? `Observed: ${formScopeLabel}.` : ""} Displayed values; no new forecast.`}>
       {({ isFullscreen }) => (
         <div className={`flex flex-col gap-2 ${isFullscreen ? "min-h-0 flex-1" : ""}`}>
           {formScopeLabel && (
