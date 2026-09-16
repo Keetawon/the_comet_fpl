@@ -4,10 +4,27 @@
 # populations, bin shapes, baselines, metrics, or lift gates after seeing its
 # results.
 
-contract_version: "1.0"
+contract_version: "1.1"
 phase: 3
 
-amendments: []
+amendments:
+  - version: "1.1"
+    date: "2026-07-31"
+    candidates_evaluated_before_amendment: 0
+    changed: >
+      additive_stage_c_attacking_candidate_v1_pre_registration_only_no_population_roster_baseline_metric_or_gate_field_changed
+    reason: >
+      Pre-register Candidate V1 xg_informed_trailing_player_goals_v1: the v1.0
+      trailing-player goal-rate baseline with its recent GOALS signal replaced by recent
+      expected_goals where xG is measured and finishing shrunk almost fully to the positional
+      mean, falling back to the exact v1.0 trailing-player baseline where xG is unmeasured. This
+      block is additive: it changes no v1.0 population, target roster, baseline, metric, gate,
+      seed, or calibration field and is judged by the unchanged v1.0 promotion gate.
+    evidence: >
+      docs/research-adaptation.md (xG beats recorded goals as the attacking signal where xG is
+      measured, judged within xG-covered seasons 2023-24+; finishing does not persist within
+      position FWD 0.138 / MID 0.060 / DEF -0.103 so it is shrunk almost fully to the positional
+      mean); config xg_signal_policy.use_when_measured_within_covered_seasons.
 
 target:
   entity: player
@@ -63,6 +80,43 @@ xg_signal_policy:
     - "2025-26"
   finishing_persistence: shrink_almost_fully_to_positional_mean
   fallback_signal: threat
+
+stage_c_candidate_v1:
+  name: xg_informed_trailing_player_goals_v1
+  development_only: true
+  development_only_reason: archive_target_roster_and_first_kickoff_cutoff_are_unversioned_proxies_and_archive_evidence_shaped_the_design
+  grain: season_player_code_fixture
+  identity: stable_code
+  history_population: up_to_5_most_recent_prior_player_fixture_rows_including_zero
+  history_order: kickoff_time_then_season_then_fixture
+  history_window: 5
+  history_observed_results: "kickoff_time < as_of"
+  signal: expected_goals_where_measured_else_fallback_to_v1_trailing_baseline
+  xg_handling: use_when_measured_per_row_null_is_unmeasured
+  positional_goal_mean: fold_local_mean_goals_per_appearance_at_target_position_equal_to_v1_positional_baseline
+  positional_xg_mean: fold_local_mean_expected_goals_per_appearance_over_xg_measured_prior_rows_at_target_position
+  trailing_xg_shrinkage: "shrunk_xg_equals_(sum_x_plus_alpha_times_pos_x)_over_(m_plus_alpha)"
+  finishing_policy: finishing_shrunk_almost_fully_to_positional_mean_keep_0.05
+  finishing_term: "0.05_times_player_finishing_plus_0.95_times_positional_finishing"
+  rate: rate_equals_shrunk_xg_plus_finishing_term_clamped_at_zero
+  fallback_to_v1: when_no_xg_measured_trailing_row_or_no_positional_xg_mean_rate_is_exact_v1_trailing_shrunk_goals_rate
+  cold_start_fallback: when_n_equals_0_rate_is_positional_goal_mean_equal_to_v1_baseline
+  reduces_to_v1_baseline: when_all_trailing_xg_unmeasured_candidate_equals_v1_trailing_baseline_bit_for_bit
+  alpha: 5.0
+  finishing_keep: 0.05
+  poisson_max_goals: 10
+  estimator: poisson_goal_count_distribution_over_0_to_10
+  additional_smoothing: none
+  scoring_floor_role: existing_1e-12_floor_is_scoring_only_not_model_smoothing
+  selected_parameter: none_fixed_closed_form_estimator_no_grid_no_inner_walk_forward
+  fit_scope: positional_means_and_player_histories_recomputed_within_each_fold
+  target_label_policy: target_labels_never_enter_model_inputs
+  target_position_source: existing_unversioned_target_roster_proxy_current_position
+  null_policy: preserve_nulls
+  zero_minutes_policy: include_in_history_and_training
+  assistant_manager_policy: excluded_upstream_element_type_5
+  double_gameweek_policy: "fixture_rows_remain_separate_same_pre_gameweek_state_no_within_gameweek_absorption"
+  monte_carlo: out_of_scope_closed_form
 
 baselines:
   stage_c_attacking:

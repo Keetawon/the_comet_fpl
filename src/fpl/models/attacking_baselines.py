@@ -52,6 +52,10 @@ class PlayerHistoryRow:
     code: int
     position: Position
     goals: int
+    # `expected_goals` (xG) is NULL where unmeasured (all of 2021-22, GW1-15 of 2022-23). The v1.0
+    # baselines ignore it; Candidate V1 reads it. Defaulted so existing positional constructions
+    # (7 args) keep working.
+    expected_goals: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
