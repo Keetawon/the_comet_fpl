@@ -1,0 +1,53 @@
+{
+  "folders": [{ "name": "THE COMET — active V2", "path": "." }],
+  "settings": {
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/.mypy_cache": true,
+      "**/.pytest_cache": true,
+      "**/.ruff_cache": true,
+      "**/.venv": true,
+      "**/node_modules": true,
+      "**/dist": true,
+      "data": true,
+      "dashboard/public/data": true,
+      "dashboard/public/sdp": true
+    },
+    "search.exclude": {
+      "data/**": true,
+      "dashboard/public/data/**": true,
+      "dashboard/public/sdp/**": true
+    },
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "window.title": "THE COMET V2 — ${activeEditorShort}"
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "COMET: Start dashboard and optimizer",
+        "type": "process",
+        "command": "powershell.exe",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/comet.ps1", "start"],
+        "options": { "cwd": "${workspaceFolder}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "COMET: Refresh data and dashboard",
+        "type": "process",
+        "command": "powershell.exe",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/comet.ps1", "refresh"],
+        "options": { "cwd": "${workspaceFolder}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "COMET: Check pipeline status",
+        "type": "process",
+        "command": "powershell.exe",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/comet.ps1", "status"],
+        "options": { "cwd": "${workspaceFolder}" },
+        "problemMatcher": []
+      }
+    ]
+  }
+}

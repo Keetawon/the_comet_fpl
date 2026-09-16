@@ -1,5 +1,13 @@
 # The Comet — FPL decision dashboard
 
+For the owner machine, open `../THE-COMET.code-workspace` and run
+`../scripts/comet.ps1 start` from this directory (or use **COMET: Start dashboard and
+optimizer** in the editor). `../scripts/comet.ps1 refresh` runs the existing full
+capture/export/build flow with explicit operational paths. See the
+[workspace guide](../docs/workspace-organization-2026-09-16.md).
+Examples in dated sections describe their original development state; current
+forecast selection comes from the registered primary artifact, not a hard-coded GW.
+
 Static Vite + React + TypeScript + Tailwind + shadcn/ui + @tanstack/react-table app. It
 renders the **static JSON read models** published by the Python layer and nothing else —
 it never queries DuckDB and never reads Parquet in the browser.

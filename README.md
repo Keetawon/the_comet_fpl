@@ -1,3 +1,48 @@
+# THE COMET FPL
+
+Start here for the active V2 workspace. Open
+[THE-COMET.code-workspace](THE-COMET.code-workspace) in your editor; it hides generated
+caches and local data without deleting them. On the owner machine the entry path is
+`D:/Personal/workspace/the_comet_fpl/.worktrees/v2`.
+
+From that workspace, use the existing-host shortcuts:
+
+```powershell
+./scripts/comet.ps1 start    # Dashboard + optimizer, using the registered primary forecast
+./scripts/comet.ps1 refresh  # Existing data capture -> dashboard export -> build
+./scripts/comet.ps1 status   # Capture health + next scheduled run
+```
+
+`start` serves the dashboard at <http://127.0.0.1:4173/> and the local optimizer API
+at <http://127.0.0.1:8765/>. These are local-only services. `refresh` does not generate
+a forecast; a new prediction vintage remains a separate pre-deadline operation.
+Use `-WhatIf` with `start` or `refresh` to inspect the action without executing it.
+The editor's **Run Task** menu exposes the same three commands.
+
+| Location | Purpose |
+|---|---|
+| `src/fpl/` | Python ingestion, storage, models, jobs and validation |
+| `dashboard/` | Existing web application |
+| `config/` | Versioned policies and scientific contracts |
+| `tests/` | Python regression checks |
+| `scripts/` | Host and development shortcuts |
+| `docs/` | [Documentation index](docs/README.md) and retained research history |
+| `results/`, `snapshots/` | Retained evidence; preserve frozen artifacts |
+| `data/` | Local generated artifacts, not the operational database default |
+
+Operational databases, predictions, receipts and private optimizer state live under
+`D:/Personal/fpl-operations`. Source code remains in this V2 checkout. The main checkout
+and the separate FBref worktree are retained; do not use them for these host commands.
+See the [workspace/path guide](docs/workspace-organization-2026-09-16.md),
+[operations runbook](docs/sdp-primary-operations.md), and [dashboard guide](dashboard/README.md).
+
+Current scientific boundaries and historical verdicts remain governed by
+[AGENTS.md](AGENTS.md); [DEV-ROADMAP.md](DEV-ROADMAP.md) owns delivery order.
+The material below is retained development history, not a current startup checklist.
+
+<details>
+<summary>Historical development record — retained verbatim</summary>
+
 # FPL points-prediction system
 
 **Descriptive attacking-usage scouting (2026-09-08).** A current-season JSON/CSV export
@@ -871,3 +916,5 @@ GK-saves component passed its full development gate; this is not a full-pipeline
 or production promotion. Every default remains unchanged, and the original
 historical-price proxy, participation, coverage and signed-score limitations stay
 explicit. No previous frozen experiment was retuned or rerun.
+
+</details>

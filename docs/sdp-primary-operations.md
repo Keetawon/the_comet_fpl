@@ -5,6 +5,22 @@ It applies only to the V2 branch. Preserve research databases, payloads, results
 Use a persistent Python environment installed from this checkout and an explicit separate
 operational DuckDB. Never point daily ingestion at the default/research database.
 
+### Owner-machine entry point (2026-09-16)
+
+Open `D:/Personal/workspace/the_comet_fpl/.worktrees/v2/THE-COMET.code-workspace`.
+From that checkout run `./scripts/comet.ps1 refresh`, `./scripts/comet.ps1 status`,
+or `./scripts/comet.ps1 start`. These wrap the existing commands with the operational
+database, receipt, forecast, plan and public-export paths. `start` selects the latest
+registered primary by hash. It refuses an occupied port belonging to another
+checkout/vintage instead of stopping it. Logs are in `D:/Personal/fpl-operations/services`.
+
+The primary and legacy SDP tasks now use the `v2` entry path; the primary dashboard
+public path was updated too. Triggers, principals and settings were preserved.
+The dated schedule record below describes its earlier update; use the
+[workspace guide](workspace-organization-2026-09-16.md) for the latest path change
+and rollback evidence. `v2` is a junction to the preserved physical `sdp_test`
+checkout, not another copy. Do not delete its target.
+
 ## Daily post-match capture
 
 ```powershell
