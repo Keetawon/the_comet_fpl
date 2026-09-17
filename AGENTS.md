@@ -1,5 +1,17 @@
 # Repository agent instructions
 
+### Owner-authorized public Players squad filter (2026-09-17)
+
+The owner additionally authorized the Players page's Manager ID filter to use the
+existing read-only public-team Worker. This supersedes the older hosted-only disable
+rule for that filter. Apply all 15 revealed members atomically using the same season,
+planning GW, stable codes, positions and clubs as public Squad Draft. Keep source GW,
+capture time, Free Hit and unrevealed-transfer limits visible. Membership only filters
+published rows; it never changes xP, prices, forecasts or optimizer inputs. Hosted
+imports must not use the local Plan Server or persist Manager IDs, and an active squad
+filter must disable AI rendering. Preserve the existing filter on import failure and
+clear it on forecast-vintage changes. Network origins remain explicitly allowlisted.
+
 ### Owner-confirmed public Squad Draft exception (2026-09-17)
 
 The owner explicitly confirmed public Squad Draft and a separate Cloudflare Worker for
