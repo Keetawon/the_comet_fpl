@@ -2,8 +2,9 @@
 
 Later activation evidence is recorded in
 [R2 publication activation](r2-dashboard-activation-2026-09-17.md). The first R2
-upload is now verified; the initial readiness findings below preserve the setup
-sequence. Production cutover and scheduled publication remain pending.
+upload and a full scheduled local refresh are now verified; the existing task has
+been connected to R2. Production frontend cutover and the first witnessed scheduled
+R2 publication remain pending. The initial findings below preserve the setup sequence.
 
 **Status: repository implementation prepared; remote activation pending,
 September 17, 2026.** The optional uploader, frontend generation resolver, workflow
