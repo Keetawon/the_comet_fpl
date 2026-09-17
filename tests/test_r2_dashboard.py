@@ -191,6 +191,54 @@ def test_sanitized_generation_is_deterministic_and_hash_binds_every_companion(
     assert r2.inventory_hash(inventory) != r2.inventory_hash(changed)
 
 
+@pytest.mark.parametrize("fail", [False, True])
+def test_sanitization_copies_are_temporary_and_original_generation_is_untouched(
+    generation: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fail: bool,
+) -> None:
+    original = {
+        p.relative_to(generation): p.read_bytes() for p in generation.rglob("*") if p.is_file()
+    }
+    output = tmp_path / "publication"
+    output.mkdir()
+    (output / "receipt.json").write_bytes(b"retained receipt")
+    stages: list[Path] = []
+    temporary_directory = r2.TemporaryDirectory
+
+    def temporary(*args: Any, **kwargs: Any) -> Any:
+        assert kwargs.get("dir") is None  # Use the system temporary disk, not the data disk.
+        result = temporary_directory(*args, **kwargs)
+        stages.append(Path(result.name))
+        return result
+
+    monkeypatch.setattr(r2, "TemporaryDirectory", temporary)
+    package = r2.package_public_dashboard
+
+    def packaged(*args: Any, **kwargs: Any) -> Any:
+        result = package(*args, **kwargs)
+        assert args[1].is_dir() and args[2].is_file()
+        if fail:
+            raise OSError("injected preparation failure after creating copies")
+        return result
+
+    monkeypatch.setattr(r2, "package_public_dashboard", packaged)
+    if fail:
+        with pytest.raises(OSError, match="injected preparation failure"):
+            r2.prepare_generation(generation, output)
+    else:
+        compressed, inventory = r2.prepare_generation(generation, output)
+        assert set(compressed) == set(inventory) == r2.PUBLIC_FILES
+    assert len(stages) == 1 and not stages[0].exists()
+    assert {
+        p.relative_to(generation): p.read_bytes() for p in generation.rglob("*") if p.is_file()
+    } == original
+    assert {p.name: p.read_bytes() for p in output.iterdir()} == {
+        "receipt.json": b"retained receipt"
+    }
+
+
 def test_public_sdp_correction_timestamp_is_scanned_without_changing_provenance(
     tmp_path: Path,
 ) -> None:

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import import_module
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -172,7 +173,14 @@ def _validate_sdp_public_safe(document: dict[str, Any]) -> None:
 
 
 def prepare_generation(generation: Path, output: Path) -> tuple[dict[str, bytes], dict[str, Any]]:
-    """Re-sanitize the exact completed generation and compress only its public allowlist."""
+    """Return verified compressed bytes; disposable copies use the system temporary disk."""
+    # Keep the public API/output receipt location; staging must not accumulate there.
+    with TemporaryDirectory(prefix="comet-r2-") as directory:
+        return _prepare_generation(generation, Path(directory))
+
+
+def _prepare_generation(generation: Path, staging: Path) -> tuple[dict[str, bytes], dict[str, Any]]:
+    """Re-sanitize inside our owned temporary directory, cleaned on success or failure."""
     receipt = _strict_json_loads((generation / "receipt.json").read_text(encoding="utf-8"))
     if receipt.get("schema") != "fpl.sdp-dashboard-generation/v1" or not receipt.get(
         "completed_at"
@@ -187,7 +195,7 @@ def prepare_generation(generation: Path, output: Path) -> tuple[dict[str, bytes]
     ):
         raise ValueError("R2 source dashboard does not match its completed generation receipt")
     package_public_dashboard(
-        generation / "public/data", output / "sanitized-data", output / "sanitized-data.zip"
+        generation / "public/data", staging / "sanitized-data", staging / "sanitized-data.zip"
     )
     documents = {}
     for name, validate, receipt_key, size_key in (
@@ -203,16 +211,16 @@ def prepare_generation(generation: Path, output: Path) -> tuple[dict[str, bytes]
         if name != "sdp_stats":
             _assert_public_safe(document)
         documents[f"sdp/{name}.json"] = document
-    check_observed_freshness(output / "sanitized-data", documents["sdp/sdp_stats.json"])
+    check_observed_freshness(staging / "sanitized-data", documents["sdp/sdp_stats.json"])
     documents["sdp/publication_status.json"] = publication_status(
-        output / "sanitized-data", documents["sdp/sdp_stats.json"]
+        staging / "sanitized-data", documents["sdp/sdp_stats.json"]
     )
     _assert_public_safe(documents["sdp/publication_status.json"])
     compressed: dict[str, bytes] = {}
     inventory: dict[str, Any] = {}
     for relative in sorted(PUBLIC_FILES):
         if relative.startswith("data/"):
-            body = (output / "sanitized-data" / relative.removeprefix("data/")).read_bytes()
+            body = (staging / "sanitized-data" / relative.removeprefix("data/")).read_bytes()
         else:
             body = _canonical_json_bytes(documents[relative], indent=2)
         inventory[relative] = {"sha256": _sha(body), "size_bytes": len(body)}

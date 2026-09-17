@@ -1,5 +1,11 @@
 # SDP primary operations
 
+September 17 storage update: the owner-authorized two-hour refresh now uses
+bounded full-copy retention. See
+[`operational-storage-retention-2026-09-17.md`](operational-storage-retention-2026-09-17.md)
+for the single post-success recovery snapshot, two retained Dashboard generations,
+immutable source exclusions, and preserved capture-health receipts.
+
 This runbook implements the [owner's architecture decision](sdp-primary-architecture-decision-2026-09-07.md).
 It applies only to the V2 branch. Preserve research databases, payloads, results and claim records.
 Use a persistent Python environment installed from this checkout and an explicit separate

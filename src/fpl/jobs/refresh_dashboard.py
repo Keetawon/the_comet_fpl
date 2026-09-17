@@ -24,6 +24,7 @@ from fpl.artifacts.optimizer_plan import read_optimizer_artifact
 from fpl.config import config_dir, repo_root
 from fpl.jobs import daily_pl_sdp
 from fpl.jobs.build_sdp_dashboard import build
+from fpl.jobs.operational_retention import create_recovery, prune_runs
 from fpl.storage.db import connect, default_db_path
 from fpl.storage.outcomes import attach_finalized_outcomes
 
@@ -167,7 +168,12 @@ def main(argv: list[str] | None = None) -> int:
     started = datetime.now(UTC)
     destination = args.runs / f"dashboard-{started.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
     destination.mkdir()
-    report: dict[str, Any] = {"started_at": started.isoformat(), "status": "FAILED"}
+    report: dict[str, Any] = {
+        "started_at": started.isoformat(),
+        "status": "FAILED",
+        "database": str(args.db.resolve()),
+        "retention_policy_version": 1,
+    }
     logging.basicConfig(level=logging.INFO)
     try:
         if not args.skip_capture:
@@ -216,10 +222,35 @@ def main(argv: list[str] | None = None) -> int:
         (destination / "receipt.json").write_text(
             json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8"
         )
+        if (
+            report["status"] == "COMPLETE"
+            and report.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
+        ):
+            try:
+                # The durable successful receipt and cycle lock precede pruning.
+                report["recovery_backup"] = create_recovery(args.db, destination)
+                (destination / "receipt.json").write_text(
+                    json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
+                    encoding="utf-8",
+                )
+                report["retention"] = prune_runs(
+                    args.db,
+                    args.runs,
+                    args.forecast_dir,
+                    recovery=Path(report["recovery_backup"]["path"]),
+                )
+            except Exception as exc:
+                report["retention"] = {"status": "BLOCKED", "error": f"{type(exc).__name__}: {exc}"}
+                logging.exception("Refresh completed but retention was blocked")
+            (destination / "receipt.json").write_text(
+                json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
+                encoding="utf-8",
+            )
         lock.unlink()
     print(json.dumps({"receipt": str(destination / "receipt.json"), **report}, sort_keys=True))
     published = report.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
-    return 0 if report["status"] == "COMPLETE" and published else 1
+    retained = report.get("retention", {}).get("status", "COMPLETE") == "COMPLETE"
+    return 0 if report["status"] == "COMPLETE" and published and retained else 1
 
 
 if __name__ == "__main__":
