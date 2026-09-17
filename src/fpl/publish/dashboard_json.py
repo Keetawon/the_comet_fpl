@@ -32,7 +32,7 @@ import polars as pl
 # The atomic-publish machinery (lock, generation swap, no-clobber, fsync) and the strict
 # JSON helpers are shared with the Parquet exporter; import rather than fork a second copy.
 from fpl.publish.contract import SEMANTIC_CONTRACT_VERSION
-from fpl.publish.current_availability import validate_current_availability
+from fpl.publish.current_availability import validate_current_availability, validate_current_price
 from fpl.publish.export import (
     BI_EXPORT_SCHEMA,
     BI_EXPORT_SCHEMA_VERSION,
@@ -4196,6 +4196,10 @@ def _validate_directory(
             validate_current_availability(player, exported_at=manifest["generated_at"])
         except (ValueError, TypeError) as exc:
             raise DashboardJsonError(f"players.json current availability: {exc}") from exc
+        try:
+            validate_current_price(player, exported_at=manifest["generated_at"])
+        except (ValueError, TypeError) as exc:
+            raise DashboardJsonError(f"players.json current price: {exc}") from exc
     _validate_player_actual_generation(documents)
     _validate_team_actual_generation(documents)
     provisional_files = _PROVISIONAL_READ_MODEL_FILENAMES & documents.keys()

@@ -393,7 +393,7 @@ export function PlayersPage() {
     const wanted = runPlayers.filter(
       (player) =>
         (managerSquad == null || managerSquad.playerCodes.has(player.code)) &&
-        matchesPlayerFilters(player, sharedFilters) &&
+        matchesPlayerFilters(player, sharedFilters, "current") &&
         matchesPlayerMultiFilters(player, playerMultiFilters),
     );
     return wanted.map((player) => {
@@ -710,6 +710,9 @@ export function PlayersPage() {
     playerFilters.minMinutes === ""
       ? undefined
       : "AI explanation is unavailable while Min min/g is active because that selected-Actual-range metric is not part of the typed public insight contract. Deterministic facts remain available.";
+  const currentPriceInsightUnavailableReason = playerFilters.minPrice !== "" || playerFilters.maxPrice !== ""
+    ? "AI explanation is unavailable while current FPL price filters are active because the renderer uses forecast-vintage prices. Deterministic facts remain available."
+    : undefined;
 
   return (
     <div className="flex flex-col gap-3 p-4 lg:p-6">
@@ -860,6 +863,7 @@ export function PlayersPage() {
               onChange={setPlayerFilters}
               teams={teams}
               showFormWindow={false}
+              priceSource="current"
               minutesFilterKind="selected_actual_per_game"
               multiSelect={{
                 players: runPlayers,
@@ -964,6 +968,7 @@ export function PlayersPage() {
         <PlayerStatTable
           fullscreenLabel="Players table"
           pageSize={25}
+          priceSource="current"
           rows={rows}
           view={filters.view}
           colorSource={colorSource}
@@ -995,9 +1000,10 @@ export function PlayersPage() {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Current availability and chance-of-playing come from the latest published FPL report;
+        Prices, current availability and chance-of-playing come from the latest published FPL report;
         hover for its gameweek, capture time and news, or expand a player to view them. Legacy
-        packages label forecast status with its original date. Neither changes xP. Player-fixture probabilities are
+        packages label forecast status with its original date; missing current prices stay unavailable.
+        Price filters and sorting use the displayed current prices. Forecast/plan prices and xP stay unchanged. Player-fixture probabilities are
         null until the ledger persists them — never 0. Club λ/ease/CS are the primitives behind
         the chip colour.
       </p>
@@ -1028,6 +1034,7 @@ export function PlayersPage() {
           unavailableReason: managerSquad
             ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
             : minutesPerGameInsightUnavailableReason ??
+              currentPriceInsightUnavailableReason ??
               unavailablePlayerInsightReason ??
               provisionalInsightUnavailableReason ??
               multiSelectInsightUnavailableReason,

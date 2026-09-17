@@ -378,7 +378,7 @@ def _read_documents(directory: Path) -> dict[str, dict[str, Any]]:
 
 
 @pytest.mark.parametrize("available", [False, True])
-def test_current_availability_is_additive_resealed_and_public_safe(
+def test_current_reporting_is_additive_resealed_and_public_safe(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, available: bool
 ) -> None:
     from fpl.publish import current_availability as overlay
@@ -391,6 +391,7 @@ def test_current_availability_is_additive_resealed_and_public_safe(
             "availability_status": "a",
             "chance_of_playing": None,
             "availability_multiplier": 1.0,
+            "now_cost": 50,
             "fixtures": [{"expected_points": 7.25}],
         }
     )
@@ -410,10 +411,26 @@ def test_current_availability_is_additive_resealed_and_public_safe(
         "next_gw": 1,
         "semantics": "current_reported_not_forecast",
     }
+    price = {
+        key: value[key]
+        for key in (
+            "source",
+            "season",
+            "code",
+            "captured_at",
+            "capture_id",
+            "source_sha256",
+            "semantics",
+        )
+    } | {"now_cost": 49}
     monkeypatch.setattr(
         overlay,
-        "current_availability",
-        lambda *a, **kw: {("2026-27", 1): value} if available else {},
+        "current_reporting",
+        lambda *a, **kw: (
+            {("2026-27", 1): {"current_availability": value, "current_price": price}}
+            if available
+            else {}
+        ),
     )
     output = tmp_path / "overlaid"
     with duckdb.connect() as con:
@@ -422,10 +439,14 @@ def test_current_availability_is_additive_resealed_and_public_safe(
         )
     updated = _read_documents(output)[PLAYERS_FILENAME]["players"][0]
     assert updated.pop("current_availability") == (value if available else None)
+    assert updated.pop("current_price") == (price if available else None)
     assert updated == player
     assert report["matched_player_rows"] == int(available)
     assert report["unavailable_player_rows"] == int(not available)
     assert report["changed_from_forecast_players"] == int(available)
+    assert report["price_matched_player_rows"] == int(available)
+    assert report["price_unavailable_player_rows"] == int(not available)
+    assert report["price_changed_from_forecast_players"] == int(available)
     assert {p.name: p.read_bytes() for p in source.iterdir()} == before
     for filename, body in before.items():
         if filename not in (PLAYERS_FILENAME, MANIFEST_FILENAME):
@@ -435,6 +456,8 @@ def test_current_availability_is_additive_resealed_and_public_safe(
     assert first.archive_sha256 == second.archive_sha256
     public_player = _read_documents(first.output_dir)[PLAYERS_FILENAME]["players"][0]
     assert public_player["current_availability"] == (value if available else None)
+    assert public_player["current_price"] == (price if available else None)
+    assert public_player["now_cost"] == 50
     assert public_player["availability_status"] == "a"
     assert public_player["fixtures"] == [{"expected_points": 7.25}]
     assert (
@@ -446,6 +469,18 @@ def test_current_availability_is_additive_resealed_and_public_safe(
         corrupted[PLAYERS_FILENAME]["players"][0]["current_availability"] = {**value, "code": 999}
         with pytest.raises(DashboardJsonError, match="current availability"):
             _write_generation(tmp_path / "wrong-identity", corrupted)
+        corrupted[PLAYERS_FILENAME]["players"][0]["current_availability"] = value
+        corrupted[PLAYERS_FILENAME]["players"][0]["current_price"] = {**price, "code": 999}
+        with pytest.raises(DashboardJsonError, match="current price"):
+            _write_generation(tmp_path / "wrong-price-identity", corrupted)
+        price["captured_at"] = "2026-08-22T11:00:00Z"
+        with duckdb.connect() as con:
+            with pytest.raises(ValueError, match="current price capture postdates export"):
+                overlay.refresh_current_availability(
+                    con, source, tmp_path / "rejected", as_of=datetime(2026, 8, 23, tzinfo=UTC)
+                )
+        assert not (tmp_path / "rejected").exists()
+        assert {p.name: p.read_bytes() for p in source.iterdir()} == before
 
 
 def test_packages_only_formal_plans_and_reseals_a_deterministic_root_zip(tmp_path: Path) -> None:

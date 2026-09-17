@@ -284,6 +284,34 @@ afterEach(() => {
 });
 
 describe("PlayersPage", () => {
+  it("displays, sorts and filters current FPL prices while preserving forecast prices and xP", async () => {
+    const user = userEvent.setup();
+    const players: PlayerRecord[] = playersWithActuals.map((player, index) => ({
+      ...player, now_cost: index === 0 ? 48 : 60,
+      current_price: {
+        source: "FPL", season: player.season, code: player.code, now_cost: index === 0 ? 49 : 45,
+        captured_at: "2026-09-17T13:40:49Z", capture_id: "latest", source_sha256: "b".repeat(64),
+        semantics: "current_reported_not_forecast",
+      },
+    }));
+    const before = JSON.stringify(players);
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    render(<PlayersPage />);
+    expect(await screen.findByText("£4.9m")).toHaveAttribute("title", expect.stringContaining("Current FPL price"));
+    expect(screen.getByText("£4.5m")).toBeInTheDocument();
+    expect(screen.queryByText("£4.8m")).not.toBeInTheDocument();
+    await user.click(within(screen.getByRole("columnheader", { name: "Price" })).getByRole("button"));
+    const names = () => screen.getAllByRole("button", { name: "Expand fixtures" }).map(button => button.closest("tr")!.textContent);
+    expect(names()[0]).toContain("Alpha"); // Current 4.9 > 4.5; forecast prices order the other way.
+    await user.type(screen.getByRole("spinbutton", { name: "Maximum price in millions" }), "4.8");
+    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(screen.getByText(/AI explanation is unavailable while current FPL price filters are active/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByTitle("Published xP for GW1: 7.4")).toHaveTextContent("7.4");
+    expect(JSON.stringify(players)).toBe(before);
+  });
+
   it("shows the latest FPL report in the table and expanded profile while retaining forecast xP", async () => {
     const user = userEvent.setup();
     const player = playersWithActuals[0];

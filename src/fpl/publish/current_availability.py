@@ -1,4 +1,4 @@
-"""Current official reporting alongside immutable forecast-vintage availability."""
+"""Current official reporting alongside immutable forecast-vintage fields."""
 
 from __future__ import annotations
 
@@ -15,29 +15,54 @@ import duckdb
 
 from fpl.ingest.live_snapshot import capture_payload
 
-_FIELDS = {
+_SOURCE_FIELDS = {
     "source",
     "season",
     "code",
+    "captured_at",
+    "capture_id",
+    "source_sha256",
+    "semantics",
+}
+_FIELDS = _SOURCE_FIELDS | {
     "status",
     "chance_of_playing_next_round",
     "news",
     "news_added",
-    "captured_at",
-    "capture_id",
-    "source_sha256",
     "next_gw",
-    "semantics",
 }
 
 
-def _timestamp(value: object) -> datetime:
+def _timestamp(value: object, *, label: str = "current availability") -> datetime:
     if not isinstance(value, str):
-        raise ValueError("current availability timestamp must be an ISO string")
+        raise ValueError(f"{label} timestamp must be an ISO string")
     stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if stamp.tzinfo is None or stamp.utcoffset() is None:
-        raise ValueError("current availability timestamp must be timezone-aware")
+        raise ValueError(f"{label} timestamp must be timezone-aware")
     return stamp.astimezone(UTC)
+
+
+def _validate_source(
+    value: Mapping[str, Any], player: Mapping[str, Any], *, exported_at: str, label: str
+) -> datetime:
+    if (
+        value["source"] != "FPL"
+        or value["semantics"] != "current_reported_not_forecast"
+        or value["season"] != player["season"]
+        or type(value["code"]) is not int
+        or value["code"] != player["code"]
+    ):
+        raise ValueError(f"{label} identity or semantics mismatch")
+    if not isinstance(value["capture_id"], str) or not value["capture_id"].strip():
+        raise ValueError(f"{label} capture identity missing")
+    if not isinstance(value["source_sha256"], str) or not re.fullmatch(
+        r"[0-9a-f]{64}", value["source_sha256"]
+    ):
+        raise ValueError(f"invalid {label} source hash")
+    captured_at = _timestamp(value["captured_at"], label=label)
+    if captured_at > _timestamp(exported_at, label=label):
+        raise ValueError(f"{label} capture postdates export")
+    return captured_at
 
 
 def validate_current_availability(player: Mapping[str, Any], *, exported_at: str) -> None:
@@ -47,14 +72,9 @@ def validate_current_availability(player: Mapping[str, Any], *, exported_at: str
         return
     if not isinstance(value, dict) or set(value) != _FIELDS:
         raise ValueError("malformed current availability fields")
-    if (
-        value["source"] != "FPL"
-        or value["semantics"] != "current_reported_not_forecast"
-        or value["season"] != player["season"]
-        or type(value["code"]) is not int
-        or value["code"] != player["code"]
-    ):
-        raise ValueError("current availability identity or semantics mismatch")
+    captured_at = _validate_source(
+        value, player, exported_at=exported_at, label="current availability"
+    )
     if value["status"] is not None and (
         not isinstance(value["status"], str)
         or value["status"] not in {"a", "d", "i", "s", "u", "n", "x"}
@@ -68,20 +88,30 @@ def validate_current_availability(player: Mapping[str, Any], *, exported_at: str
         raise ValueError("invalid current availability next gameweek")
     if value["news"] is not None and not isinstance(value["news"], str):
         raise ValueError("invalid current availability news")
-    if not isinstance(value["capture_id"], str) or not value["capture_id"].strip():
-        raise ValueError("current availability capture identity missing")
-    if not isinstance(value["source_sha256"], str) or not re.fullmatch(
-        r"[0-9a-f]{64}", value["source_sha256"]
-    ):
-        raise ValueError("invalid current availability source hash")
-    captured_at = _timestamp(value["captured_at"])
-    if captured_at > _timestamp(exported_at):
-        raise ValueError("current availability capture postdates export")
     if value["news_added"] is not None and _timestamp(value["news_added"]) > captured_at:
         raise ValueError("current availability news postdates capture")
 
 
-def current_availability(
+def validate_current_price(player: Mapping[str, Any], *, exported_at: str) -> None:
+    """Current price is optional reported integer tenths, never a forecast replacement."""
+    value = player.get("current_price")
+    if value is None:
+        return
+    if not isinstance(value, dict) or set(value) != _SOURCE_FIELDS | {"now_cost"}:
+        raise ValueError("malformed current price fields")
+    _validate_source(value, player, exported_at=exported_at, label="current price")
+    cost = value["now_cost"]
+    if cost is not None and (type(cost) is not int or cost <= 0):
+        raise ValueError("invalid current price: expected positive integer tenths or null")
+    availability = player.get("current_availability")
+    if availability is not None and (
+        not isinstance(availability, dict)
+        or any(value[k] != availability.get(k) for k in _SOURCE_FIELDS)
+    ):
+        raise ValueError("current price and availability source mismatch")
+
+
+def current_reporting(
     con: duckdb.DuckDBPyConnection, *, as_of: datetime
 ) -> dict[tuple[str, int], dict[str, Any]]:
     """Select one complete retained bootstrap per season, never fill from older players."""
@@ -196,8 +226,23 @@ def current_availability(
                 {"season": season, "code": code, "current_availability": value},
                 exported_at=as_of.isoformat(),
             )
-            result[(season, code)] = value
+            price = {k: value[k] for k in _SOURCE_FIELDS} | {"now_cost": player.get("now_cost")}
+            report = {"current_availability": value, "current_price": price}
+            validate_current_price(
+                {"season": season, "code": code, **report}, exported_at=as_of.isoformat()
+            )
+            result[(season, code)] = report
     return result
+
+
+def current_availability(
+    con: duckdb.DuckDBPyConnection, *, as_of: datetime
+) -> dict[tuple[str, int], dict[str, Any]]:
+    """Retain the availability-only API for callers without current-price reporting."""
+    return {
+        key: report["current_availability"]
+        for key, report in current_reporting(con, as_of=as_of).items()
+    }
 
 
 def refresh_current_availability(
@@ -208,15 +253,26 @@ def refresh_current_availability(
     from fpl.publish.export import _canonical_json_bytes, _sha256_bytes
 
     manifest = validate_dashboard_json(source)
-    available = current_availability(con, as_of=as_of)
+    reporting = current_reporting(con, as_of=as_of)
+    available = {key: report["current_availability"] for key, report in reporting.items()}
     document = json.loads((source / "players.json").read_bytes())
     matched = 0
     changed = 0
     changed_players: set[tuple[str, int]] = set()
+    price_matched = 0
+    price_changed = 0
+    price_changed_players: set[tuple[str, int]] = set()
     for player in document["players"]:
         key = (player["season"], player["code"])
         value = available.get(key)
         player["current_availability"] = value
+        price = reporting.get(key, {}).get("current_price")
+        player["current_price"] = price
+        if price is not None and price["now_cost"] is not None:
+            price_matched += 1
+            if price["now_cost"] != player.get("now_cost"):
+                price_changed += 1
+                price_changed_players.add(key)
         matched += value is not None
         if value is not None and (
             value["status"] != player.get("availability_status")
@@ -224,6 +280,8 @@ def refresh_current_availability(
         ):
             changed += 1
             changed_players.add(key)
+        validate_current_availability(player, exported_at=manifest["generated_at"])
+        validate_current_price(player, exported_at=manifest["generated_at"])
     shutil.copytree(source, output)
     payload = _canonical_json_bytes(document, indent=2)
     (output / "players.json").write_bytes(payload)
@@ -237,6 +295,10 @@ def refresh_current_availability(
         "unavailable_player_rows": len(document["players"]) - matched,
         "changed_from_forecast_player_rows": changed,
         "changed_from_forecast_players": len(changed_players),
+        "price_matched_player_rows": price_matched,
+        "price_unavailable_player_rows": len(document["players"]) - price_matched,
+        "price_changed_from_forecast_player_rows": price_changed,
+        "price_changed_from_forecast_players": len(price_changed_players),
         "sources": list(
             {
                 v["season"]: {

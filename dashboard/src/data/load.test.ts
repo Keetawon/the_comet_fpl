@@ -243,6 +243,30 @@ describe("loadNextGw schema boundary", () => {
 });
 
 describe("shared schema-v9 envelope", () => {
+  const currentPrice = {
+    source: "FPL", season: playersSample.players[0].season, code: playersSample.players[0].code,
+    now_cost: 49, captured_at: "2026-09-17T13:40:49Z", capture_id: "latest",
+    source_sha256: "b".repeat(64), semantics: "current_reported_not_forecast",
+  };
+  it("loads current price independently of the frozen price and keeps null explicit", async () => {
+    for (const current_price of [currentPrice, { ...currentPrice, now_cost: null }, null]) {
+      const record = { ...playersSample.players[0], now_cost: 48, current_price };
+      const loaded = await loadPlayersPayload({ ...playersSample, players: [record] });
+      expect(loaded.players[0]).toEqual(record);
+      expect(loaded.players[0].now_cost).toBe(48);
+    }
+  });
+  it.each([
+    { source: "other" }, { season: "wrong" }, { code: -1 }, { semantics: "forecast" },
+    { now_cost: undefined }, { now_cost: 0 }, { now_cost: -1 }, { now_cost: 49.5 },
+    { now_cost: "49" }, { now_cost: true }, { captured_at: "yesterday" },
+    { capture_id: "" }, { source_sha256: "invalid" },
+  ])("rejects malformed current price: %j", async patch => {
+    await expect(loadPlayersPayload({ ...playersSample, players: [{
+      ...playersSample.players[0], current_price: { ...currentPrice, ...patch },
+    }] })).rejects.toThrow(/current_price/);
+  });
+
   const reported = {
     source: "FPL", season: playersSample.players[0].season, code: playersSample.players[0].code,
     status: "d", chance_of_playing_next_round: 75, news: "Unspecified injury", news_added: null,

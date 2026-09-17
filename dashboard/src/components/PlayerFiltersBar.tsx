@@ -15,6 +15,7 @@ import {
 import type { PlayerRecord, WindowLabel } from "@/data/types";
 import { WINDOW_LABELS } from "@/data/types";
 import { AVAILABILITY_LABEL, currentAvailability } from "@/lib/availability";
+import { playerPrice, type PlayerPriceSource } from "@/lib/playerPrice";
 
 export interface PlayerFilters {
   position: string; // "all" | GK | DEF | MID | FWD
@@ -62,7 +63,7 @@ export const FORM_WINDOW_LABEL: Record<WindowLabel, string> = {
   season_to_date: "Season",
 };
 
-export function matchesPlayerFilters(p: PlayerRecord, f: PlayerFilters): boolean {
+export function matchesPlayerFilters(p: PlayerRecord, f: PlayerFilters, priceSource: PlayerPriceSource = "forecast"): boolean {
   const current = currentAvailability(p);
   if (f.hideUnavailable && current?.status === "u") return false;
   const minPrice = f.minPrice === "" ? null : Number(f.minPrice) * 10;
@@ -70,8 +71,9 @@ export function matchesPlayerFilters(p: PlayerRecord, f: PlayerFilters): boolean
   const minMinutes = f.minMinutes === "" ? null : Number(f.minMinutes);
   if (f.position !== "all" && p.position !== f.position) return false;
   if (f.teamCode !== "all" && String(p.team_code) !== f.teamCode) return false;
-  if (minPrice != null && !(p.now_cost != null && p.now_cost >= minPrice)) return false;
-  if (maxPrice != null && !(p.now_cost != null && p.now_cost <= maxPrice)) return false;
+  const cost = playerPrice(p, priceSource);
+  if (minPrice != null && !(cost != null && cost >= minPrice)) return false;
+  if (maxPrice != null && !(cost != null && cost <= maxPrice)) return false;
   if (minMinutes != null && !(p.avg_minutes_last_5 != null && p.avg_minutes_last_5 >= minMinutes))
     return false;
   const status = current?.status;
@@ -87,6 +89,7 @@ interface PlayerFiltersBarProps {
   teams: [number, string][];
   /** The form-window select does not apply everywhere (e.g. the plan-builder picker); hide it there. */
   showFormWindow?: boolean;
+  priceSource?: PlayerPriceSource;
   /** Players-table mode follows its explicit observed Actual range; all other routes keep L5. */
   minutesFilterKind?: "forecast_last_five" | "selected_actual_per_game";
   /** Players-table mode: searchable names plus multi-select position/team dimensions. */
@@ -102,6 +105,7 @@ export function PlayerFiltersBar({
   onChange,
   teams,
   showFormWindow = true,
+  priceSource = "forecast",
   minutesFilterKind = "forecast_last_five",
   multiSelect,
 }: PlayerFiltersBarProps) {
@@ -197,7 +201,9 @@ export function PlayerFiltersBar({
         </>
       )}
       <div className="flex items-center gap-1">
-        <span>Price £m</span>
+        <span title={priceSource === "current" ? "Latest captured FPL purchase price" : "Price recorded with the selected forecast"}>
+          {priceSource === "current" ? "Price now £m" : "Forecast price £m"}
+        </span>
         <Input
           type="number"
           inputMode="decimal"
