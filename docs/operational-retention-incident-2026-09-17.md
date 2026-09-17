@@ -65,3 +65,20 @@ the lost historical publication source snapshots documented above.
 No model, configuration, forecast, scoring method, availability policy, or source
 knowledge timestamp changed. This correction prevents further missed-reference
 deletions; it cannot reverse the three deletions recorded above.
+
+## Corrected operational verification
+
+The corrected local-only refresh completed at 09:45 UTC with capture skipped,
+the existing plan reused, and no forecast regenerated. Its retention receipt
+`retention-20260917T094543Z-2805e0aa.json` completed at 09:46:43 UTC and retired
+three session-created copies only after verifying their bytes were identical
+to the surviving recovery. The independently verified publication source with
+SHA256 `57da817269a8f5616fe0bcfad2e4865c93039b021613908965a0a9e3948491a3`
+remains present. The final manual retirement of the previous ordinary recovery
+at 09:49 UTC left one ordinary recovery, with protected source exceptions.
+
+The interrupted cycle's lock was retired separately only after proving its
+owning process had stopped and recording its original ownership and the reason.
+Unresolved legacy operational database lock/WAL files were not removed. The
+new successful retention receipt does not replace or repair the interrupted
+receipt or its missing historical database copies.

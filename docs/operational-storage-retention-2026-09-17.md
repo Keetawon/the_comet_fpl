@@ -110,6 +110,27 @@ immutable-row comparisons, recovery mismatch, concurrent live-DB advancement,
 source pins, health preservation, failure paths and R2 temporary cleanup.
 Ruff, changed-file formatting and strict mypy (three source modules) passed.
 
+After the source-pin correction, the final eight-file regression group passed
+**164 tests**. One local-only refresh using `--skip-capture` then completed,
+reused the plan, and recorded `forecast_regenerated: false`. Its retention receipt
+`retention-20260917T094543Z-2805e0aa.json` is `COMPLETE`: three byte-identical
+session-created duplicates totaling 8,324,419,584 bytes were removed, with the
+verified 2,774,806,528-byte recovery retained. These temporary duplicates are
+not additional pre-existing cleanup savings.
+
+At 09:49 UTC a separate guarded deletion retired the previous ordinary recovery
+only after fresh equal-hash checks, reference checks and a read lease on its
+surviving peer. The nine safe manual cleanup receipts total **81,667,541,846
+bytes**; D: had **87,572,037,632 bytes free**. One ordinary recovery copy remains.
+Pinned source copies and reviewed legacy generations remain explicit exceptions.
+All 226 frozen/model/config/research files and 10 forecast files still matched
+their baseline hashes after corrected retention. The three source copies lost
+in the earlier incident are separate and have not been restored.
+
+This local-only run verifies rebuilding and retention, not a fresh provider
+capture. The scheduled task remains enabled with its existing two-hour/sign-in
+triggers; its earlier disk-full capture failure remains in the health record.
+
 R2 publication is separate: the first public generation is uploaded and its HTTP
 CORS checks pass. Browser verification, frontend cutover and the optional scheduled
 R2 argument retain their own readiness

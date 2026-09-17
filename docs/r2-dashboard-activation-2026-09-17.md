@@ -66,11 +66,16 @@ copies and stale synthetic tests/exports were removed, restoring capacity.
 The new policy retains one verified post-success operational recovery copy,
 two Dashboard generations, and all required frozen source evidence. See
 [the storage cleanup and retention record](operational-storage-retention-2026-09-17.md).
-No active database, forecast, raw evidence, model, credential, lock or WAL was removed.
+No active database, forecast, model or credential was removed. A later retention
+verification defect deleted three historical publication database copies; their
+immutable raw rows survive, but exact database bytes are not restored. See the
+[incident record](operational-retention-incident-2026-09-17.md). Only that stopped
+verification process's resolved cycle lock was subsequently retired with recorded
+ownership checks; unresolved legacy database locks/WALs remain untouched.
 
 The existing two-hour/sign-in task is enabled, but its action still lacks
-`--r2-config`. Do not claim automatic public updates: first finish live CORS and
-browser verification, verify the recovered operational flow, and complete the reviewed
+`--r2-config`. Do not claim automatic public updates: CORS and corrected local
+rebuild/retention now pass, but finish browser verification and the reviewed
 frontend cutover. Preserve the existing task's locks, backups and identity when
 adding its optional publication argument.
 
