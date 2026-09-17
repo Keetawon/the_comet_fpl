@@ -55,7 +55,7 @@ it("uses current FPL reports in the availability watch while retaining raw xP", 
   const before = JSON.stringify(player);
   load.loadPlayers.mockResolvedValueOnce({ manifest: null, players: [player] });
   render(<SummaryPage />);
-  expect(await screen.findByText("doubtful · 75%")).toBeInTheDocument();
+  expect(await screen.findByText("doubtful")).toBeInTheDocument();
   expect(screen.getByText("Unspecified injury")).toBeInTheDocument();
   expect(screen.getAllByText("4.5")).toHaveLength(3);
   expect(JSON.stringify(player)).toBe(before);

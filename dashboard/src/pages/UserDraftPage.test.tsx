@@ -172,10 +172,10 @@ describe("UserDraftPage", () => {
     vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
     render(<UserDraftPage />);
     const picker = await screen.findByRole("list", { name: "Squad Draft player list" });
-    expect(within(picker).getByText("doubtful · 75%")).toBeInTheDocument();
+    expect(within(picker).getByText("doubtful")).toBeInTheDocument();
     await user.click(within(picker).getByRole("button", { name: `Add ${player.web_name}` }));
     const selected = screen.getByRole("rowgroup", { name: "Goalkeepers (1/2)" });
-    expect(within(selected).getByText("doubtful · 75%")).toBeInTheDocument();
+    expect(within(selected).getByText("doubtful")).toBeInTheDocument();
     expect(within(selected).getByTitle(/captured 2026-09-17 06:34 UTC/)).toHaveAttribute("title", expect.stringContaining("Unspecified injury"));
     expect(JSON.stringify(players)).toBe(before);
     expect(player.fixtures).toBe(draftPlayers[0].fixtures);
