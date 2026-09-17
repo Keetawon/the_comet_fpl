@@ -1,21 +1,21 @@
 {
   "asset_name": "dashboard-public-data.zip",
-  "asset_sha256": "f66d95c2df3088f06d86cde9c02a2789a0c2a7a5b41a62f4442c04419307355f",
-  "asset_size_bytes": 14890953,
+  "asset_sha256": "1114f92d19f30216d7b9f505d77b7362f17c88a42c946ac6b8bd4bfdd2c03c84",
+  "asset_size_bytes": 14891002,
   "competitive_schedule_asset": {
     "name": "competitive_schedule.json",
-    "sha256": "33df7b92c9802f6dd5dd0ce79068850fef06dcbc8483e4aa36fa7d970414d638",
-    "size_bytes": 31259
+    "sha256": "94437952c5c01c6eb4c22a1fc78b8ed8e550c11975fc4dcbc58c56d003e6f717",
+    "size_bytes": 33388
   },
-  "manifest_content_sha256": "c5ceae2a3e3614ba4e7a9bf37619cfd972864fc7ee34d9dbc571b2698be8c21d",
-  "release_tag": "dashboard-data-c5ceae2a3e36",
+  "manifest_content_sha256": "10a2db48d1b2b26c02d1baf02eebffb5df01c3097a17c3bf92b29bed7e270453",
+  "release_tag": "dashboard-data-10a2db48d1b2-goals-20260917",
   "repository": "Keetawon/the_comet_fpl",
   "schema": "fpl.dashboard-public-release-pin",
   "schema_version": 1,
   "sdp_asset": {
     "name": "sdp_stats.json",
-    "sha256": "4b85bff05c3d71c2b6d9319747a46c10c887b3b36218180074174d91a6965c09",
-    "size_bytes": 13632494
+    "sha256": "ca03c19b6350d4bc55d7e77009a5fd05320d54652da1f17d07230bf11f07eb0c",
+    "size_bytes": 13633623
   },
   "status": "published"
 }

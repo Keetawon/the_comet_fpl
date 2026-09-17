@@ -39,8 +39,12 @@ https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your
 GitHub subsequently reported an **approved** certificate covering both
 `www.thecometfpl.com` and `thecometfpl.com`, expiring 2026-12-16. **Enforce HTTPS was
 enabled.** DNS, repository default branch, main content and Worker settings were
-unchanged. Approval is distinct from TLS rollout to every serving edge; check the
-actual served certificate before declaring worldwide readiness.
+unchanged. Approval is distinct from TLS rollout to every serving edge. At
+04:33 UTC the real HTTPS site returned 200 with normal certificate validation.
+At 04:35 UTC isolated Chrome loaded the actual public site (no asset interception,
+no TLS bypass) and imported the reported manager's 15 players on a 390px mobile
+viewport. API preflight returned 204 and import returned 200; no runtime errors.
+The local resolver was bypassed only with independently verified provider IPs.
 
 Cached HTTP pages now receive a specific secure-site explanation on network failure
 instead of only a generic retry message. No TLS verification is bypassed.
@@ -50,6 +54,7 @@ instead of only a generic retry message. No TLS verification is bypassed.
 - 77 focused import/draft/privacy tests passed, TypeScript and lint passed (nine
   inherited Fast Refresh warnings). The full normal-environment suite passed
   512 tests before the final HTTP error-message regression was added.
+- The final shared-helper suite passed 18 tests, including HTTPS-only error guidance.
 - One initial full-suite invocation inadvertently inherited hosted build variables,
   disabling local-only test paths; it was rerun with the normal test environment.
   Those failures were test invocation errors, not evidence of inherited app defects.
@@ -69,3 +74,9 @@ instead of only a generic retry message. No TLS verification is bypassed.
 The separately committed goal-pattern fix and corrected sanitized data companion
 are described in `sdp-goal-pattern-refresh-2026-09-17.md`. Original predictions,
 model configuration and frozen scientific artifacts are unchanged.
+
+The new immutable release `dashboard-data-10a2db48d1b2-goals-20260917` reuses the
+completed capture's sanitized ZIP and calendar, plus the corrected SDP companion.
+The exact hash pin is updated on the working branch. It becomes the public data
+vintage only when the follow-up change reaches main through owner review. Existing
+live Squad Draft HTTPS import is fixed independently of that frontend publication.
