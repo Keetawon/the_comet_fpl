@@ -648,7 +648,9 @@ describe("PlayersPage", () => {
     vi.mocked(fetchManagerTeamMembers).mockResolvedValueOnce(managerPreview(squad));
 
     render(<PlayersPage />);
-    await waitFor(() => expect(screen.getByText("1–50 of 60")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("1–25 of 60")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByText("26–50 of 60")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next page" }));
     expect(await screen.findByText("51–60 of 60")).toBeInTheDocument();
 
