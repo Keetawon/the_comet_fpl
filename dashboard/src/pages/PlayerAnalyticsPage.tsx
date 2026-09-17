@@ -452,7 +452,7 @@ export function PlayerAnalyticsPage() {
   const unavailablePlayerInsightReason =
     filters.hideUnavailable && exactRunPlayers.some((player) => currentAvailability(player)?.status === "u")
       ? "AI explanation is unavailable while unavailable players are hidden because this display filter is outside the renderer contract. Deterministic facts use the visible players."
-      : filters.availability !== "all"
+      : filters.availabilityStatuses.length > 0
         ? "AI explanation is unavailable while current FPL availability filters are active because the renderer uses forecast-vintage status. Deterministic facts remain available."
         : undefined;
 
@@ -848,7 +848,7 @@ export function PlayerAnalyticsPage() {
                 min_price_tenths: minPriceTenthsScope(filters.minPrice),
                 max_price_tenths: maxPriceTenthsScope(filters.maxPrice),
                 min_avg_minutes_l5: minAverageMinutesScope(filters.minMinutes),
-                availability: filters.availability,
+                availability: "all", // Current status selections disable this forecast-vintage renderer above.
                 past_metric:
                   pastMetric === "xgi_per_90"
                     ? undefined

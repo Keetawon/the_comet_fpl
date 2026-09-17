@@ -302,7 +302,9 @@ describe("PlayersPage", () => {
     await user.click(screen.getByRole("button", { name: "Expand fixtures" }));
     expect(screen.getByText("Unspecified injury")).toBeInTheDocument();
     expect(screen.getByText(/FPL · 2026-27 GW5 · captured 2026-09-17 06:34 UTC/)).toBeInTheDocument();
-    await user.click(within(screen.getByRole("radiogroup", { name: "Availability filter" })).getByRole("radio", { name: "Flagged" }));
+    await user.click(screen.getByRole("button", { name: "Availability filter: All statuses" }));
+    await user.click(screen.getByRole("checkbox", { name: "Doubtful" }));
+    await user.keyboard("{Escape}");
     expect(screen.getByText(/AI explanation is unavailable while current FPL availability filters are active/)).toBeInTheDocument();
     expect(screen.getByText("Alpha")).toBeInTheDocument();
     expect(JSON.stringify(players)).toBe(before);
@@ -1970,14 +1972,17 @@ describe("PlayersPage", () => {
 
     const view = screen.getByRole("radiogroup", { name: "View" });
     const venue = screen.getByRole("radiogroup", { name: "Venue filter" });
-    const availability = screen.getByRole("radiogroup", { name: "Availability filter" });
+    const availability = screen.getByRole("button", { name: "Availability filter: All statuses" });
     const minPrice = screen.getByRole("spinbutton", { name: "Minimum price in millions" });
 
     await user.click(within(view).getByRole("radio", { name: "Defense" }));
     await user.click(within(venue).getByRole("radio", { name: "Away" }));
     expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
     expect(screen.getByText(/dense Players table omits the six overlapping/i)).toBeInTheDocument();
-    await user.click(within(availability).getByRole("radio", { name: "Flagged" }));
+    await user.click(availability);
+    await user.click(screen.getByRole("checkbox", { name: "Doubtful" }));
+    await user.click(screen.getByRole("checkbox", { name: "Injured" }));
+    await user.keyboard("{Escape}");
     await user.type(minPrice, "99");
     expect(await screen.findByText("No players match the current filters.")).toBeInTheDocument();
 
@@ -1989,7 +1994,7 @@ describe("PlayersPage", () => {
     expect(within(view).getByRole("radio", { name: "Overall" })).toBeChecked();
     expect(within(venue).getByRole("radio", { name: "All" })).toBeChecked();
     expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
-    expect(within(availability).getByRole("radio", { name: "All" })).toBeChecked();
+    expect(availability).toHaveAccessibleName("Availability filter: All statuses");
     expect(minPrice).toHaveValue(null);
     expect(clear).toHaveFocus();
   });

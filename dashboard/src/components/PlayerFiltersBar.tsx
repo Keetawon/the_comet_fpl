@@ -12,10 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { PlayerRecord, WindowLabel } from "@/data/types";
 import { WINDOW_LABELS } from "@/data/types";
-import { currentAvailability, hasCurrentAvailabilityConcern } from "@/lib/availability";
+import { AVAILABILITY_LABEL, currentAvailability } from "@/lib/availability";
 
 export interface PlayerFilters {
   position: string; // "all" | GK | DEF | MID | FWD
@@ -23,7 +22,7 @@ export interface PlayerFilters {
   minPrice: string; // £m, "" = unbounded
   maxPrice: string; // £m, "" = unbounded
   minMinutes: string; // L5 in shared routes; selected-Actual Min/g on Players; "" = unbounded
-  availability: "all" | "available" | "flagged";
+  availabilityStatuses: string[]; // Exact current FPL codes; [] = all, "unknown" = unreported/unrecognised.
   hideUnavailable: boolean;
   formWindow: WindowLabel;
 }
@@ -34,13 +33,21 @@ export const INITIAL_PLAYER_FILTERS: PlayerFilters = {
   minPrice: "",
   maxPrice: "",
   minMinutes: "",
-  availability: "all",
+  availabilityStatuses: [],
   hideUnavailable: true,
   formWindow: "last_5",
 };
 
 export const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 export type PlayerPosition = (typeof POSITIONS)[number];
+
+const AVAILABILITY_OPTIONS = [
+  ...Object.entries(AVAILABILITY_LABEL).map(([value, label]) => ({
+    value,
+    label: label[0].toUpperCase() + label.slice(1),
+  })),
+  { value: "unknown", label: "Unknown / unreported" },
+];
 
 export interface PlayerMultiFilters {
   playerCodes: number[];
@@ -67,12 +74,10 @@ export function matchesPlayerFilters(p: PlayerRecord, f: PlayerFilters): boolean
   if (maxPrice != null && !(p.now_cost != null && p.now_cost <= maxPrice)) return false;
   if (minMinutes != null && !(p.avg_minutes_last_5 != null && p.avg_minutes_last_5 >= minMinutes))
     return false;
-  if (f.availability === "available" && (current?.status !== "a" || hasCurrentAvailabilityConcern(p))) return false;
-  if (
-    f.availability === "flagged" &&
-    !hasCurrentAvailabilityConcern(p)
-  )
-    return false;
+  const status = current?.status;
+  const availabilityStatus = status != null && Object.hasOwn(AVAILABILITY_LABEL, status)
+    ? status : "unknown";
+  if (f.availabilityStatuses.length > 0 && !f.availabilityStatuses.includes(availabilityStatus)) return false;
   return true;
 }
 
@@ -243,20 +248,19 @@ export function PlayerFiltersBar({
           onChange={(e) => set({ minMinutes: e.target.value })}
         />
       </div>
-      <ToggleGroup
-        type="single"
-        value={filters.availability}
-        onValueChange={(value) => {
-          if (value) set({ availability: value as PlayerFilters["availability"] });
-        }}
-        variant="outline"
-        aria-label="Availability filter"
-        title="Latest published FPL availability only; unknown current status matches All."
-      >
-        <ToggleGroupItem value="all">All</ToggleGroupItem>
-        <ToggleGroupItem value="available">Available</ToggleGroupItem>
-        <ToggleGroupItem value="flagged">Flagged</ToggleGroupItem>
-      </ToggleGroup>
+      <div title="Select one or more latest FPL statuses. Status and reported chance are separate; unreported status stays unknown. This only filters displayed rows.">
+        <MultiSelectFilter
+          label="Avail"
+          ariaLabel="Availability filter"
+          allLabel="All statuses"
+          options={AVAILABILITY_OPTIONS}
+          selected={filters.availabilityStatuses}
+          onChange={(availabilityStatuses) => set({
+            availabilityStatuses,
+            hideUnavailable: availabilityStatuses.includes("u") ? false : filters.hideUnavailable,
+          })}
+        />
+      </div>
       <label
         className="flex cursor-pointer items-center gap-2"
         title="Hide only current FPL status u (unavailable), such as players who left the league. Injured, doubtful, suspended and unknown statuses remain visible. Uses the latest published FPL report; does not change xP or squad decisions."
@@ -265,7 +269,12 @@ export function PlayerFiltersBar({
           type="checkbox"
           className="size-4 accent-primary"
           checked={filters.hideUnavailable}
-          onChange={(event) => set({ hideUnavailable: event.target.checked })}
+          onChange={(event) => set({
+            hideUnavailable: event.target.checked,
+            availabilityStatuses: event.target.checked
+              ? filters.availabilityStatuses.filter((status) => status !== "u")
+              : filters.availabilityStatuses,
+          })}
         />
         Hide unavailable
       </label>

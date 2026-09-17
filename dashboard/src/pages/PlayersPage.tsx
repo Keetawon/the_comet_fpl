@@ -700,7 +700,7 @@ export function PlayersPage() {
   const unavailablePlayerInsightReason =
     playerFilters.hideUnavailable && runPlayers.some((player) => currentAvailability(player)?.status === "u")
       ? "AI explanation is unavailable while unavailable players are hidden because this display filter is outside the renderer contract. Deterministic facts use the visible players."
-      : playerFilters.availability !== "all"
+      : playerFilters.availabilityStatuses.length > 0
         ? "AI explanation is unavailable while current FPL availability filters are active because the renderer uses forecast-vintage status. Deterministic facts remain available."
         : undefined;
   const provisionalInsightUnavailableReason = selectedActualsIncludeProvisional
@@ -1023,7 +1023,7 @@ export function PlayersPage() {
             venue: filters?.venue,
             min_price_tenths: minPriceTenthsScope(playerFilters.minPrice),
             max_price_tenths: maxPriceTenthsScope(playerFilters.maxPrice),
-            availability: playerFilters.availability,
+            availability: "all", // Current status selections disable this forecast-vintage renderer above.
           }),
           unavailableReason: managerSquad
             ? "AI explanation is unavailable while the private My squad filter is active. Deterministic facts remain available."
