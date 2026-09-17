@@ -70,6 +70,17 @@ only official status `u`, not injuries, doubts or suspensions. Legacy packages
 explicitly label forecast status with its original date. Current status never
 changes xP, PMFs, prices, optimizer inputs or historical scorecards.
 
+The shared Avail filter supports multiple current FPL statuses (Available,
+Doubtful, Injured, Suspended, Unavailable, Not available, Not announced and
+Unknown / unreported). Selections are ORed together and intersect the other
+table filters. Empty selection means all statuses, subject to the separate
+Hide unavailable preference, which remains on by default. Explicitly selecting
+Unavailable turns that preference off; checking it again removes Unavailable
+from the selection. Clear filters restores the defaults. Matching uses the
+reported status code, not the chance percentage; missing or unrecognised current
+evidence stays unknown. Current-status selections keep the forecast-vintage AI
+renderer disabled. The Players page displays 25 rows per page.
+
 The shared Avail badge shows status only to keep table columns compact. The
 official next-round percentage stays in its tooltip when FPL supplies it.
 Injured (`i`), suspended (`s`) and explicitly reported 0% use a
