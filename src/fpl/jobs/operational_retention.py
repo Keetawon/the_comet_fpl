@@ -7,6 +7,7 @@ import json
 import re
 import shutil
 import stat
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -71,28 +72,136 @@ def _safe_tree(path: Path, root: Path) -> None:
             _safe_tree(child, root)
 
 
-def _references() -> tuple[set[str], set[str]]:
-    hashes: set[str] = set()
-    runs: set[str] = set()
+def _files(root: Path) -> Iterator[Path]:
+    """Discover every entry or fail; glob can silently suppress directory errors."""
+    try:
+        info = root.lstat()
+    except FileNotFoundError:
+        return
+    if (
+        root.is_symlink()
+        or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+    ):
+        raise ValueError("reference discovery refuses linked paths")
+    if stat.S_ISDIR(info.st_mode):
+        for child in sorted(root.iterdir()):
+            yield from _files(child)
+    elif stat.S_ISREG(info.st_mode):
+        yield root
+
+
+def _existing_file(path: Path) -> bool:
+    """Only a genuinely absent optional file may be skipped."""
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return False
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+    ):
+        raise ValueError("expected an unlinked metadata/source file")
+    return True
+
+
+def _references(
+    runs: Path | None = None,
+    seeds: tuple[set[str], set[str]] | None = None,
+    database: Path | None = None,
+) -> tuple[set[str], set[str]]:
+    hashes: set[str] = set(seeds[0]) if seeds else set()
+    run_names: set[str] = set(seeds[1]) if seeds else set()
+    paths: set[Path] = set()
     for folder in ("config", "results", "docs"):
-        for path in (repo_root() / folder).rglob("*"):
-            if path.suffix not in (".json", ".yaml", ".yml", ".md") or not path.is_file():
+        paths.update(
+            path
+            for path in _files(repo_root() / folder)
+            if path.suffix in (".json", ".yaml", ".yml", ".md")
+        )
+    # Ignored release/verification manifests also bind exact historical DB bytes.
+    # Retention proofs and retired manifests are audit records, not new source pins.
+    metadata_names = {
+        "manifest.json",
+        "provenance.json",
+        "source-manifest.json",
+        "historical-inputs.json",
+    }
+    metadata_roots = [repo_root() / "data" / "artifacts"]
+    managed: list[tuple[datetime, Path]] = []
+    if runs is not None:
+        metadata_roots.append(runs.parent / "verification")
+        now = datetime.now(UTC)
+        for child in sorted(runs.iterdir()):
+            if not _DASHBOARD.fullmatch(child.name):
                 continue
-            with path.open("rb") as handle:
-                tail = b""
-                while block := handle.read(128 * 1024):
-                    data = tail + block
-                    hashes.update(match.decode() for match in _SHA.findall(data))
-                    runs.update(match.decode() for match in _RUN.findall(data))
-                    tail = data[-128:]
-    return hashes, runs
+            receipt = child / "receipt.json"
+            if not _existing_file(receipt):
+                continue
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            manifest = child / "generation" / "public" / "data" / "manifest.json"
+            if not _existing_file(manifest):
+                continue
+            if (
+                payload.get("retention_policy_version") != 1
+                or payload.get("status") != "COMPLETE"
+                or payload.get("public_publication", {}).get("status", "COMPLETE") != "COMPLETE"
+                or (
+                    database is not None
+                    and Path(payload.get("database", "")).resolve() != database.resolve()
+                )
+            ):
+                paths.add(manifest)
+                continue
+            finished = parse_receipt_instant(payload.get("finished_at"), now)
+            if finished is None:
+                raise ValueError("unresolved publication receipt time")
+            managed.append((finished, manifest))
+        # The latest two live generations retain their byte sources. Retired
+        # ordinary generations must not permanently pin every two-hour backup.
+        paths.update(path for _, path in sorted(managed, reverse=True)[:2])
+    for root in metadata_roots:
+        paths.update(path for path in _files(root) if path.name in metadata_names)
+
+    def read(path: Path) -> None:
+        with path.open("rb") as handle:
+            tail = b""
+            while block := handle.read(128 * 1024):
+                data = tail + block
+                hashes.update(match.decode() for match in _SHA.findall(data))
+                run_names.update(match.decode() for match in _RUN.findall(data))
+                tail = data[-128:]
+
+    for path in sorted(paths):
+        read(path)
+    # A preserved generation may pin a source in another run. Follow those
+    # metadata references to closure before deciding which copies are disposable.
+    source_hashes: dict[Path, set[str]] = {}
+    for _, path in managed:
+        if path not in paths:
+            source_hashes[path] = {
+                _hash(backup)
+                for name in ("before-outcomes.duckdb", "recovery.duckdb")
+                if _existing_file(backup := path.parents[3] / name)
+            }
+    while remaining := {
+        path
+        for _, path in managed
+        if path not in paths
+        and (path.parents[3].name in run_names or source_hashes.get(path, set()) & hashes)
+    }:
+        for path in sorted(remaining):
+            read(path)
+        paths.update(remaining)
+    return hashes, run_names
 
 
-def _protected_hashes(forecasts: Path) -> set[str]:
+def _protected_hashes(forecasts: Path, run_names: set[str] | None = None) -> set[str]:
     if not forecasts.is_dir():
         raise ValueError("retention requires the retained forecast directory")
     hashes: set[str] = set()
-    for path in forecasts.rglob("*.jsonl"):
+    for path in _files(forecasts):
+        if path.suffix != ".jsonl":
+            continue
         with path.open(encoding="utf-8") as handle:
             line = handle.readline(16 * 1024 * 1024 + 1)
         if len(line) > 16 * 1024 * 1024:
@@ -104,6 +213,8 @@ def _protected_hashes(forecasts: Path) -> set[str]:
         # Serialized component provenance also pins source DBs distinct from the
         # top-level replay DB. All SHA references conservatively protect copies.
         hashes.update(match.decode() for match in _SHA.findall(line.encode("utf-8")))
+        if run_names is not None:
+            run_names.update(match.decode() for match in _RUN.findall(line.encode("utf-8")))
     return hashes
 
 
@@ -216,9 +327,13 @@ def prune_runs(
         or database.resolve().is_relative_to(root.resolve())
     ):
         raise ValueError("retention requires an isolated operational runs root")
-    references, protected_names = _references()
-    references.update(_protected_hashes(forecasts))
+    forecast_names: set[str] = set()
+    forecast_hashes = _protected_hashes(forecasts, forecast_names)
+    references, protected_names = _references(runs, (forecast_hashes, forecast_names), database)
+    references.update(forecast_hashes)
+    protected_names.update(forecast_names)
     now = datetime.now(UTC)
+    recovery_sha256 = None
     if recovery is not None:
         recovery = recovery.absolute()
         _safe_tree(recovery, root)
@@ -228,7 +343,8 @@ def prune_runs(
         ):
             raise ValueError("invalid recovery snapshot")
         with connect(database, read_only=True):
-            if _hash(recovery) != _hash(database):
+            recovery_sha256 = _hash(recovery)
+            if recovery_sha256 != _hash(database):
                 raise ValueError("recovery snapshot differs from active database")
     groups: dict[str, list[tuple[datetime, Path, dict[str, Any]]]] = {
         "capture": [],
@@ -372,7 +488,8 @@ def prune_runs(
                 )
                 continue
             if candidate.is_file():
-                if _hash(candidate) in references:
+                candidate_hash = _hash(candidate)
+                if candidate_hash in references and candidate_hash != recovery_sha256:
                     blocked_directories[candidate.parent] = "immutable source hash pin"
                     skipped.append({"path": str(candidate), "reason": "immutable source hash pin"})
                     continue

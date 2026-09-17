@@ -76,8 +76,8 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Pa
     runs.mkdir()
     forecasts.mkdir()
     monkeypatch.setattr(retention, "_verify_backup", lambda *args: {"synthetic_proof": True})
-    monkeypatch.setattr(retention, "_protected_hashes", lambda _: set())
-    monkeypatch.setattr(retention, "_references", lambda: (set(), set()))
+    monkeypatch.setattr(retention, "_protected_hashes", lambda *args: set())
+    monkeypatch.setattr(retention, "_references", lambda *args: (set(), set()))
     return database, runs, forecasts
 
 
@@ -224,7 +224,7 @@ def test_forecast_hash_pin_and_forecast_source_are_never_pruned(
         encoding="utf-8",
     )
     forecast_bytes = forecast.read_bytes()
-    monkeypatch.setattr(retention, "_protected_hashes", lambda _: {_hash(pinned)})
+    monkeypatch.setattr(retention, "_protected_hashes", lambda *args: {_hash(pinned)})
 
     retention.prune_runs(database, runs, forecasts)
 
@@ -242,6 +242,241 @@ def test_forecast_headers_are_discovered_recursively(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert expected_hash in retention._protected_hashes(forecasts.parent)
+
+
+@pytest.mark.parametrize(
+    "location", ["repo_artifact", "operational_generation", "external_verification"]
+)
+@pytest.mark.parametrize("serialized", [False, True])
+def test_publication_metadata_pins_backup_without_any_forecast_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, location: str, serialized: bool
+) -> None:
+    repository = tmp_path / "checkout"
+    repository.mkdir()
+    database, runs, forecasts = (
+        tmp_path / "operations" / "operational.duckdb",
+        tmp_path / "operations" / "runs",
+        tmp_path / "operations" / "forecasts",
+    )
+    database.parent.mkdir()
+    database.write_bytes(b"current database sentinel")
+    forecasts.mkdir()
+    captures = [_cycle(runs, database, index) for index in range(3)]
+    pinned = captures[0] / "before.duckdb"
+    original = pinned.read_bytes()
+    pinned_hash = _hash(pinned)
+    if location == "repo_artifact":
+        manifest = repository / "data" / "artifacts" / "retained-publication" / "manifest.json"
+    elif location == "operational_generation":
+        publication = _cycle(runs, database, 4, dashboard=True)
+        manifest = publication / "generation" / "public" / "data" / "manifest.json"
+    else:
+        manifest = runs.parent / "verification" / "retained-publication" / "manifest.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    source = {"database_sha256": pinned_hash}
+    _write_json(manifest, {"source_export": json.dumps(source) if serialized else source})
+    manifest_bytes = manifest.read_bytes()
+    monkeypatch.setattr(retention, "repo_root", lambda: repository)
+    monkeypatch.setattr(
+        retention, "_verify_backup", lambda *args: pytest.fail("publication-pinned backup pruned")
+    )
+
+    assert pinned_hash in retention._references(runs)[0]
+    result = retention.prune_runs(database, runs, forecasts)
+
+    assert pinned.read_bytes() == original
+    assert manifest.read_bytes() == manifest_bytes
+    assert any(row["reason"] == "immutable source hash pin" for row in result["skipped"])
+    assert not list(forecasts.iterdir())
+
+
+def test_retention_deletion_proofs_do_not_create_permanent_source_pins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, runs, forecasts = tmp_path / "checkout", tmp_path / "runs", tmp_path / "forecasts"
+    repository.mkdir()
+    forecasts.mkdir()
+    database = tmp_path / "operational.duckdb"
+    database.write_bytes(b"current database sentinel")
+    captures = [_cycle(runs, database, index) for index in range(3)]
+    backup = captures[0] / "before.duckdb"
+    backup_hash = _hash(backup)
+    receipt = runs / "retention-20260917T120000Z-deadbeef.json"
+    _write_json(
+        receipt,
+        {
+            "schema": "fpl.operational-retention",
+            "schema_version": 1,
+            "status": "COMPLETE",
+            "deleted": [{"retention_proof": {"backup_sha256": backup_hash}}],
+        },
+    )
+    receipt_bytes = receipt.read_bytes()
+    monkeypatch.setattr(retention, "repo_root", lambda: repository)
+    monkeypatch.setattr(retention, "_verify_backup", lambda *args: {"synthetic_proof": True})
+
+    assert backup_hash not in retention._references(runs)[0]
+    retention.prune_runs(database, runs, forecasts)
+
+    assert not backup.exists()
+    assert receipt.read_bytes() == receipt_bytes
+
+
+def test_older_managed_generation_does_not_pin_its_own_backup_forever(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, runs, forecasts = tmp_path / "checkout", tmp_path / "runs", tmp_path / "forecasts"
+    repository.mkdir()
+    forecasts.mkdir()
+    database = tmp_path / "operational.duckdb"
+    database.write_bytes(b"current database sentinel")
+    dashboards = [_cycle(runs, database, index, dashboard=True) for index in range(3)]
+    backup = dashboards[0] / "before-outcomes.duckdb"
+    backup_hash = _hash(backup)
+    manifest = dashboards[0] / "generation" / "public" / "data" / "manifest.json"
+    manifest.parent.mkdir(parents=True)
+    _write_json(manifest, {"source_export": {"database_sha256": backup_hash}})
+    manifest_bytes = manifest.read_bytes()
+    for directory in dashboards[-2:]:
+        retained = directory / "generation" / "public" / "data" / "manifest.json"
+        retained.parent.mkdir(parents=True)
+        _write_json(retained, {"source_export": {"database_sha256": "c" * 64}})
+    monkeypatch.setattr(retention, "repo_root", lambda: repository)
+    monkeypatch.setattr(retention, "_verify_backup", lambda *args: {"synthetic_proof": True})
+
+    assert backup_hash not in retention._references(runs)[0]
+    retention.prune_runs(database, runs, forecasts)
+
+    assert not backup.exists()
+    assert not (dashboards[0] / "generation").exists()
+    assert (dashboards[0] / "generation-retired-manifest.json").read_bytes() == manifest_bytes
+
+
+def test_unreadable_metadata_subtree_aborts_before_backup_deletion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, runs, forecasts = tmp_path / "checkout", tmp_path / "runs", tmp_path / "forecasts"
+    blocked = repository / "data" / "artifacts" / "unreadable-publication"
+    blocked.mkdir(parents=True)
+    forecasts.mkdir()
+    database = tmp_path / "operational.duckdb"
+    database.write_bytes(b"current database sentinel")
+    captures = [_cycle(runs, database, index) for index in range(3)]
+    originals = {p / "before.duckdb": (p / "before.duckdb").read_bytes() for p in captures}
+    _write_json(
+        blocked / "manifest.json", {"database_sha256": _hash(captures[0] / "before.duckdb")}
+    )
+    original_iterdir = Path.iterdir
+
+    def iterdir(path: Path) -> Any:
+        if path == blocked:
+            raise PermissionError("metadata subtree unreadable")
+        return original_iterdir(path)
+
+    monkeypatch.setattr(retention, "repo_root", lambda: repository)
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    with pytest.raises(PermissionError, match="metadata subtree unreadable"):
+        retention.prune_runs(database, runs, forecasts)
+    assert {path: path.read_bytes() for path in originals} == originals
+
+
+@pytest.mark.parametrize("pin_source", ["repository", "forecast"])
+def test_manifest_of_an_older_pinned_generation_protects_its_other_source_backup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pin_source: str
+) -> None:
+    repository, runs, forecasts = tmp_path / "checkout", tmp_path / "runs", tmp_path / "forecasts"
+    repository.mkdir()
+    forecasts.mkdir()
+    database = tmp_path / "operational.duckdb"
+    database.write_bytes(b"current database sentinel")
+    captures = [_cycle(runs, database, index) for index in range(3)]
+    dashboards = [_cycle(runs, database, index, dashboard=True) for index in range(3)]
+    publication_backup = dashboards[0] / "before-outcomes.duckdb"
+    other_source = captures[0] / "before.duckdb"
+    publication_hash, source_hash = _hash(publication_backup), _hash(other_source)
+    if pin_source == "repository":
+        pin = repository / "data" / "artifacts" / "scientific-record" / "manifest.json"
+        pin.parent.mkdir(parents=True)
+        _write_json(pin, {"source_export": {"database_sha256": publication_hash}})
+    else:
+        (forecasts / "retained.jsonl").write_text(
+            json.dumps({"record_type": "manifest", "database_sha256": publication_hash}) + "\n",
+            encoding="utf-8",
+        )
+    dependency = dashboards[0] / "generation" / "public" / "data" / "manifest.json"
+    dependency.parent.mkdir(parents=True)
+    _write_json(dependency, {"source_export": {"database_sha256": source_hash}})
+    for directory in dashboards[-2:]:
+        retained = directory / "generation" / "public" / "data" / "manifest.json"
+        retained.parent.mkdir(parents=True)
+        _write_json(retained, {"source_export": {"database_sha256": "c" * 64}})
+    monkeypatch.setattr(retention, "repo_root", lambda: repository)
+    monkeypatch.setattr(
+        retention,
+        "_verify_backup",
+        lambda *args: pytest.fail("retained publication dependency pruned"),
+    )
+
+    names: set[str] = set()
+    hashes = retention._protected_hashes(forecasts, names)
+    assert {publication_hash, source_hash} <= retention._references(
+        runs, (hashes, names), database
+    )[0]
+    retention.prune_runs(database, runs, forecasts)
+
+    assert _hash(publication_backup) == publication_hash
+    assert _hash(other_source) == source_hash
+    assert dependency.is_file()
+
+
+@pytest.mark.parametrize("case", ["old_failed_r2", "new_foreign_database"])
+def test_preserved_publication_manifests_keep_cross_run_source_backups(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    repository, runs, forecasts = tmp_path / "checkout", tmp_path / "runs", tmp_path / "forecasts"
+    repository.mkdir()
+    forecasts.mkdir()
+    database = tmp_path / "operational.duckdb"
+    database.write_bytes(b"current database sentinel")
+    captures = [_cycle(runs, database, index) for index in range(3)]
+    source = captures[0] / "before.duckdb"
+    source_hash = _hash(source)
+    owned = [_cycle(runs, database, index, dashboard=True) for index in range(2, 5)]
+    exceptional = _cycle(
+        runs,
+        database,
+        0 if case == "old_failed_r2" else 9,
+        dashboard=True,
+        hours_old=12 if case == "old_failed_r2" else 0,
+    )
+    receipt = json.loads((exceptional / "receipt.json").read_text())
+    if case == "old_failed_r2":
+        receipt["public_publication"] = {"status": "FAILED"}
+        dependent = exceptional
+    else:
+        receipt["database"] = str(database.with_name("another.duckdb"))
+        dependent = owned[-2]
+    _write_json(exceptional / "receipt.json", receipt)
+    for directory in [*owned, exceptional]:
+        manifest = directory / "generation" / "public" / "data" / "manifest.json"
+        manifest.parent.mkdir(parents=True)
+        _write_json(
+            manifest,
+            {
+                "source_export": {
+                    "database_sha256": source_hash if directory == dependent else "c" * 64
+                }
+            },
+        )
+    monkeypatch.setattr(retention, "repo_root", lambda: repository)
+    monkeypatch.setattr(retention, "_verify_backup", lambda *args: {"synthetic_proof": True})
+
+    assert source_hash in retention._references(runs, database=database)[0]
+    retention.prune_runs(database, runs, forecasts)
+
+    assert _hash(source) == source_hash
+    assert (dependent / "generation" / "public" / "data" / "manifest.json").is_file()
+    assert (exceptional / "generation").is_dir()
 
 
 def test_serialized_component_provenance_pins_an_older_source_backup(
@@ -268,7 +503,7 @@ def test_serialized_component_provenance_pins_an_older_source_backup(
         },
     }
     (forecasts / "retained.jsonl").write_text(json.dumps(header) + "\n", encoding="utf-8")
-    monkeypatch.setattr(retention, "_references", lambda: (set(), set()))
+    monkeypatch.setattr(retention, "_references", lambda *args: (set(), set()))
     monkeypatch.setattr(
         retention, "_hash", lambda path: component_hash if path == pinned else _hash(path)
     )
@@ -310,7 +545,7 @@ def test_missing_or_malformed_forecast_pin_aborts_before_deletion(
     (forecasts / "frozen.jsonl").write_text(header + "\n", encoding="utf-8")
     directories = [_cycle(runs, database, index) for index in range(3)]
     original = {p / "before.duckdb": (p / "before.duckdb").read_bytes() for p in directories}
-    monkeypatch.setattr(retention, "_references", lambda: (set(), set()))
+    monkeypatch.setattr(retention, "_references", lambda *args: (set(), set()))
 
     with pytest.raises(ValueError, match=r"(?i)forecast pin|expecting value"):
         retention.prune_runs(database, runs, forecasts)
@@ -398,7 +633,7 @@ def test_pinned_dashboard_backup_keeps_entire_generation(
     directories = [_cycle(runs, database, index, dashboard=True) for index in range(3)]
     pinned = directories[0] / "before-outcomes.duckdb"
     original = pinned.read_bytes()
-    monkeypatch.setattr(retention, "_protected_hashes", lambda _: {_hash(pinned)})
+    monkeypatch.setattr(retention, "_protected_hashes", lambda *args: {_hash(pinned)})
 
     retention.prune_runs(database, runs, forecasts)
 
@@ -429,6 +664,84 @@ def _tiny_database(path: Path, *, extra_current_row: bool = False) -> None:
             con.execute(f"INSERT INTO {table} VALUES (1, 'frozen')")
             if extra_current_row:
                 con.execute(f"INSERT INTO {table} VALUES (2, 'append only')")
+
+
+def _recovery_pin_files(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path]:
+    database, runs, forecasts = (
+        tmp_path / "operational.duckdb",
+        tmp_path / "runs",
+        tmp_path / "forecasts",
+    )
+    _tiny_database(database)
+    forecasts.mkdir()
+    capture = _cycle(runs, database, 0)
+    backup = capture / "before.duckdb"
+    backup.write_bytes(database.read_bytes())
+    receipt = json.loads((capture / "report.json").read_text())
+    receipt["backup"]["sha256"] = _hash(backup)
+    _write_json(capture / "report.json", receipt)
+    recovery = runs / "surviving" / "recovery.duckdb"
+    recovery.parent.mkdir()
+    recovery.write_bytes(database.read_bytes())
+    return database, runs, forecasts, backup, recovery
+
+
+@pytest.mark.parametrize("different", [False, True])
+def test_hash_only_pin_retires_duplicate_only_when_identical_recovery_survives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, different: bool
+) -> None:
+    database, runs, forecasts, backup, recovery = _recovery_pin_files(tmp_path)
+    if different:
+        backup.unlink()
+        _tiny_database(backup, extra_current_row=True)
+        receipt = json.loads((backup.parent / "report.json").read_text())
+        receipt["backup"]["sha256"] = _hash(backup)
+        _write_json(backup.parent / "report.json", receipt)
+    backup_bytes, recovery_bytes = backup.read_bytes(), recovery.read_bytes()
+    (forecasts / "retained.jsonl").write_text(
+        json.dumps({"record_type": "manifest", "database_sha256": _hash(backup)}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(retention, "_references", lambda *args: (set(), set()))
+
+    retention.prune_runs(database, runs, forecasts, recovery=recovery)
+
+    assert backup.exists() is different
+    if different:
+        assert backup.read_bytes() == backup_bytes
+    assert recovery.read_bytes() == recovery_bytes
+
+
+def test_exact_source_path_pin_preserves_original_even_with_identical_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database, runs, forecasts, backup, recovery = _recovery_pin_files(tmp_path)
+    original = backup.read_bytes()
+    (forecasts / "retained.jsonl").write_text(
+        json.dumps(
+            {
+                "record_type": "manifest",
+                "database_sha256": _hash(backup),
+                "component_modes": {"provenance": json.dumps({"database_path": str(backup)})},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(retention, "_references", lambda *args: (set(), set()))
+    monkeypatch.setattr(
+        retention,
+        "_verify_backup",
+        lambda *args: pytest.fail("exact source path was not protected"),
+    )
+    run_names: set[str] = set()
+    assert _hash(backup) in retention._protected_hashes(forecasts, run_names)
+    assert backup.parent.name in run_names
+
+    retention.prune_runs(database, runs, forecasts, recovery=recovery)
+
+    assert backup.read_bytes() == original
+    assert recovery.read_bytes() == original
 
 
 def test_recovery_snapshot_is_an_exact_copy_without_changing_current_database(
@@ -546,7 +859,7 @@ def test_retired_backup_must_be_contained_in_surviving_snapshot_not_advanced_liv
         proof_targets.append(survivor)
         return original_verify(survivor, retiring)
 
-    monkeypatch.setattr(retention, "_references", lambda: (set(), set()))
+    monkeypatch.setattr(retention, "_references", lambda *args: (set(), set()))
     monkeypatch.setattr(retention, "_verify_backup", prove)
     result = retention.prune_runs(database, runs, forecasts, recovery=golden)
 

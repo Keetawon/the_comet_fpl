@@ -5,6 +5,12 @@ backup retention on September 17, 2026. This changes storage operations only.
 Forecasts, model/configuration files, scientific verdicts, and the capture and
 selection evidence rules are unchanged.
 
+The first real retention verification subsequently exposed a source-pin discovery
+defect and was stopped. Three historical publication source copies were deleted;
+their immutable rows survive, but exact old database bytes have not been restored.
+See the [incident and correction record](operational-retention-incident-2026-09-17.md).
+The manual cleanup totals below exclude those unintended deletions.
+
 ## Automatic policy
 
 After a successful local refresh and, when configured, successful R2 publication,
@@ -22,8 +28,10 @@ differences, unknown tables, missing rows, unresolved locks/WALs and linked path
 fail closed. Proof comparison uses bounded memory and system temporary storage
 (C: on this host). It never opens a source database for writing.
 
-Registered forecast headers are inspected in full, including hashes inside
-serialized component provenance. Frozen config/results/document references and
+Registered forecast headers are inspected in full, including hashes and paths inside
+serialized component provenance. Publication/replay manifests outside Git and
+operational verification metadata are included with fail-closed traversal.
+Frozen config/results/document references and
 `forecast-source.duckdb` are protected. These immutable replay sources are not
 ordinary rolling backups and can exceed the one-copy limit. Legacy Dashboard
 generations without explicit database attribution require manual review.
@@ -56,6 +64,14 @@ the existing 2,774,806,528-byte recovery snapshot, byte-identical to the active
 database. No new copy was necessary for this manual cleanup. The seven deletion
 receipts total **77,304,130,390 bytes**; D: then had **78,005,936,128 bytes free**.
 Sizes here are decimal GB, not GiB.
+
+One separately reviewed checkpoint copy then passed all 24 immutable-table
+checks and had no retained path/hash references. Removing its 1,588,604,928 bytes
+brought the eight manual cleanup receipts to **78,892,735,318 bytes**, with
+**79,594,315,776 bytes free** before the local verification refresh.
+Five nested replay copies examined in that final pass remain protected by explicit
+forecast-source paths, including a byte-identical duplicate whose original path
+is itself part of the immutable replay contract.
 
 The requested blanket deletion of `development`, `verification`, and legacy
 `runs` is unsafe: these also contain pinned model/research inputs and four legacy
@@ -94,6 +110,7 @@ immutable-row comparisons, recovery mismatch, concurrent live-DB advancement,
 source pins, health preservation, failure paths and R2 temporary cleanup.
 Ruff, changed-file formatting and strict mypy (three source modules) passed.
 
-R2 publication is separate: the first public generation is uploaded, while CORS,
-frontend cutover and the optional scheduled R2 argument retain their own readiness
+R2 publication is separate: the first public generation is uploaded and its HTTP
+CORS checks pass. Browser verification, frontend cutover and the optional scheduled
+R2 argument retain their own readiness
 requirements in `r2-dashboard-activation-2026-09-17.md`.

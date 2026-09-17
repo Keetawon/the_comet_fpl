@@ -74,10 +74,25 @@ browser verification, verify the recovered operational flow, and complete the re
 frontend cutover. Preserve the existing task's locks, backups and identity when
 adding its optional publication argument.
 
-## Remaining activation checks
+## CORS verified; browser and automatic publication pending
 
-CORS persistence and live browser verification are pending. The owner is applying
-the exact three-origin GET/HEAD policy in the publication runbook. The GitHub
+After the owner saved the policy, live HTTPS verification completed at
+`2026-09-17T09:15:41Z`: **51/51 CORS checks passed** (GET of `current.json`
+and HEAD of all 16 immutable files for each of the three approved origins).
+The response permits the exact requesting origin and the pointer remains
+`Cache-Control: no-store`. An unrelated origin receives no allow-origin header.
+GETs of the manifest, publication status and competitive schedule also matched
+their pinned SHA256 values. The public pointer did not change during this check.
+Evidence: `data/artifacts/availability-20260917/r2-cors-verification-20260917T091541Z.json`.
+
+This is HTTP evidence, not a rendered browser pass. The supported browser runtime
+returned `No browser is available`; documented discovery returned `[]`.
+No screenshots or browser PASS were fabricated and no production assets changed.
+Automatic approval review rejected appending `--r2-config` to the scheduled task
+because the required hosted-browser check remained unsatisfied. The attempted
+PowerShell command did not execute, so the existing task is unchanged.
+
+The GitHub
 `PUBLIC_DASHBOARD_DATA_POINTER` variable has not been activated, and the existing
 Pages workflow still deploys only main. The reviewed frontend must be deployed
 before the production website can consume R2. The uploaded generation is ready
