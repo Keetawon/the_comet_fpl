@@ -13,6 +13,7 @@ import {
   type PlayerFilters,
 } from "@/components/PlayerFiltersBar";
 import { VintageSelect } from "@/components/VintageSelect";
+import { currentAvailability } from "@/lib/availability";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -449,9 +450,11 @@ export function PlayerAnalyticsPage() {
       ? "AI explanation is unavailable for derived observed xGI/90 because that selector is not part of the typed public insight contract. Deterministic facts remain available."
       : undefined;
   const unavailablePlayerInsightReason =
-    filters.hideUnavailable && exactRunPlayers.some((player) => player.availability_status === "u")
+    filters.hideUnavailable && exactRunPlayers.some((player) => currentAvailability(player)?.status === "u")
       ? "AI explanation is unavailable while unavailable players are hidden because this display filter is outside the renderer contract. Deterministic facts use the visible players."
-      : undefined;
+      : filters.availability !== "all"
+        ? "AI explanation is unavailable while current FPL availability filters are active because the renderer uses forecast-vintage status. Deterministic facts remain available."
+        : undefined;
 
   const changeRun = (nextRunId: string) => {
     setRunId(nextRunId);

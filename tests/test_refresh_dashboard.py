@@ -142,7 +142,8 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
                 "publication_status": {
                     "current_platform_plan": True,
                     "latest_forecast": {"run_id": "run"},
-                }
+                },
+                "current_availability": {"matched_player_rows": 15},
             }
         ),
     )
@@ -159,14 +160,16 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
     for index in range(2):
         destination = tmp_path / f"repeat-{index}"
         destination.mkdir()
-        assert job.complete(
+        result = job.complete(
             tmp_path / "db",
             destination,
             tmp_path,
             tmp_path / "public",
             tmp_path / "cache",
             initial_plan=plan,
-        )["plan_reused"]
+        )
+        assert result["plan_reused"]
+        assert result["current_availability"] == {"matched_player_rows": 15}
     assert calls == ["attach", "build", "install", "frontend"] * 2
     assert forecast.read_bytes() == b"frozen"
     assert plan.read_bytes() == b"immutable plan"

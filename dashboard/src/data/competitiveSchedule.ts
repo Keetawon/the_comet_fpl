@@ -1,3 +1,5 @@
+import { resolveDataUrl } from "./publicData";
+
 export interface ScheduleSource { payload_id: string; sha256: string; known_at: string }
 export interface CupMatch {
   provider_match_id: number;
@@ -17,8 +19,7 @@ export interface CompetitiveSchedule {
 }
 
 export async function loadCompetitiveSchedule(): Promise<CompetitiveSchedule> {
-  const base = import.meta.env.VITE_SDP_DATA_BASE ?? `${import.meta.env.BASE_URL}sdp`;
-  const response = await fetch(`${base}/competitive_schedule.json`);
+  const response = await fetch(await resolveDataUrl("sdp/competitive_schedule.json"));
   if (!response.ok) throw new Error(`Competitive schedule unavailable (HTTP ${response.status})`);
   const value = await response.json() as CompetitiveSchedule;
   if (value.schema_version !== 1 || value.semantics !== "current_schedule_not_prediction" ||

@@ -38,3 +38,25 @@ it.each([false, true])("keeps published xP but hides all optimizer cards when ho
   expect(screen.queryByText("Your custom plan") !== null).toBe(!hosted);
   expect(screen.queryByRole("link", { name: /Open your plan in Plan Builder/ }) !== null).toBe(!hosted);
 });
+
+it("uses current FPL reports in the availability watch while retaining raw xP", async () => {
+  vi.stubEnv("VITE_HOSTED_STATIC", "true");
+  const player = {
+    run_id: "frozen", season: "2026-27", code: 1, web_name: "Observed player", position: "DEF",
+    team_short_name: "TST", now_cost: 50, availability_status: "a", as_of: "2026-09-15T00:00:00Z",
+    fixtures: [{ gw: 5, expected_points: 4.5 }],
+    current_availability: {
+      source: "FPL", season: "2026-27", code: 1, status: "d", chance_of_playing_next_round: 75,
+      news: "Unspecified injury", news_added: null, captured_at: "2026-09-17T06:34:00Z",
+      capture_id: "latest", source_sha256: "a".repeat(64), next_gw: 5,
+      semantics: "current_reported_not_forecast",
+    },
+  };
+  const before = JSON.stringify(player);
+  load.loadPlayers.mockResolvedValueOnce({ manifest: null, players: [player] });
+  render(<SummaryPage />);
+  expect(await screen.findByText("doubtful · 75%")).toBeInTheDocument();
+  expect(screen.getByText("Unspecified injury")).toBeInTheDocument();
+  expect(screen.getAllByText("4.5")).toHaveLength(3);
+  expect(JSON.stringify(player)).toBe(before);
+});

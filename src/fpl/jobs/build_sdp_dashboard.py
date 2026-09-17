@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from fpl.publish.competitive_schedule import export_competitive_schedule
+from fpl.publish.current_availability import refresh_current_availability
 from fpl.publish.dashboard_json import export_dashboard_json, validate_dashboard_json
 from fpl.publish.dashboard_refresh import (
     check_observed_freshness,
@@ -77,7 +78,7 @@ def build(
     output.mkdir(parents=True, exist_ok=False)
     stamp = datetime.now(UTC)
     # Keep a read lease throughout the export; a writer must not mix generations.
-    with connect(db, read_only=True):
+    with connect(db, read_only=True) as con:
         bi_published = retain_validated_generation(
             partial(export_bi, optimizer_plan_paths=optimizer_plans),
             db,
@@ -101,6 +102,10 @@ def build(
                 base, base_dashboard, output / "dashboard-with-retained-plans"
             )
             base = output / "dashboard-with-retained-plans"
+        availability = refresh_current_availability(
+            con, base, output / "dashboard-with-current-availability", as_of=stamp
+        )
+        base = output / "dashboard-with-current-availability"
         base_manifest = validate_dashboard_json(base)
         package = package_public_dashboard(
             base,
@@ -145,6 +150,7 @@ def build(
         "sdp_sidecar": sidecar,
         "competitive_schedule": calendar,
         "observed_freshness_reconciliation": freshness,
+        "current_availability": availability,
         "forecast_regenerated": False,
         "remote_deployed": False,
         "preview_assets_installed": preview_public is not None,

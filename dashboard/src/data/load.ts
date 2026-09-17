@@ -38,8 +38,8 @@ import type {
   TeamRecord,
 } from "./types";
 import { PLAYER_HORIZON_FIELDS } from "./types";
-
-const BASE: string = import.meta.env.VITE_DATA_BASE ?? "/data";
+import { resolveDataUrl } from "./publicData";
+import { AVAILABILITY_LABEL } from "@/lib/availability";
 
 // Session-level cache: players.json is ~15 MB, so every page fetches it through this
 // map and the browser tab parses it exactly once. A failed fetch is evicted so it can
@@ -59,10 +59,11 @@ function fetchJson<T>(name: string): Promise<T> {
   const hit = cache.get(name);
   if (hit) return hit as Promise<T>;
   const pending = (async () => {
-    const response = await fetch(`${BASE}/${name}`);
+    const url = await resolveDataUrl(`data/${name}`);
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(
-        `could not load ${BASE}/${name} (${response.status}); generate the read models ` +
+        `could not load ${url} (${response.status}); generate the read models ` +
           `first -- see dashboard/README.md`,
       );
     }
@@ -183,6 +184,37 @@ export async function loadPlayers(): Promise<PlayersData> {
       "invalid players.json: every player must carry the forecast cold-start provenance flag; " +
         "republish the dashboard read models",
     );
+  }
+  for (const player of candidate.players as PlayerRecord[]) {
+    if (player.current_availability == null) continue; // Legacy or explicitly unmeasured.
+    const current = objectValue(player.current_availability, "players.json current_availability");
+    const subject = "players.json current_availability";
+    if (current.source !== "FPL" || current.semantics !== "current_reported_not_forecast" ||
+        current.season !== player.season || current.code !== player.code) {
+      throw new Error(`invalid ${subject}: source, semantics or player identity mismatch`);
+    }
+    const status = nullableString(current.status, `${subject}.status`);
+    if (status != null && !Object.hasOwn(AVAILABILITY_LABEL, status)) {
+      throw new Error(`invalid ${subject}: unrecognized FPL status`);
+    }
+    if (current.chance_of_playing_next_round !== null &&
+        (!Number.isInteger(current.chance_of_playing_next_round) ||
+         (current.chance_of_playing_next_round as number) < 0 ||
+         (current.chance_of_playing_next_round as number) > 100)) {
+      throw new Error(`invalid ${subject}: chance must be null or an integer from 0 to 100`);
+    }
+    if (current.news !== null && typeof current.news !== "string") {
+      throw new Error(`invalid ${subject}: news must be text or null`);
+    }
+    if (current.news_added !== null) timezoneAwareIsoValue(current.news_added, `${subject}.news_added`);
+    timezoneAwareIsoValue(current.captured_at, `${subject}.captured_at`);
+    stringValue(current.capture_id, `${subject}.capture_id`);
+    if (typeof current.source_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(current.source_sha256)) {
+      throw new Error(`invalid ${subject}: source hash is missing or malformed`);
+    }
+    if (current.next_gw !== null && integerValue(current.next_gw, `${subject}.next_gw`, 1) > 38) {
+      throw new Error(`invalid ${subject}: next gameweek must be at most 38`);
+    }
   }
   return { players: candidate.players as PlayerRecord[], manifest };
 }

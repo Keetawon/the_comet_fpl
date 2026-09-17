@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { resolveDataUrl } from "@/data/publicData";
 
 interface Status {
   schema: string;
@@ -18,7 +19,7 @@ export function PublicationStatus({ manifestHash }: { manifestHash: string }) {
   const [status, setStatus] = useState<Status | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch(`${import.meta.env.VITE_SDP_DATA_BASE ?? `${import.meta.env.BASE_URL}sdp`}/publication_status.json`)
+    resolveDataUrl("sdp/publication_status.json").then((url) => fetch(url))
       .then(async (response) => {
         if (!response.ok) return;
         const value: Status = await response.json();

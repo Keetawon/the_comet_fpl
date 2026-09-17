@@ -1,4 +1,6 @@
 // Independently versioned observed sidecar. No forecast/optimizer read models enter these pages.
+import { resolveDataUrl } from "./publicData";
+
 export type SdpScope = "team" | "player";
 export type SdpSource = "sdp" | "fpl";
 export type SourceAvailability = "AVAILABLE" | "PARTIAL" | "UNAVAILABLE";
@@ -344,8 +346,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
 }
 
 export async function loadSdpStats(): Promise<SdpStatsData> {
-  const base = import.meta.env.VITE_SDP_DATA_BASE ?? `${import.meta.env.BASE_URL}sdp`;
-  const response = await fetch(`${base}/sdp_stats.json`);
+  const response = await fetch(await resolveDataUrl("sdp/sdp_stats.json"));
   if (!response.ok) throw new Error("Observed SDP statistics have not been published for this dashboard.");
   return parseSdpStats(await response.json());
 }

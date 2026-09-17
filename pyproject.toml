@@ -26,6 +26,9 @@ dev = [
     "mypy>=1.11",
     "types-pyyaml>=6.0",
 ]
+public-data = [
+    "boto3>=1.40,<2",
+]
 
 [build-system]
 requires = ["hatchling"]

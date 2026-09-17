@@ -26,7 +26,8 @@ import type {
   SummaryData,
   TeamRecord,
 } from "@/data/types";
-import { availabilityLabel } from "@/lib/availability";
+import { currentAvailability, hasCurrentAvailabilityConcern } from "@/lib/availability";
+import { AvailabilityBadge } from "@/components/AvailabilityBadge";
 import { chipBucket, chipMetric } from "@/lib/fixtureChips";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import {
@@ -193,7 +194,7 @@ export function SummaryPage() {
     const topHorizon = [...withXp].sort((a, b) => (b.horizon ?? -1) - (a.horizon ?? -1)).slice(0, 5);
     const flagged = withXp
       .filter(
-        ({ player }) => player.availability_status != null && player.availability_status !== "a",
+        ({ player }) => hasCurrentAvailabilityConcern(player),
       )
       .slice(0, 8);
 
@@ -379,40 +380,38 @@ export function SummaryPage() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <Card title={`Availability watch (reported overlay, GW${view.gwFrom})`}>
+        <Card title="Availability watch (latest FPL report)">
           {view.flagged.length ? (
             <ul className="space-y-1.5 text-sm">
               {view.flagged.map(({ player, next }) => (
-                <li key={player.code} className="flex items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <PlayerPhoto code={player.code} name={player.web_name} />
-                    <span className="min-w-0 truncate">
-                      <span className="font-medium">{player.web_name}</span>
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        {player.team_short_name} · {player.position}
+                <li key={player.code} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <PlayerPhoto code={player.code} name={player.web_name} />
+                      <span className="min-w-0 truncate">
+                        <span className="font-medium">{player.web_name}</span>
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          {player.team_short_name} · {player.position}
+                        </span>
                       </span>
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-2 whitespace-nowrap">
-                    <span className="text-xs text-amber-600 dark:text-amber-400">
-                      {availabilityLabel(player.availability_status)}
-                      {player.chance_of_playing != null
-                        ? ` ${Math.round(player.chance_of_playing)}%`
-                        : ""}
                     </span>
                     <span className="tabular-nums text-xs text-muted-foreground" title="GW xP">
                       {fmt(next)}
                     </span>
-                  </span>
+                  </div>
+                  <AvailabilityBadge player={player} details />
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-muted-foreground">no flagged players in this vintage</p>
+            <p className="text-xs text-muted-foreground">No flagged players in the published current FPL reports.</p>
+          )}
+          {view.players.some((player) => currentAvailability(player) == null) && (
+            <p className="mt-2 text-xs text-muted-foreground">Current availability is unknown for players without a published FPL report; forecast status is retained separately.</p>
           )}
           <p className="mt-2 text-[10px] text-muted-foreground">
-            Official status/chance fields only — there is no news feed in the read models. An
-            overlay never changes the stored distribution.
+            FPL status, chance and news are reporting context at the displayed capture time.
+            They never change the stored forecast distribution or xP.
           </p>
         </Card>
 

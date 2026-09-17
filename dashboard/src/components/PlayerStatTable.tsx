@@ -36,7 +36,8 @@ import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import { NULL_BUCKET_CLASS } from "@/lib/difficulty";
 import type { ColorSource, ViewMode } from "@/lib/difficulty";
 import { playerChipBucket, playerChipMetric } from "@/lib/playerChips";
-import { availabilityLabel } from "@/lib/availability";
+import { currentAvailability } from "@/lib/availability";
+import { AvailabilityBadge } from "@/components/AvailabilityBadge";
 import type {
   PlayerFixture,
   PlayerFormWindow,
@@ -932,24 +933,10 @@ export function PlayerStatTable({
         },
       },
       {
-        accessorKey: "player.availability_status",
+        id: "availability",
+        accessorFn: (row) => currentAvailability(row.player)?.status ?? null,
         header: "Avail",
-        cell: ({ row }) => {
-          const p = row.original.player;
-          const flagged = p.availability_status != null && p.availability_status !== "a";
-          return (
-            <span
-              className={flagged ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}
-              title={
-                flagged && p.chance_of_playing != null
-                  ? `${Math.round(p.chance_of_playing)}% chance of playing next round`
-                  : undefined
-              }
-            >
-              {availabilityLabel(p.availability_status)}
-            </span>
-          );
-        },
+        cell: ({ row }) => <AvailabilityBadge player={row.original.player} />,
       },
       ...visibleFormColumns,
       ...gwFromXpColumns,
@@ -1065,6 +1052,7 @@ export function PlayerStatTable({
                   <TableRow key={`${row.id}-detail`}>
                     <TableCell colSpan={row.getVisibleCells().length} className="bg-muted/40 p-3">
                       <div className="max-w-4xl space-y-1">
+                        <AvailabilityBadge player={player} details />
                         <p className="text-xs font-medium">
                           {player.web_name} ({player.position}, {player.team_short_name}) —
                           {expandedRowMode === "historical"

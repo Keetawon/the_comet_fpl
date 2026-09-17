@@ -304,6 +304,19 @@ The registration helper still defaults to a daily schedule for **new** tasks;
 rerunning it is neither required nor allowed to overwrite this existing task.
 This schedule change does not modify pipeline/model code or frozen evidence.
 
+### Two-hour update and current availability (2026-09-17)
+
+The owner changed the existing four-hour task to **every two hours** on September
+17. It retains the odd-hour anchor (01:00, 03:00, ... 23:00 Bangkok) and two-minute
+sign-in trigger. Action, account, retry/lock/backup behavior and settings are
+unchanged. Exact verification and rollback XML are documented in
+`current-player-availability-2026-09-17.md`. This supersedes the four-hour timing
+above; it does not imply automatic public publication or run while the PC is off.
+
+Current FPL availability is a separate reporting overlay. Original forecast
+status and all predictions stay immutable. A fresh observed-data export must not
+be represented as proof that forecast-time injury information is current.
+
 ### Goal-origin display refresh (2026-09-17)
 
 The existing dashboard exporter now reaccounts new or revised current-season

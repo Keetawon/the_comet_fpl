@@ -298,6 +298,8 @@ jobs:
         working-directory: dashboard
         env:
           VITE_DATA_BASE: ${{ steps.pages.outputs.base_path }}/data
+          # Optional reviewed R2 generation pointer. Empty keeps the pinned Pages release.
+          VITE_PUBLIC_DATA_POINTER: ${{ vars.PUBLIC_DASHBOARD_DATA_POINTER }}
           VITE_HOSTED_STATIC: "true"
           # Set only after the read-only import Worker passes deployed-origin verification.
           VITE_PUBLIC_MANAGER_IMPORT_URL: ${{ vars.PUBLIC_MANAGER_IMPORT_URL }}

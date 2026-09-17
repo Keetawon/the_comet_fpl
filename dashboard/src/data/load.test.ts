@@ -243,6 +243,41 @@ describe("loadNextGw schema boundary", () => {
 });
 
 describe("shared schema-v9 envelope", () => {
+  const reported = {
+    source: "FPL", season: playersSample.players[0].season, code: playersSample.players[0].code,
+    status: "d", chance_of_playing_next_round: 75, news: "Unspecified injury", news_added: null,
+    captured_at: "2026-09-17T06:34:00Z", capture_id: "latest", source_sha256: "a".repeat(64),
+    next_gw: 5, semantics: "current_reported_not_forecast",
+  };
+
+  it("loads a current report separately from frozen forecast values and preserves explicit unknowns", async () => {
+    for (const current_availability of [reported, { ...reported, status: "x" }, null]) {
+      const payload = { ...playersSample, players: playersSample.players.map(player => ({
+        ...player, current_availability: current_availability == null ? null : { ...current_availability, code: player.code },
+      })) };
+      const before = JSON.stringify(payload);
+      const loaded = await loadPlayersPayload(payload);
+      expect(loaded.players).toEqual(payload.players);
+      expect(loaded.players[0].fixtures).toEqual(playersSample.players[0].fixtures);
+      expect(loaded.players[0].availability_status).toBe(playersSample.players[0].availability_status);
+      expect(JSON.stringify(payload)).toBe(before);
+    }
+  });
+
+  it.each([
+    { source: "other" }, { semantics: "forecast" }, { season: "2025-26" }, { code: -1 },
+    { chance_of_playing_next_round: -1 }, { chance_of_playing_next_round: 101 },
+    { chance_of_playing_next_round: 50.5 }, { chance_of_playing_next_round: "75" },
+    { chance_of_playing_next_round: undefined }, { status: undefined }, { status: "unrecognized" }, { news: {} },
+    { captured_at: "2026-09-17T06:34:00" }, { captured_at: "2026-02-30T06:34:00Z" },
+    { news_added: "yesterday" }, { capture_id: "" }, { source_sha256: "invalid" },
+    { next_gw: 0 }, { next_gw: 39 }, { next_gw: undefined },
+  ])("rejects malformed current reporting evidence: %j", async patch => {
+    await expect(loadPlayersPayload({ ...playersSample, players: [{
+      ...playersSample.players[0], current_availability: { ...reported, ...patch },
+    }] })).rejects.toThrow(/current_availability/);
+  });
+
   it("accepts current players and rejects a mixed stale generation", async () => {
     await expect(loadPlayersPayload(playersSample)).resolves.toMatchObject({
       players: playersSample.players,

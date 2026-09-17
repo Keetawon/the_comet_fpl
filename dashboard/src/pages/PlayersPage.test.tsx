@@ -284,10 +284,39 @@ afterEach(() => {
 });
 
 describe("PlayersPage", () => {
+  it("shows the latest FPL report in the table and expanded profile while retaining forecast xP", async () => {
+    const user = userEvent.setup();
+    const player = playersWithActuals[0];
+    const players: PlayerRecord[] = [{ ...player, availability_status: "a", current_availability: {
+      source: "FPL", season: player.season, code: player.code, status: "d",
+      chance_of_playing_next_round: 75, news: "Unspecified injury", news_added: null,
+      captured_at: "2026-09-17T06:34:00Z", capture_id: "latest", source_sha256: "a".repeat(64),
+      next_gw: 5, semantics: "current_reported_not_forecast",
+    } }];
+    const before = JSON.stringify(players);
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    render(<PlayersPage />);
+    expect(await screen.findByText("doubtful · 75%")).toBeInTheDocument();
+    expect(screen.getByTitle("Published xP for GW1: 7.4")).toHaveTextContent("7.4");
+    await user.click(screen.getByRole("button", { name: "Expand fixtures" }));
+    expect(screen.getByText("Unspecified injury")).toBeInTheDocument();
+    expect(screen.getByText(/FPL · 2026-27 GW5 · captured 2026-09-17 06:34 UTC/)).toBeInTheDocument();
+    await user.click(within(screen.getByRole("radiogroup", { name: "Availability filter" })).getByRole("radio", { name: "Flagged" }));
+    expect(screen.getByText(/AI explanation is unavailable while current FPL availability filters are active/)).toBeInTheDocument();
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(JSON.stringify(players)).toBe(before);
+  });
+
   it("hides unavailable players while keeping injured players, with show and reset controls", async () => {
     const user = userEvent.setup();
     const players = playersWithActuals.map((player, index) => ({
-      ...player, availability_status: index === 0 ? "u" : "i",
+      ...player, availability_status: "a", current_availability: {
+        source: "FPL" as const, season: player.season, code: player.code,
+        status: index === 0 ? "u" : "i", chance_of_playing_next_round: 0,
+        news: "Current FPL report", news_added: null, captured_at: "2026-09-17T06:34:00Z",
+        capture_id: "latest", source_sha256: "a".repeat(64), next_gw: 5,
+        semantics: "current_reported_not_forecast" as const,
+      },
     }));
     vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
     const before = JSON.stringify(players);

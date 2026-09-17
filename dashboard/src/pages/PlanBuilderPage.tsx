@@ -59,7 +59,7 @@ import {
 } from "@/lib/planServerToken";
 import { reloadPublishedReadModels } from "@/lib/readModelReload";
 import { squadDraftHandoffHref } from "@/lib/squadDraftHandoff";
-import { availabilityLabel } from "@/lib/availability";
+import { AvailabilityBadge } from "@/components/AvailabilityBadge";
 import { cn } from "@/lib/utils";
 
 type PageState =
@@ -1326,7 +1326,7 @@ export function PlanBuilderPage() {
                     <TeamBadge teamCode={player.team_code} shortName={player.team_short_name} />
                     {player.position} · {price(player.now_cost)} ·{" "}
                     {(player.selected_by_percent ?? 0).toFixed(1)}% ·{" "}
-                    {availabilityLabel(player.availability_status)}
+                    <AvailabilityBadge player={player} />
                   </span>
                 </span>
                 <span className="text-right">
@@ -1859,7 +1859,7 @@ export function PlanBuilderPage() {
                           <TeamBadge teamCode={player.team_code} shortName={player.team_short_name} />
                           {player.position} · {price(player.now_cost)} ·{" "}
                           {(player.selected_by_percent ?? 0).toFixed(1)}% ·{" "}
-                          {availabilityLabel(player.availability_status)}
+                          <AvailabilityBadge player={player} />
                         </span>
                       </span>
                       <span className="text-right">

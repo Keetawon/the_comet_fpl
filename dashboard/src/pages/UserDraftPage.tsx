@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
+import { AvailabilityBadge } from "@/components/AvailabilityBadge";
 import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import {
   INITIAL_PLAYER_FILTERS,
@@ -741,7 +742,10 @@ function DraftSquadTable({
                     <TableCell className="sticky left-0 z-[1] bg-background">
                       <div className="flex items-center gap-2">
                         <PlayerPhoto code={player.code} name={player.web_name} />
-                        <span className="font-medium">{player.web_name}</span>
+                        <span className="flex flex-col gap-0.5">
+                          <span className="font-medium">{player.web_name}</span>
+                          <AvailabilityBadge player={player} />
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1415,6 +1419,7 @@ export function UserDraftPage() {
                     <p className="truncate text-[11px] text-muted-foreground">
                       {player.team_short_name} · {player.position} · {formatPrice(player.now_cost)}
                     </p>
+                    <AvailabilityBadge player={player} />
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold tabular-nums">
@@ -1474,8 +1479,8 @@ export function UserDraftPage() {
       <p className="text-xs leading-relaxed text-muted-foreground">
         Expected points and prices come from the recorded platform forecast vintage. A blank
         gameweek is zero only when that gameweek is inside the loaded horizon; any unknown fixture
-        xP propagates as “–”. Availability is a next-gameweek overlay and is never projected across
-        this five-gameweek draft.
+        xP propagates as “–”. Current availability is an FPL report for its stated next gameweek,
+        separate from the forecast vintage, and never changes this draft’s published xP.
       </p>
     </div>
   );

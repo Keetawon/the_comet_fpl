@@ -140,6 +140,7 @@ def complete(
         "plan_reused": reused,
         "outcomes": asdict(attached),
         "publication_status": status,
+        "current_availability": generation["current_availability"],
         "forecast_regenerated": False,
         "preview_updated": True,
     }
@@ -154,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--plan-store", required=True, type=Path)
     parser.add_argument("--optimizer-plan", type=Path, help="Already verified initial plan")
     parser.add_argument("--skip-capture", action="store_true", help="Republish retained data only")
+    parser.add_argument("--r2-config", type=Path, help="Optional external R2 publication config")
     args = parser.parse_args(argv)
     if not args.db.is_file() or args.db.resolve() == default_db_path().resolve():
         raise ValueError("explicit existing non-default operational database required")
@@ -193,6 +195,19 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         report["status"] = "COMPLETE"
+        if args.r2_config is not None:
+            from fpl.publish.r2_dashboard import publish_r2_dashboard
+
+            try:
+                report["public_publication"] = publish_r2_dashboard(
+                    destination / "generation", args.r2_config, destination / "r2-publication"
+                )
+            except Exception as exc:
+                report["public_publication"] = {
+                    "status": "FAILED",
+                    "error_type": type(exc).__name__,
+                    "error": "R2 publication could not retain its receipt; local refresh completed",
+                }
     except Exception as exc:
         report["error"] = f"{type(exc).__name__}: {exc}"
         logging.exception("Dashboard refresh failed; inspect retained receipt")
@@ -203,7 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         lock.unlink()
     print(json.dumps({"receipt": str(destination / "receipt.json"), **report}, sort_keys=True))
-    return 0 if report["status"] == "COMPLETE" else 1
+    published = report.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
+    return 0 if report["status"] == "COMPLETE" and published else 1
 
 
 if __name__ == "__main__":
