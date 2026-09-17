@@ -9,7 +9,12 @@ import duckdb
 import pytest
 
 from fpl.ingest.live_snapshot import _manifest, capture_payload
-from fpl.publish.current_availability import current_availability, validate_current_availability
+from fpl.publish.current_availability import (
+    current_availability,
+    current_reporting,
+    validate_current_availability,
+    validate_current_price,
+)
 
 STAMP = datetime(2026, 9, 17, 4, tzinfo=UTC)
 
@@ -64,7 +69,7 @@ def test_whole_latest_capture_exact_identity_nulls_and_real_cutoff(
     availability_db: duckdb.DuckDBPyConnection,
 ) -> None:
     con = availability_db
-    player = {"id": 165, "code": 475168, "status": "a"}
+    player = {"id": 165, "code": 475168, "status": "a", "now_cost": 50}
     add_capture(con, [player, {"id": 2, "code": 2}], identity="old", at="2026-09-14T03:00:00Z")
     add_capture(
         con,
@@ -75,11 +80,17 @@ def test_whole_latest_capture_exact_identity_nulls_and_real_cutoff(
                 "chance_of_playing_next_round": 75,
                 "news": "Unspecified injury - 75% chance of playing",
                 "news_added": "2026-09-16T19:00:09Z",
+                "now_cost": 49,
             },
             {"id": 3, "code": 3},
         ],
     )
-    add_capture(con, [{**player, "status": "i"}], identity="future", at="2026-09-18T03:00:00Z")
+    add_capture(
+        con,
+        [{**player, "status": "i", "now_cost": 48}],
+        identity="future",
+        at="2026-09-18T03:00:00Z",
+    )
     add_capture(con, [{**player, "status": "s"}], identity="previous-season", season="2025-26")
     result = current_availability(con, as_of=STAMP)
     assert ("2026-27", 2) not in result  # No per-player stale backfill.
@@ -92,6 +103,17 @@ def test_whole_latest_capture_exact_identity_nulls_and_real_cutoff(
         unknown[k] is None for k in ("status", "chance_of_playing_next_round", "news", "news_added")
     )
     assert current_availability(con, as_of=STAMP) == result
+    reporting = current_reporting(con, as_of=STAMP)
+    price = reporting[("2026-27", 475168)]["current_price"]
+    assert price["now_cost"] == 49
+    assert reporting[("2025-26", 475168)]["current_price"]["now_cost"] == 50
+    assert reporting[("2026-27", 3)]["current_price"]["now_cost"] is None
+    assert ("2026-27", 2) not in reporting
+    assert {key: value for key, value in price.items() if key != "now_cost"} == {
+        key: result[("2026-27", 475168)][key] for key in price if key != "now_cost"
+    }
+    earlier = current_reporting(con, as_of=datetime(2026, 9, 15, tzinfo=UTC))
+    assert earlier[("2026-27", 475168)]["current_price"]["now_cost"] == 50
 
 
 @pytest.mark.parametrize(
@@ -133,6 +155,7 @@ def test_no_capture_is_unknown_and_bad_overlay_cannot_pass_validation(
 ) -> None:
     con = availability_db
     assert current_availability(con, as_of=STAMP) == {}
+    assert current_reporting(con, as_of=STAMP) == {}
     add_capture(con, [{"id": 1, "code": 1, "status": "d"}])
     original = current_availability(con, as_of=STAMP)[("2026-27", 1)]
     for key, value in [
@@ -153,3 +176,67 @@ def test_no_capture_is_unknown_and_bad_overlay_cannot_pass_validation(
         {"season": "2026-27", "code": 1, "current_availability": {**original, "status": "x"}},
         exported_at=STAMP.isoformat(),
     )
+
+
+@pytest.mark.parametrize("price", [True, 49.0, "49", 0, -1])
+def test_invalid_current_price_fails_without_using_older_price(
+    availability_db: duckdb.DuckDBPyConnection, price: object
+) -> None:
+    player = {"id": 1, "code": 1, "now_cost": 50}
+    add_capture(availability_db, [player], identity="old", at="2026-09-16T03:00:00Z")
+    add_capture(availability_db, [{**player, "now_cost": price}])
+    with pytest.raises(ValueError, match="current price"):
+        current_reporting(availability_db, as_of=STAMP)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("code", 2),
+        ("code", True),
+        ("season", "2025-26"),
+        ("source", "other"),
+        ("unexpected", 49),
+        ("semantics", "forecast"),
+        ("source_sha256", "bad"),
+        ("capture_id", ""),
+        ("captured_at", "2026-09-19T00:00:00Z"),
+        ("captured_at", "2026-09-17T00:00:00"),
+    ],
+)
+def test_current_price_identity_provenance_and_time_are_validated(
+    availability_db: duckdb.DuckDBPyConnection, field: str, value: object
+) -> None:
+    add_capture(availability_db, [{"id": 1, "code": 1, "now_cost": 49}])
+    original = current_reporting(availability_db, as_of=STAMP)[("2026-27", 1)]["current_price"]
+    with pytest.raises(ValueError, match="current price"):
+        validate_current_price(
+            {"season": "2026-27", "code": 1, "current_price": {**original, field: value}},
+            exported_at=STAMP.isoformat(),
+        )
+
+
+def test_price_requires_same_capture_as_availability_and_supports_legacy_and_null(
+    availability_db: duckdb.DuckDBPyConnection,
+) -> None:
+    add_capture(
+        availability_db,
+        [{"id": 1, "code": 1, "now_cost": 50}],
+        identity="old",
+        at="2026-09-16T03:00:00Z",
+    )
+    add_capture(availability_db, [{"id": 1, "code": 1, "now_cost": None}])
+    report = current_reporting(availability_db, as_of=STAMP)[("2026-27", 1)]
+    player = {"season": "2026-27", "code": 1, **report}
+    validate_current_price(player, exported_at=STAMP.isoformat())
+    assert report["current_price"]["now_cost"] is None
+    for legacy in (
+        {"season": "2026-27", "code": 1},
+        {"season": "2026-27", "code": 1, "current_price": None},
+    ):
+        validate_current_price(legacy, exported_at=STAMP.isoformat())
+    with pytest.raises(ValueError, match="source mismatch"):
+        validate_current_price(
+            {**player, "current_price": {**report["current_price"], "capture_id": "another"}},
+            exported_at=STAMP.isoformat(),
+        )

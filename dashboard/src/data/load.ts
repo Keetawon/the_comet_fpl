@@ -216,6 +216,28 @@ export async function loadPlayers(): Promise<PlayersData> {
       throw new Error(`invalid ${subject}: next gameweek must be at most 38`);
     }
   }
+  for (const player of candidate.players as PlayerRecord[]) {
+    if (player.current_price == null) continue;
+    const subject = "players.json current_price";
+    const current = strictObject(player.current_price, [
+      "source", "season", "code", "now_cost", "captured_at", "capture_id", "source_sha256", "semantics",
+    ], subject);
+    if (current.source !== "FPL" || current.semantics !== "current_reported_not_forecast" ||
+        current.season !== player.season || current.code !== player.code) {
+      throw new Error(`invalid ${subject}: source, semantics or player identity mismatch`);
+    }
+    if (current.now_cost !== null) integerValue(current.now_cost, `${subject}.now_cost`, 1);
+    timezoneAwareIsoValue(current.captured_at, `${subject}.captured_at`);
+    stringValue(current.capture_id, `${subject}.capture_id`);
+    if (typeof current.source_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(current.source_sha256)) {
+      throw new Error(`invalid ${subject}: source hash is missing or malformed`);
+    }
+    if (player.current_availability != null && (
+      player.current_availability.captured_at !== current.captured_at ||
+      player.current_availability.capture_id !== current.capture_id ||
+      player.current_availability.source_sha256 !== current.source_sha256
+    )) throw new Error(`invalid ${subject}: price and availability must share a capture`);
+  }
   return { players: candidate.players as PlayerRecord[], manifest };
 }
 

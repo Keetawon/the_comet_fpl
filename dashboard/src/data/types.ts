@@ -259,6 +259,18 @@ export interface CurrentPlayerAvailability {
   semantics: "current_reported_not_forecast";
 }
 
+/** Latest captured FPL purchase price; never replaces the forecast's deadline price. */
+export interface CurrentPlayerPrice {
+  source: "FPL";
+  season: string;
+  code: number;
+  now_cost: number | null;
+  captured_at: string;
+  capture_id: string;
+  source_sha256: string;
+  semantics: "current_reported_not_forecast";
+}
+
 export interface PlayerRecord {
   run_id: string;
   as_of: string;
@@ -275,6 +287,7 @@ export interface PlayerRecord {
   availability_multiplier: number | null;
   /** Absent in legacy packages; null means no current source evidence. */
   current_availability?: CurrentPlayerAvailability | null;
+  current_price?: CurrentPlayerPrice | null;
   /** True when the selected forecast vintage used its no-history player path. */
   cold_start_player: boolean;
   form: PlayerForm | null;

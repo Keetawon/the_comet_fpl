@@ -28,6 +28,7 @@ import type {
 } from "@/data/types";
 import { currentAvailability, hasCurrentAvailabilityConcern } from "@/lib/availability";
 import { AvailabilityBadge } from "@/components/AvailabilityBadge";
+import { playerPrice, playerPriceTitle } from "@/lib/playerPrice";
 import { chipBucket, chipMetric } from "@/lib/fixtureChips";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import {
@@ -108,7 +109,8 @@ function PlayerLine({ player, value, valueLabel }: { player: PlayerRecord; value
         <span className="min-w-0 truncate">
           <span className="font-medium">{player.web_name}</span>
           <span className="ml-1 text-xs text-muted-foreground">
-            {player.position} · {player.team_short_name} · {price(player.now_cost)}
+            {player.position} · {player.team_short_name} ·{" "}
+            <span title={playerPriceTitle(player, "current")}>{price(playerPrice(player, "current"))}</span>
           </span>
         </span>
       </span>

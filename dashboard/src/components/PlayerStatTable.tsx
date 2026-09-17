@@ -37,6 +37,7 @@ import { NULL_BUCKET_CLASS } from "@/lib/difficulty";
 import type { ColorSource, ViewMode } from "@/lib/difficulty";
 import { playerChipBucket, playerChipMetric } from "@/lib/playerChips";
 import { currentAvailability } from "@/lib/availability";
+import { playerPrice, playerPriceTitle, type PlayerPriceSource } from "@/lib/playerPrice";
 import { AvailabilityBadge } from "@/components/AvailabilityBadge";
 import type {
   PlayerFixture,
@@ -111,6 +112,7 @@ export interface PlayerStatTableProps {
   expandedRowMode?: "forecast" | "historical";
   initialSorting?: SortingState;
   pageSize?: number;
+  priceSource?: PlayerPriceSource;
   /** Columns inserted just BEFORE the per-gameweek fixture columns (fixtures stay last). */
   beforeFixtureColumns?: LegacyColumnDef<PlayerStatRow>[];
   extraColumns?: LegacyColumnDef<PlayerStatRow>[];
@@ -430,6 +432,7 @@ export function PlayerStatTable({
   expandedRowMode = "forecast",
   initialSorting = DEFAULT_SORTING,
   pageSize = 50,
+  priceSource = "forecast",
   beforeFixtureColumns = [],
   extraColumns = [],
   nameSuffix,
@@ -918,10 +921,15 @@ export function PlayerStatTable({
         },
       },
       {
-        accessorKey: "player.now_cost",
+        id: "player_now_cost",
+        accessorFn: (row) => playerPrice(row.player, priceSource) ?? undefined,
         header: "Price",
+        sortUndefined: "last",
+        sortDescFirst: true,
         cell: ({ row }) => (
-          <span className="tabular-nums">{price(row.original.player.now_cost)}</span>
+          <span className="tabular-nums" title={playerPriceTitle(row.original.player, priceSource)}>
+            {price(playerPrice(row.original.player, priceSource))}
+          </span>
         ),
       },
       {
@@ -957,6 +965,7 @@ export function PlayerStatTable({
     beforeFixtureColumns,
     extraColumns,
     opponentIndexOf,
+    priceSource,
   ]);
 
   const table = useLegacyTable({
@@ -977,7 +986,7 @@ export function PlayerStatTable({
   const pageIndex = table.getState().pagination.pageIndex;
 
   return (
-    <DecisionTableFullscreen label={fullscreenLabel} captureContext={`${view} · GW${gwFrom}–${gwTo} · Page ${pageIndex + 1}/${Math.max(1, pageCount)} · ${rows.length} filtered players · Forecast as of ${rows[0]?.player.as_of ?? "unavailable"}. ${formScopeLabel ? `Observed: ${formScopeLabel}.` : ""} Displayed values; no new forecast.`}>
+    <DecisionTableFullscreen label={fullscreenLabel} captureContext={`${view} · GW${gwFrom}–${gwTo} · Page ${pageIndex + 1}/${Math.max(1, pageCount)} · ${rows.length} filtered players · Forecast as of ${rows[0]?.player.as_of ?? "unavailable"}. Prices: ${priceSource === "current" ? "latest captured FPL" : "forecast vintage"}. ${formScopeLabel ? `Observed: ${formScopeLabel}.` : ""} Displayed values; no new forecast.`}>
       {({ isFullscreen }) => (
         <div className={`flex flex-col gap-2 ${isFullscreen ? "min-h-0 flex-1" : ""}`}>
           {formScopeLabel && (
