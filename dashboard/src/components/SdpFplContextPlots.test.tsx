@@ -10,7 +10,7 @@ function receipt(open: number, set: number, own: number, unknown: number): NonNu
   return { open_play_goals: open, set_piece_goals: unknown ? null : set, confirmed_set_piece_goals: set,
     own_goals_received: own, unclassified_goals: unknown, total_goals: open + set + own + unknown,
     source_version: "synthetic-v1", raw_payload_sha256: "a".repeat(64), source_known_at: "2026-09-07T08:00:00Z",
-    audited_at: "2026-09-14T03:00:00Z", evidence_urls: [], method: "Synthetic test receipt" };
+    audited_at: "2026-09-14T03:00:00Z", evidence_urls: [], method: "audited_goal_accounting_v1" };
 }
 
 function inputs() {
@@ -196,7 +196,7 @@ describe("four observed team context plots", () => {
     rerender(<SdpFplContextPlots {...props} />);
     expect(within(finishing).queryByTestId("analytics-point")).not.toBeInTheDocument();
     expect(within(finishing).getByRole("status")).toHaveTextContent("Missing observations remain unavailable");
-    expect(within(patterns).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/Unavailable: 1\/2 match receipts/);
+    expect(within(patterns).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/Unavailable goal total; 1\/2 match receipts/);
     expect(patterns.querySelector("[data-pattern]")).toBeNull();
   });
 
@@ -209,6 +209,22 @@ describe("four observed team context plots", () => {
     expect(within(screen.getByRole("article", { name: "Goals vs xG plot panel" })).getByTestId("analytics-point")).toHaveAccessibleName(/xG \/match: 1; FPL Goals \/match: 1/);
     expect(within(screen.getByRole("article", { name: "Goal patterns plot panel" })).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/1 matched observations; Open play: 1; Set piece \(confirmed\): 0; Opponent own goal: 0; Unclassified: 0; Total goals: 1/);
     expect(JSON.stringify(props)).toBe(before);
+  });
+
+  it("retains known goals when one match lacks a breakdown and updates when a receipt arrives", () => {
+    const props = inputs(); const row = props.teams[0].rows[1];
+    row.goal_patterns = null; row.sdp.open_play_goals = 1;
+    const before = JSON.stringify(props);
+    const { rerender } = render(<SdpFplContextPlots {...props} />);
+    const patterns = screen.getByRole("article", { name: "Goal patterns plot panel" });
+    expect(within(patterns).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/Open play: 2; Set piece \(confirmed\): 0; Opponent own goal: 0; Unclassified: 2; Total goals: 4; Goal-origin breakdown unavailable for 1\/2 matches/);
+    expect(within(patterns).getByText("Origin breakdown missing: 1/2 matches")).toBeInTheDocument();
+    expect(patterns.querySelector('[data-pattern="unclassified_goals"]')).toHaveAttribute("data-count", "2");
+    expect(JSON.stringify(props)).toBe(before);
+    row.goal_patterns = receipt(1, 1, 1, 0);
+    rerender(<SdpFplContextPlots {...props} />);
+    expect(within(patterns).getByRole("button", { name: /^Arsenal;/ })).toHaveAccessibleName(/Open play: 2; Set piece \(confirmed\): 1; Opponent own goal: 1; Unclassified: 0; Total goals: 4/);
+    expect(within(patterns).queryByText(/Origin breakdown missing:/)).not.toBeInTheDocument();
   });
 
   it("sorts observed totals descending, keeps zero before missing and breaks ties consistently", () => {

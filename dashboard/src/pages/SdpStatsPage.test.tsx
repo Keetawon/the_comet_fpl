@@ -32,8 +32,8 @@ describe("SDP football observatory", () => {
     const csv = await new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result as string); reader.readAsText(create.mock.calls[0][0] as Blob); });
     create.mockRestore(); revoke.mockRestore(); click.mockRestore();
     expect(csv).toContain("Open-play goals [average per match]");
-    expect(csv).toContain('"1.5","2/2",""');
-    expect(csv).toContain(`"","0/2","${setPiece.description}"`);
+    expect(csv).toContain('"1.5","2/2","Fixture 1: complete goal-origin classification unavailable.');
+    expect(csv).toContain(`"","0/2","${setPiece.description} | Fixture 1:`);
     fireEvent.change(screen.getByRole("combobox", { name: "Venue" }), { target: { value: "away" } });
     expect(within(grid).getByText("0")).toBeInTheDocument();
   });

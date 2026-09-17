@@ -303,3 +303,13 @@ Register-ScheduledTask -TaskName 'The Comet FPL - SDP primary V2' `
 The registration helper still defaults to a daily schedule for **new** tasks;
 rerunning it is neither required nor allowed to overwrite this existing task.
 This schedule change does not modify pipeline/model code or frozen evidence.
+
+### Goal-origin display refresh (2026-09-17)
+
+The existing dashboard exporter now reaccounts new or revised current-season
+goal-pattern sources on each refresh, retaining source-bound manual audits where
+their raw hash still matches. Unknown origins are displayed as Unclassified;
+they never default to open play. This does not change capture windows, provider
+core validity, selection policy or forecasts. See
+`sdp-goal-pattern-refresh-2026-09-17.md` for source reconciliation and verification.
+Local refresh/build and public release publication remain separate operations.

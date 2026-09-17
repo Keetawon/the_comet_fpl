@@ -103,7 +103,7 @@ export interface SdpMatch {
   fpl?: Record<string, number | null>;
 }
 
-export interface GoalPatterns {
+interface GoalPatternCounts {
   open_play_goals: number;
   set_piece_goals: number | null;
   confirmed_set_piece_goals: number;
@@ -113,14 +113,17 @@ export interface GoalPatterns {
   source_version: string;
   raw_payload_sha256: string;
   source_known_at: string;
-  audited_at: string;
   evidence_urls: string[];
-  method: string;
 }
+
+export type GoalPatterns = GoalPatternCounts & (
+  | { method: "audited_goal_accounting_v1"; audited_at: string; interpreted_at?: never }
+  | { method: "source_goal_accounting_v1"; interpreted_at: string; audited_at?: never }
+);
 
 export interface SdpStatsData {
   schema: "fpl.sdp-stats";
-  json_schema_version: 2 | 3 | 4 | 5 | 6 | 7;
+  json_schema_version: 2 | 3 | 4 | 5 | 6 | 7 | 8;
   as_of: string;
   source_status: {
     team_stats: SourceAvailability;
@@ -156,7 +159,7 @@ const timestamp = (v: unknown) => typeof v === "string" &&
 
 export function parseSdpStats(payload: unknown): SdpStatsData {
   const fail = () => { throw new Error("The observed SDP file is invalid or incompatible. Republish its source data."); };
-  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3, 4, 5, 6, 7].includes(payload.json_schema_version as number) ||
+  if (!object(payload) || payload.schema !== "fpl.sdp-stats" || ![2, 3, 4, 5, 6, 7, 8].includes(payload.json_schema_version as number) ||
       !timestamp(payload.as_of) || !object(payload.source_status) || !object(payload.coverage) ||
       !Array.isArray(payload.metrics) || !Array.isArray(payload.team_matches) ||
       !Array.isArray(payload.player_matches) || !Array.isArray(payload.gameweeks)) return fail();
@@ -219,12 +222,15 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
         if (Number(payload.json_schema_version) >= 7 && row.goal_patterns !== null) {
           const p = row.goal_patterns;
           const counts = ["open_play_goals", "confirmed_set_piece_goals", "own_goals_received", "unclassified_goals", "total_goals"];
+          const sourceAccounting = object(p) && p.method === "source_goal_accounting_v1";
+          const interpretedAt = object(p) ? p[sourceAccounting ? "interpreted_at" : "audited_at"] : null;
           if (!object(p) || counts.some(k => typeof p[k] !== "number" || !Number.isSafeInteger(p[k]) || (p[k] as number) < 0) ||
-              p.method !== "audited_goal_accounting_v1" || p.source_version !== row.source_version ||
+              (sourceAccounting ? Number(payload.json_schema_version) < 8 || p.audited_at !== undefined : p.method !== "audited_goal_accounting_v1" || p.interpreted_at !== undefined) || p.source_version !== row.source_version ||
               typeof p.source_version !== "string" || !/^[0-9a-f]{64}$/.test(p.source_version) ||
               typeof p.raw_payload_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(p.raw_payload_sha256) ||
-              !timestamp(p.source_known_at) || !timestamp(p.audited_at) ||
-              Date.parse(p.audited_at as string) < Date.parse(p.source_known_at as string) ||
+              !timestamp(p.source_known_at) || !timestamp(interpretedAt) ||
+              Date.parse(interpretedAt as string) < Date.parse(p.source_known_at as string) ||
+              (sourceAccounting && Date.parse(interpretedAt as string) > asOf) ||
               Date.parse(p.source_known_at as string) > Date.parse(row.known_at as string) ||
               Date.parse(p.source_known_at as string) <= Date.parse(row.kickoff_time as string) ||
               !Array.isArray(p.evidence_urls) || p.evidence_urls.some(u => typeof u !== "string" || !u.startsWith("https://")) ||

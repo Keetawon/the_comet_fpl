@@ -3,20 +3,96 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fpl.config import config_dir
+from fpl.ingest.pl_sdp import SdpSchemaError, parse_team_stats
 
 AUDIT_FILE = "sdp_goal_pattern_display_audit.json"
 METHOD = "audited_goal_accounting_v1"
+SOURCE_METHOD = "source_goal_accounting_v1"
 DESCRIPTION = (
-    "Audited SDP goal accounting with match-report corroboration. Includes penalties, "
-    "corners, free-kick and throw-in phases; opponent own goals are separate. "
+    "SDP goal accounting, with match-report corroboration where separately audited. "
+    "Automatic accounting confirms explicit penalty and direct free-kick goals only; "
+    "other origins require evidence. Opponent own goals are separate. "
     "An incomplete classification stays unavailable, never zero. Display-only; "
     "not a provider-supplied set-piece total. See each match's goal-pattern evidence."
 )
+
+
+def apply_source_goal_pattern(
+    row: dict[str, Any], source: dict[str, Any], *, interpreted_at: datetime
+) -> None:
+    """Account only explicit counts from the identity-validated export source.
+
+    The caller supplies the exact raw payload used to construct this match side,
+    never an independently selected latest payload. No residual is called open play
+    or set piece. A future capture is reinterpreted afresh; manual audits stay pinned.
+    """
+    if row["goal_patterns"] is not None:
+        return
+    if (
+        source["endpoint"] != "match_stats"
+        or source["season"] != row["season"]
+        or source["sdp_match_id"] != row["provider_match_id"]
+        or source["fetched_at"] > interpreted_at
+    ):
+        return
+    try:
+        sides = parse_team_stats(json.loads(source["body"]), match_id=row["provider_match_id"])
+    except (SdpSchemaError, ValueError, TypeError):
+        return
+    own = next(s.stats for s in sides if s.side == ("home" if row["was_home"] else "away"))
+    other = next(s.stats for s in sides if s.side != ("home" if row["was_home"] else "away"))
+    values = [
+        own.get("goals"),
+        own.get("goalsOpenplay"),
+        own.get("attPenGoal"),
+        own.get("attFreekickGoal"),
+        other.get("ownGoals"),
+        other.get("goals"),
+    ]
+    # Missing, fractional or contradictory counts are not observed zeroes.
+    if any(
+        not isinstance(v, (int, float))
+        or isinstance(v, bool)
+        or not math.isfinite(v)
+        or v < 0
+        or int(v) != v
+        for v in values
+    ):
+        return
+    total, open_play, penalties, free_kicks, own_received, conceded = map(
+        int, cast(list[float], values)
+    )
+    if (
+        total != row["fpl"]["goals_scored"]
+        or conceded != row["fpl"]["goals_conceded"]
+        or open_play != row["sdp"]["open_play_goals"]
+    ):
+        return
+    confirmed = penalties + free_kicks
+    unknown = total - open_play - confirmed - own_received
+    if unknown < 0:
+        return
+    row["goal_patterns"] = {
+        "method": SOURCE_METHOD,
+        "source_version": row["source_version"],
+        "source_known_at": source["fetched_at"].isoformat(),
+        "interpreted_at": interpreted_at.isoformat(),
+        "raw_payload_sha256": source["sha256"],
+        "open_play_goals": open_play,
+        "confirmed_set_piece_goals": confirmed,
+        "set_piece_goals": None if unknown else confirmed,
+        "own_goals_received": own_received,
+        "unclassified_goals": unknown,
+        "total_goals": total,
+        "evidence_urls": [],
+    }
+    validate_goal_patterns(row)
 
 
 def public_evidence_urls() -> set[str]:
@@ -80,6 +156,9 @@ def validate_goal_patterns(row: dict[str, Any]) -> None:
     p = row["goal_patterns"]
     if p is None:
         return
+    if not isinstance(p, dict):
+        raise ValueError("invalid goal-pattern display evidence")
+    interpreted_field = "interpreted_at" if p.get("method") == SOURCE_METHOD else "audited_at"
     counts = (
         "open_play_goals",
         "confirmed_set_piece_goals",
@@ -97,11 +176,11 @@ def validate_goal_patterns(row: dict[str, Any]) -> None:
             "evidence_urls",
             "source_version",
             "source_known_at",
-            "audited_at",
+            interpreted_field,
             "method",
         }
         or any(type(p[k]) is not int or p[k] < 0 for k in counts)
-        or p["method"] != METHOD
+        or p["method"] not in (METHOD, SOURCE_METHOD)
         or p["source_version"] != row["source_version"]
         or not isinstance(p["source_version"], str)
         or not re.fullmatch(r"[0-9a-f]{64}", p["source_version"])
@@ -117,12 +196,12 @@ def validate_goal_patterns(row: dict[str, Any]) -> None:
         != (None if p["unclassified_goals"] else p["confirmed_set_piece_goals"])
     ):
         raise ValueError("invalid goal-pattern display evidence")
-    for field in ("source_known_at", "audited_at"):
+    for field in ("source_known_at", interpreted_field):
         stamp = datetime.fromisoformat(p[field])
         if stamp.tzinfo is None:
             raise ValueError("goal-pattern timestamp requires timezone")
     source = datetime.fromisoformat(p["source_known_at"])
     if not datetime.fromisoformat(row["kickoff_time"]) < source <= datetime.fromisoformat(
         row["known_at"]
-    ) or source > datetime.fromisoformat(p["audited_at"]):
+    ) or source > datetime.fromisoformat(p[interpreted_field]):
         raise ValueError("goal-pattern source availability mismatch")
