@@ -64,7 +64,8 @@ async function upstream(path: string, fetcher: typeof fetch): Promise<Record<str
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetcher(`${FPL}${path}`, {
-        headers: { Accept: "application/json" }, redirect: "error",
+        // Workerd supports manual/follow only; non-2xx below rejects every redirect.
+        headers: { Accept: "application/json" }, redirect: "manual",
         signal: AbortSignal.timeout(6000),
       });
       if (response.status === 404) throw new ImportError(404, "Manager or published squad not found. Check the Manager ID; picks appear after the first deadline.");
@@ -76,7 +77,7 @@ async function upstream(path: string, fetcher: typeof fetch): Promise<Record<str
       return record(await boundedJson(response, 4_000_000));
     } catch (error) {
       if (error instanceof ImportError) throw error;
-      if (attempt === 1) throw new ImportError(504, "FPL did not respond in time. Please try again.");
+      if (attempt === 1) throw new ImportError(504, "FPL could not be reached. Please try again.");
     }
   }
   throw new ImportError(504, "FPL did not respond in time.");

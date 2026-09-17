@@ -1,4 +1,71 @@
-# Public Squad Draft import: prepared, not enabled
+# Public Squad Draft import: authorized activation
+
+## September 17 activation update
+
+The owner explicitly confirmed public Squad Draft and the read-only team service, then
+completed Cloudflare OAuth. This supersedes the earlier preparation restriction below for
+Squad Draft only. The optimizer, Plan Builder, private captures and local Plan Server remain
+unavailable in hosted mode. No model, forecast, source snapshot or public-data release changes.
+
+The Worker is deployed at `https://manager-api.thecometfpl.com/manager-team`, version
+`c3145f8a-f2aa-4220-9570-de8c03cdf8bf`. Deployed-origin testing returned 15 unique players,
+public picks GW4 and next planning GW5. CORS preflight returned 204 with the exact allowed
+origin and no credential allowance. Responses remain `no-store`; no console or body logging
+was added. Original deployment `cde061b3-0c75-434a-a3a6-948cea433fbf` failed imports because
+workerd rejects `redirect: "error"`. Local runtime debugging identified that incompatibility;
+the deployed repair uses `manual` and rejects non-2xx responses without following redirects.
+A dedicated redirect rejection regression covers it. Free-plan deployment also required
+omitting the custom CPU-limit setting; no plan upgrade was made.
+
+The hosted UI imports only a complete, matching 15-player squad. It displays source GW,
+actual fetch time, Free Hit limitations and published-price context. Incomplete identities,
+mismatched planning GW and network failures leave the existing editable draft unchanged.
+The browser does not persist Manager ID; its saved draft contains selected stable codes and
+the response identity. Restored public drafts are labelled as edited snapshots, not live
+ownership. Hosted routes reject both private manager-capture and optimizer handoffs.
+
+Final verification: **503 dashboard tests across 58 files passed**, including all 17 Worker
+tests. Both strict TypeScript checks and the hosted build passed; lint passed with nine
+inherited Fast Refresh warnings. `git diff --check` passed. Python checks were not rerun:
+no Python or model files changed, and their content was checked against the frozen receipt.
+The original preparation record is retained below as history.
+
+At the activation check, public Google DNS resolved the Worker to Cloudflare and www to
+GitHub Pages, but the workstation resolver still returned `208.91.112.55` for both.
+Endpoint checks therefore used the public DNS address with normal TLS verification, not
+an insecure certificate bypass. GitHub Pages still reported no custom-domain certificate;
+its HTTPS www request independently failed hostname validation. This is a separate website
+TLS/publication limitation, not a failure of the deployed Worker certificate.
+
+## Activation verification evidence
+
+- Deployed checks on September 17 at 03:37 UTC: valid request 200 / 15 unique players,
+  invalid Manager ID 400, disallowed Origin 403. Repository variable
+  `PUBLIC_MANAGER_IMPORT_URL` now points to the verified endpoint; only a new hosted build
+  consumes it. No token is in that variable.
+- Browser verification at 03:42 UTC: desktop 1440x1100 and mobile 390x844 imported all 15
+  official players through the actual Worker, real browser CORS and normal API TLS validation.
+  Missing-manager failure retained all 15 selections; clear reset the draft; hosted
+  Plan Builder navigation stayed blocked. Mobile document width equals its 390px viewport.
+  There were no JavaScript runtime exceptions or local Plan Server calls.
+- This was **a local hosted-build preview**, not proof that GitHub Pages had published it.
+  Test-only request interception served unchanged local frontend assets under the allowed
+  origin; the oversized existing public JSON used a loopback asset server with permission
+  limited to the disposable browser profile. API requests/responses were not intercepted.
+  The API hostname used its independently checked public DNS answer because local DNS was
+  stale. TLS checking stayed enabled. The in-app Browser capability had returned no available
+  browser; an isolated headless Chrome profile was used instead.
+- Several existing external Premier League player photos were blocked/unavailable and fell
+  back to initials. This does not affect squad identity or import; no zero-network-error claim
+  is made. The large existing player JSON also remains an initial-load limitation.
+- Local evidence: `data/artifacts/public-squad-20260917/browser-verification.json`,
+  `squad-draft-desktop.png`, `squad-draft-mobile.png`, and
+  `squad-draft-failure-preserves-team.png`. These are ignored operator review artifacts,
+  not public downloadable squad exports.
+- All 668 pinned model/source/config/results/snapshot files remained byte-identical.
+  No forecast, optimizer, model evaluation, or data-refresh job was executed.
+
+## Original preparation record (before confirmation)
 
 Starting branch: `claude/comet-fpl-v2-architecture-mqrj8f`,
 `a877ff058f0ee9fdec86e9adde071868d3706bf0`.

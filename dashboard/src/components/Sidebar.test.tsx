@@ -7,10 +7,11 @@ describe("Sidebar", () => {
   it("hides local decision pages only in the public build", () => {
     vi.stubEnv("VITE_HOSTED_STATIC", "true");
     const { rerender } = render(<Sidebar active="summary" onNavigate={vi.fn()} />);
-    for (const name of ["Next GW suggestion", "Plan builder", "Squad draft", "Optimizer audit"]) {
+    for (const name of ["Next GW suggestion", "Plan builder", "Optimizer audit"]) {
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }
     expect(screen.getByRole("button", { name: "Team stat from SDP" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Squad draft" })).toBeInTheDocument();
     vi.stubEnv("VITE_HOSTED_STATIC", "false");
     rerender(<Sidebar active="summary" onNavigate={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Optimizer audit" })).toBeInTheDocument();

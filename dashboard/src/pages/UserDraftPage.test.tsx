@@ -22,6 +22,12 @@ import {
   type ManagerTeamPreview,
 } from "@/lib/planServer";
 import { USER_DRAFT_STORAGE_KEY, UserDraftPage } from "./UserDraftPage";
+import { fetchPublicManagerTeam, type PublicManagerSquad } from "@/lib/publicManagerTeam";
+
+vi.mock("@/lib/publicManagerTeam", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/publicManagerTeam")>(),
+  fetchPublicManagerTeam: vi.fn(),
+}));
 
 vi.mock("@/data/load", () => ({
   loadNextGw: vi.fn(),
@@ -107,6 +113,7 @@ beforeEach(() => {
   vi.mocked(loadSummary).mockResolvedValue({ ...summarySample, latest_run: null } as SummaryData);
   vi.mocked(fetchManagerTeamMembers).mockReset();
   vi.mocked(fetchManagerTeamMembersCapture).mockReset();
+  vi.mocked(fetchPublicManagerTeam).mockReset();
 });
 
 function publishCurrentForecast(gw: number) {
@@ -224,17 +231,77 @@ describe("UserDraftPage", () => {
     expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
   });
 
-  it("keeps hosted Squad Draft manual and never exposes manager import controls", async () => {
+  it("keeps manual drafting usable when the public import endpoint is not configured", async () => {
     vi.stubEnv("VITE_HOSTED_STATIC", "true");
 
     render(<UserDraftPage />);
 
     expect(await screen.findByRole("heading", { name: "Squad Draft" })).toBeInTheDocument();
-    expect(screen.getByText(/Current-team import is intentionally local-only/)).toBeInTheDocument();
-    expect(screen.queryByLabelText("FPL manager ID")).not.toBeInTheDocument();
+    expect(screen.getByText(/Online Manager ID import has not been enabled/)).toBeInTheDocument();
+    expect(screen.getByLabelText("FPL manager ID")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fetch public team" })).toBeDisabled();
     expect(screen.queryByLabelText(/Plan server token/)).not.toBeInTheDocument();
     expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Add Draft 01" })).toBeEnabled();
+  });
+
+  it("imports public picks atomically, labels provenance and never calls the local server", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    vi.stubEnv("VITE_PUBLIC_MANAGER_IMPORT_URL", "https://manager-api.thecometfpl.com/manager-team");
+    const { players } = publishCurrentForecast(5);
+    const user = userEvent.setup();
+    const preview: PublicManagerSquad = {
+      schema: "fpl.public-manager-squad", schema_version: 1, source: "official_fpl_public_picks",
+      manager_id: 123456, season: plans[0].season, picks_event: 4, planning_gw: 5,
+      picks_deadline: "2026-09-11T17:30:00Z", captured_at: "2026-09-17T03:00:00Z",
+      snapshot_id: "a".repeat(64), active_chip: "freehit",
+      players: players.map((player, i) => ({ code: player.code, element_id: i + 1, position: player.position, team_code: player.team_code })),
+    };
+    vi.mocked(fetchPublicManagerTeam).mockResolvedValue(preview);
+    const { unmount } = render(<UserDraftPage />);
+    await screen.findByRole("heading", { name: "Squad Draft" });
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Fetch public team" }));
+    expect(await screen.findByText("15/15 players")).toBeInTheDocument();
+    expect(screen.getByLabelText("Imported public team")).toHaveTextContent("GW4");
+    expect(screen.getByLabelText("Imported public team")).toHaveTextContent("Free Hit squad is temporary");
+    expect(screen.getByText(/Unrevealed transfers for the next GW/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Plan server token/)).not.toBeInTheDocument();
+    expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
+    expect(fetchManagerTeamMembersCapture).not.toHaveBeenCalled();
+    const saved = window.localStorage.getItem(USER_DRAFT_STORAGE_KEY)!;
+    expect(JSON.parse(saved)).toMatchObject({ seedSource: "manager_public", managerCaptureId: preview.snapshot_id });
+    expect(saved).not.toContain("123456");
+    unmount();
+    render(<UserDraftPage />);
+    expect(await screen.findByText("15/15 players")).toBeInTheDocument();
+    expect(screen.getByText(/Restored your edited public-picks draft/)).toBeInTheDocument();
+  });
+
+  it.each(["network", "stale"])("preserves a public draft on %s import failure", async issue => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    vi.stubEnv("VITE_PUBLIC_MANAGER_IMPORT_URL", "https://manager-api.thecometfpl.com/manager-team");
+    publishCurrentForecast(5);
+    const user = userEvent.setup();
+    if (issue === "network") vi.mocked(fetchPublicManagerTeam).mockRejectedValue(new Error("FPL is busy"));
+    else vi.mocked(fetchPublicManagerTeam).mockResolvedValue({ season: "2025-26", planning_gw: 5, picks_event: 4 } as PublicManagerSquad);
+    render(<UserDraftPage />);
+    await screen.findByRole("heading", { name: "Squad Draft" });
+    await user.click(screen.getByRole("button", { name: "Add Draft 01" }));
+    const saved = window.localStorage.getItem(USER_DRAFT_STORAGE_KEY);
+    await user.type(screen.getByLabelText("FPL manager ID"), "123456");
+    await user.click(screen.getByRole("button", { name: "Fetch public team" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("existing draft was kept unchanged");
+    expect(screen.getByText("1/15 players")).toBeInTheDocument();
+    expect(window.localStorage.getItem(USER_DRAFT_STORAGE_KEY)).toBe(saved);
+  });
+
+  it("rejects hosted optimizer handoffs instead of revealing an old optimized squad", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    window.location.hash = `#squad-draft?optimizer_run_id=${plans[0].optimizer_run_id}`;
+    render(<UserDraftPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Optimizer handoffs remain local");
+    expect(fetchPublicManagerTeam).not.toHaveBeenCalled();
   });
 
   it("blocks captured-manager handoffs on hosted builds without probing a Plan Server", async () => {

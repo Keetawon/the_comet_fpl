@@ -56,3 +56,5 @@ dashboard/public/data/
 /check_defs.py
 /get_defcon.py
 /output_dc.json
+# Local Cloudflare runtime state and generated bundles (never public assets).
+dashboard/worker/.wrangler/

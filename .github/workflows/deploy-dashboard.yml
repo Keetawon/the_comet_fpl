@@ -299,6 +299,8 @@ jobs:
         env:
           VITE_DATA_BASE: ${{ steps.pages.outputs.base_path }}/data
           VITE_HOSTED_STATIC: "true"
+          # Set only after the read-only import Worker passes deployed-origin verification.
+          VITE_PUBLIC_MANAGER_IMPORT_URL: ${{ vars.PUBLIC_MANAGER_IMPORT_URL }}
         run: |
           ./node_modules/.bin/tsc -b
           ./node_modules/.bin/vite build --base="${{ steps.pages.outputs.base_path }}/"

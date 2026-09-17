@@ -11,16 +11,22 @@ optimizer, and local plan server are never deployed.
 - Player/team deep analytics remain static: they filter, sum published expectations, and draw
   presentation geometry over that same generation.
 - Hosted builds (`VITE_HOSTED_STATIC=true`) hide Next GW suggestion, Optimizer audit,
-  Plan Builder, and Squad Draft, including direct hash navigation. Summary hides optimizer
+  and Plan Builder, including direct hash navigation. Summary hides optimizer
   squad cards. The local build retains these tools; exact solves remain a trusted-machine workflow.
   Every local-server client request also fails closed in hosted mode.
+- The owner-confirmed September 17 exception exposes **Squad Draft** for manual editing.
+  Its optional Manager ID import uses only the isolated read-only public-picks Worker,
+  never the local Plan Server or optimizer. It shows the source GW and warns about unrevealed
+  transfers, temporary Free Hit picks, and forecast-vintage prices. No bank, selling prices,
+  or free-transfer allowance is inferred. See [service readiness](public-squad-import-readiness-2026-09-17.md).
 - Buy Me a Coffee opens the owner-provided `https://buymeacoffee.com/thecomet` in a new tab
   with `noopener noreferrer`. Payment handling stays on that external site; there is no embedded
   payment widget or third-party script in the Dashboard.
 - Every route includes its implemented network-free deterministic insight summary. The seven public
   renderer-eligible routes are Summary, Fixture matrix, Players, Player analytics, Team analytics,
   Player prediction vs actual, and Team prediction vs actual. Next GW suggestion, Optimizer audit,
-  Plan Builder, and Squad Draft remain local deterministic-only surfaces.
+  and Plan Builder remain local deterministic-only surfaces. Squad Draft is also
+  deterministic-only, including its public manual workspace; it never invokes AI.
 - The hosted build never contains a Z.AI or other provider credential and makes zero insight-status
   or provider-summary calls. Optional AI-selected explanation is explicit opt-in through the protected local Plan
   Server only; it stays unavailable in the static hosted build. No key belongs in `VITE_*`, static
@@ -112,6 +118,18 @@ Dashboard tests, lint, and a normal build run even while the pin is `unpublished
 asset-dependent hosted build and deploy are skipped.
 
 ## Refresh and rollback
+
+The public import endpoint is a build-time repository variable, `PUBLIC_MANAGER_IMPORT_URL`.
+After deployed-origin verification, set it to `https://manager-api.thecometfpl.com/manager-team`.
+The existing Pages workflow passes it as `VITE_PUBLIC_MANAGER_IMPORT_URL`; it is a public URL,
+not a credential. A missing variable disables import and leaves manual drafting available.
+Clearing it requires a new Pages build to remove the button's network capability from served
+assets. Keep HTTPS working on the configured site origin; the Worker allows HTTPS origins only.
+Deploy Worker updates separately from `dashboard` with
+`npx --yes wrangler@4.133.0 deploy --config worker/wrangler.jsonc` after tests. Wrangler OAuth
+stays on the operator machine, outside Git and browser builds. The Free plan's default CPU
+limit applies; do not configure a paid-only custom CPU limit. Roll back a Worker through its
+retained deployment version; frontend rollback remains a reviewed revert and Pages rebuild.
 
 - The local four-hour/sign-in `refresh_dashboard` task refreshes local data and the preview;
   it does **not** upload a release, change this public pin, or deploy Pages. Public deployment

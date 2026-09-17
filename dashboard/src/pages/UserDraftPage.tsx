@@ -73,6 +73,12 @@ import {
   squadDraftHandoff,
 } from "@/lib/squadDraftHandoff";
 import { cn } from "@/lib/utils";
+import {
+  fetchPublicManagerTeam,
+  publicManagerImportUrl,
+  publicSquadDraft,
+  type PublicManagerSquad,
+} from "@/lib/publicManagerTeam";
 
 const PLAYER_PAGE_SIZE = 40;
 export const USER_DRAFT_STORAGE_KEY = "the-comet-user-draft-v1";
@@ -102,7 +108,7 @@ type PageState =
   | { status: "error"; message: string }
   | ReadyState;
 
-type DraftSeedSource = "manual" | "optimized" | "manager_current";
+type DraftSeedSource = "manual" | "optimized" | "manager_current" | "manager_public";
 
 interface StoredDraftV2 {
   version: 2;
@@ -303,7 +309,8 @@ function restoreDraft(
     if (
       stored.seedSource !== "manual" &&
       stored.seedSource !== "optimized" &&
-      stored.seedSource !== "manager_current"
+      stored.seedSource !== "manager_current" &&
+      stored.seedSource !== "manager_public"
     ) {
       return empty("The saved Squad Draft had invalid seed provenance and was not restored.");
     }
@@ -312,12 +319,12 @@ function restoreDraft(
       typeof stored.managerCaptureId === "string"
         ? stored.managerCaptureId.trim()
         : "";
-    if (seedSource === "manager_current" && !capture) {
+    if ((seedSource === "manager_current" || seedSource === "manager_public") && !capture) {
       return empty(
         "The saved current-team draft had no manager capture id and was not restored.",
       );
     }
-    if (seedSource !== "manager_current" && capture) {
+    if (seedSource !== "manager_current" && seedSource !== "manager_public" && capture) {
       return empty(
         "The saved Squad Draft mixed incompatible seed provenance and was not restored.",
       );
@@ -341,6 +348,9 @@ function restoreDraft(
     restored.push(player);
   }
   const warnings: string[] = [];
+  if (seedSource === "manager_public") {
+    warnings.push("Restored your edited public-picks draft. Fetch again to check the latest published team; this is not live ownership.");
+  }
   if (migrate) {
     warnings.push(
       "The legacy saved draft was restored as manual because it did not record its original seed source.",
@@ -450,7 +460,7 @@ function storeDraft(
   seedSource: DraftSeedSource,
   managerCaptureId: string | null,
 ): string | null {
-  if (seedSource === "manager_current" && !managerCaptureId?.trim()) {
+  if ((seedSource === "manager_current" || seedSource === "manager_public") && !managerCaptureId?.trim()) {
     throw new Error("Current-team draft storage requires a manager capture id.");
   }
   const payload: StoredDraft = {
@@ -459,7 +469,7 @@ function storeDraft(
     optimizerRunId: state.plan.optimizer_run_id,
     forecastRunId: state.forecast.run_id,
     season: state.forecast.season,
-    managerCaptureId: seedSource === "manager_current" ? managerCaptureId : null,
+    managerCaptureId: seedSource === "manager_current" || seedSource === "manager_public" ? managerCaptureId : null,
     playerCodes: players.map((player) => player.code),
   };
   try {
@@ -811,10 +821,11 @@ export function UserDraftPage() {
   const [seedSource, setSeedSource] = useState<DraftSeedSource>("manual");
   const [managerCaptureId, setManagerCaptureId] = useState<string | null>(null);
   const [managerPreview, setManagerPreview] = useState<ManagerTeamPreview | null>(null);
+  const [publicPreview, setPublicPreview] = useState<PublicManagerSquad | null>(null);
   const [managerId, setManagerId] = useState("");
   const [managerImporting, setManagerImporting] = useState(false);
   const [managerImportError, setManagerImportError] = useState<string | null>(null);
-  const [serverToken, setServerToken] = useState(loadPlanServerToken);
+  const [serverToken, setServerToken] = useState(() => hostedStatic ? "" : loadPlanServerToken());
   const [tokenStorageWarning, setTokenStorageWarning] = useState<string | null>(null);
   const managerImportRequestRef = useRef(0);
   const handoffServerTokenRef = useRef(serverToken);
@@ -829,6 +840,9 @@ export function UserDraftPage() {
     let handoff: ReturnType<typeof squadDraftHandoff>;
     try {
       handoff = squadDraftHandoff(window.location.hash);
+      if (hostedStatic && handoff?.source === "optimized") {
+        throw new Error("Optimizer handoffs remain local. Open Squad Draft without a handoff to build a manual team.");
+      }
     } catch (error: unknown) {
       setState({
         status: "error",
@@ -920,6 +934,7 @@ export function UserDraftPage() {
       });
     return () => {
       cancelled = true;
+      managerImportRequestRef.current += 1;
     };
   }, [hostedStatic]);
 
@@ -938,12 +953,6 @@ export function UserDraftPage() {
   };
 
   const importManagerTeam = async (ready: ReadyState) => {
-    if (hostedStatic) {
-      setManagerImportError(
-        "Manager import is available only with the trusted local Plan Server.",
-      );
-      return;
-    }
     if (!/^\d{1,10}$/.test(managerId.trim()) || Number(managerId.trim()) <= 0) {
       setManagerImportError("Enter a positive FPL manager ID.");
       return;
@@ -952,6 +961,16 @@ export function UserDraftPage() {
     setManagerImporting(true);
     setManagerImportError(null);
     try {
+      if (hostedStatic) {
+        const preview = await fetchPublicManagerTeam(managerId.trim());
+        if (requestId !== managerImportRequestRef.current) return;
+        const imported = publicSquadDraft(preview, ready.forecast, ready.players, ready.rules);
+        persistSelection(ready, imported, "manager_public", preview.snapshot_id);
+        setPublicPreview(preview);
+        setManagerPreview(null);
+        setHandoffNotice(`Imported ${imported.length} players from the public GW${preview.picks_event} team.`);
+        return;
+      }
       const preview = await fetchManagerTeamMembers(managerId.trim(), serverToken);
       if (requestId !== managerImportRequestRef.current) return;
       // Resolve and validate the complete replacement before changing UI or browser storage.
@@ -1043,8 +1062,8 @@ export function UserDraftPage() {
         <div className="max-w-3xl">
           <h1 className="text-lg font-semibold">Squad Draft</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Build a manual what-if squad from the current published forecast. An optimizer handoff starts
-            from that run's optimized first-week squad; you can then edit it freely. Position
+            Build a manual what-if squad from the current published forecast.
+            {!hostedStatic && " An optimizer handoff starts from that run's optimized first-week squad; you can then edit it freely."} Position
             quotas and the maximum-per-club rule are enforced; cost is shown but never blocks an
             experimental draft. Nothing here re-runs or replaces the optimizer.
           </p>
@@ -1088,23 +1107,23 @@ export function UserDraftPage() {
           <UserRoundSearch className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
           <div>
             <h2 id="manager-draft-import-heading" className="font-semibold">
-              Import your current FPL team
+              {hostedStatic ? "Import your public FPL team" : "Import your current FPL team"}
             </h2>
             <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-              This shortcut fetches your current 15 and replaces this browser draft only after
-              every player maps into the exact forecast and recorded squad rules. It does not
-              optimize transfers or create a suggestion; use Plan Builder for that.
+              {hostedStatic
+                ? "Enter your Manager ID to load the latest 15 players FPL has made public after a deadline. Unrevealed transfers for the next GW are not included. No FPL login is needed. Your editable draft stays in this browser."
+                : "This shortcut fetches your current 15 and replaces this browser draft only after every player maps into the exact forecast and recorded squad rules. It does not optimize transfers or create a suggestion; use Plan Builder for that."}
             </p>
           </div>
         </div>
-        {hostedStatic ? (
+        {hostedStatic && !publicManagerImportUrl() && (
           <p className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
-            Current-team import is intentionally local-only. Manual Squad Draft remains available
-            here, but manager IDs and private captures require the trusted local Plan Server.
+            Online Manager ID import has not been enabled on this site yet. You can build and save
+            a draft manually below; an unavailable import never replaces your draft.
           </p>
-        ) : (
+        )}
         <form
-          className="mt-3 grid items-end gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+          className={cn("mt-3 grid items-end gap-2", hostedStatic ? "sm:grid-cols-[minmax(0,20rem)_auto] sm:justify-start" : "md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]")}
           onSubmit={(event) => {
             event.preventDefault();
             void importManagerTeam(state);
@@ -1135,7 +1154,7 @@ export function UserDraftPage() {
                 : "The number in fantasy.premierleague.com/entry/{id}."}
             </p>
           </div>
-          <div className="w-full max-w-xs">
+          {!hostedStatic && <div className="w-full max-w-xs">
             <label htmlFor="draft-plan-server-token" className="text-xs font-medium">
               Plan server token{" "}
               <span className="font-normal text-muted-foreground">(LAN only)</span>
@@ -1167,17 +1186,16 @@ export function UserDraftPage() {
             >
               Remember token on this browser
             </button>
-          </div>
-          <Button type="submit" disabled={!managerIdValid || managerImporting}>
+          </div>}
+          <Button type="submit" disabled={!managerIdValid || managerImporting || (hostedStatic && !publicManagerImportUrl())}>
             {managerImporting ? (
               <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
             ) : (
               <UserRoundSearch className="size-3.5" aria-hidden />
             )}
-            {managerImporting ? "Fetching current team…" : "Fetch current team"}
+            {managerImporting ? "Fetching team…" : hostedStatic ? "Fetch public team" : "Fetch current team"}
           </Button>
         </form>
-        )}
         {tokenStorageWarning && !hostedStatic && (
           <p role="status" className="mt-2 text-xs text-amber-700 dark:text-amber-300">
             {tokenStorageWarning}
@@ -1187,6 +1205,14 @@ export function UserDraftPage() {
           <p role="alert" className="mt-2 text-xs text-destructive">
             {managerImportError} Your existing draft was kept unchanged.
           </p>
+        )}
+        {publicPreview && (
+          <div className="mt-3 space-y-1 rounded-lg border bg-muted/20 p-3 text-xs" aria-label="Imported public team">
+            <p><strong>Official FPL public picks · {publicPreview.season} GW{publicPreview.picks_event}</strong></p>
+            <p>Fetched {publicPreview.captured_at.replace("T", " ").slice(0, 16)} UTC. Next planning GW{publicPreview.planning_gw}.</p>
+            <p>Transfers not yet public are excluded. This is not authenticated live ownership. Bank, selling values and free transfers are unavailable here; draft costs use the published forecast prices.</p>
+            {publicPreview.active_chip && <p className="font-medium">Chip in the source GW: {publicPreview.active_chip}. A Free Hit squad is temporary and may differ from the permanent team.</p>}
+          </div>
         )}
         {managerPreview && (
           <div
@@ -1242,6 +1268,7 @@ export function UserDraftPage() {
             onClick={() => {
               persistSelection(state, [], "manual", null);
               setManagerPreview(null);
+              setPublicPreview(null);
               setHandoffNotice(null);
             }}
           >

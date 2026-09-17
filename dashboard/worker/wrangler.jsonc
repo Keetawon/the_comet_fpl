@@ -13,6 +13,5 @@
     "namespace_id": "91701",
     "simple": { "limit": 20, "period": 60 }
   }],
-  "observability": { "enabled": false },
-  "limits": { "cpu_ms": 10 }
+  "observability": { "enabled": false }
 }

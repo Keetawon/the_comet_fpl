@@ -49,7 +49,7 @@ describe("bounded public FPL team service", () => {
     }
     expect(result).toEqual(await publicSquad(42, f.fetcher, now));
     expect(result.snapshot_id).toMatch(/^[a-f0-9]{64}$/);
-    expect(f.fetcher.mock.calls.every(([url, options]) => String(url).startsWith("https://fantasy.premierleague.com/api/") && options?.redirect === "error")).toBe(true);
+    expect(f.fetcher.mock.calls.every(([url, options]) => String(url).startsWith("https://fantasy.premierleague.com/api/") && options?.redirect === "manual")).toBe(true);
   });
 
   it("labels a Free Hit squad rather than inventing permanent ownership", async () => {
@@ -115,5 +115,17 @@ describe("bounded public FPL team service", () => {
     const absent = fixture(); absent.fetcher.mockResolvedValueOnce(new Response(null, { status: 404 }));
     await expect(publicSquad(42, absent.fetcher, now)).rejects.toThrow("not found");
     expect(absent.fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects redirects without following their destination in the Workers runtime", async () => {
+    const f = fixture();
+    f.fetcher.mockResolvedValueOnce(new Response(null, {
+      status: 302, headers: { Location: "https://untrusted.example/" },
+    }));
+    await expect(publicSquad(42, f.fetcher, now)).rejects.toThrow("temporarily unavailable");
+    expect(f.fetcher).toHaveBeenCalledTimes(2);
+    expect(f.fetcher.mock.calls.every(([url, options]) =>
+      String(url).startsWith("https://fantasy.premierleague.com/api/") && options?.redirect === "manual",
+    )).toBe(true);
   });
 });

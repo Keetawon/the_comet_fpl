@@ -1,5 +1,20 @@
 # Repository agent instructions
 
+### Owner-confirmed public Squad Draft exception (2026-09-17)
+
+The owner explicitly confirmed public Squad Draft and a separate Cloudflare Worker for
+read-only Manager ID import. This supersedes the older local-only restriction for Squad
+Draft alone. Import only the latest publicly revealed official FPL picks, label the source
+GW and unrevealed-transfer/Free Hit limitations, and map all 15 members atomically against
+the selected same-season forecast. Never claim authenticated live ownership or invent bank,
+selling values or free transfers. Keep manager inputs and edited drafts out of public data
+exports and AI requests. The Worker has no optimizer, account login or manager database.
+Next GW suggestion, Plan Builder, Optimizer audit, local Plan Server calls and private capture
+handoffs remain local-only. Models, forecast artifacts and optimizer semantics are unchanged.
+Enable the online import endpoint only after deployed-origin verification; an unconfigured or
+failed import must preserve the existing draft. Keep the public-export sanitizer unchanged.
+See `docs/public-squad-import-readiness-2026-09-17.md` for implementation/deployment status.
+
 ### Public Dashboard scope (2026-09-15)
 
 Hosted builds (`VITE_HOSTED_STATIC=true`) expose analytical pages only. Next GW suggestion,
