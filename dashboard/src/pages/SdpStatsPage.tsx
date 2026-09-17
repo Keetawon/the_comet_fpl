@@ -82,7 +82,7 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
   };
   const reset = () => { setFilters(defaults); setGroup("overview"); setMode("per_match"); setSortKey("expected_goals"); setAscending(false); setCompared([]); setDetail(null); setShowLog(false); setChartKey("expected_goals"); };
   const weekLabel = (gw: number) => `GW${gw}${data.gameweeks.some(row => row.season === filters.season && row.gw === gw && !row.finished) ? " · in progress" : ""}`;
-  const chooseComparison = (id: string) => setCompared(current => current.includes(id) ? current.filter(value => value !== id) : [...current.filter(value => filtered.some(row => row.id === value)), id].slice(0, 3));
+  const chooseComparison = (id: string) => setCompared(current => current.includes(id) ? current.filter(value => value !== id) : [...current.filter(value => filtered.some(row => row.id === value)), id].slice(0, 6));
   const exportCsv = () => {
     const url = URL.createObjectURL(new Blob([sdpCsv(ordered, metrics, mode, shots)], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = `team-observed-${filters.season}-gw${filters.from}-${filters.to}.csv`; link.click(); URL.revokeObjectURL(url);
@@ -132,7 +132,7 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
         <div className="flex flex-wrap items-end justify-between gap-4 p-4">
           <label className="sdp-control min-w-0 flex-1 sm:max-w-xs"><span>Search clubs</span><span className="relative"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" aria-hidden="true" /><input aria-label="Search clubs" placeholder="Find a club…" value={filters.search} onChange={e => patch({ search: e.target.value })} className="pl-9!" /></span></label>
           <Control label="Display" value={mode} options={[["per_match", "Average per match"], ["total", "Totals"]]} onChange={value => setMode(value as SdpMode)} />
-          <p className="max-w-md text-xs leading-relaxed text-muted-foreground">{category.description} Select up to 3 clubs to compare.</p>
+          <p className="max-w-md text-xs leading-relaxed text-muted-foreground">{category.description} Select up to 6 clubs to compare.</p>
         </div>
         <DecisionTableFullscreen label="SDP team statistics table" captureContext={`${filters.season} · GW${filters.from}–${filters.to} · ${filters.recent === "all" ? "Full selected range" : `Last ${filters.recent} matches`} · ${filters.venue} · ${category.label} · ${mode === "total" ? "Totals" : "Average per match"}. Observed SDP; marked FPL supplements and display corrections retained. Unavailable is not zero.`} className="rounded-none border-x-0 border-b-0">
           {({ isFullscreen }) => <div className={isFullscreen ? "sdp-table-body sdp-table-body-fullscreen" : "sdp-table-body space-y-4"}>
@@ -145,7 +145,7 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
               </TableRow></TableHeader>
               <TableBody>{ordered.map(team => <TableRow key={team.id} data-state={selected?.id === team.id ? "selected" : undefined}>
                 <TableCell className="sticky left-0 z-10 bg-card"><button className="sdp-table-club flex items-center gap-2 text-left font-medium" onClick={() => { setDetail(team.id); setShowLog(true); }} aria-label={`View ${team.name} match detail`}><span className="sdp-club-mark" aria-hidden="true">{team.clubs}</span><span>{team.name}</span></button></TableCell>
-                <TableCell><label className="sdp-table-compare inline-flex cursor-pointer items-center justify-center"><input className="size-4 accent-[var(--sdp-accent)]" type="checkbox" aria-label={`Compare ${team.name}`} checked={comparisons.some(t => t.id === team.id)} disabled={!comparisons.some(t => t.id === team.id) && comparisons.length >= 3} onChange={() => chooseComparison(team.id)} /></label></TableCell>
+                <TableCell><label className="sdp-table-compare inline-flex cursor-pointer items-center justify-center"><input className="size-4 accent-[var(--sdp-accent)]" type="checkbox" aria-label={`Compare ${team.name}`} checked={comparisons.some(t => t.id === team.id)} disabled={!comparisons.some(t => t.id === team.id) && comparisons.length >= 6} onChange={() => chooseComparison(team.id)} /></label></TableCell>
                 <TableCell className="text-muted-foreground tabular-nums">{team.rows.length}</TableCell>
                 {metrics.map(metric => <TableCell key={metricId(metric)}><MetricCell rows={team.rows} metric={metric} mode={mode} shots={shots} /></TableCell>)}
                 <TableCell className="min-w-28">{xMetric ? <TeamTrend entity={team} metric={xMetric} compact /> : "Unavailable"}</TableCell>

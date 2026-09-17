@@ -4,6 +4,11 @@ The team SDP route now puts the league picture and a club profile before the det
 statistics table. This is a descriptive UI change over the existing observed-data export.
 It does not refresh sources, generate predictions, change models, or change evidence policy.
 
+Owner-requested update (2026-09-17): the comparison now accepts up to six clubs,
+with six distinct colors in both themes. The existing wrapping controls, responsive
+metric grid and scrolling fullscreen details remain in use; the three-club references
+below describe the original redesign. Observed values and player comparisons are unchanged.
+
 ## Review
 
 Open `http://127.0.0.1:4173/#team-stat-sdp` on the existing host. This is a local preview,
