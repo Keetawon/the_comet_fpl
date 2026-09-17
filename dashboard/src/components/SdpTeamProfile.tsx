@@ -90,6 +90,6 @@ export function TeamComparison({ teams, metrics, mode, onRemove }: { teams: SdpE
       const max = Math.max(1, ...values.filter(finite));
       return <div key={metricId(metric)}><h3 className="mb-3 text-xs font-medium text-muted-foreground">{teamMetricLabel(metric, mode)}</h3>{teams.map((team, i) => <div key={team.id} className="mt-3"><div className="mb-1.5 flex items-center justify-between gap-3 text-xs"><span>{team.name}</span><MetricCell rows={team.rows} metric={metric} mode={mode} /></div><div className="h-1.5 rounded-full bg-muted" aria-hidden="true">{values[i] !== null && <div className="h-full rounded-full" style={{ width: `${Math.max(0, values[i]!) / max * 100}%`, background: `var(--sdp-series-${i + 1})` }} />}</div></div>)}</div>;
     })}</div>
-    <p className="mt-5 border-t pt-3 text-xs text-muted-foreground">Same filters and units for every club. Up to 3 clubs; each value includes its matched coverage. Missing values have no bar.</p>
+    <p className="mt-5 border-t pt-3 text-xs text-muted-foreground">Same filters and units for every club. Up to 6 clubs; each value includes its matched coverage. Missing values have no bar.</p>
   </section>;
 }

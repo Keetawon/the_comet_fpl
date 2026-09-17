@@ -143,15 +143,21 @@ describe("SDP football observatory", () => {
     expect(JSON.stringify(data)).toBe(original);
   });
 
-  it("keeps sorting, comparisons, and match logs usable inside fullscreen and after Escape", async () => {
+  it("compares up to six clubs and keeps sorting, removal, and match logs usable across fullscreen", async () => {
+    const data = sdpFixture();
+    data.team_matches.push(...["Fulham", "Liverpool", "Wolves"].flatMap((name, index) => data.team_matches.filter(row => row.team_code === 1).map(row => ({ ...row, team_code: index + 5, team_name: name, team_short_name: name.slice(0, 3).toUpperCase(), fixture: 50 + index * 10 + row.gw }))));
+    vi.mocked(loadSdpStats).mockResolvedValue(data);
     render(<TeamSdpStatsPage />); const grid = await table();
     fireEvent.click(within(grid).getByRole("button", { name: "Shots /match" }));
     const enter = screen.getByRole("button", { name: "Enter SDP team statistics table fullscreen" });
     enter.focus(); fireEvent.click(enter);
     const expanded = await screen.findByRole("dialog", { name: "SDP team statistics table fullscreen" });
-    for (const name of ["Arsenal", "Brighton", "Chelsea"]) fireEvent.click(within(expanded).getByRole("checkbox", { name: `Compare ${name}` }));
-    expect(within(expanded).getByRole("checkbox", { name: "Compare Everton" })).toBeDisabled();
-    expect(within(expanded).getByRole("region", { name: "Selected comparison" })).toBeInTheDocument();
+    for (const name of ["Arsenal", "Brighton", "Chelsea", "Everton", "Fulham", "Liverpool"]) fireEvent.click(within(expanded).getByRole("checkbox", { name: `Compare ${name}` }));
+    expect(within(expanded).getAllByRole("checkbox", { checked: true })).toHaveLength(6);
+    expect(within(expanded).getByRole("checkbox", { name: "Compare Wolves" })).toBeDisabled();
+    const comparison = within(expanded).getByRole("region", { name: "Selected comparison" });
+    expect(within(comparison).getAllByRole("button", { name: /^Remove .* from comparison$/ })).toHaveLength(6);
+    expect(comparison).toHaveTextContent("Up to 6 clubs");
     fireEvent.click(within(expanded).getByRole("button", { name: "View Arsenal match detail" }));
     expect(within(expanded).getByRole("table", { name: "Arsenal observed match log" })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
@@ -159,7 +165,11 @@ describe("SDP football observatory", () => {
     expect(within(grid).getByRole("columnheader", { name: "Shots /match" })).toHaveAttribute("aria-sort", "descending");
     expect(screen.getByRole("checkbox", { name: "Compare Arsenal" })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Remove Arsenal from comparison" }));
-    expect(screen.getByRole("checkbox", { name: "Compare Everton" })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: "Compare Wolves" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Compare Wolves" }));
+    expect(screen.getAllByRole("checkbox", { checked: true })).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "Remove Wolves from comparison" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Compare Arsenal" })).toBeDisabled();
   });
 
   it("changes metric groups and totals while profiles consistently remain averages", async () => {
