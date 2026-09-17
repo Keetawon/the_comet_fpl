@@ -130,9 +130,10 @@ describe("SummaryPage", () => {
     expect(screen.getByText("Platform recommendation — default")).toBeInTheDocument();
     expect(screen.getByText("Platform diagnostic sensitivity")).toBeInTheDocument();
     expect(screen.getAllByText(/GW1 squad xP/).length).toBe(2); // one card per plan
-    // availability watch labels the official overlay status and chance
+    // Legacy forecast status must not masquerade as current FPL reporting.
     expect(screen.getByText(/Availability watch/)).toBeInTheDocument();
-    expect(screen.getByText(/doubtful 75%/)).toBeInTheDocument();
+    expect(screen.getByText(/Current availability is unknown/)).toBeInTheDocument();
+    expect(screen.queryByText(/doubtful 75%/)).not.toBeInTheDocument();
     // player and team watchlists derive from the selected vintage
     expect(screen.getAllByText(/Players to watch/).length).toBe(2);
     expect(screen.getByText(/easiest schedules/)).toBeInTheDocument();

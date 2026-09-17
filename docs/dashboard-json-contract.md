@@ -1,14 +1,20 @@
 # Dashboard read-model JSON contract, established schema version 9 plus provisional schemas version 1
 
-The shared player-table filters default to **Hide unavailable**: only the selected
-forecast's published FPL `availability_status == "u"` is hidden. Injury (`i`),
+The shared player-table filters default to **Hide unavailable**: only current
+reported FPL `current_availability.status == "u"` is hidden. Injury (`i`),
 doubt (`d`), suspension (`s`), other codes and unknown status remain visible unless
 another explicitly selected filter excludes them. This does not infer departure
 from names, clubs, news or playing chance. Unchecking the control restores those
 rows; reset restores the hidden default. It applies to Players, Player analytics,
 Next GW's player table, and Plan Builder/Squad Draft player pickers. Stored squad
 membership, selections, xP and optimizer inputs are unchanged. The selected vintage
-still owns status; a newer observed-stat export does not rewrite it. When this
+still owns the original `availability_status`, `chance_of_playing` and multiplier;
+a newer observed-stat export does not rewrite them. An additive
+`current_availability` reporting overlay carries the latest exact season/code FPL
+bootstrap status, next-round chance, news, applicable next GW and capture/hash
+provenance. This overlay is never fed into xP, optimizer or historical scoring.
+Legacy packages visibly label their status as forecast-time evidence; absent
+current evidence stays unknown. When this
 filter removes players, optional AI summaries are disabled because their existing
 request contract cannot represent it; deterministic summaries use the visible scope.
 

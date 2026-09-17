@@ -15,6 +15,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { PlayerRecord, WindowLabel } from "@/data/types";
 import { WINDOW_LABELS } from "@/data/types";
+import { currentAvailability, hasCurrentAvailabilityConcern } from "@/lib/availability";
 
 export interface PlayerFilters {
   position: string; // "all" | GK | DEF | MID | FWD
@@ -55,7 +56,8 @@ export const FORM_WINDOW_LABEL: Record<WindowLabel, string> = {
 };
 
 export function matchesPlayerFilters(p: PlayerRecord, f: PlayerFilters): boolean {
-  if (f.hideUnavailable && p.availability_status === "u") return false;
+  const current = currentAvailability(p);
+  if (f.hideUnavailable && current?.status === "u") return false;
   const minPrice = f.minPrice === "" ? null : Number(f.minPrice) * 10;
   const maxPrice = f.maxPrice === "" ? null : Number(f.maxPrice) * 10;
   const minMinutes = f.minMinutes === "" ? null : Number(f.minMinutes);
@@ -65,10 +67,10 @@ export function matchesPlayerFilters(p: PlayerRecord, f: PlayerFilters): boolean
   if (maxPrice != null && !(p.now_cost != null && p.now_cost <= maxPrice)) return false;
   if (minMinutes != null && !(p.avg_minutes_last_5 != null && p.avg_minutes_last_5 >= minMinutes))
     return false;
-  if (f.availability === "available" && p.availability_status !== "a") return false;
+  if (f.availability === "available" && (current?.status !== "a" || hasCurrentAvailabilityConcern(p))) return false;
   if (
     f.availability === "flagged" &&
-    !(p.availability_status != null && p.availability_status !== "a")
+    !hasCurrentAvailabilityConcern(p)
   )
     return false;
   return true;
@@ -249,6 +251,7 @@ export function PlayerFiltersBar({
         }}
         variant="outline"
         aria-label="Availability filter"
+        title="Latest published FPL availability only; unknown current status matches All."
       >
         <ToggleGroupItem value="all">All</ToggleGroupItem>
         <ToggleGroupItem value="available">Available</ToggleGroupItem>
@@ -256,7 +259,7 @@ export function PlayerFiltersBar({
       </ToggleGroup>
       <label
         className="flex cursor-pointer items-center gap-2"
-        title="Hide only FPL status u (unavailable), such as players who left the league. Injured, doubtful, suspended and unknown statuses remain visible. Uses the selected forecast's published status; does not change xP or squad decisions."
+        title="Hide only current FPL status u (unavailable), such as players who left the league. Injured, doubtful, suspended and unknown statuses remain visible. Uses the latest published FPL report; does not change xP or squad decisions."
       >
         <input
           type="checkbox"

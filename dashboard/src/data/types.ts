@@ -243,6 +243,22 @@ export interface PlayerFixture {
   team_probability_clean_sheet: number | null;
 }
 
+/** Current FPL reporting context, separate from every immutable forecast field. */
+export interface CurrentPlayerAvailability {
+  source: "FPL";
+  season: string;
+  code: number;
+  status: string | null;
+  chance_of_playing_next_round: number | null;
+  news: string | null;
+  news_added: string | null;
+  captured_at: string;
+  capture_id: string;
+  source_sha256: string;
+  next_gw: number | null;
+  semantics: "current_reported_not_forecast";
+}
+
 export interface PlayerRecord {
   run_id: string;
   as_of: string;
@@ -257,6 +273,8 @@ export interface PlayerRecord {
   availability_status: string | null;
   chance_of_playing: number | null;
   availability_multiplier: number | null;
+  /** Absent in legacy packages; null means no current source evidence. */
+  current_availability?: CurrentPlayerAvailability | null;
   /** True when the selected forecast vintage used its no-history player path. */
   cold_start_player: boolean;
   form: PlayerForm | null;

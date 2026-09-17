@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import zipfile
 from copy import deepcopy
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import duckdb
 import pytest
 
 from fpl.jobs.package_public_dashboard import main
@@ -165,9 +167,7 @@ def _documents() -> dict[str, dict[str, Any]]:
         FIXTURE_MATRIX_FILENAME: {
             "schema": FIXTURE_MATRIX_SCHEMA,
             "json_schema_version": DASHBOARD_JSON_SCHEMA_VERSION,
-            "teams": [
-                {"season": "2026-27", "team_code": 1, "preserved": "fixture"}
-            ],
+            "teams": [{"season": "2026-27", "team_code": 1, "preserved": "fixture"}],
             "schedule": {"gameweeks": [1, 2, 3, 4, 5]},
         },
         PLAYERS_FILENAME: {
@@ -377,6 +377,77 @@ def _read_documents(directory: Path) -> dict[str, dict[str, Any]]:
     }
 
 
+@pytest.mark.parametrize("available", [False, True])
+def test_current_availability_is_additive_resealed_and_public_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, available: bool
+) -> None:
+    from fpl.publish import current_availability as overlay
+
+    source = tmp_path / "source"
+    documents = _documents()
+    player = documents[PLAYERS_FILENAME]["players"][0]
+    player.update(
+        {
+            "availability_status": "a",
+            "chance_of_playing": None,
+            "availability_multiplier": 1.0,
+            "fixtures": [{"expected_points": 7.25}],
+        }
+    )
+    _write_generation(source, documents)
+    before = {p.name: p.read_bytes() for p in source.iterdir()}
+    value = {
+        "source": "FPL",
+        "season": "2026-27",
+        "code": 1,
+        "status": "d",
+        "chance_of_playing_next_round": 75,
+        "news": "Knock - 75% chance of playing",
+        "news_added": "2026-08-21T10:00:00Z",
+        "captured_at": "2026-08-21T11:00:00Z",
+        "capture_id": "official-bootstrap",
+        "source_sha256": _sha("4"),
+        "next_gw": 1,
+        "semantics": "current_reported_not_forecast",
+    }
+    monkeypatch.setattr(
+        overlay,
+        "current_availability",
+        lambda *a, **kw: {("2026-27", 1): value} if available else {},
+    )
+    output = tmp_path / "overlaid"
+    with duckdb.connect() as con:
+        report = overlay.refresh_current_availability(
+            con, source, output, as_of=datetime(2026, 8, 21, 12, tzinfo=UTC)
+        )
+    updated = _read_documents(output)[PLAYERS_FILENAME]["players"][0]
+    assert updated.pop("current_availability") == (value if available else None)
+    assert updated == player
+    assert report["matched_player_rows"] == int(available)
+    assert report["unavailable_player_rows"] == int(not available)
+    assert report["changed_from_forecast_players"] == int(available)
+    assert {p.name: p.read_bytes() for p in source.iterdir()} == before
+    for filename, body in before.items():
+        if filename not in (PLAYERS_FILENAME, MANIFEST_FILENAME):
+            assert (output / filename).read_bytes() == body
+    first = package_public_dashboard(output, tmp_path / "public-one", tmp_path / "one.zip")
+    second = package_public_dashboard(output, tmp_path / "public-two", tmp_path / "two.zip")
+    assert first.archive_sha256 == second.archive_sha256
+    public_player = _read_documents(first.output_dir)[PLAYERS_FILENAME]["players"][0]
+    assert public_player["current_availability"] == (value if available else None)
+    assert public_player["availability_status"] == "a"
+    assert public_player["fixtures"] == [{"expected_points": 7.25}]
+    assert (
+        validate_dashboard_json(output)["content_sha256"]
+        != json.loads(before[MANIFEST_FILENAME])["content_sha256"]
+    )
+    if available:
+        corrupted = deepcopy(documents)
+        corrupted[PLAYERS_FILENAME]["players"][0]["current_availability"] = {**value, "code": 999}
+        with pytest.raises(DashboardJsonError, match="current availability"):
+            _write_generation(tmp_path / "wrong-identity", corrupted)
+
+
 def test_packages_only_formal_plans_and_reseals_a_deterministic_root_zip(tmp_path: Path) -> None:
     source = tmp_path / "source"
     _write_generation(source, _documents())
@@ -411,12 +482,14 @@ def test_packages_only_formal_plans_and_reseals_a_deterministic_root_zip(tmp_pat
     assert public_documents[PLAYERS_FILENAME] == _documents()[PLAYERS_FILENAME]
     assert public_documents[PLAYER_ACTUALS_FILENAME] == _documents()[PLAYER_ACTUALS_FILENAME]
     assert public_documents[TEAM_ACTUALS_FILENAME] == _documents()[TEAM_ACTUALS_FILENAME]
-    assert public_documents[PLAYER_PROVISIONAL_ACTUALS_FILENAME] == _documents()[
-        PLAYER_PROVISIONAL_ACTUALS_FILENAME
-    ]
-    assert public_documents[TEAM_PROVISIONAL_ACTUALS_FILENAME] == _documents()[
-        TEAM_PROVISIONAL_ACTUALS_FILENAME
-    ]
+    assert (
+        public_documents[PLAYER_PROVISIONAL_ACTUALS_FILENAME]
+        == _documents()[PLAYER_PROVISIONAL_ACTUALS_FILENAME]
+    )
+    assert (
+        public_documents[TEAM_PROVISIONAL_ACTUALS_FILENAME]
+        == _documents()[TEAM_PROVISIONAL_ACTUALS_FILENAME]
+    )
     assert public_documents[PLAYER_HORIZONS_FILENAME] == _documents()[PLAYER_HORIZONS_FILENAME]
     horizon_payload = (first.output_dir / PLAYER_HORIZONS_FILENAME).read_bytes()
     assert horizon_payload.endswith(b"\n")

@@ -43,6 +43,7 @@ import {
 } from "@/data/load";
 import type { DashboardManifest, NextGwPlan, PlayerHorizonsRecord, PlayerObservedActualsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import type { ColorSource } from "@/lib/difficulty";
+import { currentAvailability } from "@/lib/availability";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import {
   actualGameweekLabel,
@@ -648,7 +649,7 @@ export function PlayersPage() {
     insightFact(
       "coverage.flagged_overlay",
       "coverage",
-      `${flaggedCount} visible players carry a non-available next-round status overlay.`,
+      `${flaggedCount} visible players carry a non-available status in the selected forecast vintage.`,
       ["players.json"],
     ),
     insightFact(
@@ -675,7 +676,7 @@ export function PlayersPage() {
   const insightCaveats = [
     "xP totals sum already-published player-fixture values or select an exact cumulative endpoint.",
     "Overlapping cumulative probability columns are intentionally kept out of this dense table; Player analytics exposes the exact published blank/haul endpoints.",
-    "The availability status is a next-round overlay and is not applied to raw xP.",
+    "Current FPL availability is separate reporting context; forecast status facts and raw xP retain the selected vintage.",
     "Actual endpoints use exact ended season/GW keys from the forecast season and its immediate predecessor.",
     ...(selectedActualsIncludeProvisional
       ? [
@@ -697,9 +698,11 @@ export function PlayersPage() {
         ? "AI explanation is unavailable while multiple positions or teams are selected because the renderer accepts only one of each. Deterministic facts remain available."
         : undefined;
   const unavailablePlayerInsightReason =
-    playerFilters.hideUnavailable && runPlayers.some((player) => player.availability_status === "u")
+    playerFilters.hideUnavailable && runPlayers.some((player) => currentAvailability(player)?.status === "u")
       ? "AI explanation is unavailable while unavailable players are hidden because this display filter is outside the renderer contract. Deterministic facts use the visible players."
-      : undefined;
+      : playerFilters.availability !== "all"
+        ? "AI explanation is unavailable while current FPL availability filters are active because the renderer uses forecast-vintage status. Deterministic facts remain available."
+        : undefined;
   const provisionalInsightUnavailableReason = selectedActualsIncludeProvisional
     ? "AI explanation is unavailable while the selected Actual range includes provisional fixtures. Deterministic facts remain available, and prediction monitoring remains finalized-only."
     : undefined;
@@ -991,8 +994,9 @@ export function PlayersPage() {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Availability and chance-of-playing are reported overlays valid for the next gameweek
-        only; they label rows here and never fold into xP. Player-fixture probabilities are
+        Current availability and chance-of-playing come from the latest published FPL report;
+        hover for its gameweek, capture time and news, or expand a player to view them. Legacy
+        packages label forecast status with its original date. Neither changes xP. Player-fixture probabilities are
         null until the ledger persists them — never 0. Club λ/ease/CS are the primitives behind
         the chip colour.
       </p>

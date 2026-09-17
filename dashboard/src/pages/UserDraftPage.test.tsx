@@ -159,6 +159,28 @@ function publishCurrentForecast(gw: number) {
 }
 
 describe("UserDraftPage", () => {
+  it("shows current status in the picker and selected squad without changing draft xP", async () => {
+    const user = userEvent.setup();
+    const player: PlayerRecord = { ...draftPlayers[0], current_availability: {
+      source: "FPL", season: draftPlayers[0].season, code: draftPlayers[0].code,
+      status: "d", chance_of_playing_next_round: 75, news: "Unspecified injury", news_added: null,
+      captured_at: "2026-09-17T06:34:00Z", capture_id: "latest", source_sha256: "a".repeat(64),
+      next_gw: 5, semantics: "current_reported_not_forecast",
+    } };
+    const players = [player, ...draftPlayers.slice(1)];
+    const before = JSON.stringify(players);
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    render(<UserDraftPage />);
+    const picker = await screen.findByRole("list", { name: "Squad Draft player list" });
+    expect(within(picker).getByText("doubtful · 75%")).toBeInTheDocument();
+    await user.click(within(picker).getByRole("button", { name: `Add ${player.web_name}` }));
+    const selected = screen.getByRole("rowgroup", { name: "Goalkeepers (1/2)" });
+    expect(within(selected).getByText("doubtful · 75%")).toBeInTheDocument();
+    expect(within(selected).getByTitle(/captured 2026-09-17 06:34 UTC/)).toHaveAttribute("title", expect.stringContaining("Unspecified injury"));
+    expect(JSON.stringify(players)).toBe(before);
+    expect(player.fixtures).toBe(draftPlayers[0].fixtures);
+  });
+
   it.each([4, 5])("imports GW%s against the current forecast even when the retained optimizer plan is older", async (gw) => {
     const user = userEvent.setup();
     const { latestRun, players } = publishCurrentForecast(gw);

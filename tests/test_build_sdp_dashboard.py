@@ -105,12 +105,19 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
     monkeypatch.setattr(job, "check_observed_freshness", lambda *a: {})
     monkeypatch.setattr(job, "publication_status", lambda *a: {})
     monkeypatch.setattr(job, "retain_existing_plans", lambda *a: {"observations_refreshed": True})
+
+    def availability(*args: Any, **kwargs: Any) -> dict[str, int]:
+        calls.append(("availability", args[1]))
+        return {"matched_player_rows": 1}
+
+    monkeypatch.setattr(job, "refresh_current_availability", availability)
     report = job.build(db, output, base_dashboard=old_base if retained else None)
     assert calls == [
         (
-            "package",
+            "availability",
             output / "dashboard-with-retained-plans" if retained else output / "dashboard-retained",
         ),
+        ("package", output / "dashboard-with-current-availability"),
         ("sidecar", db),
         ("sidecar", db),
     ]
@@ -121,5 +128,6 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
         else "refreshed_operational_generation"
     )
     assert report["forecast_regenerated"] is False
+    assert report["current_availability"] == {"matched_player_rows": 1}
     assert old_evidence.read_bytes() == b"original forecast"
     assert db.read_bytes() == b"unchanged database"
