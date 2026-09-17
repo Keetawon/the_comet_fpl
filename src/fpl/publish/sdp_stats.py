@@ -31,6 +31,7 @@ from fpl.publish.player_attacking_usage import _raw_capture
 from fpl.publish.sdp_goal_patterns import (
     DESCRIPTION,
     apply_goal_patterns,
+    apply_source_goal_pattern,
     public_evidence_urls,
     validate_goal_patterns,
 )
@@ -1190,9 +1191,12 @@ def build_sdp_stats(
                 "goals_conceded": source["away_score"] if home else source["home_score"],
             }
             teams[current, fixture, code]["source_version"] = source["source_version"]
+    current_goal_sources: dict[tuple[str, int, int], dict[str, Any]] = {}
     if state.global_failure is None:
         for observed in state.rows:
             source = raw_by_id[observed.provenance["payload_id"]]
+            if observed.season == current:
+                current_goal_sources[observed.key] = source
             parsed = parse_team_stats(
                 json.loads(source["body"]), match_id=observed.provenance["provider_match_id"]
             )
@@ -1343,10 +1347,16 @@ def build_sdp_stats(
                 row["dashboard_status"] = "OWNER_CONFIRMED_VALID"
     team_rows = [teams[k] for k in sorted(teams)]
     apply_goal_patterns(team_rows, raw)
+    for row in team_rows:
+        goal_source = current_goal_sources.get((row["season"], row["fixture"], row["team_code"]))
+        if goal_source is not None:
+            apply_source_goal_pattern(row, goal_source, interpreted_at=cutoff)
     notes.append(
-        "Goal-pattern classifications are a separately dated display audit of pinned raw "
-        "payloads, not new provider captures. Own goals are separate; unresolved origins "
-        "remain unclassified. Revised or unaudited sources receive no classification."
+        "Goal patterns retain exact pinned match audits where valid. Other current-season "
+        "validated match sources use explicit open-play, penalty, direct free-kick and "
+        "opponent own-goal counts. Remaining origins stay unclassified, never assumed open "
+        "play or set piece. Source corrections are reinterpreted at each export; old audits "
+        "are never carried over to revised payloads. This is display-only accounting."
     )
     notes.extend(apply_team_xg_supplements(con, team_rows, cutoff=cutoff, current=current))
     notes.append(
@@ -1386,7 +1396,7 @@ def build_sdp_stats(
         )
     document = {
         "schema": SCHEMA,
-        "json_schema_version": 7,
+        "json_schema_version": 8,
         "as_of": _iso(cutoff),
         "source_status": {
             "team_stats": "UNAVAILABLE" if not valid else "PARTIAL" if failures else "AVAILABLE",
@@ -1432,7 +1442,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             "gameweeks",
         }
         or document["schema"] != SCHEMA
-        or document["json_schema_version"] not in (3, 4, 5, 6, 7)
+        or document["json_schema_version"] not in (3, 4, 5, 6, 7, 8)
     ):
         raise ValueError("invalid SDP sidecar envelope")
     cutoff = AsOf(datetime.fromisoformat(document["as_of"])).ts
@@ -1488,6 +1498,12 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             if scope == "team" and document["json_schema_version"] >= 7:
                 fields = fields | {"goal_patterns"}
                 validate_goal_patterns(row)
+                pattern = row["goal_patterns"]
+                if pattern is not None and pattern["method"] == "source_goal_accounting_v1":
+                    if document["json_schema_version"] < 8 or datetime.fromisoformat(
+                        pattern["interpreted_at"]
+                    ) > datetime.fromisoformat(document["as_of"]):
+                        raise ValueError("invalid goal-pattern interpretation version or time")
             if set(row) != fields:
                 raise ValueError("unexpected public observed-row field")
             if row["status"] not in {"FINAL", "PROVISIONAL", "UNAVAILABLE"}:

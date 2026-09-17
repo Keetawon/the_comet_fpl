@@ -6,7 +6,11 @@ from typing import Any
 
 import pytest
 
-from fpl.publish.sdp_goal_patterns import apply_goal_patterns, validate_goal_patterns
+from fpl.publish.sdp_goal_patterns import (
+    apply_goal_patterns,
+    apply_source_goal_pattern,
+    validate_goal_patterns,
+)
 
 
 def example() -> dict[str, Any]:
@@ -143,3 +147,126 @@ def test_brighton_throw_in_corroboration_is_bound_to_its_own_review_time() -> No
     source["sha256"] = "c" * 64
     apply_goal_patterns([row], [source])
     assert row["goal_patterns"] is None
+
+
+def source_example() -> tuple[dict[str, Any], dict[str, Any]]:
+    import json
+
+    row = {
+        **example(),
+        "season": "2026-27",
+        "provider_match_id": 2645230,
+        "was_home": True,
+        "goal_patterns": None,
+        "sdp": {"open_play_goals": 2, "set_piece_goals": None},
+        "fpl": {"goals_scored": 4, "goals_conceded": 1},
+    }
+    source = {
+        "endpoint": "match_stats",
+        "season": "2026-27",
+        "sdp_match_id": 2645230,
+        "sha256": "c" * 64,
+        "fetched_at": datetime(2026, 9, 10, tzinfo=UTC),
+        "body": json.dumps(
+            [
+                {
+                    "side": "Home",
+                    "stats": {
+                        "goals": 4,
+                        "goalsOpenplay": 2,
+                        "attPenGoal": 0,
+                        "attFreekickGoal": 0,
+                        "ownGoals": 0,
+                    },
+                },
+                {
+                    "side": "Away",
+                    "stats": {
+                        "goals": 1,
+                        "goalsOpenplay": 1,
+                        "attPenGoal": 0,
+                        "attFreekickGoal": 0,
+                        "ownGoals": 1,
+                    },
+                },
+            ]
+        ),
+    }
+    return row, source
+
+
+def test_new_match_source_counts_separate_unknown_and_opponent_own_goal() -> None:
+    import json
+
+    row, source = source_example()
+    payload = json.loads(source["body"])
+    for side in payload:
+        side["stats"] = {key: float(value) for key, value in side["stats"].items()}
+    source["body"] = json.dumps(payload)
+    original = deepcopy(source)
+    stamp = datetime(2026, 9, 17, tzinfo=UTC)
+    apply_source_goal_pattern(row, source, interpreted_at=stamp)
+    receipt = row["goal_patterns"]
+    assert receipt["open_play_goals"] == 2
+    assert receipt["own_goals_received"] == receipt["unclassified_goals"] == 1
+    assert receipt["confirmed_set_piece_goals"] == 0 and receipt["set_piece_goals"] is None
+    assert receipt["method"] == "source_goal_accounting_v1" and "audited_at" not in receipt
+    assert receipt["source_known_at"] == source["fetched_at"].isoformat()
+    assert source == original and row["sdp"]["set_piece_goals"] is None
+    replay, _ = source_example()
+    apply_source_goal_pattern(replay, source, interpreted_at=stamp)
+    assert replay == row
+
+    away = {
+        **row,
+        "was_home": False,
+        "goal_patterns": None,
+        "sdp": {"open_play_goals": 1},
+        "fpl": {"goals_scored": 1, "goals_conceded": 4},
+    }
+    apply_source_goal_pattern(away, source, interpreted_at=stamp)
+    assert away["goal_patterns"]["open_play_goals"] == 1
+    assert away["goal_patterns"]["set_piece_goals"] == 0
+    assert away["goal_patterns"]["own_goals_received"] == 0
+
+
+@pytest.mark.parametrize("bad", [None, True, -1, 0.5, "0"])
+def test_absent_or_invalid_goal_origin_is_not_assumed_zero(bad: Any) -> None:
+    import json
+
+    row, source = source_example()
+    payload = json.loads(source["body"])
+    payload[0]["stats"]["attPenGoal"] = bad
+    source["body"] = json.dumps(payload)
+    apply_source_goal_pattern(row, source, interpreted_at=datetime(2026, 9, 17, tzinfo=UTC))
+    assert row["goal_patterns"] is None
+
+
+def test_new_capture_reaccounts_without_inheriting_old_audit_or_backdating() -> None:
+    import json
+
+    row, source = source_example()
+    stamp = datetime(2026, 9, 17, tzinfo=UTC)
+    apply_source_goal_pattern(row, source, interpreted_at=stamp)
+    original = deepcopy(row["goal_patterns"])
+    revised = deepcopy(source)
+    payload = json.loads(revised["body"])
+    payload[0]["stats"]["attPenGoal"] = 1
+    revised.update(body=json.dumps(payload), sha256="d" * 64)
+    refreshed, _ = source_example()
+    refreshed["source_version"] = "e" * 64
+    apply_source_goal_pattern(refreshed, revised, interpreted_at=stamp)
+    assert refreshed["goal_patterns"]["set_piece_goals"] == 1
+    assert refreshed["goal_patterns"]["unclassified_goals"] == 0
+    assert row["goal_patterns"] == original
+    pending, _ = source_example()
+    apply_source_goal_pattern(pending, source, interpreted_at=datetime(2026, 9, 9, tzinfo=UTC))
+    assert pending["goal_patterns"] is None
+    wrong, _ = source_example()
+    wrong["provider_match_id"] = 999
+    apply_source_goal_pattern(wrong, source, interpreted_at=stamp)
+    assert wrong["goal_patterns"] is None
+    wrong["provider_match_id"] = source["sdp_match_id"]
+    wrong["fpl"]["goals_scored"] = 0
+    apply_source_goal_pattern(wrong, source, interpreted_at=stamp)
+    assert wrong["goal_patterns"] is None

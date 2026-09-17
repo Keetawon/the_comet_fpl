@@ -24,10 +24,36 @@ export const metricAssumption = (row: SdpMatch, metric: SdpMetric): SdpDisplayAs
 export const metricSupplement = (row: SdpMatch, metric: SdpMetric): FplXgSupplement | null =>
   metric.source === "sdp" && row.sdp[metric.key] == null ? row.display_supplements?.[metric.key] ?? null : null;
 export const metricSupplements = (rows: readonly SdpMatch[], metric: SdpMetric) => rows.flatMap(row => metricSupplement(row, metric) ?? []);
-export const metricSourceLabel = (metric: SdpMetric) => metric.source === "sdp" && metric.key === "set_piece_goals" ? "SDP + audit" : metric.source === "sdp" && ["expected_goals", "expected_goals_allowed"].includes(metric.key) ? "SDP / marked FPL" : metric.source.toUpperCase();
+export const metricSourceLabel = (metric: SdpMetric, rows?: readonly SdpMatch[]) => {
+  if (metric.source === "sdp" && metric.key === "set_piece_goals") {
+    if (!rows) return "SDP accounting / audit";
+    const audited = rows?.some(row => row.goal_patterns?.method === "audited_goal_accounting_v1");
+    const accounting = rows?.some(row => row.goal_patterns?.method === "source_goal_accounting_v1");
+    return audited ? accounting ? "SDP accounting + audit" : "SDP + audit" : "SDP accounting";
+  }
+  return metric.source === "sdp" && ["expected_goals", "expected_goals_allowed"].includes(metric.key) ? "SDP / marked FPL" : metric.source.toUpperCase();
+};
+
+// Display reconciliation only: a known score survives a missing origin receipt.
+// Zero segments below mean no classified goals, not measured zero source fields.
+export function goalPatternDisplay(row: SdpMatch) {
+  if (row.goal_patterns) return row.goal_patterns;
+  const total = row.fpl?.goals_scored;
+  if (!finite(total) || !Number.isSafeInteger(total) || total < 0) return null;
+  const open = row.sdp.open_play_goals;
+  const knownOpen = finite(open) && Number.isSafeInteger(open) && open >= 0 && open <= total ? open : 0;
+  return { open_play_goals: knownOpen, confirmed_set_piece_goals: 0, own_goals_received: 0,
+    unclassified_goals: total - knownOpen, total_goals: total };
+}
+
 export const goalPatternDescriptions = (rows: readonly SdpMatch[], metric: SdpMetric) =>
   metric.source === "sdp" && ["open_play_goals", "set_piece_goals"].includes(metric.key)
-    ? rows.flatMap(row => row.goal_patterns ? [`Fixture ${row.fixture}: ${row.goal_patterns.open_play_goals} open-play; ${row.goal_patterns.confirmed_set_piece_goals} confirmed set-piece (including penalties); ${row.goal_patterns.own_goals_received} opponent own goals; ${row.goal_patterns.unclassified_goals} unclassified. Display audit ${row.goal_patterns.audited_at}; source captured ${row.goal_patterns.source_known_at}; raw SHA256 ${row.goal_patterns.raw_payload_sha256}. ${row.goal_patterns.evidence_urls.join(" ")}`] : []) : [];
+    ? rows.map(row => {
+      const p = row.goal_patterns;
+      if (p) return `Fixture ${row.fixture}: ${p.open_play_goals} open-play; ${p.confirmed_set_piece_goals} confirmed set-piece (including penalties); ${p.own_goals_received} opponent own goals; ${p.unclassified_goals} unclassified. ${p.method === "source_goal_accounting_v1" ? `SDP accounting interpreted ${p.interpreted_at}` : `Display audit ${p.audited_at}`}; source captured ${p.source_known_at}; raw SHA256 ${p.raw_payload_sha256}. ${p.evidence_urls.join(" ")}`;
+      const displayed = goalPatternDisplay(row);
+      return `Fixture ${row.fixture}: complete goal-origin classification unavailable. ${displayed ? `${displayed.total_goals} official FPL goals; ${displayed.unclassified_goals} unclassified in the chart. Only explicitly observed SDP open-play goals are shown; no missing goal is assigned to open play or set pieces.` : "Official goal total is also unavailable."} No goal-pattern receipt; captured ${row.known_at}.`;
+    }) : [];
 export const supplementDescription = (s: FplXgSupplement) =>
   `FPL archive player-sum xG (${s.season}, fixture ${s.fixture}, team ${s.subject_team_code}): ${s.player_rows} measured player rows including GK; ${s.appeared_players} appearances, 11 explicit starts. Actual archive capture ${s.source_known_at}. Retrospective descriptive evidence; no independent substitute-roster completeness witness. Rounded FPL player totals may differ from SDP. Records SHA256 ${s.records_sha256}; source SHA256 ${Object.entries(s.source_sha256).sort().map(([key, hash]) => `${key}=${hash}`).join(", ")}. Raw SDP and core validity unchanged.`;
 export const metricRaw = (row: SdpMatch, metric: SdpMetric): number | null => {
@@ -139,7 +165,8 @@ const csvCell = (value: unknown) => {
   return `"${text.replaceAll('"', '""')}"`;
 };
 export function sdpCsv(rows: readonly SdpEntity[], metrics: readonly SdpMetric[], mode: SdpMode, shots?: SdpMetric): string {
-  const label = (m: SdpMetric) => `${metricSourceLabel(m)} ${m.label}${m.aggregation === "mean" ? " [per-match mean]" : mode === "per_match" ? " [average per match]" : mode === "per_appearance" ? " [average per appearance; FPL minutes > 0]" : mode === "per90" ? " [per 90 actual minutes]" : ""}${m.verified_semantics ? "" : ` [provider observation; not independently reconciled; ${m.provider_field ?? m.key}]`}`;
+  const sourceRows = rows.flatMap(row => row.rows);
+  const label = (m: SdpMetric) => `${metricSourceLabel(m, sourceRows)} ${m.label}${m.aggregation === "mean" ? " [per-match mean]" : mode === "per_match" ? " [average per match]" : mode === "per_appearance" ? " [average per appearance; FPL minutes > 0]" : mode === "per90" ? " [per 90 actual minutes]" : ""}${m.verified_semantics ? "" : ` [provider observation; not independently reconciled; ${m.provider_field ?? m.key}]`}`;
   const header = ["Name", "Stable identity", "Clubs in selected scope", "Season", "First kickoff", "Last kickoff", "Match rows", "Display mode", ...metrics.flatMap(m => [label(m), ...shots && isShotBreakdown(m) ? [`SDP ${m.label} [% of all shots; matched totals]`] : [], `${label(m)} displayed ${mode === "per_appearance" ? "appearances" : "matches"}`, `${label(m)} display provenance`])];
   const records = rows.map(row => [row.name, row.id, row.clubs, row.rows[0]?.season, row.rows[0]?.kickoff_time, row.rows.at(-1)?.kickoff_time, row.rows.length, mode, ...metrics.flatMap(m => { const value = metricValue(row.rows, m, mode); const corrections = metricCorrections(row.rows, m); const assumptions = metricAssumptions(row.rows, m); return [value.value, ...shots && isShotBreakdown(m) ? [shotShare(row.rows, m, shots)] : [], mode === "per_appearance" && row.rows.some(r => !finite(r.minutes_fpl)) ? "unknown appearances (missing FPL minutes)" : `${value.measured}/${value.matches}${assumptions.length ? ` (${assumptions.length} assumed zero)` : ""}`, [...value.value === null && m.provider_field === null && m.description ? [m.description] : [], ...corrections.map(correctionDescription), ...assumptions.map(assumptionDescription), ...metricSupplements(row.rows, m).map(supplementDescription), ...goalPatternDescriptions(row.rows, m)].join(" | ")]; })]);
   return [header, ...records].map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";

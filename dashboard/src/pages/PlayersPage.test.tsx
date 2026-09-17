@@ -29,6 +29,7 @@ import {
   type ManagerTeamPlayer,
   type ManagerTeamPreview,
 } from "@/lib/planServer";
+import { fetchPublicManagerTeam, type PublicManagerSquad } from "@/lib/publicManagerTeam";
 import { PlayersPage } from "./PlayersPage";
 
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
@@ -69,6 +70,9 @@ vi.mock("@/lib/planServer", async () => {
   const actual = await vi.importActual<typeof import("@/lib/planServer")>("@/lib/planServer");
   return { ...actual, fetchManagerTeamMembers: vi.fn() };
 });
+vi.mock("@/lib/publicManagerTeam", async importOriginal => ({
+  ...await importOriginal<object>(), fetchPublicManagerTeam: vi.fn(),
+}));
 
 beforeAll(() => {
   HTMLElement.prototype.hasPointerCapture = () => false;
@@ -199,6 +203,26 @@ function managerFilterPlayers(): { squad: PlayerRecord[]; outsider: PlayerRecord
   };
 }
 
+function publicManagerPreview(players: readonly PlayerRecord[]): PublicManagerSquad {
+  return {
+    schema: "fpl.public-manager-squad", schema_version: 1, source: "official_fpl_public_picks",
+    manager_id: 13768, season: "2026-27", picks_event: 4, planning_gw: 5,
+    picks_deadline: "2026-09-11T17:30:00Z", captured_at: "2026-09-17T10:00:00Z",
+    snapshot_id: "b".repeat(64), active_chip: "freehit",
+    players: players.map((player, i) => ({ element_id: i + 1, code: player.code, position: player.position, team_code: player.team_code })),
+  };
+}
+
+function enableHostedImport() {
+  vi.stubEnv("VITE_HOSTED_STATIC", "true");
+  vi.stubEnv("VITE_PUBLIC_MANAGER_IMPORT_URL", "https://manager-api.thecometfpl.com/manager-team");
+  vi.mocked(loadPlayerHorizons).mockResolvedValue({ ...horizonsData,
+    players: horizonsData.players.map(player => ({ ...player,
+      horizons: player.horizons.map(horizon => ({ ...horizon, gw_to: horizon.gw_to + 4 })),
+    })),
+  });
+}
+
 function playerWithLastFive(
   code: number,
   webName: string,
@@ -227,6 +251,7 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
   window.localStorage.clear();
   vi.mocked(fetchManagerTeamMembers).mockReset();
+  vi.mocked(fetchPublicManagerTeam).mockReset();
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersWithActuals, manifest: null });
   vi.mocked(loadPlayerActuals).mockResolvedValue(actualsData);
   vi.mocked(loadPlayerProvisionalActuals).mockResolvedValue({
@@ -748,16 +773,92 @@ describe("PlayersPage", () => {
     expect(screen.queryByRole("button", { name: "Show all players" })).not.toBeInTheDocument();
   });
 
-  it("keeps manager-squad filtering local-only in hosted static builds", async () => {
+  it("keeps hosted membership import disabled without a public service endpoint", async () => {
     vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    vi.stubEnv("VITE_PUBLIC_MANAGER_IMPORT_URL", "");
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
 
     expect(screen.getByLabelText("FPL manager ID")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Show my squad" })).toBeDisabled();
     expect(
-      screen.getByText(/Manager-squad filtering is local-only and requires the trusted Plan Server/),
+      screen.getByText(/Online Manager ID import is not configured/),
     ).toBeInTheDocument();
+    expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
+    expect(fetchPublicManagerTeam).not.toHaveBeenCalled();
+  });
+
+  it("filters hosted Players to public picks without Plan Server, saved ID, or changed forecasts", async () => {
+    enableHostedImport(); const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    const players = [...squad, outsider]; const before = JSON.stringify(players);
+    window.localStorage.setItem("fpl-manager-id", "999999");
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    vi.mocked(fetchPublicManagerTeam).mockResolvedValue(publicManagerPreview(squad));
+    render(<PlayersPage />);
+    await screen.findByText("Outside Defender");
+    const id = screen.getByLabelText("FPL manager ID");
+    expect(id).toHaveValue("");
+    await user.type(id, "13768");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+    await waitFor(() => expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument());
+    expect(fetchPublicManagerTeam).toHaveBeenCalledWith("13768");
+    expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(15);
+    expect(screen.getByLabelText("Public squad source")).toHaveTextContent("2026-27 GW4. Next planning GW5");
+    expect(screen.getByLabelText("Public squad source")).toHaveTextContent("Free Hit squad is temporary");
+    expect(screen.getByLabelText("Public squad source")).toHaveTextContent("Transfers not yet public are excluded");
+    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
+    expect(window.localStorage.getItem("fpl-manager-id")).toBe("999999");
+    expect(window.location.href).not.toContain("13768");
+    expect(JSON.stringify(players)).toBe(before);
+    await user.click(screen.getByRole("button", { name: /^Position filter:/ }));
+    await user.click(screen.getByRole("checkbox", { name: "DEF" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(5);
+    await user.click(screen.getByRole("button", { name: "Show all players" }));
+    expect(await screen.findByText("Outside Defender")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Public squad source")).not.toBeInTheDocument();
+  });
+
+  it.each(["network", "mapping", "vintage"])("keeps an active public membership after a %s failure", async issue => {
+    enableHostedImport(); const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players: [...squad, outsider], manifest: null });
+    const preview = publicManagerPreview(squad);
+    vi.mocked(fetchPublicManagerTeam).mockResolvedValueOnce(preview);
+    if (issue === "network") vi.mocked(fetchPublicManagerTeam).mockRejectedValueOnce(new Error("service unavailable"));
+    else if (issue === "mapping") vi.mocked(fetchPublicManagerTeam).mockResolvedValueOnce({ ...preview, players: preview.players.slice(1) });
+    else vi.mocked(fetchPublicManagerTeam).mockResolvedValueOnce({ ...preview, planning_gw: 6 });
+    render(<PlayersPage />);
+    await screen.findByText("Outside Defender");
+    await user.type(screen.getByLabelText("FPL manager ID"), "13768");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+    await waitFor(() => expect(screen.queryByText("Outside Defender")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The verified My squad filter was kept unchanged");
+    expect(screen.getAllByRole("button", { name: /expand fixtures/i })).toHaveLength(15);
+    expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
+  });
+
+  it("discards a pending public response after a forecast-vintage change", async () => {
+    enableHostedImport(); const user = userEvent.setup();
+    const { squad, outsider } = managerFilterPlayers();
+    const first = [...squad, outsider];
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players: [...first, ...first.map(player => ({ ...player, run_id: "run-b" }))], manifest: null });
+    vi.mocked(loadPlayerHorizons).mockResolvedValueOnce({ ...horizonsData, players: ["run-a", "run-b"].flatMap(runId => horizonsData.players.map(player => ({ ...player, run_id: runId, horizons: player.horizons.map(h => ({ ...h, gw_to: h.gw_to + 4 })) }))) });
+    let resolveManager!: (preview: PublicManagerSquad) => void;
+    vi.mocked(fetchPublicManagerTeam).mockReturnValueOnce(new Promise(resolve => { resolveManager = resolve; }));
+    render(<PlayersPage />);
+    await screen.findByText("Outside Defender");
+    await user.type(screen.getByLabelText("FPL manager ID"), "13768");
+    await user.click(screen.getByRole("button", { name: "Show my squad" }));
+    await user.click(screen.getByRole("combobox", { name: "Forecast vintage" }));
+    await user.click(screen.getByRole("option", { name: /run-b/ }));
+    resolveManager(publicManagerPreview(squad));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("forecast vintage changed"));
+    expect(screen.getByText("Outside Defender")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show all players" })).not.toBeInTheDocument();
     expect(fetchManagerTeamMembers).not.toHaveBeenCalled();
   });
 

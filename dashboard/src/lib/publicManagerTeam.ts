@@ -90,6 +90,10 @@ export async function fetchPublicManagerTeam(managerId: string, signal?: AbortSi
       signal: signal ?? AbortSignal.timeout(30_000),
     });
   } catch {
+    if (typeof location !== "undefined" && location.protocol === "http:" &&
+        ["www.thecometfpl.com", "thecometfpl.com"].includes(location.hostname)) {
+      throw new Error("This page uses HTTP. Team import requires HTTPS. Open https://www.thecometfpl.com. If the secure site is not available yet, team import will become available after HTTPS setup is complete.");
+    }
     throw new Error("Could not reach FPL team import. Please try again shortly.");
   }
   let payload: unknown;
@@ -102,23 +106,37 @@ export async function fetchPublicManagerTeam(managerId: string, signal?: AbortSi
   return parsePublicManagerSquad(payload, Number(clean));
 }
 
-/** Atomic membership import; prices and every xP remain the selected published values. */
+/** Atomic identity match; prices and every xP remain the selected published values. */
+export function publicSquadMembers(
+  squad: PublicManagerSquad,
+  forecast: { season: string; gw_from: number },
+  players: readonly PlayerRecord[],
+): PlayerRecord[] {
+  if (squad.season !== forecast.season || squad.planning_gw !== forecast.gw_from) {
+    throw new Error(`The public team is from ${squad.season} GW${squad.picks_event}, but this forecast is not for its next planning GW. Refresh the published forecast before importing.`);
+  }
+  if (squad.players.length !== 15 || new Set(squad.players.map(member => member.code)).size !== 15) {
+    throw new Error("A complete 15-player squad with unique stable identities is required.");
+  }
+  return squad.players.map(member => {
+    const matches = players.filter(player => player.code === member.code && player.season === squad.season);
+    const player = matches[0];
+    if (matches.length !== 1 || player.position !== member.position || player.team_code !== member.team_code) {
+      throw new Error(`Player ${member.code} does not match this forecast's position and club. The dashboard needs a matching roster refresh.`);
+    }
+    return player;
+  });
+}
+
+/** Draft structure is separate from a read-only membership filter. */
 export function publicSquadDraft(
   squad: PublicManagerSquad,
   forecast: { season: string; gw_from: number },
   players: readonly PlayerRecord[],
   rules: UserDraftRules,
 ): PlayerRecord[] {
-  if (squad.season !== forecast.season || squad.planning_gw !== forecast.gw_from) {
-    throw new Error(`The public team is from ${squad.season} GW${squad.picks_event}, but this forecast is not for its next planning GW. Refresh the published forecast before importing.`);
-  }
   const selected: PlayerRecord[] = [];
-  for (const member of squad.players) {
-    const matches = players.filter(player => player.code === member.code && player.season === squad.season);
-    const player = matches[0];
-    if (matches.length !== 1 || player.position !== member.position || player.team_code !== member.team_code) {
-      throw new Error(`Player ${member.code} does not match this forecast's position and club. The dashboard needs a matching roster refresh.`);
-    }
+  for (const player of publicSquadMembers(squad, forecast, players)) {
     const guard = userDraftSelectionGuard(selected, player, rules);
     if (!guard.allowed) throw new Error(`The imported squad does not meet the draft's squad rules (${guard.reason}).`);
     selected.push(player);

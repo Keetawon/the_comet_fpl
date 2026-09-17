@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchPublicManagerTeam, parsePublicManagerSquad, publicManagerImportUrl, publicSquadDraft } from "./publicManagerTeam";
+import { fetchPublicManagerTeam, parsePublicManagerSquad, publicManagerImportUrl, publicSquadDraft, publicSquadMembers } from "./publicManagerTeam";
 import { deriveUserDraftRules } from "./userDraft";
 import type { PlayerRecord, RulesSnapshot } from "@/data/types";
 import audit from "@/data/sampleOptimizerAudit.json";
@@ -43,7 +43,18 @@ describe("public membership boundary", () => {
     if (issue === "missing") roster.pop();
     const before = JSON.stringify(roster);
     expect(() => publicSquadDraft(parsed, forecast, roster, rules)).toThrow();
+    expect(() => publicSquadMembers(parsed, forecast, roster)).toThrow();
     expect(JSON.stringify(roster)).toBe(before);
+  });
+
+  it("matches the same complete membership without draft rules or changing published prices", () => {
+    const parsed = parsePublicManagerSquad(payload, 42);
+    const roster = players.map(player => ({ ...player, now_cost: 99 }));
+    const before = JSON.stringify(roster);
+    expect(publicSquadMembers(parsed, { season: "2026-27", gw_from: 5 }, roster)).toEqual(roster);
+    expect(JSON.stringify(roster)).toBe(before);
+    expect(() => publicSquadMembers({ ...parsed, players: parsed.players.slice(1) }, { season: "2026-27", gw_from: 5 }, roster)).toThrow("15-player");
+    expect(() => publicSquadMembers({ ...parsed, players: Array(15).fill(parsed.players[0]) }, { season: "2026-27", gw_from: 5 }, roster)).toThrow("unique stable identities");
   });
 
   it("rejects wrong manager, future picks, duplicate identity and malformed payloads", () => {
@@ -79,5 +90,22 @@ describe("public membership boundary", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
     await expect(fetchPublicManagerTeam("42")).rejects.toThrow("Could not reach");
     await expect(fetchPublicManagerTeam("https://example.com")).rejects.toThrow("positive");
+  });
+
+  it.each(["http://www.thecometfpl.com", "http://thecometfpl.com"])("explains the HTTPS requirement after failed import from %s", async pageUrl => {
+    vi.stubEnv("VITE_PUBLIC_MANAGER_IMPORT_URL", "https://manager-api.thecometfpl.com/manager-team");
+    vi.stubGlobal("location", new URL(pageUrl));
+    const fetcher = vi.fn().mockRejectedValue(new Error("Failed to fetch"));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(fetchPublicManagerTeam("13768")).rejects.toThrow("This page uses HTTP. Team import requires HTTPS.");
+    expect(fetcher).toHaveBeenCalledWith("https://manager-api.thecometfpl.com/manager-team", expect.any(Object));
+    expect(location.href).toBe(`${pageUrl}/`);
+  });
+
+  it.each(["https://www.thecometfpl.com", "https://thecometfpl.com", "http://localhost:4173", "http://www.thecometfpl.com.example.org"])("keeps the network error accurate for %s", async pageUrl => {
+    vi.stubEnv("VITE_PUBLIC_MANAGER_IMPORT_URL", "https://manager-api.thecometfpl.com/manager-team");
+    vi.stubGlobal("location", new URL(pageUrl));
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Failed to fetch")));
+    await expect(fetchPublicManagerTeam("13768")).rejects.toThrow("Could not reach FPL team import.");
   });
 });

@@ -61,6 +61,7 @@ import {
 import { indexPlayerHorizons, playerHorizon } from "@/lib/playerHorizons";
 import { fetchManagerTeamMembers, type ManagerTeamPreview } from "@/lib/planServer";
 import { loadPlanServerToken } from "@/lib/planServerToken";
+import { fetchPublicManagerTeam, publicManagerImportUrl, publicSquadMembers, type PublicManagerSquad } from "@/lib/publicManagerTeam";
 import { rawPlayerGameweekXp } from "@/lib/userDraft";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 import {
@@ -77,10 +78,9 @@ interface ActualRange {
   toIndex: number;
 }
 
-interface ManagerSquadFilter {
-  preview: ManagerTeamPreview;
+type ManagerSquadFilter = {
   playerCodes: ReadonlySet<number>;
-}
+} & ({ source: "local"; preview: ManagerTeamPreview } | { source: "public"; preview: PublicManagerSquad });
 
 const PLAYERS_TABLE_INITIAL_SORTING: SortingState = [{ id: "gwFromXp", desc: true }];
 const INITIAL_PLAYER_MULTI_FILTERS: PlayerMultiFilters = {
@@ -134,6 +134,7 @@ function managerSquadForRun(
     );
   }
   return {
+    source: "local",
     preview,
     playerCodes: new Set(preview.players.map((player) => player.code)),
   };
@@ -175,6 +176,7 @@ type PageState =
 
 export function PlayersPage() {
   const hostedStatic = import.meta.env.VITE_HOSTED_STATIC === "true";
+  const managerImportEnabled = !hostedStatic || publicManagerImportUrl() !== null;
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [runId, setRunId] = useState<string | null>(null);
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
@@ -184,7 +186,7 @@ export function PlayersPage() {
     INITIAL_PLAYER_MULTI_FILTERS,
   );
   const [actualRange, setActualRange] = useState<ActualRange | null>(null);
-  const [managerId, setManagerId] = useState(initialManagerId);
+  const [managerId, setManagerId] = useState(() => hostedStatic ? "" : initialManagerId());
   const [managerSquad, setManagerSquad] = useState<ManagerSquadFilter | null>(null);
   const [managerLoading, setManagerLoading] = useState(false);
   const [managerError, setManagerError] = useState<string | null>(null);
@@ -513,10 +515,6 @@ export function PlayersPage() {
   };
 
   const importManagerSquad = async () => {
-    if (hostedStatic) {
-      setManagerError("Manager-squad filtering is available only with the trusted local Plan Server.");
-      return;
-    }
     if (!managerIdValid || state.status !== "ready" || selectedRun == null) {
       setManagerError("Enter a positive FPL manager ID.");
       return;
@@ -525,19 +523,19 @@ export function PlayersPage() {
     setManagerLoading(true);
     setManagerError(null);
     try {
-      const preview = await fetchManagerTeamMembers(
-        managerId.trim(),
-        loadPlanServerToken(),
-      );
-      const nextSquad = managerSquadForRun(
-        preview,
-        runPlayers,
-        selectedRun.gw_from,
-      );
+      let nextSquad: ManagerSquadFilter;
+      if (hostedStatic) {
+        const preview = await fetchPublicManagerTeam(managerId.trim());
+        const members = publicSquadMembers(preview, selectedRun, runPlayers);
+        nextSquad = { source: "public", preview, playerCodes: new Set(members.map(player => player.code)) };
+      } else {
+        const preview = await fetchManagerTeamMembers(managerId.trim(), loadPlanServerToken());
+        nextSquad = managerSquadForRun(preview, runPlayers, selectedRun.gw_from);
+      }
       if (requestId !== managerRequestRef.current) return;
       setManagerSquad(nextSquad);
       try {
-        window.localStorage.setItem("fpl-manager-id", String(preview.manager_id));
+        if (!hostedStatic) window.localStorage.setItem("fpl-manager-id", String(nextSquad.preview.manager_id));
       } catch {
         // The verified squad remains active in component state when storage is unavailable.
       }
@@ -686,7 +684,9 @@ export function PlayersPage() {
       : []),
     ...(managerSquad
       ? [
-          "My squad membership comes from a private local manager capture and only filters already-published player rows; it does not change any statistic.",
+          managerSquad.source === "public"
+            ? "My squad uses the latest publicly revealed FPL picks; unrevealed transfers are excluded and Free Hit picks can be temporary. It only filters published rows and changes no statistic."
+            : "My squad membership comes from a private local manager capture and only filters already-published player rows; it does not change any statistic.",
         ]
       : []),
   ];
@@ -795,7 +795,7 @@ export function PlayersPage() {
                     inputMode="numeric"
                     autoComplete="off"
                     value={managerId}
-                    disabled={hostedStatic || managerLoading}
+                    disabled={!managerImportEnabled || managerLoading}
                     aria-invalid={managerId.length > 0 && !managerIdValid}
                     aria-describedby="players-manager-id-hint"
                     placeholder="e.g. 123456"
@@ -808,7 +808,7 @@ export function PlayersPage() {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={hostedStatic || !managerIdValid || managerLoading}
+                  disabled={!managerImportEnabled || !managerIdValid || managerLoading}
                 >
                   {managerLoading ? (
                     <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
@@ -825,8 +825,8 @@ export function PlayersPage() {
               </form>
             </div>
             <p id="players-manager-id-hint" className="mt-2 text-[11px] text-muted-foreground">
-              {hostedStatic
-                ? "Manager-squad filtering is local-only and requires the trusted Plan Server."
+              {!managerImportEnabled
+                ? "Online Manager ID import is not configured. All published players remain available."
                 : managerId.trim() && !managerIdValid
                   ? "Use 1–10 digits and a value greater than zero."
                   : "Use the number in fantasy.premierleague.com/entry/{id}."}
@@ -834,9 +834,16 @@ export function PlayersPage() {
             {managerSquad && (
               <p role="status" className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
                 Verified 15/15 players for{" "}
-                {managerSquad.preview.entry_name || `manager #${managerSquad.preview.manager_id}`}.
+                {managerSquad.source === "local" ? managerSquad.preview.entry_name || `manager #${managerSquad.preview.manager_id}` : "the latest revealed public picks"}.
                 {` ${rows.length} match the other visible filters.`}
               </p>
+            )}
+            {managerSquad?.source === "public" && (
+              <div className="mt-2 space-y-1 text-xs text-muted-foreground" aria-label="Public squad source">
+                <p>Official FPL public picks · {managerSquad.preview.season} GW{managerSquad.preview.picks_event}. Next planning GW{managerSquad.preview.planning_gw}. Fetched {new Date(managerSquad.preview.captured_at).toISOString().slice(0, 16).replace("T", " ")} UTC.</p>
+                <p>Transfers not yet public are excluded. This is not authenticated live ownership. Published player prices and forecasts stay unchanged; your Manager ID is not saved.</p>
+                {managerSquad.preview.active_chip && <p>Chip in the source GW: {managerSquad.preview.active_chip}. A Free Hit squad is temporary and may differ from the permanent team.</p>}
+              </div>
             )}
             {managerError && (
               <p role="alert" className="mt-2 text-xs text-destructive">
