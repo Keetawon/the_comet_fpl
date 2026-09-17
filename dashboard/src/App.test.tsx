@@ -93,7 +93,15 @@ describe("App deep-analytics routes", () => {
     expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
   });
 
-  it.each(["next-gw", "plan-builder", "squad-draft", "optimizer"])(
+  it("allows the hosted browser draft without exposing the optimizer", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    window.location.hash = "#squad-draft";
+    render(<App />);
+    expect(await screen.findByText("active:squad-draft")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
+  });
+
+  it.each(["next-gw", "plan-builder", "optimizer"])(
     "rejects direct hosted navigation to %s", async route => {
       vi.stubEnv("VITE_HOSTED_STATIC", "true");
       window.location.hash = `#${route}`;
