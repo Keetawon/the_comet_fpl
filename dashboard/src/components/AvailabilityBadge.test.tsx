@@ -13,10 +13,12 @@ const player: PlayerRecord = { ...frozen, current_availability: {
 } };
 
 describe("reported availability badge", () => {
-  it("shows current status, chance, source gameweek, capture time and news without changing the forecast", () => {
+  it("keeps the status compact and the reported chance in the tooltip without changing the forecast", () => {
     const before = JSON.stringify(player);
     render(<AvailabilityBadge player={player} details />);
-    expect(screen.getByText("doubtful · 75%")).toHaveClass("text-amber-600", "font-medium", "tabular-nums");
+    expect(screen.getByText("doubtful")).toHaveClass("text-amber-600", "font-medium");
+    expect(screen.getByTitle(/Reported next-round chance: 75%/)).toBeInTheDocument();
+    expect(screen.queryByText("doubtful · 75%")).not.toBeInTheDocument();
     expect(screen.getByText(/FPL · 2026-27 GW5 · captured 2026-09-17 06:34 UTC/)).toBeInTheDocument();
     expect(screen.getByText("Unspecified injury - 75% chance of playing")).toBeInTheDocument();
     expect(JSON.stringify(player)).toBe(before);
@@ -44,7 +46,9 @@ describe("reported availability badge", () => {
     render(<AvailabilityBadge player={{ ...player, current_availability: {
       ...player.current_availability!, status: "a", chance_of_playing_next_round: 0,
     } }} />);
-    expect(screen.getByText("available · 0%")).toHaveClass("bg-red-900", "text-white");
+    expect(screen.getByText("available")).toHaveClass("bg-red-900", "text-white");
+    expect(screen.getByTitle(/Reported next-round chance: 0%/)).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 
   it.each(["i", "s"])("makes official %s status dark red, without inventing a missing percentage", status => {
@@ -54,7 +58,9 @@ describe("reported availability badge", () => {
     const before = JSON.stringify(record);
     const label = status === "i" ? "injured" : "suspended";
     const { rerender } = render(<AvailabilityBadge player={record} />);
-    expect(screen.getByText(`${label} · 0%`)).toHaveClass("bg-red-900", "text-white", "dark:bg-red-950");
+    expect(screen.getByText(label)).toHaveClass("bg-red-900", "text-white", "dark:bg-red-950");
+    expect(screen.getByTitle(/Reported next-round chance: 0%/)).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
     expect(JSON.stringify(record)).toBe(before);
 
     rerender(<AvailabilityBadge player={{ ...record, current_availability: {
@@ -62,6 +68,7 @@ describe("reported availability badge", () => {
     } }} />);
     expect(screen.getByText(label)).toHaveClass("bg-red-900");
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/Reported next-round chance:/)).not.toBeInTheDocument();
   });
 
   it("does not turn an available status with no reported chance into 100%", () => {

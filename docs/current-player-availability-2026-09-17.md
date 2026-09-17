@@ -70,8 +70,9 @@ only official status `u`, not injuries, doubts or suspensions. Legacy packages
 explicitly label forecast status with its original date. Current status never
 changes xP, PMFs, prices, optimizer inputs or historical scorecards.
 
-The shared Avail badge displays the official next-round percentage inline when
-FPL supplies it. Injured (`i`), suspended (`s`) and explicitly reported 0% use a
+The shared Avail badge shows status only to keep table columns compact. The
+official next-round percentage stays in its tooltip when FPL supplies it.
+Injured (`i`), suspended (`s`) and explicitly reported 0% use a
 dark-red background with light text in both themes; doubtful nonzero chances stay
 amber. Status text remains visible so color is not the only signal. Missing
 chance stays unreported, never inferred as 0% or 100% from status. These display

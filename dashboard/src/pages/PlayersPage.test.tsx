@@ -296,7 +296,8 @@ describe("PlayersPage", () => {
     const before = JSON.stringify(players);
     vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
     render(<PlayersPage />);
-    expect(await screen.findByText("doubtful · 75%")).toBeInTheDocument();
+    expect(await screen.findByText("doubtful")).toBeInTheDocument();
+    expect(screen.getByTitle(/Reported next-round chance: 75%/)).toBeInTheDocument();
     expect(screen.getByTitle("Published xP for GW1: 7.4")).toHaveTextContent("7.4");
     await user.click(screen.getByRole("button", { name: "Expand fixtures" }));
     expect(screen.getByText("Unspecified injury")).toBeInTheDocument();
