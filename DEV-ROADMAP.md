@@ -1248,6 +1248,23 @@ Only after the ordered dashboard program above, unless an operational blocker re
   hash, or local dashboard freshness claim is recorded here until the controlled local refresh
   produces that evidence.
 
+- **Pre-deadline rest summary (implemented development-only 2026-09-18).** A descriptive screen
+  answering one question per player: did he play midweek football, and how long is the gap to his
+  club's next Premier League fixture? It reads only sources that already run daily -- the six-
+  competition lineup/event capture in `sdp_competitive_match_version` (`daily_pl_sdp --workload`)
+  and the FPL registry/schedule -- through a pure domain module and a thin read-only job that
+  writes no table. A witnessed appearance proves congestion; a "full rest" verdict requires a
+  complete, error-free interpretation of that club's side in every midweek fixture it played in
+  the window, so an unproven side is unusable in both directions and yields `unknown` with the
+  exact `provider_match_id` that caused it. Durations are the provider's nominal period-clock
+  minutes, not FPL minutes. National-team call-ups are captured nowhere in this repository, so an
+  overlapping published international window qualifies a rest claim and never establishes that a
+  player travelled; the Python config and the browser calendar's copy of those windows are pinned
+  to each other against drift. This changes no forecast, PMF, price, optimizer input, monitoring
+  score or model default, and the archive `rest_days` constant in `AGENTS.md` is unchanged:
+  making rest a model feature still needs a separately named, pre-registered candidate. See
+  `docs/pre-deadline-rest-summary.md`. Acceptance to date: 41 focused offline tests; dashboard
+  exposure and a Premier League leg cross-checked against FPL's own recorded minutes remain open.
 - measure and contract per-GW availability semantics;
 - design future price-change and future selling-value handling;
 - monitor recorded real-deadline forecasts against finalized outcomes;
