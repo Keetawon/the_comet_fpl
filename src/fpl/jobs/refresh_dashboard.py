@@ -26,6 +26,7 @@ from fpl.config import config_dir, repo_root
 from fpl.jobs import daily_pl_sdp
 from fpl.jobs.build_db import _wal_path
 from fpl.jobs.build_sdp_dashboard import build
+from fpl.jobs.operational_disk import check_disk_space
 from fpl.jobs.operational_lock import operational_lock
 from fpl.jobs.operational_retention import create_recovery, prune_runs
 from fpl.storage.db import connect, default_db_path
@@ -76,11 +77,16 @@ def complete(
     plan_store: Path,
     *,
     initial_plan: Path | None = None,
+    cycle_backup: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     forecast, season, run_id = latest_primary(database, forecasts)
     forecast_hash = digest(forecast)
     # Outcome attachment is the existing append-only authoritative path.
-    with daily_pl_sdp.writer_lock(database, backup=destination / "before-outcomes.duckdb") as con:
+    with daily_pl_sdp.writer_lock(
+        database,
+        backup=None if cycle_backup is not None else destination / "before-outcomes.duckdb",
+        cycle_backup=cycle_backup,
+    ) as con:
         attached = attach_finalized_outcomes(
             con, as_of=datetime.now(UTC), season=season, skip_pending_live=True
         )
@@ -150,6 +156,29 @@ def complete(
     }
 
 
+def assert_no_inflight_backup(runs: Path, destination: Path) -> None:
+    """A failed/interrupted cycle must be resolved before allocating another recovery copy."""
+    for backup in sorted(runs.glob("dashboard-*/recovery.duckdb")):
+        if backup.parent == destination:
+            continue
+        receipt = backup.parent / "receipt.json"
+        try:
+            previous = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"unattributed recovery backup requires review: {backup}") from exc
+        if previous.get("retention_policy_version", 1) < 2:
+            continue
+        if not (
+            previous.get("status") == "COMPLETE"
+            and previous.get("phase") == "finished"
+            and previous.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
+            and previous.get("retention", {}).get("status") == "COMPLETE"
+        ):
+            raise ValueError(
+                f"incomplete cycle recovery requires review before a new copy: {backup}"
+            )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", required=True, type=Path)
@@ -174,7 +203,8 @@ def main(argv: list[str] | None = None) -> int:
         "pid": os.getpid(),
         "phase": "acquire_lock",
         "database": str(args.db.resolve()),
-        "retention_policy_version": 1,
+        "retention_policy_version": 2,
+        "backup_semantics": "pre_cycle",
     }
     receipt = destination / "receipt.json"
 
@@ -208,10 +238,30 @@ def main(argv: list[str] | None = None) -> int:
                 validate_recovery=lambda: daily_pl_sdp.validate_idle_database(args.db),
             ) as recovered:
                 report["lock_recovery"] = recovered
+                save("recovery_backup")
+                export_bytes = sum(
+                    path.stat().st_size
+                    for path in args.preview_public.rglob("*")
+                    if path.is_file() and not path.is_symlink()
+                )
+                report["disk_preflight"] = {
+                    "active_database": check_disk_space(args.db, 0),
+                    "cycle_allocation": check_disk_space(
+                        destination, args.db.stat().st_size + 2 * export_bytes
+                    ),
+                    "estimate_basis": "database copy + twice current preview bytes; not a quota",
+                }
+                assert_no_inflight_backup(args.runs, destination)
+                report["recovery_backup"] = create_recovery(args.db, destination)
+                save()
                 if not args.skip_capture:
                     save("capture")
                     report["capture_exit_code"] = daily_pl_sdp.run(
-                        database=args.db, runs=args.runs, include_workload=True, player_history=True
+                        database=args.db,
+                        runs=args.runs,
+                        include_workload=True,
+                        player_history=True,
+                        cycle_backup=report["recovery_backup"],
                     )
                     # Source gaps may require fallback. FPL history must be fully captured.
                     with connect(args.db, read_only=True) as con:
@@ -233,6 +283,7 @@ def main(argv: list[str] | None = None) -> int:
                         args.preview_public,
                         args.plan_store,
                         initial_plan=args.optimizer_plan,
+                        cycle_backup=report["recovery_backup"],
                     )
                 )
                 report["status"] = "COMPLETE"
@@ -263,13 +314,13 @@ def main(argv: list[str] | None = None) -> int:
                         # Retention stays under the cycle lock and retains its own WAL veto.
                         report["retention"] = {"status": "RUNNING"}
                         save("retention")
-                        report["recovery_backup"] = create_recovery(args.db, destination)
-                        save()
                         report["retention"] = prune_runs(
                             args.db,
                             args.runs,
                             args.forecast_dir,
                             recovery=Path(report["recovery_backup"]["path"]),
+                            recovery_sha=report["recovery_backup"]["sha256"],
+                            archive_pins=True,
                         )
                     except Exception as exc:
                         report["retention"] = {

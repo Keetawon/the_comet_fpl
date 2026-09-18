@@ -18,6 +18,7 @@ import duckdb
 
 from fpl.config import repo_root
 from fpl.jobs.build_db import _prepare_temporary_database
+from fpl.jobs.operational_lock import operational_lock
 from fpl.jobs.sdp_capture_health import parse_receipt_instant
 from fpl.storage.db import connect
 
@@ -112,11 +113,11 @@ def _references(
     hashes: set[str] = set(seeds[0]) if seeds else set()
     run_names: set[str] = set(seeds[1]) if seeds else set()
     paths: set[Path] = set()
-    for folder in ("config", "results", "docs"):
+    for folder in ("config", "results", "docs/data"):
         paths.update(
             path
             for path in _files(repo_root() / folder)
-            if path.suffix in (".json", ".yaml", ".yml", ".md")
+            if path.suffix in (".json", ".yaml", ".yml")
         )
     # Ignored release/verification manifests also bind exact historical DB bytes.
     # Retention proofs and retired manifests are audit records, not new source pins.
@@ -128,6 +129,7 @@ def _references(
     }
     metadata_roots = [repo_root() / "data" / "artifacts"]
     managed: list[tuple[datetime, Path]] = []
+    dependency_manifests: dict[Path, Path] = {}
     if runs is not None:
         metadata_roots.append(runs.parent / "verification")
         now = datetime.now(UTC)
@@ -140,9 +142,13 @@ def _references(
             payload = json.loads(receipt.read_text(encoding="utf-8"))
             manifest = child / "generation" / "public" / "data" / "manifest.json"
             if not _existing_file(manifest):
+                retired = child / "generation-retired-manifest.json"
+                if _existing_file(retired):
+                    dependency_manifests[retired] = child
                 continue
+            dependency_manifests[manifest] = child
             if (
-                payload.get("retention_policy_version") != 1
+                payload.get("retention_policy_version") not in (1, 2)
                 or payload.get("status") != "COMPLETE"
                 or payload.get("public_publication", {}).get("status", "COMPLETE") != "COMPLETE"
                 or (
@@ -176,18 +182,26 @@ def _references(
     # A preserved generation may pin a source in another run. Follow those
     # metadata references to closure before deciding which copies are disposable.
     source_hashes: dict[Path, set[str]] = {}
-    for _, path in managed:
-        if path not in paths:
-            source_hashes[path] = {
-                _hash(backup)
-                for name in ("before-outcomes.duckdb", "recovery.duckdb")
-                if _existing_file(backup := path.parents[3] / name)
-            }
+    for path, directory in dependency_manifests.items():
+        if path in paths:
+            continue
+        source_hashes[path] = set()
+        for name in ("before-outcomes.duckdb", "recovery.duckdb"):
+            backup = directory / name
+            if _existing_file(backup):
+                source_hashes[path].add(_hash(backup))
+            archive_receipt = directory / (name + ".gz.receipt.json")
+            if _existing_file(archive_receipt):
+                archived = json.loads(archive_receipt.read_text(encoding="utf-8"))
+                digest = archived.get("source_sha256")
+                if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+                    raise ValueError("invalid archived source hash")
+                source_hashes[path].add(digest)
     while remaining := {
         path
-        for _, path in managed
+        for path, directory in dependency_manifests.items()
         if path not in paths
-        and (path.parents[3].name in run_names or source_hashes.get(path, set()) & hashes)
+        and (directory.name in run_names or source_hashes.get(path, set()) & hashes)
     }:
         for path in sorted(remaining):
             read(path)
@@ -286,13 +300,20 @@ def _verify_backup(database: Path, backup: Path) -> dict[str, Any]:
 
 
 def create_recovery(database: Path, destination: Path) -> dict[str, str]:
-    """Freeze one complete post-success recovery copy before retiring older copies."""
+    """Freeze one byte-verified recovery checkpoint under the database read lease."""
     target = destination / "recovery.duckdb"
     if target.exists():
         raise FileExistsError(target)
-    if Path(str(database) + ".daily-sdp.lock").exists() or Path(str(database) + ".wal").exists():
-        raise ValueError("database writer lock/WAL; recovery deferred")
-    with connect(database, read_only=True):
+    from fpl.jobs.daily_pl_sdp import validate_idle_database
+
+    with (
+        operational_lock(
+            Path(str(database) + ".daily-sdp.lock"),
+            wal=Path(str(database) + ".wal"),
+            validate_recovery=lambda: validate_idle_database(database),
+        ),
+        connect(database, read_only=True),
+    ):
         digest = _prepare_temporary_database(database, target)
     if digest is None:
         raise ValueError("missing operational database")
@@ -310,6 +331,8 @@ def prune_runs(
     *,
     keep: int = 2,
     recovery: Path | None = None,
+    recovery_sha: str | None = None,
+    archive_pins: bool = False,
 ) -> dict[str, Any]:
     """Keep two full refreshes/captures; old diagnostic skeletons stay discoverable.
 
@@ -344,8 +367,13 @@ def prune_runs(
             raise ValueError("invalid recovery snapshot")
         with connect(database, read_only=True):
             recovery_sha256 = _hash(recovery)
-            if recovery_sha256 != _hash(database):
-                raise ValueError("recovery snapshot differs from active database")
+            if recovery_sha is None:
+                if recovery_sha256 != _hash(database):
+                    raise ValueError("recovery snapshot differs from active database")
+            elif recovery_sha256 != recovery_sha:
+                raise ValueError("recovery snapshot differs from its verified receipt")
+            else:
+                _verify_backup(database, recovery)
     groups: dict[str, list[tuple[datetime, Path, dict[str, Any]]]] = {
         "capture": [],
         "dashboard": [],
@@ -398,7 +426,26 @@ def prune_runs(
         ):
             continue
         groups[kind].append((finished, child, payload))
+    # Recovery generations are independent of dashboard exports. Select only
+    # byte-verified receipts; a failed cycle can never displace a verified one.
+    retained_recoveries: set[Path] = {recovery} if recovery is not None else set()
+    for _, child, payload in sorted(groups["dashboard"], reverse=True):
+        candidate = child / "recovery.duckdb"
+        pin = payload.get("recovery_backup")
+        if not isinstance(pin, dict):
+            continue
+        if candidate == recovery or not candidate.is_file():
+            continue
+        if (
+            Path(pin.get("path", "")).resolve() == candidate.resolve()
+            and pin.get("sha256") == _hash(candidate)
+            and parse_receipt_instant(pin.get("created_at"), now) is not None
+        ):
+            if len(retained_recoveries) < keep:
+                retained_recoveries.add(candidate.absolute())
+    survivor_hashes = {_hash(path) for path in retained_recoveries}
     candidates: list[Path] = []
+    archive_candidates: set[Path] = set()
     skipped: list[dict[str, str]] = []
     for kind, group in groups.items():
         ordered = sorted(group, reverse=True)
@@ -413,9 +460,22 @@ def prune_runs(
                 skipped.append(
                     {"path": str(child), "reason": "retained scientific/forecast reference"}
                 )
+                if archive_pins:
+                    for name in ("before.duckdb", "before-outcomes.duckdb", "recovery.duckdb"):
+                        path = child / name
+                        if path.is_file() and path.absolute() not in retained_recoveries:
+                            candidates.append(path)
+                            archive_candidates.add(path)
+                    generation = child / "generation"
+                    if (
+                        kind == "dashboard"
+                        and child not in retained_generations
+                        and generation.is_dir()
+                    ):
+                        candidates.append(generation)
                 continue
             if kind == "dashboard" and (
-                payload.get("retention_policy_version") != 1
+                payload.get("retention_policy_version") not in (1, 2)
                 or Path(payload.get("database", "")).resolve() != database.resolve()
             ):
                 skipped.append(
@@ -443,7 +503,7 @@ def prune_runs(
             candidates.extend(
                 child / name
                 for name in names
-                if (child / name).exists() and (child / name).absolute() != recovery
+                if (child / name).exists() and (child / name).absolute() not in retained_recoveries
             )
     # Validate every destructive boundary before the first removal.
     for candidate in candidates:
@@ -459,11 +519,13 @@ def prune_runs(
         "started_at": now.isoformat(),
         "database": str(database.resolve()),
         "keep_full_runs_per_kind": keep,
-        "recovery_policy": "one_verified_post_success_copy"
+        "recovery_policy": "two_verified_recovery_copies"
         if recovery is not None
         else "two_verified_full_copies_per_kind",
         "retained_recovery": str(recovery) if recovery is not None else None,
+        "retained_recoveries": sorted(str(p) for p in retained_recoveries),
         "deleted": [],
+        "archived": [],
         "skipped": skipped,
         "health_receipts_preserved": True,
     }
@@ -489,9 +551,20 @@ def prune_runs(
                 continue
             if candidate.is_file():
                 candidate_hash = _hash(candidate)
-                if candidate_hash in references and candidate_hash != recovery_sha256:
-                    blocked_directories[candidate.parent] = "immutable source hash pin"
-                    skipped.append({"path": str(candidate), "reason": "immutable source hash pin"})
+                pinned = candidate in archive_candidates or (
+                    candidate_hash in references and candidate_hash not in survivor_hashes
+                )
+                if pinned:
+                    if archive_pins:
+                        from fpl.jobs.audit_db_archive import compress_audit_database
+
+                        report["archived"].append(compress_audit_database(candidate, root.parent))
+                        save()
+                    else:
+                        blocked_directories[candidate.parent] = "immutable source hash pin"
+                        skipped.append(
+                            {"path": str(candidate), "reason": "immutable source hash pin"}
+                        )
                     continue
                 # Bind retirement to the surviving copy, even if an independent
                 # capture has appended to the live database since it was frozen.

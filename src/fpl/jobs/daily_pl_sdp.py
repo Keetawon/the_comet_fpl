@@ -53,7 +53,11 @@ def _write(path: Path, value: object) -> None:
 
 @contextmanager
 def writer_lock(
-    database: Path, *, backup: Path | None = None
+    database: Path,
+    *,
+    backup: Path | None = None,
+    cycle_backup: dict[str, str] | None = None,
+    require_current_backup: bool = False,
 ) -> Iterator[duckdb.DuckDBPyConnection]:
     """Recover proven-dead owners; refuse overlap, unknown owners and unresolved WALs.
 
@@ -70,11 +74,34 @@ def writer_lock(
             logger.warning("Recovered abandoned database sidecar: %s", recovered)
         if _wal_path(database).exists():
             raise RuntimeError("unresolved WAL: close writers and inspect recovery before retrying")
-        if backup is not None:
+        if backup is not None and cycle_backup is not None:
+            raise ValueError("choose a new backup or the verified cycle backup, not both")
+        if backup is not None or cycle_backup is not None:
             with connect(database, read_only=True):
-                _prepare_temporary_database(database, backup)
+                if cycle_backup is not None:
+                    validate_cycle_backup(database, cycle_backup, current=require_current_backup)
+                elif backup is not None:
+                    _prepare_temporary_database(database, backup)
         with connect(database) as con:
             yield con
+
+
+def validate_cycle_backup(database: Path, backup: dict[str, str], *, current: bool) -> None:
+    """Validate one immutable pre-cycle rollback copy, never reinterpret it as post-capture."""
+    path = Path(backup["path"])
+    if (
+        path.is_symlink()
+        or not path.is_file()
+        or path.resolve() == database.resolve()
+        or _wal_path(path).exists()
+        or _wal_path(database).exists()
+    ):
+        raise ValueError("cycle backup must be a distinct existing file without a WAL")
+    expected = backup["sha256"]
+    if _sha256(path) != expected:
+        raise ValueError("cycle recovery backup differs from its verified receipt")
+    if current and _sha256(database) != expected:
+        raise ValueError("pre-cycle recovery backup differs from the current database")
 
 
 def validate_idle_database(database: Path) -> None:
@@ -270,6 +297,7 @@ def run(
     include_workload: bool = False,
     lookback_days: int = 7,
     player_history: bool = False,
+    cycle_backup: dict[str, str] | None = None,
 ) -> int:
     """One local cycle. Partial raw successes survive a later network or staging failure."""
     database = database.resolve(strict=True)
@@ -317,13 +345,26 @@ def run(
                 "src/fpl/storage/schema.sql",
             )
         }
-        backup = destination / "before.duckdb"
-        with writer_lock(database, backup=backup) as con:
-            report["backup"] = {
-                "path": str(backup),
-                "sha256": _sha256(backup),
-                "policy": "read lease; no WAL; source/copy SHA256 equality; then write lease",
-            }
+        backup = None if cycle_backup is not None else destination / "before.duckdb"
+        with writer_lock(
+            database,
+            backup=backup,
+            cycle_backup=cycle_backup,
+            require_current_backup=True,
+        ) as con:
+            if cycle_backup is not None:
+                report["backup"] = {
+                    **cycle_backup,
+                    "semantics": "pre_cycle",
+                    "policy": "verified shared cycle rollback; no additional full database copy",
+                }
+            else:
+                assert backup is not None
+                report["backup"] = {
+                    "path": str(backup),
+                    "sha256": _sha256(backup),
+                    "policy": "read lease; no WAL; source/copy SHA256 equality; then write lease",
+                }
             _write(
                 destination / "before.json", inventory(con, season=season, now=datetime.now(UTC))
             )

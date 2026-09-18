@@ -108,14 +108,20 @@ def test_freshness_separates_pending_gw_current_plan_and_old_scored_vintage(
     assert status["next_fixture_gw"] == 6
 
 
+@pytest.mark.parametrize("shared_backup", [False, True])
 def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_inference(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, shared_backup: bool
 ) -> None:
     calls = []
     forecast = tmp_path / "forecast.jsonl"
     forecast.write_bytes(b"frozen")
     plan = tmp_path / "plan.json"
     plan.write_bytes(b"immutable plan")
+    recovery = tmp_path / "recovery.duckdb"
+    recovery.write_bytes(b"pre-cycle state")
+    cycle_backup = (
+        {"path": str(recovery), "sha256": job.digest(recovery)} if shared_backup else None
+    )
     monkeypatch.setattr(job, "latest_primary", lambda *a: (forecast, "2026-27", "run"))
     monkeypatch.setattr(job, "reusable_plan", lambda p, h: h == job.digest(forecast))
 
@@ -125,7 +131,11 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
 
     @contextmanager
     def lock(*a: Any, **kw: Any) -> Any:
-        assert kw["backup"].name == "before-outcomes.duckdb"
+        if shared_backup:
+            assert kw["backup"] is None
+            assert kw["cycle_backup"] == cycle_backup
+        else:
+            assert kw["backup"].name == "before-outcomes.duckdb"
         yield Connection()
 
     monkeypatch.setattr(job.daily_pl_sdp, "writer_lock", lock)
@@ -167,12 +177,129 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
             tmp_path / "public",
             tmp_path / "cache",
             initial_plan=plan,
+            cycle_backup=cycle_backup,
         )
         assert result["plan_reused"]
         assert result["current_availability"] == {"matched_player_rows": 15}
     assert calls == ["attach", "build", "install", "frontend"] * 2
     assert forecast.read_bytes() == b"frozen"
     assert plan.read_bytes() == b"immutable plan"
+
+
+def test_one_failed_cycle_backup_blocks_another_allocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = _runner_args(tmp_path)
+
+    def failed_capture(**kwargs: Any) -> None:
+        raise RuntimeError("capture interrupted after recovery was retained")
+
+    monkeypatch.setattr(job.daily_pl_sdp, "run", failed_capture)
+    assert job.main(args) == 1
+    backups = list((tmp_path / "runs").glob("dashboard-*/recovery.duckdb"))
+    assert len(backups) == 1
+    original_hash = job.digest(backups[0])
+    monkeypatch.setattr(
+        job.daily_pl_sdp, "run", lambda **kwargs: pytest.fail("unresolved run retried")
+    )
+    assert job.main(args) == 1
+    assert list((tmp_path / "runs").glob("dashboard-*/recovery.duckdb")) == backups
+    assert job.digest(backups[0]) == original_hash
+    reports = [
+        json.loads(p.read_text()) for p in (tmp_path / "runs").glob("dashboard-*/receipt.json")
+    ]
+    assert any("incomplete cycle recovery requires review" in r.get("error", "") for r in reports)
+
+
+def test_cycle_preflight_budgets_backup_and_exports_before_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = _runner_args(tmp_path)
+    database = tmp_path / "operational.duckdb"
+    before = job.digest(database)
+    public = tmp_path / "public"
+    public.mkdir()
+    (public / "export.json").write_bytes(b"123")
+    allocations: list[int] = []
+
+    def space(destination: Path, required_bytes: int) -> dict[str, str]:
+        allocations.append(required_bytes)
+        if required_bytes:
+            raise RuntimeError("projected disk space is below 20 GiB")
+        return {"status": "OK"}
+
+    monkeypatch.setattr(job, "check_disk_space", space)
+    monkeypatch.setattr(job, "create_recovery", lambda *a: pytest.fail("low space began copy"))
+    assert job.main(args) == 1
+    assert allocations == [0, database.stat().st_size + 6]
+    assert not list((tmp_path / "runs").rglob("*.duckdb"))
+    assert job.digest(database) == before
+
+
+def test_daily_capture_reuses_verified_cycle_copy_without_additional_backup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fpl.jobs.capture_pl_sdp import CaptureReport
+
+    _runner_args(tmp_path)
+    database = tmp_path / "operational.duckdb"
+    destination = tmp_path / "cycle"
+    destination.mkdir()
+    backup = job.create_recovery(database, destination)
+    monkeypatch.setattr(
+        job.daily_pl_sdp,
+        "_prepare_temporary_database",
+        lambda *a: pytest.fail("shared cycle made an additional full copy"),
+    )
+    monkeypatch.setattr(job.daily_pl_sdp, "inventory", lambda *a, **kw: {"healthy": True})
+    monkeypatch.setattr(job.daily_pl_sdp.daily_snapshot, "run", lambda **kw: 0)
+    monkeypatch.setattr(
+        job.daily_pl_sdp.capture_pl_sdp,
+        "capture",
+        lambda **kw: CaptureReport(season="2026-27"),
+    )
+    assert (
+        job.daily_pl_sdp.run(
+            database=database,
+            runs=tmp_path / "runs",
+            raw_only=True,
+            cycle_backup=backup,
+        )
+        == 0
+    )
+    assert not list((tmp_path / "runs").rglob("*.duckdb"))
+    report = json.loads(next((tmp_path / "runs").glob("*/report.json")).read_text())
+    assert report["backup"]["sha256"] == backup["sha256"]
+    assert report["backup"]["semantics"] == "pre_cycle"
+
+
+def test_cycle_backup_current_at_capture_then_stable_after_database_advances(
+    tmp_path: Path,
+) -> None:
+    _runner_args(tmp_path)
+    database = tmp_path / "operational.duckdb"
+    destination = tmp_path / "cycle"
+    destination.mkdir()
+    backup = job.create_recovery(database, destination)
+    with job.daily_pl_sdp.writer_lock(
+        database, cycle_backup=backup, require_current_backup=True
+    ) as con:
+        con.execute("CREATE TABLE newly_captured(i INTEGER)")
+        con.execute("CHECKPOINT")
+    assert job.digest(database) != backup["sha256"]
+    with job.daily_pl_sdp.writer_lock(database, cycle_backup=backup) as con:
+        assert con.execute("SELECT count(*) FROM newly_captured").fetchone() == (0,)
+    with pytest.raises(ValueError, match="differs from the current database"):
+        with job.daily_pl_sdp.writer_lock(
+            database, cycle_backup=backup, require_current_backup=True
+        ):
+            pytest.fail("outdated pre-capture backup allowed")
+    before = job.digest(database)
+    Path(backup["path"]).write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="differs from its verified receipt"):
+        with job.daily_pl_sdp.writer_lock(database, cycle_backup=backup):
+            pytest.fail("tampered backup allowed")
+    assert job.digest(database) == before
 
 
 def test_reusable_plan_rejects_custom_constraints_and_wrong_forecast(
@@ -272,6 +399,9 @@ def test_full_cycle_orders_capture_export_r2_retention_and_repeats_without_conso
 
     def capture(**kwargs: Any) -> int:
         assert kwargs["include_workload"] and kwargs["player_history"]
+        backup = kwargs["cycle_backup"]
+        assert job.digest(Path(backup["path"])) == backup["sha256"]
+        assert backup["sha256"] == job.digest(kwargs["database"])
         calls.append("capture")
         with duckdb.connect(str(kwargs["database"])) as con:
             con.execute(
@@ -280,6 +410,7 @@ def test_full_cycle_orders_capture_export_r2_retention_and_repeats_without_conso
         return 1  # Existing provider gaps must not mask a complete FPL capture.
 
     def complete(*a: Any, **kw: Any) -> dict[str, Any]:
+        assert Path(kw["cycle_backup"]["path"]).exists()
         calls.append("dashboard")
         return {"forecast_regenerated": False}
 
@@ -293,29 +424,37 @@ def test_full_cycle_orders_capture_export_r2_retention_and_repeats_without_conso
         calls.append("r2")
         return {"status": "COMPLETE"}
 
+    original_recovery = job.create_recovery
+
     def recovery(database: Path, destination: Path) -> dict[str, str]:
         assert (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
         report = json.loads((destination / "receipt.json").read_text())
-        assert report["retention"]["status"] == "RUNNING"
+        assert report["phase"] == "recovery_backup"
+        assert report["backup_semantics"] == "pre_cycle"
         calls.append("recovery")
-        return {"path": str(destination / "recovery.duckdb")}
+        return original_recovery(database, destination)
+
+    def retention(*a: Any, **kw: Any) -> dict[str, str]:
+        assert job.digest(kw["recovery"]) == kw["recovery_sha"]
+        assert kw["archive_pins"] is True
+        calls.append("retention")
+        return {"status": "COMPLETE"}
 
     monkeypatch.setattr(job.daily_pl_sdp, "run", capture)
     monkeypatch.setattr(job, "complete", complete)
     monkeypatch.setattr(r2_dashboard, "publish_r2_dashboard", publish)
     monkeypatch.setattr(job, "create_recovery", recovery)
-    monkeypatch.setattr(
-        job, "prune_runs", lambda *a, **kw: calls.append("retention") or {"status": "COMPLETE"}
-    )
+    monkeypatch.setattr(job, "prune_runs", retention)
     monkeypatch.setattr(job.sys, "stdout", None)
     for _ in range(2):
         assert job.main(args) == 0
-    assert calls == ["capture", "dashboard", "r2", "recovery", "retention"] * 2
+    assert calls == ["recovery", "capture", "dashboard", "r2", "retention"] * 2
     reports = [
         json.loads(p.read_text()) for p in (tmp_path / "runs").glob("dashboard-*/receipt.json")
     ]
     assert len(reports) == 2
     assert all(r["status"] == "COMPLETE" and r["phase"] == "finished" for r in reports)
+    assert len(list((tmp_path / "runs").rglob("*.duckdb"))) == 2
     assert not (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
 
 
@@ -328,7 +467,9 @@ def test_failed_publication_skips_retention_and_returns_failure(
     args = [*_runner_args(tmp_path), "--skip-capture", "--r2-config", str(tmp_path / "r2.json")]
     monkeypatch.setattr(job, "complete", lambda *a, **kw: {"forecast_regenerated": False})
     monkeypatch.setattr(r2_dashboard, "publish_r2_dashboard", lambda *a, **kw: {"status": "FAILED"})
-    monkeypatch.setattr(job, "create_recovery", lambda *a: pytest.fail("failed publication pruned"))
+    monkeypatch.setattr(
+        job, "prune_runs", lambda *a, **kw: pytest.fail("failed publication pruned")
+    )
     assert job.main(args) == 1
     assert not (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
 
@@ -358,9 +499,6 @@ def test_proven_dead_cycle_and_database_locks_recover_without_changing_database(
         return {"forecast_regenerated": False}
 
     monkeypatch.setattr(job, "complete", complete)
-    monkeypatch.setattr(
-        job, "create_recovery", lambda *a: {"path": str(tmp_path / "recovery.duckdb")}
-    )
     monkeypatch.setattr(job, "prune_runs", lambda *a, **kw: {"status": "COMPLETE"})
     assert job.main(args) == 0
     assert job.digest(db) == before

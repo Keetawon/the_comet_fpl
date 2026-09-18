@@ -338,7 +338,9 @@ def test_failed_publication_preserves_previous_pointer_and_never_leaks_sdk_error
     assert "credential-secret" not in (tmp_path / "failed/receipt.json").read_text()
 
 
-@pytest.mark.parametrize("corruption", ["existing_content", "extra_object", "private_companion"])
+@pytest.mark.parametrize(
+    "corruption", ["existing_content", "extra_object", "audit_archive", "private_companion"]
+)
 def test_source_privacy_or_immutable_prefix_mutation_blocks_pointer_write(
     generation: Path,
     configured: Path,
@@ -354,8 +356,9 @@ def test_source_privacy_or_immutable_prefix_mutation_blocks_pointer_write(
     prefix = json.loads(pointer_body)["base_path"] + "/"
     if corruption == "existing_content":
         client.objects[prefix + "data/players.json"]["Body"] = b"altered"
-    elif corruption == "extra_object":
-        client.objects[prefix + "private.duckdb"] = {"Body": b"not public"}
+    elif corruption in ("extra_object", "audit_archive"):
+        name = "private.duckdb.gz" if corruption == "audit_archive" else "private.duckdb"
+        client.objects[prefix + name] = {"Body": b"not public"}
     else:
         path = generation / "public/sdp/competitive_schedule.json"
         schedule = json.loads(path.read_bytes())
@@ -517,7 +520,11 @@ def test_refresh_keeps_local_success_and_lock_until_optional_publication_finishe
     raises: bool,
 ) -> None:
     db = tmp_path / "operational.duckdb"
-    db.write_bytes(b"untouched")
+    import duckdb
+
+    with duckdb.connect(str(db)) as con:
+        con.execute("CREATE TABLE raw_test(id INTEGER)")
+    original = db.read_bytes()
     runs = tmp_path / "runs"
     monkeypatch.setattr(refresh_dashboard, "complete", lambda *a, **kw: {"preview_updated": True})
 
@@ -552,4 +559,4 @@ def test_refresh_keeps_local_success_and_lock_until_optional_publication_finishe
     assert report["status"] == "COMPLETE" and report["preview_updated"]
     assert report["public_publication"]["status"] == "FAILED"
     assert not (runs / ".dashboard-refresh.lock").exists()
-    assert db.read_bytes() == b"untouched"
+    assert db.read_bytes() == original

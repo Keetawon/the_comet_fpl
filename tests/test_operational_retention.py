@@ -776,7 +776,7 @@ def test_recovery_snapshot_refuses_active_database_lock_or_wal(tmp_path: Path, s
     assert database.read_bytes() == original
 
 
-def test_recovery_mode_keeps_one_verified_snapshot_and_two_dashboard_generations(
+def test_recovery_mode_keeps_two_verified_snapshots_and_two_dashboard_generations(
     workspace: tuple[Path, Path, Path],
 ) -> None:
     database, runs, forecasts = workspace
@@ -785,7 +785,15 @@ def test_recovery_mode_keeps_one_verified_snapshot_and_two_dashboard_generations
     captures = [_cycle(runs, database, index) for index in range(3)]
     dashboards = [_cycle(runs, database, index, dashboard=True) for index in range(3)]
     for directory in dashboards:
-        (directory / "recovery.duckdb").write_bytes(database.read_bytes())
+        snapshot = directory / "recovery.duckdb"
+        snapshot.write_bytes(database.read_bytes())
+        receipt = json.loads((directory / "receipt.json").read_text())
+        receipt["recovery_backup"] = {
+            "path": str(snapshot.resolve()),
+            "sha256": _hash(snapshot),
+            "created_at": receipt["finished_at"],
+        }
+        _write_json(directory / "receipt.json", receipt)
     golden = dashboards[-1] / "recovery.duckdb"
     original = golden.read_bytes()
 
@@ -797,8 +805,8 @@ def test_recovery_mode_keeps_one_verified_snapshot_and_two_dashboard_generations
         assert not (directory / "before.duckdb").exists()
     for directory in dashboards:
         assert not (directory / "before-outcomes.duckdb").exists()
-    for directory in dashboards[:-1]:
-        assert not (directory / "recovery.duckdb").exists()
+    assert not (dashboards[0] / "recovery.duckdb").exists()
+    assert (dashboards[-2] / "recovery.duckdb").read_bytes() == original
     assert not (dashboards[0] / "generation").exists()
     for directory in dashboards[-2:]:
         assert (directory / "generation" / "synthetic.json").is_file()
@@ -912,7 +920,10 @@ def test_failed_refresh_never_prunes(
     monkeypatch.setattr(
         refresh,
         "create_recovery",
-        lambda *args, **kwargs: pytest.fail("snapshot after failed refresh"),
+        lambda database, destination: {
+            "path": str(destination / "recovery.duckdb"),
+            "sha256": "synthetic",
+        },
     )
 
     def complete(*args: object, **kwargs: object) -> dict[str, Any]:
@@ -961,7 +972,7 @@ def test_successful_refresh_writes_complete_receipt_before_pruning(
 
     def create(database: Path, destination: Path) -> dict[str, Any]:
         receipt = next((tmp_path / "runs").glob("dashboard-*/receipt.json"))
-        assert json.loads(receipt.read_text())["status"] == "COMPLETE"
+        assert json.loads(receipt.read_text())["status"] == "RUNNING"
         recovery = destination / "recovery.duckdb"
         recovery.write_bytes(database.read_bytes())
         calls.append("snapshot")
@@ -978,3 +989,74 @@ def test_successful_refresh_writes_complete_receipt_before_pruning(
     monkeypatch.setattr(refresh, "prune_runs", prune)
     assert refresh.main(_refresh_args(tmp_path, database)) == 0
     assert calls == ["snapshot", "prune"]
+
+
+def test_prose_doc_mentions_do_not_pin_but_structured_evidence_does(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "checkout"
+    (repository / "docs" / "data").mkdir(parents=True)
+    (repository / "config").mkdir()
+    prose_hash, structured_hash = "a" * 64, "b" * 64
+    run = "dashboard-20260918T050000Z-12345678"
+    (repository / "docs" / "incident.md").write_text(prose_hash + " " + run)
+    (repository / "docs" / "data" / "frozen.json").write_text(
+        json.dumps({"database_sha256": structured_hash})
+    )
+    monkeypatch.setattr(retention, "repo_root", lambda: repository)
+    hashes, runs = retention._references()
+    assert prose_hash not in hashes and run not in runs
+    assert structured_hash in hashes
+
+
+def test_pre_cycle_recovery_can_survive_appended_data_without_new_copy(tmp_path: Path) -> None:
+    database, runs, forecasts = tmp_path / "db.duckdb", tmp_path / "runs", tmp_path / "forecasts"
+    runs.mkdir()
+    forecasts.mkdir()
+    _tiny_database(database)
+    cycle = _cycle(runs, database, 1, dashboard=True)
+    recovery = retention.create_recovery(database, cycle)
+    snapshot = Path(recovery["path"])
+    before = snapshot.read_bytes()
+    with duckdb.connect(str(database)) as con:
+        for table in ("raw_ingest_log", "ledger_prediction_player_gameweek"):
+            con.execute(f"INSERT INTO {table} VALUES (2, 'new observation')")
+    result = retention.prune_runs(
+        database, runs, forecasts, recovery=snapshot, recovery_sha=recovery["sha256"]
+    )
+    assert snapshot.read_bytes() == before
+    assert str(snapshot) in result["retained_recoveries"]
+
+
+def test_pinned_audit_is_losslessly_compressed_not_discarded(
+    workspace: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import gzip
+
+    database, runs, forecasts = workspace
+    captures = [_cycle(runs, database, index) for index in range(3)]
+    pinned = captures[0] / "before.duckdb"
+    before = pinned.read_bytes()
+    monkeypatch.setattr(retention, "_references", lambda *a: ({_hash(pinned)}, set()))
+    result = retention.prune_runs(database, runs, forecasts, archive_pins=True)
+    assert not pinned.exists()
+    assert gzip.decompress(pinned.with_name(pinned.name + ".gz").read_bytes()) == before
+    assert len(result["archived"]) == 1
+
+
+def test_compressed_frozen_source_keeps_transitive_retired_manifest_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, runs = tmp_path / "checkout", tmp_path / "runs"
+    (repository / "results").mkdir(parents=True)
+    runs.mkdir()
+    child = runs / "dashboard-20260918T050000Z-12345678"
+    child.mkdir()
+    _write_json(child / "receipt.json", {"status": "COMPLETE"})
+    source, dependency = "a" * 64, "b" * 64
+    _write_json(child / "recovery.duckdb.gz.receipt.json", {"source_sha256": source})
+    _write_json(child / "generation-retired-manifest.json", {"database_sha256": dependency})
+    monkeypatch.setattr(retention, "repo_root", lambda: repository)
+    assert dependency not in retention._references(runs)[0]
+    _write_json(repository / "results" / "frozen.json", {"database_sha256": source})
+    assert {source, dependency} <= retention._references(runs)[0]
