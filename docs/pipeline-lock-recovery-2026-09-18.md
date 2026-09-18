@@ -43,4 +43,54 @@ active/unknown/malformed PID refusal, WAL refusal, exact archived bytes, startup
 failure receipts, no-console execution, complete capture-to-R2 ordering and repeat
 runs. A two-sidecar integration test confirms recovery without DB mutation.
 Models/config, frozen forecasts, scoring and optimizer semantics are unchanged.
-Live scheduled-task verification is recorded below after execution.
+
+### Completed live verification
+
+The unchanged existing task was started on demand at 12:55 Bangkok on Sept 18;
+its scheduled 13:00 trigger did not create a second worker. Full capture completed
+at 13:39, R2 publication at 13:48 and retention at 13:51. Task Scheduler subsequently
+reported Ready / result 0, with the next trigger at 15:00. Both PID sidecars and the
+operational database WAL were absent after completion. This is a verified on-demand
+execution of the registered action, not proof of a future unattended trigger.
+
+The complete FPL capture covered 662 endpoints. Capture health was healthy with no
+current identity/schema failures: all 40 current fixtures were captured, but only
+36 were SDP core-valid. Four existing incomplete fixtures retain fallback; successful
+requests do not manufacture missing provider fields. SDP revisions and workload
+capture completed through the existing paths.
+
+Independent public downloads verified pointer/file hashes and CORS for the website.
+Bogle's current FPL price was 4.6m and Haaland's 15.6m across all 28 published vintages;
+these are current display prices, not replacements for frozen forecast prices.
+All 80 current team-match goal classifications were complete. The Leeds 4-1 Newcastle
+fixture showed Leeds 2 open-play + 1 evidenced set-piece + 1 own goal received,
+Newcastle 1 open-play, and zero unclassified goals. Source-bound display accounting
+remains separate from provider core validity.
+
+Verification passed 156 focused/health tests, Ruff and changed-file formatting for
+six Python files, and strict mypy for four source modules. Post-run hashes matched
+all 226 pre-task protected files and all ten forecast artifacts. The bound existing
+plan was reused; no forecast, optimizer plan or model was regenerated.
+
+Detailed local receipts and public-download checks are under
+`data/artifacts/refresh-recovery-20260918/` (ignored operational evidence).
+
+### Storage limitation identified during verification
+
+Retention completed and removed a 3.06 GB duplicate, but COMPLETE means that its
+eligible cleanup finished, not that total storage is bounded. Afterwards there were
+ten database copies in dashboard-runs (27.66 decimal GB); database copies outside
+the active data directory totaled about 49.03 GiB. Drive D had 56.89 GiB free.
+
+Routine-generation references protect the latest two generations. Frozen references
+and legacy/manual-review exceptions override this cap. In particular, the current
+reference scanner can also pin a run/hash merely because it appears in a tracked
+audit document. Duplicate retirement only covers copies matching the newest recovery;
+identical older protected copies can therefore remain. No backup policy was changed
+in this repair, and no additional manual deletion was performed.
+
+The owner requested discussion of a bounded policy. A separate decision should define
+ordinary recovery/export limits, an explicit frozen archive inventory, deduplication
+that preserves required paths, and a byte/free-space preflight. Private replay archives
+must not be uploaded to the public dashboard bucket. These are proposals, not enabled
+retention settings or authorization to discard evidence.
