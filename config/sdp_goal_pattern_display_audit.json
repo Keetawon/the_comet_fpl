@@ -1675,6 +1675,30 @@
       "raw_direct_free_kick_goals": 0,
       "evidence_urls": [],
       "evidence_note": "Explicit total/open-play/opponent-own-goal fields leave zero remainder."
+    },
+    {
+      "season": "2026-27",
+      "gw": 4,
+      "fixture": 40,
+      "provider_match_id": 2645230,
+      "kickoff_time": "2026-09-14T19:00:00+00:00",
+      "team_code": 2,
+      "opponent_team_code": 4,
+      "was_home": true,
+      "raw_payload_sha256": "9ce926e841da8e00b261d5b7c52638b701035e63b9084ea2e10099deb52afad0",
+      "total_goals": 4,
+      "open_play_goals": 2,
+      "own_goals_received": 1,
+      "confirmed_set_piece_goals": 1,
+      "set_piece_goals": 1,
+      "unclassified_goals": 0,
+      "raw_penalty_goals": 0,
+      "raw_direct_free_kick_goals": 0,
+      "audited_at": "2026-09-18T04:24:12+00:00",
+      "evidence_urls": [
+        "https://www.leedsunited.com/en/news/whites-dismantle-magpies-in-memorable-elland-road-encounter"
+      ],
+      "evidence_note": "Okafor's 59th-minute goal: official Leeds report identifies a set-piece headed to the edge of the area before his finish. Exact 14 September 2026 home fixture and 4-1 score reconcile to SDP match 2645230. The opponent own goal stays separate. New display audit only; unchanged raw stats rechecked on 18 September."
     }
   ]
 }

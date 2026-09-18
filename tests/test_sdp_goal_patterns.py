@@ -195,6 +195,48 @@ def source_example() -> tuple[dict[str, Any], dict[str, Any]]:
     return row, source
 
 
+def test_leeds_set_piece_corroboration_keeps_source_time_and_exact_revision() -> None:
+    import json
+
+    from fpl.config import config_dir
+    from fpl.publish.sdp_goal_patterns import AUDIT_FILE
+
+    audit = json.loads((config_dir() / AUDIT_FILE).read_text(encoding="utf-8"))
+    evidence = next(r for r in audit["rows"] if r["fixture"] == 40 and r["team_code"] == 2)
+    row, source = source_example()
+    row.update(
+        season=evidence["season"],
+        fixture=40,
+        team_code=2,
+        opponent_team_code=4,
+        kickoff_time=evidence["kickoff_time"],
+        known_at="2026-09-17T13:40:49.988338+00:00",
+    )
+    source.update(
+        sha256=evidence["raw_payload_sha256"],
+        fetched_at=datetime(2026, 9, 17, 2, 30, 24, 531275, tzinfo=UTC),
+    )
+    original = deepcopy(source)
+    apply_goal_patterns([row], [source])
+    receipt = row["goal_patterns"]
+    assert receipt["open_play_goals"] == 2
+    assert receipt["set_piece_goals"] == receipt["confirmed_set_piece_goals"] == 1
+    assert receipt["own_goals_received"] == 1 and receipt["unclassified_goals"] == 0
+    assert receipt["audited_at"] == evidence["audited_at"] != audit["audited_at"]
+    assert datetime.fromisoformat(receipt["audited_at"]) > source["fetched_at"]
+    assert receipt["source_known_at"] == source["fetched_at"].isoformat()
+    assert receipt["evidence_urls"] == evidence["evidence_urls"]
+    assert row["sdp"]["set_piece_goals"] is None and source == original
+
+    # A revised payload loses this exact-source audit and retains the unknown origin.
+    source["sha256"] = "d" * 64
+    apply_goal_patterns([row], [source])
+    assert row["goal_patterns"] is None
+    apply_source_goal_pattern(row, source, interpreted_at=datetime(2026, 9, 18, 5, tzinfo=UTC))
+    assert row["goal_patterns"]["unclassified_goals"] == 1
+    assert row["goal_patterns"]["set_piece_goals"] is None
+
+
 def test_new_match_source_counts_separate_unknown_and_opponent_own_goal() -> None:
     import json
 
