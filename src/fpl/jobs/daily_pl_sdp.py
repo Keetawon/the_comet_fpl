@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import subprocess
 import sys
 import uuid
@@ -35,6 +34,7 @@ from fpl.ingest.pl_sdp import (
 )
 from fpl.jobs import capture_pl_sdp, daily_snapshot
 from fpl.jobs.build_db import _prepare_temporary_database, _sha256, _wal_path
+from fpl.jobs.operational_lock import operational_lock
 from fpl.storage.db import connect, default_db_path
 from fpl.transform.pl_sdp import (
     KICKOFF_TOLERANCE_SECONDS,
@@ -55,17 +55,19 @@ def _write(path: Path, value: object) -> None:
 def writer_lock(
     database: Path, *, backup: Path | None = None
 ) -> Iterator[duckdb.DuckDBPyConnection]:
-    """Fail closed on overlap, stale locks, unresolved WALs, or external DB writers.
+    """Recover proven-dead owners; refuse overlap, unknown owners and unresolved WALs.
 
     The sidecar covers cooperating jobs; the held DuckDB write connection excludes other
     processes, including callers that ignore the sidecar. The backup is made first under a
     DuckDB read lease (Windows cannot copy a writer-open file), then the write lease covers
-    every ingestion/staging operation. A crash leaves the sidecar for explicit diagnosis.
+    every ingestion/staging operation. A recovered sidecar is retained as evidence.
     """
     lock = database.with_name(database.name + ".daily-sdp.lock")
-    with lock.open("x", encoding="utf-8") as handle:
-        json.dump({"pid": os.getpid(), "started_at": datetime.now(UTC)}, handle, default=str)
-    try:
+    with operational_lock(
+        lock, wal=_wal_path(database), validate_recovery=lambda: validate_idle_database(database)
+    ) as recovered:
+        if recovered:
+            logger.warning("Recovered abandoned database sidecar: %s", recovered)
         if _wal_path(database).exists():
             raise RuntimeError("unresolved WAL: close writers and inspect recovery before retrying")
         if backup is not None:
@@ -73,8 +75,14 @@ def writer_lock(
                 _prepare_temporary_database(database, backup)
         with connect(database) as con:
             yield con
-    finally:
-        lock.unlink()
+
+
+def validate_idle_database(database: Path) -> None:
+    """Never recover a sidecar by opening a WAL or displacing another DB writer."""
+    if _wal_path(database).exists():
+        raise RuntimeError("unresolved WAL: inspect recovery before retrying")
+    with connect(database, read_only=True) as con:
+        con.execute("SELECT 1")
 
 
 def inventory(con: duckdb.DuckDBPyConnection, *, season: str, now: datetime) -> dict[str, Any]:

@@ -198,3 +198,173 @@ def test_reusable_plan_rejects_custom_constraints_and_wrong_forecast(
     assert not job.reusable_plan(tmp_path, "wrong")
     policy.locked_codes = (1,)
     assert not job.reusable_plan(tmp_path, "forecast")
+
+
+def _runner_args(tmp_path: Path) -> list[str]:
+    database = tmp_path / "operational.duckdb"
+    with duckdb.connect(str(database)) as con:
+        con.execute("CREATE TABLE snapshot_capture(mode VARCHAR, captured_at TIMESTAMPTZ)")
+    return [
+        "--db",
+        str(database),
+        "--runs",
+        str(tmp_path / "runs"),
+        "--forecast-dir",
+        str(tmp_path / "forecasts"),
+        "--preview-public",
+        str(tmp_path / "public"),
+        "--plan-store",
+        str(tmp_path / "plans"),
+    ]
+
+
+def test_startup_failure_is_durable_and_does_not_remove_another_owner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = _runner_args(tmp_path)
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    lock = runs / ".dashboard-refresh.lock"
+    original = json.dumps({"pid": job.os.getpid(), "started_at": "original"}).encode()
+    lock.write_bytes(original)
+    monkeypatch.setattr(job, "complete", lambda *a, **kw: pytest.fail("blocked run executed"))
+    assert job.main(args) == 1
+    receipt = next(runs.glob("dashboard-*/receipt.json"))
+    report = json.loads(receipt.read_text())
+    assert report["status"] == "FAILED"
+    assert report["phase"] == "acquire_lock"
+    assert "FileExistsError" in report["error"]
+    assert "Dashboard refresh failed" in (receipt.parent / "refresh.log").read_text()
+    assert lock.read_bytes() == original
+
+
+def test_capture_failure_records_phase_and_releases_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = _runner_args(tmp_path)
+
+    def fail(**kwargs: Any) -> None:
+        receipt = next((tmp_path / "runs").glob("dashboard-*/receipt.json"))
+        assert json.loads(receipt.read_text())["phase"] == "capture"
+        raise RuntimeError("injected capture failure")
+
+    monkeypatch.setattr(job.daily_pl_sdp, "run", fail)
+    assert job.main(args) == 1
+    report = json.loads(next((tmp_path / "runs").glob("dashboard-*/receipt.json")).read_text())
+    assert report["status"] == "FAILED"
+    assert report["phase"] == "capture"
+    assert "injected capture failure" in report["error"]
+    assert not (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
+
+
+def test_full_cycle_orders_capture_export_r2_retention_and_repeats_without_console(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import UTC, datetime
+
+    from fpl.publish import r2_dashboard
+
+    args = [*_runner_args(tmp_path), "--r2-config", str(tmp_path / "publication.json")]
+    calls: list[str] = []
+
+    def capture(**kwargs: Any) -> int:
+        assert kwargs["include_workload"] and kwargs["player_history"]
+        calls.append("capture")
+        with duckdb.connect(str(kwargs["database"])) as con:
+            con.execute(
+                "INSERT INTO snapshot_capture VALUES (?, ?)", ["player-history", datetime.now(UTC)]
+            )
+        return 1  # Existing provider gaps must not mask a complete FPL capture.
+
+    def complete(*a: Any, **kw: Any) -> dict[str, Any]:
+        calls.append("dashboard")
+        return {"forecast_regenerated": False}
+
+    def publish(*a: Any, **kw: Any) -> dict[str, Any]:
+        receipt = next(
+            p
+            for p in (tmp_path / "runs").glob("dashboard-*/receipt.json")
+            if json.loads(p.read_text())["phase"] == "r2_publication"
+        )
+        assert json.loads(receipt.read_text())["public_publication"]["status"] == "RUNNING"
+        calls.append("r2")
+        return {"status": "COMPLETE"}
+
+    def recovery(database: Path, destination: Path) -> dict[str, str]:
+        assert (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
+        report = json.loads((destination / "receipt.json").read_text())
+        assert report["retention"]["status"] == "RUNNING"
+        calls.append("recovery")
+        return {"path": str(destination / "recovery.duckdb")}
+
+    monkeypatch.setattr(job.daily_pl_sdp, "run", capture)
+    monkeypatch.setattr(job, "complete", complete)
+    monkeypatch.setattr(r2_dashboard, "publish_r2_dashboard", publish)
+    monkeypatch.setattr(job, "create_recovery", recovery)
+    monkeypatch.setattr(
+        job, "prune_runs", lambda *a, **kw: calls.append("retention") or {"status": "COMPLETE"}
+    )
+    monkeypatch.setattr(job.sys, "stdout", None)
+    for _ in range(2):
+        assert job.main(args) == 0
+    assert calls == ["capture", "dashboard", "r2", "recovery", "retention"] * 2
+    reports = [
+        json.loads(p.read_text()) for p in (tmp_path / "runs").glob("dashboard-*/receipt.json")
+    ]
+    assert len(reports) == 2
+    assert all(r["status"] == "COMPLETE" and r["phase"] == "finished" for r in reports)
+    assert not (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
+
+
+def test_failed_publication_skips_retention_and_returns_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fpl.publish import r2_dashboard
+
+    args = [*_runner_args(tmp_path), "--skip-capture", "--r2-config", str(tmp_path / "r2.json")]
+    monkeypatch.setattr(job, "complete", lambda *a, **kw: {"forecast_regenerated": False})
+    monkeypatch.setattr(r2_dashboard, "publish_r2_dashboard", lambda *a, **kw: {"status": "FAILED"})
+    monkeypatch.setattr(job, "create_recovery", lambda *a: pytest.fail("failed publication pruned"))
+    assert job.main(args) == 1
+    assert not (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
+
+
+def test_proven_dead_cycle_and_database_locks_recover_without_changing_database(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+    import sys
+
+    args = [*_runner_args(tmp_path), "--skip-capture"]
+    exited = subprocess.Popen([sys.executable, "-c", "pass"])
+    exited.wait(timeout=20)
+    original = json.dumps({"pid": exited.pid, "started_at": "preserved original"}).encode()
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    db = tmp_path / "operational.duckdb"
+    before = job.digest(db)
+    locks = [runs / ".dashboard-refresh.lock", Path(str(db) + ".daily-sdp.lock")]
+    for lock in locks:
+        lock.write_bytes(original)
+
+    def complete(*a: Any, **kw: Any) -> dict[str, Any]:
+        with job.daily_pl_sdp.writer_lock(db) as con:
+            assert con.execute("SELECT count(*) FROM snapshot_capture").fetchone() == (0,)
+        return {"forecast_regenerated": False}
+
+    monkeypatch.setattr(job, "complete", complete)
+    monkeypatch.setattr(
+        job, "create_recovery", lambda *a: {"path": str(tmp_path / "recovery.duckdb")}
+    )
+    monkeypatch.setattr(job, "prune_runs", lambda *a, **kw: {"status": "COMPLETE"})
+    assert job.main(args) == 0
+    assert job.digest(db) == before
+    for lock in locks:
+        assert not lock.exists()
+        evidence = list(lock.with_name(lock.name + ".recovered").glob("*/original.lock"))
+        assert len(evidence) == 1 and evidence[0].read_bytes() == original

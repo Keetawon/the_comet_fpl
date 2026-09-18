@@ -192,7 +192,10 @@ policy remains in force, and the task retries twice 30 minutes apart. pythonw su
 unwanted console. The helper's `-WhatIf` validates without activating anything.
 Battery power does not interrupt an active database cycle. The task does not wake a sleeping
 machine. A process crash or forced shutdown can leave a lock/WAL: inspect the recorded PID and
-DuckDB recovery state before removing a stale sidecar; automatic retries do not bypass it.
+DuckDB recovery state before removing a stale sidecar. Since the bounded 2026-09-18 repair,
+new runners automatically archive/recover only a provably dead PID with no WAL and a successful
+read-only DB probe, under a permanent OS guard. Active/unknown owners, legacy unparseable
+metadata and WALs still require inspection. See `pipeline-lock-recovery-2026-09-18.md`.
 Keep the configured current season and this editable source checkout valid at season rollover.
 
 The task `The Comet FPL - daily SDP` was registered on this host and manually started through

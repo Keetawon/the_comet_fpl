@@ -7,6 +7,7 @@ pre_deadline_forecast. A missing current artifact fails before replacing the pre
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import hashlib
 import json
 import logging
@@ -23,7 +24,9 @@ from uuid import uuid4
 from fpl.artifacts.optimizer_plan import read_optimizer_artifact
 from fpl.config import config_dir, repo_root
 from fpl.jobs import daily_pl_sdp
+from fpl.jobs.build_db import _wal_path
 from fpl.jobs.build_sdp_dashboard import build
+from fpl.jobs.operational_lock import operational_lock
 from fpl.jobs.operational_retention import create_recovery, prune_runs
 from fpl.storage.db import connect, default_db_path
 from fpl.storage.outcomes import attach_finalized_outcomes
@@ -162,92 +165,134 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("explicit existing non-default operational database required")
     args.runs.mkdir(parents=True, exist_ok=True)
     lock = args.runs / ".dashboard-refresh.lock"
-    # Exclusive cycle lock complements the existing DB writer locks/backup leases.
-    with lock.open("x", encoding="utf-8") as handle:
-        json.dump({"pid": os.getpid(), "started_at": datetime.now(UTC).isoformat()}, handle)
     started = datetime.now(UTC)
     destination = args.runs / f"dashboard-{started.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
     destination.mkdir()
     report: dict[str, Any] = {
         "started_at": started.isoformat(),
-        "status": "FAILED",
+        "status": "RUNNING",
+        "pid": os.getpid(),
+        "phase": "acquire_lock",
         "database": str(args.db.resolve()),
         "retention_policy_version": 1,
     }
-    logging.basicConfig(level=logging.INFO)
-    try:
-        if not args.skip_capture:
-            report["capture_exit_code"] = daily_pl_sdp.run(
-                database=args.db, runs=args.runs, include_workload=True, player_history=True
-            )
-            # Provider gaps do not imply that FPL refresh failed. Require a fresh
-            # complete player-history capture independently before continuing.
-            with connect(args.db, read_only=True) as con:
-                fresh = con.execute(
-                    """SELECT count(*) FROM snapshot_capture
-                    WHERE mode = 'player-history' AND captured_at >= ?""",
-                    [started],
-                ).fetchone()
-            if not fresh or not fresh[0]:
-                raise ValueError("no fresh complete FPL player history; preview kept unchanged")
-        report.update(
-            complete(
-                args.db,
-                destination,
-                args.forecast_dir,
-                args.preview_public,
-                args.plan_store,
-                initial_plan=args.optimizer_plan,
-            )
-        )
-        report["status"] = "COMPLETE"
-        if args.r2_config is not None:
-            from fpl.publish.r2_dashboard import publish_r2_dashboard
+    receipt = destination / "receipt.json"
 
+    def save(phase: str | None = None) -> None:
+        if phase is not None:
+            report["phase"] = phase
+        report["updated_at"] = datetime.now(UTC).isoformat()
+        temporary = receipt.with_suffix(".tmp")
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump(report, handle, indent=2, sort_keys=True, allow_nan=False)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(receipt)
+
+    # This exists BEFORE lock acquisition, including under console-less pythonw.
+    logging.basicConfig(level=logging.INFO, handlers=[])
+    handler = logging.FileHandler(destination / "refresh.log", encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    root_logger = logging.getLogger()
+    root_logger.addHandler(handler)
+    fatal_enabled = not faulthandler.is_enabled()
+    with (destination / "fatal.log").open("x", encoding="utf-8") as fatal_log:
+        if fatal_enabled:
+            faulthandler.enable(file=fatal_log)
+        try:
+            save()
+            with operational_lock(
+                lock,
+                wal=_wal_path(args.db),
+                validate_recovery=lambda: daily_pl_sdp.validate_idle_database(args.db),
+            ) as recovered:
+                report["lock_recovery"] = recovered
+                if not args.skip_capture:
+                    save("capture")
+                    report["capture_exit_code"] = daily_pl_sdp.run(
+                        database=args.db, runs=args.runs, include_workload=True, player_history=True
+                    )
+                    # Source gaps may require fallback. FPL history must be fully captured.
+                    with connect(args.db, read_only=True) as con:
+                        fresh = con.execute(
+                            """SELECT count(*) FROM snapshot_capture
+                            WHERE mode = 'player-history' AND captured_at >= ?""",
+                            [started],
+                        ).fetchone()
+                    if not fresh or not fresh[0]:
+                        raise ValueError(
+                            "no fresh complete FPL player history; preview kept unchanged"
+                        )
+                save("dashboard")
+                report.update(
+                    complete(
+                        args.db,
+                        destination,
+                        args.forecast_dir,
+                        args.preview_public,
+                        args.plan_store,
+                        initial_plan=args.optimizer_plan,
+                    )
+                )
+                report["status"] = "COMPLETE"
+                if args.r2_config is not None:
+                    from fpl.publish.r2_dashboard import publish_r2_dashboard
+
+                    report["public_publication"] = {"status": "RUNNING"}
+                    save("r2_publication")
+                    try:
+                        report["public_publication"] = publish_r2_dashboard(
+                            destination / "generation",
+                            args.r2_config,
+                            destination / "r2-publication",
+                        )
+                    except Exception as exc:
+                        report["public_publication"] = {
+                            "status": "FAILED",
+                            "error_type": type(exc).__name__,
+                            "error": (
+                                "R2 publication could not retain its receipt; "
+                                "local refresh completed"
+                            ),
+                        }
+                report["finished_at"] = datetime.now(UTC).isoformat()
+                save()
+                if report.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE":
+                    try:
+                        # Retention stays under the cycle lock and retains its own WAL veto.
+                        report["retention"] = {"status": "RUNNING"}
+                        save("retention")
+                        report["recovery_backup"] = create_recovery(args.db, destination)
+                        save()
+                        report["retention"] = prune_runs(
+                            args.db,
+                            args.runs,
+                            args.forecast_dir,
+                            recovery=Path(report["recovery_backup"]["path"]),
+                        )
+                    except Exception as exc:
+                        report["retention"] = {
+                            "status": "BLOCKED",
+                            "error": f"{type(exc).__name__}: {exc}",
+                        }
+                        logging.exception("Refresh completed but retention was blocked")
+                save("finished")
+        except Exception as exc:
+            report["status"] = "FAILED"
+            report["error"] = f"{type(exc).__name__}: {exc}"
+            logging.exception("Dashboard refresh failed; inspect retained receipt")
+        finally:
             try:
-                report["public_publication"] = publish_r2_dashboard(
-                    destination / "generation", args.r2_config, destination / "r2-publication"
-                )
-            except Exception as exc:
-                report["public_publication"] = {
-                    "status": "FAILED",
-                    "error_type": type(exc).__name__,
-                    "error": "R2 publication could not retain its receipt; local refresh completed",
-                }
-    except Exception as exc:
-        report["error"] = f"{type(exc).__name__}: {exc}"
-        logging.exception("Dashboard refresh failed; inspect retained receipt")
-    finally:
-        report["finished_at"] = datetime.now(UTC).isoformat()
-        (destination / "receipt.json").write_text(
-            json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8"
-        )
-        if (
-            report["status"] == "COMPLETE"
-            and report.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
-        ):
-            try:
-                # The durable successful receipt and cycle lock precede pruning.
-                report["recovery_backup"] = create_recovery(args.db, destination)
-                (destination / "receipt.json").write_text(
-                    json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
-                    encoding="utf-8",
-                )
-                report["retention"] = prune_runs(
-                    args.db,
-                    args.runs,
-                    args.forecast_dir,
-                    recovery=Path(report["recovery_backup"]["path"]),
-                )
-            except Exception as exc:
-                report["retention"] = {"status": "BLOCKED", "error": f"{type(exc).__name__}: {exc}"}
-                logging.exception("Refresh completed but retention was blocked")
-            (destination / "receipt.json").write_text(
-                json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
-                encoding="utf-8",
-            )
-        lock.unlink()
-    print(json.dumps({"receipt": str(destination / "receipt.json"), **report}, sort_keys=True))
+                report["finished_at"] = datetime.now(UTC).isoformat()
+                save()
+            finally:
+                if fatal_enabled:
+                    faulthandler.disable()
+                root_logger.removeHandler(handler)
+                handler.close()
+    if sys.stdout is not None:
+        print(json.dumps({"receipt": str(receipt), **report}, sort_keys=True))
     published = report.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
     retained = report.get("retention", {}).get("status", "COMPLETE") == "COMPLETE"
     return 0 if report["status"] == "COMPLETE" and published and retained else 1
