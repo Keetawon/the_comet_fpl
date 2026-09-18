@@ -76,5 +76,43 @@ and credentials are never uploaded to the public bucket by this workflow.
 ## Verification and cleanup record
 
 Synthetic tests cover rotation, source pins, pre-cycle reuse, copy failure, low-space
-boundaries, compression corruption, restore identity and public-file rejection. The actual
-cleanup totals and retained checkpoints are recorded below after safe execution.
+boundaries, compression corruption, restore identity and public-file rejection.
+
+The one-time cleanup completed at **2026-09-18 09:13:12 UTC / 16:13 Bangkok**. New task
+triggers were paused while the already-running 15:00 refresh completed normally; that
+process retained its original policy-v1 receipt. Maintenance then acquired the existing
+cycle gate and a read-only database lease. No running writer was terminated or WAL removed.
+
+- Cleanup-phase free space rose from **50.42 to 95.15 GiB**, reclaiming **44.73 GiB**.
+  This is the measured maintenance interval, after archive preparation and completion of
+  the existing refresh; it is not an estimate of all earlier cleanup work.
+- Exactly **two raw verified recoveries** remain, totaling **5.79 GiB**, from the 12:55
+  and 15:00 successful cycles. There is no current in-flight recovery.
+- Exactly **two dashboard export generations** remain, from those same cycles. Older
+  export provenance/receipts remain available without their large presentation copies.
+- **21 local audit archives** occupy **6.93 GiB**. Each has original-byte and archive
+  hashes and verified decompression. Four legacy backups could not prove containment of
+  every old immutable row in the active database (`raw_pl_sdp_payload` or
+  `mart_fact_team_match_stats_v2_version`); their complete bytes were archived, not lost.
+- The active primary database SHA256 was identical before and after cleanup. All **226**
+  recorded model/config/result files and **10** retained forecast artifacts matched their
+  pre-maintenance hashes. Active data/runtime, optimizer state and credentials were excluded.
+- Existing capture health passed with exit code 0, `healthy=true`, no newer suspect receipt,
+  no identity/schema failures, and unchanged current-season core coverage of **36/40**.
+  The historical interrupted receipt remains preserved; it is not presented as an active run.
+
+The existing task was re-enabled at 16:14 Bangkok: **Enabled / Ready**, last result **0**,
+unchanged **PT2H** plus sign-in trigger, next scheduled run **17:00 Bangkok**. Its existing
+action resolves to the updated working tree. No extra refresh, forecast generation, scheduler,
+model evaluation or public infrastructure was introduced for this maintenance.
+
+Validation: **216 targeted/regression tests passed**, global Ruff check and changed-file
+formatting passed, and full strict mypy passed across **241 source files**. The default mypy
+cache first produced an internal error; a task-local cache completed successfully. A sandbox
+health scan initially lacked directory access; the operational-permission scan above passed.
+
+Local private execution receipts are under
+`data/artifacts/retention-policy-20260918/`: `cleanup-result.json`,
+`verification-after.json`, `capture-health-after.json` and `scheduler-restored.json`.
+They are not dashboard exports or permanent new source pins. The policy implementation was
+committed as `afb86ba` and the operational-only disk-guard scope correction as `2302ade`.
