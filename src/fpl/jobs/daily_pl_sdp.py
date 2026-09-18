@@ -34,6 +34,7 @@ from fpl.ingest.pl_sdp import (
 )
 from fpl.jobs import capture_pl_sdp, daily_snapshot
 from fpl.jobs.build_db import _prepare_temporary_database, _sha256, _wal_path
+from fpl.jobs.operational_disk import check_disk_space
 from fpl.jobs.operational_lock import operational_lock
 from fpl.storage.db import connect, default_db_path
 from fpl.transform.pl_sdp import (
@@ -81,6 +82,7 @@ def writer_lock(
                 if cycle_backup is not None:
                     validate_cycle_backup(database, cycle_backup, current=require_current_backup)
                 elif backup is not None:
+                    check_disk_space(backup, database.stat().st_size)
                     _prepare_temporary_database(database, backup)
         with connect(database) as con:
             yield con

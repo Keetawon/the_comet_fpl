@@ -1,13 +1,14 @@
-"""Offline byte-budget guards before copying recovery or staging databases."""
+"""Offline byte-budget guards for operational copies, not general database builds."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
 
+import duckdb
 import pytest
 
-from fpl.jobs import build_db
+from fpl.jobs import build_db, daily_pl_sdp
 from fpl.jobs import operational_disk as disk
 
 
@@ -55,28 +56,35 @@ def test_invalid_size_fails_closed(tmp_path: Path, required: int) -> None:
         disk.check_disk_space(tmp_path, required)
 
 
-def test_shared_database_copy_blocks_before_writing_or_hashing(
+def test_operational_backup_blocks_before_copying_or_writing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "live.duckdb"
-    source.write_bytes(b"source remains intact")
+    with duckdb.connect(str(source)) as con:
+        con.execute("CREATE TABLE retained(i INTEGER)")
+    before = build_db._sha256(source)
     destination = tmp_path / "before.duckdb"
     monkeypatch.setattr(disk.shutil, "disk_usage", lambda path: SimpleNamespace(free=20 * disk.GIB))
     with pytest.raises(RuntimeError, match="minimum is 20 GiB"):
-        build_db._prepare_temporary_database(source, destination)
-    assert source.read_bytes() == b"source remains intact"
+        with daily_pl_sdp.writer_lock(source, backup=destination):
+            pytest.fail("low space allowed database write")
+    assert build_db._sha256(source) == before
     assert not destination.exists()
+    assert not Path(str(source) + ".daily-sdp.lock").exists()
 
 
-def test_shared_database_copy_preserves_hash_verification(
+def test_operational_backup_preserves_hash_verification(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "live.duckdb"
-    source.write_bytes(b"existing version")
+    with duckdb.connect(str(source)) as con:
+        con.execute("CREATE TABLE retained(i INTEGER)")
+    before = build_db._sha256(source)
     destination = tmp_path / "before.duckdb"
     monkeypatch.setattr(disk.shutil, "disk_usage", lambda path: SimpleNamespace(free=40 * disk.GIB))
-    digest = build_db._prepare_temporary_database(source, destination)
-    assert digest == build_db._sha256(source) == build_db._sha256(destination)
+    with daily_pl_sdp.writer_lock(source, backup=destination) as con:
+        assert con.execute("SELECT count(*) FROM retained").fetchone() == (0,)
+    assert before == build_db._sha256(source) == build_db._sha256(destination)
     assert source.read_bytes() == destination.read_bytes()
 
 
@@ -92,9 +100,21 @@ def test_unresolved_wal_is_rejected_before_disk_preflight(
         raise AssertionError("WAL refusal must precede allocation checks")
 
     monkeypatch.setattr(disk.shutil, "disk_usage", unexpected_disk_query)
-    with pytest.raises(RuntimeError, match="exists"):
-        build_db._prepare_temporary_database(source, tmp_path / "before.duckdb")
+    with pytest.raises(RuntimeError, match="WAL"):
+        with daily_pl_sdp.writer_lock(source, backup=tmp_path / "before.duckdb"):
+            pytest.fail("unresolved WAL allowed copy")
     assert wal.read_bytes() == b"unresolved"
+
+
+def test_general_build_copy_does_not_inherit_operational_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "research.duckdb"
+    source.write_bytes(b"tiny non-operational copy")
+    destination = tmp_path / "rebuild.duckdb"
+    monkeypatch.setattr(disk.shutil, "disk_usage", lambda path: SimpleNamespace(free=1))
+    assert build_db._prepare_temporary_database(source, destination) == build_db._sha256(source)
+    assert destination.read_bytes() == source.read_bytes()
 
 
 def test_absent_source_never_allocates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

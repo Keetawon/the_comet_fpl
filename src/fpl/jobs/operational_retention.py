@@ -18,6 +18,7 @@ import duckdb
 
 from fpl.config import repo_root
 from fpl.jobs.build_db import _prepare_temporary_database
+from fpl.jobs.operational_disk import check_disk_space
 from fpl.jobs.operational_lock import operational_lock
 from fpl.jobs.sdp_capture_health import parse_receipt_instant
 from fpl.storage.db import connect
@@ -314,6 +315,7 @@ def create_recovery(database: Path, destination: Path) -> dict[str, str]:
         ),
         connect(database, read_only=True),
     ):
+        check_disk_space(target, database.stat().st_size)
         digest = _prepare_temporary_database(database, target)
     if digest is None:
         raise ValueError("missing operational database")

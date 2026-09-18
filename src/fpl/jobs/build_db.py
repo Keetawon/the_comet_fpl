@@ -22,7 +22,6 @@ from pathlib import Path
 
 from fpl.config import available_rulesets, load_data_quality, load_sources
 from fpl.ingest.archive import download_archive, land_raw
-from fpl.jobs.operational_disk import check_disk_space
 from fpl.storage.db import default_db_path, initialise, record_build_metadata
 from fpl.transform import crosswalk, facts, football_v2, quality
 
@@ -159,7 +158,6 @@ def _prepare_temporary_database(target_path: Path, temporary_path: Path) -> str 
             f"refusing to copy {target_path}: {target_wal.name} exists; "
             "close active writers or recover the existing database first"
         )
-    check_disk_space(temporary_path, target_path.stat().st_size)
     shutil.copy2(target_path, temporary_path)
     source_sha256 = _sha256(target_path)
     if _sha256(temporary_path) != source_sha256:
