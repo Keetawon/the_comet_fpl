@@ -3,6 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 
 describe("Sidebar", () => {
+  it("keeps GW Analysis separate from Fixture matrix", () => {
+    const onNavigate = vi.fn();
+    render(<Sidebar active="gw-analysis" onNavigate={onNavigate} />);
+    expect(screen.getByRole("button", { name: "GW Analysis" })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("button", { name: "Fixture matrix" }));
+    expect(onNavigate).toHaveBeenCalledWith("fixtures");
+  });
   afterEach(() => vi.unstubAllEnvs());
   it("hides local decision pages only in the public build", () => {
     vi.stubEnv("VITE_HOSTED_STATIC", "true");

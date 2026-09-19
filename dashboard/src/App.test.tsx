@@ -10,6 +10,7 @@ vi.mock("@/components/ThemeToggle", () => ({
 }));
 vi.mock("@/pages/SummaryPage", () => ({ SummaryPage: () => <h1>Summary route</h1> }));
 vi.mock("@/pages/FixtureMatrixPage", () => ({ FixtureMatrixPage: () => null }));
+vi.mock("@/pages/GwAnalysisPage", () => ({ GwAnalysisPage: () => <h1>GW Analysis route</h1> }));
 vi.mock("@/pages/PlayersPage", () => ({ PlayersPage: () => <h1>Players route</h1> }));
 vi.mock("@/pages/NextGwPage", () => ({ NextGwPage: () => null }));
 vi.mock("@/pages/PlanBuilderPage", () => ({ PlanBuilderPage: () => null }));
@@ -34,6 +35,13 @@ vi.mock("@/pages/TeamForecastVsActualPage", () => ({
 import App from "./App";
 
 describe("App deep-analytics routes", () => {
+  it("opens standalone shareable GW analysis in hosted mode", async () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    window.location.hash = "#gw-analysis";
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "GW Analysis route" })).toBeInTheDocument();
+    expect(screen.getByText("active:gw-analysis")).toBeInTheDocument();
+  });
   it("keeps the SDP team route and sends retired SDP player bookmarks to Players", async () => {
     window.location.hash = "#team-stat-sdp";
     render(<App />);

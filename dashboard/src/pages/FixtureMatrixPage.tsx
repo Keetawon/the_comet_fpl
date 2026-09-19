@@ -36,7 +36,6 @@ import {
 import { DifficultyLegend } from "@/components/DifficultyLegend";
 import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
 import { CompetitiveFixtureCalendar } from "@/components/CompetitiveFixtureCalendar";
-import { MatchPreviews } from "@/components/MatchPreviews";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FixtureChip } from "@/components/FixtureTicker";
@@ -334,7 +333,7 @@ function TeamGwCell({
 }
 
 export function FixtureMatrixPage() {
-  const [layout, setLayout] = useState<"gameweeks" | "calendar" | "previews">("calendar");
+  const [layout, setLayout] = useState<"gameweeks" | "calendar">("calendar");
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [runId, setRunId] = useState<string | null>(null);
   const [colorSource, setColorSource] = useState<ColorSource>("opponent");
@@ -858,12 +857,11 @@ export function FixtureMatrixPage() {
         </div>
       </div>
 
-      <ToggleGroup className="flex-wrap" type="single" value={layout} onValueChange={(v) => { if (v) setLayout(v as typeof layout); }} variant="outline" aria-label="Fixture table view">
+      <ToggleGroup type="single" value={layout} onValueChange={(v) => { if (v) setLayout(v as typeof layout); }} variant="outline" aria-label="Fixture table view">
         <ToggleGroupItem value="gameweeks">Gameweek matrix</ToggleGroupItem>
         <ToggleGroupItem value="calendar">All competitions</ToggleGroupItem>
-        <ToggleGroupItem value="previews">Match previews</ToggleGroupItem>
       </ToggleGroup>
-      {layout === "previews" ? <MatchPreviews key={activeRunId} teams={runTeams} exportCreatedAt={state.manifest?.source.export_created_at ?? null} /> : layout === "calendar" ? <CompetitiveFixtureCalendar key={activeRunId} teams={runTeams} schedule={state.schedule} fromGw={runBounds.from} toGw={runBounds.from + 9} /> : <>
+      {layout === "calendar" ? <CompetitiveFixtureCalendar key={activeRunId} teams={runTeams} schedule={state.schedule} fromGw={runBounds.from} toGw={runBounds.from + 9} /> : <>
       <div className="rounded-lg border bg-card p-2">
         <DifficultyLegend
           colorSource={colorSource}
