@@ -1,0 +1,11 @@
+# Development default: no paid provider calls. Keys belong only in the capture
+# process environment (X_BEARER_TOKEN / OPENAI_API_KEY), never in this file.
+enabled: false
+summarize: true
+x_monthly_budget_usd: 3.0
+openai_monthly_budget_usd: 0.5
+x_max_results: 10
+# Add only selected accounts whose use has been reviewed. No broad X scraping.
+# Each entry needs source_id, name, handle, reuse_approved; optional exact
+# team_code + team_name and season. Never resolve a player mention by name.
+x_sources: []

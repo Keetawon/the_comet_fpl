@@ -27,6 +27,7 @@ from fpl.publish.public_dashboard import (
     _assert_public_safe,
     package_public_dashboard,
 )
+from fpl.publish.public_news import validate_news_feed
 from fpl.publish.rest_summary import validate_rest_summary
 from fpl.publish.sdp_stats import validate_sdp_stats
 
@@ -35,6 +36,9 @@ LEGACY_PUBLIC_FILES = frozenset(
     + [f"sdp/{name}.json" for name in ("sdp_stats", "competitive_schedule", "publication_status")]
 )
 PUBLIC_FILES = LEGACY_PUBLIC_FILES | {"sdp/rest_summary.json"}
+NEWS_PUBLIC_FILES = LEGACY_PUBLIC_FILES | {"sdp/news_feed.json"}
+ALL_PUBLIC_FILES = PUBLIC_FILES | NEWS_PUBLIC_FILES
+VALID_PUBLIC_FILE_SETS = (LEGACY_PUBLIC_FILES, PUBLIC_FILES, NEWS_PUBLIC_FILES, ALL_PUBLIC_FILES)
 _IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
 
 
@@ -213,18 +217,28 @@ def _prepare_generation(generation: Path, staging: Path) -> tuple[dict[str, byte
         if name != "sdp_stats":
             _assert_public_safe(document)
         documents[f"sdp/{name}.json"] = document
-    rest_path = generation / "public/sdp/rest_summary.json"
-    rest_pin = receipt.get("rest_summary")
-    if rest_path.exists() or rest_pin is not None:
-        if not rest_path.is_file() or not isinstance(rest_pin, dict):
-            raise ValueError("R2 rest summary requires both its public file and receipt pin")
-        body = rest_path.read_bytes()
-        if rest_pin.get("sha256") != _sha(body) or rest_pin.get("bytes") != len(body):
-            raise ValueError("R2 rest summary does not match its completed generation receipt")
+    public_files = LEGACY_PUBLIC_FILES
+    for name, validate_optional in (
+        ("rest_summary", validate_rest_summary),
+        ("news_feed", validate_news_feed),
+    ):
+        path = generation / f"public/sdp/{name}.json"
+        pin = receipt.get(name)
+        if not path.exists() and pin is None:
+            continue
+        if not path.is_file() or not isinstance(pin, dict):
+            raise ValueError(f"R2 {name} requires both its public file and receipt pin")
+        body = path.read_bytes()
+        if pin.get("sha256") != _sha(body) or pin.get("bytes") != len(body):
+            raise ValueError(f"R2 {name} does not match its completed generation receipt")
         document = _strict_json_loads(body.decode("utf-8"))
-        validate_rest_summary(document)
+        validate_optional(document)
+        if name == "news_feed" and document["demo"]:
+            raise ValueError("R2 cannot publish synthetic demonstration news")
         _assert_public_safe(document)
-        documents["sdp/rest_summary.json"] = document
+        relative = f"sdp/{name}.json"
+        documents[relative] = document
+        public_files = public_files | {relative}
     check_observed_freshness(staging / "sanitized-data", documents["sdp/sdp_stats.json"])
     documents["sdp/publication_status.json"] = publication_status(
         staging / "sanitized-data", documents["sdp/sdp_stats.json"]
@@ -232,7 +246,6 @@ def _prepare_generation(generation: Path, staging: Path) -> tuple[dict[str, byte
     _assert_public_safe(documents["sdp/publication_status.json"])
     compressed: dict[str, bytes] = {}
     inventory: dict[str, Any] = {}
-    public_files = PUBLIC_FILES if rest_pin is not None else LEGACY_PUBLIC_FILES
     for relative in sorted(public_files):
         if relative.startswith("data/"):
             body = (staging / "sanitized-data" / relative.removeprefix("data/")).read_bytes()
@@ -254,7 +267,7 @@ def validate_pointer(value: dict[str, Any]) -> None:
         or type(value["schema_version"]) is not int
         or value["schema_version"] != 1
         or not isinstance(value["files"], dict)
-        or frozenset(value["files"]) not in (LEGACY_PUBLIC_FILES, PUBLIC_FILES)
+        or frozenset(value["files"]) not in VALID_PUBLIC_FILE_SETS
     ):
         raise ValueError("invalid R2 current pointer contract")
     for entry in value["files"].values():

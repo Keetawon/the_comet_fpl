@@ -109,8 +109,9 @@ def test_freshness_separates_pending_gw_current_plan_and_old_scored_vintage(
 
 
 @pytest.mark.parametrize("shared_backup", [False, True])
+@pytest.mark.parametrize("with_news", [False, True])
 def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_inference(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, shared_backup: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, shared_backup: bool, with_news: bool
 ) -> None:
     calls = []
     forecast = tmp_path / "forecast.jsonl"
@@ -143,20 +144,20 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
         job, "attach_finalized_outcomes", lambda *a, **kw: calls.append("attach") or {}
     )
     monkeypatch.setattr(job, "asdict", lambda v: v)
-    monkeypatch.setattr(
-        job,
-        "build",
-        lambda *a, **kw: (
-            calls.append("build")
-            or {
-                "publication_status": {
-                    "current_platform_plan": True,
-                    "latest_forecast": {"run_id": "run"},
-                },
-                "current_availability": {"matched_player_rows": 15},
-            }
-        ),
-    )
+    news_store = tmp_path / "news-store" if with_news else None
+
+    def build(*a: Any, **kw: Any) -> dict[str, Any]:
+        assert kw["news_store"] == news_store
+        calls.append("build")
+        return {
+            "publication_status": {
+                "current_platform_plan": True,
+                "latest_forecast": {"run_id": "run"},
+            },
+            "current_availability": {"matched_player_rows": 15},
+        }
+
+    monkeypatch.setattr(job, "build", build)
     from fpl.jobs import build_sdp_dashboard
 
     monkeypatch.setattr(build_sdp_dashboard, "install_preview", lambda *a: calls.append("install"))
@@ -178,6 +179,7 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
             tmp_path / "cache",
             initial_plan=plan,
             cycle_backup=cycle_backup,
+            news_store=news_store,
         )
         assert result["plan_reused"]
         assert result["current_availability"] == {"matched_player_rows": 15}
@@ -386,19 +388,25 @@ def test_capture_failure_records_phase_and_releases_lock(
     assert not (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
 
 
+@pytest.mark.parametrize("with_news", [False, True])
 def test_full_cycle_orders_capture_export_r2_retention_and_repeats_without_console(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    with_news: bool,
 ) -> None:
     from datetime import UTC, datetime
 
     from fpl.publish import r2_dashboard
 
     args = [*_runner_args(tmp_path), "--r2-config", str(tmp_path / "publication.json")]
+    news_store = tmp_path / "captured-news" if with_news else None
+    if news_store is not None:
+        args += ["--news-store", str(news_store)]
     calls: list[str] = []
 
     def capture(**kwargs: Any) -> int:
         assert kwargs["include_workload"] and kwargs["player_history"]
+        assert "news_store" not in kwargs  # Export wiring never activates provider capture.
         backup = kwargs["cycle_backup"]
         assert job.digest(Path(backup["path"])) == backup["sha256"]
         assert backup["sha256"] == job.digest(kwargs["database"])
@@ -411,6 +419,7 @@ def test_full_cycle_orders_capture_export_r2_retention_and_repeats_without_conso
 
     def complete(*a: Any, **kw: Any) -> dict[str, Any]:
         assert Path(kw["cycle_backup"]["path"]).exists()
+        assert kw["news_store"] == news_store
         calls.append("dashboard")
         return {"forecast_regenerated": False}
 

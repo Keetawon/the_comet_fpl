@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LineChart,
   ListPlus,
+  Newspaper,
   Scale,
   ScatterChart,
   Users,
@@ -26,6 +27,7 @@ export interface PageDef {
 
 const PAGES: readonly PageDef[] = [
   { id: "summary", label: "Summary", icon: LayoutDashboard },
+  { id: "news", label: "News", icon: Newspaper },
   { id: "fixtures", label: "Fixture matrix", icon: CalendarDays },
   { id: "team-analytics", label: "Team analytics", icon: Goal },
   { id: "team-stat-sdp", label: "Team stat from SDP", icon: Goal },

@@ -14,6 +14,7 @@ import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { FixtureTicker } from "@/components/FixtureTicker";
 import { VintageSelect } from "@/components/VintageSelect";
 import { SummaryRestTable } from "@/components/SummaryRestTable";
+import { NewsFeed } from "@/components/NewsFeed";
 import {
   loadFixtureMatrix,
   loadNextGw,
@@ -390,6 +391,7 @@ export function SummaryPage() {
         </Card>
       </div>
 
+      <NewsFeed compact />
       <Separator className="my-1" />
       <p className="text-xs text-muted-foreground">
         Headline numbers only — the Fixture matrix and Players pages expose the raw lambdas,

@@ -17,6 +17,7 @@ from fpl.publish import r2_dashboard as r2
 from fpl.publish import sdp_stats
 from fpl.publish.export import _canonical_json_bytes
 from fpl.publish.public_dashboard import PublicDashboardPackageError, _assert_public_safe
+from fpl.publish.public_news import empty_news_feed
 from fpl.publish.rest_summary import RosterPlayer, build_rest_summary
 from fpl.publish.team_form import refresh_team_forms
 
@@ -84,10 +85,11 @@ def seal_receipt(root: Path) -> None:
     ):
         body = (root / f"public/sdp/{name}.json").read_bytes()
         receipt[key] = {"sha256": hashlib.sha256(body).hexdigest(), size_key: len(body)}
-    rest_path = root / "public/sdp/rest_summary.json"
-    if rest_path.is_file():
-        body = rest_path.read_bytes()
-        receipt["rest_summary"] = {"sha256": hashlib.sha256(body).hexdigest(), "bytes": len(body)}
+    for name in ("rest_summary", "news_feed"):
+        path = root / f"public/sdp/{name}.json"
+        if path.is_file():
+            body = path.read_bytes()
+            receipt[name] = {"sha256": hashlib.sha256(body).hexdigest(), "bytes": len(body)}
     (root / "receipt.json").write_bytes(_canonical_json_bytes(receipt))
 
 
@@ -183,6 +185,82 @@ def add_rest_summary(generation: Path) -> Path:
     return target
 
 
+def add_news_feed(generation: Path) -> Path:
+    document = empty_news_feed(as_of=STAMP)
+    target = generation / "public/sdp/news_feed.json"
+    target.write_bytes(_canonical_json_bytes(document))
+    seal_receipt(generation)
+    return target
+
+
+@pytest.mark.parametrize("with_rest", [False, True])
+def test_optional_news_is_pinned_deterministic_without_changing_existing_exports(
+    generation: Path, configured: Path, tmp_path: Path, with_rest: bool
+) -> None:
+    if with_rest:
+        add_rest_summary(generation)
+    old_bytes, old_inventory = r2.prepare_generation(generation, tmp_path / "old")
+    news_path = add_news_feed(generation)
+    before = {p.relative_to(generation): p.read_bytes() for p in generation.rglob("*.json")}
+    encoded, inventory = r2.prepare_generation(generation, tmp_path / "first")
+    assert r2.prepare_generation(generation, tmp_path / "repeat") == (encoded, inventory)
+    assert set(inventory) == (r2.ALL_PUBLIC_FILES if with_rest else r2.NEWS_PUBLIC_FILES)
+    for name in old_inventory:
+        assert inventory[name] == old_inventory[name]
+        assert encoded[name] == old_bytes[name]
+    assert json.loads(gzip.decompress(encoded["sdp/news_feed.json"])) == json.loads(
+        news_path.read_bytes()
+    )
+    client = FakeS3()
+    report = r2.publish_r2_dashboard(
+        generation, configured, tmp_path / "publication", client=client, published_at=STAMP
+    )
+    assert report["status"] == "COMPLETE"
+    pointer = json.loads(client.objects["current.json"]["Body"])
+    r2.validate_pointer(pointer)
+    assert pointer["files"] == inventory
+    assert client.puts[-1] == "current.json"
+    assert {p.relative_to(generation): p.read_bytes() for p in generation.rglob("*.json")} == before
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    ["missing_pin", "wrong_hash", "wrong_size", "missing_file", "tamper", "schema", "demo"],
+)
+def test_news_feed_rejects_incomplete_binding_before_any_remote_write(
+    generation: Path, configured: Path, tmp_path: Path, corruption: str
+) -> None:
+    path = add_news_feed(generation)
+    receipt_path = generation / "receipt.json"
+    receipt = json.loads(receipt_path.read_bytes())
+    if corruption == "missing_pin":
+        receipt.pop("news_feed")
+    elif corruption == "wrong_hash":
+        receipt["news_feed"]["sha256"] = "0" * 64
+    elif corruption == "wrong_size":
+        receipt["news_feed"]["bytes"] += 1
+    elif corruption == "missing_file":
+        path.unlink()
+    else:
+        value = json.loads(path.read_bytes())
+        if corruption == "demo":
+            value["demo"] = True
+        else:
+            value["manager_id"] = 123456
+        path.write_bytes(_canonical_json_bytes(value))
+        if corruption in {"schema", "demo"}:
+            seal_receipt(generation)
+            receipt = json.loads(receipt_path.read_bytes())
+    receipt_path.write_bytes(_canonical_json_bytes(receipt))
+    client = FakeS3()
+    report = r2.publish_r2_dashboard(
+        generation, configured, tmp_path / "rejected", client=client, published_at=STAMP
+    )
+    assert report["status"] == "FAILED"
+    assert report["pointer_update_attempted"] is False
+    assert client.puts == []
+
+
 def test_optional_rest_summary_is_pinned_deterministic_and_preserves_forecast_exports(
     generation: Path, configured: Path, tmp_path: Path
 ) -> None:
@@ -252,11 +330,14 @@ def test_optional_rest_summary_fails_closed_before_any_remote_write(
 
 
 @pytest.mark.parametrize("with_rest", [False, True])
-def test_pointer_accepts_only_complete_legacy_or_rest_generation(
-    generation: Path, configured: Path, tmp_path: Path, with_rest: bool
+@pytest.mark.parametrize("with_news", [False, True])
+def test_pointer_accepts_only_complete_optional_generations(
+    generation: Path, configured: Path, tmp_path: Path, with_rest: bool, with_news: bool
 ) -> None:
     if with_rest:
         add_rest_summary(generation)
+    if with_news:
+        add_news_feed(generation)
     client = FakeS3()
     assert (
         r2.publish_r2_dashboard(

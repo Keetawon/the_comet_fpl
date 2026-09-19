@@ -15,6 +15,7 @@ const DEFAULT_ROUTE = "summary";
 
 const PAGES: Record<string, React.ComponentType> = {
   summary: SummaryPage,
+  news: lazy(() => import("@/pages/NewsPage").then(m => ({ default: m.NewsPage }))),
   fixtures: lazy(() => import("@/pages/FixtureMatrixPage").then(m => ({ default: m.FixtureMatrixPage }))),
   "team-analytics": lazy(() => import("@/pages/TeamAnalyticsPage").then(m => ({ default: m.TeamAnalyticsPage }))),
   "team-stat-sdp": lazy(() => import("@/pages/SdpStatsPage").then(m => ({ default: m.TeamSdpStatsPage }))),

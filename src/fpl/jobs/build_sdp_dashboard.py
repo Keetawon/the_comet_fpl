@@ -29,6 +29,7 @@ from fpl.publish.dashboard_refresh import (
 )
 from fpl.publish.export import _canonical_json_bytes, export_bi, validate_bi_export
 from fpl.publish.public_dashboard import _assert_public_safe, package_public_dashboard
+from fpl.publish.public_news import export_news_feed, validate_news_feed
 from fpl.publish.rest_summary import validate_rest_summary
 from fpl.publish.sdp_stats import export_sdp_stats
 from fpl.storage.db import connect
@@ -49,6 +50,18 @@ def export_rest_summary(db: Path, target: Path, *, as_of: datetime) -> dict[str,
         "as_of": as_of.isoformat(),
         "counts": document["counts"],
     }
+
+
+def publish_news_feed(store: Path, target: Path, *, as_of: datetime) -> dict[str, Any]:
+    """Copy validated public summaries only; never capture or call a provider here."""
+    document = export_news_feed(store, as_of=as_of)
+    validate_news_feed(document)
+    _assert_public_safe(document)
+    body = _canonical_json_bytes(document, indent=2)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as handle:
+        handle.write(body)
+    return {"sha256": hashlib.sha256(body).hexdigest(), "bytes": len(body)}
 
 
 def retain_validated_generation(
@@ -83,6 +96,9 @@ def install_preview(generation: Path, public: Path) -> None:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, destination / source.name)
+    # An optional feed must not survive a switch back to a generation without it.
+    if not (generation / "public" / "sdp" / "news_feed.json").is_file():
+        (public / "sdp" / "news_feed.json").unlink(missing_ok=True)
 
 
 def build(
@@ -92,6 +108,7 @@ def build(
     preview_public: Path | None = None,
     base_dashboard: Path | None = None,
     optimizer_plans: tuple[Path, ...] = (),
+    news_store: Path | None = None,
 ) -> dict[str, Any]:
     if not db.is_file():
         raise ValueError("explicit existing operational database required")
@@ -137,6 +154,11 @@ def build(
             db, output / "public" / "sdp" / "competitive_schedule.json", as_of=stamp
         )
         rest = export_rest_summary(db, output / "public" / "sdp" / "rest_summary.json", as_of=stamp)
+        news = (
+            publish_news_feed(news_store, output / "public" / "sdp" / "news_feed.json", as_of=stamp)
+            if news_store is not None
+            else None
+        )
         freshness = check_observed_freshness(
             output / "public" / "data",
             json.loads((output / "public" / "sdp" / "sdp_stats.json").read_bytes()),
@@ -177,6 +199,8 @@ def build(
         "remote_deployed": False,
         "preview_assets_installed": preview_public is not None,
     }
+    if news is not None:
+        report["news_feed"] = news
     if preview_public is not None:
         install_preview(output, preview_public)
     (output / "receipt.json").write_text(
@@ -194,6 +218,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--preview-public", type=Path, help="Existing dashboard/public directory")
     parser.add_argument("--optimizer-plan", type=Path, action="append", default=[])
     parser.add_argument(
+        "--news-store", type=Path, help="Optional captured public-news store; read-only export"
+    )
+    parser.add_argument(
         "--base-dashboard",
         type=Path,
         help="Existing validated plan source; current observations come from the operational DB",
@@ -207,6 +234,7 @@ def main(argv: list[str] | None = None) -> int:
                 preview_public=args.preview_public,
                 base_dashboard=args.base_dashboard,
                 optimizer_plans=tuple(args.optimizer_plan),
+                news_store=args.news_store,
             ),
             sort_keys=True,
         )

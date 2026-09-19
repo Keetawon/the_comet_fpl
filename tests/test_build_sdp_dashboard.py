@@ -56,6 +56,7 @@ def test_preview_copies_only_intended_public_exports(tmp_path: Path) -> None:
     (generation / "public" / "sdp" / "sdp_stats.json").write_text('{"observed":true}')
     (generation / "public" / "sdp" / "competitive_schedule.json").write_text('{"schedule":true}')
     (generation / "public" / "sdp" / "rest_summary.json").write_text('{"rest":true}')
+    (generation / "public" / "sdp" / "news_feed.json").write_text('{"news":true}')
     destination = tmp_path / "dashboard" / "public"
     install_preview(generation, destination)
     install_preview(generation, destination)
@@ -64,15 +65,20 @@ def test_preview_copies_only_intended_public_exports(tmp_path: Path) -> None:
     ) == [
         "data/manifest.json",
         "sdp/competitive_schedule.json",
+        "sdp/news_feed.json",
         "sdp/rest_summary.json",
         "sdp/sdp_stats.json",
     ]
     assert (generation / "before.duckdb").read_bytes() == b"private database"
+    (generation / "public" / "sdp" / "news_feed.json").unlink()
+    install_preview(generation, destination)
+    assert not (destination / "sdp" / "news_feed.json").exists()
 
 
 @pytest.mark.parametrize("retained", [False, True])
+@pytest.mark.parametrize("with_news", [False, True])
 def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, retained: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, retained: bool, with_news: bool
 ) -> None:
     db = tmp_path / "operational.duckdb"
     db.write_bytes(b"unchanged database")
@@ -110,6 +116,7 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
     monkeypatch.setattr(job, "export_sdp_stats", sidecar)
     monkeypatch.setattr(job, "export_competitive_schedule", sidecar)
     monkeypatch.setattr(job, "export_rest_summary", sidecar)
+    monkeypatch.setattr(job, "publish_news_feed", sidecar)
     monkeypatch.setattr(job, "check_observed_freshness", lambda *a: {})
     monkeypatch.setattr(job, "publication_status", lambda *a: {})
     monkeypatch.setattr(job, "retain_existing_plans", lambda *a: {"observations_refreshed": True})
@@ -119,7 +126,10 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
         return {"matched_player_rows": 1}
 
     monkeypatch.setattr(job, "refresh_current_availability", availability)
-    report = job.build(db, output, base_dashboard=old_base if retained else None)
+    news_store = tmp_path / "separate-news-store" if with_news else None
+    report = job.build(
+        db, output, base_dashboard=old_base if retained else None, news_store=news_store
+    )
     assert calls == [
         (
             "availability",
@@ -129,7 +139,7 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
         ("sidecar", db),
         ("sidecar", db),
         ("sidecar", db),
-    ]
+    ] + ([("sidecar", news_store)] if with_news else [])
     assert report["base_dashboard"]["generated_at"] == "new"
     assert report["base_dashboard"]["mode"] == (
         "refreshed_observations_with_retained_plans"
@@ -139,8 +149,36 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
     assert report["forecast_regenerated"] is False
     assert report["current_availability"] == {"matched_player_rows": 1}
     assert report["rest_summary"] == {"source": "current operational observations"}
+    assert ("news_feed" in report) is with_news
     assert old_evidence.read_bytes() == b"original forecast"
     assert db.read_bytes() == b"unchanged database"
+
+
+def test_news_export_is_read_only_write_once_and_hash_bound(tmp_path: Path) -> None:
+    stamp = datetime(2026, 9, 18, 10, tzinfo=UTC)
+    missing_store = tmp_path / "not-configured"
+    first, second = tmp_path / "first/news_feed.json", tmp_path / "second/news_feed.json"
+    receipt = job.publish_news_feed(missing_store, first, as_of=stamp)
+    assert job.publish_news_feed(missing_store, second, as_of=stamp) == receipt
+    assert first.read_bytes() == second.read_bytes()
+    job.validate_news_feed(json.loads(first.read_bytes()))
+    assert receipt == {
+        "sha256": hashlib.sha256(first.read_bytes()).hexdigest(),
+        "bytes": len(first.read_bytes()),
+    }
+    assert not missing_store.exists()
+    with pytest.raises(FileExistsError):
+        job.publish_news_feed(missing_store, first, as_of=stamp)
+
+
+def test_news_export_rejects_private_document_before_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(job, "export_news_feed", lambda *a, **kw: {"manager_id": 123})
+    target = tmp_path / "public/sdp/news_feed.json"
+    with pytest.raises((ValueError, PublicDashboardPackageError)):
+        job.publish_news_feed(tmp_path / "store", target, as_of=datetime.now(UTC))
+    assert not target.exists()
 
 
 def test_public_rest_export_is_whole_roster_write_once_and_deterministic(

@@ -19,6 +19,16 @@ build/
 *.duckdb
 *.duckdb.wal
 
+# Public-news raw captures and budget ledger are private, never dashboard assets.
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite3-journal
+*.sqlite-wal
+*.sqlite3-wal
+*.sqlite-shm
+*.sqlite3-shm
+
 # Credentials. The FPL API needs no authentication and this project has no secrets, so
 # anything matching these is an accident -- keep it out of history, where it cannot be
 # removed by a later commit.

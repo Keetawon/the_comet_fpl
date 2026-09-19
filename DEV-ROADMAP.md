@@ -19,6 +19,19 @@ evidence-bound insight summaries. Its implementation and automated gates are com
 responsive in-browser visual verification remains pending where recorded in P2.5. No model default
 or frozen evaluation changed. P2.5 owns any later post-deadline work.
 
+## Public news development (owner request, 2026-09-19)
+
+The owner clarified R2 as a public bilingual Premier League news digest, not the
+separate local manual-note proposal. Development now provides an optional News
+page and latest-three Summary section over a sanitized published feed, retained
+FPL news plus explicitly approved X accounts, and a bounded GPT summarizer.
+The news prose is an attributed source digest, separate from the model-facts
+renderer. It cannot author or change model quantities, identities or decisions.
+Provider calls remain disabled; API keys, source reuse review and a bounded live
+check precede operational activation. No scheduler, live site or model change is
+part of this delivery. Contract and commands:
+`docs/public-news-development-2026-09-19.md`.
+
 ## Owner-authorized data prerequisites (2026-09-06)
 
 Before the next new model experiment, complete and verify revision-stable strict football PIT

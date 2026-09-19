@@ -78,6 +78,7 @@ def complete(
     *,
     initial_plan: Path | None = None,
     cycle_backup: dict[str, str] | None = None,
+    news_store: Path | None = None,
 ) -> dict[str, Any]:
     forecast, season, run_id = latest_primary(database, forecasts)
     forecast_hash = digest(forecast)
@@ -121,6 +122,7 @@ def complete(
         destination / "generation",
         base_dashboard=public / "data",
         optimizer_plans=(plan,),
+        news_store=news_store,
     )
     status = generation["publication_status"]
     if not status["current_platform_plan"] or status["latest_forecast"]["run_id"] != run_id:
@@ -189,6 +191,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--optimizer-plan", type=Path, help="Already verified initial plan")
     parser.add_argument("--skip-capture", action="store_true", help="Republish retained data only")
     parser.add_argument("--r2-config", type=Path, help="Optional external R2 publication config")
+    parser.add_argument(
+        "--news-store", type=Path, help="Optional captured public-news store; no provider calls"
+    )
     args = parser.parse_args(argv)
     if not args.db.is_file() or args.db.resolve() == default_db_path().resolve():
         raise ValueError("explicit existing non-default operational database required")
@@ -284,6 +289,7 @@ def main(argv: list[str] | None = None) -> int:
                         args.plan_store,
                         initial_plan=args.optimizer_plan,
                         cycle_backup=report["recovery_backup"],
+                        news_store=args.news_store,
                     )
                 )
                 report["status"] = "COMPLETE"
