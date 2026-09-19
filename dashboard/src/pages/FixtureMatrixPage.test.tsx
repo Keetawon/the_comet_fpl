@@ -20,6 +20,8 @@ import type {
 import { FixtureMatrixPage } from "./FixtureMatrixPage";
 
 vi.mock("@/data/competitiveSchedule", () => ({ loadCompetitiveSchedule: vi.fn().mockRejectedValue(new Error("No cup snapshot in fixture test")) }));
+vi.mock("@/data/restSummary", () => ({ loadRestSummary: vi.fn().mockRejectedValue(new Error("No rest report")) }));
+vi.mock("@/data/newsFeed", () => ({ loadNewsFeed: vi.fn().mockRejectedValue(new Error("No news feed")) }));
 
 const plans: NextGwPlan[] = nextGwSample.plans as unknown as NextGwPlan[];
 
@@ -162,6 +164,7 @@ vi.mock("@/data/load", () => ({
   loadTeamActuals: vi.fn(),
   loadTeamProvisionalActuals: vi.fn(),
   loadSummary: vi.fn(),
+  loadPlayers: vi.fn().mockRejectedValue(new Error("No player sidecar")),
 }));
 
 beforeEach(() => {
@@ -184,6 +187,17 @@ beforeEach(() => {
 });
 
 describe("FixtureMatrixPage", () => {
+  it("opens isolated match previews and returns to the existing calendar", async () => {
+    const user = userEvent.setup();
+    const before = JSON.stringify(sample);
+    render(<FixtureMatrixPage />);
+    await user.click(await screen.findByRole("radio", { name: "Match previews" }));
+    expect(await screen.findByRole("heading", { name: "Match previews" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "All competitions" }));
+    expect(screen.getByRole("radio", { name: "Weekly" })).toBeChecked();
+    expect(JSON.stringify(sample)).toBe(before);
+  });
   it("defaults to All competitions, Weekly and 10 GWs, including reset", async () => {
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);

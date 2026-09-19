@@ -19,6 +19,18 @@ evidence-bound insight summaries. Its implementation and automated gates are com
 responsive in-browser visual verification remains pending where recorded in P2.5. No model default
 or frozen evaluation changed. P2.5 owns any later post-deadline work.
 
+## Match-preview development (owner request, 2026-09-19)
+
+R3-A starts with a deterministic **Match previews** view inside Fixtures: one GW
+overview and exact-fixture detail using the selected published forecast. Current
+observed form, R1 witnessed rest and R2 attributed news remain separately dated
+context. This view never authors scorelines, adjusts predictions or invokes an
+AI provider. The existing remote insight selector cannot express a fixture, so it
+is not reused with a misleading broader scope. An exact-fixture evidence contract
+is required before adding optional AI selection to this view. R3-B (an AI
+challenger) is not started. Work remains local; no activation or publication.
+See `docs/match-previews-development-2026-09-19.md`.
+
 ## Public news development (owner request, 2026-09-19)
 
 The owner clarified R2 as a public bilingual Premier League news digest, not the
