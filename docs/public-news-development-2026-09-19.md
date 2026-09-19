@@ -124,6 +124,14 @@ or private receipts. A `demo: true` feed is rejected by R2 before any upload.
   isolation, SDP primary/fallback and deterministic insights; all pass (PuLP warnings).
 - 91 frontend checks: parser, cards, sharing, same-generation resolver, Sidebar,
   App and Summary. TypeScript/worker TypeScript, Vite build and scoped oxlint pass.
+- Full repository gate completed once in 18m30s: **4,515 passed, 156 skipped,
+  64 failed, 22 errors**. Failures include Windows symlink privilege `WinError 1314`,
+  old frozen byte/hash pins (including checkout EOL differences), duplicate model
+  discovery assumptions and an untouched adapter fixture missing
+  `stg_live_team_version`. No new-news test failed. These broader failures were
+  not repaired or all independently rerun on a pristine baseline in this delivery;
+  the full suite is not claimed green. Local log:
+  `data/artifacts/public-news-20260919/full-pytest.txt`.
 - Strict mypy passes 247 source files; global `ruff check src tests` and changed
   Python formatting pass. Global formatting still reports 10 untouched legacy files
   in insights/publication and their tests; no unrelated reformat was performed.
@@ -146,3 +154,8 @@ or private receipts. A `demo: true` feed is rejected by R2 before any upload.
 The local preview uses three explicitly synthetic stories and cannot be published.
 It is accessible on the owner's computer only while the preview process is running.
 Production remains unchanged until a later reviewed activation/publication.
+
+Implementation commit: `1d3390e`. Automatic approval review rejected a normal push
+to `origin/codex/public-news`, including after checking the owner-named GitHub
+remote and the code-only file list. No workaround was attempted. Local commits
+are retained; pushing this branch awaits the owner's explicit confirmation.
