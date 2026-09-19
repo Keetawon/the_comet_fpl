@@ -10,7 +10,7 @@ const { load } = vi.hoisted(() => {
     weeks: [{ gw: 5, players: [], hit_points: 0, squad_cost: 1000 }],
   };
   return { load: {
-    loadSummary: vi.fn().mockResolvedValue({ latest_run: run, next_gameweek: null }),
+    loadSummary: vi.fn().mockResolvedValue({ latest_run: run, next_gameweek: { gw: 5 } }),
     loadPlayers: vi.fn().mockResolvedValue({ manifest: null, players: [{
       ...run, code: 1, web_name: "Observed player", position: "DEF", team_short_name: "TST",
       now_cost: 50, availability_status: "a", as_of: "2026-09-15T00:00:00Z",
@@ -24,6 +24,7 @@ const { load } = vi.hoisted(() => {
   } };
 });
 vi.mock("@/data/load", () => load);
+vi.mock("@/data/restSummary", () => ({ loadRestSummary: vi.fn().mockRejectedValue(new Error("Old generation without rest evidence")) }));
 // No insight request is part of this presentation test.
 vi.mock("@/components/InsightSummaryPanel", () => ({ InsightSummaryPanel: () => null }));
 
@@ -33,7 +34,7 @@ it.each([false, true])("keeps published xP but hides all optimizer cards when ho
   vi.stubEnv("VITE_HOSTED_STATIC", String(hosted));
   render(<SummaryPage />);
   await screen.findByRole("heading", { name: "Summary" });
-  expect(screen.getAllByText("4.5")).toHaveLength(2);
+  expect(screen.getAllByText("4.5")).toHaveLength(1);
   expect(screen.queryByText(/Platform recommendation/ ) !== null).toBe(!hosted);
   expect(screen.queryByText("Your custom plan") !== null).toBe(!hosted);
   expect(screen.queryByRole("link", { name: /Open your plan in Plan Builder/ }) !== null).toBe(!hosted);
@@ -55,8 +56,8 @@ it("uses current FPL reports in the availability watch while retaining raw xP", 
   const before = JSON.stringify(player);
   load.loadPlayers.mockResolvedValueOnce({ manifest: null, players: [player] });
   render(<SummaryPage />);
-  expect(await screen.findByText("doubtful")).toBeInTheDocument();
+  expect(await screen.findAllByText("doubtful")).toHaveLength(2);
   expect(screen.getByText("Unspecified injury")).toBeInTheDocument();
-  expect(screen.getAllByText("4.5")).toHaveLength(3);
+  expect(screen.getAllByText("4.5")).toHaveLength(2);
   expect(JSON.stringify(player)).toBe(before);
 });

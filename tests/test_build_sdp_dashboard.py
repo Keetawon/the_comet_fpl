@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from contextlib import nullcontext
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +11,8 @@ import pytest
 
 from fpl.jobs import build_sdp_dashboard as job
 from fpl.jobs.build_sdp_dashboard import install_preview, retain_validated_generation
+from fpl.publish.public_dashboard import PublicDashboardPackageError
+from fpl.publish.rest_summary import RosterPlayer, build_rest_summary, validate_rest_summary
 
 
 def test_windows_copy_requires_the_validated_publication_hook(tmp_path: Path) -> None:
@@ -50,6 +55,7 @@ def test_preview_copies_only_intended_public_exports(tmp_path: Path) -> None:
     (generation / "public" / "data" / "manifest.json").write_text('{"public":true}')
     (generation / "public" / "sdp" / "sdp_stats.json").write_text('{"observed":true}')
     (generation / "public" / "sdp" / "competitive_schedule.json").write_text('{"schedule":true}')
+    (generation / "public" / "sdp" / "rest_summary.json").write_text('{"rest":true}')
     destination = tmp_path / "dashboard" / "public"
     install_preview(generation, destination)
     install_preview(generation, destination)
@@ -58,6 +64,7 @@ def test_preview_copies_only_intended_public_exports(tmp_path: Path) -> None:
     ) == [
         "data/manifest.json",
         "sdp/competitive_schedule.json",
+        "sdp/rest_summary.json",
         "sdp/sdp_stats.json",
     ]
     assert (generation / "before.duckdb").read_bytes() == b"private database"
@@ -102,6 +109,7 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
     monkeypatch.setattr(job, "package_public_dashboard", package)
     monkeypatch.setattr(job, "export_sdp_stats", sidecar)
     monkeypatch.setattr(job, "export_competitive_schedule", sidecar)
+    monkeypatch.setattr(job, "export_rest_summary", sidecar)
     monkeypatch.setattr(job, "check_observed_freshness", lambda *a: {})
     monkeypatch.setattr(job, "publication_status", lambda *a: {})
     monkeypatch.setattr(job, "retain_existing_plans", lambda *a: {"observations_refreshed": True})
@@ -120,6 +128,7 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
         ("package", output / "dashboard-with-current-availability"),
         ("sidecar", db),
         ("sidecar", db),
+        ("sidecar", db),
     ]
     assert report["base_dashboard"]["generated_at"] == "new"
     assert report["base_dashboard"]["mode"] == (
@@ -129,5 +138,66 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
     )
     assert report["forecast_regenerated"] is False
     assert report["current_availability"] == {"matched_player_rows": 1}
+    assert report["rest_summary"] == {"source": "current operational observations"}
     assert old_evidence.read_bytes() == b"original forecast"
     assert db.read_bytes() == b"unchanged database"
+
+
+def test_public_rest_export_is_whole_roster_write_once_and_deterministic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stamp = datetime(2026, 9, 18, 10, tzinfo=UTC)
+    document = build_rest_summary(
+        season="2026-27",
+        as_of=stamp,
+        roster=[
+            RosterPlayer(101, "Player One", 3, "Club One"),
+            RosterPlayer(102, "Player Two", 4, "Club Two"),
+        ],
+        fixtures=[],
+        next_fixtures={},
+    )
+    db = tmp_path / "operational.duckdb"
+    db.write_bytes(b"immutable operational source")
+    calls: list[dict[str, Any]] = []
+
+    def build(source: Path, **kwargs: Any) -> Any:
+        assert source == db
+        calls.append(kwargs)
+        return document
+
+    monkeypatch.setattr(job, "build_rest_summary", build)
+    first, replay = tmp_path / "first/rest_summary.json", tmp_path / "replay/rest_summary.json"
+    receipt = job.export_rest_summary(db, first, as_of=stamp)
+    assert job.export_rest_summary(db, replay, as_of=stamp) == receipt
+    assert first.read_bytes() == replay.read_bytes()
+    assert calls == [{"as_of": stamp}, {"as_of": stamp}]  # No private squad/code selector.
+    value = json.loads(first.read_bytes())
+    assert {row["code"] for row in value["players"]} == {101, 102}
+    assert validate_rest_summary(value).counts["unknown"] == 2
+    assert receipt["sha256"] == hashlib.sha256(first.read_bytes()).hexdigest()
+    assert receipt["bytes"] == len(first.read_bytes())
+    assert receipt["counts"] == value["counts"]
+    with pytest.raises(FileExistsError):
+        job.export_rest_summary(db, first, as_of=stamp)
+    assert first.read_bytes() == replay.read_bytes()
+    assert db.read_bytes() == b"immutable operational source"
+
+
+@pytest.mark.parametrize("invalid", ["counts", "privacy"])
+def test_public_rest_export_rejects_invalid_or_private_document_before_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, invalid: str
+) -> None:
+    stamp = datetime(2026, 9, 18, 10, tzinfo=UTC)
+    document = build_rest_summary(
+        season="2026-27", as_of=stamp, roster=[], fixtures=[], next_fixtures={}
+    )
+    if invalid == "counts":
+        document = document.model_copy(update={"counts": {**document.counts, "players": 1}})
+    else:
+        document = document.model_copy(update={"source_issues": ["manager-123456"]})
+    monkeypatch.setattr(job, "build_rest_summary", lambda *args, **kwargs: document)
+    target = tmp_path / "public/rest_summary.json"
+    with pytest.raises((ValueError, PublicDashboardPackageError)):
+        job.export_rest_summary(tmp_path / "source.duckdb", target, as_of=stamp)
+    assert not target.exists()

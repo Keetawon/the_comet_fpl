@@ -8,6 +8,7 @@ No capture, inference, optimizer solve or remote deployment happens here.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -17,6 +18,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from fpl.jobs.rest_summary import build as build_rest_summary
 from fpl.publish.competitive_schedule import export_competitive_schedule
 from fpl.publish.current_availability import refresh_current_availability
 from fpl.publish.dashboard_json import export_dashboard_json, validate_dashboard_json
@@ -25,10 +27,28 @@ from fpl.publish.dashboard_refresh import (
     publication_status,
     retain_existing_plans,
 )
-from fpl.publish.export import export_bi, validate_bi_export
-from fpl.publish.public_dashboard import package_public_dashboard
+from fpl.publish.export import _canonical_json_bytes, export_bi, validate_bi_export
+from fpl.publish.public_dashboard import _assert_public_safe, package_public_dashboard
+from fpl.publish.rest_summary import validate_rest_summary
 from fpl.publish.sdp_stats import export_sdp_stats
 from fpl.storage.db import connect
+
+
+def export_rest_summary(db: Path, target: Path, *, as_of: datetime) -> dict[str, Any]:
+    """Publish the complete public roster, never a private squad selector."""
+    document = build_rest_summary(db, as_of=as_of).model_dump(mode="json")
+    validate_rest_summary(document)
+    _assert_public_safe(document)
+    body = _canonical_json_bytes(document, indent=2)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as handle:
+        handle.write(body)
+    return {
+        "sha256": hashlib.sha256(body).hexdigest(),
+        "bytes": len(body),
+        "as_of": as_of.isoformat(),
+        "counts": document["counts"],
+    }
 
 
 def retain_validated_generation(
@@ -116,6 +136,7 @@ def build(
         calendar = export_competitive_schedule(
             db, output / "public" / "sdp" / "competitive_schedule.json", as_of=stamp
         )
+        rest = export_rest_summary(db, output / "public" / "sdp" / "rest_summary.json", as_of=stamp)
         freshness = check_observed_freshness(
             output / "public" / "data",
             json.loads((output / "public" / "sdp" / "sdp_stats.json").read_bytes()),
@@ -149,6 +170,7 @@ def build(
         },
         "sdp_sidecar": sidecar,
         "competitive_schedule": calendar,
+        "rest_summary": rest,
         "observed_freshness_reconciliation": freshness,
         "current_availability": availability,
         "forecast_regenerated": False,

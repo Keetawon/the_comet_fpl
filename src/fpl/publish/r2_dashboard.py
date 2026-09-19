@@ -27,12 +27,14 @@ from fpl.publish.public_dashboard import (
     _assert_public_safe,
     package_public_dashboard,
 )
+from fpl.publish.rest_summary import validate_rest_summary
 from fpl.publish.sdp_stats import validate_sdp_stats
 
-PUBLIC_FILES = frozenset(
+LEGACY_PUBLIC_FILES = frozenset(
     [f"data/{name}" for name in _ARCHIVE_FILENAMES]
     + [f"sdp/{name}.json" for name in ("sdp_stats", "competitive_schedule", "publication_status")]
 )
+PUBLIC_FILES = LEGACY_PUBLIC_FILES | {"sdp/rest_summary.json"}
 _IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
 
 
@@ -211,6 +213,18 @@ def _prepare_generation(generation: Path, staging: Path) -> tuple[dict[str, byte
         if name != "sdp_stats":
             _assert_public_safe(document)
         documents[f"sdp/{name}.json"] = document
+    rest_path = generation / "public/sdp/rest_summary.json"
+    rest_pin = receipt.get("rest_summary")
+    if rest_path.exists() or rest_pin is not None:
+        if not rest_path.is_file() or not isinstance(rest_pin, dict):
+            raise ValueError("R2 rest summary requires both its public file and receipt pin")
+        body = rest_path.read_bytes()
+        if rest_pin.get("sha256") != _sha(body) or rest_pin.get("bytes") != len(body):
+            raise ValueError("R2 rest summary does not match its completed generation receipt")
+        document = _strict_json_loads(body.decode("utf-8"))
+        validate_rest_summary(document)
+        _assert_public_safe(document)
+        documents["sdp/rest_summary.json"] = document
     check_observed_freshness(staging / "sanitized-data", documents["sdp/sdp_stats.json"])
     documents["sdp/publication_status.json"] = publication_status(
         staging / "sanitized-data", documents["sdp/sdp_stats.json"]
@@ -218,7 +232,8 @@ def _prepare_generation(generation: Path, staging: Path) -> tuple[dict[str, byte
     _assert_public_safe(documents["sdp/publication_status.json"])
     compressed: dict[str, bytes] = {}
     inventory: dict[str, Any] = {}
-    for relative in sorted(PUBLIC_FILES):
+    public_files = PUBLIC_FILES if rest_pin is not None else LEGACY_PUBLIC_FILES
+    for relative in sorted(public_files):
         if relative.startswith("data/"):
             body = (staging / "sanitized-data" / relative.removeprefix("data/")).read_bytes()
         else:
@@ -239,7 +254,7 @@ def validate_pointer(value: dict[str, Any]) -> None:
         or type(value["schema_version"]) is not int
         or value["schema_version"] != 1
         or not isinstance(value["files"], dict)
-        or set(value["files"]) != PUBLIC_FILES
+        or frozenset(value["files"]) not in (LEGACY_PUBLIC_FILES, PUBLIC_FILES)
     ):
         raise ValueError("invalid R2 current pointer contract")
     for entry in value["files"].values():

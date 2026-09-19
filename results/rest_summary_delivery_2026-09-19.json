@@ -1,0 +1,100 @@
+{
+  "as_of": "2026-09-19T07:17:26.050156+00:00",
+  "browser": {
+    "console_errors": 0,
+    "desktop": "PASS",
+    "evidence_expansion": "PASS",
+    "local_only": true,
+    "mobile_390x844": "PASS",
+    "page_horizontal_overflow": false,
+    "player_rows": 15,
+    "preview_url": "http://127.0.0.1:4174/#summary",
+    "screenshots": {
+      "summary-desktop.png": "7086db808804708fe198e787b026aa01f793f2d7b5e9158ced4b6d9e19503d43",
+      "summary-mobile.png": "06a8b40e43da6212ed7bf6fd9d994ca8e331574ba548ecbad4d9ad1f48296d30"
+    },
+    "table_horizontal_scroll": "PASS",
+    "transient_tool_timeout": "One CDP screenshot and one selector timeout; a fresh tab completed verification.",
+    "view_all_players_navigation": "PASS"
+  },
+  "checks": {
+    "backend_integration_passed": 151,
+    "forecast_regenerated": false,
+    "frontend_build": "PASS",
+    "frontend_focused_passed": 64,
+    "frontend_lint": {
+      "errors": 0,
+      "preexisting_fast_refresh_warnings": 9
+    },
+    "historical_audits_rerun": false,
+    "pytest_warning": "Cache write access denied; tests passed.",
+    "ruff": "PASS",
+    "strict_mypy_source_files": 243
+  },
+  "counts": {
+    "full_rest": 0,
+    "midweek_played": 174,
+    "players": 662,
+    "unknown": 488
+  },
+  "deterministic_replay": true,
+  "fpl_comparison": {
+    "pl_different_minutes": 59,
+    "pl_equal_minutes": 162,
+    "pl_exact_fpl_minutes_matches": 221,
+    "pl_last_appearance_rows": 221
+  },
+  "limitations": [
+    "All-competition window completeness is unproven; no full-rest claims.",
+    "Nominal provider duration and FPL minutes use different definitions; differences are not reconciled.",
+    "This is an actual-time descriptive report, not a pre-deadline forecast or historical replay.",
+    "Public UI publication requires the existing reviewed main/Pages flow."
+  ],
+  "operational_base_commit": "290cf74024717776cf05868cbd8da9bc3d6c02a5",
+  "operational_refresh_observed": {
+    "finished_at": "2026-09-19T07:20:51.851829+00:00",
+    "next_successful_refresh_emits_rest_sidecar": true,
+    "r2_files": 16,
+    "rest_sidecar_in_that_prior_code_run": false,
+    "retention": "COMPLETE",
+    "run": "dashboard-20260919T062700Z-9f18c1c1",
+    "status": "COMPLETE"
+  },
+  "original_r1_commit": "6a31539164939e4807dc3b6c61c9b8a6a6c863f7",
+  "protected_verification": {
+    "forecasts-before": {
+      "changed": [],
+      "checked": 10,
+      "missing": []
+    },
+    "frozen-before": {
+      "changed": [],
+      "checked": 226,
+      "missing": []
+    },
+    "protected_diff_from_operational_head": []
+  },
+  "purpose": "descriptive_operational_verification_not_model_evaluation",
+  "rest_report_sha256": "7f5d54334135c70a36d81e814006b7c0e574c0d9689768e3ea749889d5b5c2a0",
+  "schema": "fpl.rest-summary-delivery/v1",
+  "source_issues": [
+    "provider_club_unresolved:2685170:45",
+    "provider_club_unresolved:2685179:39",
+    "provider_club_unresolved:2685181:108",
+    "provider_club_unresolved:2685183:21",
+    "provider_club_unresolved:2685521:313",
+    "provider_club_unresolved:2685525:188",
+    "provider_club_unresolved:2685530:243"
+  ],
+  "summary_contract": {
+    "availability_adjusted": false,
+    "limit": 15,
+    "public_inventory_counts": [
+      16,
+      17
+    ],
+    "ranking": "existing raw published next-gameweek xP descending; stable code tie-break",
+    "rest_changes_forecast": false,
+    "sidecar": "sdp/rest_summary.json"
+  }
+}

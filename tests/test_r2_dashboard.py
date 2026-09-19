@@ -17,6 +17,7 @@ from fpl.publish import r2_dashboard as r2
 from fpl.publish import sdp_stats
 from fpl.publish.export import _canonical_json_bytes
 from fpl.publish.public_dashboard import PublicDashboardPackageError, _assert_public_safe
+from fpl.publish.rest_summary import RosterPlayer, build_rest_summary
 from fpl.publish.team_form import refresh_team_forms
 
 from .test_public_dashboard import _documents, _write_generation
@@ -83,6 +84,10 @@ def seal_receipt(root: Path) -> None:
     ):
         body = (root / f"public/sdp/{name}.json").read_bytes()
         receipt[key] = {"sha256": hashlib.sha256(body).hexdigest(), size_key: len(body)}
+    rest_path = root / "public/sdp/rest_summary.json"
+    if rest_path.is_file():
+        body = rest_path.read_bytes()
+        receipt["rest_summary"] = {"sha256": hashlib.sha256(body).hexdigest(), "bytes": len(body)}
     (root / "receipt.json").write_bytes(_canonical_json_bytes(receipt))
 
 
@@ -164,6 +169,119 @@ def configured(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path / "non-secret-config.json"
 
 
+def add_rest_summary(generation: Path) -> Path:
+    document = build_rest_summary(
+        season="2026-27",
+        as_of=STAMP,
+        roster=[RosterPlayer(12345, "Public Player", 3, "Public Club")],
+        fixtures=[],
+        next_fixtures={},
+    )
+    target = generation / "public/sdp/rest_summary.json"
+    target.write_bytes(_canonical_json_bytes(document.model_dump(mode="json")))
+    seal_receipt(generation)
+    return target
+
+
+def test_optional_rest_summary_is_pinned_deterministic_and_preserves_forecast_exports(
+    generation: Path, configured: Path, tmp_path: Path
+) -> None:
+    legacy_bytes, legacy_inventory = r2.prepare_generation(generation, tmp_path / "legacy")
+    rest_path = add_rest_summary(generation)
+    before = {p.relative_to(generation): p.read_bytes() for p in generation.rglob("*.json")}
+    encoded, inventory = r2.prepare_generation(generation, tmp_path / "first")
+    assert r2.prepare_generation(generation, tmp_path / "repeat") == (encoded, inventory)
+    assert set(inventory) == r2.PUBLIC_FILES
+    assert len(inventory) == len(legacy_inventory) + 1
+    for name in legacy_inventory:
+        assert inventory[name] == legacy_inventory[name]
+        assert encoded[name] == legacy_bytes[name]
+    assert json.loads(gzip.decompress(encoded["sdp/rest_summary.json"])) == json.loads(
+        rest_path.read_bytes()
+    )
+    client = FakeS3()
+    report = r2.publish_r2_dashboard(
+        generation, configured, tmp_path / "publication", client=client, published_at=STAMP
+    )
+    assert report["status"] == "COMPLETE"
+    pointer = json.loads(client.objects["current.json"]["Body"])
+    r2.validate_pointer(pointer)
+    assert set(pointer["files"]) == r2.PUBLIC_FILES
+    assert client.puts[-1] == "current.json"
+    assert {p.relative_to(generation): p.read_bytes() for p in generation.rglob("*.json")} == before
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    ["missing_pin", "wrong_hash", "wrong_size", "missing_file", "tamper", "privacy", "schema"],
+)
+def test_optional_rest_summary_fails_closed_before_any_remote_write(
+    generation: Path, configured: Path, tmp_path: Path, corruption: str
+) -> None:
+    path = add_rest_summary(generation)
+    receipt_path = generation / "receipt.json"
+    receipt = json.loads(receipt_path.read_bytes())
+    if corruption == "missing_pin":
+        receipt.pop("rest_summary")
+    elif corruption == "wrong_hash":
+        receipt["rest_summary"]["sha256"] = "0" * 64
+    elif corruption == "wrong_size":
+        receipt["rest_summary"]["bytes"] += 1
+    elif corruption == "missing_file":
+        path.unlink()
+    else:
+        value = json.loads(path.read_bytes())
+        if corruption == "schema":
+            value["manager_id"] = 123456
+        elif corruption == "privacy":
+            value["players"][0]["web_name"] = "manager-123456"
+        else:
+            value["players"][0]["web_name"] = "Changed Public Name"
+        path.write_bytes(_canonical_json_bytes(value))
+        if corruption in {"privacy", "schema"}:
+            seal_receipt(generation)
+            receipt = json.loads(receipt_path.read_bytes())
+    receipt_path.write_bytes(_canonical_json_bytes(receipt))
+    client = FakeS3()
+    report = r2.publish_r2_dashboard(
+        generation, configured, tmp_path / "rejected", client=client, published_at=STAMP
+    )
+    assert report["status"] == "FAILED"
+    assert report["pointer_update_attempted"] is False
+    assert client.puts == []
+
+
+@pytest.mark.parametrize("with_rest", [False, True])
+def test_pointer_accepts_only_complete_legacy_or_rest_generation(
+    generation: Path, configured: Path, tmp_path: Path, with_rest: bool
+) -> None:
+    if with_rest:
+        add_rest_summary(generation)
+    client = FakeS3()
+    assert (
+        r2.publish_r2_dashboard(
+            generation, configured, tmp_path / "publication", client=client, published_at=STAMP
+        )["status"]
+        == "COMPLETE"
+    )
+    pointer = json.loads(client.objects["current.json"]["Body"])
+    r2.validate_pointer(pointer)
+    for invalid_files in (
+        {name: value for name, value in pointer["files"].items() if name != "data/players.json"},
+        {**pointer["files"], "sdp/private_notes.json": {"sha256": "a" * 64, "size_bytes": 1}},
+    ):
+        digest = r2.inventory_hash(invalid_files)
+        with pytest.raises(ValueError, match="pointer contract"):
+            r2.validate_pointer(
+                {
+                    **pointer,
+                    "files": invalid_files,
+                    "generation_sha256": digest,
+                    "base_path": f"generations/{digest}",
+                }
+            )
+
+
 def test_sanitized_generation_is_deterministic_and_hash_binds_every_companion(
     generation: Path,
     tmp_path: Path,
@@ -173,7 +291,7 @@ def test_sanitized_generation_is_deterministic_and_hash_binds_every_companion(
         output.mkdir()
     encoded, inventory = r2.prepare_generation(generation, outputs[0])
     assert r2.prepare_generation(generation, outputs[1]) == (encoded, inventory)
-    assert set(inventory) == r2.PUBLIC_FILES
+    assert set(inventory) == r2.LEGACY_PUBLIC_FILES
     assert all(gzip.decompress(encoded[k]) for k in inventory)
     manifest = json.loads(gzip.decompress(encoded["data/manifest.json"]))
     status = json.loads(gzip.decompress(encoded["sdp/publication_status.json"]))
@@ -229,7 +347,7 @@ def test_sanitization_copies_are_temporary_and_original_generation_is_untouched(
             r2.prepare_generation(generation, output)
     else:
         compressed, inventory = r2.prepare_generation(generation, output)
-        assert set(compressed) == set(inventory) == r2.PUBLIC_FILES
+        assert set(compressed) == set(inventory) == r2.LEGACY_PUBLIC_FILES
     assert len(stages) == 1 and not stages[0].exists()
     assert {
         p.relative_to(generation): p.read_bytes() for p in generation.rglob("*") if p.is_file()

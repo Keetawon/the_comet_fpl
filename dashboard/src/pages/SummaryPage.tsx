@@ -1,8 +1,8 @@
 // Summary landing page: what is interesting RIGHT NOW, derived client-side from the same
 // read models the exploratory pages use (one SELECTED vintage -- the default architecture
 // an optimizer plan references). Sections: next gameweek, optimizer squad summaries,
-// availability watch (the reported injury/doubt overlay), players to watch (GW1 and
-// horizon xP), and teams to watch (schedule ease extremes with recent form and the next
+// availability watch (the reported injury/doubt overlay), top 15 next-GW players with
+// separate observed midweek context, and teams to watch (schedule ease with recent form and the next
 // fixtures). Every number links back to a page that exposes its primitives; headline EV
 // is never compared across architectures.
 
@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { FixtureTicker } from "@/components/FixtureTicker";
 import { VintageSelect } from "@/components/VintageSelect";
+import { SummaryRestTable } from "@/components/SummaryRestTable";
 import {
   loadFixtureMatrix,
   loadNextGw,
@@ -28,7 +29,8 @@ import type {
 } from "@/data/types";
 import { currentAvailability, hasCurrentAvailabilityConcern } from "@/lib/availability";
 import { AvailabilityBadge } from "@/components/AvailabilityBadge";
-import { playerPrice, playerPriceTitle } from "@/lib/playerPrice";
+import { summaryNextGw, topNextPlayers } from "@/lib/summaryRest";
+import { rawPlayerGameweekXp } from "@/lib/userDraft";
 import { chipBucket, chipMetric } from "@/lib/fixtureChips";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import {
@@ -59,23 +61,6 @@ const fmt = (value: number | null | undefined, digits = 1) =>
 
 const price = (value: number | null) => (value == null ? "–" : `£${(value / 10).toFixed(1)}m`);
 
-/** GW1 (first-horizon-gameweek) xP for a player: both legs of a double gameweek count. */
-function gwXp(player: PlayerRecord, gw: number): number | null {
-  const values = player.fixtures
-    .filter((f) => f.gw === gw)
-    .map((f) => f.expected_points)
-    .filter((v): v is number => v != null);
-  return values.length ? values.reduce((a, b) => a + b, 0) : null;
-}
-
-function horizonXpSum(player: PlayerRecord, gwFrom: number, gwTo: number): number | null {
-  const values = player.fixtures
-    .filter((f) => f.gw >= gwFrom && f.gw <= gwTo)
-    .map((f) => f.expected_points)
-    .filter((v): v is number => v != null);
-  return values.length ? values.reduce((a, b) => a + b, 0) : null;
-}
-
 function savedCustomPlanId(): string | null {
   try {
     return window.localStorage.getItem("fpl-solved-plan");
@@ -98,26 +83,6 @@ function Card({
       <p className="mb-2 text-xs font-medium text-muted-foreground">{title}</p>
       {children}
     </section>
-  );
-}
-
-function PlayerLine({ player, value, valueLabel }: { player: PlayerRecord; value: number | null; valueLabel?: string }) {
-  return (
-    <li className="flex items-center justify-between gap-2">
-      <span className="flex min-w-0 items-center gap-1.5">
-        <PlayerPhoto code={player.code} name={player.web_name} />
-        <span className="min-w-0 truncate">
-          <span className="font-medium">{player.web_name}</span>
-          <span className="ml-1 text-xs text-muted-foreground">
-            {player.position} · {player.team_short_name} ·{" "}
-            <span title={playerPriceTitle(player, "current")}>{price(playerPrice(player, "current"))}</span>
-          </span>
-        </span>
-      </span>
-      <span className="tabular-nums text-sm" title={valueLabel}>
-        {fmt(value)}
-      </span>
-    </li>
   );
 }
 
@@ -188,12 +153,12 @@ export function SummaryPage() {
     const opponentStrength = buildOpponentStrength(teams);
     const opponentIndexOf = (code: number) => opponentStrength.get(code)?.index ?? null;
 
+    const nextGw = summaryNextGw(state.summary, run);
     const withXp = players
-      .map((player) => ({ player, next: gwXp(player, gwFrom), horizon: horizonXpSum(player, gwFrom, gwTo) }))
-      .sort((a, b) => (b.next ?? -1) - (a.next ?? -1));
+      .map((player) => ({ player, next: nextGw === null ? null : rawPlayerGameweekXp(player, nextGw) }))
+      .sort((a, b) => (b.next ?? -Infinity) - (a.next ?? -Infinity) || a.player.code - b.player.code);
 
-    const topNext = withXp.slice(0, 5);
-    const topHorizon = [...withXp].sort((a, b) => (b.horizon ?? -1) - (a.horizon ?? -1)).slice(0, 5);
+    const topNext = topNextPlayers(players, nextGw);
     const flagged = withXp
       .filter(
         ({ player }) => hasCurrentAvailabilityConcern(player),
@@ -215,7 +180,7 @@ export function SummaryPage() {
     const easiest = teamEase.slice(0, 3);
     const hardest = [...teamEase].reverse().slice(0, 3);
 
-    return { run, players, teams, gwFrom, gwTo, opponentIndexOf, topNext, topHorizon, flagged, easiest, hardest };
+    return { run, players, teams, gwFrom, gwTo, nextGw, opponentIndexOf, topNext, flagged, easiest, hardest };
   }, [state, runId]);
 
   if (state.status === "loading") {
@@ -250,19 +215,14 @@ export function SummaryPage() {
   const customPlan =
     customPlans.find((plan) => plan.optimizer_run_id === savedCustomId) ?? customPlans[0] ?? null;
   const visibleTopNext = view.topNext[0];
-  const visibleTopHorizon = view.topHorizon[0];
   const localInsightItems = [
     {
       id: "coverage.visible_scope",
       statement: `${view.players.length} players and ${view.teams.length} clubs are visible for GW${view.gwFrom} through GW${view.gwTo}.`,
     },
-    ...(visibleTopNext?.next == null ? [] : [{
+    ...(visibleTopNext?.xp == null ? [] : [{
       id: "rank.visible_next_xp",
-      statement: `${visibleTopNext.player.web_name} has the highest visible GW${view.gwFrom} xP at ${visibleTopNext.next.toFixed(3)}.`,
-    }]),
-    ...(visibleTopHorizon?.horizon == null ? [] : [{
-      id: "rank.visible_horizon_xp",
-      statement: `${visibleTopHorizon.player.web_name} has the highest visible GW${view.gwFrom}-${view.gwTo} xP total at ${visibleTopHorizon.horizon.toFixed(3)}.`,
+      statement: `${visibleTopNext.player.web_name} has the highest visible GW${view.nextGw} xP at ${visibleTopNext.xp.toFixed(3)}.`,
     }]),
   ];
   const summaryMatchesVisible = summary.latest_run?.run_id === view.run.run_id;
@@ -381,10 +341,12 @@ export function SummaryPage() {
         )}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <SummaryRestTable players={view.topNext} gw={view.nextGw} />
+
+      <div className="grid gap-3">
         <Card title="Availability watch (latest FPL report)">
           {view.flagged.length ? (
-            <ul className="space-y-1.5 text-sm">
+            <ul className="grid gap-x-6 gap-y-3 text-sm md:grid-cols-2 xl:grid-cols-4">
               {view.flagged.map(({ player, next }) => (
                 <li key={player.code} className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
@@ -417,21 +379,6 @@ export function SummaryPage() {
           </p>
         </Card>
 
-        <Card title={`Players to watch — GW${view.gwFrom} xP`}>
-          <ul className="space-y-1.5">
-            {view.topNext.map(({ player, next }) => (
-              <PlayerLine key={player.code} player={player} value={next} valueLabel={`GW${view.gwFrom} expected points`} />
-            ))}
-          </ul>
-        </Card>
-
-        <Card title={`Players to watch — GW${view.gwFrom}-${view.gwTo} xP`}>
-          <ul className="space-y-1.5">
-            {view.topHorizon.map(({ player, horizon }) => (
-              <PlayerLine key={player.code} player={player} value={horizon} valueLabel={`GW${view.gwFrom}-${view.gwTo} expected points`} />
-            ))}
-          </ul>
-        </Card>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">

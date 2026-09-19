@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -45,6 +45,8 @@ def _bundle(*, match_id: int, rows: list[dict[str, object]], valid: bool = True)
             "errors": [] if valid else ["two goalkeepers in the starting roster"],
             "raw_metadata": {
                 "id": match_id,
+                "period": "FullTime",
+                "resultType": "NormalResult",
                 "homeTeam": {"id": LIVERPOOL_PROVIDER, "name": "Liverpool"},
                 "awayTeam": {"id": 6, "name": "Tottenham"},
             },
@@ -131,8 +133,6 @@ def database(tmp_path: Path) -> Path:
                             team_code=LIVERPOOL_CODE,
                             provider_team_id=LIVERPOOL_PROVIDER,
                         ),
-                        # An unresolved player identity must not reach a scoped side.
-                        _row(code=None, team_code=LIVERPOOL_CODE, provider_team_id=26),
                         # A foreign club without an FPL code must not become a scoped side.
                         _row(code=777, team_code=None, provider_team_id=6),
                     ],
@@ -163,9 +163,12 @@ def test_the_job_reads_identity_opponents_and_the_next_kickoff_from_existing_sou
 
     haaland = next(p for p in document.players if p.code == HAALAND)
     # City played no fixture in the window at all, so nothing is witnessed and nothing invented.
-    assert haaland.verdict == "full_rest"
+    assert haaland.verdict == "unknown"
     assert haaland.last_appearance is None
-    assert haaland.unknown_reasons == ["no_witnessed_appearance_in_window"]
+    assert haaland.unknown_reasons == [
+        "no_witnessed_appearance_in_window",
+        "schedule_coverage_unproven",
+    ]
 
 
 def test_an_invalid_interpretation_leaves_the_verdict_unknown(database: Path) -> None:
@@ -191,6 +194,7 @@ def test_an_invalid_interpretation_leaves_the_verdict_unknown(database: Path) ->
     assert gakpo.unknown_reasons == [
         "no_witnessed_appearance_in_window",
         "roster_not_proven:5001",
+        "schedule_coverage_unproven",
     ]
 
 
@@ -230,3 +234,261 @@ def test_the_code_file_ignores_comments_and_blank_lines(tmp_path: Path) -> None:
     target.write_text(f"# my squad\n{GAKPO}\n\n{HAALAND}  # captain\n", encoding="utf-8")
     parsed = job._codes(argparse.Namespace(codes=None, code_file=target))
     assert parsed == frozenset({GAKPO, HAALAND})
+
+
+def add_version(
+    database: Path,
+    *,
+    version: str,
+    known: datetime,
+    valid: bool = True,
+    rows: list[dict[str, object]] | None = None,
+    kickoff: datetime | None = None,
+    competition: int = 2,
+    record_extra: dict[str, object] | None = None,
+) -> None:
+    body = json.loads(
+        _bundle(
+            match_id=5001,
+            valid=valid,
+            rows=rows
+            if rows is not None
+            else [
+                _row(
+                    code=GAKPO,
+                    team_code=LIVERPOOL_CODE,
+                    provider_team_id=LIVERPOOL_PROVIDER,
+                    minutes=45.0,
+                )
+            ],
+        )
+    )
+    body.update(record_extra or {})
+    with initialise(database) as con:
+        con.execute(
+            "INSERT INTO sdp_competitive_match_version VALUES (?,?,?,?,?,?,?,?)",
+            [
+                version,
+                "pl_sdp",
+                competition,
+                SEASON,
+                5001,
+                known,
+                kickoff or datetime(2026, 9, 15, 19, tzinfo=UTC),
+                json.dumps(body),
+            ],
+        )
+
+
+def test_latest_eligible_revision_and_aba_keep_their_actual_knowledge_times(database: Path) -> None:
+    with initialise(database) as con:
+        con.execute(
+            "UPDATE sdp_competitive_match_version SET record_json=?",
+            [_bundle(match_id=5001, rows=[], valid=False)],
+        )
+    add_version(database, version="v2", known=AS_OF - timedelta(hours=2))
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.verdict == "midweek_played"
+    assert row.last_appearance.version_id == "v2"
+    assert row.last_appearance.source_known_at == AS_OF - timedelta(hours=2)
+    before = job.build(database, as_of=AS_OF).model_dump_json()
+    # A later ABA return to invalid/empty is a new event, not the first A timestamp.
+    add_version(database, version="v3", known=AS_OF + timedelta(hours=1), rows=[], valid=False)
+    assert job.build(database, as_of=AS_OF).model_dump_json() == before
+    later = next(
+        p for p in job.build(database, as_of=AS_OF + timedelta(hours=2)).players if p.code == GAKPO
+    )
+    assert later.verdict == "unknown"
+    assert later.evidence_versions[0].version_id == "v3"
+    assert later.evidence_versions[0].known_at == AS_OF + timedelta(hours=1)
+    assert "empty_side_interpretation:5001" in later.unknown_reasons
+
+
+def test_failed_empty_side_is_not_dropped_after_known_club_mapping(database: Path) -> None:
+    add_version(database, version="bad", known=AS_OF - timedelta(hours=1), rows=[], valid=False)
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.verdict == "unknown"
+    assert row.last_appearance is None
+    assert "roster_not_proven:5001" in row.unknown_reasons
+    assert row.evidence_versions[0].roster_proven is False
+
+
+def test_unresolved_participant_makes_whole_side_unusable(database: Path) -> None:
+    add_version(
+        database,
+        version="unresolved",
+        known=AS_OF - timedelta(hours=1),
+        rows=[
+            _row(code=GAKPO, team_code=LIVERPOOL_CODE, provider_team_id=LIVERPOOL_PROVIDER),
+            _row(code=None, team_code=LIVERPOOL_CODE, provider_team_id=LIVERPOOL_PROVIDER),
+        ],
+    )
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.verdict == "unknown"
+    assert row.last_appearance is None
+    assert "side_identity_unresolved:5001" in row.unknown_reasons
+
+
+def test_revised_future_kickoff_cannot_resurrect_old_completed_version(database: Path) -> None:
+    add_version(
+        database,
+        version="reschedule",
+        known=AS_OF - timedelta(hours=1),
+        kickoff=AS_OF + timedelta(days=2),
+    )
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.verdict == "unknown"
+    assert row.last_appearance is None
+
+
+def test_raw_knowledge_time_cannot_postdate_interpretation(database: Path) -> None:
+    add_version(
+        database,
+        version="bad-time",
+        known=AS_OF - timedelta(hours=1),
+        record_extra={"source_versions": {"lineups": {"known_at": AS_OF.isoformat()}}},
+    )
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.verdict == "unknown"
+    assert "source_time_contradiction:5001" in row.unknown_reasons
+
+
+def test_no_capture_table_returns_honest_unknown(database: Path) -> None:
+    with initialise(database) as con:
+        con.execute("DROP TABLE sdp_competitive_match_version")
+    result = job.build(database, as_of=AS_OF)
+    assert result.counts["unknown"] == 2
+    assert "competitive_participation_not_captured" in result.source_issues
+
+
+def test_initial_unmapped_failure_reports_provider_match_without_name_guess(database: Path) -> None:
+    with initialise(database) as con:
+        con.execute(
+            "UPDATE sdp_competitive_match_version SET record_json=?",
+            [_bundle(match_id=5001, rows=[], valid=False)],
+        )
+    result = job.build(database, as_of=AS_OF)
+    assert result.counts["unknown"] == 2
+    assert f"provider_club_unresolved:5001:{LIVERPOOL_PROVIDER}" in result.source_issues
+
+
+def _official_minutes(
+    database: Path,
+    *,
+    known: datetime,
+    minutes: int | None,
+    capture: str = "history1",
+    code: int = GAKPO,
+    fixture: int = 77,
+) -> None:
+    with initialise(database) as con:
+        con.execute(
+            "INSERT INTO mart_fact_player_fixture_live "
+            "(season,gw,fixture,kickoff_time,code,position,team_id,opponent_team_id,"
+            "was_home,minutes,known_at,capture_id) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            [
+                SEASON,
+                4,
+                fixture,
+                datetime(2026, 9, 15, 19, tzinfo=UTC),
+                code,
+                "MID",
+                LIVERPOOL_ID,
+                CITY_ID,
+                True,
+                minutes,
+                known,
+                capture,
+            ],
+        )
+
+
+def _league_comparison(database: Path) -> None:
+    with initialise(database) as con:
+        con.execute("DELETE FROM sdp_competitive_match_version")
+        con.execute(
+            "INSERT INTO stg_pl_sdp_fixture_crosswalk VALUES (?,?,?,?,?,?,?,?,?)",
+            [SEASON, 77, 5001, "exact", 999, True, True, True, AS_OF - timedelta(hours=3)],
+        )
+    add_version(
+        database,
+        version="league",
+        competition=8,
+        known=AS_OF - timedelta(hours=2),
+        rows=[
+            _row(
+                code=GAKPO,
+                team_code=LIVERPOOL_CODE,
+                provider_team_id=LIVERPOOL_PROVIDER,
+                minutes=45.0,
+            ),
+            _row(code=HAALAND, team_code=CITY_CODE, provider_team_id=CITY_PROVIDER),
+        ],
+        record_extra={
+            "raw_metadata": {
+                "id": 5001,
+                "period": "FullTime",
+                "resultType": "NormalResult",
+                "homeTeam": {"id": LIVERPOOL_PROVIDER, "name": "Liverpool"},
+                "awayTeam": {"id": CITY_PROVIDER, "name": "Man City"},
+            }
+        },
+    )
+
+
+def test_fpl_comparison_uses_exact_fixture_code_and_latest_cutoff_known_value(
+    database: Path,
+) -> None:
+    _league_comparison(database)
+    _official_minutes(database, known=AS_OF - timedelta(hours=2), minutes=42)
+    _official_minutes(database, known=AS_OF + timedelta(hours=2), minutes=90, capture="future")
+    _official_minutes(
+        database, known=AS_OF - timedelta(hours=1), minutes=88, capture="wrong-player", code=HAALAND
+    )
+    _official_minutes(
+        database, known=AS_OF - timedelta(hours=1), minutes=89, capture="wrong-fixture", fixture=78
+    )
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.last_appearance.nominal_minutes == 45.0
+    assert row.last_appearance.fpl_minutes == 42
+    assert row.last_appearance.fpl_fixture_id == 77
+    assert row.last_appearance.fpl_capture_id == "history1"
+    assert row.last_appearance.fpl_known_at == AS_OF - timedelta(hours=2)
+    # Latest NULL must not revive the older observed number.
+    _official_minutes(
+        database, known=AS_OF - timedelta(minutes=30), minutes=None, capture="missing"
+    )
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.last_appearance.fpl_minutes is None
+    assert row.last_appearance.fpl_capture_id == "missing"
+
+
+def test_postcutoff_fixture_identity_proof_cannot_enter_comparison(database: Path) -> None:
+    _league_comparison(database)
+    _official_minutes(database, known=AS_OF - timedelta(hours=2), minutes=42)
+    with initialise(database) as con:
+        con.execute(
+            "UPDATE stg_pl_sdp_fixture_crosswalk SET resolved_at=?", [AS_OF + timedelta(seconds=1)]
+        )
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.last_appearance.fpl_minutes is None
+    assert row.last_appearance.fpl_fixture_id is None
+
+
+def test_fpl_comparison_rejects_contradictory_opponent_identity(database: Path) -> None:
+    _league_comparison(database)
+    _official_minutes(database, known=AS_OF - timedelta(hours=2), minutes=42)
+    with initialise(database) as con:
+        con.execute("UPDATE mart_fact_player_fixture_live SET opponent_team_id=?", [LIVERPOOL_ID])
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.last_appearance.fpl_minutes is None
+
+
+def test_missing_optional_fpl_history_keeps_comparison_null(database: Path) -> None:
+    _league_comparison(database)
+    with initialise(database) as con:
+        con.execute("DROP TABLE mart_fact_player_fixture_live")
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.last_appearance.nominal_minutes == 45.0
+    assert row.last_appearance.fpl_minutes is None

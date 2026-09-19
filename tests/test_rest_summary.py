@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -94,6 +95,7 @@ def summarise(fixtures, **kwargs):
         roster=ROSTER,
         fixtures=fixtures,
         next_fixtures=kwargs.pop("next_fixtures", NEXT),
+        coverage_by_team=kwargs.pop("coverage_by_team", {LIVERPOOL: True, CITY: True}),
         **kwargs,
     )
 
@@ -553,3 +555,103 @@ def test_an_explicit_config_path_is_honoured(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="ends before it starts"):
         load_international_breaks(target)
+
+
+def test_no_capture_or_catalogue_proof_is_unknown_not_rest() -> None:
+    document = build_rest_summary(
+        season=SEASON, as_of=AS_OF, roster=ROSTER, fixtures=[], next_fixtures=NEXT
+    )
+    assert all(p.verdict == "unknown" for p in document.players)
+    assert all(not p.coverage_complete for p in document.players)
+    assert all("schedule_coverage_unproven" in p.unknown_reasons for p in document.players)
+    validate_rest_summary(document.model_dump(mode="json"))
+
+
+def test_explicit_complete_empty_scope_can_prove_no_midweek_football() -> None:
+    row = player(summarise([], coverage_by_team={CITY: True}), HAALAND)
+    assert row.verdict == "full_rest" and row.coverage_complete
+    assert row.rest_hours is None
+
+
+def test_partial_duration_total_stays_null() -> None:
+    fixtures = [
+        cup(LIVERPOOL, day=day, observations=(PlayerObservation(GAKPO, True, True, minutes),))
+        for day, minutes in [(15, 90.0), (16, None)]
+    ]
+    row = player(summarise(fixtures), GAKPO)
+    assert row.midweek_appearances == 2
+    assert row.midweek_nominal_minutes is None
+    assert row.verdict == "midweek_played"
+
+
+def test_transfer_keeps_exact_player_appearance_at_previous_club() -> None:
+    old_club = cup(CITY, observations=(PlayerObservation(GAKPO, True, True, 45.0),))
+    row = player(summarise([old_club]), GAKPO)
+    assert row.verdict == "midweek_played"
+    assert row.team_code == LIVERPOOL
+    assert row.last_appearance.observed_team_code == CITY
+    assert row.next_fixture.opponent_name == NEXT[LIVERPOOL].opponent_name
+
+
+def test_future_interpretation_cannot_change_earlier_summary() -> None:
+    fixture = replace(
+        cup(LIVERPOOL, observations=(PlayerObservation(GAKPO, True, True, 90.0),)),
+        source_known_at=AS_OF + timedelta(seconds=1),
+        version_id="future",
+    )
+    assert summarise([fixture]).model_dump_json() == summarise([]).model_dump_json()
+
+
+def test_published_full_rest_needs_explicit_coverage_proof() -> None:
+    value = summarise([]).model_dump(mode="json")
+    value["players"][0]["coverage_complete"] = False
+    with pytest.raises(ValueError, match="complete schedule coverage"):
+        validate_rest_summary(value)
+
+
+def test_fpl_comparison_keeps_its_own_minutes_and_knowledge_time() -> None:
+    observation = PlayerObservation(
+        GAKPO,
+        True,
+        True,
+        94.0,
+        fpl_minutes=90,
+        fpl_fixture_id=77,
+        fpl_known_at=AS_OF - timedelta(hours=2),
+        fpl_capture_id="official-capture",
+    )
+    fixture = replace(league(LIVERPOOL, code=GAKPO, day=13), observations=(observation,))
+    row = player(summarise([fixture]), GAKPO)
+    assert row.last_appearance.nominal_minutes == 94.0
+    assert row.last_appearance.fpl_minutes == 90
+    validate_rest_summary(summarise([fixture]).model_dump(mode="json"))
+    with pytest.raises(ValueError, match="postdates"):
+        summarise(
+            [
+                replace(
+                    fixture,
+                    observations=(replace(observation, fpl_known_at=AS_OF + timedelta(seconds=1)),),
+                )
+            ]
+        )
+
+
+def test_international_window_qualifies_even_without_witnessed_appearance() -> None:
+    row = player(
+        summarise(
+            [],
+            international_windows=[
+                InternationalWindow(
+                    season=SEASON,
+                    starts_on=date(2026, 9, 15),
+                    ends_on=date(2026, 9, 18),
+                    label="international",
+                )
+            ],
+        ),
+        HAALAND,
+    )
+    assert row.verdict == "full_rest"
+    assert row.international_window_overlap
+    assert "international_window_overlap_call_ups_not_captured" in row.unknown_reasons
+    assert row.rest_hours is None

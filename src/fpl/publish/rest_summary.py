@@ -64,6 +64,10 @@ class PlayerObservation:
     started: bool | None
     nominal_minutes: float | None
     errors: tuple[str, ...] = ()
+    fpl_minutes: int | None = None
+    fpl_fixture_id: int | None = None
+    fpl_known_at: datetime | None = None
+    fpl_capture_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +83,9 @@ class CompletedFixture:
     # absence from `observations` is a proved non-selection rather than missing evidence.
     roster_proven: bool
     observations: tuple[PlayerObservation, ...] = ()
+    source_known_at: datetime | None = None
+    version_id: str | None = None
+    errors: tuple[str, ...] = ()
 
     @property
     def midweek(self) -> bool:
@@ -100,6 +107,9 @@ class NextFixture:
     kickoff: datetime | None
     opponent_name: str | None
     was_home: bool | None
+    fixture_id: int | None = None
+    known_at: datetime | None = None
+    capture_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,12 +137,30 @@ class Appearance(RestRecord):
     provider_match_id: int = Field(gt=0)
     kickoff: AwareDatetime
     opponent_name: str | None
+    observed_team_code: int | None = None
     started: bool | None
     nominal_minutes: float | None = Field(default=None, ge=0.0)
     midweek: bool
+    source_known_at: AwareDatetime | None = None
+    version_id: str | None = None
+    fpl_minutes: int | None = Field(default=None, ge=0)
+    fpl_fixture_id: int | None = Field(default=None, gt=0)
+    fpl_known_at: AwareDatetime | None = None
+    fpl_capture_id: str | None = None
+
+
+class EvidenceVersion(RestRecord):
+    competition_id: int
+    provider_match_id: int = Field(gt=0)
+    known_at: AwareDatetime | None = None
+    version_id: str | None = None
+    roster_proven: bool
 
 
 class UpcomingFixture(RestRecord):
+    fixture_id: int | None = Field(default=None, gt=0)
+    known_at: AwareDatetime | None = None
+    capture_id: str | None = None
     gw: int = Field(ge=1, le=38)
     kickoff: AwareDatetime | None
     opponent_name: str | None
@@ -155,6 +183,8 @@ class PlayerRest(RestRecord):
     window_appearances: int
     international_window_overlap: bool
     unknown_reasons: list[str]
+    coverage_complete: bool = False
+    evidence_versions: list[EvidenceVersion] = Field(default_factory=list)
 
 
 class RestSummary(RestRecord):
@@ -172,6 +202,7 @@ class RestSummary(RestRecord):
     international_break_source: BreakSource | None = None
     counts: dict[str, int]
     players: list[PlayerRest]
+    source_issues: list[str] = Field(default_factory=list)
 
 
 def load_international_breaks(
@@ -223,6 +254,8 @@ def build_rest_summary(
     international_windows: Sequence[InternationalWindow] = (),
     break_source: BreakSource | None = None,
     window_hours: int = DEFAULT_WINDOW_HOURS,
+    coverage_by_team: Mapping[int, bool] | None = None,
+    source_issues: Sequence[str] = (),
 ) -> RestSummary:
     """Summarise observed congestion for each rostered player. Pure; reads no source."""
     _aware(as_of, "rest summary cutoff")
@@ -235,6 +268,15 @@ def build_rest_summary(
     seen: set[tuple[int, int, int]] = set()
     for fixture in fixtures:
         _aware(fixture.kickoff, "fixture kickoff")
+        if fixture.source_known_at is not None:
+            _aware(fixture.source_known_at, "fixture knowledge time")
+            if fixture.source_known_at > as_of:
+                continue
+        for observation in fixture.observations:
+            if observation.fpl_known_at is not None:
+                _aware(observation.fpl_known_at, "FPL knowledge time")
+                if observation.fpl_known_at > as_of:
+                    raise ValueError("FPL comparison postdates the summary cutoff")
         if fixture.competition_id not in COMPETITION_NAMES:
             raise ValueError("unverified competition cannot supply rest evidence")
         if fixture.kickoff >= as_of:
@@ -257,10 +299,20 @@ def build_rest_summary(
                 player,
                 season=season,
                 club_fixtures=sorted(
-                    scoped.get(player.team_code, ()), key=lambda f: (f.kickoff, f.provider_match_id)
+                    [
+                        fixture
+                        for sides in scoped.values()
+                        for fixture in sides
+                        if fixture.team_code == player.team_code
+                        or any(o.code == player.code for o in fixture.observations)
+                    ],
+                    key=lambda f: (f.kickoff, f.provider_match_id),
                 ),
                 upcoming=next_fixtures.get(player.team_code),
                 windows=international_windows,
+                review_start=datetime.fromtimestamp(window_start, UTC),
+                as_of=as_of,
+                coverage_complete=(coverage_by_team or {}).get(player.team_code) is True,
             )
         )
     counts = {
@@ -276,6 +328,7 @@ def build_rest_summary(
         international_break_source=break_source,
         counts=counts,
         players=players,
+        source_issues=sorted(set(source_issues)),
     )
 
 
@@ -286,8 +339,13 @@ def _player_rest(
     club_fixtures: Sequence[CompletedFixture],
     upcoming: NextFixture | None,
     windows: Sequence[InternationalWindow],
+    review_start: datetime,
+    as_of: datetime,
+    coverage_complete: bool,
 ) -> PlayerRest:
     reasons: set[str] = set()
+    if not coverage_complete:
+        reasons.add("schedule_coverage_unproven")
     appearances: list[tuple[CompletedFixture, PlayerObservation]] = []
     midweek_unusable = False
     for fixture in club_fixtures:
@@ -296,6 +354,7 @@ def _player_rest(
             # prove non-selection, and a row from a contradictory interpretation does not
             # prove an appearance. A midweek leg therefore leaves the verdict unknown.
             reasons.add(f"roster_not_proven:{fixture.provider_match_id}")
+            reasons.update(f"{error}:{fixture.provider_match_id}" for error in fixture.errors)
             midweek_unusable = midweek_unusable or fixture.midweek
             continue
         row = next((o for o in fixture.observations if o.code == player.code), None)
@@ -322,7 +381,7 @@ def _player_rest(
 
     if midweek:
         verdict: Verdict = "midweek_played"
-    elif midweek_unusable:
+    elif midweek_unusable or not coverage_complete:
         verdict = "unknown"
     else:
         verdict = "full_rest"
@@ -342,14 +401,16 @@ def _player_rest(
             upcoming.kickoff.astimezone(DISPLAY_ZONE).date()
             - last[0].kickoff.astimezone(DISPLAY_ZONE).date()
         ).days
-        overlap = _overlaps(
-            windows,
-            season,
-            last[0].kickoff.astimezone(DISPLAY_ZONE).date(),
-            upcoming.kickoff.astimezone(DISPLAY_ZONE).date(),
-        )
-        if overlap:
-            reasons.add("international_window_overlap_call_ups_not_captured")
+    overlap = _overlaps(
+        windows,
+        season,
+        (last[0].kickoff if last is not None else review_start).astimezone(DISPLAY_ZONE).date(),
+        (upcoming.kickoff if upcoming is not None and upcoming.kickoff is not None else as_of)
+        .astimezone(DISPLAY_ZONE)
+        .date(),
+    )
+    if overlap:
+        reasons.add("international_window_overlap_call_ups_not_captured")
 
     return PlayerRest(
         code=player.code,
@@ -365,14 +426,30 @@ def _player_rest(
             kickoff=upcoming.kickoff,
             opponent_name=upcoming.opponent_name,
             was_home=upcoming.was_home,
+            fixture_id=upcoming.fixture_id,
+            known_at=upcoming.known_at,
+            capture_id=upcoming.capture_id,
         ),
         rest_hours=rest_hours,
         rest_days=rest_days,
         midweek_appearances=len(midweek),
-        midweek_nominal_minutes=sum(measured) if measured else None,
+        midweek_nominal_minutes=(
+            sum(measured) if midweek and len(measured) == len(midweek) else None
+        ),
         window_appearances=len(appearances),
         international_window_overlap=overlap,
         unknown_reasons=sorted(reasons),
+        coverage_complete=coverage_complete,
+        evidence_versions=[
+            EvidenceVersion(
+                competition_id=f.competition_id,
+                provider_match_id=f.provider_match_id,
+                known_at=f.source_known_at,
+                version_id=f.version_id,
+                roster_proven=f.roster_proven,
+            )
+            for f in club_fixtures
+        ],
     )
 
 
@@ -383,9 +460,16 @@ def _appearance(fixture: CompletedFixture, row: PlayerObservation) -> Appearance
         provider_match_id=fixture.provider_match_id,
         kickoff=fixture.kickoff,
         opponent_name=fixture.opponent_name,
+        observed_team_code=fixture.team_code,
         started=row.started,
         nominal_minutes=row.nominal_minutes,
         midweek=fixture.midweek,
+        source_known_at=fixture.source_known_at,
+        version_id=fixture.version_id,
+        fpl_minutes=row.fpl_minutes,
+        fpl_fixture_id=row.fpl_fixture_id,
+        fpl_known_at=row.fpl_known_at,
+        fpl_capture_id=row.fpl_capture_id,
     )
 
 
@@ -397,6 +481,22 @@ def validate_rest_summary(value: Any) -> RestSummary:
         raise ValueError("duplicate player in rest summary")
     for player in document.players:
         last, upcoming = player.last_appearance, player.next_fixture
+        stamps = [e.known_at for e in player.evidence_versions]
+        if last is not None:
+            stamps.extend([last.source_known_at, last.fpl_known_at])
+            if last.fpl_minutes is not None and (
+                last.competition_id != 8
+                or last.fpl_fixture_id is None
+                or last.fpl_known_at is None
+                or not last.fpl_capture_id
+            ):
+                raise ValueError("FPL minutes require exact league-fixture provenance")
+        if upcoming is not None:
+            stamps.append(upcoming.known_at)
+        if any(stamp is not None and stamp > document.as_of for stamp in stamps):
+            raise ValueError("source knowledge time postdates the summary cutoff")
+        if player.verdict == "full_rest" and not player.coverage_complete:
+            raise ValueError("full rest requires complete schedule coverage")
         if last is not None and last.kickoff >= document.as_of:
             raise ValueError("witnessed appearance postdates the summary cutoff")
         if (player.verdict == "midweek_played") != (player.midweek_appearances > 0):

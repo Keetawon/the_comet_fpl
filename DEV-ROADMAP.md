@@ -1263,8 +1263,11 @@ Only after the ordered dashboard program above, unless an operational blocker re
   to each other against drift. This changes no forecast, PMF, price, optimizer input, monitoring
   score or model default, and the archive `rest_days` constant in `AGENTS.md` is unchanged:
   making rest a model feature still needs a separately named, pre-registered candidate. See
-  `docs/pre-deadline-rest-summary.md`. Acceptance to date: 41 focused offline tests; dashboard
-  exposure and a Premier League leg cross-checked against FPL's own recorded minutes remain open.
+  `docs/pre-deadline-rest-summary.md`. The 2026-09-19 delivery adds the Summary top-15
+  next-GW raw-xP view, the public rest sidecar through the existing refresh/R2 path, and
+  exact cutoff-known FPL-minutes comparisons. Missing whole-window catalogue coverage
+  remains `unknown`, never inferred full rest. See
+  `docs/pre-deadline-rest-delivery-2026-09-19.md` for semantics, checks and publication boundary.
 - measure and contract per-GW availability semantics;
 - design future price-change and future selling-value handling;
 - monitor recorded real-deadline forecasts against finalized outcomes;

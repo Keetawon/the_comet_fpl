@@ -38,6 +38,8 @@ from fpl.publish.rest_summary import (
     render_rest_summary_text,
     validate_rest_summary,
 )
+from fpl.storage.db import table_exists
+from fpl.transform.competitive_participation_v2 import RESULT_TYPES
 
 # Assistant managers (element type 5) are not players and stay out of every population.
 PLAYER_ELEMENT_TYPES = (1, 2, 3, 4)
@@ -72,6 +74,7 @@ def next_fixtures(
         """
         WITH latest AS (
             SELECT season, team_id, fixture, gw, kickoff_time, opponent_team_id, was_home,
+                   known_at, capture_id,
                    row_number() OVER (
                        PARTITION BY season, team_id, fixture
                        ORDER BY known_at DESC, capture_id DESC
@@ -79,7 +82,7 @@ def next_fixtures(
             FROM mart_team_fixture_live
             WHERE season = ? AND known_at <= ?
         )
-        SELECT team_id, gw, kickoff_time, opponent_team_id, was_home
+        SELECT team_id, fixture, gw, kickoff_time, opponent_team_id, was_home, known_at, capture_id
         FROM latest
         WHERE recency = 1 AND kickoff_time IS NOT NULL AND kickoff_time >= ? AND gw IS NOT NULL
         ORDER BY team_id, kickoff_time, fixture
@@ -98,8 +101,59 @@ def next_fixtures(
             kickoff=row["kickoff_time"],
             opponent_name=None if opponent is None else club_names.get(opponent),
             was_home=bool(row["was_home"]),
+            fixture_id=int(row["fixture"]),
+            known_at=row["known_at"],
+            capture_id=str(row["capture_id"]),
         )
     return out
+
+
+def _record_times_valid(record: dict[str, Any], known_at: datetime) -> bool:
+    """An interpretation cannot know its identity or raw sources before they exist."""
+    stamps = [record.get("identity_known_at"), record.get("fetched_at")]
+    stamps.extend(source.get("known_at") for source in record.get("source_versions", {}).values())
+    try:
+        if (
+            record.get("known_at") is not None
+            and datetime.fromisoformat(record["known_at"].replace("Z", "+00:00")) != known_at
+        ):
+            return False
+        return all(
+            (stamp := datetime.fromisoformat(value.replace("Z", "+00:00"))).utcoffset() is not None
+            and stamp <= known_at
+            for value in stamps
+            if value is not None
+        )
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def _fpl_comparisons(
+    con: duckdb.DuckDBPyConnection, *, season: str, as_of: datetime
+) -> dict[tuple[int, int], dict[str, Any]]:
+    """Exact captured league fixture/code only; no pulse-id assumption or archive proxy."""
+    if not all(
+        table_exists(con, table)
+        for table in ("mart_fact_player_fixture_live", "stg_pl_sdp_fixture_crosswalk")
+    ):
+        return {}
+    frame = con.execute(
+        """
+        WITH h AS (
+            SELECT * FROM mart_fact_player_fixture_live WHERE season=? AND known_at<=?
+            QUALIFY row_number() OVER (
+                PARTITION BY season,code,fixture ORDER BY known_at DESC,capture_id DESC
+            )=1
+        )
+        SELECT x.sdp_match_id, h.code, h.fixture, h.minutes, h.known_at, h.capture_id,
+               h.kickoff_time, h.team_id, h.opponent_team_id, h.was_home
+        FROM h JOIN stg_pl_sdp_fixture_crosswalk x USING (season,fixture)
+        WHERE x.resolved_at<=? AND x.corroborated_kickoff AND x.corroborated_teams
+          AND h.kickoff_time<? AND h.position IN ('GK','DEF','MID','FWD')
+        """,
+        [season, as_of, as_of, as_of],
+    ).pl()
+    return {(r["sdp_match_id"], r["code"]): r for r in frame.iter_rows(named=True)}
 
 
 def completed_fixtures(
@@ -108,68 +162,144 @@ def completed_fixtures(
     season: str,
     as_of: datetime,
     window_hours: int,
+    teams: dict[int, int] | None = None,
+    source_issues: list[str] | None = None,
 ) -> list[CompletedFixture]:
-    """One row per scoped club side of every retained competitive fixture in the window."""
-    frame = con.execute(
-        """
-        WITH latest AS (
-            SELECT competition, provider_match_id, kickoff_time, record_json,
-                   row_number() OVER (
-                       PARTITION BY competition, provider_match_id
-                       ORDER BY known_at ASC, version_id ASC
-                   ) AS retained
-            FROM sdp_competitive_match_version
-            WHERE season = ? AND known_at <= ?
-              AND kickoff_time >= ? AND kickoff_time < ?
-        )
-        SELECT competition, provider_match_id, kickoff_time, CAST(record_json AS VARCHAR) AS body
-        FROM latest
-        WHERE retained = 1
-        ORDER BY kickoff_time, competition, provider_match_id
-        """,
-        [season, as_of, as_of - timedelta(hours=window_hours), as_of],
-    ).pl()
+    """Latest cutoff-known whole interpretations; never hide an invalid revision.
 
-    fixtures: list[CompletedFixture] = []
-    for row in frame.iter_rows(named=True):
+    Retained normalized rows already carry the capture job's exact club bridge. Reuse
+    those cutoff-known bridges for failed/empty later interpretations as well. A
+    missing/contradictory bridge stays unresolved; names never resolve an identity.
+    """
+    if not table_exists(con, "sdp_competitive_match_version"):
+        if source_issues is not None:
+            source_issues.append("competitive_participation_not_captured")
+        return []
+    all_versions = (
+        con.execute(
+            """SELECT version_id, competition, provider_match_id, kickoff_time, known_at,
+                  CAST(record_json AS VARCHAR) AS body
+           FROM sdp_competitive_match_version
+           WHERE provider='pl_sdp' AND season=? AND known_at<=?
+           ORDER BY known_at, version_id""",
+            [season, as_of],
+        )
+        .pl()
+        .to_dicts()
+    )
+    versions: dict[tuple[int, int], dict[str, Any]] = {}
+    club_candidates: dict[int, set[int]] = {}
+    for row in all_versions:
         record = json.loads(row["body"])
+        row["record"] = record
+        versions[row["competition"], row["provider_match_id"]] = row
+        if row["kickoff_time"] >= as_of or not _record_times_valid(record, row["known_at"]):
+            continue
+        for entry in record.get("rows", ()):
+            provider = entry.get("provider_team_id")
+            code = entry.get("team_code")
+            if isinstance(provider, int) and isinstance(code, int):
+                club_candidates.setdefault(provider, set()).add(code)
+    mapping = {p: next(iter(c)) for p, c in club_candidates.items() if len(c) == 1}
+    # Many provider ids mapping to one club is equally ambiguous.
+    mapping = {p: c for p, c in mapping.items() if list(mapping.values()).count(c) == 1}
+    official = _fpl_comparisons(con, season=season, as_of=as_of)
+    fixtures: list[CompletedFixture] = []
+    start = as_of - timedelta(hours=window_hours)
+    for row in sorted(
+        versions.values(),
+        key=lambda r: (r["kickoff_time"], r["competition"], r["provider_match_id"]),
+    ):
+        if not start <= row["kickoff_time"] < as_of:
+            continue
+        record = row["record"]
         competition = int(row["competition"])
         if competition not in COMPETITION_NAMES:
             continue
-        summary = parse_match_summary(record["raw_metadata"])
+        match_id = int(row["provider_match_id"])
+        try:
+            summary = parse_match_summary(record["raw_metadata"])
+        except (ValueError, KeyError, TypeError):
+            if source_issues is not None:
+                source_issues.append(f"match_metadata_unresolved:{match_id}")
+            continue
         opponents = {
             summary.home_team_id: summary.away_team_name,
             summary.away_team_id: summary.home_team_name,
         }
-        proven = record.get("valid") is True
-        sides: dict[int, list[PlayerObservation]] = {}
-        provider_of: dict[int, int | None] = {}
-        for entry in record.get("rows", ()):
-            team_code = entry.get("team_code")
-            if team_code is None or entry.get("code") is None:
-                # An unresolved club or player identity is never attached to a scoped side.
+        whole_errors: list[str] = []
+        if not _record_times_valid(record, row["known_at"]):
+            whole_errors.append("source_time_contradiction")
+        if summary.match_id != match_id or (
+            summary.kickoff is not None and summary.kickoff != row["kickoff_time"]
+        ):
+            whole_errors.append("match_identity_contradiction")
+        metadata = record["raw_metadata"]
+        if metadata.get("period") != "FullTime" or metadata.get("resultType") not in RESULT_TYPES:
+            whole_errors.append("match_completion_unproven")
+        for provider_id, opponent in opponents.items():
+            team_code = mapping.get(provider_id) if provider_id is not None else None
+            if team_code is None:
+                if source_issues is not None:
+                    source_issues.append(f"provider_club_unresolved:{match_id}:{provider_id}")
                 continue
-            sides.setdefault(int(team_code), []).append(
-                PlayerObservation(
-                    code=int(entry["code"]),
-                    appeared=entry.get("appeared"),
-                    started=entry.get("started"),
-                    nominal_minutes=entry.get("nominal_minutes"),
-                    errors=tuple(entry.get("identity_errors") or ()),
-                )
+            side_rows = [
+                e for e in record.get("rows", ()) if e.get("provider_team_id") == provider_id
+            ]
+            errors = list(whole_errors)
+            if not side_rows:
+                errors.append("empty_side_interpretation")
+            if any(
+                e.get("team_code") != team_code or e.get("code") is None or e.get("identity_errors")
+                for e in side_rows
+            ):
+                errors.append("side_identity_unresolved")
+            opponent_provider = (
+                summary.away_team_id
+                if provider_id == summary.home_team_id
+                else summary.home_team_id
             )
-            provider_of[int(team_code)] = entry.get("provider_team_id")
-        for team_code, observations in sides.items():
-            opponent = opponents.get(provider_of.get(team_code))
+            opponent_code = None if opponent_provider is None else mapping.get(opponent_provider)
+            observations: list[PlayerObservation] = []
+            for entry in side_rows:
+                if entry.get("team_code") != team_code or entry.get("code") is None:
+                    continue
+                code = int(entry["code"])
+                fpl = official.get((match_id, code)) if competition == 8 else None
+                if fpl is not None and (
+                    fpl["kickoff_time"] != row["kickoff_time"]
+                    or (teams or {}).get(fpl["team_id"]) != team_code
+                    or fpl["was_home"] != (provider_id == summary.home_team_id)
+                    or (teams or {}).get(fpl["opponent_team_id"]) != opponent_code
+                ):
+                    fpl = None
+                observations.append(
+                    PlayerObservation(
+                        code=code,
+                        appeared=entry.get("appeared"),
+                        started=entry.get("started"),
+                        nominal_minutes=entry.get("nominal_minutes"),
+                        errors=tuple(entry.get("identity_errors") or ()),
+                        fpl_minutes=None if fpl is None else fpl["minutes"],
+                        fpl_fixture_id=None if fpl is None else fpl["fixture"],
+                        fpl_known_at=None if fpl is None else fpl["known_at"],
+                        fpl_capture_id=None if fpl is None else fpl["capture_id"],
+                    )
+                )
             fixtures.append(
                 CompletedFixture(
                     competition_id=competition,
-                    provider_match_id=int(row["provider_match_id"]),
+                    provider_match_id=match_id,
                     kickoff=row["kickoff_time"],
                     team_code=team_code,
                     opponent_name=opponent,
-                    roster_proven=proven,
+                    roster_proven=record.get("valid") is True
+                    and not record.get("errors")
+                    and not errors,
                     observations=tuple(sorted(observations, key=lambda o: o.code)),
+                    source_known_at=row["known_at"],
+                    version_id=row["version_id"],
+                    errors=tuple(errors),
                 )
             )
     return fixtures
@@ -198,7 +328,15 @@ def build(
         upcoming = next_fixtures(
             con, season=season, as_of=as_of, teams=teams, club_names=club_names
         )
-        fixtures = completed_fixtures(con, season=season, as_of=as_of, window_hours=window_hours)
+        source_issues: list[str] = []
+        fixtures = completed_fixtures(
+            con,
+            season=season,
+            as_of=as_of,
+            window_hours=window_hours,
+            teams=teams,
+            source_issues=source_issues,
+        )
     source, windows = load_international_breaks()
     return build_rest_summary(
         season=season,
@@ -209,6 +347,10 @@ def build(
         international_windows=windows,
         break_source=source,
         window_hours=window_hours,
+        # The retained workload store contains attempted recent FullTime legs, not a
+        # complete all-competition census. A traversable schedule catalogue alone also
+        # does not establish that every played leg was captured. Never infer full rest.
+        source_issues=source_issues,
     )
 
 
