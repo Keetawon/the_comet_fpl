@@ -128,7 +128,7 @@ export function InsightSummaryPanel({
             Facts from the selected filters.
           </p>
         </div>
-        {remote && (
+        {remote && !isHosted && (
           <Button
             type="button"
             variant="outline"
@@ -155,12 +155,13 @@ export function InsightSummaryPanel({
         </p>
       )}
       {displayCaveats.length > 0 && (
-        <div className="mt-3 space-y-1 border-t pt-3 text-xs text-muted-foreground">
+        <details className="mt-3 space-y-1 border-t pt-3 text-xs text-muted-foreground">
+          <summary className="cursor-pointer font-medium">How to read these insights</summary>
           {displayCaveats.map((caveat) => <p key={caveat}>{caveat}</p>)}
-        </div>
+        </details>
       )}
 
-      {disabledReason && <p className="mt-3 text-xs text-muted-foreground">{disabledReason}</p>}
+      {!isHosted && disabledReason && <p className="mt-3 text-xs text-muted-foreground">{disabledReason}</p>}
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       {result && (
         <div
@@ -186,9 +187,10 @@ export function InsightSummaryPanel({
               </li>
             ))}
           </ul>
-          <p className="mt-2 min-w-0 text-[11px] text-muted-foreground [overflow-wrap:anywhere]">
-            {result.provider} · {result.model} · {result.source}
-          </p>
+          <details className="mt-2 min-w-0 text-[11px] text-muted-foreground [overflow-wrap:anywhere]">
+            <summary className="cursor-pointer">Explanation source</summary>
+            <p>{result.provider} · {result.model} · {result.source}</p>
+          </details>
         </div>
       )}
     </section>

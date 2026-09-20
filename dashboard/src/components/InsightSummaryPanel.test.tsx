@@ -99,6 +99,7 @@ describe("InsightSummaryPanel", () => {
 
     expect(screen.getByRole("heading", { name: "Insight summary" })).toBeInTheDocument();
     expect(screen.getByText("5 players are visible.")).toBeInTheDocument();
+    expect(screen.getByText("Missing values are not zero.").closest("details")).not.toHaveAttribute("open");
     expect(fetchInsightStatus).not.toHaveBeenCalled();
     expect(fetchInsightSummary).not.toHaveBeenCalled();
   });
@@ -162,13 +163,13 @@ describe("InsightSummaryPanel", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("makes no insight status or summary call in hosted-static mode", async () => {
+  it("omits unavailable hosted AI controls and makes no provider request", () => {
     vi.stubEnv("VITE_HOSTED_STATIC", "true");
     render(panel());
 
-    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
-    expect(screen.getByText(/disabled in the hosted static dashboard/i)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Explain with AI" }));
+    expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/disabled in the hosted static dashboard/i)).not.toBeInTheDocument();
+    expect(screen.getByText("5 players are visible.")).toBeVisible();
     expect(fetchInsightStatus).not.toHaveBeenCalled();
     expect(fetchInsightSummary).not.toHaveBeenCalled();
   });

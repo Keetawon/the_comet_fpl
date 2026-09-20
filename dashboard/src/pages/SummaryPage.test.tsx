@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { SummaryPage } from "./SummaryPage";
 
@@ -10,7 +11,7 @@ const { load } = vi.hoisted(() => {
     weeks: [{ gw: 5, players: [], hit_points: 0, squad_cost: 1000 }],
   };
   return { load: {
-    loadSummary: vi.fn().mockResolvedValue({ latest_run: run, next_gameweek: null }),
+    loadSummary: vi.fn().mockResolvedValue({ latest_run: run, next_gameweek: { gw: 5 } }),
     loadPlayers: vi.fn().mockResolvedValue({ manifest: null, players: [{
       ...run, code: 1, web_name: "Observed player", position: "DEF", team_short_name: "TST",
       now_cost: 50, availability_status: "a", as_of: "2026-09-15T00:00:00Z",
@@ -24,8 +25,10 @@ const { load } = vi.hoisted(() => {
   } };
 });
 vi.mock("@/data/load", () => load);
+vi.mock("@/data/restSummary", () => ({ loadRestSummary: vi.fn().mockRejectedValue(new Error("Old generation without rest evidence")) }));
 // No insight request is part of this presentation test.
 vi.mock("@/components/InsightSummaryPanel", () => ({ InsightSummaryPanel: () => null }));
+vi.mock("@/components/NewsFeed", () => ({ NewsFeed: () => <p>Latest published news</p> }));
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -33,7 +36,7 @@ it.each([false, true])("keeps published xP but hides all optimizer cards when ho
   vi.stubEnv("VITE_HOSTED_STATIC", String(hosted));
   render(<SummaryPage />);
   await screen.findByRole("heading", { name: "Summary" });
-  expect(screen.getAllByText("4.5")).toHaveLength(2);
+  expect(screen.getAllByText("4.5")).toHaveLength(1);
   expect(screen.queryByText(/Platform recommendation/ ) !== null).toBe(!hosted);
   expect(screen.queryByText("Your custom plan") !== null).toBe(!hosted);
   expect(screen.queryByRole("link", { name: /Open your plan in Plan Builder/ }) !== null).toBe(!hosted);
@@ -55,8 +58,35 @@ it("uses current FPL reports in the availability watch while retaining raw xP", 
   const before = JSON.stringify(player);
   load.loadPlayers.mockResolvedValueOnce({ manifest: null, players: [player] });
   render(<SummaryPage />);
-  expect(await screen.findByText("doubtful")).toBeInTheDocument();
+  expect(await screen.findAllByText("doubtful")).toHaveLength(2);
   expect(screen.getByText("Unspecified injury")).toBeInTheDocument();
-  expect(screen.getAllByText("4.5")).toHaveLength(3);
+  expect(screen.getAllByText("4.5")).toHaveLength(2);
   expect(JSON.stringify(player)).toBe(before);
+});
+
+it("puts player decisions first and keeps forecast controls behind an accessible disclosure", async () => {
+  vi.stubEnv("VITE_HOSTED_STATIC", "true");
+  const user = userEvent.setup();
+  render(<SummaryPage />);
+  await screen.findByRole("heading", { name: "Summary" });
+  expect(screen.getByRole("link", { name: /Find your next pick/ })).toHaveAttribute("href", "#players");
+  expect(screen.getByRole("link", { name: /Score Prediction/ })).toHaveAttribute("href", "#gw-analysis");
+  expect(screen.getByRole("link", { name: /Read the latest news/ })).toHaveAttribute("href", "#news");
+  expect(screen.getByText(/Forecast as of 2026-09-15/)).toBeVisible();
+  const details = screen.getByText("Data & forecast details").closest("details")!;
+  expect(details).not.toHaveAttribute("open");
+  expect(screen.getByText("Forecast reference: frozen")).not.toBeVisible();
+  await user.click(screen.getByText("Data & forecast details"));
+  expect(details).toHaveAttribute("open");
+  expect(screen.getByText("Forecast reference: frozen")).toBeVisible();
+  expect(screen.queryByText("Your local plans")).not.toBeInTheDocument();
+});
+
+it("never relabels an uncovered forecast as the current gameweek", async () => {
+  load.loadSummary.mockResolvedValueOnce({ latest_run: { run_id: "frozen", season: "2026-27", gw_from: 5, gw_to: 5 }, next_gameweek: { gw: 6 } });
+  render(<SummaryPage />);
+  expect(await screen.findByText("Not covered")).toBeInTheDocument();
+  expect(screen.getByText("Kickoff information unavailable")).toBeInTheDocument();
+  expect(screen.getByText(/published next GW is not covered/)).toBeInTheDocument();
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });
