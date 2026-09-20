@@ -160,7 +160,11 @@ def _request(
                 headers={"Authorization": f"Bearer {key}"},
                 params=params,
                 json=body,
-                timeout=httpx.Timeout(min(10.0, remaining), read=min(5.0, remaining)),
+                # Text generation needs longer than a source-page read. Both attempts
+                # still share the original deadline and reserve cost before sending.
+                timeout=httpx.Timeout(
+                    min(10.0, remaining), read=min(20.0 if provider == "openai" else 5.0, remaining)
+                ),
                 follow_redirects=False,
             ) as response:
                 if response.status_code == 429 or response.status_code >= 500:

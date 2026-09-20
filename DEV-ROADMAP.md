@@ -59,6 +59,13 @@ check precede operational activation. No scheduler, live site or model change is
 part of this delivery. Contract and commands:
 `docs/public-news-development-2026-09-19.md`.
 
+Owner-authorized private checks on 2026-09-20 captured only FFScout (no duplicate
+FPL import). The next retained-post GPT check is blocked by HTTP 429; zero live
+summaries exist and bilingual fidelity remains unverified. The bounded news
+read timeout was repaired without changing the model/prompt or budget caps.
+Automatic capture/publication is still disabled; see
+`docs/ffscout-gpt-private-check-2026-09-20.md` for receipts and limits.
+
 ## Owner-authorized data prerequisites (2026-09-06)
 
 Before the next new model experiment, complete and verify revision-stable strict football PIT

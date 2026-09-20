@@ -191,6 +191,7 @@ def test_x_incremental_ids_summary_cache_and_secret_boundary(tmp_path: Path) -> 
             assert states[0].status == "ok"
             assert states[0].summary_status == "ok"
     assert [r.url.host for r in requests] == ["api.x.com", "api.openai.com", "api.x.com"]
+    assert [r.extensions["timeout"]["read"] for r in requests] == [5.0, 20.0, 5.0]
     assert requests[2].url.params["since_id"] == "100"
     assert "expansions" not in requests[0].url.params
     body = json.loads(requests[1].content)
@@ -203,6 +204,39 @@ def test_x_incremental_ids_summary_cache_and_secret_boundary(tmp_path: Path) -> 
     assert store.recent_observations()[0].player_code is None
     assert b"x-secret" not in store.path.read_bytes()
     assert b"ai-secret" not in store.path.read_bytes()
+
+
+def test_summary_retry_uses_remaining_shared_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    elapsed = 0.0
+    read_timeouts: list[float] = []
+    monkeypatch.setattr("fpl.ingest.public_news.time.monotonic", lambda: elapsed)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal elapsed
+        read_timeouts.append(request.extensions["timeout"]["read"])
+        if len(read_timeouts) == 1:
+            elapsed = 21.0
+            raise httpx.ReadTimeout("synthetic delayed generation")
+        return httpx.Response(200, json=ai_response())
+
+    store = NewsStore(tmp_path / "news.sqlite")
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        result = summarize_observation(
+            observation()[0],
+            store,
+            config(),
+            client,
+            key="secret",
+            clock=lambda: NOW,
+            sleep=lambda _: None,
+        )
+    assert result.summary.title_en == SUMMARY["title_en"]
+    assert read_timeouts == [20.0, 9.0]
+    with closing(sqlite3.connect(store.path)) as db:
+        costs = db.execute("SELECT microusd FROM reservations WHERE provider='openai'").fetchall()
+    assert len(costs) == 2 and costs[0] == costs[1]
 
 
 @pytest.mark.parametrize("handle", ["FFScout", "Account12345678"])
