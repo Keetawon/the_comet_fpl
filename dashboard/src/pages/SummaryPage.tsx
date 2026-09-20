@@ -257,7 +257,7 @@ export function SummaryPage() {
       <nav aria-label="Explore this gameweek" className="grid gap-3 sm:grid-cols-3">
         {[
           { href: "#players", title: "Find your next pick", text: "Compare points, price and availability", Icon: UsersRound, tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" },
-          { href: "#gw-analysis", title: "Score Prediction", text: "Match outlooks and a ready-to-share briefing", Icon: Target, tone: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200" },
+          { href: "#score-prediction", title: "Score Prediction", text: "Match outlooks and a ready-to-share briefing", Icon: Target, tone: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200" },
           { href: "#news", title: "Read the latest news", text: "Team updates, injuries and manager comments", Icon: Newspaper, tone: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200" },
         ].map(({ href, title, text, Icon, tone }) => <a key={href} href={href} className="group flex min-h-24 items-center gap-3 rounded-2xl border bg-card p-4 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-4">
           <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon className="size-5" aria-hidden="true" /></span>

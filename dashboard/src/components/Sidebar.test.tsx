@@ -24,10 +24,12 @@ describe("Sidebar", () => {
     expect(screen.queryByRole("button", { name: "Collapse sidebar" })).not.toBeInTheDocument();
   });
 
-  it("keeps GW Analysis separate from Fixture matrix", () => {
+  it("navigates to Score Prediction separately from Fixture matrix", () => {
     const onNavigate = vi.fn();
-    render(<Sidebar active="gw-analysis" onNavigate={onNavigate} />);
+    render(<Sidebar active="score-prediction" onNavigate={onNavigate} />);
     expect(screen.getByRole("button", { name: "Score Prediction" })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("button", { name: "Score Prediction" }));
+    expect(onNavigate).toHaveBeenCalledWith("score-prediction");
     fireEvent.click(screen.getByRole("button", { name: "Fixture matrix" }));
     expect(onNavigate).toHaveBeenCalledWith("fixtures");
   });

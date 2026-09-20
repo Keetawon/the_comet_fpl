@@ -29,7 +29,7 @@ function sidebarPreference(): boolean {
 const PAGES: Record<string, React.ComponentType> = {
   summary: SummaryPage,
   news: lazy(() => import("@/pages/NewsPage").then(m => ({ default: m.NewsPage }))),
-  "gw-analysis": lazy(() => import("@/pages/GwAnalysisPage").then(m => ({ default: m.GwAnalysisPage }))),
+  "score-prediction": lazy(() => import("@/pages/GwAnalysisPage").then(m => ({ default: m.GwAnalysisPage }))),
   fixtures: lazy(() => import("@/pages/FixtureMatrixPage").then(m => ({ default: m.FixtureMatrixPage }))),
   "team-analytics": lazy(() => import("@/pages/TeamAnalyticsPage").then(m => ({ default: m.TeamAnalyticsPage }))),
   "team-stat-sdp": lazy(() => import("@/pages/SdpStatsPage").then(m => ({ default: m.TeamSdpStatsPage }))),
@@ -54,15 +54,23 @@ function routeFromHash(): string {
   const fragment = window.location.hash.slice(1);
   const route = fragment.split("?", 1)[0] || DEFAULT_ROUTE;
   // The retired SDP player view duplicated FPL statistics. Preserve old bookmarks.
-  const resolved = route === "players-stat-sdp" ? "players" : route;
+  const resolved = route === "players-stat-sdp" ? "players" : route === "gw-analysis" ? "score-prediction" : route;
   return Object.hasOwn(PAGES, resolved) && isPageAvailable(resolved) ? resolved : DEFAULT_ROUTE;
 }
 
 function useHashRoute(): [string, (id: string) => void] {
   const [route, setRoute] = useState(routeFromHash);
   useEffect(() => {
-    const onHashChange = () => setRoute(routeFromHash());
+    const onHashChange = () => {
+      const hash = window.location.hash;
+      // Canonicalize old shared links without adding a browser-history entry.
+      if (hash.split("?", 1)[0] === "#gw-analysis") {
+        window.history.replaceState(window.history.state, "", hash.replace("#gw-analysis", "#score-prediction"));
+      }
+      setRoute(routeFromHash());
+    };
     window.addEventListener("hashchange", onHashChange);
+    onHashChange();
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
   return [route, (id: string) => {

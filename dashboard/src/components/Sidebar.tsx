@@ -39,7 +39,7 @@ export interface PageDef {
 const PAGES: readonly PageDef[] = [
   { id: "summary", label: "Summary", icon: LayoutDashboard },
   { id: "news", label: "News", icon: Newspaper },
-  { id: "gw-analysis", label: "Score Prediction", icon: FileText },
+  { id: "score-prediction", label: "Score Prediction", icon: FileText },
   { id: "fixtures", label: "Fixture matrix", icon: CalendarDays },
   { id: "team-analytics", label: "Team analytics", icon: Goal },
   { id: "team-stat-sdp", label: "Team stat from SDP", icon: Goal },

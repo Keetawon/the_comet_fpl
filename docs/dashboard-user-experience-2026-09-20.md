@@ -1,5 +1,15 @@
 # Player-facing dashboard refresh
 
+## Owner follow-up: canonical Score Prediction route (2026-09-20)
+
+The sidebar and Summary link now open `#score-prediction`. Existing `#gw-analysis`
+bookmarks resolve to the same page and replace the old fragment without adding a
+history entry. Query suffixes are preserved. This is a navigation-only change.
+
+The fixture cards also now show rounded goal averages above the smaller original
+decimal values in parentheses. A five-column desktop layout fits ten fixtures in
+two rows; narrow displays use fewer columns. Published forecast values are unchanged.
+
 ## Owner follow-up: whole-number goal summary (2026-09-20)
 
 The read-only shared text now formats the existing published goal averages as
