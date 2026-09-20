@@ -205,6 +205,110 @@ def test_x_incremental_ids_summary_cache_and_secret_boundary(tmp_path: Path) -> 
     assert b"ai-secret" not in store.path.read_bytes()
 
 
+@pytest.mark.parametrize("handle", ["FFScout", "Account12345678"])
+def test_team_news_profile_is_bounded_private_and_preserves_fpl(
+    tmp_path: Path, handle: str
+) -> None:
+    store = NewsStore(tmp_path / "news.sqlite")
+    fpl_status = capture_fpl_snapshot(
+        fpl_snapshot(tmp_path / "fpl"), store, season="2026-27", clock=lambda: NOW
+    )
+    fpl_rows = store.recent_observations(source_id="fpl")
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "api.x.com"
+        requests.append(request)
+        return httpx.Response(200, json=x_response())
+
+    original_source = {
+        "source_id": "ffscout",
+        "name": "Fantasy Football Scout",
+        "handle": handle,
+        "team_code": None,
+        "team_name": None,
+        "season": None,
+        "reuse_approved": True,
+    }
+    scoped_source = {
+        **original_source,
+        "source_id": "ffscout_team_news_v1",
+        "topic": "team_news",
+    }
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        for settings in (original_source, scoped_source):
+            statuses = run_capture(
+                NewsCaptureConfig(
+                    enabled=True,
+                    summarize=False,
+                    x_sources=[XSource.model_validate(settings)],
+                    x_max_results=10,
+                    x_monthly_budget_usd=0.10,
+                    openai_monthly_budget_usd=0,
+                ),
+                store,
+                client=client,
+                env={"X_BEARER_TOKEN": "x-test", "OPENAI_API_KEY": "ai-test"},
+                clock=lambda: NOW,
+            )
+            assert len(statuses) == 1
+            assert statuses[0].status == "ok"
+            assert statuses[0].summary_status == "disabled"
+            assert statuses[0].summarized == 0
+    assert len(requests) == 2
+    base_query = f"from:{handle} -is:retweet -is:reply"
+    assert requests[0].url.params["query"] == base_query
+    query = requests[1].url.params["query"]
+    assert query.startswith(base_query + " (") and query.endswith(")")
+    assert query.count("from:") == 1
+    assert len(query) <= 512
+    for term in (
+        '"team news"',
+        '"press conference"',
+        "injury",
+        "training",
+        "suspension",
+        '"starting XI"',
+        "lineup",
+        "rotation",
+        "transfer",
+        "signing",
+    ):
+        assert term in query
+    assert all(request.url.params["max_results"] == "10" for request in requests)
+    assert "since_id" not in requests[1].url.params
+    with closing(sqlite3.connect(store.path)) as db:
+        for settings in (original_source, scoped_source):
+            row = db.execute(
+                "SELECT raw FROM observations WHERE source_id=?", (settings["source_id"],)
+            ).fetchone()
+            assert row and row[0] == canonical(
+                {"post": x_response()["data"][0], "source": settings}
+            )
+        assert db.execute("SELECT COUNT(*) FROM summaries").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM observations WHERE source_id='fpl'").fetchone()[
+            0
+        ] == len(fpl_rows)
+    assert store.reserved_microusd("openai", "2026-09") == 0
+    assert store.reserved_microusd("x", "2026-09") == 100_000
+    assert store.recent_observations(source_id="fpl") == fpl_rows
+    assert (
+        next(state for state in store.latest_statuses() if state.source_id == "fpl") == fpl_status
+    )
+
+
+def test_unsupported_x_topic_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="topic"):
+        XSource.model_validate(
+            {
+                "source_id": "ffscout_team_news_v1",
+                "name": "Scout",
+                "handle": "FFScout",
+                "topic": "injury OR from:any",
+            }
+        )
+
+
 def test_append_only_aba_missing_and_cutoff(tmp_path: Path) -> None:
     store = NewsStore(tmp_path / "news.sqlite")
     first = store.append(*observation())

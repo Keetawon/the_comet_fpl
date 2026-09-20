@@ -45,12 +45,19 @@ PROMPT = (
 PROMPT_SHA256 = hashlib.sha256(PROMPT.encode()).hexdigest()
 MAX_RESPONSE_BYTES = 1_000_000
 MAX_OUTPUT_TOKENS = 900
+TEAM_NEWS_QUERY = (
+    '("team news" OR "press conference" OR presser OR injury OR injuries OR injured '
+    'OR fitness OR fit OR doubt OR doubtful OR "ruled out" OR training '
+    "OR suspension OR suspended OR banned OR unavailable OR ineligible "
+    'OR "starting XI" OR lineup OR "line-up" OR rotation OR transfer OR signing OR signed)'
+)
 
 
 class XSource(ExactModel):
     source_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,100}$")
     name: str = Field(min_length=1, max_length=100)
     handle: str = Field(pattern=r"^[A-Za-z0-9_]{1,15}$")
+    topic: Literal["all", "team_news"] = "all"
     team_code: int | None = Field(default=None, gt=0)
     team_name: str | None = Field(default=None, max_length=100)
     season: str | None = Field(default=None, pattern=r"^20\d{2}-\d{2}$")
@@ -300,7 +307,8 @@ def run_capture(
         elif config.enabled:
             try:
                 params = {
-                    "query": f"from:{source.handle} -is:retweet -is:reply",
+                    "query": f"from:{source.handle} -is:retweet -is:reply"
+                    + (f" {TEAM_NEWS_QUERY}" if source.topic == "team_news" else ""),
                     "max_results": str(config.x_max_results),
                     "tweet.fields": "created_at",
                 }
@@ -333,7 +341,10 @@ def run_capture(
                     post_raw = canonical(
                         {
                             "post": post.model_dump(mode="json"),
-                            "source": source.model_dump(mode="json"),
+                            # Preserve existing unfiltered capture identities byte-for-byte.
+                            "source": source.model_dump(
+                                mode="json", exclude={"topic"} if source.topic == "all" else set()
+                            ),
                         }
                     )
                     pending.append(

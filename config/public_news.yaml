@@ -5,7 +5,12 @@ summarize: true
 x_monthly_budget_usd: 3.0
 openai_monthly_budget_usd: 0.5
 x_max_results: 10
-# Add only selected accounts whose use has been reviewed. No broad X scraping.
-# Each entry needs source_id, name, handle, reuse_approved; optional exact
-# team_code + team_name and season. Never resolve a player mention by name.
-x_sources: []
+# Owner-selected X source only. Public reuse and automatic capture remain disabled.
+# A changed query topic must use a new source_id so an older cursor cannot skip news.
+# No --fpl-snapshot is needed: the owner does not want duplicate FPL news ingestion.
+x_sources:
+  - source_id: ffscout_team_news_v1
+    name: Fantasy Football Scout
+    handle: FFScout
+    topic: team_news
+    reuse_approved: false
