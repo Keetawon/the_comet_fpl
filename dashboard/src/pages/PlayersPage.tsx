@@ -744,11 +744,6 @@ export function PlayersPage() {
           its colour follows the selected source. GW columns are the pivot -- one per gameweek,
           two chips in a double gameweek.
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          The dense Players table omits the six overlapping P(≤/≥ threshold) columns. Use Player
-          analytics for the exact backend-published blank and haul probabilities; this table keeps
-          cumulative xP and observed stats readable.
-        </p>
       </div>
 
 

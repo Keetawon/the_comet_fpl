@@ -188,6 +188,7 @@ describe("FixtureMatrixPage", () => {
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);
     expect(await screen.findByRole("radio", { name: "All competitions" })).toBeChecked();
+    expect(screen.queryByRole("radio", { name: "Match previews" })).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Weekly" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "10 GWs" })).toBeChecked();
     await user.click(screen.getByRole("radio", { name: "5 GWs" }));

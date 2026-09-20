@@ -1,18 +1,20 @@
-// Summary landing page: what is interesting RIGHT NOW, derived client-side from the same
+// Summary landing page: a player-first overview from the same
 // read models the exploratory pages use (one SELECTED vintage -- the default architecture
-// an optimizer plan references). Sections: next gameweek, optimizer squad summaries,
-// availability watch (the reported injury/doubt overlay), players to watch (GW1 and
-// horizon xP), and teams to watch (schedule ease extremes with recent form and the next
+// an optimizer plan references). Sections: gameweek focus, availability,
+// availability watch (the reported injury/doubt overlay), top 15 next-GW players with
+// separate observed midweek context, and teams to watch (schedule ease with recent form and the next
 // fixtures). Every number links back to a page that exposes its primitives; headline EV
 // is never compared across architectures.
 
 import { useEffect, useMemo, useState } from "react";
+import { ArrowUpRight, CalendarDays, CircleAlert, Newspaper, Target, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
-import { Separator } from "@/components/ui/separator";
 import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { FixtureTicker } from "@/components/FixtureTicker";
 import { VintageSelect } from "@/components/VintageSelect";
+import { SummaryRestTable } from "@/components/SummaryRestTable";
+import { NewsFeed } from "@/components/NewsFeed";
 import {
   loadFixtureMatrix,
   loadNextGw,
@@ -28,7 +30,8 @@ import type {
 } from "@/data/types";
 import { currentAvailability, hasCurrentAvailabilityConcern } from "@/lib/availability";
 import { AvailabilityBadge } from "@/components/AvailabilityBadge";
-import { playerPrice, playerPriceTitle } from "@/lib/playerPrice";
+import { summaryNextGw, topNextPlayers } from "@/lib/summaryRest";
+import { rawPlayerGameweekXp } from "@/lib/userDraft";
 import { chipBucket, chipMetric } from "@/lib/fixtureChips";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import {
@@ -59,23 +62,6 @@ const fmt = (value: number | null | undefined, digits = 1) =>
 
 const price = (value: number | null) => (value == null ? "–" : `£${(value / 10).toFixed(1)}m`);
 
-/** GW1 (first-horizon-gameweek) xP for a player: both legs of a double gameweek count. */
-function gwXp(player: PlayerRecord, gw: number): number | null {
-  const values = player.fixtures
-    .filter((f) => f.gw === gw)
-    .map((f) => f.expected_points)
-    .filter((v): v is number => v != null);
-  return values.length ? values.reduce((a, b) => a + b, 0) : null;
-}
-
-function horizonXpSum(player: PlayerRecord, gwFrom: number, gwTo: number): number | null {
-  const values = player.fixtures
-    .filter((f) => f.gw >= gwFrom && f.gw <= gwTo)
-    .map((f) => f.expected_points)
-    .filter((v): v is number => v != null);
-  return values.length ? values.reduce((a, b) => a + b, 0) : null;
-}
-
 function savedCustomPlanId(): string | null {
   try {
     return window.localStorage.getItem("fpl-solved-plan");
@@ -94,30 +80,10 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-lg border bg-card p-3 ${className ?? ""}`}>
-      <p className="mb-2 text-xs font-medium text-muted-foreground">{title}</p>
+    <section className={`comet-glass min-w-0 rounded-2xl border p-4 sm:p-5 ${className ?? ""}`}>
+      <h2 className="mb-3 text-base font-semibold tracking-tight">{title}</h2>
       {children}
     </section>
-  );
-}
-
-function PlayerLine({ player, value, valueLabel }: { player: PlayerRecord; value: number | null; valueLabel?: string }) {
-  return (
-    <li className="flex items-center justify-between gap-2">
-      <span className="flex min-w-0 items-center gap-1.5">
-        <PlayerPhoto code={player.code} name={player.web_name} />
-        <span className="min-w-0 truncate">
-          <span className="font-medium">{player.web_name}</span>
-          <span className="ml-1 text-xs text-muted-foreground">
-            {player.position} · {player.team_short_name} ·{" "}
-            <span title={playerPriceTitle(player, "current")}>{price(playerPrice(player, "current"))}</span>
-          </span>
-        </span>
-      </span>
-      <span className="tabular-nums text-sm" title={valueLabel}>
-        {fmt(value)}
-      </span>
-    </li>
   );
 }
 
@@ -188,12 +154,12 @@ export function SummaryPage() {
     const opponentStrength = buildOpponentStrength(teams);
     const opponentIndexOf = (code: number) => opponentStrength.get(code)?.index ?? null;
 
+    const nextGw = summaryNextGw(state.summary, run);
     const withXp = players
-      .map((player) => ({ player, next: gwXp(player, gwFrom), horizon: horizonXpSum(player, gwFrom, gwTo) }))
-      .sort((a, b) => (b.next ?? -1) - (a.next ?? -1));
+      .map((player) => ({ player, next: nextGw === null ? null : rawPlayerGameweekXp(player, nextGw) }))
+      .sort((a, b) => (b.next ?? -Infinity) - (a.next ?? -Infinity) || a.player.code - b.player.code);
 
-    const topNext = withXp.slice(0, 5);
-    const topHorizon = [...withXp].sort((a, b) => (b.horizon ?? -1) - (a.horizon ?? -1)).slice(0, 5);
+    const topNext = topNextPlayers(players, nextGw);
     const flagged = withXp
       .filter(
         ({ player }) => hasCurrentAvailabilityConcern(player),
@@ -215,11 +181,11 @@ export function SummaryPage() {
     const easiest = teamEase.slice(0, 3);
     const hardest = [...teamEase].reverse().slice(0, 3);
 
-    return { run, players, teams, gwFrom, gwTo, opponentIndexOf, topNext, topHorizon, flagged, easiest, hardest };
+    return { run, players, teams, gwFrom, gwTo, nextGw, opponentIndexOf, topNext, flagged, easiest, hardest };
   }, [state, runId]);
 
   if (state.status === "loading") {
-    return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
+    return <p role="status" className="p-6 text-muted-foreground">Loading your gameweek overview…</p>;
   }
   if (state.status === "error") {
     return (
@@ -234,8 +200,7 @@ export function SummaryPage() {
       <div className="p-6">
         <h1 className="mb-2 text-lg font-semibold">Summary</h1>
         <p className="text-sm text-muted-foreground">
-          No recorded forecast runs in this export. Generate a vintage first (see
-          dashboard/README.md).
+          The gameweek overview is not available yet. Check back after the next update.
         </p>
       </div>
     );
@@ -250,57 +215,114 @@ export function SummaryPage() {
   const customPlan =
     customPlans.find((plan) => plan.optimizer_run_id === savedCustomId) ?? customPlans[0] ?? null;
   const visibleTopNext = view.topNext[0];
-  const visibleTopHorizon = view.topHorizon[0];
   const localInsightItems = [
     {
       id: "coverage.visible_scope",
       statement: `${view.players.length} players and ${view.teams.length} clubs are visible for GW${view.gwFrom} through GW${view.gwTo}.`,
     },
-    ...(visibleTopNext?.next == null ? [] : [{
+    ...(visibleTopNext?.xp == null ? [] : [{
       id: "rank.visible_next_xp",
-      statement: `${visibleTopNext.player.web_name} has the highest visible GW${view.gwFrom} xP at ${visibleTopNext.next.toFixed(3)}.`,
-    }]),
-    ...(visibleTopHorizon?.horizon == null ? [] : [{
-      id: "rank.visible_horizon_xp",
-      statement: `${visibleTopHorizon.player.web_name} has the highest visible GW${view.gwFrom}-${view.gwTo} xP total at ${visibleTopHorizon.horizon.toFixed(3)}.`,
+      statement: `${visibleTopNext.player.web_name} has the highest visible GW${view.nextGw} xP at ${visibleTopNext.xp.toFixed(3)}.`,
     }]),
   ];
   const summaryMatchesVisible = summary.latest_run?.run_id === view.run.run_id;
 
   return (
-    <div className="flex flex-col gap-4 p-4 lg:p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h1 className="text-lg font-semibold">Summary</h1>
-          <p className="text-xs text-muted-foreground">
-            {view.run.season} · GW{view.gwFrom}-{view.gwTo} · as of{" "}
-            {first?.as_of?.replace("T", " ").slice(0, 16)} UTC · {view.players.length} players ·{" "}
-            {view.teams.length} clubs
-          </p>
+    <div className="flex min-w-0 flex-col gap-6 p-4 lg:p-6">
+      <header className="comet-hero overflow-hidden rounded-2xl border p-5 text-foreground sm:p-7">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
+          <span className="rounded-full bg-secondary/70 px-3 py-1">THE COMET / MATCHWEEK BRIEFING</span>
+          <span>{view.run.season}</span>
         </div>
-        <VintageSelect options={vintageOptions(state.runs, state.plans)} value={runId ?? state.defaultRunId} onChange={setRunId} />
-      </div>
+        <div className="mt-5 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div className="max-w-xl">
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Summary</h1>
+            <p className="mt-2 text-base leading-relaxed text-muted-foreground">Your gameweek, at a glance. The players, team news and fixtures worth a closer look.</p>
+          </div>
+          <div className="shrink-0 border-l-2 border-primary pl-4">
+            <p className="text-xs font-medium text-muted-foreground">Forecast focus</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums">{view.nextGw === null ? "Not covered" : `GW${view.nextGw}`}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{view.players.length} players · {view.teams.length} clubs</p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
+          <p className="flex items-center gap-2"><CalendarDays className="size-4" aria-hidden="true" />{view.nextGw !== null && summary.next_gameweek?.first_kickoff
+            ? `First kickoff ${summary.next_gameweek.first_kickoff.replace("T", " ").slice(0, 16)} UTC`
+            : "Kickoff information unavailable"}</p>
+          <p>Forecast as of {first?.as_of?.replace("T", " ").slice(0, 16) ?? "unknown date"} UTC</p>
+          {view.nextGw !== null && summary.next_gameweek?.fixture_count != null && <p>{summary.next_gameweek.fixture_count} fixtures</p>}
+        </div>
+      </header>
 
+      <nav aria-label="Explore this gameweek" className="grid gap-3 sm:grid-cols-3">
+        {[
+          { href: "#players", title: "Find your next pick", text: "Compare points, price and availability", Icon: UsersRound, tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" },
+          { href: "#gw-analysis", title: "Score Prediction", text: "Match outlooks and a ready-to-share briefing", Icon: Target, tone: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200" },
+          { href: "#news", title: "Read the latest news", text: "Team updates, injuries and manager comments", Icon: Newspaper, tone: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200" },
+        ].map(({ href, title, text, Icon, tone }) => <a key={href} href={href} className="group flex min-h-24 items-center gap-3 rounded-2xl border bg-card p-4 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-4">
+          <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon className="size-5" aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{title}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{text}</span></span>
+          <ArrowUpRight className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" aria-hidden="true" />
+        </a>)}
+      </nav>
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        <Card title="Next gameweek">
-          {summary.next_gameweek ? (
-            <>
-              <p className="text-2xl font-semibold">GW{summary.next_gameweek.gw}</p>
-              <p className="text-xs text-muted-foreground">
-                first kickoff{" "}
-                {summary.next_gameweek.first_kickoff?.replace("T", " ").slice(0, 16)} UTC ·{" "}
-                {summary.next_gameweek.fixture_count ?? "–"} fixtures
-              </p>
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                Deadlines are not sourced in the export, so none is shown.
-              </p>
-            </>
+      <div className="grid gap-3">
+        <Card title="Availability watch">
+          <div className="mb-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">
+            <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <p>Check before picking. Latest FPL reports for up to eight flagged players{view.nextGw === null ? "" : `, ordered by GW${view.nextGw} xP`}. A flag does not change their predicted points.</p>
+          </div>
+          {view.flagged.length ? (
+            <ul className="grid gap-x-6 gap-y-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+              {view.flagged.map(({ player, next }) => (
+                <li key={player.code} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <PlayerPhoto code={player.code} name={player.web_name} />
+                      <span className="min-w-0 truncate">
+                        <span className="font-medium">{player.web_name}</span>
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          {player.team_short_name} · {player.position}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="tabular-nums text-xs text-muted-foreground" title="GW xP">
+                      {fmt(next)}
+                    </span>
+                  </div>
+                  <AvailabilityBadge player={player} details />
+                </li>
+              ))}
+            </ul>
           ) : (
-            <p className="text-xs text-muted-foreground">no scheduled fixtures</p>
+            <p className="text-xs text-muted-foreground">No flagged players in the published current FPL reports.</p>
           )}
+          {view.players.some((player) => currentAvailability(player) == null) && (
+            <p className="mt-2 text-xs text-muted-foreground">Current availability is unknown for players without a published FPL report; forecast status is retained separately.</p>
+          )}
+          <a href="#players" className="mt-3 inline-flex min-h-11 items-center text-xs font-medium underline underline-offset-4">Check all players and statuses <ArrowUpRight className="ml-1 size-3.5" aria-hidden="true" /></a>
         </Card>
 
+      </div>
+
+      <SummaryRestTable players={view.topNext} gw={view.nextGw} />
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Card title="A kinder run of fixtures">
+          <p className="mb-4 text-xs text-muted-foreground">Easiest published schedules · GW{view.gwFrom}–{view.gwTo}. Higher ease is better.</p>
+          <TeamWatchList teams={view.easiest} opponentIndexOf={view.opponentIndexOf} gwFrom={view.gwFrom} gwTo={view.gwTo} />
+        </Card>
+        <Card title="A tougher run ahead">
+          <p className="mb-4 text-xs text-muted-foreground">Hardest published schedules · GW{view.gwFrom}–{view.gwTo}. Compare the opponents before making a move.</p>
+          <TeamWatchList teams={view.hardest} opponentIndexOf={view.opponentIndexOf} gwFrom={view.gwFrom} gwTo={view.gwTo} />
+        </Card>
+      </div>
+
+      <NewsFeed compact />
+      {!hosted && <details className="rounded-2xl border bg-card p-4 sm:p-5">
+        <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-2">Your local plans</summary>
+        <p className="my-3 text-xs leading-relaxed text-muted-foreground">Saved planning scenarios, with their own forecast dates. These do not update when news changes.</p>
+        <div className="grid gap-3 lg:grid-cols-2">
         {officialPlans.map((plan) => {
           const week = plan.weeks[0];
           const squadXp = week.players.reduce((a, p) => a + (p.expected_points ?? 0), 0);
@@ -338,6 +360,7 @@ export function SummaryPage() {
               <p className="mt-1 text-[10px] text-muted-foreground">
                 {planDisplayLabel(plan)} · development-only · see the Next GW page
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">Plan as of {plan.as_of ? `${plan.as_of.replace("T", " ").slice(0, 16)} UTC` : "unknown date"}</p>
             </Card>
           );
         })}
@@ -364,6 +387,7 @@ export function SummaryPage() {
             <p className="mt-2 text-xs">
               This rule-specific scenario stays separate from the platform recommendation.
             </p>
+            <p className="mt-1 text-xs text-muted-foreground">Plan as of {customPlan.as_of ? `${customPlan.as_of.replace("T", " ").slice(0, 16)} UTC` : "unknown date"}</p>
             <a
               className="mt-2 inline-block text-xs font-medium text-primary"
               href={`#plan-builder?run=${encodeURIComponent(customPlan.optimizer_run_id)}`}
@@ -375,81 +399,27 @@ export function SummaryPage() {
         {!hosted && !officialPlans.length && (
           <Card title="Platform optimizer squads">
             <p className="text-xs text-muted-foreground">
-              none in this export — rebuild it with --optimizer-plan inputs
+              No saved platform plan in this update.
             </p>
           </Card>
         )}
-      </div>
+        </div>
+      </details>}
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        <Card title="Availability watch (latest FPL report)">
-          {view.flagged.length ? (
-            <ul className="space-y-1.5 text-sm">
-              {view.flagged.map(({ player, next }) => (
-                <li key={player.code} className="space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <PlayerPhoto code={player.code} name={player.web_name} />
-                      <span className="min-w-0 truncate">
-                        <span className="font-medium">{player.web_name}</span>
-                        <span className="ml-1 text-xs text-muted-foreground">
-                          {player.team_short_name} · {player.position}
-                        </span>
-                      </span>
-                    </span>
-                    <span className="tabular-nums text-xs text-muted-foreground" title="GW xP">
-                      {fmt(next)}
-                    </span>
-                  </div>
-                  <AvailabilityBadge player={player} details />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-muted-foreground">No flagged players in the published current FPL reports.</p>
-          )}
-          {view.players.some((player) => currentAvailability(player) == null) && (
-            <p className="mt-2 text-xs text-muted-foreground">Current availability is unknown for players without a published FPL report; forecast status is retained separately.</p>
-          )}
-          <p className="mt-2 text-[10px] text-muted-foreground">
-            FPL status, chance and news are reporting context at the displayed capture time.
-            They never change the stored forecast distribution or xP.
-          </p>
-        </Card>
-
-        <Card title={`Players to watch — GW${view.gwFrom} xP`}>
-          <ul className="space-y-1.5">
-            {view.topNext.map(({ player, next }) => (
-              <PlayerLine key={player.code} player={player} value={next} valueLabel={`GW${view.gwFrom} expected points`} />
-            ))}
-          </ul>
-        </Card>
-
-        <Card title={`Players to watch — GW${view.gwFrom}-${view.gwTo} xP`}>
-          <ul className="space-y-1.5">
-            {view.topHorizon.map(({ player, horizon }) => (
-              <PlayerLine key={player.code} player={player} value={horizon} valueLabel={`GW${view.gwFrom}-${view.gwTo} expected points`} />
-            ))}
-          </ul>
-        </Card>
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card title="Teams to watch — easiest schedules (overall ease, higher = easier)">
-          <TeamWatchList teams={view.easiest} opponentIndexOf={view.opponentIndexOf} gwFrom={view.gwFrom} gwTo={view.gwTo} />
-        </Card>
-        <Card title="Teams to watch — hardest schedules">
-          <TeamWatchList teams={view.hardest} opponentIndexOf={view.opponentIndexOf} gwFrom={view.gwFrom} gwTo={view.gwTo} />
-        </Card>
-      </div>
-
-      <Separator className="my-1" />
-      <p className="text-xs text-muted-foreground">
-        Headline numbers only — the Fixture matrix and Players pages expose the raw lambdas,
-        ease indices, and per-fixture xP behind every figure. Availability is a reported
-        overlay valid for the next gameweek, never folded into xP; EV is never compared across
-        architectures. Chips colour on opponent strength (green = weak opponent, red = strong).
-      </p>
+      <details className="rounded-2xl border bg-card p-4 sm:p-5">
+        <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-2">Data &amp; forecast details</summary>
+        <div className="mt-4 space-y-3 text-xs leading-relaxed text-muted-foreground">
+          <p>{view.run.season} · GW{view.gwFrom}-{view.gwTo} · forecast as of {first?.as_of?.replace("T", " ").slice(0, 16) ?? "unknown date"} UTC</p>
+          <VintageSelect options={vintageOptions(state.runs, state.plans)} value={runId ?? state.defaultRunId} onChange={setRunId} />
+          <p className="break-all">Forecast reference: {view.run.run_id}</p>
+          <p>xP means expected FPL points, not guaranteed points. Rankings use the selected forecast; the latest FPL availability and observed match information are shown separately.</p>
+          <p>Green fixture chips indicate weaker opponents; red indicates stronger opponents. Team form labels identify its season, match count and any provisional results.</p>
+          <p>Deadlines are not sourced in this export. The kickoff above is not an FPL deadline.</p>
+        </div>
+      </details>
+      <details className="rounded-2xl border bg-card p-4 sm:p-5">
+        <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-2">More about this overview</summary>
+        <div className="mt-4">
       <InsightSummaryPanel
         items={localInsightItems}
         caveats={[
@@ -469,6 +439,8 @@ export function SummaryPage() {
             : "AI explanation is unavailable because the visible vintage differs from summary.json.",
         }}
       />
+        </div>
+      </details>
     </div>
   );
 }
@@ -484,6 +456,7 @@ function TeamWatchList({
   gwFrom: number;
   gwTo: number;
 }) {
+  if (teams.length === 0) return <p className="text-sm text-muted-foreground">Fixture comparison unavailable for this forecast.</p>;
   return (
     <ul className="space-y-3">
       {teams.map(({ team, avgEase }) => {
@@ -491,11 +464,11 @@ function TeamWatchList({
         return (
           <li key={team.team_code}>
             <div className="flex items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-1.5">
+              <span className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <TeamBadge teamCode={team.team_code} shortName={team.short_name} />
                 <span className="font-medium">{team.team_name}</span>
                 {team.form && (
-                  <Badge variant="outline" className="text-[9px]">
+                  <Badge variant="outline" className="text-[11px]">
                     {team.form.source === "published_team_actuals" ? "Observed" : "Archived"} form {team.form.season} GW{team.form.as_at_gw}
                   </Badge>
                 )}

@@ -18,6 +18,29 @@ beforeEach(() => { vi.resetModules(); vi.stubEnv("VITE_PUBLIC_DATA_POINTER", poi
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("public data generation resolution", () => {
+  it("loads optional news from the already-pinned inventory even when the live pointer advances", async () => {
+    const news = { schema: "fpl.public-news", schema_version: 1, semantics: "reported_news_not_forecast", generated_at: "2026-09-19T12:00:00Z", demo: false, sources: [], stories: [] };
+    let livePointer = { ...pointer(), files: { ...pointer().files, "sdp/news_feed.json": { sha256: "d".repeat(64), size_bytes: 200 } } };
+    const fetcher = vi.fn(async (url: string) => ({ ok: true, json: async () => url === pointerUrl ? livePointer : news }));
+    vi.stubGlobal("fetch", fetcher);
+    const { resolveDataUrl } = await import("./publicData");
+    expect(await resolveDataUrl("data/players.json")).toContain(`/generations/${generation}/`);
+    livePointer = { ...livePointer, generation_sha256: "c".repeat(64), base_path: `generations/${"c".repeat(64)}` };
+    const { loadNewsFeed } = await import("./newsFeed");
+    expect(await loadNewsFeed()).toEqual(news);
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([pointerUrl, `https://data.thecometfpl.com/generations/${generation}/sdp/news_feed.json`]);
+  });
+
+  it("refuses optional news absent from the pinned inventory without a legacy or provider fallback", async () => {
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => pointer() }));
+    vi.stubGlobal("fetch", fetcher);
+    const { loadNewsFeed } = await import("./newsFeed");
+    await expect(loadNewsFeed()).rejects.toThrow("does not contain sdp/news_feed.json");
+    const { resolveDataUrl } = await import("./publicData");
+    expect(await resolveDataUrl("data/players.json")).toContain(`/generations/${generation}/`);
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(pointerUrl, expect.objectContaining({ redirect: "error" }));
+  });
+
   it("pins a single concurrent pointer read across data, SDP and publication status for this session", async () => {
     let livePointer = pointer();
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => livePointer }));

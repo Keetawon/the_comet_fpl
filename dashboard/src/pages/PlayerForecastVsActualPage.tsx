@@ -264,16 +264,18 @@ export function PlayerForecastVsActualPage() {
       </div>
       <PublicationStatus manifestHash={state.data.manifest?.content_sha256 ?? ""} />
 
-      <p
+      <div
         aria-label="Selected player forecast provenance"
         className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
       >
-        Viewing <span className="font-medium text-foreground">{accuracyRunRoleLabel(selectedRole)}</span>
-        {" · "}{accuracyComponentLabel(run.component_modes)}
+        <p>Viewing <span className="font-medium text-foreground">{accuracyRunRoleLabel(selectedRole)}</span>
         {" · "}as of {run.as_of ?? "unknown"}
         {" · "}{run.coverage.scored_rows} scored
-        {" · "}development-only monitoring
-      </p>
+        {" · "}development-only monitoring</p>
+        <details className="mt-2"><summary className="cursor-pointer">Forecast components</summary>
+          <p className="mt-1">{accuracyComponentLabel(run.component_modes)}</p>
+        </details>
+      </div>
 
       <section className="rounded-lg border bg-card p-4" aria-labelledby="player-coverage-heading">
         <h2 id="player-coverage-heading" className="text-sm font-semibold">Coverage and finality</h2>
@@ -354,9 +356,12 @@ export function PlayerForecastVsActualPage() {
 
       </details>
 
-      <p className="break-all text-xs text-muted-foreground">
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer">Forecast record and methodology</summary>
+        <p className="mt-2 break-all">
         Run {run.run_id} · as of {run.as_of ?? "unknown"} · created {run.created_at ?? "unknown"}. Cross-vintage differences diagnose calibration only; compare every vintage against its own attached outcomes.
-      </p>
+        </p>
+      </details>
       <InsightSummaryPanel
         items={insightFacts}
         caveats={insightCaveats}

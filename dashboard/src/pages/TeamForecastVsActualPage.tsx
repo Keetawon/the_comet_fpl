@@ -275,16 +275,18 @@ export function TeamForecastVsActualPage() {
       </div>
       <PublicationStatus manifestHash={state.data.manifest?.content_sha256 ?? ""} />
 
-      <p
+      <div
         aria-label="Selected team forecast provenance"
         className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
       >
-        Viewing <span className="font-medium text-foreground">{accuracyRunRoleLabel(selectedRole)}</span>
-        {" · "}{accuracyComponentLabel(run.component_modes)}
+        <p>Viewing <span className="font-medium text-foreground">{accuracyRunRoleLabel(selectedRole)}</span>
         {" · "}as of {run.as_of ?? "unknown"}
         {" · "}{run.coverage.scored_rows} scored
-        {" · "}development-only monitoring
-      </p>
+        {" · "}development-only monitoring</p>
+        <details className="mt-2"><summary className="cursor-pointer">Forecast components</summary>
+          <p className="mt-1">{accuracyComponentLabel(run.component_modes)}</p>
+        </details>
+      </div>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Team accuracy view">
         {(["attack", "defence", "clean_sheet"] as const).map((value) => <button key={value} type="button" aria-pressed={view === value} onClick={() => setView(value)} className={`rounded-md border px-3 py-1.5 text-sm ${view === value ? "bg-primary text-primary-foreground" : "bg-background"}`}>{value === "clean_sheet" ? "Clean sheet" : value[0].toUpperCase() + value.slice(1)}</button>)}
@@ -351,7 +353,7 @@ export function TeamForecastVsActualPage() {
 
       </details>
 
-      <p className="break-all text-xs text-muted-foreground">Run {run.run_id} · as of {run.as_of ?? "unknown"} · created {run.created_at ?? "unknown"}. Attack and defence CRPS were published from exact stored PMFs; defence uses the opponent’s recorded goals-for PMF, never a browser reconstruction from λ against.</p>
+      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Forecast record and methodology</summary><p className="mt-2 break-all">Run {run.run_id} · as of {run.as_of ?? "unknown"} · created {run.created_at ?? "unknown"}. Attack and defence CRPS were published from exact stored PMFs; defence uses the opponent’s recorded goals-for PMF, never a browser reconstruction from λ against.</p></details>
       <InsightSummaryPanel
         items={insightFacts}
         caveats={insightCaveats}
