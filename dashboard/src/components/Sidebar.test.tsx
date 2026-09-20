@@ -3,6 +3,27 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 
 describe("Sidebar", () => {
+  it("keeps collapsed icons accessible and supports the desktop toggle", () => {
+    const toggle = vi.fn();
+    render(<Sidebar active="players" onNavigate={vi.fn()} collapsed onToggleCollapse={toggle} />);
+    expect(screen.getByRole("navigation", { name: "Pages" })).toHaveAttribute("data-collapsed", "true");
+    const players = screen.getByRole("button", { name: "Players" });
+    expect(players).toHaveAttribute("title", "Players");
+    expect(players).toHaveAttribute("aria-current", "page");
+    expect(players).not.toHaveTextContent("Players");
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    expect(toggle).toHaveBeenCalledOnce();
+  });
+
+  it("shows full labels in the mobile drawer without exposing hosted-only routes", () => {
+    vi.stubEnv("VITE_HOSTED_STATIC", "true");
+    render(<Sidebar active="summary" onNavigate={vi.fn()} variant="drawer" />);
+    expect(screen.getByRole("navigation", { name: "All pages" })).toHaveAttribute("data-variant", "drawer");
+    expect(screen.getByRole("button", { name: "Score Prediction" })).toHaveTextContent("Score Prediction");
+    expect(screen.queryByRole("button", { name: "Plan builder" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collapse sidebar" })).not.toBeInTheDocument();
+  });
+
   it("keeps GW Analysis separate from Fixture matrix", () => {
     const onNavigate = vi.fn();
     render(<Sidebar active="gw-analysis" onNavigate={onNavigate} />);

@@ -19,6 +19,16 @@ evidence-bound insight summaries. Its implementation and automated gates are com
 responsive in-browser visual verification remains pending where recorded in P2.5. No model default
 or frozen evaluation changed. P2.5 owns any later post-deadline work.
 
+## Responsive owner themes (2026-09-20, local only)
+
+Desktop navigation now collapses to an icon rail; mobile uses a dismissible drawer
+and bottom shortcuts with full-width content. The day/night controls share saved
+or system initialization and work on the first click. The owner's four background
+assets and cyan/navy glass styling are applied without changing data calculations,
+route restrictions or model outputs. Local browser and 741-test verification:
+`docs/dashboard-responsive-themes-2026-09-20.md`. No publication is authorized by
+this delivery.
+
 ## Match-preview development (owner correction, 2026-09-20)
 
 The standalone page is now **Score Prediction**, retaining `#gw-analysis` links.

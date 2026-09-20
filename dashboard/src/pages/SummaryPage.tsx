@@ -80,7 +80,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={`min-w-0 rounded-2xl border bg-card p-4 sm:p-5 ${className ?? ""}`}>
+    <section className={`comet-glass min-w-0 rounded-2xl border p-4 sm:p-5 ${className ?? ""}`}>
       <h2 className="mb-3 text-base font-semibold tracking-tight">{title}</h2>
       {children}
     </section>
@@ -229,23 +229,23 @@ export function SummaryPage() {
 
   return (
     <div className="flex min-w-0 flex-col gap-6 p-4 lg:p-6">
-      <header className="overflow-hidden rounded-2xl bg-neutral-950 p-5 text-white sm:p-7">
-        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-neutral-300">
-          <span className="rounded-full bg-white/10 px-3 py-1">THE COMET / MATCHWEEK BRIEFING</span>
+      <header className="comet-hero overflow-hidden rounded-2xl border p-5 text-foreground sm:p-7">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
+          <span className="rounded-full bg-secondary/70 px-3 py-1">THE COMET / MATCHWEEK BRIEFING</span>
           <span>{view.run.season}</span>
         </div>
         <div className="mt-5 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div className="max-w-xl">
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Summary</h1>
-            <p className="mt-2 text-base leading-relaxed text-neutral-300">Your gameweek, at a glance. The players, team news and fixtures worth a closer look.</p>
+            <p className="mt-2 text-base leading-relaxed text-muted-foreground">Your gameweek, at a glance. The players, team news and fixtures worth a closer look.</p>
           </div>
-          <div className="shrink-0 border-l-2 border-amber-300 pl-4">
-            <p className="text-xs font-medium text-neutral-400">Forecast focus</p>
+          <div className="shrink-0 border-l-2 border-primary pl-4">
+            <p className="text-xs font-medium text-muted-foreground">Forecast focus</p>
             <p className="mt-1 text-3xl font-semibold tabular-nums">{view.nextGw === null ? "Not covered" : `GW${view.nextGw}`}</p>
-            <p className="mt-1 text-xs text-neutral-300">{view.players.length} players · {view.teams.length} clubs</p>
+            <p className="mt-1 text-xs text-muted-foreground">{view.players.length} players · {view.teams.length} clubs</p>
           </div>
         </div>
-        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/15 pt-4 text-xs text-neutral-300">
+        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
           <p className="flex items-center gap-2"><CalendarDays className="size-4" aria-hidden="true" />{view.nextGw !== null && summary.next_gameweek?.first_kickoff
             ? `First kickoff ${summary.next_gameweek.first_kickoff.replace("T", " ").slice(0, 16)} UTC`
             : "Kickoff information unavailable"}</p>

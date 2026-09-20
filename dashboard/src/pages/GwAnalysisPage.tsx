@@ -45,7 +45,7 @@ function ShareBriefing({ text, language }: { text: string; language: Language })
       if (current === version.current) setFeedback(error instanceof Error ? error.message : "Sharing is unavailable. Download the text instead.");
     } finally { if (current === version.current) setBusy(false); }
   };
-  return <section id="matchweek-analysis" aria-labelledby="analysis-heading" className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+  return <section id="matchweek-analysis" aria-labelledby="analysis-heading" className="comet-glass overflow-hidden rounded-2xl border shadow-sm">
     <div className="border-b p-5 sm:p-6">
       <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground"><MessageSquareText className="size-4" aria-hidden="true" />The Comet briefing</div>
       <h2 id="analysis-heading" className="text-xl font-semibold tracking-tight">{language === "th" ? "บทสรุปพร้อมแชร์" : "Your matchweek, in words"}</h2>
@@ -68,7 +68,7 @@ function ShareBriefing({ text, language }: { text: string; language: Language })
 }
 
 function MatchOutlook({ match }: { match: MatchPreview }) {
-  return <article aria-label={`${match.home.team.team_name} v ${match.away.team.team_name}`} className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+  return <article aria-label={`${match.home.team.team_name} v ${match.away.team.team_name}`} className="comet-glass rounded-2xl border p-4 shadow-sm sm:p-5">
     <div className="mb-5 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span className="font-medium">GW{match.gw}</span><time dateTime={match.kickoff_time ?? undefined}>{match.kickoff_time ? utc(match.kickoff_time) : "Kickoff to be confirmed"}</time></div>
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
       {[match.home, match.away].map((side, index) => <div key={side.team.team_code} className={index === 0 ? "col-start-1 row-start-1 min-w-0" : "col-start-3 row-start-1 min-w-0 text-right"}>
@@ -119,12 +119,12 @@ export function GwAnalysisPage() {
   const defence = [...sides].filter(side => side.forecast.probability_clean_sheet !== null).sort((a, b) => b.forecast.probability_clean_sheet! - a.forecast.probability_clean_sheet!)[0];
 
   return <div className="mx-auto w-full max-w-7xl space-y-6 p-4 pb-12 lg:p-6">
-    <header className="relative overflow-hidden rounded-2xl bg-neutral-950 p-6 text-white sm:p-8">
+    <header className="comet-hero relative overflow-hidden rounded-2xl border p-5 text-foreground sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-5">
-        <div className="max-w-xl"><p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">The Comet · matchweek outlook</p><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Score Prediction</h1><p className="mt-3 text-sm leading-relaxed text-neutral-300">The games, the goal outlook, and a take you can share. A little context before you pick your XI.</p></div>
-        {selectedGw != null && <div className="rounded-xl border border-white/20 px-5 py-3"><p className="text-xs text-neutral-400">{selectedSeason}</p><p className="mt-1 text-3xl font-semibold tracking-tight">GW{selectedGw}</p></div>}
+        <div className="max-w-xl"><p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-sidebar-accent-foreground">The Comet · matchweek outlook</p><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Score Prediction</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">The games, the goal outlook, and a take you can share. A little context before you pick your XI.</p></div>
+        {selectedGw != null && <div className="rounded-xl border border-border px-5 py-3"><p className="text-xs text-muted-foreground">{selectedSeason}</p><p className="mt-1 text-3xl font-semibold tracking-tight">GW{selectedGw}</p></div>}
       </div>
-      <a href="#matchweek-analysis" onClick={event => { event.preventDefault(); document.getElementById("matchweek-analysis")?.scrollIntoView({ block: "start" }); }} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-white/10 px-4 text-sm font-medium hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2">Read & share the briefing<ArrowDown className="size-4" aria-hidden="true" /></a>
+      <a href="#matchweek-analysis" onClick={event => { event.preventDefault(); document.getElementById("matchweek-analysis")?.scrollIntoView({ block: "start" }); }} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-secondary/70 px-4 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2">Read & share the briefing<ArrowDown className="size-4" aria-hidden="true" /></a>
     </header>
     {selectedRun?.startsWith("DEMO-") && <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">DEMO · Synthetic preview data. These are not current football forecasts.</p>}
     {state.status === "loading" ? <p role="status" className="rounded-xl border p-6 text-sm text-muted-foreground">Loading the matchweek outlook…</p> : state.status === "unavailable" ? <div role="status" className="rounded-xl border border-dashed p-6"><h2 className="font-semibold">This matchweek is not available yet</h2><p className="mt-2 text-sm text-muted-foreground">The forecast could not be loaded. Please try again later.</p></div> : <>

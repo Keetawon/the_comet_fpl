@@ -49,72 +49,90 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    color-scheme: light;
+    --background: #edf7ff;
+    --foreground: #071b4a;
+    --card: #f8fcff;
+    --card-foreground: #071b4a;
+    --popover: #f8fcff;
+    --popover-foreground: #071b4a;
+    --primary: #00bfe9;
+    --primary-text: #00658a;
+    --primary-foreground: #04233c;
+    --secondary: #dff3ff;
+    --secondary-foreground: #123969;
+    --muted: #e3effa;
+    --muted-foreground: #3b567b;
+    --accent: #d2f2ff;
+    --accent-foreground: #063153;
+    --destructive: #b42336;
+    --border: #a7d3ec;
+    --input: #81bddf;
+    --ring: #007cac;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: #f1faff;
+    --sidebar-foreground: #102c59;
+    --sidebar-primary: #00bfe9;
+    --sidebar-primary-foreground: #04233c;
+    --sidebar-accent: #c7f0ff;
+    --sidebar-accent-foreground: #005478;
+    --sidebar-border: #a7d3ec;
+    --sidebar-ring: #007cac;
+    --comet-glass: rgb(248 252 255 / 91%);
+    --comet-navigation: rgb(244 251 255 / 94%);
+    --comet-veil: rgb(231 245 255 / 16%);
+    --comet-shadow: 0 4px 24px rgb(21 88 136 / 9%);
+    --comet-hero: linear-gradient(120deg, rgb(246 252 255 / 94%), rgb(212 242 255 / 89%));
+    --comet-desktop-art: url('/images/backgrounds/background-desktop-day.png');
+    --comet-mobile-art: url('/images/backgrounds/background-mobile-day.png');
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    color-scheme: dark;
+    --background: #020e20;
+    --foreground: #f3f8ff;
+    --card: #061b31;
+    --card-foreground: #f3f8ff;
+    --popover: #09233d;
+    --popover-foreground: #f3f8ff;
+    --primary: #0bc9f0;
+    --primary-text: #67e6ff;
+    --primary-foreground: #001c30;
+    --secondary: #123551;
+    --secondary-foreground: #cceeff;
+    --muted: #112d47;
+    --muted-foreground: #b0cbea;
+    --accent: #0c3a58;
+    --accent-foreground: #a7edff;
+    --destructive: #ff8798;
+    --border: #235779;
+    --input: #36769c;
+    --ring: #36d5ff;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --sidebar: #04162b;
+    --sidebar-foreground: #c6dffa;
+    --sidebar-primary: #0bc9f0;
+    --sidebar-primary-foreground: #001c30;
+    --sidebar-accent: #083551;
+    --sidebar-accent-foreground: #67e6ff;
+    --sidebar-border: #235779;
+    --sidebar-ring: #36d5ff;
+    --comet-glass: rgb(3 25 45 / 91%);
+    --comet-navigation: rgb(2 18 36 / 95%);
+    --comet-veil: rgb(0 9 23 / 16%);
+    --comet-shadow: 0 4px 28px rgb(0 7 20 / 28%);
+    --comet-hero: linear-gradient(120deg, rgb(3 21 42 / 94%), rgb(5 48 76 / 89%));
+    --comet-desktop-art: url('/images/backgrounds/background-desktop-dark.png');
+    --comet-mobile-art: url('/images/backgrounds/background-mobile-dark.png');
 }
 
 @layer base {
@@ -127,4 +145,84 @@
   html {
     @apply font-sans;
     }
+  button:not(:disabled), summary, select {
+    cursor: pointer;
+  }
+  select option {
+    background: var(--popover);
+    color: var(--popover-foreground);
+  }
+}
+
+/* Owner artwork is decorative; numeric cards, plot halos and capture backgrounds
+   keep opaque semantic tokens. Only deliberately selected panels use glass. */
+.comet-shell {
+  position: relative;
+  isolation: isolate;
+}
+.comet-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(var(--comet-veil), var(--comet-veil)), var(--comet-desktop-art);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.comet-glass, .comet-hero {
+  background: var(--comet-glass);
+  box-shadow: var(--comet-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.comet-hero { background: var(--comet-hero); }
+/* Cyan fills keep navy labels; small links need a darker ink in daylight. */
+.text-primary { color: var(--primary-text); }
+.comet-topbar, .comet-sidebar, .comet-bottom-nav, .comet-mobile-drawer {
+  background: var(--comet-navigation);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--comet-shadow);
+}
+.comet-topbar {
+  margin: 12px 24px 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.comet-brand-mark {
+  color: var(--primary);
+  filter: drop-shadow(0 0 5px rgb(0 192 255 / 35%));
+}
+.comet-sidebar [aria-current="page"] {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.comet-sidebar { border-right: 1px solid var(--sidebar-border); }
+.comet-nav-toggle:hover, .comet-bottom-item:hover { background: var(--sidebar-accent); }
+.comet-nav-toggle:focus-visible, .comet-nav-item:focus-visible, .comet-bottom-item:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.comet-bottom-nav [aria-current="page"] {
+  color: var(--sidebar-accent-foreground);
+  background: var(--sidebar-accent);
+}
+.comet-shell main table { background-color: var(--card); }
+.comet-shell main table thead { background-color: var(--muted); }
+.comet-news-topics { scrollbar-width: thin; }
+@media (max-width: 767px) {
+  .comet-shell::before { background-image: linear-gradient(var(--comet-veil), var(--comet-veil)), var(--comet-mobile-art); }
+  .comet-topbar { margin: 0; border-radius: 0; border-width: 0 0 1px; padding-top: max(8px, env(safe-area-inset-top)); }
+  .comet-bottom-nav { border: 1px solid var(--border); border-bottom: 0; border-radius: 22px 22px 0 0; padding-bottom: env(safe-area-inset-bottom); overflow: hidden; }
+  .comet-mobile-drawer { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  .comet-news-topics { scroll-snap-type: x proximity; }
+  .comet-news-topics > button { scroll-snap-align: start; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .comet-glass, .comet-hero { background: var(--card); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .comet-topbar, .comet-sidebar, .comet-bottom-nav, .comet-mobile-drawer { background: var(--sidebar); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .comet-shell *, .comet-mobile-drawer * { scroll-behavior: auto; transition-duration: 0.01ms; animation-duration: 0.01ms; }
 }
