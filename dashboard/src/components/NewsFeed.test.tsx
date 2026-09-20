@@ -59,6 +59,39 @@ describe("published News feed", () => {
     expect(screen.getByRole("link", { name: "View all news" })).toHaveAttribute("href", "#news?lang=en");
     expect(mockLoad).toHaveBeenCalledTimes(1);
   });
+  it("keeps the Summary reading list lean while linking to the attributed full stories", async () => {
+    render(<NewsFeed compact />); await screen.findByRole("heading", { name: "Update 4" });
+    const cards = screen.getAllByRole("article");
+    expect(within(cards[0]).getByRole("heading")).toHaveTextContent("Update 4");
+    expect(within(cards[0]).getByRole("link", { name: "Update 4" })).toHaveAttribute("href", `#news?story=${"4".repeat(64)}&lang=en`);
+    expect(within(cards[0]).getByText(/FPL news updated/)).toBeInTheDocument();
+    expect(within(cards[0]).queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/gpt-test/)).not.toBeInTheDocument();
+  });
+  it("synchronizes club shortcuts, topic counts and the search without inferring importance", async () => {
+    render(<NewsFeed />); await screen.findByRole("heading", { name: "Update 1" });
+    expect(screen.getByText("Newest captured first")).toBeInTheDocument();
+    expect(screen.getAllByRole("article")[0]).toHaveAccessibleName("Update 4");
+    fireEvent.click(screen.getByRole("button", { name: "Arsenal" }));
+    expect(screen.getByRole("combobox", { name: "Club" })).toHaveValue("3");
+    expect(screen.getByRole("button", { name: "Injury" })).toHaveTextContent("Injury2");
+    expect(screen.getByRole("button", { name: "Transfer" })).toHaveTextContent("Transfer0");
+    expect(screen.getByText("Showing 3 / 4 stories")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Search news" }), { target: { value: "Press briefing" } });
+    expect(screen.getByText("Showing 1 / 4 stories")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+    expect(screen.getByRole("button", { name: "Arsenal" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Showing 4 / 4 stories")).toBeInTheDocument();
+  });
+  it("keeps provider setup and model names behind closed details, while news dates stay visible", async () => {
+    render(<NewsFeed />); await screen.findByRole("heading", { name: "Update 1" });
+    const setup = screen.getByText(/X sources · Not connected/);
+    expect(setup.closest("details")).not.toHaveAttribute("open");
+    expect(setup).not.toBeVisible();
+    for (const model of screen.getAllByText(/gpt-test/)) expect(model).not.toBeVisible();
+    expect(screen.getAllByText(/FPL news updated/)[0]).toBeVisible();
+    expect(screen.getAllByText("AI summary")[0]).toBeVisible();
+  });
   it("loads the Thai shared story and highlights its card", async () => {
     window.history.replaceState(null, "", `#news?story=${"2".repeat(64)}&lang=th`);
     render(<NewsFeed />); const title = await screen.findByRole("heading", { name: "ข่าว 2" });

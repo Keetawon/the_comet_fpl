@@ -123,7 +123,7 @@ describe("SummaryPage", () => {
   it("shows next GW, optimizer squad summaries, availability watch, and watchlists", async () => {
     render(<SummaryPage />);
     await waitFor(() => expect(screen.getByText(/2026-27 · GW1-3/)).toBeInTheDocument());
-    expect(screen.getByText(/first kickoff 2026-08-22 11:30 UTC/)).toBeInTheDocument();
+    expect(screen.getByText(/First kickoff 2026-08-22 11:30 UTC/)).toBeInTheDocument();
     expect(screen.getByText(/Deadlines are not sourced/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     // one platform card per formal plan, labelled by product role, never comparing EV
@@ -135,9 +135,9 @@ describe("SummaryPage", () => {
     expect(screen.getByText(/Current availability is unknown/)).toBeInTheDocument();
     expect(screen.queryByText(/doubtful 75%/)).not.toBeInTheDocument();
     // player and team watchlists derive from the selected vintage
-    expect(screen.getAllByText(/Players to watch/).length).toBe(2);
-    expect(screen.getByText(/easiest schedules/)).toBeInTheDocument();
-    expect(screen.getByText(/hardest schedules/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Top 15 players · GW1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "A kinder run of fixtures" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "A tougher run ahead" })).toBeInTheDocument();
   });
 
   it("separates a saved custom plan from the formal platform cards", async () => {

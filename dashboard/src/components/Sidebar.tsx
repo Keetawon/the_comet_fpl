@@ -29,7 +29,7 @@ export interface PageDef {
 const PAGES: readonly PageDef[] = [
   { id: "summary", label: "Summary", icon: LayoutDashboard },
   { id: "news", label: "News", icon: Newspaper },
-  { id: "gw-analysis", label: "GW Analysis", icon: FileText },
+  { id: "gw-analysis", label: "Score Prediction", icon: FileText },
   { id: "fixtures", label: "Fixture matrix", icon: CalendarDays },
   { id: "team-analytics", label: "Team analytics", icon: Goal },
   { id: "team-stat-sdp", label: "Team stat from SDP", icon: Goal },
@@ -90,8 +90,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
         <SupportButton />
       </div>
       <p className="hidden px-4 py-3 text-[10px] leading-snug text-muted-foreground md:block">
-        Reads only the static JSON read models exported by the publish layer. It never
-        queries DuckDB.
+        Independent FPL insights. Your team, your call.
       </p>
     </nav>
   );

@@ -19,21 +19,22 @@ evidence-bound insight summaries. Its implementation and automated gates are com
 responsive in-browser visual verification remains pending where recorded in P2.5. No model default
 or frozen evaluation changed. P2.5 owns any later post-deadline work.
 
-## Match-preview development (owner request, 2026-09-19)
+## Match-preview development (owner correction, 2026-09-20)
 
-The owner corrected the first R3-A interface: **GW Analysis** is now a standalone
-social-text page, leaving Fixture Matrix and All competitions unchanged. It
-composes an attributed Thai/English draft from the selected published forecast and
-earlier-GW observed SDP evidence, with copy/share/text-download actions. Optional
-owner edits remain a separate in-memory editorial draft with an actual edit time
-and required reason, plus explicit owner review before sharing. Text/reason edits
-revoke review. Editorial scoreline opinions stay labelled separately from model
-values. The shared draft carries that disclosure; no model or
-publication data is edited. Automatic scoreline picks and winner-confidence
-claims are not invented from expected-goal means. AI editorial generation and
-R3-B remain unimplemented. Work remains local, with no provider activation or
-publication. See `docs/gw-analysis-social-draft-2026-09-19.md`; the superseded first
-UI is recorded in `docs/match-previews-development-2026-09-19.md`.
+The standalone page is now **Score Prediction**, retaining `#gw-analysis` links.
+The owner removed on-page editorial editing: its Thai/English briefing is read-only,
+with copy/share/text download; readers edit their own copy in another app. Fixture
+Matrix and All competitions remain separate. Match cards display already-published
+goal averages and team clean-sheet probabilities, never invented integer picks or
+winner confidence. No approved exact-score article or AI editorial generator is
+connected yet. R3-B remains unimplemented. Summary prioritizes availability, the
+unchanged Top 15 next-GW players, fixtures and latest news; News adds readable topic
+and club browsing. Model identifiers and long technical explanations sit in details
+while source dates, coverage and essential limits remain visible. Work remains
+local, with no provider activation, model change or publication. Current delivery:
+`docs/dashboard-user-experience-2026-09-20.md`. Earlier UI records remain unchanged:
+`docs/gw-analysis-social-draft-2026-09-19.md` and
+`docs/match-previews-development-2026-09-19.md`.
 
 ## Public news development (owner request, 2026-09-19)
 

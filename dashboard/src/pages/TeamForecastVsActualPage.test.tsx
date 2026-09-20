@@ -101,7 +101,11 @@ describe("TeamForecastVsActualPage", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Selected team forecast provenance")).toHaveTextContent(
-      /Prospective default .* goals v3 .* assists coupled .* appearance seasonal/,
+      "Prospective default",
+    );
+    expect(screen.getByText("Forecast components").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByLabelText("Selected team forecast provenance")).toHaveTextContent(
+      /goals v3 .* assists coupled .* appearance seasonal/,
     );
 
     fireEvent.change(screen.getByLabelText("Completed team gameweek"), {
@@ -112,7 +116,10 @@ describe("TeamForecastVsActualPage", () => {
     });
     expect(screen.getByLabelText("Completed team gameweek")).toHaveValue("all");
     expect(screen.getByLabelText("Selected team forecast provenance")).toHaveTextContent(
-      /Diagnostic comparator .* goals v1 .* assists v1 .* appearance seasonal/,
+      "Diagnostic comparator",
+    );
+    expect(screen.getByLabelText("Selected team forecast provenance")).toHaveTextContent(
+      /goals v1 .* assists v1 .* appearance seasonal/,
     );
   });
 

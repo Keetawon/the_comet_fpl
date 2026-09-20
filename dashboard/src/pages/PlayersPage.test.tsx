@@ -407,7 +407,7 @@ describe("PlayersPage", () => {
     for (const name of ["P(≤2)", "P(≥2)", "P(≥4)", "P(≥6)", "P(≥10)", "P(≥15)"]) {
       expect(screen.queryByRole("columnheader", { name })).not.toBeInTheDocument();
     }
-    expect(screen.getByText(/dense Players table omits the six overlapping/i)).toBeInTheDocument();
+    expect(screen.queryByText(/dense Players table omits the six overlapping/i)).not.toBeInTheDocument();
     // availability is labelled as the official overlay, never as "starts"
     expect(screen.getAllByText(/doubtful/).length).toBeGreaterThan(0);
     expect(
@@ -870,7 +870,7 @@ describe("PlayersPage", () => {
     expect(screen.getByLabelText("Public squad source")).toHaveTextContent("2026-27 GW4. Next planning GW5");
     expect(screen.getByLabelText("Public squad source")).toHaveTextContent("Free Hit squad is temporary");
     expect(screen.getByLabelText("Public squad source")).toHaveTextContent("Transfers not yet public are excluded");
-    expect(screen.getByRole("button", { name: "Explain with AI" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Explain with AI" })).not.toBeInTheDocument();
     expect(window.localStorage.getItem("fpl-manager-id")).toBe("999999");
     expect(window.location.href).not.toContain("13768");
     expect(JSON.stringify(players)).toBe(before);
@@ -2006,7 +2006,7 @@ describe("PlayersPage", () => {
     await user.click(within(view).getByRole("radio", { name: "Defense" }));
     await user.click(within(venue).getByRole("radio", { name: "Away" }));
     expect(screen.queryByRole("columnheader", { name: "P(≥6)" })).not.toBeInTheDocument();
-    expect(screen.getByText(/dense Players table omits the six overlapping/i)).toBeInTheDocument();
+    expect(screen.queryByText(/dense Players table omits the six overlapping/i)).not.toBeInTheDocument();
     await user.click(availability);
     await user.click(screen.getByRole("checkbox", { name: "Doubtful" }));
     await user.click(screen.getByRole("checkbox", { name: "Injured" }));

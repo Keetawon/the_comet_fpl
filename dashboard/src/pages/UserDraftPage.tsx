@@ -1066,21 +1066,24 @@ export function UserDraftPage() {
         <div className="max-w-3xl">
           <h1 className="text-lg font-semibold">Squad Draft</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Build a manual what-if squad from the current published forecast.
-            {!hostedStatic && " An optimizer handoff starts from that run's optimized first-week squad; you can then edit it freely."} Position
-            quotas and the maximum-per-club rule are enforced; cost is shown but never blocks an
-            experimental draft. Nothing here re-runs or replaces the optimizer.
+            Build a what-if squad and compare its published expected points.
+            Position and club limits apply; the displayed cost is advisory.
           </p>
         </div>
         <div className="text-right text-xs text-muted-foreground">
           <p>{state.forecast.season} · GW{state.loadedGws[0]}–GW{state.loadedGws.at(-1)}</p>
-          <p title={state.forecast.run_id}>
-            Forecast {state.forecast.run_id.slice(0, 12)}…
-            {" · "}as of {state.forecast.as_of?.replace("T", " ").slice(0, 16) ?? "unavailable"} UTC
+          <p>
+            Forecast as of {state.forecast.as_of?.replace("T", " ").slice(0, 16) ?? "unavailable"} UTC
           </p>
-          <p title={`Rules from optimizer ${state.plan.optimizer_run_id}`}>
-            Squad rules: {state.plan.display_label} · {state.auditPlan.rules_snapshot.season}
-          </p>
+          <details className="mt-2 max-w-sm">
+            <summary className="cursor-pointer">Draft rules and forecast record</summary>
+            <div className="mt-2 space-y-1 break-words">
+              <p>Forecast {state.forecast.run_id}</p>
+              <p>Squad rules: {state.plan.display_label} · {state.auditPlan.rules_snapshot.season}</p>
+              <p>Cost is shown but never blocks an experimental draft. Nothing here re-runs or replaces the optimizer.</p>
+              {!hostedStatic && <p>An optimizer handoff starts from that run's optimized first-week squad; you can then edit it freely.</p>}
+            </div>
+          </details>
         </div>
       </div>
 

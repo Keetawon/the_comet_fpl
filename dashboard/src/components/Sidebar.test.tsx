@@ -6,7 +6,7 @@ describe("Sidebar", () => {
   it("keeps GW Analysis separate from Fixture matrix", () => {
     const onNavigate = vi.fn();
     render(<Sidebar active="gw-analysis" onNavigate={onNavigate} />);
-    expect(screen.getByRole("button", { name: "GW Analysis" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Score Prediction" })).toHaveAttribute("aria-current", "page");
     fireEvent.click(screen.getByRole("button", { name: "Fixture matrix" }));
     expect(onNavigate).toHaveBeenCalledWith("fixtures");
   });

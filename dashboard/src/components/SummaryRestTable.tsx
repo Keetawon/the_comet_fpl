@@ -21,18 +21,25 @@ export function SummaryRestTable({ players, gw }: { players: RankedNextPlayer[];
   }, []);
   const report = state.status === "ready" ? state.data : null;
 
-  return <section className="min-w-0 overflow-hidden rounded-xl border bg-card" aria-labelledby="summary-next-players">
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b p-4">
+  return <section className="min-w-0 overflow-hidden rounded-2xl border bg-card" aria-labelledby="summary-next-players">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b p-4 sm:p-5">
       <div>
         <h2 id="summary-next-players" className="flex items-center gap-2 text-base font-semibold"><Clock3 className="size-4 text-muted-foreground" aria-hidden="true" />Top 15 players{gw === null ? " · next GW" : ` · GW${gw}`}</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Ranked by published raw xP for this GW only. Midweek context does not change the ranking or forecast.</p>
+        <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">Expected points for one gameweek, with availability flags and recent club football alongside. Check both before making your pick.</p>
       </div>
-      <a href="#players" className="text-xs font-medium underline underline-offset-4">View all players</a>
+      <a href="#players" className="inline-flex min-h-11 items-center text-xs font-medium underline underline-offset-4 focus-visible:outline-2">View all players</a>
     </div>
     <div className="space-y-1 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-      {report ? <p>Rest evidence as of <span className="font-medium text-foreground">{utcTime(report.as_of)} UTC</span> · previous {report.window_hours} hours · midweek: Mon–Thu UTC.</p>
-        : <p role="status">{state.status === "loading" ? "Loading published rest evidence…" : "Rest evidence unavailable in this published generation. The xP ranking is still usable."}</p>}
-      <p>Club participation only; national-team call-ups are not captured. Gaps are kickoff-to-kickoff, not verified recovery or fitness.</p>
+      {report ? <p>Club football updated <span className="font-medium text-foreground">{utcTime(report.as_of)} UTC</span></p>
+        : <p role="status">{state.status === "loading" ? "Loading club football updates…" : "Rest evidence unavailable. Expected points are still shown; unknown does not mean rested."}</p>}
+      <details className="pt-1">
+        <summary className="cursor-pointer py-1 font-medium focus-visible:outline-2">About points &amp; rest</summary>
+        <div className="space-y-1 py-2 leading-relaxed">
+          <p>Ranked by published raw xP for this GW only. Midweek context does not change the ranking or forecast.</p>
+          {report && <p>Previous {report.window_hours} hours · midweek: Mon–Thu UTC.</p>}
+          <p>Club participation only; national-team call-ups are not captured. Gaps are kickoff-to-kickoff, not verified recovery or fitness.</p>
+        </div>
+      </details>
     </div>
     {gw === null || players.length === 0 ? <p className="p-4 text-sm text-muted-foreground">
       {gw === null ? "The published next GW is not covered by the selected forecast. Select a current vintage to see this ranking." : "No players with complete published xP for this GW."}

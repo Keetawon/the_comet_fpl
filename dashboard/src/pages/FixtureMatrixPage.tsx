@@ -975,18 +975,22 @@ export function FixtureMatrixPage() {
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Form uses up to the selected number of ended matches in {runBounds.season},
-          including explicitly provisional results. It never fills a short current season
-          with older-season matches. Match counts and source coverage are shown per club.
-          This observed context updates independently of the frozen forecast.
+          including marked provisional results. Shorter histories stay shorter.
+          Current form and forecast dates are separate.
         </p>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <details className="mt-2 text-xs text-muted-foreground">
+          <summary className="cursor-pointer">About form and match history</summary>
+          <p className="mt-2">
+          Match counts and source coverage are shown per club. Form never fills a short current
+          season with older-season matches and updates independently of the frozen forecast.
           Expanded rows default to a shared rolling window of the latest five ended gameweeks.
           At a season boundary it continues into the immediately preceding season; the season
           options isolate either season. Double-gameweek legs stay separate, and clubs are never
           individually backfilled outside the shared window. xG, xGC, BPS, and DC are source-row
           aggregates; unavailable evidence is shown as –. Possession and shots are unavailable in
           the approved published sources, so no proxy is shown.
-        </p>
+          </p>
+        </details>
         {actualScopeIncludesProvisional && (
           <p
             role="status"

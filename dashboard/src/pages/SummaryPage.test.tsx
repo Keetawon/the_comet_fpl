@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { SummaryPage } from "./SummaryPage";
 
@@ -27,6 +28,7 @@ vi.mock("@/data/load", () => load);
 vi.mock("@/data/restSummary", () => ({ loadRestSummary: vi.fn().mockRejectedValue(new Error("Old generation without rest evidence")) }));
 // No insight request is part of this presentation test.
 vi.mock("@/components/InsightSummaryPanel", () => ({ InsightSummaryPanel: () => null }));
+vi.mock("@/components/NewsFeed", () => ({ NewsFeed: () => <p>Latest published news</p> }));
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -60,4 +62,31 @@ it("uses current FPL reports in the availability watch while retaining raw xP", 
   expect(screen.getByText("Unspecified injury")).toBeInTheDocument();
   expect(screen.getAllByText("4.5")).toHaveLength(2);
   expect(JSON.stringify(player)).toBe(before);
+});
+
+it("puts player decisions first and keeps forecast controls behind an accessible disclosure", async () => {
+  vi.stubEnv("VITE_HOSTED_STATIC", "true");
+  const user = userEvent.setup();
+  render(<SummaryPage />);
+  await screen.findByRole("heading", { name: "Summary" });
+  expect(screen.getByRole("link", { name: /Find your next pick/ })).toHaveAttribute("href", "#players");
+  expect(screen.getByRole("link", { name: /Score Prediction/ })).toHaveAttribute("href", "#gw-analysis");
+  expect(screen.getByRole("link", { name: /Read the latest news/ })).toHaveAttribute("href", "#news");
+  expect(screen.getByText(/Forecast as of 2026-09-15/)).toBeVisible();
+  const details = screen.getByText("Data & forecast details").closest("details")!;
+  expect(details).not.toHaveAttribute("open");
+  expect(screen.getByText("Forecast reference: frozen")).not.toBeVisible();
+  await user.click(screen.getByText("Data & forecast details"));
+  expect(details).toHaveAttribute("open");
+  expect(screen.getByText("Forecast reference: frozen")).toBeVisible();
+  expect(screen.queryByText("Your local plans")).not.toBeInTheDocument();
+});
+
+it("never relabels an uncovered forecast as the current gameweek", async () => {
+  load.loadSummary.mockResolvedValueOnce({ latest_run: { run_id: "frozen", season: "2026-27", gw_from: 5, gw_to: 5 }, next_gameweek: { gw: 6 } });
+  render(<SummaryPage />);
+  expect(await screen.findByText("Not covered")).toBeInTheDocument();
+  expect(screen.getByText("Kickoff information unavailable")).toBeInTheDocument();
+  expect(screen.getByText(/published next GW is not covered/)).toBeInTheDocument();
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });

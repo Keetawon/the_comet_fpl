@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { SummaryRestTable } from "./SummaryRestTable";
 import { loadRestSummary, type RestSummary } from "@/data/restSummary";
@@ -70,4 +71,18 @@ it("keeps a transfer's witnessed club distinct from the current forecast club", 
   render(<SummaryRestTable players={[{ player, xp: 6.7 }]} gw={5} />);
   expect(await screen.findByText(/appearance was for club code 20; current forecast club code 10/)).toBeInTheDocument();
   expect(screen.getByText("SDP: 90 nominal min · FPL: 89 min")).toBeInTheDocument();
+});
+
+it("keeps source time visible and moves detailed rest limits into a disclosure", async () => {
+  const user = userEvent.setup();
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-19T10:00:00Z"));
+  vi.mocked(loadRestSummary).mockResolvedValueOnce(report);
+  render(<SummaryRestTable players={[{ player, xp: 6.7 }]} gw={5} />);
+  expect(await screen.findByText("2026-09-19 08:00 UTC")).toBeVisible();
+  const method = screen.getByText(/Club participation only/);
+  expect(method).not.toBeVisible();
+  expect(screen.getByText("Unknown")).toBeVisible();
+  await user.click(screen.getByText("About points & rest"));
+  expect(method).toBeVisible();
+  expect(screen.getByText("6.7")).toBeVisible();
 });
