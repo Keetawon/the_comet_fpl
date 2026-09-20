@@ -1,5 +1,16 @@
 # Player-facing dashboard refresh
 
+## Owner follow-up: whole-number goal summary (2026-09-20)
+
+The read-only shared text now formats the existing published goal averages as
+`ALP 2–1 BET`, labelled **Rounded goal averages** / **ปัดค่าเฉลี่ยประตู**.
+Each value is rounded directly to the nearest integer, with 0.5 rounded up.
+Missing, nonfinite or negative values remain `—`; measured zero stays zero.
+The copied text explains that these are rounded means, not exact-score picks or
+win probabilities. Match-card decimals, observed xG/xGA/SOT precision, source dates,
+copy/share behavior and all underlying forecast data remain unchanged. This narrow
+owner-authorized display change supersedes the earlier textbox precision only.
+
 Local UI work from `5b9400796817b54d0f86ef112d952003101b93b3` on
 `codex/match-preview`. The owner requested Score Prediction, read-only social text,
 a clearer News feed and a more useful Summary. No push, merge, deployment, live

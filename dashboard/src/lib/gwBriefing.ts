@@ -15,8 +15,9 @@ export interface GwBriefing { text: string; coverage: string; warnings: string[]
 const instant = (value: string | null) => value !== null && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? Date.parse(value) : NaN;
 const stamp = (value: string | null) => Number.isFinite(instant(value)) ? new Date(value!).toISOString().slice(0, 16).replace("T", " ") + " UTC" : null;
 const number = (value: number | null) => value !== null && Number.isFinite(value) && value >= 0 ? value.toFixed(2) : "—";
+const roundedGoal = (value: number | null) => value !== null && Number.isFinite(value) && value >= 0 ? String(Math.round(value)) : "—";
 
-/** Deterministic source-bound prose. Never creates a scoreline, winner or probability. */
+/** Source-bound prose. Rounded means are display precision, never exact-score picks. */
 export function buildGwBriefing({ matches, gw, language, stats, exportCreatedAt, expectedFixtureIds }: GwBriefingInput): GwBriefing {
   const say = (en: string, th: string) => language === "th" ? th : en;
   const warnings: string[] = [];
@@ -133,10 +134,11 @@ export function buildGwBriefing({ matches, gw, language, stats, exportCreatedAt,
   );
   for (const [index, match] of selected.entries()) {
     const home = match.home.team, away = match.away.team;
-    lines.push("", `${index + 1}. ${home.team_name} v ${away.team_name}`, say(`Published model expected goals: ${home.short_name} ${number(match.home.forecast.lambda_for)}; ${away.short_name} ${number(match.away.forecast.lambda_for)}.`, `ค่าเฉลี่ยประตูที่โมเดลคาด: ${home.short_name} ${number(match.home.forecast.lambda_for)}; ${away.short_name} ${number(match.away.forecast.lambda_for)}`));
+    const rounded = `${home.short_name} ${roundedGoal(match.home.forecast.lambda_for)}–${roundedGoal(match.away.forecast.lambda_for)} ${away.short_name}`;
+    lines.push("", `${index + 1}. ${home.team_name} v ${away.team_name}`, say(`Rounded goal averages: ${rounded}`, `ปัดค่าเฉลี่ยประตู: ${rounded}`));
     if (usableStats) lines.push(`${teamContext(home.team_code, home.short_name)} ${teamContext(away.team_code, away.short_name)}`);
   }
-  lines.push("", say("Model expected goals are means, not predicted scores or win probabilities. Observed xG/xGA describe chances created/conceded; SOT is shots on target. — means unavailable.", "ค่าเฉลี่ยประตูของโมเดลไม่ใช่สกอร์ทายหรือโอกาสชนะ สถิติ xG/xGA แสดงคุณภาพโอกาสที่สร้าง/เสีย ส่วน SOT คือยิงตรงกรอบ เครื่องหมาย — คือไม่มีข้อมูล"));
+  lines.push("", say("Goal averages are rounded to the nearest integer (0.5 rounds up), not predicted scores or win probabilities. Decimal estimates remain on the match cards. Observed xG/xGA describe chances created/conceded; SOT is shots on target. — means unavailable.", "ตัวเลขด้านบนปัดค่าเฉลี่ยประตูเป็นจำนวนเต็มที่ใกล้ที่สุด (0.5 ปัดขึ้น) ไม่ใช่สกอร์ทายหรือโอกาสชนะ ค่าทศนิยมยังดูได้บนการ์ดแต่ละคู่ สถิติ xG/xGA แสดงคุณภาพโอกาสที่สร้าง/เสีย ส่วน SOT คือยิงตรงกรอบ เครื่องหมาย — คือไม่มีข้อมูล"));
   const uniqueWarnings = [...new Set(warnings)];
   if (uniqueWarnings.length) lines.push("", say("Data notes:", "หมายเหตุข้อมูล:"), ...uniqueWarnings.map(warning => `• ${warning}`));
   return { text: lines.join("\n"), coverage, warnings: uniqueWarnings };
