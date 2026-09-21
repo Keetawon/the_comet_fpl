@@ -23,13 +23,36 @@ its synthetic data is absent from production JavaScript and public JSON exports.
 The browser does not load the real news feed in this mode or contact X/GPT.
 Real news storage, public data, models and frozen forecasts remain unchanged.
 
+## All-team roundup
+
+The top read-only text box consolidates every club in the sample into one bilingual
+message. News-card filters never narrow the roundup. Clubs without a recap are
+listed explicitly; lack of news is not a fitness conclusion. Copy copies the whole
+message, including its synthetic-news label. Clipboard denial selects the text for
+manual copying. External sharing remains disabled for this invented news.
+
+The timing selector demonstrates three fixed scenarios: collecting, all conferences
+finished, and exactly three hours before the example deadline. The earlier qualifying
+trigger releases the message. Conference completion is explicit sample evidence;
+passing a timetable START time never establishes completion. Stories and translations
+known after the selected edition are excluded. Recap coverage can remain partial
+even after all conferences finish. The example covers six clubs, not all 20 PL clubs.
+
+This is an executable UI simulation, not an activated automatic publication job.
+Real release orchestration still needs the retained official deadline, the complete
+expected conference list and explicit completion evidence, plus source-approved
+summaries in the published generation. No such evidence is fabricated by the UI.
+
 ## Verification
 
-- 41 offline News tests pass, including four simulation integration tests.
+- 46 offline News tests pass, including nine simulation integration tests.
 - TypeScript and production build pass; no fixture markers in production assets.
 - Targeted Oxlint and Git whitespace check pass.
 - Actual Chrome verification: desktop and 390 × 844 mobile; Thai/English;
   pending-club filter, reset, UK/Thai timetable conversion, light/dark themes.
+- Roundup follow-up: desktop/mobile rendering, collecting and T-minus-three-hour
+  states, and visible copy-success feedback checked in Chrome. Exact copied payload
+  and clipboard-denied selection fallback are covered by the offline tests.
 - Mobile document width 390, main client/scroll width 375: no page overflow.
 - Screenshots were captured in the review session. Final browser console contained
   no errors/warnings after resolving a preview-only shared-font path restriction.

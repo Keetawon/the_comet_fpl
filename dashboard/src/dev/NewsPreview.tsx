@@ -1,9 +1,10 @@
 /** Local UI fixture only. Not a capture, publication, source claim or model input. */
-import { useState } from "react";
-import { CalendarClock, Check, ChevronDown, Clock3, Radio } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CalendarClock, Check, ChevronDown, Clock3 } from "lucide-react";
 import { NewsFeed, type NewsPreview } from "@/components/NewsFeed";
 import type { NewsStory, PublicNewsFeed } from "@/data/newsFeed";
 import type { NewsLanguage } from "@/lib/newsShare";
+import NewsRoundupPreview from "./NewsRoundupPreview";
 
 const simulatedAt = "2026-09-25T11:45:00Z";
 const schedule = [
@@ -54,23 +55,12 @@ const previewFeed: PublicNewsFeed = {
   ],
 };
 
-function Briefing({ language }: { language: NewsLanguage }) {
-  const thai = language === "th";
-  return <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/80 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-cyan-900 dark:bg-cyan-950/40">
-    <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-800 dark:text-cyan-200"><Radio className="size-4" aria-hidden="true" />{thai ? "จำลองรอบข่าวก่อนเดดไลน์" : "Pre-deadline briefing · simulation"}</p>
-      <h2 className="mt-2 text-lg font-semibold">{thai ? "วันศุกร์: ตามข่าวให้ครบก่อนจัดทีม" : "Friday: catch up before picking your XI"}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{thai ? "ตัวอย่างเวลา 25 ก.ย. 2026 · 12:45 อังกฤษ / 18:45 ไทย" : "Example clock: 25 Sep 2026 · 12:45 UK / 18:45 Thailand"}</p></div>
-    <div className="flex shrink-0 items-center gap-4 border-t border-cyan-200 pt-3 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5 dark:border-cyan-900">
-      <p className="text-3xl font-semibold tabular-nums">3<span className="text-lg font-normal text-muted-foreground"> / 6</span></p>
-      <div><p className="text-sm font-medium">{thai ? "ทีมที่มีสรุปแล้ว" : "Club summaries received"}</p><p className="mt-1 text-xs text-muted-foreground">{thai ? "1 รอสรุป · 2 ยังไม่ถึงเวลา" : "1 awaiting recap · 2 scheduled"}</p></div>
-    </div>
-  </div>;
-}
-
-function PressSchedule({ language, selectedTeam }: { language: NewsLanguage; selectedTeam: string }) {
+function PressSchedule({ language, selectedTeam, asOf }: { language: NewsLanguage; selectedTeam: string; asOf: string }) {
   const [zone, setZone] = useState<"Europe/London" | "Asia/Bangkok">("Europe/London");
   const thai = language === "th";
-  const rows = schedule.filter(row => !selectedTeam || String(row.code) === selectedTeam);
+  const rows = schedule.filter(row => !selectedTeam || String(row.code) === selectedTeam).map(row => ({ ...row,
+    status: row.status === "received" ? "received" : Date.parse(row.time) <= Date.parse(asOf) ? "waiting" : "scheduled",
+  } as const));
   const statuses = thai ? { received: "มีสรุปแล้ว", waiting: "รอสรุป", scheduled: "ยังไม่ถึงเวลา" } : { received: "Recap received", waiting: "Awaiting recap", scheduled: "Scheduled" };
   return <section className="comet-glass rounded-2xl border p-4 sm:p-5" aria-label={thai ? "ตารางแถลงข่าวจำลอง" : "Simulated press-conference schedule"}>
     <div className="flex items-center gap-2"><CalendarClock className="size-4 text-cyan-700 dark:text-cyan-300" aria-hidden="true" /><h2 className="text-sm font-semibold">{thai ? "ตารางแถลงข่าว" : "Press-conference schedule"}</h2></div>
@@ -88,13 +78,33 @@ function PressSchedule({ language, selectedTeam }: { language: NewsLanguage; sel
   </section>;
 }
 
-const preview: NewsPreview = {
-  feed: previewFeed,
-  clubs: schedule.map(row => [row.code, row.club]),
-  header: language => <Briefing language={language} />,
-  sidebar: (language, selectedTeam) => <PressSchedule language={language} selectedTeam={selectedTeam} />,
-};
+const scenarios = {
+  collecting: { asOf: simulatedAt, completedAt: null },
+  conferences: { asOf: "2026-09-25T15:05:00Z", completedAt: "2026-09-25T15:00:00Z" },
+  deadline: { asOf: "2026-09-26T07:00:00Z", completedAt: null },
+} as const;
+type Scenario = keyof typeof scenarios;
+const clubs = schedule.map(row => [row.code, row.club] as const);
 
 export default function LocalNewsPreview() {
+  const [scenario, setScenario] = useState<Scenario>("conferences");
+  const preview = useMemo<NewsPreview>(() => {
+    const { asOf, completedAt } = scenarios[scenario];
+    const feed = { ...previewFeed, generated_at: asOf };
+    return {
+      feed, clubs,
+      header: language => <>
+        <label className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">{language === "th" ? "จำลองช่วงเวลา" : "Preview timing"}
+          <select value={scenario} onChange={event => setScenario(event.target.value as Scenario)} className="min-h-11 max-w-full rounded-lg border bg-background px-3 text-sm text-foreground">
+            <option value="collecting">{language === "th" ? "ระหว่างรอข่าว" : "Still collecting"}</option>
+            <option value="conferences">{language === "th" ? "หลังแถลงครบทุกทีม" : "All conferences finished"}</option>
+            <option value="deadline">{language === "th" ? "ก่อนเดดไลน์ 3 ชั่วโมง" : "Three hours before deadline"}</option>
+          </select>
+        </label>
+        <NewsRoundupPreview key={scenario + language} language={language} feed={feed} clubs={clubs} asOf={asOf} deadline="2026-09-26T10:00:00Z" allConferencesEndedAt={completedAt} />
+      </>,
+      sidebar: (language, selectedTeam) => <PressSchedule language={language} selectedTeam={selectedTeam} asOf={asOf} />,
+    };
+  }, [scenario]);
   return <NewsFeed preview={preview} />;
 }
