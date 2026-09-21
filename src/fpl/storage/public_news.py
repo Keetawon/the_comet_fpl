@@ -80,6 +80,8 @@ class BilingualSummary(ExactModel):
     summary_en: str = Field(min_length=1, max_length=600)
     summary_th: str = Field(min_length=1, max_length=800)
     category: Category
+    # Old summaries had no substantive-content check and are not publishable X news.
+    has_substantive_update: bool = False
 
 
 class SummaryRecord(ExactModel):

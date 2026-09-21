@@ -66,6 +66,13 @@ read timeout was repaired without changing the model/prompt or budget caps.
 Automatic capture/publication is still disabled; see
 `docs/ffscout-gpt-private-check-2026-09-20.md` for receipts and limits.
 
+September 21 follow-up: after funding, the five-post GPT checks succeed at the API
+level. A substantive-update gate now excludes promotional and legacy unchecked X
+summaries, but live quality review still finds time/wording errors and a false
+negative. Test sources remain explicitly withheld; no automatic publication.
+See `docs/ffscout-gpt-quality-2026-09-21.md` for both retained prompt versions,
+bounded costs, quality findings and verification.
+
 ## Owner-authorized data prerequisites (2026-09-06)
 
 Before the next new model experiment, complete and verify revision-stable strict football PIT

@@ -36,6 +36,7 @@ SUMMARY = {
     "summary_en": "The manager hopes the player returns next week; no return was confirmed.",
     "summary_th": "ผู้จัดการหวังว่านักเตะจะกลับมาสัปดาห์หน้า แต่ยังไม่ได้ยืนยัน",
     "category": "injury",
+    "has_substantive_update": True,
 }
 
 
@@ -200,6 +201,9 @@ def test_x_incremental_ids_summary_cache_and_secret_boundary(tmp_path: Path) -> 
     assert "tools" not in body
     assert body["text"]["format"]["strict"] is True
     assert body["text"]["format"]["schema"]["additionalProperties"] is False
+    schema = body["text"]["format"]["schema"]
+    assert set(schema["required"]) == set(schema["properties"])
+    assert all("default" not in prop for prop in schema["properties"].values())
     assert store.recent_observations()[0].known_at == NOW
     assert store.recent_observations()[0].player_code is None
     assert b"x-secret" not in store.path.read_bytes()

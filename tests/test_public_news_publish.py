@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -246,7 +247,10 @@ def test_unsafe_source_text_is_not_exported_or_allowed_to_block_core(tmp_path: P
     assert "private@example.com" not in str(result)
 
 
-def test_withdrawn_x_permission_hides_retained_digest(tmp_path: Path) -> None:
+@pytest.mark.parametrize("substantive", [True, False, None])
+def test_withdrawn_x_permission_hides_retained_digest(
+    tmp_path: Path, substantive: bool | None
+) -> None:
     path = tmp_path / "news.sqlite3"
     store = NewsStore(path)
     original = observe(store, "Synthetic source", 9)
@@ -265,21 +269,31 @@ def test_withdrawn_x_permission_hides_retained_digest(tmp_path: Path) -> None:
         }
     )
     store.append(post, raw)
-    store.save_summary(
-        SummaryRecord(
-            content_sha256=post.content_sha256,
-            model="gpt-4o-mini-2024-07-18",
-            prompt_sha256="c" * 64,
-            summarized_at=AS_OF.replace(hour=10),
-            summary=BilingualSummary(
-                title_en="Example",
-                title_th="ตัวอย่าง",
-                summary_en="Synthetic digest",
-                summary_th="ข่าวสมมติ",
-                category="other",
-            ),
-        )
+    record = SummaryRecord(
+        content_sha256=post.content_sha256,
+        model="gpt-4o-mini-2024-07-18",
+        prompt_sha256="c" * 64,
+        summarized_at=AS_OF.replace(hour=10),
+        summary=BilingualSummary(
+            title_en="Example",
+            title_th="ตัวอย่าง",
+            summary_en="Synthetic digest",
+            summary_th="ข่าวสมมติ",
+            category="other",
+            has_substantive_update=bool(substantive),
+        ),
     )
+    if substantive is None:
+        # Simulate the pre-review contract's immutable serialized record.
+        legacy = record.model_dump(mode="json")
+        del legacy["summary"]["has_substantive_update"]
+        with sqlite3.connect(path) as db:
+            db.execute(
+                "INSERT INTO summaries VALUES(?,?,?,?)",
+                (record.content_sha256, record.model, record.prompt_sha256, json.dumps(legacy)),
+            )
+    else:
+        store.save_summary(record)
     # A raw observation alone does not establish publication permission.
     assert all(s["source_kind"] != "x" for s in export_news_feed(path, as_of=AS_OF)["stories"])
     state = CaptureStatus(
@@ -293,7 +307,7 @@ def test_withdrawn_x_permission_hides_retained_digest(tmp_path: Path) -> None:
     )
     store.record_status(state)
     earlier = export_news_feed(path, as_of=AS_OF.replace(hour=10))
-    assert any(s["source_kind"] == "x" for s in earlier["stories"])
+    assert any(s["source_kind"] == "x" for s in earlier["stories"]) is bool(substantive)
     store.record_status(
         state.model_copy(
             update={

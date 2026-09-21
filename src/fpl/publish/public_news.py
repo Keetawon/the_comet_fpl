@@ -270,6 +270,11 @@ def _retained_feed(store: NewsStore, *, as_of: datetime) -> dict[str, Any]:
         ):
             continue
         summary = store.latest_summary(observation.content_sha256, as_of=as_of)
+        if observation.source_kind == "x" and (
+            summary is None or not summary.summary.has_substantive_update
+        ):
+            # A teaser is not a team update. Legacy unchecked summaries also stay private.
+            continue
         if summary is None and (observation.source_kind == "x" or len(observation.text) > 800):
             # X raw posts remain private. Await a validated digest instead of publishing a
             # copied post without its required native display/attribution contract.

@@ -40,7 +40,21 @@ PROMPT = (
     "Do not claim an expected starting XI, fitness probability, FPL forecast, or recommendation. "
     "Do not add facts, infer player identities, or invent dates. Paraphrase briefly; do not "
     "copy quotations. Titles max 160 English/200 Thai characters; summaries max 600 English/800 "
-    "Thai characters. This is a news digest, not a model output. Return only the required JSON."
+    "Thai characters. Apply the same evidence limits to BOTH titles and summaries. "
+    "Could/may/might must never become likely/expected/confirmed. Do not invent reactions, "
+    "discussions, selection implications, injury causes or return dates. Unavailable alone "
+    "does not establish injury: use category squad when no reason is stated. "
+    "Keep player names in their original Latin spelling in both languages. "
+    "Use reporting tense and attribute claims to the named source. No unanchored today, "
+    "tonight, currently or soon: anchor source-relative time to the supplied publication "
+    "date or say at the time of that report. A three-match ban does not mean three matches "
+    "remain. Set has_substantive_update true ONLY if the supplied text itself states a "
+    "concrete real-club/player squad, availability, transfer or manager update. Links, "
+    "hashtags and article titles do not supply their unseen contents. A teaser such as "
+    "'injury latest - read now', a video advert or FPL-manager transfer plans alone has "
+    "has_substantive_update false and category other; briefly describe it as a promotion "
+    "with no update details provided, without inventing those details. When unsure, false. "
+    "This is a news digest, not a model output. Return only the required JSON."
 )
 PROMPT_SHA256 = hashlib.sha256(PROMPT.encode()).hexdigest()
 MAX_RESPONSE_BYTES = 1_000_000
@@ -208,6 +222,8 @@ def summarize_observation(
     for prop in schema["properties"].values():
         prop.pop("minLength", None)
         prop.pop("maxLength", None)
+        prop.pop("default", None)
+    schema["required"] = list(schema["properties"])
     body: dict[str, Any] = {
         "model": OPENAI_MODEL,
         "store": False,
