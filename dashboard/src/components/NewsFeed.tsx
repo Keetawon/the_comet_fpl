@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowUpRight, Copy, ExternalLink, Newspaper, Search, Share2 } from "lucide-react";
 import { loadNewsFeed, type NewsCategory, type NewsStory, type PublicNewsFeed } from "@/data/newsFeed";
 import { newsShareLinks, newsStoryUrl, shareNews, type NewsLanguage } from "@/lib/newsShare";
@@ -87,7 +87,7 @@ function NewsCard({ story, language, demo, selected, compact }: { story: NewsSto
     </div>
     {!compact && <>
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <a href={story.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold underline underline-offset-4">{t.source}<ExternalLink className="size-3.5" aria-hidden="true" /></a>
+        {demo ? <span className="text-xs text-muted-foreground">{language === "th" ? "ข่าวสมมติ · ปิดลิงก์และการแชร์" : "Synthetic story · links and sharing disabled"}</span> : <a href={story.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold underline underline-offset-4">{t.source}<ExternalLink className="size-3.5" aria-hidden="true" /></a>}
         <div className="flex flex-wrap gap-2" aria-label={`${t.share}: ${title}`}>
           <button type="button" className={actionClass} disabled={demo} onClick={() => { void share(); }}><Share2 className="size-3.5" aria-hidden="true" />{t.share}</button>
           {demo ? <><button type="button" className={actionClass} disabled>LINE</button><button type="button" className={actionClass} disabled>Facebook</button></> : <><a className={actionClass} href={links.line} target="_blank" rel="noopener noreferrer">LINE</a><a className={actionClass} href={links.facebook} target="_blank" rel="noopener noreferrer">Facebook</a></>}
@@ -106,7 +106,15 @@ function NewsCard({ story, language, demo, selected, compact }: { story: NewsSto
 }
 
 /** The browser only reads a published feed. It never contacts X or an AI provider. */
-export function NewsFeed({ compact = false }: { compact?: boolean }) {
+export interface NewsPreview {
+  feed: PublicNewsFeed;
+  clubs: readonly (readonly [number, string])[];
+  header: (language: NewsLanguage) => ReactNode;
+  sidebar: (language: NewsLanguage, selectedTeam: string) => ReactNode;
+}
+
+export function NewsFeed({ compact = false, preview }: { compact?: boolean; preview?: NewsPreview }) {
+  const demoPreview = import.meta.env.DEV && preview?.feed.demo ? preview : undefined;
   const [state, setState] = useState<{ status: "loading" | "unavailable" } | { status: "ready"; data: PublicNewsFeed }>({ status: "loading" });
   const [language, setLanguage] = useState<NewsLanguage>(() => routeQuery().get("lang") === "th" ? "th" : "en");
   const [sharedId, setSharedId] = useState<string | null>(() => compact ? null : routeQuery().get("story"));
@@ -114,10 +122,14 @@ export function NewsFeed({ compact = false }: { compact?: boolean }) {
   const [team, setTeam] = useState("");
   const [category, setCategory] = useState<NewsCategory | "">("");
   useEffect(() => {
+    if (demoPreview) {
+      setState({ status: "ready", data: demoPreview.feed });
+      return;
+    }
     let active = true;
     loadNewsFeed().then(data => { if (active) setState({ status: "ready", data }); }).catch(() => { if (active) setState({ status: "unavailable" }); });
     return () => { active = false; };
-  }, []);
+  }, [demoPreview]);
   useEffect(() => {
     if (compact) return;
     const changed = () => { setSharedId(routeQuery().get("story")); setLanguage(routeQuery().get("lang") === "th" ? "th" : "en"); };
@@ -130,17 +142,24 @@ export function NewsFeed({ compact = false }: { compact?: boolean }) {
   const t = copy[language];
   const feed = state.status === "ready" ? state.data : null;
   const clubs = useMemo(() => {
-    const result = new Map<number, string>();
+    const result = new Map<number, string>(demoPreview?.clubs);
     for (const story of feed?.stories ?? []) if (story.team_code !== null && story.team_name !== null) result.set(story.team_code, story.team_name);
     return [...result].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [feed]);
+  }, [feed, demoPreview]);
   const searched = useMemo(() => (feed?.stories ?? []).filter(story =>
     (!team || String(story.team_code) === team) &&
     (!query.trim() || [story.title.en, story.title.th, story.summary.en, story.summary.th, story.player_name, story.team_name, story.source_name].filter(Boolean).join(" ").toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())))
     .sort((a, b) => Date.parse(b.known_at) - Date.parse(a.known_at) || a.id.localeCompare(b.id)), [feed, query, team]);
   const filtered = searched.filter(story => !category || story.category === category);
   const stories = compact ? filtered.slice(0, 3) : filtered;
-  const changeLanguage = (next: NewsLanguage) => { setLanguage(next); if (!compact) window.history.replaceState(null, "", `#news?${new URLSearchParams({ ...(sharedId ? { story: sharedId } : {}), lang: next })}`); };
+  const changeLanguage = (next: NewsLanguage) => {
+    setLanguage(next);
+    if (!compact) {
+      const params = routeQuery();
+      params.set("lang", next);
+      window.history.replaceState(null, "", `#news?${params}`);
+    }
+  };
   const reset = () => { setQuery(""); setTeam(""); setCategory(""); };
 
   return <section className={compact ? "min-w-0 comet-glass rounded-2xl border p-4 sm:p-6" : "min-w-0"} aria-label={t.title}>
@@ -154,6 +173,7 @@ export function NewsFeed({ compact = false }: { compact?: boolean }) {
       <div className="flex shrink-0 rounded-lg border bg-background p-1" aria-label="News language">{(["en", "th"] as const).map(lang => <button type="button" key={lang} lang={lang} aria-pressed={language === lang} onClick={() => changeLanguage(lang)} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold focus-visible:outline-2 ${language === lang ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{lang === "en" ? "English" : "ไทย"}</button>)}</div>
     </header>
     {feed?.demo && <p role="note" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">{t.demo}</p>}
+    {!compact && demoPreview?.header(language)}
     {!compact && feed && feed.stories.length > 0 && <div className="mt-6 space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row"><label className="relative col-span-2 min-w-0 flex-1"><Search className="pointer-events-none absolute top-3.5 left-3 size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">{t.search}</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} className={`${fieldClass} w-full pl-9`} /></label><label><span className="sr-only">{t.club}</span><select value={team} onChange={event => setTeam(event.target.value)} className={`${fieldClass} w-full sm:max-w-56`}><option value="">{t.allTeams}</option>{clubs.map(([code, name]) => <option value={code} key={code}>{name}</option>)}</select></label><button type="button" className={fieldClass} onClick={reset}>{t.reset}</button></div>
       <div className="comet-news-topics flex max-w-full gap-2 overflow-x-auto pb-2 sm:flex-wrap" role="group" aria-label={language === "th" ? "ประเภทข่าว" : "News category"}>{(["", ...Object.keys(categoryNames)] as (NewsCategory | "")[]).map(key => <button type="button" key={key} aria-pressed={category === key} onClick={() => setCategory(key)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium focus-visible:outline-2 ${category === key ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-muted"}`}>
@@ -167,7 +187,8 @@ export function NewsFeed({ compact = false }: { compact?: boolean }) {
         {state.status !== "ready" || stories.length === 0 ? <div className="rounded-xl border border-dashed bg-muted/20 px-5 py-10 text-center text-sm text-muted-foreground" role="status"><Newspaper className="mx-auto mb-3 size-6" aria-hidden="true" />{state.status === "loading" ? t.loading : state.status === "unavailable" ? t.unavailable : feed?.stories.length ? t.noMatches : t.empty}</div> : <div className={compact ? "divide-y" : "space-y-4"}>{stories.map(story => <NewsCard story={story} language={language} demo={feed!.demo} selected={story.id === sharedId} compact={compact} key={story.id} />)}</div>}
       </div>
       {!compact && <aside className="space-y-4 self-start">
-        {clubs.length > 0 && <div className="comet-glass rounded-2xl border p-5"><h2 className="text-sm font-semibold">{t.clubs}</h2><div className="mt-3 flex flex-wrap gap-2">{clubs.map(([code, name]) => <button type="button" key={code} aria-pressed={team === String(code)} onClick={() => setTeam(team === String(code) ? "" : String(code))} className={`min-h-11 rounded-lg border px-3 py-2 text-xs font-medium focus-visible:outline-2 ${team === String(code) ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>{name}</button>)}</div></div>}
+        {demoPreview?.sidebar(language, team)}
+        {!demoPreview && clubs.length > 0 && <div className="comet-glass rounded-2xl border p-5"><h2 className="text-sm font-semibold">{t.clubs}</h2><div className="mt-3 flex flex-wrap gap-2">{clubs.map(([code, name]) => <button type="button" key={code} aria-pressed={team === String(code)} onClick={() => setTeam(team === String(code) ? "" : String(code))} className={`min-h-11 rounded-lg border px-3 py-2 text-xs font-medium focus-visible:outline-2 ${team === String(code) ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>{name}</button>)}</div></div>}
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900 dark:bg-amber-950/20"><h2 className="text-sm font-semibold">{t.context}</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{t.contextText}</p><p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t.limited}</p></div>
       </aside>}
     </div>
