@@ -58,9 +58,11 @@ it("shows Score Prediction with unchanged goal averages and team clean-sheet cha
   expect(text).toHaveAttribute("lang", "th");
   expect(text.value).toContain("สรุป GW5");
   expect(text.value).toContain("ปัดค่าเฉลี่ยประตู: ALP 2–2 BET");
-  expect(screen.getByText(/Exact-score analysis has not been published/)).toBeInTheDocument();
+  expect(screen.getByText(/Rounded goal averages, with the original estimates/)).toBeInTheDocument();
   const match = screen.getByRole("article", { name: "Alpha v Beta" });
-  expect(within(match).getAllByText("1.80")).toHaveLength(2);
+  expect(within(match).getAllByText("(1.80)")).toHaveLength(2);
+  expect(within(match).getAllByText("2")).toHaveLength(2);
+  expect(within(match).getByRole("group", { name: "Alpha goal outlook" })).toHaveTextContent("Rounded expected goals: 2Published expected goals: (1.80)");
   expect(within(match).getAllByText("30%")).toHaveLength(2);
   expect(screen.queryByRole("checkbox", { name: /Edit|review/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Reset draft" })).not.toBeInTheDocument();
@@ -130,6 +132,18 @@ it("does not fill a missing goal estimate or clean-sheet probability with zero",
   const match = screen.getByRole("article", { name: "Alpha v Beta" });
   expect(within(match).getAllByText("—")).toHaveLength(2);
   expect(within(match).queryByText("0%")).not.toBeInTheDocument();
+  expect(within(match).queryByText("(0.00)")).not.toBeInTheDocument();
+});
+
+it("retains observed zero and the original estimate below the rounded score", async () => {
+  const data = matrix();
+  data.teams[0].fixtures[0].lambda_for = 0;
+  data.teams[1].fixtures[0].lambda_for = 1.77;
+  vi.mocked(loadFixtureMatrix).mockResolvedValue(data);
+  render(<GwAnalysisPage />); await ready();
+  expect(screen.getByRole("group", { name: "Alpha goal outlook" })).toHaveTextContent("Rounded expected goals: 0Published expected goals: (0.00)");
+  expect(screen.getByRole("group", { name: "Beta goal outlook" })).toHaveTextContent("Rounded expected goals: 2Published expected goals: (1.77)");
+  expect(data.teams[1].fixtures[0].lambda_for).toBe(1.77);
 });
 
 it("keeps a usable post without SDP statistics and labels the missing context", async () => {

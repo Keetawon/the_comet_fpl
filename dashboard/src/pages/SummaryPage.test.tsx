@@ -70,7 +70,7 @@ it("puts player decisions first and keeps forecast controls behind an accessible
   render(<SummaryPage />);
   await screen.findByRole("heading", { name: "Summary" });
   expect(screen.getByRole("link", { name: /Find your next pick/ })).toHaveAttribute("href", "#players");
-  expect(screen.getByRole("link", { name: /Score Prediction/ })).toHaveAttribute("href", "#gw-analysis");
+  expect(screen.getByRole("link", { name: /Score Prediction/ })).toHaveAttribute("href", "#score-prediction");
   expect(screen.getByRole("link", { name: /Read the latest news/ })).toHaveAttribute("href", "#news");
   expect(screen.getByText(/Forecast as of 2026-09-15/)).toBeVisible();
   const details = screen.getByText("Data & forecast details").closest("details")!;

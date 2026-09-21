@@ -45,12 +45,20 @@ vi.mock("@/pages/TeamForecastVsActualPage", () => ({
 import App from "./App";
 
 describe("App deep-analytics routes", () => {
-  it("opens standalone shareable GW analysis in hosted mode", async () => {
+  it.each(["#score-prediction", "#gw-analysis", "#gw-analysis?gw=5"])("opens Score Prediction from %s in hosted mode", async hash => {
     vi.stubEnv("VITE_HOSTED_STATIC", "true");
-    window.location.hash = "#gw-analysis";
+    window.location.hash = hash;
+    const historyLength = window.history.length;
     render(<App />);
     expect(await screen.findByRole("heading", { name: "GW Analysis route" })).toBeInTheDocument();
-    expect(screen.getByText("active:gw-analysis")).toBeInTheDocument();
+    expect(screen.getByText("active:score-prediction")).toBeInTheDocument();
+    expect(window.location.hash).toBe(hash.replace("#gw-analysis", "#score-prediction"));
+    expect(window.history.length).toBe(historyLength);
+    act(() => { window.location.hash = "#players"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    expect(await screen.findByRole("heading", { name: "Players route" })).toBeInTheDocument();
+    act(() => { window.location.hash = "#gw-analysis"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    expect(await screen.findByRole("heading", { name: "GW Analysis route" })).toBeInTheDocument();
+    expect(window.location.hash).toBe("#score-prediction");
   });
   it("keeps the SDP team route and sends retired SDP player bookmarks to Players", async () => {
     window.location.hash = "#team-stat-sdp";
