@@ -1,0 +1,20 @@
+experiment: team_venue_form_v1_20260921
+primary: C
+arms: [C0, C1, A, B, C, D]
+evidence_class: retrospective_backfill_development
+database_sha256: 0db60c08d5d85cda471c9ec65060365169007e036c28fa1dd851567a7d1ecac8
+eligible_seasons: ['2023-24', '2024-25', '2025-26']
+expected_rows: 2280
+expected_folds: 114
+maximum_historical_batches: 189
+maximum_stage_fits: 378
+recent_weights: [0.40, 0.30, 0.20, 0.07, 0.03]
+overall_prior_matches: 2
+venue_prior_matches: 3
+weighted_median_midpoint: average_adjacent_when_cumulative_weight_equals_half
+seed: 20260907
+minimum_log_lift: 0.01
+minimum_cs_brier_lift: 0.01
+maximum_pit80_absolute_error: 0.05
+refutation_relative_regression: 0.01
+promotion_permitted: false

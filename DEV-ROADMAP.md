@@ -1,5 +1,15 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
+## Owner-authorized venue-form experiment (2026-09-21)
+
+Dashboard release PR17 is deployed. A separate development-only six-arm Team
+experiment is preregistered in
+`docs/team-venue-form-v1-preregistration-2026-09-21.md` on
+`codex/team-venue-form-v1`. It regenerates each arm's historical OOS tactical and
+chance chain, with fixed overall/venue WMA and hybrid median definitions. Production,
+prior research, and immutable forecasts remain unchanged; there is no promotion.
+Formal results are not yet generated at this preregistration commit.
+
 Status: active execution plan  
 Last updated: 2026-09-01<br>
 Target: 2026/27 GW1  

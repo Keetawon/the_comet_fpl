@@ -142,3 +142,11 @@ results/player_model_gw1_3_strict_v2_2026-09-08.json -text
 results/player_model_gw1_3_retrospective_sdp_v2_2026-09-08.json -text
 results/player_model_gw1_3_verification_v2_2026-09-08.json -text
 docs/player-model-gw1-3-scorecard-v2-2026-09-08.md -text
+
+# Separate venue-form development experiment: preserve byte fingerprints.
+config/team_venue_form_v1.yaml -text
+docs/team-venue-form-v1-preregistration-2026-09-21.md -text
+src/fpl/validate/team_venue_form.py -text
+src/fpl/validate/dev_team_venue_form.py -text
+tests/test_team_venue_form.py -text
+results/team_venue_form_v1_20260921.json -text
