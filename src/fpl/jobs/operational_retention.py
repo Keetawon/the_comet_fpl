@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import shutil
 import stat
@@ -282,12 +283,20 @@ def _verify_backup(database: Path, backup: Path) -> dict[str, Any]:
             if old != current or not old:
                 raise ValueError(f"retention schema mismatch: {table}")
             quoted = '"' + table.replace('"', '""') + '"'
-            missing = con.execute(
-                f"SELECT count(*) FROM (SELECT * FROM old_db.main.{quoted} EXCEPT ALL "
-                f"SELECT * FROM current_db.main.{quoted})"
-            ).fetchone()
-            if missing is None or missing[0] != 0:
-                raise ValueError(f"immutable rows missing or changed: {table}")
+            logging.info("Verifying retained immutable rows: %s", table)
+            # Partition the exact multiset comparison before loading large JSON
+            # payloads into EXCEPT ALL's hash table. Hashes only route rows; every
+            # full value and duplicate occurrence is still compared exactly.
+            column = '"' + old[0][0].replace('"', '""') + '"'
+            for bucket in range(64):
+                predicate = f"hash({column}) % 64 = {bucket}"
+                missing = con.execute(
+                    f"SELECT count(*) FROM (SELECT * FROM old_db.main.{quoted} "
+                    f"WHERE {predicate} EXCEPT ALL SELECT * FROM current_db.main.{quoted} "
+                    f"WHERE {predicate})"
+                ).fetchone()
+                if missing is None or missing[0] != 0:
+                    raise ValueError(f"immutable rows missing or changed: {table}")
             count = con.execute(f"SELECT count(*) FROM old_db.main.{quoted}").fetchone()
             assert count is not None
             checks.append({"table": table, "retained_rows": count[0], "missing_rows": 0})

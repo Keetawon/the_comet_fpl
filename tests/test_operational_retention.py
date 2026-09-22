@@ -906,6 +906,33 @@ def test_unknown_backup_schema_fails_closed(tmp_path: Path) -> None:
     assert backup.is_file()
 
 
+def test_partitioned_proof_preserves_nulls_full_values_and_duplicate_counts(tmp_path: Path) -> None:
+    current, backup = tmp_path / "current.duckdb", tmp_path / "backup.duckdb"
+    for path in (current, backup):
+        with duckdb.connect(str(path)) as con:
+            con.execute("CREATE TABLE raw_events (id INTEGER, payload VARCHAR)")
+            con.executemany(
+                "INSERT INTO raw_events VALUES (?, ?)",
+                [
+                    (None, None),
+                    (1, "same"),
+                    (1, "same"),
+                    (65, "other"),
+                    *[(i, str(i)) for i in range(100, 200)],
+                ],
+            )
+    with duckdb.connect(str(current)) as con:
+        con.execute("INSERT INTO raw_events VALUES (NULL, 'new observation')")
+    proof = retention._verify_backup(current, backup)
+    assert proof["tables"][0]["retained_rows"] == 104
+    with duckdb.connect(str(current)) as con:
+        con.execute(
+            "DELETE FROM raw_events WHERE rowid=(SELECT min(rowid) FROM raw_events WHERE id=1)"
+        )
+    with pytest.raises(ValueError, match="immutable rows missing"):
+        retention._verify_backup(current, backup)
+
+
 @pytest.mark.parametrize("failure", ["local", "r2_result", "r2_exception"])
 def test_failed_refresh_never_prunes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str

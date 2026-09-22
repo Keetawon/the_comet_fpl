@@ -156,8 +156,18 @@ def complete(
     }
 
 
-def assert_no_inflight_backup(runs: Path, destination: Path) -> None:
-    """A failed/interrupted cycle must be resolved before allocating another recovery copy."""
+def assert_no_inflight_backup(
+    runs: Path,
+    destination: Path,
+    *,
+    database: Path | None = None,
+    forecasts: Path | None = None,
+) -> None:
+    """Retry cleanup of published cycles, never an interrupted capture/publication.
+
+    Caller holds the cycle lock. No new full copy is allocated until retention
+    succeeds; its additive resolution receipt preserves the original failure.
+    """
     for backup in sorted(runs.glob("dashboard-*/recovery.duckdb")):
         if backup.parent == destination:
             continue
@@ -168,15 +178,62 @@ def assert_no_inflight_backup(runs: Path, destination: Path) -> None:
             raise ValueError(f"unattributed recovery backup requires review: {backup}") from exc
         if previous.get("retention_policy_version", 1) < 2:
             continue
-        if not (
+        published = (
             previous.get("status") == "COMPLETE"
             and previous.get("phase") == "finished"
             and previous.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
-            and previous.get("retention", {}).get("status") == "COMPLETE"
+        )
+        if published and previous.get("retention", {}).get("status") == "COMPLETE":
+            continue
+        resolution_path = backup.parent / "retention-recovery.json"
+        if published and resolution_path.exists():
+            resolution = json.loads(resolution_path.read_text(encoding="utf-8"))
+            if (
+                resolution.get("original_receipt_sha256") == digest(receipt)
+                and resolution.get("backup_sha256") == digest(backup)
+                and resolution.get("status") == "COMPLETE"
+                and resolution.get("retention", {}).get("status") == "COMPLETE"
+            ):
+                continue
+            raise ValueError(f"invalid retention recovery receipt: {resolution_path}")
+        pin = previous.get("recovery_backup", {})
+        if (
+            published
+            and database is not None
+            and forecasts is not None
+            and Path(previous.get("database", "")).resolve() == database.resolve()
+            and Path(pin.get("path", "")).resolve() == backup.resolve()
+            and pin.get("sha256") == digest(backup)
         ):
-            raise ValueError(
-                f"incomplete cycle recovery requires review before a new copy: {backup}"
+            logging.info("Resuming retention only for published cycle: %s", backup.parent)
+            retention = prune_runs(
+                database,
+                runs,
+                forecasts,
+                recovery=backup,
+                recovery_sha=pin["sha256"],
+                archive_pins=True,
             )
+            if retention["status"] == "COMPLETE":
+                with resolution_path.open("x", encoding="utf-8") as handle:
+                    json.dump(
+                        {
+                            "status": "COMPLETE",
+                            "resolved_at": datetime.now(UTC).isoformat(),
+                            "original_receipt_sha256": digest(receipt),
+                            "backup_sha256": pin["sha256"],
+                            "retention": retention,
+                        },
+                        handle,
+                        indent=2,
+                        sort_keys=True,
+                        allow_nan=False,
+                    )
+                    handle.write("\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                continue
+        raise ValueError(f"incomplete cycle recovery requires review before a new copy: {backup}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -251,7 +308,9 @@ def main(argv: list[str] | None = None) -> int:
                     ),
                     "estimate_basis": "database copy + twice current preview bytes; not a quota",
                 }
-                assert_no_inflight_backup(args.runs, destination)
+                assert_no_inflight_backup(
+                    args.runs, destination, database=args.db, forecasts=args.forecast_dir
+                )
                 report["recovery_backup"] = create_recovery(args.db, destination)
                 save()
                 if not args.skip_capture:
