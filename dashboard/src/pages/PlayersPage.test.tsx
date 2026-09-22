@@ -284,6 +284,78 @@ afterEach(() => {
 });
 
 describe("PlayersPage", () => {
+  it("ranks five-GW xP per current £m, retaining missing values and frozen forecasts", async () => {
+    const user = userEvent.setup();
+    const source = playersWithActuals[0];
+    const names = ["Value leader", "Expensive", "Missing price", "Zero price", "Short forecast", "Blank horizon"];
+    const costs = [50, 100, null, 0, 50, 50];
+    const totals = [30, 40, 30, 30, null, 0];
+    const players: PlayerRecord[] = names.map((web_name, index) => ({
+      ...source, code: index + 101, web_name, now_cost: 200,
+      current_price: costs[index] == null ? null : {
+        source: "FPL", season: source.season, code: index + 101, now_cost: costs[index]!,
+        captured_at: "2026-09-21T10:00:00Z", capture_id: "current", source_sha256: "b".repeat(64),
+        semantics: "current_reported_not_forecast",
+      },
+    }));
+    const horizons: PlayerHorizonsData = { ...horizonsData, players: players.map((player, index) => ({
+      run_id: player.run_id, season: player.season, code: player.code,
+      horizons: horizonsData.players[0].horizons
+        .filter(h => totals[index] != null || h.gw_to < 5)
+        .map(h => ({ ...h, xp: totals[index] === 0 ? 0 : h.gw_to === 5 ? totals[index]! : h.xp })),
+    })) };
+    const before = JSON.stringify({ players, horizons });
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    vi.mocked(loadPlayerHorizons).mockResolvedValueOnce(horizons);
+    render(<PlayersPage />);
+    const header = await screen.findByRole("columnheader", { name: "5GW xP/£m" });
+    const columnIndex = within(header.closest("table")!).getAllByRole("columnheader").indexOf(header);
+    const value = (name: string) => within(screen.getByText(name).closest("tr")!).getAllByRole("cell")[columnIndex];
+    expect(value("Value leader")).toHaveTextContent("6.00");
+    expect(value("Expensive")).toHaveTextContent("4.00");
+    expect(value("Blank horizon")).toHaveTextContent("0.00");
+    for (const name of names.slice(2, 5)) expect(value(name)).toHaveTextContent("–");
+    const order = () => screen.getAllByRole("button", { name: "Expand fixtures" })
+      .map(button => names.find(name => button.closest("tr")!.textContent!.includes(name)));
+    await user.click(within(header).getByRole("button"));
+    expect(order().slice(0, 3)).toEqual(["Value leader", "Expensive", "Blank horizon"]);
+    await user.click(within(header).getByRole("button"));
+    expect(order().slice(0, 3)).toEqual(["Blank horizon", "Expensive", "Value leader"]);
+    expect(screen.getByRole("columnheader", { name: "Player" })).toHaveClass("sticky", "left-0");
+    expect(screen.getByText("Value leader").closest("td")).toHaveClass("sticky", "left-0", "bg-background");
+    expect(JSON.stringify({ players, horizons })).toBe(before);
+  });
+
+  it("keeps five-GW value separate from venue/To filters and rejects a shortened forecast", async () => {
+    const user = userEvent.setup();
+    const source = playersWithActuals[0];
+    const player: PlayerRecord = { ...source, current_price: {
+      source: "FPL", season: source.season, code: source.code, now_cost: 50,
+      captured_at: "2026-09-21T10:00:00Z", capture_id: "current", source_sha256: "b".repeat(64),
+      semantics: "current_reported_not_forecast",
+    } };
+    const horizons = { ...horizonsData, players: [{ ...horizonsData.players[0], horizons:
+      [2, 10, 18, 24, 30, 36].map((xp, index) => ({ ...horizonsData.players[0].horizons[0], gw_to: index + 1, xp })),
+    }] };
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players: [player], manifest: null });
+    vi.mocked(loadPlayerHorizons).mockResolvedValueOnce(horizons);
+    render(<PlayersPage />);
+    expect(await screen.findByText("6.00")).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "To gameweek" }));
+    await user.click(screen.getByRole("option", { name: "GW1" }));
+    expect(screen.getByText("6.00")).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Away" }));
+    expect(screen.getByText("6.00")).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "To gameweek" }));
+    await user.click(screen.getByRole("option", { name: "GW6" }));
+    await user.click(screen.getByRole("combobox", { name: "From gameweek" }));
+    await user.click(screen.getByRole("option", { name: "GW2" }));
+    expect(screen.getByText("6.80")).toBeInTheDocument(); // (36 - 2) / £5m
+    await user.click(screen.getByRole("combobox", { name: "From gameweek" }));
+    await user.click(screen.getByRole("option", { name: "GW3" }));
+    expect(screen.getByTitle(/Unavailable: requires a complete GW3–7 forecast/)).toHaveTextContent("–");
+  });
+
   it("displays, sorts and filters current FPL prices while preserving forecast prices and xP", async () => {
     const user = userEvent.setup();
     const players: PlayerRecord[] = playersWithActuals.map((player, index) => ({

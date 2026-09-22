@@ -56,6 +56,8 @@ export interface PlayerStatRow {
   filtered: PlayerFixture[];
   /** Exact or strictly summed raw xP for the selected forecast-start GW. */
   gwFromXp?: number | null;
+  /** Players-only raw xP for five complete GWs from Forecast From, across both venues. */
+  fiveGwXp?: number | null;
   /** Players-only descriptive BPS average over appeared fixtures between the Actual endpoints. */
   bpsPerAppearance?: number | null;
   /** Players-only fail-closed minutes average over played fixtures between the Actual endpoints. */
@@ -134,6 +136,13 @@ const price = (value: number | null) => (value == null ? "–" : `£${(value / 1
 const HEAD_CLASS = "sticky top-0 z-10 h-8 bg-background px-2 text-xs whitespace-nowrap";
 const CELL_CLASS = "px-2 py-1 text-xs whitespace-nowrap";
 const DEFAULT_SORTING: SortingState = [{ id: "totalXp", desc: true }];
+
+function fiveGwXpPerCost(row: PlayerStatRow, priceSource: PlayerPriceSource): number | undefined {
+  const cost = playerPrice(row.player, priceSource);
+  return row.fiveGwXp != null && Number.isFinite(row.fiveGwXp) &&
+    cost != null && Number.isFinite(cost) && cost > 0
+    ? row.fiveGwXp / (cost / 10) : undefined;
+}
 
 const ATTACK_FORM_COLUMN_IDS = new Set([
   "form-goals_scored",
@@ -381,15 +390,17 @@ function SortableHead({
   onToggle,
   children,
   title,
+  pinned = false,
 }: {
   sorted: false | "asc" | "desc";
   canSort: boolean;
   onToggle: ((event: unknown) => void) | undefined;
   children: ReactNode;
   title?: string;
+  pinned?: boolean;
 }) {
   return (
-    <TableHead className={HEAD_CLASS} title={title} aria-sort={
+    <TableHead className={`${HEAD_CLASS} ${pinned ? "left-0 z-30 shadow-[1px_0_0_var(--border)]" : ""}`} title={title} aria-sort={
       sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : canSort ? "none" : undefined
     }>
       {canSort ? (
@@ -949,6 +960,26 @@ export function PlayerStatTable({
       ...visibleFormColumns,
       ...gwFromXpColumns,
       ...totalXpColumns,
+      ...(formColumnProfile === "players" ? [{
+        id: "fiveGwXpPerCost",
+        header: () => (
+          <span title={`Published xP for GW${gwFrom}–${gwFrom + 4} divided by current FPL price in £m. Both venues; independent of Forecast To and venue filters. Requires all five GWs.`}>
+            5GW xP/£m
+          </span>
+        ),
+        accessorFn: (row: PlayerStatRow) => fiveGwXpPerCost(row, priceSource),
+        sortUndefined: "last" as const,
+        sortDescFirst: true,
+        cell: ({ row }: { row: { original: PlayerStatRow } }) => (
+          <span className="tabular-nums" title={
+            fiveGwXpPerCost(row.original, priceSource) == null
+              ? `Unavailable: requires a complete GW${gwFrom}–${gwFrom + 4} forecast and a valid current FPL price.`
+              : `${fmt(row.original.fiveGwXp, 2)} xP ÷ ${price(playerPrice(row.original.player, priceSource))}. ${playerPriceTitle(row.original.player, priceSource)}`
+          }>
+            {fmt(fiveGwXpPerCost(row.original, priceSource), 2)}
+          </span>
+        ),
+      }] : []),
       ...beforeFixtureColumns,
       ...gwColumns,
       ...extraColumns,
@@ -1014,6 +1045,7 @@ export function PlayerStatTable({
                 {headerGroup.headers.map((header) => (
                   <SortableHead
                     key={header.id}
+                    pinned={formColumnProfile === "players" && header.column.id === "player_web_name"}
                     sorted={header.column.getIsSorted()}
                     canSort={header.column.getCanSort()}
                     onToggle={header.column.getToggleSortingHandler()}
@@ -1037,9 +1069,13 @@ export function PlayerStatTable({
             ) : (
               table.getRowModel().rows.flatMap((row) => {
                 const cells = (
-                  <TableRow key={row.id} className={rowClassName?.(row.original)}>
+                  <TableRow key={row.id} className={`group/player-row ${rowClassName?.(row.original) ?? ""}`}>
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className={CELL_CLASS}>
+                      <TableCell key={cell.id} className={`${CELL_CLASS} ${
+                        formColumnProfile === "players" && cell.column.id === "player_web_name"
+                          ? "sticky left-0 z-20 bg-background group-hover/player-row:bg-muted shadow-[1px_0_0_var(--border)]"
+                          : ""
+                      }`}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}

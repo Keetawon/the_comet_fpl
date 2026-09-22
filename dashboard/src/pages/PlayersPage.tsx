@@ -431,6 +431,18 @@ export function PlayersPage() {
         player.fixtures.length === 0
           ? null
           : rawPlayerGameweekXp({ ...player, fixtures: filtered }, filters.gwFrom);
+      // Fixed five-GW value view, across both venues. Cumulative endpoints include
+      // blank/double GWs; never present a partial horizon as five gameweeks.
+      const fiveGwEnd = filters.gwFrom + 4;
+      const fiveGwEndXp = selectedRun != null && fiveGwEnd <= selectedRun.gw_to
+        ? playerHorizon(horizonIndex, player.run_id, player.season, player.code, fiveGwEnd)?.xp
+        : null;
+      const beforeFiveGwXp = filters.gwFrom === selectedRun?.gw_from
+        ? 0
+        : playerHorizon(horizonIndex, player.run_id, player.season, player.code, filters.gwFrom - 1)?.xp;
+      const fiveGwXp = fiveGwEndXp != null && beforeFiveGwXp != null &&
+        Number.isFinite(fiveGwEndXp) && Number.isFinite(beforeFiveGwXp)
+        ? fiveGwEndXp - beforeFiveGwXp : null;
       const selectedActuals = latestPlayerActualDetails(
         rollingActualsByCode.get(player.code) ?? [],
         selectedActualGameweeks,
@@ -443,6 +455,7 @@ export function PlayersPage() {
         player: { ...player, form: null },
         filtered,
         gwFromXp: gwFromHorizon?.xp ?? filteredGwFromXp,
+        fiveGwXp,
         bpsPerAppearance:
           actualRange == null
             ? null
@@ -498,6 +511,7 @@ export function PlayersPage() {
     playerMultiFilters,
     cumulativeOutcomesAvailable,
     horizonIndex,
+    selectedRun,
     actualRange,
     selectedActualGameweeks,
     expandedActualGameweeks,

@@ -14,6 +14,14 @@ it never queries DuckDB and never reads Parquet in the browser.
 
 ## Table captures and sharing
 
+The Players table pins the player name while scrolling horizontally, including in
+expanded-table mode. Its sortable **5GW xP/£m** column divides published raw xP for
+five complete GWs starting at **Forecast From** by the displayed current FPL price
+in millions. It uses both venues, independently of Forecast To and the venue filter.
+Missing horizon endpoints or a missing/invalid current price display an em dash;
+short horizons are never treated as five GWs. This display ratio changes no forecast,
+availability adjustment, planning price or optimizer input.
+
 Fixture matrix opens on **All competitions · Weekly · 10 GWs**; Reset calendar restores
 that range. This is a display horizon, separate from the published prediction horizon.
 
