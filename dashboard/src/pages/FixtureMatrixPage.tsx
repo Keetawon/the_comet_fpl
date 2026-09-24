@@ -6,6 +6,8 @@
 // gameweeks across the forecast season boundary, with explicit single-season scopes available.
 
 import { useEffect, useMemo, useState } from "react";
+import { nextFixtureGameweek } from "@/lib/competitiveCalendar";
+import { useFootballDate } from "@/lib/useFootballDate";
 import { flexRender } from "@tanstack/react-table";
 import {
   type LegacyColumnDef,
@@ -513,15 +515,19 @@ export function FixtureMatrixPage() {
     return gws.length ? Math.max(...gws) : runBounds.to;
   }, [scheduleTeams, runBounds.to]);
 
+  const today = useFootballDate();
+  const nextGw = nextFixtureGameweek(scheduleTeams.flatMap((team) => team.fixtures), today);
+  const fixtureStartGw = nextGw ?? runBounds.from;
+
   useEffect(() => {
     setFilters((current) => {
       if (!current || !runTeams.length) return current;
-      const nextTo = Math.min(runBounds.from + horizon - 1, scheduleMaxGw);
-      if (current.gwFrom === runBounds.from && current.gwTo === nextTo) return current;
-      return { ...current, gwFrom: runBounds.from, gwTo: nextTo };
+      const nextTo = Math.max(fixtureStartGw, Math.min(fixtureStartGw + horizon - 1, scheduleMaxGw));
+      if (current.gwFrom === fixtureStartGw && current.gwTo === nextTo) return current;
+      return { ...current, gwFrom: fixtureStartGw, gwTo: nextTo };
     });
     setExpanded({});
-  }, [horizon, runBounds.from, runTeams.length, scheduleMaxGw]);
+  }, [horizon, fixtureStartGw, runTeams.length, scheduleMaxGw]);
 
   const opponentStrength = useMemo(() => buildOpponentStrength(runTeams), [runTeams]);
   const strengthOf = useMemo(
@@ -861,7 +867,7 @@ export function FixtureMatrixPage() {
         <ToggleGroupItem value="gameweeks">Gameweek matrix</ToggleGroupItem>
         <ToggleGroupItem value="calendar">All competitions</ToggleGroupItem>
       </ToggleGroup>
-      {layout === "calendar" ? <CompetitiveFixtureCalendar key={activeRunId} teams={runTeams} schedule={state.schedule} fromGw={runBounds.from} toGw={runBounds.from + 9} /> : <>
+      {layout === "calendar" ? <CompetitiveFixtureCalendar key={activeRunId} teams={runTeams} schedule={state.schedule} fromGw={runBounds.from} toGw={runBounds.from + 9} /> : nextGw === null ? <p role="status">No upcoming dated Premier League fixtures in the published schedule. Use All competitions to browse retained dates.</p> : <>
       <div className="rounded-lg border bg-card p-2">
         <DifficultyLegend
           colorSource={colorSource}

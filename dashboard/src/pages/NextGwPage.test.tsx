@@ -4,7 +4,7 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   loadFixtureMatrix,
   loadNextGw,
@@ -101,6 +101,7 @@ vi.mock("@/data/load", () => ({
 const teamsForRunA: TeamRecord[] = teamsSample.teams.map((t) => ({ ...t, run_id: "run-a" }));
 
 beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-08-20T12:00:00Z"));
   window.localStorage.clear();
   vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
@@ -112,18 +113,40 @@ beforeEach(() => {
       semantics: "current_at_export_not_forecast_vintage",
       export_created_at: "2026-08-20T00:00:00+00:00",
       database_sha256: "d".repeat(64),
-      teams: [],
+      teams: teamsForRunA,
     },
     manifest: null,
     easeIndexFormulaVersion: "fixture-ease-v1",
   });
+});
+afterEach(() => vi.restoreAllMocks());
+
+it("does not present the previous GW plan as the next GW suggestion", async () => {
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-08-29T12:00:00Z"));
+  const before = JSON.stringify(plans);
+  render(<NextGwPage />);
+  expect(await screen.findByText(/No platform optimizer plan is published for 2026-27 GW2/)).toBeVisible();
+  expect(screen.queryByRole("columnheader", { name: "Plan xP GW1" })).not.toBeInTheDocument();
+  expect(JSON.stringify(plans)).toBe(before);
+});
+
+it("selects the available next-GW plan instead of an older default", async () => {
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-08-29T12:00:00Z"));
+  const next = structuredClone(plans[0]);
+  next.optimizer_run_id = "next-gw-plan";
+  next.gw_from += 1; next.gw_to += 1;
+  next.weeks = next.weeks.map((week) => ({ ...week, gw: week.gw + 1 }));
+  vi.mocked(loadNextGw).mockResolvedValue({ plans: [...plans, next] });
+  render(<NextGwPage />);
+  expect(await screen.findByRole("columnheader", { name: "Plan xP GW2" })).toBeVisible();
+  expect(screen.queryByRole("columnheader", { name: "Plan xP GW1" })).not.toBeInTheDocument();
 });
 
 describe("SummaryPage", () => {
   it("shows next GW, optimizer squad summaries, availability watch, and watchlists", async () => {
     render(<SummaryPage />);
     await waitFor(() => expect(screen.getByText(/2026-27 · GW1-3/)).toBeInTheDocument());
-    expect(screen.getByText(/First kickoff 2026-08-22 11:30 UTC/)).toBeInTheDocument();
+    expect(screen.getByText(/First kickoff 2026-08-22 14:00 UTC/)).toBeInTheDocument();
     expect(screen.getByText(/Deadlines are not sourced/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Explain with AI" })).toBeInTheDocument();
     // one platform card per formal plan, labelled by product role, never comparing EV

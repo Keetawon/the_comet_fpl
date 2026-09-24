@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calendarColumns, calendarFixtures, calendarRange, collapseInternationalDays, dailyCalendarColumns, listedClubGaps, footballDate, leagueSlot, visibleCalendar } from "./competitiveCalendar";
+import { calendarColumns, calendarFixtures, calendarRange, collapseInternationalDays, dailyCalendarColumns, listedClubGaps, footballDate, nextFixtureGameweek, leagueSlot, visibleCalendar } from "./competitiveCalendar";
 
 import { schedule, cups } from "@/data/competitiveSchedule.fixture";
 import { internationalBreaksForRange } from "@/data/internationalBreaks";
@@ -99,11 +99,24 @@ describe("descriptive all-competition calendar", () => {
     expect(JSON.stringify([schedule, cups])).toBe(before);
     expect(calendarFixtures(schedule, cups, "2026-27")).toEqual(rows);
   });
-  it("starts with the preceding midweek, omits empty days and filters exact clubs", () => {
+  it("starts on today, omits empty days and filters exact clubs", () => {
     const all = calendarFixtures(schedule, cups, "2026-27");
-    expect(calendarRange(all, 5, 5)).toEqual(["2026-09-14", "2026-09-21"]);
+    expect(calendarRange(all, 5, 5, "2026-09-14")).toEqual(["2026-09-14", "2026-09-21"]);
+    expect(calendarRange(all, 5, 5, "2026-09-20")).toEqual(["2026-09-20", "2026-09-21"]);
+    expect(calendarRange(all, 5, 5, "2026-09-24")).toEqual(["2026-09-24", "2026-09-24"]);
     expect(visibleCalendar(all, [3], "2026-09-14", "2026-09-21").dates).toEqual(["2026-09-16", "2026-09-19", "2026-09-21"]);
     expect(visibleCalendar(all, [36], "2026-09-14", "2026-09-21").rows).toEqual([]);
+  });
+  it("rolls past completed GWs, preserves an ongoing DGW, and never guesses undated fixtures", () => {
+    const fixtures = [...schedule.teams[0].fixtures,
+      { gw: 6, kickoff_time: "2026-10-10T14:00:00Z" },
+      { gw: 4, kickoff_time: null },
+      { gw: 3, kickoff_time: "invalid" }];
+    expect(nextFixtureGameweek(fixtures, "2026-09-19")).toBe(5);
+    expect(nextFixtureGameweek(fixtures, "2026-09-21")).toBe(5);
+    expect(nextFixtureGameweek(fixtures, "2026-09-24")).toBe(6);
+    expect(nextFixtureGameweek(fixtures, "2026-10-11")).toBeNull();
+    expect(nextFixtureGameweek([], "2026-09-24")).toBeNull();
   });
   it("does not borrow another season or fabricate missing dates/venue", () => {
     expect(calendarFixtures(schedule, {...cups, season: "2025-26"}, "2026-27")).toHaveLength(2);

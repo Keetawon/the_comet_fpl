@@ -35,7 +35,9 @@ import {
   type PlayerStatSummaryRow,
 } from "@/components/PlayerStatTable";
 import { loadFixtureMatrix, loadNextGw, loadPlayers } from "@/data/load";
-import type { NextGwPlan, PlanPlayer, PlanWeek, PlayerRecord, SquadContext, TeamRecord } from "@/data/types";
+import type { FixtureScheduleOverlay, NextGwPlan, PlanPlayer, PlanWeek, PlayerRecord, SquadContext, TeamRecord } from "@/data/types";
+import { nextFixtureGameweek } from "@/lib/competitiveCalendar";
+import { useFootballDate } from "@/lib/useFootballDate";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import { squadDraftHandoffHref } from "@/lib/squadDraftHandoff";
 import {
@@ -56,7 +58,7 @@ import type { LegacyColumnDef } from "@tanstack/react-table/legacy";
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; plans: NextGwPlan[]; players: PlayerRecord[]; teams: TeamRecord[] };
+  | { status: "ready"; plans: NextGwPlan[]; players: PlayerRecord[]; teams: TeamRecord[]; schedule: FixtureScheduleOverlay };
 
 const fmt = (value: number | null | undefined, digits = 1) =>
   value == null ? "–" : value.toFixed(digits);
@@ -233,6 +235,7 @@ export function NextGwPage() {
           plans: officialPlans,
           players: playersData.players,
           teams: teamsData.teams,
+          schedule: teamsData.schedule,
         });
         setPlanId(defaultPlan(officialPlans)?.optimizer_run_id ?? null);
       })
@@ -246,19 +249,23 @@ export function NextGwPage() {
     };
   }, []);
 
+  const today = useFootballDate();
+  const season = state.status === "ready" ? state.schedule.teams.map((team) => team.season).sort().at(-1) : undefined;
+  const nextGw = state.status === "ready" ? nextFixtureGameweek(state.schedule.teams.filter((team) => team.season === season).flatMap((team) => team.fixtures), today) : null;
+  const availablePlans = useMemo(() => state.status === "ready" ? state.plans.filter((p) => p.season === season && p.gw_from === nextGw) : [], [state, season, nextGw]);
   const plan = useMemo(
     () =>
       state.status === "ready"
-        ? (state.plans.find((p) => p.optimizer_run_id === planId) ?? null)
+        ? (availablePlans.find((p) => p.optimizer_run_id === planId) ?? defaultPlan(availablePlans))
         : null,
-    [state, planId],
+    [state, planId, availablePlans],
   );
 
   const diff = useMemo(() => {
     if (state.status !== "ready") return null;
-    const pair = platformComparisonPlans(state.plans);
+    const pair = platformComparisonPlans(availablePlans);
     return pair ? diffPlans(pair.defaultPlan, pair.diagnosticPlan) : null;
-  }, [state]);
+  }, [state, availablePlans]);
 
   const runPlayers = useMemo(
     () =>
@@ -353,7 +360,7 @@ export function NextGwPage() {
       </div>
     );
   }
-  if (!plan) return <p className="p-6 text-muted-foreground">Select a plan.</p>;
+  if (!plan) return <div className="p-6"><h1 className="mb-2 text-lg font-semibold">Next GW suggestion</h1><p role="status" className="text-sm text-muted-foreground">{nextGw === null ? "The next gameweek is unavailable: no upcoming dated fixtures are published." : `No platform optimizer plan is published for ${season} GW${nextGw}. A new plan is required for this gameweek.`}</p></div>;
 
   const horizon = plan.gw_to - plan.gw_from + 1;
   const week = plan.weeks[0];
@@ -456,13 +463,13 @@ export function NextGwPage() {
           </p>
         </div>
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          {state.plans.length > 1 && (
+          {availablePlans.length > 1 && (
             <Select value={plan.optimizer_run_id} onValueChange={setPlanId}>
               <SelectTrigger size="sm" className="w-full min-w-0 max-w-full overflow-hidden sm:w-80 [&_[data-slot=select-value]]:min-w-0" aria-label="Platform model">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {state.plans.map((p) => (
+                {availablePlans.map((p) => (
                   <SelectItem key={p.optimizer_run_id} value={p.optimizer_run_id}>
                     {planDisplayLabel(p)} · GW{p.gw_from}–{p.gw_to}
                   </SelectItem>
@@ -632,7 +639,7 @@ export function NextGwPage() {
         items={[
           {
             id: "scope.plan",
-            statement: `${state.plans.length} formal platform output${state.plans.length === 1 ? " is" : "s are"} published; this view shows ${planDisplayLabel(plan)} for GW${plan.gw_from}-${plan.gw_to}.`,
+            statement: `${availablePlans.length} formal platform output${availablePlans.length === 1 ? " is" : "s are"} published for the upcoming GW; this view shows ${planDisplayLabel(plan)} for GW${plan.gw_from}-${plan.gw_to}.`,
           },
           {
             id: "sum.first_week_xp",

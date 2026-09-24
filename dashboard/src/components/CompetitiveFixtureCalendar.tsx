@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useFootballDate } from "@/lib/useFootballDate";
 import { Download } from "lucide-react";
 import { loadCompetitiveSchedule, type CompetitiveSchedule } from "@/data/competitiveSchedule";
 import { INTERNATIONAL_BREAK_SOURCE, internationalBreaksForRange } from "@/data/internationalBreaks";
 import type { FixtureScheduleOverlay, TeamRecord } from "@/data/types";
-import { calendarColumns, calendarFixtures, calendarRange, collapseInternationalDays, dailyCalendarColumns, listedClubGaps, MAX_DAILY_DAYS, leagueSlot, visibleCalendar, type CalendarFixture } from "@/lib/competitiveCalendar";
+import { calendarColumns, calendarFixtures, calendarRange, collapseInternationalDays, dailyCalendarColumns, footballDate, nextFixtureGameweek, listedClubGaps, MAX_DAILY_DAYS, leagueSlot, visibleCalendar, type CalendarFixture } from "@/lib/competitiveCalendar";
 import { BUCKET_CLASSES, FDR_LEGEND, OPPONENT_LEGEND, NULL_BUCKET_CLASS, fdrBucket } from "@/lib/difficulty";
 import { buildOpponentStrength, opponentStrengthBucket } from "@/lib/opponentStrength";
 import { DecisionTableFullscreen } from "@/components/DecisionTableFullscreen";
@@ -47,15 +48,18 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
   }, []);
   const season = teams[0]?.season ?? "";
   const all = useMemo(() => calendarFixtures(schedule, data, season), [schedule, data, season]);
-  const defaults = calendarRange(all, fromGw, fromGw + horizon - 1);
+  const today = useFootballDate();
+  const nextGw = nextFixtureGameweek(schedule.teams.filter((t) => t.season === season).flatMap((t) => t.fixtures), today);
+  const firstGw = nextGw ?? fromGw;
+  const defaults = calendarRange(all, firstGw, firstGw + horizon - 1, today);
   const [from, to] = range ?? defaults;
   const dailyTooWide = view === "daily" && (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > MAX_DAILY_DAYS;
   const invalidRange = !from || !to || from > to || dailyTooWide;
   const clubs = [...teams].filter((t) => !selected.length || selected.includes(t.team_code)).sort((a, b) => a.team_name.localeCompare(b.team_name));
-  const eligible = range === null ? all.filter((f) => f.gw === null || (f.gw >= fromGw && f.gw < fromGw + horizon)) : all;
+  const eligible = range === null ? all.filter((f) => f.gw === null || (f.gw >= firstGw && f.gw < firstGw + horizon)) : all;
   const visible = visibleCalendar(view === "daily" ? all : eligible, clubs.map((t) => t.team_code), from, to);
   const globalRange = visibleCalendar(eligible, teams.map((t) => t.team_code), from, to);
-  const selectedGws = new Set((range === null ? eligible : globalRange.rows).filter((f) => f.gw !== null).map((f) => f.gw));
+  const selectedGws = new Set((range === null ? eligible.filter((f) => !f.kickoff || footballDate(f.kickoff) >= from) : globalRange.rows).filter((f) => f.gw !== null).map((f) => f.gw));
   // Once a GW is selected, keep every leg, even an undated or later DGW leg.
   // Preserve its column when the selected club has a genuine blank.
   const breaks = internationalBreaksForRange(season, from, to);
@@ -137,6 +141,7 @@ export function CompetitiveFixtureCalendar({ teams, schedule, fromGw, toGw }: {
       {view === "daily" && <p className="text-xs text-muted-foreground">Listed gap = clear calendar days between the club’s previous and next listed games, excluding both match dates. This is not player recovery time: appearances, training, travel and national-team games are unknown. Missing cup schedules can hide games; an undated club fixture makes the gap unavailable.</p>}
       {view === "daily" && breaks.length > 0 && <p className="text-xs text-muted-foreground">International dates are folded by default. Use + Expand / − Collapse in a yellow column header to inspect individual days. Listed club games remain visible in either view.</p>}
     </div>
+    {range === null && nextGw === null && <p className="text-sm text-muted-foreground">No upcoming dated Premier League fixtures in the published schedule. Choose dates to browse the retained calendar.</p>}
     {loading && <p role="status" className="text-sm text-muted-foreground">Loading retained cup and European schedules…</p>}
     {(error || (data && data.season !== season)) && <p role="alert" className="rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">{error ?? `No competitive schedule for ${season}`}. Only official PL fixtures are shown; cup workload is unknown.</p>}
     {data?.season === season && <div className="space-y-1.5">

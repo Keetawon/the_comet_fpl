@@ -23,6 +23,7 @@ import {
 } from "@/data/load";
 import type {
   DashboardManifest,
+  FixtureScheduleOverlay,
   NextGwPlan,
   PlayerRecord,
   SummaryData,
@@ -31,6 +32,8 @@ import type {
 import { currentAvailability, hasCurrentAvailabilityConcern } from "@/lib/availability";
 import { AvailabilityBadge } from "@/components/AvailabilityBadge";
 import { summaryNextGw, topNextPlayers } from "@/lib/summaryRest";
+import { nextFixtureGameweek } from "@/lib/competitiveCalendar";
+import { useFootballDate } from "@/lib/useFootballDate";
 import { rawPlayerGameweekXp } from "@/lib/userDraft";
 import { chipBucket, chipMetric } from "@/lib/fixtureChips";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
@@ -51,6 +54,7 @@ type PageState =
       summary: SummaryData;
       players: PlayerRecord[];
       teams: TeamRecord[];
+      schedule: FixtureScheduleOverlay;
       plans: NextGwPlan[];
       manifest: DashboardManifest | null;
       runs: { run_id: string; season: string; gw_from: number; gw_to: number }[];
@@ -88,6 +92,7 @@ function Card({
 }
 
 export function SummaryPage() {
+  const today = useFootballDate();
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [runId, setRunId] = useState<string | null>(null);
 
@@ -124,6 +129,7 @@ export function SummaryPage() {
           summary,
           players: playersData.players,
           teams: teamsData.teams,
+          schedule: teamsData.schedule,
           plans: nextGw.plans,
           manifest: playersData.manifest ?? teamsData.manifest,
           runs,
@@ -154,7 +160,12 @@ export function SummaryPage() {
     const opponentStrength = buildOpponentStrength(teams);
     const opponentIndexOf = (code: number) => opponentStrength.get(code)?.index ?? null;
 
-    const nextGw = summaryNextGw(state.summary, run);
+    const scheduleFixtures = state.schedule.teams.filter((team) => team.season === run.season).flatMap((team) => team.fixtures);
+    const nextGw = summaryNextGw(state.summary, run, nextFixtureGameweek(scheduleFixtures, today));
+    const nextFixtures = scheduleFixtures.filter((fixture) => fixture.gw === nextGw);
+    const firstKickoff = nextFixtures.flatMap((fixture) => fixture.kickoff_time ? [fixture.kickoff_time] : [])
+      .sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
+    const fixtureCount = new Set(nextFixtures.map((fixture) => fixture.fixture)).size;
     const withXp = players
       .map((player) => ({ player, next: nextGw === null ? null : rawPlayerGameweekXp(player, nextGw) }))
       .sort((a, b) => (b.next ?? -Infinity) - (a.next ?? -Infinity) || a.player.code - b.player.code);
@@ -181,8 +192,8 @@ export function SummaryPage() {
     const easiest = teamEase.slice(0, 3);
     const hardest = [...teamEase].reverse().slice(0, 3);
 
-    return { run, players, teams, gwFrom, gwTo, nextGw, opponentIndexOf, topNext, flagged, easiest, hardest };
-  }, [state, runId]);
+    return { run, players, teams, gwFrom, gwTo, nextGw, firstKickoff, fixtureCount, opponentIndexOf, topNext, flagged, easiest, hardest };
+  }, [state, runId, today]);
 
   if (state.status === "loading") {
     return <p role="status" className="p-6 text-muted-foreground">Loading your gameweek overview…</p>;
@@ -246,11 +257,11 @@ export function SummaryPage() {
           </div>
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
-          <p className="flex items-center gap-2"><CalendarDays className="size-4" aria-hidden="true" />{view.nextGw !== null && summary.next_gameweek?.first_kickoff
-            ? `First kickoff ${summary.next_gameweek.first_kickoff.replace("T", " ").slice(0, 16)} UTC`
+          <p className="flex items-center gap-2"><CalendarDays className="size-4" aria-hidden="true" />{view.firstKickoff
+            ? `First kickoff ${new Date(view.firstKickoff).toISOString().replace("T", " ").slice(0, 16)} UTC`
             : "Kickoff information unavailable"}</p>
           <p>Forecast as of {first?.as_of?.replace("T", " ").slice(0, 16) ?? "unknown date"} UTC</p>
-          {view.nextGw !== null && summary.next_gameweek?.fixture_count != null && <p>{summary.next_gameweek.fixture_count} fixtures</p>}
+          {view.nextGw !== null && <p>{view.fixtureCount} fixtures</p>}
         </div>
       </header>
 

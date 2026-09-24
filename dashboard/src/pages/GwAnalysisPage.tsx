@@ -6,6 +6,8 @@ import { loadFixtureMatrix, loadSummary, type FixtureMatrixData } from "@/data/l
 import { loadSdpStats, type SdpStatsData } from "@/data/sdpStats";
 import { buildMatchPreviews, type MatchPreview } from "@/lib/matchPreview";
 import { buildGwBriefing } from "@/lib/gwBriefing";
+import { nextFixtureGameweek } from "@/lib/competitiveCalendar";
+import { useFootballDate } from "@/lib/useFootballDate";
 import { copyGwBriefing, downloadGwBriefing, gwBriefingLineUrl, prepareGwBriefingFacebook, shareGwBriefing } from "@/lib/gwBriefingShare";
 
 type Language = "en" | "th";
@@ -89,6 +91,7 @@ function MatchOutlook({ match }: { match: MatchPreview }) {
 }
 
 export function GwAnalysisPage() {
+  const today = useFootballDate();
   const [state, setState] = useState<PageState>({ status: "loading" });
   const [stats, setStats] = useState<StatsState>({ status: "loading" });
   const [runId, setRunId] = useState<string | null>(null);
@@ -103,18 +106,22 @@ export function GwAnalysisPage() {
     return () => { active = false; };
   }, []);
   const teams = useMemo(() => state.status === "ready" ? state.data.teams : [], [state]);
-  const runs = [...new Map(teams.map(team => [team.run_id, { id: team.run_id, season: team.season, asOf: team.as_of }])).values()];
-  const defaultRun = state.status === "ready" && runs.some(run => run.id === state.latestRun) ? state.latestRun : runs.at(-1)?.id;
+  const runs = [...new Map(teams.map(team => [team.run_id, { id: team.run_id, season: team.season, asOf: team.as_of }])).values()]
+    .sort((a, b) => Date.parse(b.asOf) - Date.parse(a.asOf) || a.id.localeCompare(b.id));
+  const defaultRun = state.status === "ready" && runs.some(run => run.id === state.latestRun) ? state.latestRun : runs[0]?.id;
   const selectedRun = runs.some(run => run.id === runId) ? runId : defaultRun;
   const runTeams = useMemo(() => teams.filter(team => team.run_id === selectedRun), [teams, selectedRun]);
   const built = useMemo(() => buildMatchPreviews(runTeams), [runTeams]);
   const gameweeks = [...new Set(runTeams.flatMap(team => team.fixtures.map(fixture => fixture.gw)))].filter(value => Number.isInteger(value) && value >= 1 && value <= 38).sort((a, b) => a - b);
-  const selectedGw = gw != null && gameweeks.includes(gw) ? gw : gameweeks[0];
-  const matches = built.matches.filter(match => match.gw === selectedGw);
   const selectedSeason = runTeams[0]?.season;
   const scheduleTeams = state.status === "ready" ? state.data.schedule.teams.filter(team => team.season === selectedSeason) : [];
+  const nextGw = nextFixtureGameweek(scheduleTeams.flatMap(team => team.fixtures), today);
+  const defaultGw = selectedRun !== defaultRun ? gameweeks[0] : nextGw;
+  const options = [...new Set([...gameweeks, ...(nextGw === null ? [] : [nextGw])])].sort((a, b) => a - b);
+  const selectedGw = gw != null && options.includes(gw) ? gw : defaultGw;
+  const matches = built.matches.filter(match => match.gw === selectedGw);
   const expectedFixtureIds = scheduleTeams.length ? [...new Set(scheduleTeams.flatMap(team => team.fixtures.filter(fixture => fixture.gw === selectedGw).map(fixture => fixture.fixture)))].sort((a, b) => a - b) : undefined;
-  const briefing = selectedGw == null ? null : buildGwBriefing({ matches, gw: selectedGw, language, stats: stats.status === "ready" ? stats.data : null,
+  const briefing = selectedGw == null || !gameweeks.includes(selectedGw) ? null : buildGwBriefing({ matches, gw: selectedGw, language, stats: stats.status === "ready" ? stats.data : null,
     exportCreatedAt: state.status === "ready" ? state.data.manifest?.source.export_created_at ?? state.data.schedule.export_created_at : null, expectedFixtureIds });
   const sharedText = briefing?.text ? `${selectedRun?.startsWith("DEMO-") ? "DEMO · Synthetic preview only. Not current football forecasts.\n\n" : ""}${briefing.text}` : "";
   const sides = matches.flatMap(match => [match.home, match.away]);
@@ -132,7 +139,7 @@ export function GwAnalysisPage() {
     {selectedRun?.startsWith("DEMO-") && <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">DEMO · Synthetic preview data. These are not current football forecasts.</p>}
     {state.status === "loading" ? <p role="status" className="rounded-xl border p-6 text-sm text-muted-foreground">Loading the matchweek outlook…</p> : state.status === "unavailable" ? <div role="status" className="rounded-xl border border-dashed p-6"><h2 className="font-semibold">This matchweek is not available yet</h2><p className="mt-2 text-sm text-muted-foreground">The forecast could not be loaded. Please try again later.</p></div> : <>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap items-end gap-4"><label className="flex flex-col gap-1.5 text-xs font-medium">Gameweek<select className={fieldClass} value={selectedGw ?? ""} disabled={!gameweeks.length} onChange={event => setGw(Number(event.target.value))}>{!gameweeks.length && <option value="">Unavailable</option>}{gameweeks.map(value => <option key={value} value={value}>GW{value}</option>)}</select></label><p className="pb-3 text-xs text-muted-foreground">Forecast dated {utc(runTeams[0]?.as_of ?? "")}</p></div>
+        <div className="flex flex-wrap items-end gap-4"><label className="flex flex-col gap-1.5 text-xs font-medium">Gameweek<select className={fieldClass} value={selectedGw ?? ""} disabled={!options.length} onChange={event => setGw(Number(event.target.value))}>{selectedGw == null && <option value="">No upcoming dated fixtures</option>}{options.map(value => <option key={value} value={value}>GW{value}{gameweeks.includes(value) ? "" : " (forecast unavailable)"}</option>)}</select></label><p className="pb-3 text-xs text-muted-foreground">Forecast dated {utc(runTeams[0]?.as_of ?? "")}</p></div>
         <div className="flex gap-1 rounded-lg border p-1" role="group" aria-label="Post language">{(["th", "en"] as const).map(value => <Button key={value} className="min-h-11 px-4" variant={language === value ? "secondary" : "ghost"} aria-pressed={language === value} onClick={() => setLanguage(value)}>{value === "th" ? "ไทย" : "English"}</Button>)}</div>
       </div>
       {matches.length > 0 && <div className="grid gap-3 sm:grid-cols-3">

@@ -2,9 +2,33 @@
 
 The Fixture Matrix now has an additive **All competitions** view. Club rows and
 compact 84px period columns show **Weekend / GWx** and **Midweek / competition**.
-The default begins with the cup week before the selected forecast's first GW.
-Quick controls show 5, 10 or 15 GWs; a custom date range remains available.
+Since the owner repair on 2026-09-24, the default begins **today in UK time**.
+Quick controls show 5, 10 or 15 GWs starting with the earliest official GW that
+still has a dated fixture today or later in the selected season's current schedule.
+A custom date range remains available; Reset calendar returns to today's date.
 Dates and UK kickoff times are in accessible match tooltips and CSV cells.
+
+The Gameweek matrix uses the same upcoming-GW selector. Score Prediction defaults
+to that GW in the latest published forecast, and explicitly reports a missing
+forecast rather than opening a completed GW. Manually selected historical GWs and
+forecast records remain available. When Summary is unavailable, the newest dated
+forecast record is the fallback, independent of file ordering. Local Next GW
+suggestion accepts only platform plans whose season and starting GW match the
+current schedule selection; a plan covering a later week within an older planning
+horizon is not relabelled as a new next-GW plan. Missing plans stay unavailable.
+Summary's next-GW ranking, kickoff and fixture count also use this current schedule
+selection. If that GW is outside the selected forecast horizon, Summary shows
+Not covered and does not backfill rankings from the previous GW.
+
+Open views recheck the UK date once a minute and when a tab regains focus or
+visibility. Explicit calendar dates and historical GW selections are preserved.
+This advances display defaults from already-published schedules; it does not fetch
+new forecasts, infer an FPL deadline, modify predictions or rerun the optimizer.
+Today includes the whole UK date. An ongoing DGW retains all its official legs in
+Weekly; Daily still clips to the exact selected dates. Unknown kickoff times do
+not establish an upcoming GW. If no future dated PL fixture is published, the
+calendar starts on today with an availability message, and the matrix and Next GW
+suggestion report that no upcoming dated GW can be established.
 
 The **Weekly / Daily** toggle retains the chosen teams, horizon, dates and
 difficulty source. Weekly remains the default. Daily uses continuous 76px UK-date
@@ -145,6 +169,26 @@ downloaded CSV, public export/replay receipts and source reconciliation are
 retained under `data/artifacts/competitive-calendar-20260915/` (local, ignored).
 
 ## Verification
+
+Date/GW rollover repair (2026-09-24): all 774 frontend tests pass, including
+UK-midnight/focus rollover, an ongoing DGW, explicit historical selections,
+expired schedule coverage, and missing next-GW forecasts/plans. TypeScript/Vite
+build and frontend lint pass with the nine existing Fast Refresh warnings.
+Installed Chrome verified today's calendar start, GW6 in the matrix, Score
+Prediction and Summary, and the explicit missing-GW6-plan message. The retained
+local data has no optional cup/rest sidecars, so those unavailable-data notices
+remain. Logs and the browser receipt are in
+`data/artifacts/fixture-date-defaults-20260924/`. Existing owner files and the
+protected SDP/news worktrees retain their original hashes. No data publication
+or deployment was performed.
+
+The broader Python gate is not clean: 4,455 tests pass, 4 skip, 66 fail and 22
+error. Failures include frozen-byte/contract checks in unchanged files, missing
+Windows symlink privilege, reference-component assertions and a local HTTP
+connection abort. No Python source, tests, configuration or workflows changed
+in this repair. Ruff check and strict mypy pass; the root-only formatting check
+reports 11 existing unformatted Python files, including the owner's probe.
+Protected worktrees are excluded from the formatting scan.
 
 Cup colour update (2026-09-16): both Weekly and Daily use the same blue scale,
 darkest to lightest: UCL, UEL, UECL, FA Cup (FAC), League Cup (LC). These are

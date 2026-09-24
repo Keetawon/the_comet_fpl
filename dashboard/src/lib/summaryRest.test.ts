@@ -24,12 +24,12 @@ function report(): RestSummary {
 }
 
 describe("Summary next-GW ranking", () => {
-  it("uses the published next GW, not the first stale horizon; no out-of-range/season substitution", () => {
+  it("uses the current schedule GW, not a stale summary or horizon; no out-of-range/season substitution", () => {
     const summary = { latest_run: { season: "2026-27" }, next_gameweek: { gw: 5 } } as SummaryData;
-    expect(summaryNextGw(summary, { season: "2026-27", gw_from: 3, gw_to: 7 })).toBe(5);
-    expect(summaryNextGw(summary, { season: "2026-27", gw_from: 1, gw_to: 3 })).toBeNull();
-    expect(summaryNextGw(summary, { season: "2025-26", gw_from: 1, gw_to: 38 })).toBeNull();
-    expect(summaryNextGw({ ...summary, next_gameweek: null }, { season: "2026-27", gw_from: 1, gw_to: 38 })).toBeNull();
+    expect(summaryNextGw(summary, { season: "2026-27", gw_from: 3, gw_to: 7 }, 6)).toBe(6);
+    expect(summaryNextGw(summary, { season: "2026-27", gw_from: 1, gw_to: 3 }, 6)).toBeNull();
+    expect(summaryNextGw(summary, { season: "2025-26", gw_from: 1, gw_to: 38 }, 6)).toBeNull();
+    expect(summaryNextGw(summary, { season: "2026-27", gw_from: 1, gw_to: 38 }, null)).toBeNull();
   });
   it("shows only 15 raw next-GW values, breaks ties by stable code, and never uses availability or horizon", () => {
     const players: PlayerRecord[] = Array.from({ length: 20 }, (_, i) => ({ ...player(20 - i, 20 - i), availability_multiplier: 0 }));

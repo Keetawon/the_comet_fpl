@@ -50,6 +50,29 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function ready() { return screen.findByRole("textbox", { name: "Analysis message" }) as Promise<HTMLTextAreaElement>; }
 function sources() { fireEvent.click(screen.getByText("Sources & how to read this")); }
 
+it("advances the default to the next scheduled GW and preserves an explicit historical selection", async () => {
+  render(<GwAnalysisPage />); await ready();
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-24T12:00:00Z"));
+  fireEvent.focus(window);
+  expect(screen.getByRole("combobox", { name: "Gameweek" })).toHaveValue("7");
+  fireEvent.change(screen.getByRole("combobox", { name: "Gameweek" }), { target: { value: "5" } });
+  fireEvent.focus(window);
+  expect(screen.getByRole("combobox", { name: "Gameweek" })).toHaveValue("5");
+});
+
+it("shows the next scheduled GW as unavailable when its forecast has not been published", async () => {
+  const data = matrix();
+  data.schedule.teams[0].fixtures.push(fixture(51, 6, true, 1.2));
+  data.schedule.teams[0].fixtures.at(-1)!.kickoff_time = "2026-09-25T14:00:00Z";
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-24T12:00:00Z"));
+  vi.mocked(loadFixtureMatrix).mockResolvedValue(data);
+  render(<GwAnalysisPage />);
+  await screen.findByRole("option", { name: "GW6 (forecast unavailable)" });
+  expect(screen.getByRole("combobox", { name: "Gameweek" })).toHaveValue("6");
+  expect(screen.queryByRole("textbox", { name: "Analysis message" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("article")).not.toBeInTheDocument();
+});
+
 it("shows Score Prediction with unchanged goal averages and team clean-sheet chances, not invented score picks", async () => {
   render(<GwAnalysisPage />);
   const text = await ready();
@@ -149,7 +172,7 @@ it("retains observed zero and the original estimate below the rounded score", as
 it("keeps a usable post without SDP statistics and labels the missing context", async () => {
   vi.mocked(loadSummary).mockRejectedValue(new Error("No summary"));
   render(<GwAnalysisPage />);
-  expect((await ready()).value).toContain("GW3");
+  expect((await ready()).value).toContain("GW5");
   expect(screen.getByText(/Recent team statistics are unavailable/)).toBeInTheDocument();
   vi.mocked(copyGwBriefing).mockRejectedValueOnce(new Error("Copy denied. Download the text instead."));
   fireEvent.click(screen.getByRole("button", { name: "Copy text" }));

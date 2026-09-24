@@ -4,9 +4,8 @@ import { rawPlayerGameweekXp } from "@/lib/userDraft";
 
 export interface RankedNextPlayer { player: PlayerRecord; xp: number }
 
-/** The published upcoming GW is authoritative; never substitute an older horizon. */
-export function summaryNextGw(summary: SummaryData, run: { season: string; gw_from: number; gw_to: number }): number | null {
-  const gw = summary.next_gameweek?.gw;
+/** Use the current schedule's upcoming GW only when this forecast covers it. */
+export function summaryNextGw(summary: SummaryData, run: { season: string; gw_from: number; gw_to: number }, gw: number | null): number | null {
   return summary.latest_run?.season === run.season && gw != null && Number.isInteger(gw) && gw >= run.gw_from && gw <= run.gw_to ? gw : null;
 }
 

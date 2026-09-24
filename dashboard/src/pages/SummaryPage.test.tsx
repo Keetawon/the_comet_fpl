@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SummaryPage } from "./SummaryPage";
 
 const { load } = vi.hoisted(() => {
@@ -17,7 +17,10 @@ const { load } = vi.hoisted(() => {
       now_cost: 50, availability_status: "a", as_of: "2026-09-15T00:00:00Z",
       fixtures: [{ gw: 5, expected_points: 4.5 }],
     }] }),
-    loadFixtureMatrix: vi.fn().mockResolvedValue({ manifest: null, teams: [] }),
+    loadFixtureMatrix: vi.fn().mockResolvedValue({ manifest: null, teams: [], schedule: { teams: [{ season: "2026-27", fixtures: [
+      { fixture: 51, gw: 5, kickoff_time: "2026-09-20T14:00:00Z" },
+      { fixture: 61, gw: 6, kickoff_time: "2026-09-26T14:00:00Z" },
+    ] }] } }),
     loadNextGw: vi.fn().mockResolvedValue({ plans: [
       { ...plan, optimizer_run_id: "formal", plan_kind: "platform_default" },
       { ...plan, optimizer_run_id: "private", plan_kind: "user_custom" },
@@ -30,7 +33,8 @@ vi.mock("@/data/restSummary", () => ({ loadRestSummary: vi.fn().mockRejectedValu
 vi.mock("@/components/InsightSummaryPanel", () => ({ InsightSummaryPanel: () => null }));
 vi.mock("@/components/NewsFeed", () => ({ NewsFeed: () => <p>Latest published news</p> }));
 
-afterEach(() => vi.unstubAllEnvs());
+beforeEach(() => vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-19T12:00:00Z")));
+afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 it.each([false, true])("keeps published xP but hides all optimizer cards when hosted=%s", async hosted => {
   vi.stubEnv("VITE_HOSTED_STATIC", String(hosted));
@@ -83,10 +87,21 @@ it("puts player decisions first and keeps forecast controls behind an accessible
 });
 
 it("never relabels an uncovered forecast as the current gameweek", async () => {
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-24T12:00:00Z"));
   load.loadSummary.mockResolvedValueOnce({ latest_run: { run_id: "frozen", season: "2026-27", gw_from: 5, gw_to: 5 }, next_gameweek: { gw: 6 } });
   render(<SummaryPage />);
   expect(await screen.findByText("Not covered")).toBeInTheDocument();
   expect(screen.getByText("Kickoff information unavailable")).toBeInTheDocument();
   expect(screen.getByText(/published next GW is not covered/)).toBeInTheDocument();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
+});
+
+it("rolls the homepage forward even when retained summary metadata still calls GW5 next", async () => {
+  render(<SummaryPage />);
+  await screen.findByRole("heading", { name: "Top 15 players · GW5" });
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-24T12:00:00Z"));
+  fireEvent.focus(window);
+  expect(await screen.findByText("Not covered")).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "Top 15 players · GW5" })).not.toBeInTheDocument();
+  expect(screen.queryByText(/First kickoff 2026-09-20/)).not.toBeInTheDocument();
 });

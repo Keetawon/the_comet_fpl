@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { loadCompetitiveSchedule } from "@/data/competitiveSchedule";
 import type { TeamRecord } from "@/data/types";
@@ -11,7 +11,40 @@ const teams = [{run_id: "unchanged", as_of: "2026-09-14T00:00:00Z", season: "202
   team_code: 3, team_name: "Arsenal", short_name: "ARS", form: null, fixtures: []}] as TeamRecord[];
 
 describe("club calendar interactions", () => {
-  beforeEach(() => { vi.mocked(loadCompetitiveSchedule).mockResolvedValue(cups); });
+  beforeEach(() => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-14T12:00:00Z"));
+    vi.mocked(loadCompetitiveSchedule).mockResolvedValue(cups);
+  });
+  afterEach(() => vi.restoreAllMocks());
+  it("opens from today's UK date and the next GW, preserves manual dates, and resets to today", async () => {
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-23T23:30:00Z"));
+    const current = structuredClone(schedule);
+    current.teams[0].fixtures.push({ ...current.teams[0].fixtures[0], fixture: 60, gw: 6, kickoff_time: "2026-10-10T14:00:00Z" });
+    const before = JSON.stringify(current);
+    render(<CompetitiveFixtureCalendar teams={teams} schedule={current} fromGw={5} toGw={5} />);
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+    expect(screen.getByLabelText("Calendar from")).toHaveValue("2026-09-24");
+    expect(screen.getByLabelText("Calendar to")).toHaveValue("2026-10-10");
+    expect(screen.getByRole("columnheader", { name: /GW6/ })).toBeVisible();
+    expect(screen.queryByText("GW5")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Arsenal: CUP/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Calendar from"), { target: { value: "2026-09-14" } });
+    expect(screen.getByRole("columnheader", { name: /GW5/ })).toBeVisible();
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-25T12:00:00Z"));
+    fireEvent.focus(window);
+    expect(screen.getByLabelText("Calendar from")).toHaveValue("2026-09-14");
+    fireEvent.click(screen.getByRole("button", { name: "Reset calendar" }));
+    expect(screen.getByLabelText("Calendar from")).toHaveValue("2026-09-25");
+    expect(JSON.stringify(current)).toBe(before);
+  });
+  it("does not reopen a completed GW when the schedule has no future dated fixtures", async () => {
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-24T12:00:00Z"));
+    render(<CompetitiveFixtureCalendar teams={teams} schedule={schedule} fromGw={5} toGw={5} />);
+    await screen.findByText(/No upcoming dated Premier League fixtures/);
+    expect(screen.getByLabelText("Calendar from")).toHaveValue("2026-09-24");
+    expect(screen.queryByText("GW5")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
   it("expands and collapses daily international dates with keyboard focus, fixtures and CSV preserved", async () => {
     const user = userEvent.setup();
     render(<CompetitiveFixtureCalendar teams={teams} schedule={schedule} fromGw={5} toGw={5} />);

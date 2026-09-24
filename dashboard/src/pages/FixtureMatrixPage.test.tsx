@@ -3,9 +3,9 @@
 // default sort by the selected horizon measure, and opponent-strength colouring direction
 // (a weak opponent colours green, a strong opponent red, regardless of the row club).
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadFixtureMatrix, loadNextGw, loadSummary, loadTeamActuals, loadTeamProvisionalActuals } from "@/data/load";
 import sample from "@/data/sampleFixtureMatrix.json";
 import nextGwSample from "@/data/sampleNextGw.json";
@@ -112,11 +112,12 @@ const schedule: FixtureScheduleOverlay = {
       team_name: "Alpha",
       short_name: "ALP",
       fixtures: [
+        ...sample.teams[0].fixtures,
         ...Array.from({ length: 11 }, (_, index) => {
           const gw = index + 5;
           return {
             gw,
-            fixture: gw === 6 ? 100 : 200 + gw,
+            fixture: gw === 6 ? 600 : 200 + gw,
             kickoff_time: `2026-10-${String(gw).padStart(2, "0")}T14:00:00+00:00`,
             opponent_team_code: 102,
             opponent_short_name: "BET",
@@ -140,18 +141,18 @@ const schedule: FixtureScheduleOverlay = {
       team_code: 102,
       team_name: "Beta",
       short_name: "BET",
-      fixtures: Array.from({ length: 11 }, (_, index) => {
+      fixtures: [...sample.teams[1].fixtures, ...Array.from({ length: 11 }, (_, index) => {
         const gw = index + 5;
         return {
           gw,
-          fixture: gw === 6 ? 100 : 200 + gw,
+          fixture: gw === 6 ? 600 : 200 + gw,
           kickoff_time: `2026-10-${String(gw).padStart(2, "0")}T14:00:00+00:00`,
           opponent_team_code: 101,
           opponent_short_name: "ALP",
           was_home: gw % 2 === 0,
           official_fdr: 4,
         };
-      }).filter((fixture) => fixture.gw !== 7),
+      }).filter((fixture) => fixture.gw !== 7)],
     },
   ],
 };
@@ -165,6 +166,7 @@ vi.mock("@/data/load", () => ({
 }));
 
 beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-08-20T12:00:00Z"));
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
   vi.mocked(loadFixtureMatrix).mockResolvedValue({
     teams: sample.teams,
@@ -182,8 +184,27 @@ beforeEach(() => {
   });
   vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe("FixtureMatrixPage", () => {
+  it("rolls both fixture layouts to the next dated GW even when the forecast starts earlier", async () => {
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-10-05T23:30:00Z"));
+    const user = userEvent.setup();
+    const before = JSON.stringify([sample, schedule]);
+    render(<FixtureMatrixPage />);
+    await screen.findByRole("radio", { name: "All competitions" });
+    expect(screen.getByLabelText("Calendar from")).toHaveValue("2026-10-06");
+    expect(screen.queryByText("GW5")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Gameweek matrix" }));
+    expect(screen.getByRole("columnheader", { name: "GW6" })).toBeVisible();
+    expect(screen.getByRole("columnheader", { name: "GW10" })).toBeVisible();
+    expect(screen.queryByRole("columnheader", { name: "GW5" })).not.toBeInTheDocument();
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-10-07T12:00:00Z"));
+    fireEvent.focus(window);
+    await waitFor(() => expect(screen.queryByRole("columnheader", { name: "GW6" })).not.toBeInTheDocument());
+    expect(screen.getByRole("columnheader", { name: "GW7" })).toBeVisible();
+    expect(JSON.stringify([sample, schedule])).toBe(before);
+  });
   it("defaults to All competitions, Weekly and 10 GWs, including reset", async () => {
     const user = userEvent.setup();
     render(<FixtureMatrixPage />);

@@ -1,5 +1,5 @@
 import type { CompetitiveSchedule } from "@/data/competitiveSchedule";
-import type { FixtureScheduleOverlay } from "@/data/types";
+import type { FixtureScheduleOverlay, ScheduleFixture } from "@/data/types";
 import type { InternationalBreak } from "@/data/internationalBreaks";
 
 export interface CalendarFixture {
@@ -14,6 +14,13 @@ export const MAX_DAILY_DAYS = 366;
 /** A fixed UK football calendar, independent of the browser's time zone. */
 export function footballDate(instant: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(instant));
+}
+
+/** Keep an in-progress GW until its last dated leg has passed in UK calendar time. */
+export function nextFixtureGameweek(fixtures: Pick<ScheduleFixture, "gw" | "kickoff_time">[], today: string): number | null {
+  const gws = fixtures.filter((f) => f.kickoff_time && Number.isFinite(Date.parse(f.kickoff_time)) && footballDate(f.kickoff_time) >= today)
+    .map((f) => f.gw);
+  return gws.length ? Math.min(...gws) : null;
 }
 
 export function calendarFixtures(schedule: FixtureScheduleOverlay, cups: CompetitiveSchedule | null, season: string): CalendarFixture[] {
@@ -48,13 +55,10 @@ export function calendarFixtures(schedule: FixtureScheduleOverlay, cups: Competi
   return rows.sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? "") || a.key.localeCompare(b.key));
 }
 
-export function calendarRange(rows: CalendarFixture[], fromGw: number, toGw: number): [string, string] {
+export function calendarRange(rows: CalendarFixture[], fromGw: number, toGw: number, today: string): [string, string] {
   const days = rows.filter((r) => r.gw !== null && r.gw >= fromGw && r.gw <= toGw && r.kickoff)
-    .map((r) => footballDate(r.kickoff!)).sort();
-  if (!days.length) return ["", ""];
-  const first = new Date(`${days[0]}T12:00:00Z`);
-  first.setUTCDate(first.getUTCDate() - (first.getUTCDay() + 6) % 7);
-  return [first.toISOString().slice(0, 10), days.at(-1)!];
+    .map((r) => footballDate(r.kickoff!)).filter((day) => day >= today).sort();
+  return [today, days.at(-1) ?? today];
 }
 
 export function visibleCalendar(rows: CalendarFixture[], codes: number[], from: string, to: string) {
