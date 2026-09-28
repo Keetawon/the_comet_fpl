@@ -1,4 +1,4 @@
-﻿import { render, screen, waitFor } from "@testing-library/react";
+﻿import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublicationStatus } from "./PublicationStatus";
 
@@ -8,7 +8,7 @@ const receipt = {
   awaiting_finality: [{gw: 4, fixtures_completed: 10, fixtures_total: 10}],
   latest_forecast: { as_of: "2026-09-14", gw_from: 5, gw_to: 9 }, current_platform_plan: true,
 };
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("publication freshness", () => {
   it("separates latest forecast from ended but unfinalized GW4", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ok: true, json: async () => receipt}));
@@ -24,5 +24,37 @@ describe("publication freshness", () => {
     render(<PublicationStatus manifestHash="other" />);
     await waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
     expect(screen.queryByLabelText("Dashboard publication status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Data update overdue")).not.toBeInTheDocument();
+  });
+  it("warns as an open page ages beyond the operational limit without changing data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-15T07:59:00Z"));
+    const fetcher = vi.fn().mockResolvedValue({ok: true, json: async () => receipt});
+    vi.stubGlobal("fetch", fetcher);
+    await act(async () => { render(<PublicationStatus manifestHash="bound" freshnessOnly />); });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(screen.getByRole("status")).toHaveTextContent("Data update overdue");
+    expect(screen.getByRole("status")).toHaveTextContent("FPL source: 2026-09-15");
+    expect(screen.queryByText(/Officially finalized/)).not.toBeInTheDocument();
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+  it("does not treat a fresh export as proof of a fresh source", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-28T03:00:00Z"));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ok: true, json: async () => ({
+      ...receipt, exported_at: "2026-09-28T02:59:00Z",
+    })}));
+    await act(async () => { render(<PublicationStatus manifestHash="bound" freshnessOnly />); });
+    expect(screen.getByRole("status")).toHaveTextContent("Data update overdue");
+  });
+  it("reports missing source freshness", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-15T01:00:00Z"));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ok: true, json: async () => ({
+      ...receipt, source_known_at: null,
+    })}));
+    await act(async () => { render(<PublicationStatus manifestHash="bound" freshnessOnly />); });
+    expect(screen.getByRole("status")).toHaveTextContent("Data freshness unavailable");
   });
 });

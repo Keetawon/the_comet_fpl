@@ -15,8 +15,18 @@ interface Status {
 }
 
 /** Status only. No provisional observation is passed into accuracy scoring. */
-export function PublicationStatus({ manifestHash }: { manifestHash: string }) {
+export function PublicationStatus({ manifestHash, freshnessOnly = false }: { manifestHash: string; freshnessOnly?: boolean }) {
   const [status, setStatus] = useState<Status | null>(null);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    const timer = window.setInterval(update, 60_000);
+    window.addEventListener("focus", update);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", update);
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     resolveDataUrl("sdp/publication_status.json").then((url) => fetch(url))
@@ -29,7 +39,19 @@ export function PublicationStatus({ manifestHash }: { manifestHash: string }) {
     return () => { cancelled = true; };
   }, [manifestHash]);
   if (!status || status.data_manifest_sha256 !== manifestHash) return null;
+  const dates = [status.source_known_at, status.exported_at];
+  const unknownFreshness = dates.some((date) => !date || !Number.isFinite(Date.parse(date)));
+  // Match the existing operational capture-health limit; forecasts have their own dates.
+  const overdue = dates.some((date) => date && now - Date.parse(date) > 8 * 60 * 60 * 1000);
+  const warning = (overdue || unknownFreshness) ? <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+    <p className="font-semibold">{overdue ? "Data update overdue" : "Data freshness unavailable"}</p>
+    <p>{overdue ? "This page’s source data or export is over 8 hours old." : "This publication is missing a valid source or export date."} Reload to check for a newer update.</p>
+    <p className="mt-1 text-xs">FPL source: {status.source_known_at ?? "Unavailable"} · Dashboard exported: {status.exported_at || "Unavailable"}</p>
+    <p className="mt-1 text-xs">Forecasts keep their separately displayed dates.</p>
+  </div> : null;
+  if (freshnessOnly) return warning;
   return <aside aria-label="Dashboard publication status" className="rounded-lg border bg-muted/30 p-3 text-sm">
+    {warning}
     <div className="flex flex-wrap gap-x-6 gap-y-2">
       <span><strong>Officially finalized:</strong> {status.latest_finalized_gw == null ? "Unavailable" : `through GW${status.latest_finalized_gw}`}</span>
       <span><strong>Latest forecast:</strong> {status.latest_forecast ? `GW${status.latest_forecast.gw_from}–${status.latest_forecast.gw_to}` : "Unavailable"}</span>

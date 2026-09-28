@@ -15,6 +15,7 @@ import { FixtureTicker } from "@/components/FixtureTicker";
 import { VintageSelect } from "@/components/VintageSelect";
 import { SummaryRestTable } from "@/components/SummaryRestTable";
 import { NewsFeed } from "@/components/NewsFeed";
+import { PublicationStatus } from "@/components/PublicationStatus";
 import {
   loadFixtureMatrix,
   loadNextGw,
@@ -240,6 +241,7 @@ export function SummaryPage() {
 
   return (
     <div className="flex min-w-0 flex-col gap-6 p-4 lg:p-6">
+      {state.manifest && <PublicationStatus manifestHash={state.manifest.content_sha256} freshnessOnly />}
       <header className="comet-hero overflow-hidden rounded-2xl border p-5 text-foreground sm:p-7">
         <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
           <span className="rounded-full bg-secondary/70 px-3 py-1">THE COMET / MATCHWEEK BRIEFING</span>
