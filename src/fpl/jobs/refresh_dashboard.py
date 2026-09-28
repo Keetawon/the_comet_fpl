@@ -27,7 +27,7 @@ from fpl.jobs import daily_pl_sdp
 from fpl.jobs.build_db import _wal_path
 from fpl.jobs.build_sdp_dashboard import build
 from fpl.jobs.operational_disk import check_disk_space
-from fpl.jobs.operational_lock import operational_lock
+from fpl.jobs.operational_lock import _pid_alive, operational_lock
 from fpl.jobs.operational_retention import create_recovery, prune_runs
 from fpl.storage.db import connect, default_db_path
 from fpl.storage.outcomes import attach_finalized_outcomes
@@ -178,9 +178,13 @@ def assert_no_inflight_backup(
             raise ValueError(f"unattributed recovery backup requires review: {backup}") from exc
         if previous.get("retention_policy_version", 1) < 2:
             continue
+        interrupted_retention = (
+            previous.get("phase") == "retention"
+            and previous.get("retention", {}).get("status") == "RUNNING"
+        )
         published = (
             previous.get("status") == "COMPLETE"
-            and previous.get("phase") == "finished"
+            and (previous.get("phase") == "finished" or interrupted_retention)
             and previous.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
         )
         if published and previous.get("retention", {}).get("status") == "COMPLETE":
@@ -196,6 +200,16 @@ def assert_no_inflight_backup(
             ):
                 continue
             raise ValueError(f"invalid retention recovery receipt: {resolution_path}")
+        # A verified resolution stays valid even if Windows later reuses the old PID.
+        # Starting recovery still requires proof that its original owner has exited.
+        if interrupted_retention and not (
+            type(previous.get("pid")) is int
+            and previous["pid"] > 0
+            and _pid_alive(previous["pid"]) is False
+        ):
+            raise ValueError(
+                f"incomplete cycle recovery requires review before a new copy: {backup}"
+            )
         pin = previous.get("recovery_backup", {})
         if (
             published

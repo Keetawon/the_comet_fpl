@@ -212,8 +212,9 @@ def test_one_failed_cycle_backup_blocks_another_allocation(
 
 
 @pytest.mark.parametrize("retention_status", ["COMPLETE", "PARTIAL"])
+@pytest.mark.parametrize("interrupted", [False, True])
 def test_published_cycle_can_retry_retention_without_rewriting_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, retention_status: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, retention_status: str, interrupted: bool
 ) -> None:
     runs = tmp_path / "runs"
     previous = runs / "dashboard-20260920T043520Z-4a7a5276"
@@ -229,9 +230,10 @@ def test_published_cycle_can_retry_retention_without_rewriting_failure(
                 "database": str(database),
                 "retention_policy_version": 2,
                 "status": "COMPLETE",
-                "phase": "finished",
+                "phase": "retention" if interrupted else "finished",
+                "pid": 123456,
                 "public_publication": {"status": "COMPLETE"},
-                "retention": {"status": "BLOCKED", "error": "OutOfMemoryException"},
+                "retention": {"status": "RUNNING" if interrupted else "BLOCKED"},
                 "recovery_backup": {"path": str(backup), "sha256": job.digest(backup)},
             }
         )
@@ -246,12 +248,14 @@ def test_published_cycle_can_retry_retention_without_rewriting_failure(
         return {"status": retention_status}
 
     monkeypatch.setattr(job, "prune_runs", prune)
+    monkeypatch.setattr(job, "_pid_alive", lambda _: False)
     if retention_status == "PARTIAL":
         with pytest.raises(ValueError, match="incomplete cycle recovery"):
             job.assert_no_inflight_backup(runs, runs / "new", database=database, forecasts=tmp_path)
         assert not (previous / "retention-recovery.json").exists()
     else:
         job.assert_no_inflight_backup(runs, runs / "new", database=database, forecasts=tmp_path)
+        monkeypatch.setattr(job, "_pid_alive", lambda _: True)  # PID reused after resolution.
         job.assert_no_inflight_backup(runs, runs / "new", database=database, forecasts=tmp_path)
         resolution = json.loads((previous / "retention-recovery.json").read_text())
         assert resolution["original_receipt_sha256"] == job.digest(receipt)
@@ -261,6 +265,54 @@ def test_published_cycle_can_retry_retention_without_rewriting_failure(
         with pytest.raises(ValueError, match="invalid retention recovery"):
             job.assert_no_inflight_backup(runs, runs / "new", database=database, forecasts=tmp_path)
     assert receipt.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "defect",
+    ["active_pid", "unknown_pid", "missing_pid", "boolean_pid", "publication", "phase", "hash"],
+)
+def test_interrupted_retention_refuses_unproven_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, defect: str
+) -> None:
+    previous = tmp_path / "dashboard-20260924T100006Z-42179fd5"
+    previous.mkdir()
+    database = tmp_path / "active.duckdb"
+    backup = previous / "recovery.duckdb"
+    backup.write_bytes(b"preserved checkpoint")
+    payload: dict[str, Any] = {
+        "database": str(database),
+        "retention_policy_version": 2,
+        "status": "COMPLETE",
+        "phase": "retention",
+        "pid": 123456,
+        "public_publication": {"status": "COMPLETE"},
+        "retention": {"status": "RUNNING"},
+        "recovery_backup": {"path": str(backup), "sha256": job.digest(backup)},
+    }
+    monkeypatch.setattr(job, "_pid_alive", lambda _: False)
+    if defect in ("active_pid", "unknown_pid"):
+        monkeypatch.setattr(job, "_pid_alive", lambda _: True if defect == "active_pid" else None)
+    elif defect == "missing_pid":
+        payload.pop("pid")
+    elif defect == "boolean_pid":
+        payload["pid"] = True
+    elif defect == "publication":
+        payload["public_publication"]["status"] = "FAILED"
+    elif defect == "phase":
+        payload["phase"] = "dashboard"
+    else:
+        payload["recovery_backup"]["sha256"] = "wrong"
+    receipt = previous / "receipt.json"
+    receipt.write_text(json.dumps(payload), encoding="utf-8")
+    original = receipt.read_bytes()
+    monkeypatch.setattr(job, "prune_runs", lambda *a, **k: pytest.fail("unsafe retention retry"))
+    with pytest.raises(ValueError, match="incomplete cycle recovery"):
+        job.assert_no_inflight_backup(
+            tmp_path, tmp_path / "new", database=database, forecasts=tmp_path
+        )
+    assert receipt.read_bytes() == original
+    assert backup.read_bytes() == b"preserved checkpoint"
+    assert not (previous / "retention-recovery.json").exists()
 
 
 def test_cycle_preflight_budgets_backup_and_exports_before_copy(
