@@ -1,5 +1,11 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
+**Owner-directed forecast automation (2026-10-05):** connect the existing desktop
+capture cycle to the unchanged prospective primary/incumbent-shadow generator and
+evidence recorder after match/schedule changes, next-GW rollover or 24-hour age.
+Implementation and offline guards are in place; runtime activation and the first
+new publication are tracked in `docs/forecast-automation-2026-10-05.md`.
+
 **Operational repair completed (2026-09-24):** recovered a proven-dead post-capture
 dashboard export interruption through exact data-preservation checks and lossless
 checkpoint archiving. The existing capture-to-R2 task, retention and next-cycle

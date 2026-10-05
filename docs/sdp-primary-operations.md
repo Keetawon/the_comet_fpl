@@ -1,5 +1,12 @@
 # SDP primary operations
 
+October 5 forecast automation: `refresh_dashboard --refresh-forecasts` now checks
+completed-match source changes, official schedule/next-GW changes and a 24-hour
+forecast age after capture. Due forecasts use the existing primary/shadow generator
+and evidence recorder before dashboard export. This supersedes the older
+observation-only scheduling statements below when the flag is enabled. See
+[policy, receipts and activation](forecast-automation-2026-10-05.md).
+
 September 24 interruption recovery: the existing refresh can verify and archive
 a proven-dead post-capture export checkpoint before beginning a fresh cycle.
 Original failed receipts and rollback bytes remain retained. See

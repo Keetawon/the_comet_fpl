@@ -1,5 +1,5 @@
-# Existing-host shortcuts. No new forecast or public deployment.
-# Refresh reuses/creates plans through the existing unchanged pipeline.
+# Existing-host shortcuts. Forecast refresh uses the registered primary/shadow path.
+# Public publication still requires the scheduled task's explicit external R2 config.
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [Parameter(Position = 0)][ValidateSet('start', 'refresh', 'status')][string]$Action = 'status',
@@ -32,7 +32,8 @@ try {
     if ($Action -eq 'refresh') {
         if ($PSCmdlet.ShouldProcess($database, 'Run the existing complete dashboard refresh')) {
             & $python -m fpl.jobs.refresh_dashboard --db $database --runs $runs `
-                --forecast-dir $forecasts --preview-public $public --plan-store $plans
+                --forecast-dir $forecasts --preview-public $public --plan-store $plans `
+                --refresh-forecasts
             if ($LASTEXITCODE -ne 0) { throw "Dashboard refresh failed ($LASTEXITCODE); inspect its receipt." }
         }
     } elseif ($Action -eq 'status') {

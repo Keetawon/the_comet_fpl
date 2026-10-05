@@ -263,6 +263,6 @@ def publication_status(generation: Path, sidecar: dict[str, Any]) -> dict[str, A
         "latest_scored_gw": score_status,
         "meaning": (
             "Capture, forecast, plan and finalized scores have independent timestamps. "
-            "No forecast regenerated."
+            "This export reads registered immutable forecasts."
         ),
     }

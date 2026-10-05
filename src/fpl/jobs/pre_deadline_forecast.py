@@ -59,6 +59,129 @@ def _refresh_receipt(receipt_root: Path, status: int) -> tuple[Path, int]:
     return destination, status
 
 
+def generate_from_capture(
+    *,
+    database: Path,
+    receipt_root: Path,
+    refresh_report: Path,
+    status: int,
+    started_at: datetime,
+    gw_from: int,
+    gw_to: int,
+    output: Path,
+    draws: int = DEFAULT_DRAWS,
+    explicit_cutoff: datetime | None = None,
+) -> int:
+    """Run the unchanged forecast/evidence path after an already recorded capture.
+
+    The caller owns the dashboard cycle lock when used by scheduled refresh.
+    The source snapshot and pair registry retain their existing writer locks.
+    """
+    if not prospective_points_v1._git_worktree_clean(repo_root()):
+        raise ValueError("commit verified implementation before a production forecast")
+    if explicit_cutoff is not None and (
+        explicit_cutoff.tzinfo is None or explicit_cutoff > datetime.now(UTC)
+    ):
+        raise ValueError("prediction cutoff must be aware and cannot be in the future")
+    shadow_path = output.with_name(output.stem + ".shadow-incumbent.jsonl")
+    if output.exists() or shadow_path.exists():
+        raise FileExistsError("prediction vintages are immutable; choose a new output path")
+    config = load_football_environment()
+    source_database = receipt_root / "forecast-source.duckdb"
+    build_report: dict[str, object] = {
+        "started_at": started_at,
+        "prediction_cutoff": None,
+        "refresh_exit_code": status,
+        "refresh_report": str(refresh_report),
+        "refresh_report_sha256": _sha256(refresh_report),
+        "source_database": str(source_database),
+        "source_database_sha256": None,
+        "forecast_exit_code": None,
+        "evidence_exit_code": None,
+    }
+    try:
+        _snapshot_source(database, source_database)
+    except Exception as error:
+        build_report.update(
+            finished_at=datetime.now(UTC),
+            snapshot_failure=f"{type(error).__name__}: {error}",
+        )
+        daily_pl_sdp._write(receipt_root / "forecast.json", build_report)
+        return 1
+    cutoff = explicit_cutoff or datetime.now(UTC)
+    command = [
+        "--db",
+        str(source_database),
+        "--as-of",
+        cutoff.isoformat(),
+        "--season",
+        load_sources().current_season.season,
+        "--gw-from",
+        str(gw_from),
+        "--gw-to",
+        str(gw_to),
+        "--draws",
+        str(draws),
+        "--output",
+        str(output),
+        "--refresh-report",
+        str(refresh_report),
+    ]
+    if status:
+        command.extend(
+            ["--sdp-refresh-failure", f"SDP refresh exit {status}; receipts: {receipt_root}"]
+        )
+    # FPL freshness and artifact legality still fail closed inside the incumbent job.
+    forecast_failure: str | None = None
+    try:
+        forecast_status = prospective_points_v1.main(command)
+    except Exception as error:
+        forecast_status = 1
+        forecast_failure = f"{type(error).__name__}: {error}"
+    evidence_status: int | None = None
+    evidence_failure: str | None = None
+    if (
+        forecast_status == 0
+        and config.football_environment_primary == "sdp_v2"
+        and config.shadow_incumbent
+    ):
+        try:
+            evidence_status = record_sdp_evidence.main(
+                [
+                    "--db",
+                    str(database),
+                    "--primary",
+                    str(output),
+                    "--shadow",
+                    str(shadow_path),
+                ]
+            )
+        except Exception as error:
+            # Retain the completed forecast and replay image even if evidence storage fails.
+            evidence_status = 1
+            evidence_failure = f"{type(error).__name__}: {error}"
+    daily_pl_sdp._write(
+        receipt_root / "forecast.json",
+        {
+            **build_report,
+            "finished_at": datetime.now(UTC),
+            "prediction_cutoff": cutoff,
+            "refresh_exit_code": status,
+            "forecast_exit_code": forecast_status,
+            "forecast_failure": forecast_failure,
+            "evidence_exit_code": evidence_status,
+            "evidence_failure": evidence_failure,
+            "source_database": str(source_database),
+            "source_database_sha256": _sha256(source_database),
+            "primary_artifact": str(output),
+            "primary_artifact_sha256": _sha256(output) if output.is_file() else None,
+            "shadow_artifact": str(shadow_path),
+            "shadow_artifact_sha256": _sha256(shadow_path) if shadow_path.is_file() else None,
+        },
+    )
+    return forecast_status or evidence_status or 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", required=True, type=Path)
@@ -116,99 +239,18 @@ def main(argv: list[str] | None = None) -> int:
         )
         status = 1
     refresh_report, status = _refresh_receipt(receipt_root, status)
-    source_database = receipt_root / "forecast-source.duckdb"
-    build_report: dict[str, object] = {
-        "started_at": started_at,
-        "prediction_cutoff": None,
-        "refresh_exit_code": status,
-        "refresh_report": str(refresh_report),
-        "refresh_report_sha256": _sha256(refresh_report),
-        "source_database": str(source_database),
-        "source_database_sha256": None,
-        "forecast_exit_code": None,
-        "evidence_exit_code": None,
-    }
-    try:
-        _snapshot_source(args.db, source_database)
-    except Exception as error:
-        build_report.update(
-            finished_at=datetime.now(UTC),
-            snapshot_failure=f"{type(error).__name__}: {error}",
-        )
-        daily_pl_sdp._write(receipt_root / "forecast.json", build_report)
-        return 1
-    cutoff = explicit_cutoff or datetime.now(UTC)
-    command = [
-        "--db",
-        str(source_database),
-        "--as-of",
-        cutoff.isoformat(),
-        "--season",
-        load_sources().current_season.season,
-        "--gw-from",
-        str(args.gw_from),
-        "--gw-to",
-        str(args.gw_to),
-        "--draws",
-        str(args.draws),
-        "--output",
-        str(args.output),
-        "--refresh-report",
-        str(refresh_report),
-    ]
-    if status:
-        command.extend(
-            ["--sdp-refresh-failure", f"SDP refresh exit {status}; receipts: {receipt_root}"]
-        )
-    # FPL freshness and artifact legality still fail closed inside the incumbent job.
-    forecast_failure: str | None = None
-    try:
-        forecast_status = prospective_points_v1.main(command)
-    except Exception as error:
-        forecast_status = 1
-        forecast_failure = f"{type(error).__name__}: {error}"
-    evidence_status: int | None = None
-    evidence_failure: str | None = None
-    if (
-        forecast_status == 0
-        and config.football_environment_primary == "sdp_v2"
-        and config.shadow_incumbent
-    ):
-        try:
-            evidence_status = record_sdp_evidence.main(
-                [
-                    "--db",
-                    str(args.db),
-                    "--primary",
-                    str(args.output),
-                    "--shadow",
-                    str(shadow_path),
-                ]
-            )
-        except Exception as error:
-            # Retain the completed forecast and replay image even if evidence storage fails.
-            evidence_status = 1
-            evidence_failure = f"{type(error).__name__}: {error}"
-    daily_pl_sdp._write(
-        receipt_root / "forecast.json",
-        {
-            **build_report,
-            "finished_at": datetime.now(UTC),
-            "prediction_cutoff": cutoff,
-            "refresh_exit_code": status,
-            "forecast_exit_code": forecast_status,
-            "forecast_failure": forecast_failure,
-            "evidence_exit_code": evidence_status,
-            "evidence_failure": evidence_failure,
-            "source_database": str(source_database),
-            "source_database_sha256": _sha256(source_database),
-            "primary_artifact": str(args.output),
-            "primary_artifact_sha256": _sha256(args.output) if args.output.is_file() else None,
-            "shadow_artifact": str(shadow_path),
-            "shadow_artifact_sha256": _sha256(shadow_path) if shadow_path.is_file() else None,
-        },
+    return generate_from_capture(
+        database=args.db,
+        receipt_root=receipt_root,
+        refresh_report=refresh_report,
+        status=status,
+        started_at=started_at,
+        gw_from=args.gw_from,
+        gw_to=args.gw_to,
+        output=args.output,
+        draws=args.draws,
+        explicit_cutoff=explicit_cutoff,
     )
-    return forecast_status or evidence_status or 0
 
 
 if __name__ == "__main__":

@@ -1,5 +1,15 @@
 # Repository agent instructions
 
+### Owner-authorized scheduled forecast refresh (2026-10-05, V2 only)
+
+The existing desktop refresh may run the unchanged prospective primary/incumbent-shadow
+forecast and evidence path after capture when completed-match sources change, the official
+schedule/next GW changes, or the registered forecast is at least 24 hours old. Use actual
+cutoff/recording times and retain every prior forecast and its replay input. Inference,
+registration and export remain under the cycle lock; only registered artifacts publish.
+This authorizes operational automation, not fitting, retuning, historical re-evaluation,
+main merge or changing frozen player components. See `docs/forecast-automation-2026-10-05.md`.
+
 ### Owner-authorized public Players squad filter (2026-09-17)
 
 The owner additionally authorized the Players page's Manager ID filter to use the

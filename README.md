@@ -9,13 +9,15 @@ From that workspace, use the existing-host shortcuts:
 
 ```powershell
 ./scripts/comet.ps1 start    # Dashboard + optimizer, using the registered primary forecast
-./scripts/comet.ps1 refresh  # Existing data capture -> dashboard export -> build
+./scripts/comet.ps1 refresh  # Capture -> forecast if due -> dashboard export -> build
 ./scripts/comet.ps1 status   # Capture health + next scheduled run
 ```
 
 `start` serves the dashboard at <http://127.0.0.1:4173/> and the local optimizer API
-at <http://127.0.0.1:8765/>. These are local-only services. `refresh` does not generate
-a forecast; a new prediction vintage remains a separate pre-deadline operation.
+at <http://127.0.0.1:8765/>. These are local-only services. `refresh` checks for changed
+match data, official schedule/next-GW changes, or a forecast at least 24 hours old.
+When due, it creates and registers an immutable primary/incumbent-shadow pair before
+exporting. See [forecast automation](docs/forecast-automation-2026-10-05.md).
 Use `-WhatIf` with `start` or `refresh` to inspect the action without executing it.
 The editor's **Run Task** menu exposes the same three commands.
 

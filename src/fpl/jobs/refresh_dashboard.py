@@ -1,7 +1,7 @@
-"""One existing-host flow: capture, final outcomes, current plan, dashboard publication.
+"""Capture, optionally refresh forecasts, attach outcomes, build and publish.
 
-No inference or forecast replacement. A new forecast must first be registered by
-pre_deadline_forecast. A missing current artifact fails before replacing the preview.
+Forecast automation is explicit (--refresh-forecasts) and uses the existing
+pre-deadline primary/shadow path. Only registered artifacts can reach the export.
 """
 
 from __future__ import annotations
@@ -280,7 +280,7 @@ def assert_no_inflight_backup(
         if (
             previous.get("retention_policy_version") == 2
             and previous.get("status") == "RUNNING"
-            and previous.get("phase") == "dashboard"
+            and previous.get("phase") in ("dashboard", "forecast")
             and type(previous.get("capture_exit_code")) is int
             and previous["capture_exit_code"] in (0, 1)
             and "public_publication" not in previous
@@ -383,8 +383,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--plan-store", required=True, type=Path)
     parser.add_argument("--optimizer-plan", type=Path, help="Already verified initial plan")
     parser.add_argument("--skip-capture", action="store_true", help="Republish retained data only")
+    parser.add_argument(
+        "--refresh-forecasts",
+        action="store_true",
+        help="Rebuild after match/schedule changes or 24h, using this capture",
+    )
     parser.add_argument("--r2-config", type=Path, help="Optional external R2 publication config")
     args = parser.parse_args(argv)
+    if args.refresh_forecasts and args.skip_capture:
+        parser.error("--refresh-forecasts requires a fresh capture; cannot use --skip-capture")
     if not args.db.is_file() or args.db.resolve() == default_db_path().resolve():
         raise ValueError("explicit existing non-default operational database required")
     args.runs.mkdir(parents=True, exist_ok=True)
@@ -442,9 +449,11 @@ def main(argv: list[str] | None = None) -> int:
                 report["disk_preflight"] = {
                     "active_database": check_disk_space(args.db, 0),
                     "cycle_allocation": check_disk_space(
-                        destination, args.db.stat().st_size + 2 * export_bytes
+                        destination,
+                        args.db.stat().st_size * (2 if args.refresh_forecasts else 1)
+                        + 2 * export_bytes,
                     ),
-                    "estimate_basis": "database copy + twice current preview bytes; not a quota",
+                    "estimate_basis": "recovery + optional forecast copy + twice preview bytes",
                 }
                 assert_no_inflight_backup(
                     args.runs, destination, database=args.db, forecasts=args.forecast_dir
@@ -453,9 +462,10 @@ def main(argv: list[str] | None = None) -> int:
                 save()
                 if not args.skip_capture:
                     save("capture")
+                    capture_root = destination / "capture" if args.refresh_forecasts else args.runs
                     report["capture_exit_code"] = daily_pl_sdp.run(
                         database=args.db,
-                        runs=args.runs,
+                        runs=capture_root,
                         include_workload=True,
                         player_history=True,
                         cycle_backup=report["recovery_backup"],
@@ -471,6 +481,26 @@ def main(argv: list[str] | None = None) -> int:
                         raise ValueError(
                             "no fresh complete FPL player history; preview kept unchanged"
                         )
+                if args.refresh_forecasts:
+                    from fpl.jobs.forecast_refresh import refresh
+
+                    save("forecast")
+                    try:
+                        report["forecast_refresh"] = refresh(
+                            database=args.db,
+                            destination=destination,
+                            forecasts=args.forecast_dir,
+                            capture_root=capture_root,
+                            capture_status=report["capture_exit_code"],
+                            started_at=started,
+                        )
+                    except Exception as exc:
+                        report["forecast_refresh"] = {
+                            "status": "FAILED",
+                            "error": f"{type(exc).__name__}: {exc}",
+                            "forecast_regenerated": False,
+                        }
+                        logging.exception("Forecast refresh failed; retaining registered forecast")
                 save("dashboard")
                 report.update(
                     complete(
@@ -482,6 +512,9 @@ def main(argv: list[str] | None = None) -> int:
                         initial_plan=args.optimizer_plan,
                         cycle_backup=report["recovery_backup"],
                     )
+                )
+                report["forecast_regenerated"] = report.get("forecast_refresh", {}).get(
+                    "forecast_regenerated", False
                 )
                 report["status"] = "COMPLETE"
                 if args.r2_config is not None:
@@ -543,7 +576,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"receipt": str(receipt), **report}, sort_keys=True))
     published = report.get("public_publication", {}).get("status", "COMPLETE") == "COMPLETE"
     retained = report.get("retention", {}).get("status", "COMPLETE") == "COMPLETE"
-    return 0 if report["status"] == "COMPLETE" and published and retained else 1
+    forecast_ok = report.get("forecast_refresh", {}).get("status") != "FAILED"
+    return 0 if report["status"] == "COMPLETE" and published and retained and forecast_ok else 1
 
 
 if __name__ == "__main__":

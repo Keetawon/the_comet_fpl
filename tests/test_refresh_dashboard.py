@@ -351,8 +351,9 @@ def _interrupted_export(
     return args, database, previous
 
 
+@pytest.mark.parametrize("phase", ["dashboard", "forecast"])
 def test_interrupted_export_archives_exact_checkpoint_and_allows_fresh_cycle(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
 ) -> None:
     from datetime import UTC, datetime
 
@@ -360,6 +361,11 @@ def test_interrupted_export_archives_exact_checkpoint_and_allows_fresh_cycle(
 
     args, database, previous = _interrupted_export(tmp_path, monkeypatch)
     receipt = previous / "receipt.json"
+    saved = json.loads(receipt.read_text())
+    saved["phase"] = phase
+    receipt.write_text(json.dumps(saved))
+    partial_forecast = previous / "forecast-source.duckdb"
+    partial_forecast.write_bytes(b"preserved scientific input")
     original = receipt.read_bytes()
     backup = previous / "recovery.duckdb"
     backup_hash = job.digest(backup)
@@ -382,6 +388,7 @@ def test_interrupted_export_archives_exact_checkpoint_and_allows_fresh_cycle(
     assert job.main(args) == 0
     assert calls == ["fresh_capture"]
     assert receipt.read_bytes() == original
+    assert partial_forecast.read_bytes() == b"preserved scientific input"
     assert (previous / "generation" / "partial.json").read_text() == "unfinished export"
     review = json.loads(next(previous.glob("interruption-review-*.json")).read_text())
     assert review["original_receipt_sha256"] == job.digest(receipt)
@@ -595,6 +602,56 @@ def _runner_args(tmp_path: Path) -> list[str]:
         "--plan-store",
         str(tmp_path / "plans"),
     ]
+
+
+@pytest.mark.parametrize("forecast_status", ["COMPLETE", "NOT_DUE", "FAILED", "exception"])
+def test_automated_forecast_runs_before_export_and_failure_keeps_reporting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, forecast_status: str
+) -> None:
+    from datetime import UTC, datetime
+
+    from fpl.jobs import forecast_refresh
+
+    args = [*_runner_args(tmp_path), "--refresh-forecasts"]
+    calls = []
+
+    def capture(**kw: Any) -> int:
+        calls.append("capture")
+        assert kw["runs"].name == "capture"
+        with duckdb.connect(str(kw["database"])) as con:
+            con.execute(
+                "INSERT INTO snapshot_capture VALUES ('player-history', ?)", [datetime.now(UTC)]
+            )
+        return 0
+
+    def forecast(**kw: Any) -> dict[str, Any]:
+        calls.append("forecast")
+        assert kw["capture_root"].parent == kw["destination"]
+        assert (tmp_path / "runs" / ".dashboard-refresh.lock").exists()
+        if forecast_status == "exception":
+            raise ValueError("unusable prediction source")
+        return {"status": forecast_status, "forecast_regenerated": forecast_status == "COMPLETE"}
+
+    def export(*a: Any, **kw: Any) -> dict[str, Any]:
+        calls.append("export")
+        return {"forecast_regenerated": False}
+
+    monkeypatch.setattr(job.daily_pl_sdp, "run", capture)
+    monkeypatch.setattr(forecast_refresh, "refresh", forecast)
+    monkeypatch.setattr(job, "complete", export)
+    monkeypatch.setattr(job, "prune_runs", lambda *a, **kw: {"status": "COMPLETE"})
+    assert job.main(args) == (1 if forecast_status in ("FAILED", "exception") else 0)
+    assert calls == ["capture", "forecast", "export"]
+    report = json.loads(next((tmp_path / "runs").glob("dashboard-*/receipt.json")).read_text())
+    assert report["status"] == "COMPLETE"
+    assert report["phase"] == "finished"
+    assert report["forecast_regenerated"] is (forecast_status == "COMPLETE")
+    assert report["retention"]["status"] == "COMPLETE"
+
+
+def test_automated_forecast_refuses_skip_capture(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        job.main([*_runner_args(tmp_path), "--refresh-forecasts", "--skip-capture"])
 
 
 def test_startup_failure_is_durable_and_does_not_remove_another_owner(
