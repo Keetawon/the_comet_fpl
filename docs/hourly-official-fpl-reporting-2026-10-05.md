@@ -68,8 +68,8 @@ hashes and the pre-existing owner edits were verified unchanged.
 ## Activation status
 
 The first public reporting capture is published and verified over HTTPS with
-the production origin's CORS header and no-store caching. The new frontend and
-scheduled workflow are committed on `codex/hourly-official-fpl-updates`.
+the production origin's CORS header and no-store caching. The frontend is ready for production deployment; the scheduled workflow will
+remain disabled pending its credential configuration.
 Activation is pending specific owner approval to transfer the existing publishing
 credentials to the encrypted main-only GitHub environment. Automatic approval
 review rejected that transfer pending explicit authorization. No credentials

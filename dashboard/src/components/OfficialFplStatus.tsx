@@ -17,7 +17,7 @@ export function OfficialFplStatus() {
   const overdue = live && now - Date.parse(live.captured_at) > 3 * 60 * 60 * 1000;
   return <aside aria-label="Official FPL updates" className="border-b bg-muted/30 px-4 py-2 text-xs text-muted-foreground lg:px-6">
     {live === undefined ? "Checking current official FPL reporting…" : live === null ?
-      "Hourly FPL feed unavailable. Showing the last dashboard publication; check its source dates." : <>
+      "Current FPL feed unavailable. Showing the last dashboard publication; check its source dates." : <>
         <strong className={overdue ? "text-amber-700 dark:text-amber-300" : ""}>
           Official FDR, injuries and prices{overdue ? " — update overdue" : ""}:
         </strong> {new Date(live.captured_at).toLocaleString()} · Hourly cloud refresh.
