@@ -21,9 +21,13 @@ whose database is unchanged. It neither restores a database nor discards a WAL.
 The September post-capture export repair and other pre-existing work remain
 preserved separately. No models, forecast artifacts or defaults are changed.
 
-The independent main-branch hourly FPL reporting path removes the desktop/SDP
+The prepared hourly FPL reporting path removes the desktop/SDP
 dependency specifically for public injuries, news, prices and official FDR.
 It does not move inference, match statistics or outcome scoring to the cloud.
+Its cloud activation is pending the specific publishing-credential transfer
+approval; no secret has been transferred. The recovery, lock and retention suite
+passes 119 tests, and the isolated recovery commit passes 32 tests independently
+of the preserved earlier uncommitted September repair.
 
 Recovery evidence and test logs are retained privately under the root checkout's
 `data/artifacts/pipeline-recovery-20261005/` directory.
