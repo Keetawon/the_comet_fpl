@@ -68,11 +68,32 @@ hashes and the pre-existing owner edits were verified unchanged.
 ## Activation status
 
 The first public reporting capture is published and verified over HTTPS with
-the production origin's CORS header and no-store caching. The frontend is ready for production deployment; the scheduled workflow will
-remain disabled pending its credential configuration.
+the production origin's CORS header and no-store caching. The frontend deployed
+successfully in Pages run `37298527051`. Production browser verification confirmed
+Konsa's October 5 report (doubtful, 75%, unspecified injury) and the new Summary
+availability reports. All competitions starts at October 5 and the gameweek
+matrix starts at GW6. Both expose official FDR. The scheduled workflow remains
+disabled pending its credential configuration.
 Activation is pending specific owner approval to transfer the existing publishing
 credentials to the encrypted main-only GitHub environment. Automatic approval
 review rejected that transfer pending explicit authorization. No credentials
 have been transferred and the hourly workflow is not yet enabled on main.
+
+The repaired full refresh published generation
+`d0ba3551548616302bd04dadca47bde9492daac9d9b75339106ac317f6f8acc8`
+on October 5 at 17:56 Bangkok. Independent HTTPS verification matched all 17
+files by SHA256 and size, the no-store pointer, production CORS and manifest
+binding. Its FPL source is 17:22 Bangkok, SDP export 17:48 and dashboard export
+17:49. The next fixture GW is 6; finalized and scored outcomes remain GW5.
+The September 14 GW5-9 forecast is unchanged and still carries its own date and
+rollover-required flag. A current reporting capture does not renew a forecast.
+Retention finished successfully at 18:00 Bangkok; the next-cycle lock and recovery
+preflight passed without starting another capture or database copy. The desktop
+task remains enabled, with its next trigger at 19:00 Bangkok.
+
+Pages run `37299448249` deployed the final wording successfully after retrying a
+transient GitHub HTTP 500 on the pinned release download. Production browser
+verification confirmed the final label and today's embedded FPL reports; the
+full-dashboard overdue warning has cleared.
 
 Private audit evidence is in `data/artifacts/pipeline-recovery-20261005/`.
