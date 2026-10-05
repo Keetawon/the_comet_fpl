@@ -1,5 +1,11 @@
 # SDP primary operations
 
+September 24 interruption recovery: the existing refresh can verify and archive
+a proven-dead post-capture export checkpoint before beginning a fresh cycle.
+Original failed receipts and rollback bytes remain retained. See
+[`pipeline-interruption-recovery-2026-09-24.md`](pipeline-interruption-recovery-2026-09-24.md)
+for the narrow safety checks and execution evidence.
+
 September 17 storage update: the owner-authorized two-hour refresh now uses
 bounded full-copy retention. See
 [`operational-storage-retention-2026-09-17.md`](operational-storage-retention-2026-09-17.md)

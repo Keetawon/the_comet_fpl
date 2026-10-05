@@ -1,5 +1,12 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
+**Operational repair completed (2026-09-24):** recovered a proven-dead post-capture
+dashboard export interruption through exact data-preservation checks and lossless
+checkpoint archiving. The existing capture-to-R2 task, retention and next-cycle
+readiness passed; no forecast or model changed.
+See `docs/pipeline-interruption-recovery-2026-09-24.md`; dated delivery records below
+remain unchanged.
+
 Status: active execution plan  
 Last updated: 2026-09-01<br>
 Target: 2026/27 GW1  

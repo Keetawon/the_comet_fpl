@@ -35,7 +35,8 @@ from fpl.storage.outcomes import attach_finalized_outcomes
 
 
 def digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    with path.open("rb") as handle:
+        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def latest_primary(database: Path, forecasts: Path) -> tuple[Path, str, str]:
@@ -226,7 +227,7 @@ def assert_no_inflight_backup(
     database: Path | None = None,
     forecasts: Path | None = None,
 ) -> None:
-    """Retry cleanup of published cycles, never an interrupted capture/publication.
+    """Recover published cleanup or a proven-dead post-capture export interruption.
 
     Caller holds the cycle lock. No new full copy is allocated until retention
     succeeds; its additive resolution receipt preserves the original failure.
@@ -276,6 +277,64 @@ def assert_no_inflight_backup(
                 f"incomplete cycle recovery requires review before a new copy: {backup}"
             )
         pin = previous.get("recovery_backup", {})
+        if (
+            previous.get("retention_policy_version") == 2
+            and previous.get("status") == "RUNNING"
+            and previous.get("phase") == "dashboard"
+            and type(previous.get("capture_exit_code")) is int
+            and previous["capture_exit_code"] in (0, 1)
+            and "public_publication" not in previous
+            # Subprocesses may outlive their parent; these phases require review.
+            and not any(
+                (backup.parent / name).exists() for name in ("optimizer.log", "dashboard-build.log")
+            )
+            and database is not None
+            and Path(previous.get("database", "")).resolve() == database.resolve()
+            and Path(pin.get("path", "")).resolve() == backup.resolve()
+            and pin.get("sha256") == digest(backup)
+            and type(previous.get("pid")) is int
+            and previous["pid"] > 0
+            and _pid_alive(previous["pid"]) is False
+        ):
+            # Capture committed before this phase. Never infer that from age alone.
+            # Hold a read lease until the old rollback bytes are safely archived;
+            # an independent writer cannot change the database during the proof.
+            daily_pl_sdp.validate_idle_database(database)
+            with connect(database, read_only=True) as con:
+                fresh = con.execute(
+                    """SELECT count(*) FROM snapshot_capture
+                    WHERE mode = 'player-history' AND captured_at >= ? AND captured_at <= ?""",
+                    [previous["started_at"], previous["updated_at"]],
+                ).fetchone()
+                if not fresh or not fresh[0]:
+                    raise ValueError("interrupted export has no complete FPL player history")
+                proof = _verify_backup(database, backup)
+                review = backup.parent / f"interruption-review-{uuid4().hex}.json"
+                with review.open("x", encoding="utf-8") as handle:
+                    json.dump(
+                        {
+                            "schema": "fpl.interrupted-dashboard-recovery/v1",
+                            "status": "VERIFIED_FOR_ARCHIVE",
+                            "verified_at": datetime.now(UTC).isoformat(),
+                            "previous_pid": previous["pid"],
+                            "original_receipt_sha256": digest(receipt),
+                            "backup_path": str(backup.resolve()),
+                            "backup_sha256": pin["sha256"],
+                            "immutable_rows": proof,
+                        },
+                        handle,
+                        indent=2,
+                        sort_keys=True,
+                        allow_nan=False,
+                    )
+                    handle.write("\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                # Existing archiver verifies compressed AND decompressed hashes,
+                # publishes its own receipt, then retires only the original copy.
+                compress_audit_database(backup, runs.parent)
+            logging.info("Archived interrupted export checkpoint after verification: %s", review)
+            continue
         if (
             published
             and database is not None

@@ -315,6 +315,154 @@ def test_interrupted_retention_refuses_unproven_recovery(
     assert not (previous / "retention-recovery.json").exists()
 
 
+def _interrupted_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[list[str], Path, Path]:
+    args = _runner_args(tmp_path)
+    database = tmp_path / "operational.duckdb"
+    with duckdb.connect(str(database)) as con:
+        con.execute("INSERT INTO snapshot_capture VALUES ('daily', '2026-09-21T00:00:00Z')")
+    previous = tmp_path / "runs" / "dashboard-20260922T100004Z-b6ae3459"
+    previous.mkdir(parents=True)
+    pin = job.create_recovery(database, previous)
+    with duckdb.connect(str(database)) as con:
+        con.execute(
+            "INSERT INTO snapshot_capture VALUES ('player-history', '2026-09-22T10:12:00Z')"
+        )
+    (previous / "receipt.json").write_text(
+        json.dumps(
+            {
+                "database": str(database),
+                "retention_policy_version": 2,
+                "status": "RUNNING",
+                "phase": "dashboard",
+                "capture_exit_code": 0,
+                "pid": 123456,
+                "started_at": "2026-09-22T10:00:04Z",
+                "updated_at": "2026-09-22T10:52:15Z",
+                "recovery_backup": pin,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (previous / "generation").mkdir()
+    (previous / "generation" / "partial.json").write_text("unfinished export")
+    monkeypatch.setattr(job, "_pid_alive", lambda _: False)
+    return args, database, previous
+
+
+def test_interrupted_export_archives_exact_checkpoint_and_allows_fresh_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import UTC, datetime
+
+    from fpl.jobs.audit_db_archive import verify_audit_archive
+
+    args, database, previous = _interrupted_export(tmp_path, monkeypatch)
+    receipt = previous / "receipt.json"
+    original = receipt.read_bytes()
+    backup = previous / "recovery.duckdb"
+    backup_hash = job.digest(backup)
+    calls = []
+
+    def capture(**kwargs: Any) -> int:
+        assert not backup.exists()
+        assert verify_audit_archive(backup, tmp_path)["source_sha256"] == backup_hash
+        assert kwargs["cycle_backup"]["sha256"] == job.digest(database)
+        with duckdb.connect(str(database)) as con:
+            con.execute(
+                "INSERT INTO snapshot_capture VALUES (?, ?)", ["player-history", datetime.now(UTC)]
+            )
+        calls.append("fresh_capture")
+        return 0
+
+    monkeypatch.setattr(job.daily_pl_sdp, "run", capture)
+    monkeypatch.setattr(job, "complete", lambda *a, **kw: {"forecast_regenerated": False})
+    monkeypatch.setattr(job, "prune_runs", lambda *a, **kw: {"status": "COMPLETE"})
+    assert job.main(args) == 0
+    assert calls == ["fresh_capture"]
+    assert receipt.read_bytes() == original
+    assert (previous / "generation" / "partial.json").read_text() == "unfinished export"
+    review = json.loads(next(previous.glob("interruption-review-*.json")).read_text())
+    assert review["original_receipt_sha256"] == job.digest(receipt)
+    assert review["backup_sha256"] == backup_hash
+    assert review["immutable_rows"]["tables"][0]["missing_rows"] == 0
+    assert len(list((tmp_path / "runs").glob("dashboard-*/recovery.duckdb"))) == 1
+    # The archived interruption never blocks or duplicates the next scheduled cycle.
+    job.assert_no_inflight_backup(tmp_path / "runs", tmp_path / "next", database=database)
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "active_pid",
+        "unknown_pid",
+        "invalid_pid",
+        "unknown_policy",
+        "capture_phase",
+        "failed_cycle",
+        "failed_capture",
+        "publication_started",
+        "optimizer_started",
+        "frontend_build_started",
+        "wrong_database",
+        "wrong_backup_hash",
+        "missing_history",
+        "lost_immutable_row",
+        "wal",
+        "archive_failure",
+    ],
+)
+def test_interrupted_export_recovery_preserves_unsafe_or_unarchived_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, defect: str
+) -> None:
+    _, database, previous = _interrupted_export(tmp_path, monkeypatch)
+    receipt = previous / "receipt.json"
+    report = json.loads(receipt.read_text())
+    if defect in ("active_pid", "unknown_pid"):
+        monkeypatch.setattr(job, "_pid_alive", lambda _: True if defect == "active_pid" else None)
+    elif defect == "invalid_pid":
+        report["pid"] = True
+    elif defect == "unknown_policy":
+        report["retention_policy_version"] = 3
+    elif defect == "capture_phase":
+        report["phase"] = "capture"
+    elif defect == "failed_cycle":
+        report["status"] = "FAILED"
+    elif defect == "failed_capture":
+        report["capture_exit_code"] = 2
+    elif defect == "publication_started":
+        report["public_publication"] = {"status": "RUNNING"}
+    elif defect in ("optimizer_started", "frontend_build_started"):
+        name = "optimizer.log" if defect == "optimizer_started" else "dashboard-build.log"
+        (previous / name).write_text("child process may still be running")
+    elif defect == "wrong_database":
+        report["database"] = str(tmp_path / "other.duckdb")
+    elif defect == "wrong_backup_hash":
+        report["recovery_backup"]["sha256"] = "0" * 64
+    elif defect in ("missing_history", "lost_immutable_row"):
+        mode = "player-history" if defect == "missing_history" else "daily"
+        with duckdb.connect(str(database)) as con:
+            con.execute("DELETE FROM snapshot_capture WHERE mode = ?", [mode])
+    elif defect == "wal":
+        Path(str(database) + ".wal").write_bytes(b"unresolved")
+    elif defect == "archive_failure":
+
+        def fail_archive(*a: Any, **kw: Any) -> None:
+            raise OSError("injected archive failure")
+
+        monkeypatch.setattr(job, "compress_audit_database", fail_archive)
+    receipt.write_text(json.dumps(report), encoding="utf-8")
+    original = receipt.read_bytes()
+    backup = previous / "recovery.duckdb"
+    backup_hash = job.digest(backup)
+    with pytest.raises((ValueError, RuntimeError, OSError)):
+        job.assert_no_inflight_backup(tmp_path / "runs", tmp_path / "next", database=database)
+    assert receipt.read_bytes() == original
+    assert job.digest(backup) == backup_hash
+    assert not backup.with_name(backup.name + ".gz").exists()
+
+
 def test_cycle_preflight_budgets_backup_and_exports_before_copy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -58,3 +58,6 @@ dashboard/public/data/
 /output_dc.json
 # Local Cloudflare runtime state and generated bundles (never public assets).
 dashboard/worker/.wrangler/
+
+# Pytest temporary test data directories
+.pytest_tmp_*/
