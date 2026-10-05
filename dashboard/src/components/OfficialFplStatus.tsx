@@ -20,7 +20,7 @@ export function OfficialFplStatus() {
       "Current FPL feed unavailable. Showing the last dashboard publication; check its source dates." : <>
         <strong className={overdue ? "text-amber-700 dark:text-amber-300" : ""}>
           Official FDR, injuries and prices{overdue ? " — update overdue" : ""}:
-        </strong> {new Date(live.captured_at).toLocaleString()} · Hourly cloud refresh.
+        </strong> {new Date(live.captured_at).toLocaleString()} · Official FPL capture.
         {" "}Forecasts and match statistics keep their own dates.
       </>}
     {live !== undefined && <button type="button" className="ml-2 underline" onClick={() => window.location.reload()}>Check latest</button>}
