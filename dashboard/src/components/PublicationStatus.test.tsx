@@ -24,7 +24,7 @@ describe("publication freshness", () => {
     render(<PublicationStatus manifestHash="other" />);
     await waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
     expect(screen.queryByLabelText("Dashboard publication status")).not.toBeInTheDocument();
-    expect(screen.queryByText("Data update overdue")).not.toBeInTheDocument();
+    expect(screen.queryByText("Full dashboard update overdue")).not.toBeInTheDocument();
   });
   it("warns as an open page ages beyond the operational limit without changing data", async () => {
     vi.useFakeTimers();
@@ -34,8 +34,8 @@ describe("publication freshness", () => {
     await act(async () => { render(<PublicationStatus manifestHash="bound" freshnessOnly />); });
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
-    expect(screen.getByRole("status")).toHaveTextContent("Data update overdue");
-    expect(screen.getByRole("status")).toHaveTextContent("FPL source: 2026-09-15");
+    expect(screen.getByRole("status")).toHaveTextContent("Full dashboard update overdue");
+    expect(screen.getByRole("status")).toHaveTextContent("Match-history FPL source: 2026-09-15");
     expect(screen.queryByText(/Officially finalized/)).not.toBeInTheDocument();
     expect(fetcher).toHaveBeenCalledOnce();
   });
@@ -46,7 +46,7 @@ describe("publication freshness", () => {
       ...receipt, exported_at: "2026-09-28T02:59:00Z",
     })}));
     await act(async () => { render(<PublicationStatus manifestHash="bound" freshnessOnly />); });
-    expect(screen.getByRole("status")).toHaveTextContent("Data update overdue");
+    expect(screen.getByRole("status")).toHaveTextContent("Full dashboard update overdue");
   });
   it("reports missing source freshness", async () => {
     vi.useFakeTimers();
@@ -55,6 +55,6 @@ describe("publication freshness", () => {
       ...receipt, source_known_at: null,
     })}));
     await act(async () => { render(<PublicationStatus manifestHash="bound" freshnessOnly />); });
-    expect(screen.getByRole("status")).toHaveTextContent("Data freshness unavailable");
+    expect(screen.getByRole("status")).toHaveTextContent("Full dashboard freshness unavailable");
   });
 });

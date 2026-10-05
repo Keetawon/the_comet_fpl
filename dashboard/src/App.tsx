@@ -6,6 +6,7 @@ import { LayoutDashboard, Menu, MoreHorizontal, Newspaper, Users, X } from "luci
 import { Dialog } from "radix-ui";
 import { CometMark, PageBreadcrumb, Sidebar } from "@/components/Sidebar";
 import { PageBoundary } from "@/components/PageBoundary";
+import { OfficialFplStatus } from "@/components/OfficialFplStatus";
 import { InsightSummaryPanel } from "@/components/InsightSummaryPanel";
 import { ThemeToggle, initTheme } from "@/components/ThemeToggle";
 import { isPageAvailable } from "@/lib/pageAccess";
@@ -136,6 +137,7 @@ export default function App() {
           <ThemeToggle />
         </header>
         <main id="main-content" className="comet-main relative min-h-0 flex-1 overflow-auto">
+          <OfficialFplStatus />
           <PageBoundary key={active}>
             <Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">Loading page…</p>}>
               <Page />

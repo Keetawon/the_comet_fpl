@@ -44,9 +44,9 @@ export function PublicationStatus({ manifestHash, freshnessOnly = false }: { man
   // Match the existing operational capture-health limit; forecasts have their own dates.
   const overdue = dates.some((date) => date && now - Date.parse(date) > 8 * 60 * 60 * 1000);
   const warning = (overdue || unknownFreshness) ? <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-    <p className="font-semibold">{overdue ? "Data update overdue" : "Data freshness unavailable"}</p>
-    <p>{overdue ? "This page’s source data or export is over 8 hours old." : "This publication is missing a valid source or export date."} Reload to check for a newer update.</p>
-    <p className="mt-1 text-xs">FPL source: {status.source_known_at ?? "Unavailable"} · Dashboard exported: {status.exported_at || "Unavailable"}</p>
+    <p className="font-semibold">{overdue ? "Full dashboard update overdue" : "Full dashboard freshness unavailable"}</p>
+    <p>{overdue ? "This page’s match-history source or full export is over 8 hours old." : "This publication is missing a valid source or export date."} Reload to check for a newer update.</p>
+    <p className="mt-1 text-xs">Match-history FPL source: {status.source_known_at ?? "Unavailable"} · Dashboard exported: {status.exported_at || "Unavailable"}</p>
     <p className="mt-1 text-xs">Forecasts keep their separately displayed dates.</p>
   </div> : null;
   if (freshnessOnly) return warning;
@@ -62,7 +62,7 @@ export function PublicationStatus({ manifestHash, freshnessOnly = false }: { man
     {status.forecast_rollover_required && <p className="mt-2 text-amber-800 dark:text-amber-300">Next match scope is GW{status.next_fixture_gw}. A new pre-deadline forecast is required; this export has kept the original forecast vintage.</p>}
     {!status.current_platform_plan && <p className="mt-2 text-amber-800 dark:text-amber-300">Platform plan update required. Older plans retain their original forecast dates.</p>}
     <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Refresh and forecast dates</summary>
-      <p>FPL source: {status.source_known_at ?? "Unavailable"}</p><p>Dashboard exported: {status.exported_at}</p>
+      <p>Match-history FPL source: {status.source_known_at ?? "Unavailable"}</p><p>Dashboard exported: {status.exported_at}</p>
       <p>Latest forecast as of: {status.latest_forecast?.as_of ?? "Unavailable"}. Refreshing results does not regenerate forecasts.</p>
     </details>
   </aside>;

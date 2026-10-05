@@ -40,6 +40,7 @@ import type {
 import { PLAYER_HORIZON_FIELDS } from "./types";
 import { resolveDataUrl } from "./publicData";
 import { AVAILABILITY_LABEL } from "@/lib/availability";
+import { applyLivePlayers, applyLiveTeams, applyLiveSchedule, loadLiveFpl } from "./liveFpl";
 
 // Session-level cache: players.json is ~15 MB, so every page fetches it through this
 // map and the browser tab parses it exactly once. A failed fetch is evicted so it can
@@ -130,9 +131,10 @@ export async function loadDashboardManifest(): Promise<DashboardManifest | null>
 }
 
 export async function loadFixtureMatrix(): Promise<FixtureMatrixData> {
-  const [payload, manifest] = await Promise.all([
+  const [payload, manifest, live] = await Promise.all([
     fetchJson<unknown>("fixture_matrix.json"),
     loadDashboardManifest(),
+    loadLiveFpl(),
   ]);
   const candidate = readModelObject(
     payload,
@@ -158,17 +160,18 @@ export async function loadFixtureMatrix(): Promise<FixtureMatrixData> {
   }
   const versions = new Set(teams.flatMap((t) => t.fixtures.map((f) => f.ease_index_formula_version)));
   return {
-    teams,
-    schedule: schedule as FixtureScheduleOverlay,
+    teams: applyLiveTeams(teams, live, schedule.export_created_at),
+    schedule: applyLiveSchedule(schedule as FixtureScheduleOverlay, live),
     manifest,
     easeIndexFormulaVersion: versions.size === 1 ? [...versions][0] : [...versions].join(", "),
   };
 }
 
 export async function loadPlayers(): Promise<PlayersData> {
-  const [payload, manifest] = await Promise.all([
+  const [payload, manifest, live] = await Promise.all([
     fetchJson<unknown>("players.json"),
     loadDashboardManifest(),
+    loadLiveFpl(),
   ]);
   const candidate = readModelObject(payload, "players.json", "fpl.dashboard-players");
   if (!Array.isArray(candidate.players)) {
@@ -238,7 +241,7 @@ export async function loadPlayers(): Promise<PlayersData> {
       player.current_availability.source_sha256 !== current.source_sha256
     )) throw new Error(`invalid ${subject}: price and availability must share a capture`);
   }
-  return { players: candidate.players as PlayerRecord[], manifest };
+  return { players: applyLivePlayers(candidate.players as PlayerRecord[], live), manifest };
 }
 
 const PLAYER_ACTUAL_KEYS = [
