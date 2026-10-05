@@ -1,10 +1,12 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
-**Owner-directed forecast automation (2026-10-05):** connect the existing desktop
+**Owner-directed forecast automation active (2026-10-05):** connect the existing desktop
 capture cycle to the unchanged prospective primary/incumbent-shadow generator and
 evidence recorder after match/schedule changes, next-GW rollover or 24-hour age.
-Implementation and offline guards are in place; runtime activation and the first
-new publication are tracked in `docs/forecast-automation-2026-10-05.md`.
+The existing scheduled task is enabled with this check, and its first new GW6–10
+forecast for all 20 teams and 667 players is published. Independent HTTPS checks
+verified all 17 public data files. Runtime evidence and test baseline limitations
+are retained in `docs/forecast-automation-2026-10-05.md`.
 
 **Operational repair completed (2026-09-24):** recovered a proven-dead post-capture
 dashboard export interruption through exact data-preservation checks and lossless
