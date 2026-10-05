@@ -458,6 +458,12 @@ def prune_runs(
     candidates: list[Path] = []
     archive_candidates: set[Path] = set()
     skipped: list[dict[str, str]] = []
+    # Keep forecast replay generations independently of frequent observation exports.
+    recent_forecasts = [
+        child
+        for _, child, payload in sorted(groups["dashboard"], reverse=True)
+        if payload.get("forecast_refresh", {}).get("status") == "COMPLETE"
+    ][:keep]
     for kind, group in groups.items():
         ordered = sorted(group, reverse=True)
         retained_generations = {child for _, child, _ in ordered[:keep]}
@@ -477,6 +483,25 @@ def prune_runs(
                         if path.is_file() and path.absolute() not in retained_recoveries:
                             candidates.append(path)
                             archive_candidates.add(path)
+                    # Owner authorized verified compression of older automated inputs.
+                    # Legacy and failed/unregistered forecast copies remain untouched.
+                    source = child / "forecast-source.duckdb"
+                    if (
+                        kind == "dashboard"
+                        and child not in recent_forecasts
+                        and payload.get("forecast_refresh", {}).get("status") == "COMPLETE"
+                        and source.is_file()
+                    ):
+                        forecast = json.loads((child / "forecast.json").read_text(encoding="utf-8"))
+                        if (
+                            Path(forecast.get("source_database", "")).resolve() != source.resolve()
+                            or forecast.get("source_database_sha256") != _hash(source)
+                            or forecast.get("forecast_exit_code") != 0
+                            or forecast.get("evidence_exit_code") != 0
+                        ):
+                            raise ValueError("automated forecast replay input binding mismatch")
+                        candidates.append(source)
+                        archive_candidates.add(source)
                     generation = child / "generation"
                     if (
                         kind == "dashboard"

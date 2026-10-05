@@ -233,6 +233,51 @@ def test_forecast_hash_pin_and_forecast_source_are_never_pruned(
     assert forecast.read_bytes() == forecast_bytes
 
 
+@pytest.mark.parametrize("tampered", [False, True])
+def test_older_automated_replays_are_losslessly_archived_and_two_latest_stay_full(
+    workspace: tuple[Path, Path, Path], tampered: bool
+) -> None:
+    from fpl.jobs.audit_db_archive import restore_audit_database, verify_audit_archive
+
+    database, runs, forecasts = workspace
+    directories = [_cycle(runs, database, i, dashboard=True) for i in range(6)]
+    sources = []
+    for directory in directories[:3]:
+        source = directory / "forecast-source.duckdb"
+        source.write_bytes(b"exact replay input " + directory.name.encode())
+        sources.append(source)
+        receipt = directory / "receipt.json"
+        payload = json.loads(receipt.read_text())
+        payload["forecast_refresh"] = {"status": "COMPLETE"}
+        _write_json(receipt, payload)
+        _write_json(
+            directory / "forecast.json",
+            {
+                "source_database": str(source),
+                "source_database_sha256": _hash(source),
+                "forecast_exit_code": 0,
+                "evidence_exit_code": 0,
+            },
+        )
+    original = {source: source.read_bytes() for source in sources}
+    if tampered:
+        sources[0].write_bytes(b"changed scientific bytes")
+        with pytest.raises(ValueError, match="replay input binding mismatch"):
+            retention.prune_runs(database, runs, forecasts, archive_pins=True)
+        assert sources[0].read_bytes() == b"changed scientific bytes"
+        return
+    report = retention.prune_runs(database, runs, forecasts, archive_pins=True)
+    assert report["status"] == "COMPLETE"
+    assert not sources[0].exists()
+    proof = verify_audit_archive(sources[0], runs.parent)
+    assert proof["source_sha256"] == hashlib.sha256(original[sources[0]]).hexdigest()
+    for source in sources[1:]:
+        assert source.read_bytes() == original[source]
+        assert not source.with_suffix(".duckdb.gz").exists()
+    restore_audit_database(sources[0], runs.parent)
+    assert sources[0].read_bytes() == original[sources[0]]
+
+
 def test_forecast_headers_are_discovered_recursively(tmp_path: Path) -> None:
     forecasts = tmp_path / "forecasts" / "nested"
     forecasts.mkdir(parents=True)

@@ -42,8 +42,17 @@ unlikely to finish recording in time. The recorder still checks the actual time.
 Each automated cycle isolates its capture receipts under `capture/`. When it
 forecasts, the cycle retains `forecast-source.duckdb`, `forecast.json`, both immutable
 JSONL artifacts, and a `.refresh.json` content-comparison receipt bound to the
-registered primary SHA. Existing retention recognizes the scientific input and
-keeps it. The source copy and pair registry keep their existing writer locks.
+registered primary SHA. The owner explicitly authorized lossless compression and
+retirement of older automated replay copies. Retention keeps the two newest
+successful automated replay databases uncompressed, independently of the much
+more frequent dashboard exports. Older successful automated copies require a
+matching forecast-source path/hash and successful forecast/evidence receipts, then
+the existing archiver checks the decompressed hash before retiring the original.
+Every compressed copy and its verification receipt remain. Legacy, failed and
+unregistered copies remain untouched. Restore with `python -m fpl.jobs.audit_db_archive
+restore --source <original-forecast-source.duckdb> --root D:/Personal/fpl-operations`;
+restoration refuses overwrite and verifies exact original bytes. The source copy
+and pair registry keep their existing writer locks.
 New output names refuse overwrite. No partial/unregistered pair is selected by
 filename or modification time.
 
