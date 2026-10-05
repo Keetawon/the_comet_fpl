@@ -57,4 +57,22 @@ errors and NULL semantics. The frontend suite passes 787 tests, and its build an
 lint pass (nine existing lint warnings). Repository Ruff and strict mypy pass;
 ten existing files still fail the global formatting gate.
 
+The full root Python gate completed with 4,463 passed, four skipped, 67 failed
+and 22 errors. Failures include the retained frozen-input/source-identity
+assertions, Windows symlink privileges, reference-component fixtures and a local
+stub connection failure. It is not a green full gate. The changed Python paths
+pass their focused tests; the recovery branch separately passes 119 focused
+checks and 32 checks against its isolated commit. All 183 protected artifact
+hashes and the pre-existing owner edits were verified unchanged.
+
+## Activation status
+
+The first public reporting capture is published and verified over HTTPS with
+the production origin's CORS header and no-store caching. The new frontend and
+scheduled workflow are committed on `codex/hourly-official-fpl-updates`.
+Activation is pending specific owner approval to transfer the existing publishing
+credentials to the encrypted main-only GitHub environment. Automatic approval
+review rejected that transfer pending explicit authorization. No credentials
+have been transferred and the hourly workflow is not yet enabled on main.
+
 Private audit evidence is in `data/artifacts/pipeline-recovery-20261005/`.
