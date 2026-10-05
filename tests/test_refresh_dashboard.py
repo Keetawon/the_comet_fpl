@@ -610,3 +610,70 @@ def test_proven_dead_cycle_and_database_locks_recover_without_changing_database(
         assert not lock.exists()
         evidence = list(lock.with_name(lock.name + ".recovered").glob("*/original.lock"))
         assert len(evidence) == 1 and evidence[0].read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        None,
+        "failed_capture",
+        "dead_sidecar",
+        "changed_database",
+        "active_pid",
+        "wal",
+        "archive_failure",
+    ],
+)
+def test_dead_capture_retries_only_an_unchanged_verified_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, defect: str | None
+) -> None:
+    from fpl.jobs.audit_db_archive import verify_audit_archive
+
+    _runner_args(tmp_path)
+    database = tmp_path / "operational.duckdb"
+    previous = tmp_path / "runs" / "dashboard-interrupted-capture"
+    previous.mkdir(parents=True)
+    pin = job.create_recovery(database, previous)
+    backup = previous / "recovery.duckdb"
+    receipt = previous / "receipt.json"
+    report = {
+        "database": str(database),
+        "retention_policy_version": 2,
+        "status": "RUNNING",
+        "phase": "capture",
+        "pid": 123456,
+        "recovery_backup": pin,
+    }
+    monkeypatch.setattr(job, "_pid_alive", lambda _: False)
+    if defect == "failed_capture":
+        report.update(status="FAILED", capture_exit_code=2)
+    receipt.write_text(json.dumps(report), encoding="utf-8")
+    original = receipt.read_bytes()
+    if defect == "dead_sidecar":
+        from fpl.jobs import operational_lock as locks
+
+        monkeypatch.setattr(locks, "_pid_alive", lambda _: False)
+        Path(str(database) + ".daily-sdp.lock").write_text(json.dumps({"pid": 123456}))
+    elif defect == "changed_database":
+        with duckdb.connect(str(database)) as con:
+            con.execute("INSERT INTO snapshot_capture VALUES ('daily', '2026-09-23T00:00:00Z')")
+    elif defect == "active_pid":
+        monkeypatch.setattr(job, "_pid_alive", lambda _: True)
+    elif defect == "wal":
+        Path(str(database) + ".wal").write_bytes(b"unresolved")
+    elif defect == "archive_failure":
+
+        def fail_archive(*a: Any, **kw: Any) -> None:
+            raise OSError("injected archive failure")
+
+        monkeypatch.setattr(job, "compress_audit_database", fail_archive)
+    if defect in (None, "dead_sidecar", "failed_capture"):
+        job.assert_no_inflight_backup(tmp_path / "runs", tmp_path / "next", database=database)
+        assert not backup.exists()
+        assert verify_audit_archive(backup, tmp_path)["source_sha256"] == job.digest(database)
+        job.assert_no_inflight_backup(tmp_path / "runs", tmp_path / "next", database=database)
+    else:
+        with pytest.raises((ValueError, RuntimeError, OSError)):
+            job.assert_no_inflight_backup(tmp_path / "runs", tmp_path / "next", database=database)
+        assert job.digest(backup) == report["recovery_backup"]["sha256"]
+    assert receipt.read_bytes() == original

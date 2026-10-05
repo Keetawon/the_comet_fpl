@@ -24,11 +24,12 @@ from uuid import uuid4
 from fpl.artifacts.optimizer_plan import read_optimizer_artifact
 from fpl.config import config_dir, repo_root
 from fpl.jobs import daily_pl_sdp
+from fpl.jobs.audit_db_archive import compress_audit_database
 from fpl.jobs.build_db import _wal_path
 from fpl.jobs.build_sdp_dashboard import build
 from fpl.jobs.operational_disk import check_disk_space
 from fpl.jobs.operational_lock import _pid_alive, operational_lock
-from fpl.jobs.operational_retention import create_recovery, prune_runs
+from fpl.jobs.operational_retention import _verify_backup, create_recovery, prune_runs
 from fpl.storage.db import connect, default_db_path
 from fpl.storage.outcomes import attach_finalized_outcomes
 
@@ -156,6 +157,68 @@ def complete(
     }
 
 
+def recover_unchanged_capture(
+    runs: Path, database: Path | None, backup: Path, receipt: Path, previous: dict[str, Any]
+) -> bool:
+    """Archive a proven-dead pre-commit capture, preserving its receipt and exact bytes."""
+    pin = previous.get("recovery_backup", {})
+    if not (
+        database is not None
+        and previous.get("retention_policy_version") == 2
+        and previous.get("status") in ("RUNNING", "FAILED")
+        and previous.get("phase") == "capture"
+        and "public_publication" not in previous
+        and not any(
+            (backup.parent / name).exists() for name in ("optimizer.log", "dashboard-build.log")
+        )
+        and Path(previous.get("database", "")).resolve() == database.resolve()
+        and Path(pin.get("path", "")).resolve() == backup.resolve()
+        and type(previous.get("pid")) is int
+        and previous["pid"] > 0
+        and _pid_alive(previous["pid"]) is False
+    ):
+        return False
+    # Clear only a proven-dead capture sidecar under its OS guard. Unknown owners,
+    # active writers and WALs still block. The following read lease excludes writes.
+    with operational_lock(
+        Path(str(database) + ".daily-sdp.lock"),
+        wal=_wal_path(database),
+        validate_recovery=lambda: daily_pl_sdp.validate_idle_database(database),
+    ):
+        pass
+    daily_pl_sdp.validate_idle_database(database)
+    with connect(database, read_only=True):
+        daily_pl_sdp.validate_cycle_backup(database, pin, current=True)
+        proof = _verify_backup(database, backup)
+        review = backup.parent / f"capture-interruption-review-{uuid4().hex}.json"
+        with review.open("x", encoding="utf-8") as handle:
+            json.dump(
+                {
+                    "schema": "fpl.unchanged-capture-recovery/v1",
+                    "status": "VERIFIED_FOR_ARCHIVE",
+                    "verified_at": datetime.now(UTC).isoformat(),
+                    "previous_pid": previous["pid"],
+                    "original_receipt_sha256": digest(receipt),
+                    "backup_path": str(backup.resolve()),
+                    "backup_sha256": pin["sha256"],
+                    "active_database_sha256": pin["sha256"],
+                    "immutable_rows": proof,
+                },
+                handle,
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            )
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        # Existing archiver verifies compressed and decompressed hashes before
+        # retiring only this duplicate checkpoint. No database restore or WAL deletion.
+        compress_audit_database(backup, runs.parent)
+    logging.info("Archived unchanged interrupted capture checkpoint: %s", review)
+    return True
+
+
 def assert_no_inflight_backup(
     runs: Path,
     destination: Path,
@@ -177,6 +240,8 @@ def assert_no_inflight_backup(
         except (OSError, ValueError) as exc:
             raise ValueError(f"unattributed recovery backup requires review: {backup}") from exc
         if previous.get("retention_policy_version", 1) < 2:
+            continue
+        if recover_unchanged_capture(runs, database, backup, receipt, previous):
             continue
         interrupted_retention = (
             previous.get("phase") == "retention"
