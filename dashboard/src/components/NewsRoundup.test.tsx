@@ -10,16 +10,26 @@ const feed: PublicNewsFeed = {
 };
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 it.each([
-  ["2026-10-10T04:59:59Z", false], ["2026-10-10T05:00:00Z", true], ["2026-10-10T10:00:00Z", false],
-])("opens only in the five-hour pre-deadline window at %s", (time, visible) => {
+  "2026-10-09T18:00:00Z", "2026-10-10T04:59:59Z", "2026-10-10T05:00:00Z", "2026-10-10T10:00:00Z",
+])("shows updates immediately, including outside the old window at %s", time => {
   vi.useFakeTimers(); vi.setSystemTime(new Date(time));
   render(<NewsRoundup feed={feed} language="en" />);
-  expect(Boolean(screen.queryByText(/Read the reviewed roundup/))).toBe(visible);
+  expect(screen.getByText(/Read the reviewed roundup/)).toBeTruthy();
+  expect(screen.queryByText(/Opens five hours/)).toBeNull();
 });
-it("withholds stale editions and never claims every conference is complete", () => {
+it("labels stale editions without hiding updates or claiming conference completion", () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-10T05:00:00Z"));
   render(<NewsRoundup feed={{ ...feed, generated_at: "2026-10-08T18:00:00Z" }} language="en" />);
-  expect(screen.queryByText(/Read the reviewed roundup/)).toBeNull();
+  expect(screen.getByText(/Read the reviewed roundup/)).toBeTruthy();
   expect(screen.getByText(/over 24 hours old/)).toBeTruthy();
   expect(screen.getByText(/does not establish/)).toBeTruthy();
+});
+it("shows updates without a deadline schedule, in both languages", () => {
+  const legacy: PublicNewsFeed = { ...feed, schema_version: 1 };
+  delete legacy.roundup;
+  const { rerender } = render(<NewsRoundup feed={legacy} language="en" />);
+  expect(screen.getByText(/Read the reviewed roundup/)).toBeTruthy();
+  rerender(<NewsRoundup feed={legacy} language="th" />);
+  expect(screen.getByText("แสดงข่าวทันทีที่ตรวจและเผยแพร่แล้ว")).toBeTruthy();
+  expect(screen.getByText(/อ่านสรุปข่าวที่ตรวจแล้ว/)).toBeTruthy();
 });

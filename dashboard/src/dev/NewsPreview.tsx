@@ -1,5 +1,5 @@
 /** Local UI fixture only. Not a capture, publication, source claim or model input. */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { CalendarClock, Check, ChevronDown, Clock3 } from "lucide-react";
 import { NewsFeed, type NewsPreview } from "@/components/NewsFeed";
 import type { NewsStory, PublicNewsFeed } from "@/data/newsFeed";
@@ -78,33 +78,13 @@ function PressSchedule({ language, selectedTeam, asOf }: { language: NewsLanguag
   </section>;
 }
 
-const scenarios = {
-  collecting: { asOf: simulatedAt, completedAt: null },
-  conferences: { asOf: "2026-09-25T15:05:00Z", completedAt: "2026-09-25T15:00:00Z" },
-  deadline: { asOf: "2026-09-26T05:00:00Z", completedAt: null },
-} as const;
-type Scenario = keyof typeof scenarios;
 const clubs = schedule.map(row => [row.code, row.club] as const);
 
 export default function LocalNewsPreview() {
-  const [scenario, setScenario] = useState<Scenario>("conferences");
-  const preview = useMemo<NewsPreview>(() => {
-    const { asOf, completedAt } = scenarios[scenario];
-    const feed = { ...previewFeed, generated_at: asOf };
-    return {
-      feed, clubs,
-      header: language => <>
-        <label className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">{language === "th" ? "จำลองช่วงเวลา" : "Preview timing"}
-          <select value={scenario} onChange={event => setScenario(event.target.value as Scenario)} className="min-h-11 max-w-full rounded-lg border bg-background px-3 text-sm text-foreground">
-            <option value="collecting">{language === "th" ? "ระหว่างรอข่าว" : "Still collecting"}</option>
-            <option value="conferences">{language === "th" ? "หลังแถลงครบทุกทีม" : "All conferences finished"}</option>
-            <option value="deadline">{language === "th" ? "ก่อนเดดไลน์ 5 ชั่วโมง" : "Five hours before deadline"}</option>
-          </select>
-        </label>
-        <NewsRoundupPreview key={scenario + language} language={language} feed={feed} clubs={clubs} asOf={asOf} deadline="2026-09-26T10:00:00Z" allConferencesEndedAt={completedAt} />
-      </>,
-      sidebar: (language, selectedTeam) => <PressSchedule language={language} selectedTeam={selectedTeam} asOf={asOf} />,
-    };
-  }, [scenario]);
+  const preview: NewsPreview = {
+    feed: previewFeed, clubs,
+    header: language => <NewsRoundupPreview key={language} language={language} feed={previewFeed} clubs={clubs} asOf={simulatedAt} deadline="2026-09-26T10:00:00Z" />,
+    sidebar: (language, selectedTeam) => <PressSchedule language={language} selectedTeam={selectedTeam} asOf={simulatedAt} />,
+  };
   return <NewsFeed preview={preview} />;
 }

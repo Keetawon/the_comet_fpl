@@ -95,10 +95,15 @@ class NewsCaptureConfig(ExactModel):
     x_monthly_budget_usd: float = Field(default=3.0, ge=0, le=3.0)
     openai_monthly_budget_usd: float = Field(default=0.5, ge=0, le=0.5)
     x_max_results: int = Field(default=10, ge=10, le=100)
+    x_max_pages: int = Field(default=1, ge=1, le=10)
+    # Explicit overlapping window for press-conference coverage/backfill, not an ID cursor.
+    x_lookback_hours: int | None = Field(default=None, ge=1, le=144)
     summarize: bool = True
 
     @model_validator(mode="after")
     def unique_sources(self) -> Self:
+        if self.x_max_results * self.x_max_pages > 100:
+            raise ValueError("one capture may request at most 100 X posts per source")
         if len({s.source_id for s in self.x_sources}) != len(self.x_sources):
             raise ValueError("duplicate source identity")
         if len({s.handle.lower() for s in self.x_sources}) != len(self.x_sources):
@@ -106,11 +111,17 @@ class NewsCaptureConfig(ExactModel):
         return self
 
 
+class _XNote(BaseModel):
+    model_config = ConfigDict(extra="ignore", strict=True)
+    text: str = Field(min_length=1, max_length=20000)
+
+
 class _XPost(BaseModel):
     model_config = ConfigDict(extra="ignore", strict=True)
     id: str = Field(pattern=r"^[0-9]{1,30}$")
     text: str = Field(min_length=1, max_length=20000)
     created_at: AwareDatetime
+    note_tweet: _XNote | None = None
 
 
 class _XMeta(BaseModel):
@@ -309,7 +320,7 @@ def run_capture(
     clock: Callable[[], datetime] = _now,
     sleep: Callable[[float], None] = time.sleep,
 ) -> list[CaptureStatus]:
-    """One bounded page per allowlisted account; no paid calls until explicitly enabled."""
+    """A bounded complete search window; incomplete pagination never advances the cursor."""
     environment = os.environ if env is None else env
     statuses: list[CaptureStatus] = []
     for source in config.x_sources:
@@ -333,41 +344,62 @@ def run_capture(
                     "query": f"from:{source.handle} -is:retweet -is:reply"
                     + (f" {TEAM_NEWS_QUERY}" if source.topic == "team_news" else ""),
                     "max_results": str(config.x_max_results),
-                    "tweet.fields": "created_at",
+                    "tweet.fields": "created_at,note_tweet",
+                    # Freeze the upper boundary while paging; newer posts belong to the next run.
+                    "end_time": (checked - timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 }
                 # Recent search rejects cursors outside its seven-day window. Leave a
                 # boundary margin; retained observations still deduplicate a restart.
                 since_id = store.since_id(
                     source.source_id, published_after=checked - timedelta(days=6, hours=23)
                 )
-                if since_id:
+                if config.x_lookback_hours is not None:
+                    params["start_time"] = (
+                        checked - timedelta(hours=config.x_lookback_hours)
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                elif since_id:
                     params["since_id"] = since_id
-                raw = _request(
-                    client,
-                    store,
-                    provider="x",
-                    cost=config.x_max_results * 5000,
-                    cap=int(config.x_monthly_budget_usd * 1_000_000),
-                    key=environment["X_BEARER_TOKEN"],
-                    params=params,
-                    clock=clock,
-                    sleep=sleep,
-                )
-                # Provider errors in a 200 response fail closed, even if data is also present.
-                document = json.loads(raw)
-                if not isinstance(document, dict) or document.get("errors"):
-                    raise CaptureError("provider returned incomplete source data")
-                result = _XResponse.model_validate_json(raw)
-                if len(result.data) > config.x_max_results:
-                    raise CaptureError("provider exceeded requested result bound")
+                posts: dict[str, _XPost] = {}
+                tokens: set[str] = set()
+                for page in range(config.x_max_pages):
+                    raw = _request(
+                        client,
+                        store,
+                        provider="x",
+                        cost=config.x_max_results * 5000,
+                        cap=int(config.x_monthly_budget_usd * 1_000_000),
+                        key=environment["X_BEARER_TOKEN"],
+                        params=params,
+                        clock=clock,
+                        sleep=sleep,
+                    )
+                    document = json.loads(raw)
+                    if not isinstance(document, dict) or document.get("errors"):
+                        raise CaptureError("provider returned incomplete source data")
+                    result = _XResponse.model_validate_json(raw)
+                    if len(result.data) > config.x_max_results or any(
+                        p.id in posts for p in result.data
+                    ):
+                        raise CaptureError("provider exceeded bound or repeated a post")
+                    posts.update({post.id: post for post in result.data})
+                    token = result.meta.next_token
+                    if not token:
+                        break
+                    state["truncated"] = True
+                    if token in tokens or page + 1 == config.x_max_pages:
+                        raise CaptureError("source window incomplete; cursor retained")
+                    tokens.add(token)
+                    params["next_token"] = token
                 captured = clock()
-                # Validate the complete page before any observation changes the source cursor.
+                # Commit all pages together. A later-page failure cannot skip uncaptured teams.
                 pending: list[tuple[SourceObservation, bytes]] = []
-                for post in sorted(result.data, key=lambda p: int(p.id)):
-                    provider_raw = canonical(post.model_dump(mode="json"))
+                for post in sorted(posts.values(), key=lambda p: int(p.id)):
+                    # Missing long-form fields retain the legacy short-post byte identity.
+                    post_payload = post.model_dump(mode="json", exclude_none=True)
+                    provider_raw = canonical(post_payload)
                     post_raw = canonical(
                         {
-                            "post": post.model_dump(mode="json"),
+                            "post": post_payload,
                             # Preserve existing unfiltered capture identities byte-for-byte.
                             "source": source.model_dump(
                                 mode="json", exclude={"topic"} if source.topic == "all" else set()
@@ -385,7 +417,7 @@ def run_capture(
                                 captured_at=captured,
                                 known_at=captured,
                                 content_sha256=hashlib.sha256(post_raw).hexdigest(),
-                                text=post.text,
+                                text=post.note_tweet.text if post.note_tweet else post.text,
                                 team_code=source.team_code,
                                 team_name=source.team_name,
                                 season=source.season,
@@ -398,9 +430,11 @@ def run_capture(
                 store.append_batch(pending)
                 state.update(
                     status="ok",
-                    reason="bounded source page captured; not exhaustive coverage",
+                    reason=(
+                        "complete bounded source window captured; not exhaustive league coverage"
+                    ),
                     observations=len(pending),
-                    truncated=bool(result.meta.next_token),
+                    truncated=False,
                     source_checked_at=captured,
                 )
             except BudgetExhaustedError:

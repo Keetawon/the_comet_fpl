@@ -1,5 +1,11 @@
 # Reviewed production news and workspace retention
 
+**October 10 owner amendment:** the five-hour display rule below is superseded.
+Reviewed updates now appear immediately; the repaired complete-text capture
+publishes 20 club reports. See
+[`news-coverage-and-storage-2026-10-10.md`](news-coverage-and-storage-2026-10-10.md).
+The remainder of this document records the earlier release and its verification.
+
 The owner authorized publishing current news, the five-hour deadline preference,
 safe disk cleanup, and committing/pushing the work. This is reporting only:
 no forecast, football model, optimizer or SDP default changes.

@@ -4,13 +4,17 @@ enabled: false
 summarize: true
 x_monthly_budget_usd: 3.0
 openai_monthly_budget_usd: 0.5
-x_max_results: 10
+x_max_results: 50
+x_max_pages: 2
+x_lookback_hours: 48
 # Owner-selected X source only. Public reuse and automatic capture remain disabled.
 # A changed query topic must use a new source_id so an older cursor cannot skip news.
 # No --fpl-snapshot is needed: the owner does not want duplicate FPL news ingestion.
 x_sources:
-  - source_id: ffscout_team_news_v1
+  - source_id: ffscout_press_conferences_v2
     name: Fantasy Football Scout
     handle: FFScout
-    topic: team_news
+    # Read the full selected-source window: fitness keywords miss some club reports.
+    # Promotions are rejected by substantive-content review before publication.
+    topic: all
     reuse_approved: false

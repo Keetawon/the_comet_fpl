@@ -210,6 +210,91 @@ def test_x_incremental_ids_summary_cache_and_secret_boundary(tmp_path: Path) -> 
     assert b"ai-secret" not in store.path.read_bytes()
 
 
+@pytest.mark.parametrize("incomplete", [False, True])
+def test_paginated_full_text_window_is_atomic_and_can_backfill_older_teams(
+    tmp_path: Path, incomplete: bool
+) -> None:
+    store = NewsStore(tmp_path / "news.sqlite")
+    old, raw = observation(record_id="100")
+    store.append(old, raw)
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) == 1:
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": "200",
+                            "text": "Club A truncated...",
+                            "created_at": "2026-09-18T10:00:00Z",
+                            "note_tweet": {
+                                "text": "Club A complete report; player remains doubtful."
+                            },
+                        }
+                    ],
+                    "meta": {"result_count": 1, "next_token": "older-page"},
+                },
+            )
+        if incomplete:
+            return httpx.Response(400, json={"detail": "test failure"})
+        return httpx.Response(
+            200,
+            json=x_response(
+                data=[
+                    {
+                        "id": "50",
+                        "text": "Club B earlier report",
+                        "created_at": "2026-09-18T08:00:00Z",
+                    },
+                ]
+            ),
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        status = run_capture(
+            config(x_max_pages=2, x_lookback_hours=72, summarize=False),
+            store,
+            client=client,
+            env={"X_BEARER_TOKEN": "secret"},
+            clock=lambda: NOW,
+        )[0]
+    assert all("since_id" not in r.url.params for r in requests)
+    assert requests[1].url.params["next_token"] == "older-page"
+    assert requests[0].url.params["end_time"] == requests[1].url.params["end_time"]
+    assert requests[0].url.params["tweet.fields"] == "created_at,note_tweet"
+    if incomplete:
+        assert status.status == "error" and status.truncated
+        assert store.since_id("club") == "100"
+        assert len(store.recent_observations()) == 1
+    else:
+        assert status.status == "ok" and not status.truncated
+        posts = {o.source_record_id: o for o in store.recent_observations()}
+        assert set(posts) == {"50", "100", "200"}
+        assert posts["200"].text == "Club A complete report; player remains doubtful."
+    assert store.reserved_microusd("x", "2026-09") == 100_000
+
+
+def test_page_bound_does_not_commit_a_partial_window_or_advance_cursor(tmp_path: Path) -> None:
+    store = NewsStore(tmp_path / "news.sqlite")
+    response = x_response()
+    response["meta"]["next_token"] = "more"
+    with httpx.Client(
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=response))
+    ) as client:
+        status = run_capture(
+            config(summarize=False),
+            store,
+            client=client,
+            env={"X_BEARER_TOKEN": "secret"},
+            clock=lambda: NOW,
+        )[0]
+    assert status.status == "error" and status.truncated
+    assert store.since_id("club") is None
+
+
 def test_restart_after_recent_search_window_omits_expired_cursor(tmp_path: Path) -> None:
     store = NewsStore(tmp_path / "news.sqlite")
     original, raw = observation()

@@ -19,7 +19,7 @@ beforeEach(() => { window.history.replaceState(null, "", "#news"); mockLoad.mock
 describe("published News feed", () => {
   it("shows attributed news, source timestamps, AI labels and limited source coverage", async () => {
     render(<NewsFeed />);
-    await screen.findByRole("heading", { name: "Update 1" });
+    await screen.findByRole("heading", { level: 2, name: "Update 1" });
     expect(screen.getAllByText("AI summary")).toHaveLength(3);
     expect(screen.getAllByText(/FPL update · linked club article/)).toHaveLength(4);
     expect(screen.getAllByText(/FPL news updated/)).toHaveLength(4);
@@ -30,19 +30,19 @@ describe("published News feed", () => {
     expect(links[0]).toHaveAttribute("href", "https://www.arsenal.com/news/update");
   });
   it("switches language without inventing a missing Thai translation", async () => {
-    render(<NewsFeed />); await screen.findByRole("heading", { name: "Update 1" });
+    render(<NewsFeed />); await screen.findByRole("heading", { level: 2, name: "Update 1" });
     fireEvent.click(screen.getByRole("button", { name: "ไทย" }));
-    expect(screen.getByRole("heading", { name: "ข่าว 1" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Press briefing" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "ข่าว 1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Press briefing" })).toBeInTheDocument();
     expect(screen.getByText("รอคำแปลไทย · แสดงภาษาอังกฤษ")).toBeInTheDocument();
-    expect(screen.getAllByText("ผู้จัดการหวังว่านักเตะจะกลับมาได้ แต่ยังไม่ได้ยืนยัน")).toHaveLength(3);
+    expect(screen.getAllByText("ผู้จัดการหวังว่านักเตะจะกลับมาได้ แต่ยังไม่ได้ยืนยัน").filter(node => node.closest("article"))).toHaveLength(3);
     expect(window.location.hash).toBe("#news?lang=th");
   });
   it("filters exact club codes/category/search consistently and resets", async () => {
-    render(<NewsFeed />); await screen.findByRole("heading", { name: "Update 1" });
+    render(<NewsFeed />); await screen.findByRole("heading", { level: 2, name: "Update 1" });
     fireEvent.change(screen.getByRole("combobox", { name: "Club" }), { target: { value: "8" } });
     expect(screen.getAllByRole("article")).toHaveLength(1);
-    expect(screen.getByRole("heading", { name: "Update 2" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Update 2" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Injury" }));
     expect(screen.getByText("No news matches these filters.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
@@ -69,7 +69,7 @@ describe("published News feed", () => {
     expect(screen.queryByText(/gpt-test/)).not.toBeInTheDocument();
   });
   it("synchronizes club shortcuts, topic counts and the search without inferring importance", async () => {
-    render(<NewsFeed />); await screen.findByRole("heading", { name: "Update 1" });
+    render(<NewsFeed />); await screen.findByRole("heading", { level: 2, name: "Update 1" });
     expect(screen.getByText("Newest captured first")).toBeInTheDocument();
     expect(screen.getAllByRole("article")[0]).toHaveAccessibleName("Update 4");
     fireEvent.click(screen.getByRole("button", { name: "Arsenal" }));
@@ -84,7 +84,7 @@ describe("published News feed", () => {
     expect(screen.getByText("Showing 4 / 4 stories")).toBeInTheDocument();
   });
   it("keeps provider setup and model names behind closed details, while news dates stay visible", async () => {
-    render(<NewsFeed />); await screen.findByRole("heading", { name: "Update 1" });
+    render(<NewsFeed />); await screen.findByRole("heading", { level: 2, name: "Update 1" });
     const setup = screen.getByText(/X sources · Not connected/);
     expect(setup.closest("details")).not.toHaveAttribute("open");
     expect(setup).not.toBeVisible();
@@ -94,7 +94,7 @@ describe("published News feed", () => {
   });
   it("loads the Thai shared story and highlights its card", async () => {
     window.history.replaceState(null, "", `#news?story=${"2".repeat(64)}&lang=th`);
-    render(<NewsFeed />); const title = await screen.findByRole("heading", { name: "ข่าว 2" });
+    render(<NewsFeed />); const title = await screen.findByRole("heading", { level: 2, name: "ข่าว 2" });
     expect(title.closest("article")).toHaveClass("ring-2");
   });
   it("labels a shared story absent from the current generation honestly", async () => {
@@ -104,7 +104,7 @@ describe("published News feed", () => {
   });
   it("labels synthetic content and disables every share action", async () => {
     const value = fixture(); value.demo = true; mockLoad.mockResolvedValue(value);
-    render(<NewsFeed />); await screen.findByRole("heading", { name: "Update 1" });
+    render(<NewsFeed />); await screen.findByRole("heading", { level: 2, name: "Update 1" });
     expect(screen.getByText(/DEMO · Synthetic examples/)).toBeInTheDocument();
     for (const article of screen.getAllByRole("article")) {
       for (const button of within(article).getAllByRole("button")) expect(button).toBeDisabled();
@@ -125,8 +125,8 @@ describe("published News feed", () => {
   });
   it("renders untrusted source markup as text and sharing links only contain public story data", async () => {
     const value = fixture(); value.stories = [story(1, { summary: { en: '<script>alert("x")</script>', th: null } })]; mockLoad.mockResolvedValue(value);
-    render(<NewsFeed />); await screen.findByRole("heading", { name: "Update 1" });
-    expect(screen.getByText('<script>alert("x")</script>')).toBeInTheDocument();
+    render(<NewsFeed />); await screen.findByRole("heading", { level: 2, name: "Update 1" });
+    expect(screen.getAllByText('<script>alert("x")</script>')).toHaveLength(2);
     expect(document.querySelector("article script")).toBeNull();
     const facebook = new URL(screen.getByRole("link", { name: "Facebook" }).getAttribute("href")!);
     expect([...facebook.searchParams.keys()]).toEqual(["u"]);
