@@ -105,7 +105,22 @@ from the retained September 22 gzip before classifying its abandoned temporary.
   Python files pass formatting; ten unrelated existing global format failures remain.
 - An initial full Python attempt hit access denied in Windows' default temporary
   directory. It was stopped and restarted with a writable workspace temp root.
-  Final full-gate results and deployment verification will be recorded below.
+  The completed run gives **4,383 passed, 156 skipped, 64 failed and 22 errors**
+  in 861.90 seconds. Comparing failing test IDs with the earlier October 9 run
+  finds **no new failing cases and no news failures**. The broader gate remains
+  non-green; frozen reference and Windows failures were not reinterpreted or
+  repaired as part of this reporting change. Logs are in
+  `data/artifacts/news-production-20261009/pytest-coverage-workspace-full.log`.
+- Commit `e9a1b7b` was pushed to `origin/main`. Pages deployment
+  [37971781604](https://github.com/Keetawon/the_comet_fpl/actions/runs/37971781604)
+  completed successfully at **2026-10-09 18:17:38 UTC**. The live browser showed
+  20 stories, including Brighton, Man City and Aston Villa, and an open roundup
+  in both EN and TH before the former five-hour boundary. No five-hour opening
+  message remains. The production news tab was left open in Thai.
+- The exact temporary-file audit and deployment verification are retained in
+  `operations-cleanup-candidates.json` and `coverage-release-verification.json`
+  beside the test logs. No operations files were removed. Older partial exports
+  include interrupted cycles that automatic retention intentionally skips.
 
 All raw and generated news evidence remains in the private operations news store.
 The protected SDP and local-news-notes worktrees were not edited.
