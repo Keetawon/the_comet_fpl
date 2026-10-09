@@ -40,6 +40,9 @@ packages = ["src/fpl"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# Test databases are disposable; preserve only the most recent failed run for diagnosis.
+tmp_path_retention_count = 1
+tmp_path_retention_policy = "failed"
 markers = [
     "archive: requires the downloaded archive database (jobs.build_db)",
 ]
