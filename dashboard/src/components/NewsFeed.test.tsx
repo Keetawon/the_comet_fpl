@@ -120,7 +120,7 @@ describe("published News feed", () => {
   it("isolates optional feed failures from other dashboard content", async () => {
     mockLoad.mockRejectedValue(new Error("missing optional file"));
     render(<><p>Published forecast is intact</p><NewsFeed compact /></>);
-    await waitFor(() => expect(screen.getByText(/News has not been published in this dashboard generation/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/The published news feed is unavailable/)).toBeInTheDocument());
     expect(screen.getByText("Published forecast is intact")).toBeInTheDocument();
   });
   it("renders untrusted source markup as text and sharing links only contain public story data", async () => {
