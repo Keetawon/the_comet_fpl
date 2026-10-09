@@ -14,7 +14,7 @@ export function newsRoundupText(feed: PublicNewsFeed, language: NewsLanguage): s
     ...(feed.demo ? [thai ? "🧪 ข่าวสมมติ — ไม่ใช่ข่าวจริง" : "🧪 SIMULATED NEWS — NOT REAL NEWS"] : []),
     "THE COMET FPL · " + (thai ? "สรุปข่าวทุกทีม" : "All-team news roundup"),
     `${thai ? "เผยแพร่ชุดข่าว" : "Edition published"}: ${stamp(feed.generated_at)}`,
-    thai ? "❌ ไม่พร้อมแน่นอน  |  🟨 ยังไม่แน่ชัด  |  ✅ ยืนยันว่าฟิต/พร้อม" : "❌ Unavailable  |  🟨 Doubtful / uncertain  |  ✅ Confirmed fit / available",
+    thai ? "❌ ไม่พร้อมแน่นอน  |  ⚠️ ยังไม่แน่ชัด  |  ✅ ยืนยันว่าฟิต/พร้อม" : "❌ Unavailable  |  ⚠️ Doubtful / uncertain  |  ✅ Confirmed fit / available",
     thai ? "ซ้อมแล้วไม่ได้แปลว่าพร้อมลงเล่น · ไม่มีข้อมูลไม่ได้แปลว่าฟิต" : "Training alone does not confirm availability. No report does not mean fit.",
     "",
     ...stories.map(story => [

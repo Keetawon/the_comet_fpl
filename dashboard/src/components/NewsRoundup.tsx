@@ -40,7 +40,7 @@ export function NewsRoundup({ feed, language }: { feed: PublicNewsFeed; language
     {!fresh && <p role="status" className="mt-2 text-sm text-amber-700 dark:text-amber-300">{thai ? "ชุดข่าวเกิน 24 ชั่วโมงแล้ว รอข่าวที่ตรวจใหม่" : "This edition is over 24 hours old. Awaiting newly reviewed reports."}</p>}
     <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3" aria-label={thai ? "ความหมายของสถานะ" : "Availability legend"}>
       <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">❌ {thai ? "ไม่พร้อมแน่นอน" : "Unavailable"}</p>
-      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">🟨 {thai ? "ยังไม่แน่ชัด / รอเช็กฟิต" : "Doubtful / uncertain"}</p>
+      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">⚠️ {thai ? "ยังไม่แน่ชัด / รอเช็กฟิต" : "Doubtful / uncertain"}</p>
       <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">✅ {thai ? "ยืนยันว่าฟิต / พร้อม" : "Confirmed fit / available"}</p>
     </div>
     <label className="mt-4 block text-sm font-medium" htmlFor="all-team-roundup">{thai ? "อ่านสรุปข่าวที่ตรวจแล้ว" : "Read the reviewed roundup"} ({feed.stories.length})</label>

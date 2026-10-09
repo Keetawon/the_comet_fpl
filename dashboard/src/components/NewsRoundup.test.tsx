@@ -41,7 +41,7 @@ it("copies all sorted source reports verbatim with attribution and branding, wit
     known_at: feed.generated_at, published_at: "2026-10-09T12:00:00Z", summarized_at: feed.generated_at,
     season: null, team_code: null, team_name: null, player_code: null, player_name: null,
     category: "squad", title: { en: "B CLUB | Team news", th: "B CLUB | ข่าวทีม" },
-    summary: { en: "❌ Out Player\n🟨 Training Player (training only)\n✅ Ready Player", th: "❌ Out Player\n🟨 Training Player (ซ้อมแล้ว ยังไม่ยืนยันความพร้อม)\n✅ Ready Player" },
+    summary: { en: "❌ Out Player\n⚠️ Training Player (training only)\n✅ Ready Player", th: "❌ Out Player\n⚠️ Training Player (ซ้อมแล้ว ยังไม่ยืนยันความพร้อม)\n✅ Ready Player" },
     rendering: "ai_summary", ai_model: "reviewed-test",
   };
   const edition = { ...feed, stories: [story, { ...story, id: "c".repeat(64), title: { en: "A CLUB | Team news", th: null }, summary: { en: "No status has been confirmed.", th: null } }] };

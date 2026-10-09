@@ -61,7 +61,7 @@ PROMPT = (
     "title and the same club label with a Thai team-news suffix as the Thai title. "
     "Format BOTH summaries as three concise newline-separated status rows in this order: "
     "'❌' followed by names explicitly unavailable for the relevant match (including bans); "
-    "'🟨' followed by names with doubts, pending tests, possible returns, training-only "
+    "'⚠️' followed by names with doubts, pending tests, possible returns, training-only "
     "updates or unspecified fitness; '✅' followed ONLY by names explicitly fit, ready, "
     "available or confirmed to return/make the squad. Training or recovery alone never "
     "means available. A later possible return does not itself establish absence for the "

@@ -135,7 +135,7 @@ The copied text includes publication/source dates, original source links,
 THE COMET FPL branding and the canonical language-specific News URL.
 
 Reviewed summaries use three rows: **❌ explicit unavailability**, including
-suspensions; **🟨 doubtful, uncertain or unconfirmed fitness**, including
+suspensions; **⚠️ doubtful, uncertain or unconfirmed fitness**, including
 training-only updates; and **✅ explicitly reported fit/ready/available** or a
 confirmed return to the squad. Each name retains necessary qualifications.
 Empty groups say **Not specified / ไม่ระบุ**, never imply everyone is fit.
@@ -150,8 +150,13 @@ unchanged. The provider prompt now requests this format for future availability
 reports; publication still requires review of the exact new summary hash.
 Twenty new Codex editorial revisions were checked against the retained posts and
 published as another edition; all source records and earlier drafts/reviews remain.
-The new live body hash is
+The initial status-row body hash was
 `adf742b90b59c594ac557734783a170f04dee90372abf5d0a28beb56a04e9f61`.
+Live Windows inspection found that the yellow-square emoji rendered as a missing
+glyph, so the uncertain group now uses **⚠️**. Twenty append-only display revisions
+replace only that symbol; names, classifications and qualifications are unchanged.
+The corrected published body hash is
+`6db59fc501c2e07a5dc6ec04baa851cbd4f6e1a994c65826380dc99d32d8a784`.
 
 Native sharing sends the whole public text only after a click. Unsupported or
 denied sharing copies the whole text; cancellation does nothing. If clipboard
@@ -163,5 +168,16 @@ Focused Python checks pass all **69 tests**; the complete dashboard suite passes
 **797 tests**, with build/lint passing. Copy fidelity, source/brand retention,
 both languages, filter independence, cancellation and clipboard fallback are
 covered. Ruff and strict mypy pass; the ten pre-existing global format failures
-remain. The full Python rerun and production verification are recorded below when
-complete.
+remain. The completed full Python rerun gives **4,383 passed, 156 skipped,
+64 failed and 22 errors** in 880.36 seconds. Its failing test IDs are identical
+to the previous full run, with no news failures. The log is
+`data/artifacts/news-production-20261009/pytest-roundup-share-full.log`.
+After the display-symbol correction, the 29 affected dashboard tests pass again.
+
+Commit `21beb39` deployed successfully through Pages run
+[37985687239](https://github.com/Keetawon/the_comet_fpl/actions/runs/37985687239).
+Live Thai inspection showed all 20 reports, the three status rows, source links
+and website branding; clicking Copy all displayed the success confirmation.
+The browser automation's virtual clipboard does not expose the page's native
+clipboard write, so live clipboard equality could not be measured there; exact
+copy/native-share payload fidelity is verified by the automated tests.
