@@ -26,17 +26,15 @@ describe("public data generation resolution", () => {
     const { resolveDataUrl } = await import("./publicData");
     expect(await resolveDataUrl("data/players.json")).toContain(`/generations/${generation}/`);
     livePointer = { ...livePointer, generation_sha256: "c".repeat(64), base_path: `generations/${"c".repeat(64)}` };
-    const { loadNewsFeed } = await import("./newsFeed");
-    expect(await loadNewsFeed()).toEqual(news);
-    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([pointerUrl, `https://data.thecometfpl.com/generations/${generation}/sdp/news_feed.json`]);
+    expect(await resolveDataUrl("sdp/news_feed.json")).toBe(`https://data.thecometfpl.com/generations/${generation}/sdp/news_feed.json`);
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([pointerUrl]);
   });
 
   it("refuses optional news absent from the pinned inventory without a legacy or provider fallback", async () => {
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => pointer() }));
     vi.stubGlobal("fetch", fetcher);
-    const { loadNewsFeed } = await import("./newsFeed");
-    await expect(loadNewsFeed()).rejects.toThrow("does not contain sdp/news_feed.json");
     const { resolveDataUrl } = await import("./publicData");
+    await expect(resolveDataUrl("sdp/news_feed.json")).rejects.toThrow("does not contain sdp/news_feed.json");
     expect(await resolveDataUrl("data/players.json")).toContain(`/generations/${generation}/`);
     expect(fetcher).toHaveBeenCalledExactlyOnceWith(pointerUrl, expect.objectContaining({ redirect: "error" }));
   });

@@ -9,7 +9,7 @@ const feed = (): PublicNewsFeed => ({
   stories: [{ id: "a".repeat(64), source_id: "fpl", source_name: "FPL", source_kind: "fpl", source_url: "https://www.arsenal.com/news/update", source_record_id: "code:123", published_at: null, known_at: "2026-09-19T11:00:00Z", source_sha256: "b".repeat(64), season: "2026-27", team_code: 3, team_name: "Arsenal", player_code: 123, player_name: "Example", category: "injury", title: { en: "Example update", th: null }, summary: { en: "The manager hopes he can return.", th: null }, rendering: "source_text", ai_model: null, summarized_at: null }],
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("public news sidecar", () => {
   it("preserves missing publication, translation and exact identity fields", () => {
@@ -53,9 +53,23 @@ describe("public news sidecar", () => {
     expect(parseNewsFeed(value).stories[0].source_kind).toBe("x");
   });
   it("fetches only the published optional file with bounded request", async () => {
-    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => feed() }); vi.stubGlobal("fetch", fetcher);
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(feed()) }); vi.stubGlobal("fetch", fetcher);
     expect(await loadNewsFeed()).toEqual(feed());
     expect(fetcher).toHaveBeenCalledExactlyOnceWith("/sdp/news_feed.json", expect.objectContaining({ signal: expect.any(AbortSignal), redirect: "error" }));
+  });
+  it("loads independent reviewed news only from the exact production origin", async () => {
+    vi.stubEnv("VITE_PUBLIC_DATA_POINTER", "https://data.thecometfpl.com/current.json");
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(feed()) }); vi.stubGlobal("fetch", fetcher);
+    expect(await loadNewsFeed()).toEqual(feed());
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith("https://data.thecometfpl.com/news/current.json", expect.objectContaining({ cache: "no-store", redirect: "error" }));
+    fetcher.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ ...feed(), demo: true }) });
+    await expect(loadNewsFeed()).rejects.toThrow("Demo");
+  });
+  it("validates five hours against the official deadline without inferring conference completion", () => {
+    const value = { ...feed(), schema_version: 2, roundup: { season: "2026-27", gw: 6, deadline_at: "2026-09-20T10:00:00Z", opens_at: "2026-09-20T05:00:00Z", schedule_captured_at: "2026-09-19T12:00:00Z", schedule_sha256: "c".repeat(64) } };
+    expect(parseNewsFeed(value).roundup?.gw).toBe(6);
+    value.roundup.opens_at = "2026-09-20T07:00:00Z";
+    expect(() => parseNewsFeed(value)).toThrow("schedule");
   });
   it("leaves a missing optional file unavailable without provider or old-generation fallback", async () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: false, status: 404 }); vi.stubGlobal("fetch", fetcher);

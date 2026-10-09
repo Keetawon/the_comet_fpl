@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowUpRight, Copy, ExternalLink, Newspaper, Search, Share2 } from "lucide-react";
 import { loadNewsFeed, type NewsCategory, type NewsStory, type PublicNewsFeed } from "@/data/newsFeed";
 import { newsShareLinks, newsStoryUrl, shareNews, type NewsLanguage } from "@/lib/newsShare";
+import { NewsRoundup } from "./NewsRoundup";
 
 const copy = {
   en: {
     title: "Premier League news", latest: "Team news to catch up on", eyebrow: "THE TEAM NEWS DESK",
     intro: "Injuries, squad updates and the manager’s own words. Catch up before choosing your XI.",
     all: "All news", search: "Search news", allTeams: "All clubs", club: "Club", reset: "Reset filters", source: "Original source", coverage: "Sources & coverage",
-    loading: "Loading published news…", unavailable: "News has not been published in this dashboard generation. Other dashboard data remains available.",
+    loading: "Loading published news…", unavailable: "The published news feed is unavailable. Other dashboard data remains available.",
     empty: "No news has been published yet.", noMatches: "No news matches these filters.", translation: "Thai translation pending · showing English", ai: "AI summary", original: "Source text",
     fpl: "FPL update · linked club article", fplOnly: "Official FPL update", publication: "Published by source", fplTime: "FPL news updated", captured: "First captured", generated: "Feed published",
     notTime: "Source publication time unavailable", bound: "Reported news is context only. It does not change xP, availability probabilities or optimizer recommendations.",
@@ -127,8 +128,10 @@ export function NewsFeed({ compact = false, preview }: { compact?: boolean; prev
       return;
     }
     let active = true;
-    loadNewsFeed().then(data => { if (active) setState({ status: "ready", data }); }).catch(() => { if (active) setState({ status: "unavailable" }); });
-    return () => { active = false; };
+    const refresh = () => loadNewsFeed().then(data => { if (active) setState({ status: "ready", data }); }).catch(() => { if (active) setState({ status: "unavailable" }); });
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 15 * 60_000);
+    return () => { active = false; window.clearInterval(timer); };
   }, [demoPreview]);
   useEffect(() => {
     if (compact) return;
@@ -174,6 +177,7 @@ export function NewsFeed({ compact = false, preview }: { compact?: boolean; prev
     </header>
     {feed?.demo && <p role="note" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">{t.demo}</p>}
     {!compact && demoPreview?.header(language)}
+    {!compact && feed && !demoPreview && <NewsRoundup feed={feed} language={language} />}
     {!compact && feed && feed.stories.length > 0 && <div className="mt-6 space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row"><label className="relative col-span-2 min-w-0 flex-1"><Search className="pointer-events-none absolute top-3.5 left-3 size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">{t.search}</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} className={`${fieldClass} w-full pl-9`} /></label><label><span className="sr-only">{t.club}</span><select value={team} onChange={event => setTeam(event.target.value)} className={`${fieldClass} w-full sm:max-w-56`}><option value="">{t.allTeams}</option>{clubs.map(([code, name]) => <option value={code} key={code}>{name}</option>)}</select></label><button type="button" className={fieldClass} onClick={reset}>{t.reset}</button></div>
       <div className="comet-news-topics flex max-w-full gap-2 overflow-x-auto pb-2 sm:flex-wrap" role="group" aria-label={language === "th" ? "ประเภทข่าว" : "News category"}>{(["", ...Object.keys(categoryNames)] as (NewsCategory | "")[]).map(key => <button type="button" key={key} aria-pressed={category === key} onClick={() => setCategory(key)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium focus-visible:outline-2 ${category === key ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-muted"}`}>

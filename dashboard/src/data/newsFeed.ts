@@ -34,12 +34,13 @@ export interface NewsStory {
 }
 export interface PublicNewsFeed {
   schema: "fpl.public-news";
-  schema_version: 1;
+  schema_version: 1 | 2;
   semantics: "reported_news_not_forecast";
   generated_at: string;
   demo: boolean;
   sources: NewsSource[];
   stories: NewsStory[];
+  roundup?: { season: string; gw: number; deadline_at: string; opens_at: string; schedule_captured_at: string; schedule_sha256: string };
 }
 
 const HASH = /^[a-f0-9]{64}$/;
@@ -66,10 +67,18 @@ export function safeNewsSourceUrl(value: unknown): value is string {
 
 /** Public sidecar only: no private notes, manager inputs, forecast fields or client AI. */
 export function parseNewsFeed(value: unknown): PublicNewsFeed {
-  if (!object(value) || !exactKeys(value, "schema schema_version semantics generated_at demo sources stories") ||
-      value.schema !== "fpl.public-news" || value.schema_version !== 1 || value.semantics !== "reported_news_not_forecast" ||
+  if (!object(value) || !exactKeys(value, `schema schema_version semantics generated_at demo sources stories${value.schema_version === 2 ? " roundup" : ""}`) ||
+      value.schema !== "fpl.public-news" || (value.schema_version !== 1 && value.schema_version !== 2) || value.semantics !== "reported_news_not_forecast" ||
       !date(value.generated_at) || typeof value.demo !== "boolean" || !Array.isArray(value.sources) || !Array.isArray(value.stories) ||
       value.sources.length > 50 || value.stories.length > 100) throw new Error("Invalid published news feed.");
+  if (value.schema_version === 2) {
+    const r = value.roundup;
+    if (!object(r) || !exactKeys(r, "season gw deadline_at opens_at schedule_captured_at schedule_sha256") ||
+        typeof r.season !== "string" || !/^\d{4}-\d{2}$/.test(r.season) || !Number.isInteger(r.gw) || Number(r.gw) < 1 || Number(r.gw) > 38 ||
+        !date(r.deadline_at) || !date(r.opens_at) || !date(r.schedule_captured_at) || typeof r.schedule_sha256 !== "string" || !HASH.test(r.schedule_sha256) ||
+        Date.parse(r.deadline_at) - Date.parse(r.opens_at) !== 5 * 60 * 60 * 1000 ||
+        Date.parse(r.schedule_captured_at) >= Date.parse(r.deadline_at) || Date.parse(r.schedule_captured_at) > Date.parse(value.generated_at)) throw new Error("Invalid official roundup schedule.");
+  }
   const sourceIds = new Map<string, Record<string, unknown>>();
   for (const source of value.sources) {
     if (!object(source) || !exactKeys(source, "source_id source_name source_kind status last_checked_at last_success_at message") ||
@@ -111,8 +120,15 @@ export function parseNewsFeed(value: unknown): PublicNewsFeed {
 }
 
 export async function loadNewsFeed(): Promise<PublicNewsFeed> {
-  const url = await resolveDataUrl("sdp/news_feed.json");
-  const response = await fetch(url, { signal: AbortSignal.timeout(15_000), redirect: "error" });
+  const independent = import.meta.env.VITE_PUBLIC_DATA_POINTER?.trim() === "https://data.thecometfpl.com/current.json";
+  const url = independent ? "https://data.thecometfpl.com/news/current.json" : await resolveDataUrl("sdp/news_feed.json");
+  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15_000), redirect: "error" });
   if (!response.ok) throw new Error("News is not available in this published generation.");
-  return parseNewsFeed(await response.json());
+  const body = await response.text();
+  if (body.length > 1_000_000) throw new Error("News exceeds size bound.");
+  const feed = parseNewsFeed(JSON.parse(body));
+  if (independent && feed.demo) throw new Error("Demo news is not publishable.");
+  // An unattended old edition cannot leave week-old X reports looking current.
+  return independent ? { ...feed, stories: feed.stories.filter(story => story.source_kind !== "x" ||
+    (story.published_at !== null && Date.parse(story.published_at) >= Date.now() - 7 * 86400_000)) } : feed;
 }
