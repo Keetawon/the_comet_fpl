@@ -42,6 +42,10 @@ describe("published News feed", () => {
     render(<NewsFeed />); await screen.findByRole("heading", { level: 2, name: "Update 1" });
     fireEvent.change(screen.getByRole("combobox", { name: "Club" }), { target: { value: "8" } });
     expect(screen.getAllByRole("article")).toHaveLength(1);
+    // The shareable all-team text stays complete when the individual cards are filtered.
+    const roundup = (screen.getByRole("textbox", { name: "All-team roundup text" }) as HTMLTextAreaElement).value;
+    expect(roundup).toContain("ARSENAL");
+    expect(roundup).toContain("CHELSEA");
     expect(screen.getByRole("heading", { level: 2, name: "Update 2" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Injury" }));
     expect(screen.getByText("No news matches these filters.")).toBeInTheDocument();
@@ -126,7 +130,8 @@ describe("published News feed", () => {
   it("renders untrusted source markup as text and sharing links only contain public story data", async () => {
     const value = fixture(); value.stories = [story(1, { summary: { en: '<script>alert("x")</script>', th: null } })]; mockLoad.mockResolvedValue(value);
     render(<NewsFeed />); await screen.findByRole("heading", { level: 2, name: "Update 1" });
-    expect(screen.getAllByText('<script>alert("x")</script>')).toHaveLength(2);
+    expect(screen.getByText('<script>alert("x")</script>')).toBeInTheDocument();
+    expect((screen.getByRole("textbox", { name: "All-team roundup text" }) as HTMLTextAreaElement).value).toContain('<script>alert("x")</script>');
     expect(document.querySelector("article script")).toBeNull();
     const facebook = new URL(screen.getByRole("link", { name: "Facebook" }).getAttribute("href")!);
     expect([...facebook.searchParams.keys()]).toEqual(["u"]);

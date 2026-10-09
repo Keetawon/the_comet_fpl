@@ -124,3 +124,44 @@ from the retained September 22 gzip before classifying its abandoned temporary.
 
 All raw and generated news evidence remains in the private operations news store.
 The protected SDP and local-news-notes worktrees were not edited.
+
+## Subsequent owner request: copyable all-team status roundup
+
+The production roundup now has one read-only text box and **Copy all teams** /
+**Share all teams** actions, independent of the individual-card filters. Reports
+are ordered by their printed club label, with latest reports first within a
+label. It does not merge reports or resolve player identities from those labels.
+The copied text includes publication/source dates, original source links,
+THE COMET FPL branding and the canonical language-specific News URL.
+
+Reviewed summaries use three rows: **❌ explicit unavailability**, including
+suspensions; **🟨 doubtful, uncertain or unconfirmed fitness**, including
+training-only updates; and **✅ explicitly reported fit/ready/available** or a
+confirmed return to the squad. Each name retains necessary qualifications.
+Empty groups say **Not specified / ไม่ระบุ**, never imply everyone is fit.
+Training, recovery, travel with the squad and absence from training photographs
+alone do not establish match availability. These are reported statuses, not
+starting-XI predictions or adjustments to model xP.
+
+Classification happens in the source-reviewed bilingual summary. The browser
+copies those rows verbatim and preserves legacy prose without guessing a status.
+The existing private summary record/review contract and public feed schema are
+unchanged. The provider prompt now requests this format for future availability
+reports; publication still requires review of the exact new summary hash.
+Twenty new Codex editorial revisions were checked against the retained posts and
+published as another edition; all source records and earlier drafts/reviews remain.
+The new live body hash is
+`adf742b90b59c594ac557734783a170f04dee90372abf5d0a28beb56a04e9f61`.
+
+Native sharing sends the whole public text only after a click. Unsupported or
+denied sharing copies the whole text; cancellation does nothing. If clipboard
+access is unavailable, the text box selects all text for manual copying. Synthetic
+editions retain their demo label and cannot use native sharing. No social-network
+SDK, browser AI call, dependency or automatic post was added.
+
+Focused Python checks pass all **69 tests**; the complete dashboard suite passes
+**797 tests**, with build/lint passing. Copy fidelity, source/brand retention,
+both languages, filter independence, cancellation and clipboard fallback are
+covered. Ruff and strict mypy pass; the ten pre-existing global format failures
+remain. The full Python rerun and production verification are recorded below when
+complete.

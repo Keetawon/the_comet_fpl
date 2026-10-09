@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { newsShareLinks, newsStoryUrl, shareNews } from "./newsShare";
+import { newsShareLinks, newsStoryUrl, shareNews, shareNewsRoundup } from "./newsShare";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -31,5 +31,21 @@ describe("public news sharing", () => {
     vi.stubGlobal("navigator", { share });
     expect(await shareNews("id", "th", "ข่าว")).toBe("shared");
     expect(share).toHaveBeenCalledWith({ title: "THE COMET · Premier League news", text: "ข่าว", url: newsStoryUrl("id", "th") });
+  });
+  it("shares or copies the complete roundup, including its website link", async () => {
+    const text = "THE COMET FPL\nCLUB A\n❌ Player A\nCLUB B\n✅ Player B\nhttps://www.thecometfpl.com/#news?lang=en";
+    const share = vi.fn().mockResolvedValue(undefined);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { share, clipboard: { writeText } });
+    expect(await shareNewsRoundup(text)).toBe("shared");
+    expect(share).toHaveBeenCalledWith({ title: "THE COMET FPL · All-team news roundup", text });
+    expect(writeText).not.toHaveBeenCalled();
+    share.mockRejectedValueOnce(new DOMException("Denied", "NotAllowedError"));
+    expect(await shareNewsRoundup(text)).toBe("copied");
+    expect(writeText).toHaveBeenCalledWith(text);
+    writeText.mockClear();
+    share.mockRejectedValueOnce(new DOMException("Cancelled", "AbortError"));
+    expect(await shareNewsRoundup(text)).toBe("cancelled");
+    expect(writeText).not.toHaveBeenCalled();
   });
 });
