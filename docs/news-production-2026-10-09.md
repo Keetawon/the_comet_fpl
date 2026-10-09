@@ -50,8 +50,8 @@ all-club completion collector, so production does not invent that signal.
 **Automation limit:** this release publishes reviewed reports, not unattended AI
 output. Automatic X capture/publication is not scheduled by this change. The
 five-hour rule controls the roundup display; it is not a claim that another X
-capture will automatically occur at that time. FDR/injury cloud updates and the
-existing desktop forecast schedule are separate and unchanged. A reliable
+capture will automatically occur at that time. FDR/injury cloud reporting and the
+existing desktop forecast schedule are separate. A reliable
 unattended news workflow still needs a factual-review process and edited/deleted
 post reconciliation; valid JSON alone failed the real bilingual quality check.
 
@@ -67,10 +67,13 @@ The October 9 production check also found the separate hourly official FPL
 workflow **disabled_manually**, with no `production-fpl` GitHub environment and
 no previous workflow runs. Its live endpoint was still dated October 5. A local
 execution of the existing publisher refreshed all 667 players and 760 fixture
-sides at **2026-10-09 17:27:44 UTC**, with verified publication. This does not
-activate the cloud job or transfer the local R2 publishing credential to GitHub.
-Do not describe that hourly workflow as operating until credentials/environment
-setup and a successful scheduled run are verified.
+sides at **2026-10-09 17:27:44 UTC**, with verified publication. The owner then
+explicitly approved the credential transfer. The main-only `production-fpl`
+environment is now configured and the hourly workflow enabled. First cloud run
+`37967569068` succeeded, publishing a new verified capture at **17:37:39 UTC**.
+This is a verified manual dispatch of the enabled hourly workflow; the next
+cron-triggered run has not yet been observed. See the activation addendum in
+`docs/hourly-official-fpl-reporting-2026-10-05.md`.
 
 ## Storage cleanup
 
@@ -97,3 +100,33 @@ Pytest now retains only the latest failed temporary run. Keep audit logs outside
 the temporary database tree; do not use permanent evidence directories as
 `--basetemp`. That explicit pytest option bypasses automatic retention. Local
 worktrees and disposable temporary paths are ignored, not deleted or staged.
+
+## Verification and deployment
+
+- News capture/store/publication tests: **66 passed**, including expired cursors,
+  exact append-only review, denied unreviewed publication, conditional writes,
+  readback failure, timestamp rollback and deadline schedule validation.
+- Dashboard: **793 passed**; build and lint passed (nine pre-existing lint warnings).
+  The final focused UI rerun passed 71 tests. Pages deployment
+  [37967528722](https://github.com/Keetawon/the_comet_fpl/actions/runs/37967528722)
+  passed all quality/build/deployment jobs at `7303219`.
+- Production browser verification: four source-linked real stories in EN and TH,
+  correct GW6 opening time **October 10 05:00 UTC / 12:00 Bangkok**, and official
+  FPL capture **October 10 00:37:39 Bangkok** from the successful cloud job.
+- The reviewed news HTTPS body hash is
+  `219e60c23c85cbfd35e486259bb553b0780a392e5446787897e40de532abf9b3`.
+  Its production CORS and no-store caching were independently verified. The main
+  forecast generation remains `29b2ce3ae80633d2fb958ad8903267e4f8b817a4d30c07d6305830ea851f28b8`.
+- Full repository Ruff passed; strict mypy passed all 244 source files. All eight
+  changed/new Python files pass formatting. Global format still reports ten
+  unrelated pre-existing files.
+- The full Python gate completed: **4,379 passed, 156 skipped, 65 failed,
+  22 errors**. This is **not a green full gate**. The failures remain outside the
+  news test files, in the broader frozen-input/reference/Windows paths also
+  recorded in the October 5 repair. Full logs and exit codes are retained under
+  `data/artifacts/news-production-20261009/`; no scientific result was rerun or
+  reinterpreted to make the gate pass.
+
+The SDP V2 checkout remains clean at `999a29c`; the active local-news-notes edits
+and pre-existing root scratch work remain intact. All changes for this delivery
+were committed and pushed to `origin/main`, without merging the V2 model branch.

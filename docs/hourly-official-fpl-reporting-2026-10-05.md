@@ -1,5 +1,23 @@
 # Hourly official FPL reporting
 
+## October 9 activation — complete
+
+The owner explicitly approved transferring the existing R2 publishing credentials
+to GitHub's encrypted `production-fpl` environment. The environment now permits
+only the `main` branch. The three required secrets and bucket variable are
+configured, and `official-fpl-refresh.yml` is **active** with its existing
+minute-17 hourly schedule. No secret values entered Git, logs or public artifacts.
+
+The first cloud run, [37967569068](https://github.com/Keetawon/the_comet_fpl/actions/runs/37967569068),
+completed successfully. Its capture at **2026-10-09 17:37:39 UTC** contains 667
+players and 760 fixture sides. Independent HTTPS verification confirmed the
+new capture, production-origin CORS and `Cache-Control: no-store`.
+This run was manually dispatched to test the now-enabled scheduled workflow;
+an actual cron-triggered run has not yet been observed at this verification.
+The October 5 pending-activation account below is historical, not current status.
+
+## October 5 repair and implementation
+
 The public dashboard stopped at its September 28 publication because a subsequent
 desktop run died during capture. Its recovery checkpoint then blocked every later
 refresh before new data could be loaded. The previous September repair covered
