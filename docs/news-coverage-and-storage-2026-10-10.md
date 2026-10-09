@@ -181,3 +181,13 @@ and website branding; clicking Copy all displayed the success confirmation.
 The browser automation's virtual clipboard does not expose the page's native
 clipboard write, so live clipboard equality could not be measured there; exact
 copy/native-share payload fidelity is verified by the automated tests.
+
+The final symbol correction, commit `373c6d0`, deployed successfully in Pages run
+[37986674222](https://github.com/Keetawon/the_comet_fpl/actions/runs/37986674222)
+at **2026-10-09 20:27:56 UTC**. The reloaded production page has the corrected
+legend and all 20 warning rows, with no unsupported yellow-square glyph left.
+Both languages retain the original source links and canonical website link.
+The live news body matches the corrected local publication byte for byte.
+At the phone viewport the text box stays within the page width with no horizontal
+document overflow; the temporary viewport override was reset. News is left open
+in Thai. The feature worktree is clean and the protected worktrees are unchanged.
