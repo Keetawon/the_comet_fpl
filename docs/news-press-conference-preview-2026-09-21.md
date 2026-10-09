@@ -1,5 +1,15 @@
 # Local News page simulation — 2026-09-21
 
+Owner timing update (2026-10-09): the current preview now releases after all
+conferences finish or five hours before the official deadline, whichever comes
+first. This replaces the original three-hour cutoff; live capture and automatic
+publication remain inactive.
+
+October 9 verification: all 46 existing news tests pass, including the exact
+five-hour boundary and exclusion of later-known stories/translations. TypeScript,
+the production build, scoped Oxlint and Git whitespace checks pass. The original
+September 21 browser verification below remains the record of the three-hour UI.
+
 Owner-requested visual preview of the proposed FFScout press-conference feed.
 This implements no capture schedule, paid request, automated team identification,
 source approval or news publication. The example date, six club timetable rows
@@ -32,7 +42,7 @@ message, including its synthetic-news label. Clipboard denial selects the text f
 manual copying. External sharing remains disabled for this invented news.
 
 The timing selector demonstrates three fixed scenarios: collecting, all conferences
-finished, and exactly three hours before the example deadline. The earlier qualifying
+finished, and exactly five hours before the example deadline. The earlier qualifying
 trigger releases the message. Conference completion is explicit sample evidence;
 passing a timetable START time never establishes completion. Stories and translations
 known after the selected edition are excluded. Recap coverage can remain partial

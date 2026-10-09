@@ -95,7 +95,7 @@ describe("local press-conference simulation", () => {
     expect(screen.queryByRole("textbox", { name: "All-team roundup text" })).not.toBeInTheDocument();
     expect(screen.getByText(/The roundup is not ready yet/)).toBeInTheDocument();
     fireEvent.change(timing, { target: { value: "deadline" } });
-    expect(screen.getByText("Three-hours-before-deadline edition")).toBeInTheDocument();
+    expect(screen.getByText("Five-hours-before-deadline edition")).toBeInTheDocument();
     expect((screen.getByRole("textbox", { name: "All-team roundup text" }) as HTMLTextAreaElement).value).toContain("3/6 sample clubs");
     expect(loadNewsFeed).not.toHaveBeenCalled();
   });
@@ -117,27 +117,27 @@ describe("local press-conference simulation", () => {
     for (const share of screen.getAllByRole("button", { name: "Share" })) expect(share).toBeDisabled();
   });
 
-  it("enforces the exact T-minus-three-hours boundary and explicit completed-conference evidence", () => {
-    const feed: PublicNewsFeed = { schema: "fpl.public-news", schema_version: 1, semantics: "reported_news_not_forecast", generated_at: "2026-09-26T07:00:00Z", demo: true, sources: [], stories: [] };
+  it("enforces the exact T-minus-five-hours boundary and explicit completed-conference evidence", () => {
+    const feed: PublicNewsFeed = { schema: "fpl.public-news", schema_version: 1, semantics: "reported_news_not_forecast", generated_at: "2026-09-26T05:00:00Z", demo: true, sources: [], stories: [] };
     const props = { language: "en" as const, feed, clubs: [[3, "Arsenal"]] as const, deadline: "2026-09-26T10:00:00Z" };
-    const { rerender } = render(<NewsRoundupPreview {...props} asOf="2026-09-26T06:59:59Z" allConferencesEndedAt="2026-09-26T07:00:01Z" />);
+    const { rerender } = render(<NewsRoundupPreview {...props} asOf="2026-09-26T04:59:59Z" allConferencesEndedAt="2026-09-26T05:00:01Z" />);
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    rerender(<NewsRoundupPreview {...props} asOf="2026-09-26T07:00:00Z" allConferencesEndedAt={null} />);
-    expect(screen.getByText("Three-hours-before-deadline edition")).toBeInTheDocument();
+    rerender(<NewsRoundupPreview {...props} asOf="2026-09-26T05:00:00Z" allConferencesEndedAt={null} />);
+    expect(screen.getByText("Five-hours-before-deadline edition")).toBeInTheDocument();
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toContain("0/1 sample clubs");
     rerender(<NewsRoundupPreview {...props} asOf="2026-09-25T15:00:00Z" allConferencesEndedAt="2026-09-25T15:00:00Z" />);
     expect(screen.getByText("After-conferences edition")).toBeInTheDocument();
-    rerender(<NewsRoundupPreview {...props} asOf="2026-09-26T07:05:00Z" allConferencesEndedAt="2026-09-26T07:05:00Z" />);
-    expect(screen.getByText("Three-hours-before-deadline edition")).toBeInTheDocument();
+    rerender(<NewsRoundupPreview {...props} asOf="2026-09-26T05:05:00Z" allConferencesEndedAt="2026-09-26T05:05:00Z" />);
+    expect(screen.getByText("Five-hours-before-deadline edition")).toBeInTheDocument();
   });
 
   it("does not include stories or translations learned after the chosen edition", () => {
-    const feed: PublicNewsFeed = { schema: "fpl.public-news", schema_version: 1, semantics: "reported_news_not_forecast", generated_at: "2026-09-26T07:00:00Z", demo: true, sources: [], stories: [] };
-    const lateStory = { id: "a".repeat(64), source_id: "sample", source_kind: "x" as const, source_name: "Sample source", source_url: "https://x.com/FFScout/status/1", source_record_id: "1", source_sha256: "b".repeat(64), team_code: 3, team_name: "Arsenal", player_code: null, player_name: null, season: "2026-27", category: "squad" as const, title: { en: "Late update", th: "ข่าวภายหลัง" }, summary: { en: "Late information", th: "ข้อมูลภายหลัง" }, rendering: "ai_summary" as const, ai_model: "test", known_at: "2026-09-26T07:00:01Z", published_at: "2026-09-26T06:00:00Z", summarized_at: "2026-09-26T07:00:02Z" };
-    const props = { language: "en" as const, clubs: [[3, "Arsenal"]] as const, asOf: "2026-09-26T07:00:00Z", deadline: "2026-09-26T10:00:00Z", allConferencesEndedAt: null };
+    const feed: PublicNewsFeed = { schema: "fpl.public-news", schema_version: 1, semantics: "reported_news_not_forecast", generated_at: "2026-09-26T05:00:00Z", demo: true, sources: [], stories: [] };
+    const lateStory = { id: "a".repeat(64), source_id: "sample", source_kind: "x" as const, source_name: "Sample source", source_url: "https://x.com/FFScout/status/1", source_record_id: "1", source_sha256: "b".repeat(64), team_code: 3, team_name: "Arsenal", player_code: null, player_name: null, season: "2026-27", category: "squad" as const, title: { en: "Late update", th: "ข่าวภายหลัง" }, summary: { en: "Late information", th: "ข้อมูลภายหลัง" }, rendering: "ai_summary" as const, ai_model: "test", known_at: "2026-09-26T05:00:01Z", published_at: "2026-09-26T04:00:00Z", summarized_at: "2026-09-26T05:00:02Z" };
+    const props = { language: "en" as const, clubs: [[3, "Arsenal"]] as const, asOf: "2026-09-26T05:00:00Z", deadline: "2026-09-26T10:00:00Z", allConferencesEndedAt: null };
     const { rerender } = render(<NewsRoundupPreview {...props} feed={{ ...feed, stories: [lateStory] }} />);
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).not.toContain("Late information");
-    rerender(<NewsRoundupPreview {...props} feed={{ ...feed, stories: [{ ...lateStory, known_at: "2026-09-26T06:30:00Z" }] }} />);
+    rerender(<NewsRoundupPreview {...props} feed={{ ...feed, stories: [{ ...lateStory, known_at: "2026-09-26T04:30:00Z" }] }} />);
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toContain("No verified recap yet");
   });
 });

@@ -81,7 +81,7 @@ function PressSchedule({ language, selectedTeam, asOf }: { language: NewsLanguag
 const scenarios = {
   collecting: { asOf: simulatedAt, completedAt: null },
   conferences: { asOf: "2026-09-25T15:05:00Z", completedAt: "2026-09-25T15:00:00Z" },
-  deadline: { asOf: "2026-09-26T07:00:00Z", completedAt: null },
+  deadline: { asOf: "2026-09-26T05:00:00Z", completedAt: null },
 } as const;
 type Scenario = keyof typeof scenarios;
 const clubs = schedule.map(row => [row.code, row.club] as const);
@@ -98,7 +98,7 @@ export default function LocalNewsPreview() {
           <select value={scenario} onChange={event => setScenario(event.target.value as Scenario)} className="min-h-11 max-w-full rounded-lg border bg-background px-3 text-sm text-foreground">
             <option value="collecting">{language === "th" ? "ระหว่างรอข่าว" : "Still collecting"}</option>
             <option value="conferences">{language === "th" ? "หลังแถลงครบทุกทีม" : "All conferences finished"}</option>
-            <option value="deadline">{language === "th" ? "ก่อนเดดไลน์ 3 ชั่วโมง" : "Three hours before deadline"}</option>
+            <option value="deadline">{language === "th" ? "ก่อนเดดไลน์ 5 ชั่วโมง" : "Five hours before deadline"}</option>
           </select>
         </label>
         <NewsRoundupPreview key={scenario + language} language={language} feed={feed} clubs={clubs} asOf={asOf} deadline="2026-09-26T10:00:00Z" allConferencesEndedAt={completedAt} />

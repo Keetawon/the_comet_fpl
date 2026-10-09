@@ -22,7 +22,7 @@ export default function NewsRoundupPreview({ language, feed, clubs, asOf, deadli
   const [feedback, setFeedback] = useState<"copied" | "manual" | null>(null);
   const thai = language === "th";
   const now = Date.parse(asOf);
-  const cutoff = Date.parse(deadline) - 3 * 60 * 60 * 1000;
+  const cutoff = Date.parse(deadline) - 5 * 60 * 60 * 1000;
   const completed = allConferencesEndedAt === null ? NaN : Date.parse(allConferencesEndedAt);
   // Completion is explicit evidence; passing a conference's START time proves nothing.
   const completionQualifies = Number.isFinite(completed) && completed <= now;
@@ -72,10 +72,10 @@ export default function NewsRoundupPreview({ language, feed, clubs, asOf, deadli
       <span className={`rounded-full px-3 py-1.5 text-xs font-medium ${ready ? "bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-200" : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"}`}>{ready ? thai ? `มีข่าว ${received}/${clubs.length} ทีมตัวอย่าง` : `${received}/${clubs.length} sample clubs covered` : thai ? "กำลังรอรอบสรุป" : "Collecting updates"}</span>
     </div>
     <p id="news-roundup-scope" className="mt-2 text-sm text-muted-foreground">{thai ? "รวมทุกทีมเสมอ ไม่เปลี่ยนตามตัวกรองข่าวด้านล่าง" : "Always includes every club; filters below only affect individual news cards."}</p>
-    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{thai ? "สรุปเมื่อแถลงครบทุกทีม หรือก่อนเดดไลน์ 3 ชั่วโมง — ถึงเงื่อนไขใดก่อน" : "Released after all conferences finish, or three hours before the deadline — whichever comes first."}</p>
+    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{thai ? "สรุปเมื่อแถลงครบทุกทีม หรือก่อนเดดไลน์ 5 ชั่วโมง — ถึงเงื่อนไขใดก่อน" : "Released after all conferences finish, or five hours before the deadline — whichever comes first."}</p>
     <p className="mt-1 text-xs text-muted-foreground">{thai ? "เดดไลน์สมมติ" : "Example deadline"}: {dateTime(deadline, language)}</p>
     {ready ? <>
-      <div className="mt-4 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><p>{reason === "conferences" ? thai ? "รอบสรุปหลังแถลงครบ" : "After-conferences edition" : thai ? "รอบสรุปก่อนเดดไลน์ 3 ชั่วโมง" : "Three-hours-before-deadline edition"}</p><p>{thai ? "ข้อมูลถึง" : "As of"}: {dateTime(asOf, language)}</p></div>
+      <div className="mt-4 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><p>{reason === "conferences" ? thai ? "รอบสรุปหลังแถลงครบ" : "After-conferences edition" : thai ? "รอบสรุปก่อนเดดไลน์ 5 ชั่วโมง" : "Five-hours-before-deadline edition"}</p><p>{thai ? "ข้อมูลถึง" : "As of"}: {dateTime(asOf, language)}</p></div>
       <textarea key={`${language}-${asOf}`} ref={textarea} aria-label={thai ? "ข้อความสรุปข่าวทุกทีม" : "All-team roundup text"} aria-describedby="news-roundup-scope" value={text} readOnly rows={11} className="mt-2 block w-full resize-y rounded-xl border bg-background/90 p-4 text-sm leading-relaxed focus-visible:outline-2 focus-visible:outline-offset-2" />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => { void copyText(); }} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2"><Copy className="size-4" aria-hidden="true" />{thai ? "คัดลอกข้อความทั้งหมด" : "Copy full roundup"}</button>
