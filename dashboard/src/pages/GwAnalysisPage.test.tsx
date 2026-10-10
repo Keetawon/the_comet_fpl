@@ -80,7 +80,7 @@ it("shows Score Prediction with unchanged goal averages and team clean-sheet cha
   expect(text).toHaveAttribute("readonly");
   expect(text).toHaveAttribute("lang", "th");
   expect(text.value).toContain("สรุป GW5");
-  expect(text.value).toContain("ปัดค่าเฉลี่ยประตู: ALP 2–2 BET");
+  expect(text.value).toContain("1. Alpha (2) - (2) Beta");
   expect(screen.getByText(/Rounded goal averages, with the original estimates/)).toBeInTheDocument();
   const match = screen.getByRole("article", { name: "Alpha v Beta" });
   expect(within(match).getAllByText("(1.80)")).toHaveLength(2);
@@ -104,7 +104,7 @@ it("selects only actual published GW keys and retains explicit vintage control i
   expect((await ready()).value).toContain("1/2 fixtures match");
   fireEvent.change(gw, { target: { value: "7" } });
   expect((await ready()).value).toContain("GW7 | THE COMET FPL");
-  expect((await ready()).value).toContain("Rounded goal averages: ALP 3–3 BET");
+  expect((await ready()).value).toContain("1. Alpha (3) - (3) Beta");
   sources();
   fireEvent.change(screen.getByRole("combobox", { name: "Forecast record" }), { target: { value: "old-record" } });
   expect((await ready()).value).toContain("GW3 | THE COMET FPL");

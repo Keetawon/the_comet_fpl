@@ -1,5 +1,17 @@
 # Player-facing dashboard refresh
 
+## Owner follow-up: one-line score summary (2026-10-10)
+
+Each match in the Thai/English shared briefing now starts with one line, for
+example `1. Alpha (2) - (1) Beta`. This combines the former full-name matchup
+heading and abbreviated rounded-goal row, so the same teams are not repeated.
+Home remains on the left, away on the right. Existing integer rounding, missing
+value markers, match ordering and the rounded-means explanation remain unchanged.
+The observed-statistics lines and underlying published forecasts are unchanged.
+The complete dashboard suite passes all 797 tests; lint and build pass. Existing
+checks retain rounding boundaries, zero/missing values, bilingual output, DGW
+numbering and exact copy/share behavior.
+
 ## Owner follow-up: canonical Score Prediction route (2026-09-20)
 
 The sidebar and Summary link now open `#score-prediction`. Existing `#gw-analysis`

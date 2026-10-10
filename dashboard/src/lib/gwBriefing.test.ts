@@ -42,7 +42,7 @@ describe("source-bound GW briefing text", () => {
     source.matches[0].home.forecast.lambda_for = value;
     const before = structuredClone(source);
     const result = buildGwBriefing(source);
-    expect(result.text).toContain(`Rounded goal averages: ALP ${formatted}–1 BET`);
+    expect(result.text).toContain(`1. Alpha (${formatted}) - (1) Beta`);
     expect(result.text).toContain("ALP: xG 1.50, xGA 0.75, SOT 3.00");
     expect(source).toEqual(before);
   });
@@ -57,7 +57,9 @@ describe("source-bound GW briefing text", () => {
     expect(result.text).toContain("Model forecast cutoff: 2026-09-17 08:00 UTC");
     expect(result.text).toContain("Dashboard export: 2026-09-19 10:00 UTC");
     expect(result.text).toContain("SDP statistics publication: 2026-09-19 09:00 UTC; latest retained SDP capture: 2026-09-19 07:00 UTC");
-    expect(result.text).toContain("Rounded goal averages: ALP 2–1 BET");
+    expect(result.text).toContain("1. Alpha (2) - (1) Beta\nALP: xG");
+    expect(result.text).not.toContain("Alpha v Beta");
+    expect(result.text).not.toContain("Rounded goal averages:");
     expect(result.text).toContain("ALP: xG 1.50, xGA 0.75, SOT 3.00 per match (2 recorded matches, GW1–2)");
     expect(result.text).toContain("not a historical pre-deadline snapshot");
     expect(result.text).toContain("not predicted scores or win probabilities");
@@ -68,7 +70,8 @@ describe("source-bound GW briefing text", () => {
     expect(thai.text).toContain("โมเดลตัดข้อมูล ณ 2026-09-17 08:00 UTC");
     expect(thai.text).toContain("เก็บข้อมูล SDP ล่าสุด: 2026-09-19 07:00 UTC");
     expect(thai.text).toContain("ไม่ใช่สกอร์ทายหรือโอกาสชนะ");
-    expect(thai.text).toContain("ปัดค่าเฉลี่ยประตู: ALP 2–1 BET");
+    expect(thai.text).toContain("1. Alpha (2) - (1) Beta\nALP: xG");
+    expect(thai.text).not.toContain("ปัดค่าเฉลี่ยประตู:");
     expect(source).toEqual(before);
   });
 
@@ -94,8 +97,8 @@ describe("source-bound GW briefing text", () => {
     const later = { ...first, fixture: 51, gw: 6, kickoff_time: "2026-09-27T14:00:00Z" };
     const result = buildGwBriefing(input({ matches: [later, second, first], expectedFixtureIds: [42, 41] }));
     expect(result.coverage).toMatch(/^2\/2/);
-    expect(result.text.match(/Rounded goal averages/g)).toHaveLength(2);
-    expect(result.text).toContain("2. Alpha v Beta");
+    expect(result.text.match(/^\d+\. Alpha \(2\) - \(1\) Beta$/gm)).toHaveLength(2);
+    expect(result.text).toContain("2. Alpha (2) - (1) Beta");
     expect(result.text).not.toContain("3. Alpha");
   });
 
@@ -145,7 +148,7 @@ describe("source-bound GW briefing text", () => {
     source.matches[0].away.forecast.lambda_for = null;
     source.stats!.team_matches.forEach(row => { row.sdp.expected_goals = 0; });
     const result = buildGwBriefing(source);
-    expect(result.text).toContain("Rounded goal averages: ALP 0–— BET");
+    expect(result.text).toContain("1. Alpha (0) - (—) Beta");
     expect(result.text).toContain("ALP: xG 0.00");
   });
 
@@ -168,7 +171,7 @@ describe("source-bound GW briefing text", () => {
 
   it("keeps forecast text usable when optional SDP is absent or an earliest kickoff cannot be proved", () => {
     const absent = buildGwBriefing(input({ stats: null }));
-    expect(absent.text).toContain("Rounded goal averages: ALP 2–1 BET");
+    expect(absent.text).toContain("1. Alpha (2) - (1) Beta");
     expect(absent.text).toContain("Observed SDP statistics are unavailable");
     expect(absent.text).not.toContain("per match (");
     const unknown = matches(); unknown[0].kickoff_time = null;
@@ -191,7 +194,7 @@ describe("source-bound GW briefing text", () => {
     const source = stats(); source.team_matches.push({ ...source.team_matches[0] });
     const result = buildGwBriefing(input({ stats: source }));
     expect(result.text).toContain("Duplicate SDP club-fixture records");
-    expect(result.text).toContain("Rounded goal averages: ALP 2–1 BET");
+    expect(result.text).toContain("1. Alpha (2) - (1) Beta");
     expect(result.text).not.toContain("ALP: xG");
   });
 

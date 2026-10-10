@@ -134,8 +134,7 @@ export function buildGwBriefing({ matches, gw, language, stats, exportCreatedAt,
   );
   for (const [index, match] of selected.entries()) {
     const home = match.home.team, away = match.away.team;
-    const rounded = `${home.short_name} ${roundedGoal(match.home.forecast.lambda_for)}–${roundedGoal(match.away.forecast.lambda_for)} ${away.short_name}`;
-    lines.push("", `${index + 1}. ${home.team_name} v ${away.team_name}`, say(`Rounded goal averages: ${rounded}`, `ปัดค่าเฉลี่ยประตู: ${rounded}`));
+    lines.push("", `${index + 1}. ${home.team_name} (${roundedGoal(match.home.forecast.lambda_for)}) - (${roundedGoal(match.away.forecast.lambda_for)}) ${away.team_name}`);
     if (usableStats) lines.push(`${teamContext(home.team_code, home.short_name)} ${teamContext(away.team_code, away.short_name)}`);
   }
   lines.push("", say("Goal averages are rounded to the nearest integer (0.5 rounds up), not predicted scores or win probabilities. Decimal estimates remain on the match cards. Observed xG/xGA describe chances created/conceded; SOT is shots on target. — means unavailable.", "ตัวเลขด้านบนปัดค่าเฉลี่ยประตูเป็นจำนวนเต็มที่ใกล้ที่สุด (0.5 ปัดขึ้น) ไม่ใช่สกอร์ทายหรือโอกาสชนะ ค่าทศนิยมยังดูได้บนการ์ดแต่ละคู่ สถิติ xG/xGA แสดงคุณภาพโอกาสที่สร้าง/เสีย ส่วน SOT คือยิงตรงกรอบ เครื่องหมาย — คือไม่มีข้อมูล"));
