@@ -13,7 +13,7 @@ from fpl.jobs import operational_disk as disk
 
 
 @pytest.mark.parametrize(
-    ("projected_gib", "status"), [(30, "OK"), (29, "WARNING"), (20, "WARNING")]
+    ("projected_gib", "status"), [(15, "OK"), (14, "WARNING"), (10, "WARNING")]
 )
 def test_exact_thresholds_and_missing_destination_parent(
     tmp_path: Path,
@@ -44,7 +44,7 @@ def test_existing_destination_still_reserves_full_allocation(
 ) -> None:
     destination = tmp_path / "backup.duckdb"
     destination.write_bytes(b"existing recovery evidence")
-    monkeypatch.setattr(disk.shutil, "disk_usage", lambda path: SimpleNamespace(free=21 * disk.GIB))
+    monkeypatch.setattr(disk.shutil, "disk_usage", lambda path: SimpleNamespace(free=11 * disk.GIB))
     with pytest.raises(RuntimeError, match="allocation blocked"):
         disk.check_disk_space(destination, disk.GIB + 1)
     assert destination.read_bytes() == b"existing recovery evidence"
@@ -64,8 +64,8 @@ def test_operational_backup_blocks_before_copying_or_writing(
         con.execute("CREATE TABLE retained(i INTEGER)")
     before = build_db._sha256(source)
     destination = tmp_path / "before.duckdb"
-    monkeypatch.setattr(disk.shutil, "disk_usage", lambda path: SimpleNamespace(free=20 * disk.GIB))
-    with pytest.raises(RuntimeError, match="minimum is 20 GiB"):
+    monkeypatch.setattr(disk.shutil, "disk_usage", lambda path: SimpleNamespace(free=10 * disk.GIB))
+    with pytest.raises(RuntimeError, match="minimum is 10 GiB"):
         with daily_pl_sdp.writer_lock(source, backup=destination):
             pytest.fail("low space allowed database write")
     assert build_db._sha256(source) == before

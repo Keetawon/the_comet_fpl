@@ -1,5 +1,27 @@
 # Repository agent instructions
 
+### Owner-authorized operational retention and storage bounds (2026-10-10)
+
+The owner explicitly authorized bounding operational retention and adjusting preflight
+disk limits to prevent disk exhaustion. Under this operational policy:
+1. Active operational database (`sdp-primary-v2.duckdb`) and immutable predictions (`*.jsonl`)
+   remain protected and immutable.
+2. Steady-state operational recovery retention is bounded to one verified recovery copy
+   (post-success `recovery.duckdb`) and the latest two dashboard export generations.
+   Superseded recovery copies are retired once the successor is verified.
+3. Historical forecast source databases (`forecast-source.duckdb`) must be compressed or retired
+   once forecasts are registered and verified in `predictions/*.jsonl`; uncompressed multi-gigabyte
+   source copies must not be retained indefinitely across runs.
+4. Bounded rolling retention for audit archives: `.duckdb.gz` compressed archives in
+   `dashboard-runs` are maintained on a rolling 48-hour window rather than accumulating indefinitely.
+5. Synthetic test outputs, test caches, and browser profile artifacts under `data/artifacts`
+   and `.tmp` are non-permanent test artifacts and must be purged after verification.
+6. Operational disk preflight guardrails in `operational_disk.py` are calibrated for host storage:
+   warning threshold is 15 GiB (lowered from 30 GiB) and hard block threshold is 10 GiB
+   (lowered from 20 GiB), preventing deadlock on modest partition sizes while preserving safe
+   execution headroom.
+See `docs/operational-storage-retention-2026-10-10.md` for policy and cleanup verification.
+
 ### Owner-authorized scheduled forecast refresh (2026-10-05, V2 only)
 
 The existing desktop refresh may run the unchanged prospective primary/incumbent-shadow

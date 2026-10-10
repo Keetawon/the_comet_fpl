@@ -8,12 +8,12 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 GIB = 1 << 30
-WARNING_FREE_BYTES = 30 * GIB
-MINIMUM_FREE_BYTES = 20 * GIB
+WARNING_FREE_BYTES = 15 * GIB
+MINIMUM_FREE_BYTES = 10 * GIB
 
 
 def check_disk_space(destination: Path, required_bytes: int) -> dict[str, int | str]:
-    """Warn below 30 GiB projected free; refuse an allocation leaving under 20 GiB.
+    """Warn below 15 GiB projected free; refuse an allocation leaving under 10 GiB.
 
     The check reserves the full new allocation even when the destination already exists.
     It is a preflight, not a reservation against unrelated processes using the same drive.
@@ -35,13 +35,13 @@ def check_disk_space(destination: Path, required_bytes: int) -> dict[str, int | 
             f"insufficient disk space for {destination}: {free_bytes / GIB:.2f} GiB free, "
             f"{required_bytes / GIB:.2f} GiB required, "
             f"{projected_free_bytes / GIB:.2f} GiB projected free; "
-            "minimum is 20 GiB; allocation blocked, no data deleted"
+            "minimum is 10 GiB; allocation blocked, no data deleted"
         )
     status = "WARNING" if projected_free_bytes < WARNING_FREE_BYTES else "OK"
     if status == "WARNING":
         logger.warning(
             "Low disk space for %s: %.2f GiB free, %.2f GiB projected after allocation "
-            "(warning threshold 30 GiB; minimum 20 GiB)",
+            "(warning threshold 15 GiB; minimum 10 GiB)",
             destination,
             free_bytes / GIB,
             projected_free_bytes / GIB,
