@@ -213,8 +213,9 @@ def test_reusable_plan_rejects_custom_constraints_and_wrong_forecast(
     policy.single_defender_per_club = False
     assert not job.reusable_plan(tmp_path, "forecast")
     policy.single_defender_per_club = True
-    policy.plan_origin = "user_custom"
-    assert not job.reusable_plan(tmp_path, "forecast")
+    for origin in ("user_custom", None):
+        policy.plan_origin = origin
+        assert not job.reusable_plan(tmp_path, "forecast")
     policy.plan_origin = "platform"
     policy.locked_codes = (1,)
     assert not job.reusable_plan(tmp_path, "forecast")
