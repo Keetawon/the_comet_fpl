@@ -718,3 +718,14 @@ even when its forecast matches. It creates a new immutable platform artifact; cu
 plans cannot substitute. Next GW shows the rule on plans that actually used it.
 Retained historical artifacts, forecast values, official FPL rules, and the
 public-export sanitizer are unchanged.
+
+### Next GW observed statistics (2026-10-10)
+
+The compact suggestion table aggregates the published finalized and explicitly provisional
+player fixture records for the forecast season, joined by permanent player code. Last 3/5/10
+selects the latest page-wide ended gameweek keys; Season selects all published keys in that
+season. Every DGW leg counts, the scope is displayed, and a short season stays short. Missing
+history is unavailable, never replaced with archived prior-season form. Provisional points
+use raw recorded FPL points with a P label; finalized points use the existing rules replay.
+The minutes filter uses the current season's latest five ended GWs. Forecast xP, squad
+selection, optimizer policy, and forecast-fixture expansion are unchanged.

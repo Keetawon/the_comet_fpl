@@ -747,10 +747,14 @@ export function PlayerStatTable({
           Pts
         </span>
       ),
-      accessorFn: (row) => row.observedPoints ?? undefined,
+      accessorFn: (row) => (row.observedPoints === undefined
+        ? row.form?.points_under_rules_2026_27
+        : row.observedPoints) ?? undefined,
       sortUndefined: "last",
       cell: ({ row }) => {
-        const value = row.original.observedPoints;
+        const value = row.original.observedPoints === undefined
+          ? row.original.form?.points_under_rules_2026_27
+          : row.original.observedPoints;
         const provisional = row.original.actualPointsProvisional === true;
         return (
           <span
@@ -837,7 +841,7 @@ export function PlayerStatTable({
       formStat("assists", "A"),
       formStat("expected_goals", "xG", { digits: 1 }),
       formStat("expected_assists", "xA", { digits: 1 }),
-      formStat("points_under_rules_2026_27", "Pts"),
+      observedPointsColumn,
     ];
     const visibleFormColumns =
       formColumnProfile === "players" ? playerFormColumns : legacyFormColumns;

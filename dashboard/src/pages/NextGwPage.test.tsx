@@ -4,10 +4,12 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   loadFixtureMatrix,
   loadNextGw,
+  loadPlayerActuals,
+  loadPlayerProvisionalActuals,
   loadPlayers,
   loadSummary,
 } from "@/data/load";
@@ -15,7 +17,8 @@ import summarySample from "@/data/sampleSummary.json";
 import nextGwSample from "@/data/sampleNextGw.json";
 import playersSample from "@/data/samplePlayers.json";
 import teamsSample from "@/data/sampleFixtureMatrix.json";
-import type { NextGwPlan, SummaryData, TeamRecord } from "@/data/types";
+import actualsSample from "@/data/samplePlayerActuals.json";
+import type { NextGwPlan, PlayerActualFixture, PlayerRecord, SummaryData, TeamRecord } from "@/data/types";
 import { NextGwPage } from "./NextGwPage";
 import { SummaryPage } from "./SummaryPage";
 
@@ -94,17 +97,28 @@ function completeFiveWeekPlan(): NextGwPlan {
 vi.mock("@/data/load", () => ({
   loadSummary: vi.fn(),
   loadNextGw: vi.fn(),
+  loadPlayerActuals: vi.fn(),
+  loadPlayerProvisionalActuals: vi.fn(),
   loadPlayers: vi.fn(),
   loadFixtureMatrix: vi.fn(),
 }));
 
 const teamsForRunA: TeamRecord[] = teamsSample.teams.map((t) => ({ ...t, run_id: "run-a" }));
 
+beforeAll(() => {
+  HTMLElement.prototype.hasPointerCapture = () => false;
+  HTMLElement.prototype.setPointerCapture = () => undefined;
+  HTMLElement.prototype.releasePointerCapture = () => undefined;
+  HTMLElement.prototype.scrollIntoView = () => undefined;
+});
+
 beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-08-20T12:00:00Z"));
   window.localStorage.clear();
   vi.mocked(loadSummary).mockResolvedValue(summarySample as unknown as SummaryData);
   vi.mocked(loadNextGw).mockResolvedValue({ plans });
+  vi.mocked(loadPlayerActuals).mockResolvedValue({ schema: "fpl.dashboard-player-actuals", json_schema_version: 9, players: [] });
+  vi.mocked(loadPlayerProvisionalActuals).mockResolvedValue({ schema: "fpl.dashboard-player-provisional-actuals", json_schema_version: 1, captured_at: null, players: [] });
   vi.mocked(loadPlayers).mockResolvedValue({ players: playersSample.players, manifest: null });
   vi.mocked(loadFixtureMatrix).mockResolvedValue({
     teams: teamsForRunA,
@@ -370,4 +384,90 @@ describe("NextGwPage", () => {
     expect(benchRow).toHaveTextContent("48.0");
     expect(squadRow).toHaveTextContent("158.0");
   });
+});
+
+// Synthetic current-season observations, independent of the forecast's archived form.
+function observedFixture(gw: number, fixture: number, patch: Partial<PlayerActualFixture> = {}): PlayerActualFixture {
+  return { ...actualsSample.players[0].actuals[0], gw, fixture,
+    kickoff_time: `2026-09-${String(gw + 1).padStart(2, "0")}T14:00:00+00:00`,
+    points_under_rules_2026_27: 5, ...patch };
+}
+
+function showUpcomingGwSeven() {
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-10-10T12:00:00Z"));
+  const plan = structuredClone(plans[0]);
+  plan.gw_from = 7; plan.gw_to = 11;
+  plan.weeks = plan.weeks.map((week) => ({ ...week, gw: 7 }));
+  vi.mocked(loadNextGw).mockResolvedValue({ plans: [plan] });
+  const teams = teamsForRunA.map((team) => ({ ...team,
+    fixtures: team.fixtures.map((fixture) => ({ ...fixture, gw: 7, kickoff_time: "2026-10-17T14:00:00Z" })) }));
+  vi.mocked(loadFixtureMatrix).mockResolvedValue({ teams, schedule: {
+    schema_version: 1, semantics: "current_at_export_not_forecast_vintage",
+    export_created_at: "2026-10-10T00:00:00Z", database_sha256: "d".repeat(64), teams,
+  }, manifest: null, easeIndexFormulaVersion: "fixture-ease-v1" });
+}
+
+function observedCell(name: string, header: string) {
+  const row = screen.getAllByText(name).map((element) => element.closest("tr")).find(Boolean)!;
+  const head = screen.getByRole("columnheader", { name: header });
+  const index = Array.from(head.parentElement!.children).indexOf(head);
+  return within(row).getAllByRole("cell")[index];
+}
+
+it("fills missing form from current observed fixtures, includes DGWs, and uses one shared season window", async () => {
+  showUpcomingGwSeven();
+  const players: PlayerRecord[] = structuredClone(playersSample.players);
+  players.find((player) => player.code === 1 && player.run_id === "run-a")!.form = null;
+  const before = JSON.stringify(players);
+  vi.mocked(loadPlayers).mockResolvedValue({ players, manifest: null });
+  vi.mocked(loadPlayerActuals).mockResolvedValue({ schema: "fpl.dashboard-player-actuals", json_schema_version: 9, players: [
+    { season: "2025-26", code: 1, actuals: [observedFixture(38, 380, { points_under_rules_2026_27: 999 })] },
+    { season: "2026-27", code: 1, actuals: [
+      observedFixture(1, 1, { points_under_rules_2026_27: 100 }),
+      observedFixture(2, 2, { points_under_rules_2026_27: 2 }),
+      observedFixture(2, 22, { minutes: 60, points_under_rules_2026_27: 3 }),
+    ] },
+    { season: "2026-27", code: 2, actuals: [3, 4, 5, 6].map((gw) => observedFixture(gw, gw)) },
+  ] });
+  render(<NextGwPage />);
+  await screen.findByRole("columnheader", { name: "Plan xP GW7" });
+  expect(screen.getByText(/2026-27 GW2 to 2026-27 GW6; 5 ended gameweeks/)).toBeVisible();
+  expect(observedCell("Alpha", "Last 5 App")).toHaveTextContent("2");
+  expect(observedCell("Alpha", "Min/g")).toHaveTextContent("75");
+  expect(observedCell("Alpha", "Pts")).toHaveTextContent("5");
+  expect(observedCell("Beta", "Pts")).toHaveTextContent("20");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("combobox", { name: "Past form window" }));
+  await user.click(screen.getByRole("option", { name: "Last 3" }));
+  expect(observedCell("Alpha", "Pts")).toHaveTextContent("\u2013");
+  expect(observedCell("Beta", "Pts")).toHaveTextContent("15");
+  expect(JSON.stringify(players)).toBe(before);
+});
+
+it("marks provisional points, prefers finalized duplicates, and leaves absent history unavailable", async () => {
+  showUpcomingGwSeven();
+  const finalized = observedFixture(6, 6, { points_under_rules_2026_27: 2, expected_goals: null });
+  const { points_under_rules_2026_27: _points, ...sameFixture } = finalized;
+  vi.mocked(loadPlayerActuals).mockResolvedValue({ schema: "fpl.dashboard-player-actuals", json_schema_version: 9, players: [
+    { season: "2026-27", code: 1, actuals: [finalized] },
+  ] });
+  vi.mocked(loadPlayerProvisionalActuals).mockResolvedValue({ schema: "fpl.dashboard-player-provisional-actuals", json_schema_version: 1, captured_at: "2026-10-10T00:00:00Z", players: [
+    { season: "2026-27", code: 1, actuals: [
+      { ...sameFixture, total_points_as_recorded: 999 },
+      { ...sameFixture, fixture: 61, minutes: 60, total_points_as_recorded: 4 },
+      { ...sameFixture, fixture: 62, minutes: 0, total_points_as_recorded: 0 },
+    ] },
+  ] });
+  render(<NextGwPage />);
+  await screen.findByRole("columnheader", { name: "Plan xP GW7" });
+  expect(observedCell("Alpha", "Last 5 App")).toHaveTextContent("2");
+  expect(observedCell("Alpha", "Min/g")).toHaveTextContent("75");
+  expect(observedCell("Alpha", "Pts")).toHaveTextContent("6");
+  expect(within(observedCell("Alpha", "Pts")).getByLabelText("includes provisional raw FPL points")).toBeVisible();
+  expect(observedCell("Alpha", "xG")).toHaveTextContent("\u2013");
+  expect(observedCell("Beta", "Pts")).toHaveTextContent("\u2013");
+  expect(screen.getByText(/2026-27 GW6 \(provisional\).*1 ended gameweeks/)).toBeVisible();
+  const user = userEvent.setup();
+  await user.type(screen.getByRole("spinbutton", { name: "Minimum average minutes over the last 5" }), "70");
+  expect(observedCell("Alpha", "Min/g")).toHaveTextContent("75");
 });

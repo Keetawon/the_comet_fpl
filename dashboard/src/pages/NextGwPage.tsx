@@ -34,10 +34,19 @@ import {
   type PlayerStatRow,
   type PlayerStatSummaryRow,
 } from "@/components/PlayerStatTable";
-import { loadFixtureMatrix, loadNextGw, loadPlayers } from "@/data/load";
-import type { FixtureScheduleOverlay, NextGwPlan, PlanPlayer, PlanWeek, PlayerRecord, SquadContext, TeamRecord } from "@/data/types";
+import { loadFixtureMatrix, loadNextGw, loadPlayerActuals, loadPlayerProvisionalActuals, loadPlayers } from "@/data/load";
+import type { FixtureScheduleOverlay, NextGwPlan, PlanPlayer, PlanWeek, PlayerObservedActualsRecord, PlayerRecord, SquadContext, TeamRecord } from "@/data/types";
 import { nextFixtureGameweek } from "@/lib/competitiveCalendar";
 import { useFootballDate } from "@/lib/useFootballDate";
+import {
+  actualGameweekLabel,
+  actualGameweeksChronological,
+  aggregateObservedPoints,
+  aggregatePlayerActuals,
+  averageMinutesPerAppearance,
+  latestPlayerActualDetails,
+  mergePlayerActualRecords,
+} from "@/lib/playerActuals";
 import { buildOpponentStrength } from "@/lib/opponentStrength";
 import { squadDraftHandoffHref } from "@/lib/squadDraftHandoff";
 import {
@@ -58,7 +67,7 @@ import type { LegacyColumnDef } from "@tanstack/react-table/legacy";
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; plans: NextGwPlan[]; players: PlayerRecord[]; teams: TeamRecord[]; schedule: FixtureScheduleOverlay };
+  | { status: "ready"; plans: NextGwPlan[]; players: PlayerRecord[]; actuals: PlayerObservedActualsRecord[]; teams: TeamRecord[]; schedule: FixtureScheduleOverlay };
 
 const fmt = (value: number | null | undefined, digits = 1) =>
   value == null ? "–" : value.toFixed(digits);
@@ -226,14 +235,15 @@ export function NextGwPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadNextGw(), loadPlayers(), loadFixtureMatrix()])
-      .then(([nextGw, playersData, teamsData]) => {
+    Promise.all([loadNextGw(), loadPlayers(), loadFixtureMatrix(), loadPlayerActuals(), loadPlayerProvisionalActuals()])
+      .then(([nextGw, playersData, teamsData, finalized, provisional]) => {
         if (cancelled) return;
         const officialPlans = platformPlans(nextGw.plans);
         setState({
           status: "ready",
           plans: officialPlans,
           players: playersData.players,
+          actuals: mergePlayerActualRecords(finalized.players, provisional.players),
           teams: teamsData.teams,
           schedule: teamsData.schedule,
         });
@@ -295,6 +305,25 @@ export function NextGwPage() {
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [runPlayers]);
 
+  // Observed context uses one current-season window for the entire roster, independent
+  // of squad/table filters. Never fill a player's gap from an archived season.
+  const observed = useMemo(() => {
+    const codes = new Set(runPlayers.map((player) => player.code));
+    const records = state.status === "ready" && plan
+      ? state.actuals.filter((record) => record.season === plan.season && codes.has(record.code))
+      : [];
+    const gameweeks = actualGameweeksChronological(records, plan ? [plan.season] : []);
+    const limit = { last_3: 3, last_5: 5, last_10: 10, season_to_date: gameweeks.length }[playerFilters.formWindow];
+    return {
+      byCode: new Map(records.map((record) => [record.code, record])),
+      gameweeks: limit > 0 ? gameweeks.slice(-limit) : [],
+      lastFive: gameweeks.slice(-5),
+    };
+  }, [state, plan, runPlayers, playerFilters.formWindow]);
+  const formScope = observed.gameweeks.length
+    ? `${actualGameweekLabel(observed.gameweeks[0])} to ${actualGameweekLabel(observed.gameweeks[observed.gameweeks.length - 1])}; ${observed.gameweeks.length} ended gameweeks. Every played double-gameweek fixture counts. Provisional points are marked P.`
+    : `No published ended-match observations for ${plan?.season ?? "this season"}.`;
+
   /** Squad rows first in the plan's own order (XI by position, then bench), then anyone
    * else from the same vintage's roster by xP -- so compare mode still reads in order. */
   const { rows, weekByCode } = useMemo(() => {
@@ -311,7 +340,20 @@ export function NextGwPage() {
         (a.bench_order_index ?? 99) - (b.bench_order_index ?? 99) ||
         a.web_name.localeCompare(b.web_name),
     );
+    const currentPlayers: PlayerRecord[] = runPlayers.map((player) => {
+      const record = observed.byCode.get(player.code);
+      return {
+        ...player,
+        form: null,
+        avg_minutes_last_5: averageMinutesPerAppearance(
+          latestPlayerActualDetails(record ? [record] : [], observed.lastFive),
+        ),
+      };
+    });
     const buildRow = (player: PlayerRecord): PlayerStatRow => {
+      const record = observed.byCode.get(player.code);
+      const actuals = latestPlayerActualDetails(record ? [record] : [], observed.gameweeks);
+      const points = aggregateObservedPoints(actuals);
       const filtered = [...player.fixtures].sort(
         (a, b) => a.gw - b.gw || (a.kickoff_time ?? "").localeCompare(b.kickoff_time ?? ""),
       );
@@ -322,21 +364,24 @@ export function NextGwPage() {
         player,
         filtered,
         totalXp: xpValues.length ? xpValues.reduce((a, b) => a + b, 0) : null,
-        form: player.form ? player.form.windows[playerFilters.formWindow] : null,
+        form: aggregatePlayerActuals(actuals),
+        minutesPerAppearance: averageMinutesPerAppearance(actuals),
+        observedPoints: points.points,
+        actualPointsProvisional: points.includesProvisional,
       };
     };
     const squadRows = squadOrdered
-      .map((squadPlayer) => runPlayers.find((p) => p.code === squadPlayer.code))
+      .map((squadPlayer) => currentPlayers.find((p) => p.code === squadPlayer.code))
       .filter((p): p is PlayerRecord => p != null)
       .filter((p) => matchesPlayerFilters(p, playerFilters))
       .map(buildRow);
-    const otherRows = runPlayers
+    const otherRows = currentPlayers
       .filter((p) => !byCode.has(p.code))
       .filter((p) => matchesPlayerFilters(p, playerFilters))
       .map(buildRow)
       .sort((a, b) => (b.totalXp ?? -1) - (a.totalXp ?? -1));
     return { rows: squadOnly === "squad" ? squadRows : [...squadRows, ...otherRows], weekByCode: byCode };
-  }, [plan, runPlayers, playerFilters, squadOnly]);
+  }, [plan, runPlayers, playerFilters, squadOnly, observed]);
 
   if (state.status === "loading") {
     return <p role="status" className="p-6 text-muted-foreground">Loading read models…</p>;
@@ -587,6 +632,8 @@ export function NextGwPage() {
         gwTo={plan.gw_to}
         opponentIndexOf={opponentIndexOf}
         formHeading={FORM_WINDOW_LABEL[playerFilters.formWindow]}
+        formTitle={formScope}
+        formScopeLabel={formScope}
         initialSorting={[]}
         beforeFixtureColumns={planColumns}
         nameSuffix={nameSuffix}
