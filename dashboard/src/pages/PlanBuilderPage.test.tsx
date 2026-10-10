@@ -453,6 +453,7 @@ describe("PlanBuilderPage", () => {
           locks: [1],
           excludes: [10],
           minBenchAppearance: null,
+          singleDefenderPerClub: true,
           freeTransfersOverride: 0,
         },
         expect.any(Function),
@@ -1315,7 +1316,7 @@ describe("PlanBuilderPage", () => {
     await user.click(solve);
     await waitFor(() => expect(vi.mocked(solvePlan)).toHaveBeenCalledTimes(1));
     expect(vi.mocked(solvePlan)).toHaveBeenCalledWith(
-      { locks: [1], excludes: [2], minBenchAppearance: 0.25 },
+      { locks: [1], excludes: [2], minBenchAppearance: 0.25, singleDefenderPerClub: true },
       expect.any(Function),
       "",
     );
@@ -1541,7 +1542,7 @@ describe("PlanBuilderPage", () => {
     await user.click(screen.getByRole("button", { name: "Solve now with my rules" }));
     await waitFor(() =>
       expect(solvePlan).toHaveBeenCalledWith(
-        { locks: [], excludes: [], minBenchAppearance: null },
+        { locks: [], excludes: [], minBenchAppearance: null, singleDefenderPerClub: true },
         expect.any(Function),
         "lan-secret",
       ),
@@ -1551,4 +1552,24 @@ describe("PlanBuilderPage", () => {
     );
     expect(reloadPublishedReadModels).toHaveBeenCalledTimes(1);
   });
+});
+
+
+it("defaults the defender-only limit on, includes it in review, and resets it", async () => {
+  const user = userEvent.setup();
+  render(<PlanBuilderPage />);
+  await user.click(await screen.findByRole("button", { name: /Build from scratch/ }));
+  const checkbox = screen.getByRole("checkbox", { name: "One defender per club (Arsenal exempt)" });
+  expect(checkbox).toBeChecked();
+  await user.click(checkbox);
+  expect(checkbox).not.toBeChecked();
+  await user.click(screen.getByRole("button", { name: /Next: Review/ }));
+  expect(screen.getByText("Defender club limit: Off")).toBeInTheDocument();
+  expect(JSON.parse(window.localStorage.getItem("fpl-plan-request")!).command).not.toContain("--single-defender-per-club");
+  await user.click(screen.getByRole("button", { name: "Back to rules" }));
+  await user.click(screen.getByRole("button", { name: "Reset rules" }));
+  expect(screen.getByRole("checkbox", { name: "One defender per club (Arsenal exempt)" })).toBeChecked();
+  await user.click(screen.getByRole("button", { name: /Next: Review/ }));
+  expect(screen.getByText("Defender club limit: one per club, Arsenal exempt")).toBeInTheDocument();
+  expect(JSON.parse(window.localStorage.getItem("fpl-plan-request")!).command).toContain("--single-defender-per-club");
 });

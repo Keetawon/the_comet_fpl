@@ -889,7 +889,8 @@ class TestRunPlanPreChecks:
 
         monkeypatch.setattr(plan_server, "_run_optimizer_cli", capture)
         with pytest.raises(RequestError, match="stop after capture"):
-            run_plan(ServerState(tmp_path), [7], [9, 11], 0.25)
+            run_plan(ServerState(tmp_path), [7], [9, 11], 0.25, single_defender_per_club=True)
+        assert "--single-defender-per-club" in seen
         assert seen.count("--exclude") == 2
         assert seen[seen.index("--plan-origin") + 1] == "user_custom"
         assert "9" in seen and "11" in seen
@@ -1344,7 +1345,7 @@ def loopback_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Threadin
     monkeypatch.setattr(
         plan_server,
         "run_plan",
-        lambda state, locks, excludes, bench: {
+        lambda state, locks, excludes, bench, **kwargs: {
             "optimizer_run_id": "r" * 64,
             "decision_sha256": "d" * 64,
             "captain": "Stub",
@@ -1377,7 +1378,7 @@ def loopback_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Threadin
     monkeypatch.setattr(
         plan_server,
         "run_manager_plan",
-        lambda state, capture_id, locks, excludes, bench, override: {
+        lambda state, capture_id, locks, excludes, bench, override, **kwargs: {
             "capture_seen": capture_id,
             "locks_seen": locks,
             "excludes_seen": excludes,
@@ -1731,7 +1732,7 @@ class TestHttpSurface:
         monkeypatch.setattr(plan_server, "_git_worktree_clean", lambda repo: True)
 
         def boom(
-            state: object, locks: list[int], excludes: list[int], bench: float
+            state: object, locks: list[int], excludes: list[int], bench: float, **kwargs: object
         ) -> dict[str, object]:
             raise RuntimeError(
                 "initial squad lineup violates min_bench_appearance before transfer planning"
@@ -1771,3 +1772,9 @@ class TestHttpSurface:
         )
         assert status == 200
         assert headers.get("Access-Control-Allow-Origin") == "http://localhost:5173"
+
+
+@pytest.mark.parametrize("value", ["true", 1, 0, None, []])
+def test_defender_limit_request_rejects_non_boolean(value: object) -> None:
+    with pytest.raises(RequestError, match="single_defender_per_club must be a boolean"):
+        validate_request({"single_defender_per_club": value})

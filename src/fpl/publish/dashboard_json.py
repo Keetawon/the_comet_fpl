@@ -2979,6 +2979,9 @@ def _optimizer_plan_metadata(
             raise DashboardJsonError(f"{subject} is not an object")
         locked_codes = _policy_codes(policy, "locked_codes", subject)
         excluded_codes = _policy_codes(policy, "excluded_codes", subject)
+        single_defender_per_club = policy.get("single_defender_per_club", False)
+        if not isinstance(single_defender_per_club, bool):
+            raise DashboardJsonError(f"{subject} single_defender_per_club must be a boolean")
         threshold = policy.get("min_bench_appearance", 0.0)
         if (
             isinstance(threshold, bool)
@@ -2991,7 +2994,8 @@ def _optimizer_plan_metadata(
         if origin is None:
             origin = (
                 "user_custom"
-                if locked_codes or excluded_codes or float(threshold) > 0.0
+                if (locked_codes or excluded_codes or float(threshold) > 0.0
+                    or single_defender_per_club)
                 else "platform"
             )
         if origin not in {"platform", "user_custom"}:
@@ -3019,6 +3023,7 @@ def _optimizer_plan_metadata(
                 "locked_codes": locked_codes,
                 "excluded_codes": excluded_codes,
                 "min_bench_appearance": float(threshold),
+                **({"single_defender_per_club": True} if single_defender_per_club else {}),
             },
             "search_policy": normalized_policy,
         }

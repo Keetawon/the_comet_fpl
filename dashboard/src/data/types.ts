@@ -483,6 +483,7 @@ export type PlanKind = "platform_default" | "platform_diagnostic" | "user_custom
 export interface PlanPolicySummary {
   locked_codes: number[];
   excluded_codes: number[];
+  single_defender_per_club?: boolean;
   min_bench_appearance: number;
 }
 
@@ -803,6 +804,7 @@ export interface SearchPolicy {
   min_bench_appearance: number;
   locked_codes: number[];
   excluded_codes: number[];
+  single_defender_per_club?: boolean;
   plan_origin: "platform" | "user_custom";
   search_method: string;
   optimality_scope: string;

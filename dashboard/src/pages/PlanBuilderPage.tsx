@@ -622,6 +622,7 @@ export function PlanBuilderPage() {
   const [excludes, setExcludes] = useState<PlayerRecord[]>([]);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("lock");
   const [threshold, setThreshold] = useState<string>("off");
+  const [singleDefenderPerClub, setSingleDefenderPerClub] = useState(true);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<PlayerFilters>(INITIAL_PLAYER_FILTERS);
   const [candidatePage, setCandidatePage] = useState(0);
@@ -767,6 +768,7 @@ export function PlanBuilderPage() {
       locks: locks.map((p) => p.code),
       excludes: excludes.map((p) => p.code),
       minBenchAppearance: thresholdFlag ? Number(thresholdFlag) : null,
+      singleDefenderPerClub,
     };
     const onStage = (stage: string | null) =>
       setSolver((current) =>
@@ -880,6 +882,7 @@ export function PlanBuilderPage() {
           const excluded = new Set(savedPlan.policy.excluded_codes);
           setLocks(availablePlayers.filter((player) => locked.has(player.code)));
           setExcludes(availablePlayers.filter((player) => excluded.has(player.code)));
+          setSingleDefenderPerClub(savedPlan.policy.single_defender_per_club === true);
           const savedThreshold = String(savedPlan.policy.min_bench_appearance);
           setThreshold(
             THRESHOLDS.some((option) => option.value === savedThreshold)
@@ -1146,6 +1149,7 @@ export function PlanBuilderPage() {
     setExcludes([]);
     setSelectionMode("lock");
     setThreshold("off");
+    setSingleDefenderPerClub(true);
     setSearch("");
     setFilters(INITIAL_PLAYER_FILTERS);
     setCandidatePage(0);
@@ -1174,6 +1178,7 @@ export function PlanBuilderPage() {
     ...locks.map((p) => `--lock ${p.code}`),
     ...excludes.map((p) => `--exclude ${p.code}`),
     ...(thresholdFlag ? [`--min-bench-appearance ${thresholdFlag}`] : []),
+    ...(singleDefenderPerClub ? ["--single-defender-per-club"] : []),
     `--output ${manualOutputPath}`,
   ].join(" ");
 
@@ -1186,6 +1191,7 @@ export function PlanBuilderPage() {
       createdAt: new Date().toISOString(),
       threshold,
       thresholdLabel,
+      singleDefenderPerClub,
       locks: locks.map((p) => ({ code: p.code, web_name: p.web_name, now_cost: p.now_cost })),
       excludes: excludes.map((p) => ({
         code: p.code,
@@ -1194,7 +1200,7 @@ export function PlanBuilderPage() {
       })),
       command,
     });
-  }, [step, locks, excludes, threshold, thresholdLabel, command]);
+  }, [step, locks, excludes, threshold, thresholdLabel, singleDefenderPerClub, command]);
 
   const resultPlan =
     state.status === "ready" && resultPlanId
@@ -1936,6 +1942,15 @@ export function PlanBuilderPage() {
               </p>
                 </>
               )}
+              <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={singleDefenderPerClub}
+                  onChange={(event) => setSingleDefenderPerClub(event.target.checked)} />
+                One defender per club (Arsenal exempt)
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Applies to all 15 players, including the bench, in every planned gameweek.
+                Goalkeepers, midfielders and forwards are unaffected. Conflicting locks must be removed.
+              </p>
               <div className="mt-3 flex items-center gap-2 text-sm">
                 Rotation threshold
                 <ToggleGroup
@@ -2095,6 +2110,9 @@ export function PlanBuilderPage() {
           <div className="rounded-xl border bg-card p-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium text-muted-foreground">Review your rules</p>
+              <p className="text-xs">
+                Defender club limit: {singleDefenderPerClub ? "one per club, Arsenal exempt" : "Off"}
+              </p>
               <span className="text-xs tabular-nums text-muted-foreground">
                 {buildMode === "manager" && managerTeam
                   ? `GW${managerTeam.planning_gw} · bank ${price(managerTeam.bank_tenths)} · FT ${freeTransfersOverride ?? managerTeam.free_transfers_available}`
@@ -2544,6 +2562,9 @@ export function PlanBuilderPage() {
                     className="border-red-400 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
                   >
                     <Ban className="size-3" /> {resultPlan.policy.excluded_codes.length} excluded
+                  </Badge>
+                  <Badge variant="outline">
+                    {resultPlan.policy.single_defender_per_club ? "One DEF per club (Arsenal exempt)" : "DEF club limit off"}
                   </Badge>
                   <Badge variant="outline">
                     bench floor{" "}

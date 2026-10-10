@@ -14,6 +14,7 @@ export interface PlanRequest {
   version: 2;
   createdAt: string;
   threshold: string;
+  singleDefenderPerClub?: boolean;
   thresholdLabel: string;
   locks: PlanRequestLock[];
   excludes: PlanRequestLock[];

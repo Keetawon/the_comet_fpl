@@ -857,3 +857,70 @@ def test_cli_consumes_only_artifact_and_emits_machine_readable_plan(
     assert report["artifact"]["schema"] == "fpl.prospective-points"
     assert len(report["initial_squad"]["members"]) == 15
     assert report["plan"]["weeks"][0]["captain"]["code"] == 30
+
+
+@pytest.mark.parametrize(("club_code", "permitted"), [(99, False), (3, True)])
+def test_defender_limit_covers_bench_and_preserves_arsenal(club_code: int, permitted: bool) -> None:
+    players = tuple(
+        replace(p, team_id=club_code) if p.code in (10, 11) else p for p in _base_players(2)
+    )
+    artifact = _artifact(players)
+    rules = load_squad_rules()
+    unrestricted = optimize_initial_squad(artifact, rules, locked_codes=(10, 11))
+    assert {10, 11} <= set(unrestricted.codes)
+    if not permitted:
+        with pytest.raises(OptimizationError, match="Locked defenders conflict"):
+            optimize_initial_squad(
+                artifact, rules, locked_codes=(10, 11), single_defender_per_club=True
+            )
+    selected = optimize_initial_squad(
+        artifact, rules, single_defender_per_club=True, locked_codes=(10, 11) if permitted else ()
+    )
+    assert len({10, 11} & set(selected.codes)) == (2 if permitted else 1)
+    index = ArtifactIndex.build(artifact, rules)
+    plan = plan_transfers(index, rules, selected, single_defender_per_club=True)
+    assert all(len({10, 11} & set(w.squad)) <= (2 if permitted else 1) for w in plan.weeks)
+
+
+def test_defender_limit_uses_permanent_club_identity_and_leaves_other_positions_alone() -> None:
+    from fpl.optimize.rules import defender_club_limit_satisfied
+
+    assert defender_club_limit_satisfied([("DEF", 42, 3), ("DEF", 42, 3)])
+    assert not defender_club_limit_satisfied([("DEF", 3, 99), ("DEF", 3, 99)])
+    assert not defender_club_limit_satisfied([("DEF", 3, None), ("DEF", 3, None)])
+    assert defender_club_limit_satisfied(
+        [("DEF", 9, 9), ("GK", 9, 9), ("MID", 8, 8), ("MID", 8, 8)]
+    )
+
+
+def test_defender_limit_repairs_imported_squad_and_never_keeps_invalid_hold() -> None:
+    artifact = _artifact(
+        tuple(replace(p, team_id=99) if p.code in (10, 11) else p for p in _base_players(2))
+    )
+    rules = load_squad_rules()
+    initial = optimize_initial_squad(artifact, rules, locked_codes=(10, 11))
+    index = ArtifactIndex.build(artifact, rules)
+    financials = ManagerFinancialState(
+        bank_tenths=0,
+        free_transfers_available=1,
+        owned_players=tuple(
+            OwnedPlayerFinancials(
+                code=m.code, purchase_price_tenths=m.now_cost, selling_price_tenths=m.now_cost
+            )
+            for m in initial.members
+        ),
+    )
+    plan = plan_transfers(
+        index, rules, initial, manager_financial_state=financials, single_defender_per_club=True
+    )
+    assert plan.weeks[0].transfers_out
+    assert all(len({10, 11} & set(w.squad)) == 1 for w in plan.weeks)
+    with pytest.raises(RuntimeError, match="no legal affordable state"):
+        plan_transfers(
+            index,
+            rules,
+            initial,
+            manager_financial_state=financials,
+            locked_codes=(10, 11),
+            single_defender_per_club=True,
+        )

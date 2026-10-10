@@ -172,6 +172,7 @@ def _successor_squads(
     *,
     enforce_budget: bool = True,
     proposal_is_eligible: Callable[[tuple[int, ...]], bool] | None = None,
+    single_defender_per_club: bool = False,
 ) -> tuple[tuple[int, ...], ...]:
     """Return the strongest legal same-position swaps within the configured bound.
 
@@ -188,7 +189,19 @@ def _successor_squads(
         )
         for position in POSITIONS
     }
-    scored: dict[tuple[int, ...], float] = {squad: 0.0}
+    scored: dict[tuple[int, ...], float] = {}
+    try:
+        validate_squad(
+            index,
+            rules,
+            squad,
+            enforce_budget=enforce_budget,
+            single_defender_per_club=single_defender_per_club,
+        )
+    except OptimizationError:
+        pass  # An imported squad may need repair at the first actionable deadline.
+    else:
+        scored[squad] = 0.0
     max_depth = min(rules.search.maximum_planned_transfers_per_gameweek, len(squad))
     for depth in range(1, max_depth + 1):
         for outgoing in combinations(squad, depth):
@@ -206,7 +219,13 @@ def _successor_squads(
                 if proposal in scored:
                     continue
                 try:
-                    validate_squad(index, rules, proposal, enforce_budget=enforce_budget)
+                    validate_squad(
+                        index,
+                        rules,
+                        proposal,
+                        enforce_budget=enforce_budget,
+                        single_defender_per_club=single_defender_per_club,
+                    )
                 except OptimizationError:  # proposal violates budget or club constraints
                     continue
                 if proposal_is_eligible is not None and not proposal_is_eligible(proposal):
@@ -223,7 +242,7 @@ def _successor_squads(
     # large pool. Holding is frequently optimal (bank a free transfer, avoid a -4 hit), so the
     # search must always be able to represent it. The successor set may now be limit + 1; the single
     # caller iterates it and a returned current squad maps to a zero-transfer, zero-hit week.
-    if squad not in kept:
+    if squad in scored and squad not in kept:
         kept.append(squad)
     return tuple(kept)
 
@@ -264,6 +283,7 @@ def plan_transfers(
     min_bench_appearance: float = 0.0,
     locked_codes: tuple[int, ...] = (),
     excluded_codes: tuple[int, ...] = (),
+    single_defender_per_club: bool = False,
     initial_banked_free_transfers: int = 0,
     manager_financial_state: ManagerFinancialState | None = None,
 ) -> TransferPlan:
@@ -319,8 +339,11 @@ def plan_transfers(
             min_bench_appearance=min_bench_appearance,
             locked_codes=locked,
             excluded_codes=excluded,
+            single_defender_per_club=single_defender_per_club,
         )
-    validate_squad(artifact_index, rules, initial_squad)
+    validate_squad(
+        artifact_index, rules, initial_squad, single_defender_per_club=single_defender_per_club
+    )
     candidate_pool = _candidate_pool(
         artifact_index, rules, initial_squad, risk_lambda, excluded_codes=excluded
     )
@@ -368,6 +391,7 @@ def plan_transfers(
                 gw,
                 risk_lambda,
                 locked_codes=locked,
+                single_defender_per_club=single_defender_per_club,
             )
             for squad in successors:
                 incoming, outgoing = _transfer_delta(path.squad, squad)
@@ -432,6 +456,7 @@ def _plan_manager_transfers(
     min_bench_appearance: float,
     locked_codes: frozenset[int],
     excluded_codes: frozenset[int],
+    single_defender_per_club: bool = False,
 ) -> TransferPlan:
     """Plan every forecast week from an imported squad using FPL cash/selling-value accounting."""
     if financials.free_transfers_available > rules.transfers.free_transfer_bank_cap:
@@ -511,6 +536,7 @@ def _plan_manager_transfers(
                 locked_codes=locked_codes,
                 excluded_codes=excluded_codes,
                 enforce_budget=False,
+                single_defender_per_club=single_defender_per_club,
                 proposal_is_eligible=partial(
                     _manager_proposal_is_affordable,
                     artifact_index,

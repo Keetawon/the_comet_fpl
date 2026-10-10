@@ -142,6 +142,7 @@ export function selectorOnlyInsightRequest(
 }
 
 export interface PlanServerStatus {
+  supported_rules?: string[];
   busy: boolean;
   stage: string | null;
   last_error: string | null;
@@ -584,6 +585,7 @@ export interface SolveRequest {
   locks: number[];
   excludes: number[];
   minBenchAppearance: number | null;
+  singleDefenderPerClub?: boolean;
 }
 
 export interface SolveManagerPlanRequest extends SolveRequest {
@@ -599,6 +601,12 @@ export async function solvePlan(
   onStage?: (stage: string | null) => void,
   token?: string | null,
 ): Promise<PlanSummary> {
+  if (request.singleDefenderPerClub) {
+    const status = await fetchPlanStatus(token);
+    if (!status?.supported_rules?.includes("single_defender_per_club")) {
+      throw new Error("Restart the updated local plan server to use the defender club limit.");
+    }
+  }
   const poll = window.setInterval(() => {
     void fetchPlanStatus(token).then((status) => onStage?.(status?.stage ?? null));
   }, 2500);
@@ -610,6 +618,7 @@ export async function solvePlan(
         locks: request.locks,
         excludes: request.excludes,
         min_bench_appearance: request.minBenchAppearance,
+        single_defender_per_club: request.singleDefenderPerClub,
       }),
       signal: AbortSignal.timeout(10 * 60 * 1000),
     });
@@ -631,6 +640,12 @@ export async function solveManagerPlan(
 ): Promise<PlanSummary> {
   const captureId = request.captureId.trim();
   if (!captureId) throw new Error("Manager capture id must not be empty.");
+  if (request.singleDefenderPerClub) {
+    const status = await fetchPlanStatus(token);
+    if (!status?.supported_rules?.includes("single_defender_per_club")) {
+      throw new Error("Restart the updated local plan server to use the defender club limit.");
+    }
+  }
   const poll = window.setInterval(() => {
     void fetchPlanStatus(token).then((status) => onStage?.(status?.stage ?? null));
   }, 2500);
@@ -643,6 +658,7 @@ export async function solveManagerPlan(
         locks: request.locks,
         excludes: request.excludes,
         min_bench_appearance: request.minBenchAppearance,
+        single_defender_per_club: request.singleDefenderPerClub,
         free_transfers_override: request.freeTransfersOverride,
       }),
       signal: AbortSignal.timeout(10 * 60 * 1000),

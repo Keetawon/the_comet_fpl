@@ -209,6 +209,10 @@ export function OptimizerAuditPage() {
               value={policy.excluded_codes.length ? policy.excluded_codes.join(", ") : "none"}
             />
             <Row
+              label="defender club limit"
+              value={policy.single_defender_per_club ? "One DEF per club (Arsenal exempt)" : "Off"}
+            />
+            <Row
               label="bench appearance floor"
               value={Math.round(policy.min_bench_appearance * 100) + "%"}
             />

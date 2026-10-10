@@ -139,6 +139,8 @@ def _run_optimizer_cli(argv: list[str]) -> None:
 
 def validate_request(body: dict[str, Any]) -> tuple[list[int], list[int], float]:
     """Parse and bound locks/exclusions/bench gate, mirroring the CLI's checks."""
+    if not isinstance(body.get("single_defender_per_club", False), bool):
+        raise RequestError("single_defender_per_club must be a boolean")
     locks_value = body.get("locks", [])
     if not isinstance(locks_value, list) or not all(
         isinstance(code, int) and not isinstance(code, bool) for code in locks_value
@@ -468,6 +470,7 @@ class ServerState:
             self.refresh_solver_versions()
         with self.status_lock:
             return {
+                "supported_rules": ["single_defender_per_club"],
                 "busy": self.run_lock.locked(),
                 "stage": self.stage,
                 "last_error": self.last_error,
@@ -702,6 +705,7 @@ def run_plan(
     locks: list[int],
     excludes: list[int],
     min_bench_appearance: float,
+    single_defender_per_club: bool = False,
 ) -> dict[str, Any]:
     """Solve one request and republish; raises RequestError with a UI-safe message on refusal."""
     if not state.run_lock.acquire(blocking=False):
@@ -744,6 +748,8 @@ def run_plan(
             *[part for code in locks for part in ("--lock", str(code))],
             *[part for code in excludes for part in ("--exclude", str(code))],
         ]
+        if single_defender_per_club:
+            argv += ["--single-defender-per-club"]
         if min_bench_appearance > 0.0:
             argv += ["--min-bench-appearance", str(min_bench_appearance)]
         argv += ["--output", str(output)]
@@ -770,6 +776,7 @@ def run_manager_plan(
     excludes: list[int],
     min_bench_appearance: float,
     free_transfers_override: int | None,
+    single_defender_per_club: bool = False,
 ) -> dict[str, Any]:
     """Optimize transfers from one exact private capture, then use the shared publish path."""
     if not state.run_lock.acquire(blocking=False):
@@ -833,6 +840,8 @@ def run_manager_plan(
             *[part for code in locks for part in ("--lock", str(code))],
             *[part for code in excludes for part in ("--exclude", str(code))],
         ]
+        if single_defender_per_club:
+            argv += ["--single-defender-per-club"]
         if min_bench_appearance > 0.0:
             argv += ["--min-bench-appearance", str(min_bench_appearance)]
         if free_transfers_override is not None:
@@ -1047,7 +1056,13 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                     raise RequestError("request body must be a JSON object")
                 if route == "/plan":
                     locks, excludes, bench = validate_request(body)
-                    result = run_plan(state, locks, excludes, bench)
+                    result = run_plan(
+                        state,
+                        locks,
+                        excludes,
+                        bench,
+                        single_defender_per_club=body.get("single_defender_per_club", False),
+                    )
                 elif route in {"/manager-team", "/manager-team/members"}:
                     manager_id = body.get("manager_id")
                     if (
@@ -1084,6 +1099,7 @@ def make_handler(state: ServerState) -> type[BaseHTTPRequestHandler]:
                         excludes,
                         bench,
                         override,
+                        single_defender_per_club=body.get("single_defender_per_club", False),
                     )
                 self._respond(200, {"ok": True, **result})
             except RequestError as exc:

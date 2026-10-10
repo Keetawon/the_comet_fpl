@@ -696,3 +696,20 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
 - Every route's implemented deterministic insight panel derives from visible published facts. Any
   optional remote explanation is explicit opt-in, cites allowlisted fact ids, never receives
   private manager/custom-plan state, and never supplies canonical numbers.
+
+
+### Defender club limit (owner preference, 2026-10-10)
+
+New local Plan Builder scenarios enable **One defender per club (Arsenal exempt)**.
+It caps DEF players across the entire 15-player squad, including the bench, in every
+planned gameweek. Arsenal is identified by permanent official club code 3 and retains
+the ordinary three-player club cap. GK, MID and FWD are unaffected. Uncheck to opt out.
+Conflicting defender locks fail visibly. Imported squads are preserved as evidence;
+the first recommended squad must satisfy the rule, possibly using transfers and hits.
+If the bounded search cannot repair it, the solve fails without relaxing the rule.
+
+The API boolean and CLI `--single-defender-per-club` default off for existing callers.
+The preference is recorded in the immutable search policy, run identity, and local
+read models. Old artifact identities and canonical bytes remain valid. The browser
+requires the server capability before submitting this option. Existing platform plans,
+forecast values, official FPL rules, and the public-export sanitizer are unchanged.

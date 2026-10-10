@@ -1560,3 +1560,40 @@ def test_initial_squad_record_is_sorted_and_priced() -> None:
     codes = [member.code for member in record.members]
     assert codes == sorted(codes)
     assert record.cost_tenths == sum(member.now_cost for member in record.members)
+
+
+def test_defender_limit_identity_and_legacy_bytes() -> None:
+    artifact = _build()
+    old = optimizer_artifact_bytes(artifact)
+    assert b'"single_defender_per_club"' not in old
+    assert optimizer_artifact_bytes(OptimizerPlanArtifact.model_validate_json(old)) == old
+    policy = artifact.search_policy.model_copy(update={"single_defender_per_club": True})
+    changed = build_optimizer_plan_artifact(
+        provenance=artifact.provenance,
+        search_policy=policy,
+        solver=artifact.solver,
+        rules=artifact.rules,
+        initial_squad=artifact.initial_squad,
+        plan=artifact.plan,
+        assumptions=artifact.assumptions,
+    )
+    assert changed.run_id != artifact.run_id
+    assert changed.decision_sha256 == artifact.decision_sha256
+    assert OptimizerPlanArtifact.model_validate_json(optimizer_artifact_bytes(changed)) == changed
+
+
+@pytest.mark.parametrize("target", ["initial", "later_week"])
+def test_defender_limit_artifact_reader_rejects_violations(target: str) -> None:
+    payload = _build().model_dump(mode="json", by_alias=True)
+    payload["search_policy"]["single_defender_per_club"] = True
+    members = (
+        payload["initial_squad"]["members"]
+        if target == "initial"
+        else payload["plan"]["weeks"][-1]["squad_after_transfers"]
+    )
+    defenders = [m for m in members if m["position"] == "DEF"]
+    for m in defenders[:2]:
+        m["team_id"] = 99
+        m["team_code"] = 99
+    with pytest.raises(ValidationError, match="violates single_defender_per_club"):
+        OptimizerPlanArtifact.model_validate(payload)

@@ -42,6 +42,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from fpl.optimize.rules import defender_club_limit_satisfied
+
 OPTIMIZER_ARTIFACT_SCHEMA = "fpl.optimizer-plan"
 OPTIMIZER_ARTIFACT_SCHEMA_VERSION: Literal[2] = 2
 _LEGACY_OPTIMIZER_ARTIFACT_SCHEMA_VERSION: Literal[1] = 1
@@ -182,6 +184,7 @@ class SearchPolicy(_Frozen):
     min_bench_appearance: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
     locked_codes: tuple[int, ...] = ()
     excluded_codes: tuple[int, ...] = ()
+    single_defender_per_club: bool = Field(default=False, strict=True)
     # These two fields are additive schema-v2 policy. Their defaults deliberately describe the
     # pre-v2 scratch-squad planner, and are omitted from schema-v1 canonical bytes and identity.
     plan_mode: Literal["scratch", "manager"] = "scratch"
@@ -584,6 +587,14 @@ class OptimizerPlanArtifact(_Frozen):
             context="initial squad",
             enforce_budget=not manager_mode,
         )
+        if (
+            not manager_mode
+            and self.search_policy.single_defender_per_club
+            and not defender_club_limit_satisfied(
+                (m.position, m.team_id, m.team_code) for m in previous.values()
+            )
+        ):
+            raise ValueError("initial squad violates single_defender_per_club (Arsenal exempt)")
         if not set(self.search_policy.locked_codes).issubset(previous):
             raise ValueError("initial squad omits a locked player")
         if not manager_mode and set(self.search_policy.excluded_codes).intersection(previous):
@@ -658,6 +669,12 @@ class OptimizerPlanArtifact(_Frozen):
                 context=f"GW{week.gw} squad",
                 enforce_budget=not manager_mode,
             )
+            if self.search_policy.single_defender_per_club and not defender_club_limit_satisfied(
+                (m.position, m.team_id, m.team_code) for m in current.values()
+            ):
+                raise ValueError(
+                    f"GW{week.gw} squad violates single_defender_per_club (Arsenal exempt)"
+                )
             incoming = _check_refs(week.transfers_in, current, context=f"GW{week.gw} transfers in")
             outgoing = _check_refs(
                 week.transfers_out, previous, context=f"GW{week.gw} transfers out"
@@ -820,6 +837,8 @@ def derive_optimizer_run_id(
         "solver_status": solver.status,
     }
     # Preserve legacy run ids: new policy fields enter identity only when non-default.
+    if search_policy.single_defender_per_club:
+        identity["single_defender_per_club"] = True
     if search_policy.excluded_codes:
         identity["excluded_codes"] = list(search_policy.excluded_codes)
     if search_policy.plan_origin == "user_custom":
@@ -919,6 +938,8 @@ def optimizer_artifact_bytes(artifact: OptimizerPlanArtifact) -> bytes:
     content and provenance serialise to identical bytes regardless of field construction order.
     """
     payload = artifact.model_dump(mode="json", by_alias=True)
+    if not artifact.search_policy.single_defender_per_club:
+        payload["search_policy"].pop("single_defender_per_club", None)
     if artifact.schema_version == _LEGACY_OPTIMIZER_ARTIFACT_SCHEMA_VERSION:
         # The v2 fields are accepted with scratch defaults when old JSON is parsed, but canonical
         # v1 output remains byte-for-byte identical to the pre-v2 serializer.

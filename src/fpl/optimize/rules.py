@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Self
@@ -121,3 +122,19 @@ def load_squad_rules(path: Path | None = None) -> SquadRules:
     """Load the verified live squad rules and bounded planning policy."""
     resolved = path or config_dir() / "squad_2026_27.yaml"
     return parse_squad_rules(resolved.read_bytes())
+
+
+# Owner preference, 2026-10-10; permanent official club code, never season-local team id.
+ARSENAL_TEAM_CODE = 3
+
+
+def defender_club_limit_satisfied(players: Iterable[tuple[str, int, int | None]]) -> bool:
+    """One DEF per club across the entire squad; Arsenal is exempt, GK is separate."""
+    seen: set[int] = set()
+    for position, team_id, team_code in players:
+        if position != "DEF" or team_code == ARSENAL_TEAM_CODE:
+            continue
+        if team_id in seen:
+            return False
+        seen.add(team_id)
+    return True

@@ -12,7 +12,13 @@ from fpl.artifacts.prospective_points import (
     ForecastArtifactRow,
     ProspectivePointsArtifact,
 )
-from fpl.optimize.rules import POSITIONS, PositionName, SquadRules
+from fpl.optimize.rules import (
+    ARSENAL_TEAM_CODE,
+    POSITIONS,
+    PositionName,
+    SquadRules,
+    defender_club_limit_satisfied,
+)
 
 # The CBC invocation is pinned here so downstream provenance (the optimizer artifact) records the
 # exact options and seed the solver actually ran under, and cannot silently drift from them. The
@@ -182,6 +188,7 @@ def validate_squad(
     codes: tuple[int, ...],
     *,
     enforce_budget: bool = True,
+    single_defender_per_club: bool = False,
 ) -> None:
     if len(codes) != rules.squad.size or len(set(codes)) != len(codes):
         raise OptimizationError("squad must contain the configured number of distinct players")
@@ -197,6 +204,10 @@ def validate_squad(
         club_counts[member.team_id] = club_counts.get(member.team_id, 0) + 1
     if any(count > rules.squad.maximum_per_club for count in club_counts.values()):
         raise OptimizationError("squad exceeds the per-club cap")
+    if single_defender_per_club and not defender_club_limit_satisfied(
+        (member.position, member.team_id, member.team_code) for member in members
+    ):
+        raise OptimizationError("Only one defender per club is allowed (Arsenal exempt)")
 
 
 def _bench_and_vice(
@@ -371,6 +382,7 @@ def optimize_initial_squad(
     min_bench_appearance: float = 0.0,
     locked_codes: tuple[int, ...] = (),
     excluded_codes: tuple[int, ...] = (),
+    single_defender_per_club: bool = False,
 ) -> SquadSolution:
     """Solve the exact fixed-squad, rotating-XI horizon problem with CBC.
 
@@ -407,6 +419,17 @@ def optimize_initial_squad(
         raise OptimizationError(
             f"excluded codes are not selectable players in the artifact: {unselectable}"
         )
+    if single_defender_per_club and not defender_club_limit_satisfied(
+        (
+            index.first_by_code[c].position,
+            index.first_by_code[c].team_id,
+            index.first_by_code[c].team_code,
+        )
+        for c in locked
+    ):
+        raise OptimizationError(
+            "Locked defenders conflict: only one defender per club (Arsenal exempt)"
+        )
     excluded_set = set(excluded)
     codes = tuple(code for code in sorted(selectable) if code not in excluded_set)
     prices = {code: _member(index, code).now_cost for code in codes}
@@ -438,6 +461,14 @@ def optimize_initial_squad(
         problem += (
             pulp.lpSum(squad_vars[code] for code in club_codes) <= rules.squad.maximum_per_club
         )
+        if single_defender_per_club:
+            defenders = [
+                c
+                for c in club_codes
+                if index.first_by_code[c].position == "DEF"
+                and index.first_by_code[c].team_code != ARSENAL_TEAM_CODE
+            ]
+            problem += pulp.lpSum(squad_vars[c] for c in defenders) <= 1
     for code in locked:
         problem += squad_vars[code] == 1
     for gw in index.gws:
@@ -560,7 +591,7 @@ def optimize_initial_squad(
         )
 
     selected = tuple(sorted(code for code in codes if pulp.value(squad_vars[code]) > 0.5))
-    validate_squad(index, rules, selected)
+    validate_squad(index, rules, selected, single_defender_per_club=single_defender_per_club)
     weeks: list[WeekSelection] = []
     for gw in index.gws:
         starters = tuple(

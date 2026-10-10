@@ -447,3 +447,19 @@ describe("plan server token source", () => {
     set.mockRestore();
   });
 });
+
+
+it.each(["scratch", "manager"])("sends the defender limit and refuses old servers (%s)", async (mode) => {
+  const request = { locks: [], excludes: [], minBenchAppearance: null,
+    singleDefenderPerClub: true, captureId: "capture-1", freeTransfersOverride: null };
+  const solve = () => mode === "scratch" ? solvePlan(request) : solveManagerPlan(request);
+  const fetchMock = vi.fn().mockResolvedValueOnce(response(status));
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(solve()).rejects.toThrow("Restart the updated local plan server");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  fetchMock.mockReset().mockResolvedValueOnce(response({ ...status, supported_rules: ["single_defender_per_club"] }))
+    .mockResolvedValueOnce(response({ ok: true, optimizer_run_id: "new-run" }));
+  await solve();
+  const sent = JSON.parse(fetchMock.mock.calls[1][1].body);
+  expect(sent.single_defender_per_club).toBe(true);
+});

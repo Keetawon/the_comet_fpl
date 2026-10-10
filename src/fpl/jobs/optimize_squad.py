@@ -410,6 +410,7 @@ def _solve(
     locked_codes: tuple[int, ...] = (),
     excluded_codes: tuple[int, ...] = (),
     *,
+    single_defender_per_club: bool = False,
     manager_capture: ManagerTeamCapture | None = None,
     free_transfers_override: int | None = None,
 ) -> tuple[SquadSolution, ArtifactIndex, TransferPlan, dict[int, str | None]]:
@@ -432,6 +433,7 @@ def _solve(
             min_bench_appearance=min_bench_appearance,
             locked_codes=locked_codes,
             excluded_codes=excluded_codes,
+            single_defender_per_club=single_defender_per_club,
         )
         plan = plan_transfers(
             index,
@@ -441,6 +443,7 @@ def _solve(
             min_bench_appearance=min_bench_appearance,
             locked_codes=locked_codes,
             excluded_codes=excluded_codes,
+            single_defender_per_club=single_defender_per_club,
         )
     else:
         if manager_capture.season != artifact.manifest.season:
@@ -497,6 +500,7 @@ def _solve(
             min_bench_appearance=min_bench_appearance,
             locked_codes=locked_codes,
             excluded_codes=excluded_codes,
+            single_defender_per_club=single_defender_per_club,
             manager_financial_state=financial_state,
         )
     names = {code: row.web_name for code, row in index.first_by_code.items()}
@@ -621,6 +625,7 @@ def _search_policy(
     excluded_codes: tuple[int, ...] = (),
     plan_origin: Literal["platform", "user_custom"] = "platform",
     manager_context: ManagerPlanContext | None = None,
+    single_defender_per_club: bool = False,
 ) -> SearchPolicy:
     return SearchPolicy(
         candidate_pool_per_position=rules.search.candidate_pool_per_position,
@@ -635,6 +640,7 @@ def _search_policy(
         min_bench_appearance=min_bench_appearance,
         locked_codes=tuple(sorted(set(locked_codes))),
         excluded_codes=tuple(sorted(set(excluded_codes))),
+        single_defender_per_club=single_defender_per_club,
         plan_mode="manager" if manager_context is not None else "scratch",
         initial_free_transfers=(
             manager_context.initial_free_transfers if manager_context is not None else 0
@@ -736,6 +742,7 @@ def assemble_optimizer_artifact(
     excluded_codes: tuple[int, ...] = (),
     plan_origin: Literal["platform", "user_custom"] = "platform",
     manager_context: ManagerPlanContext | None = None,
+    single_defender_per_club: bool = False,
 ) -> OptimizerPlanArtifact:
     """Map a solved squad/plan plus injected provenance into a validated optimizer artifact.
 
@@ -769,6 +776,7 @@ def assemble_optimizer_artifact(
             excluded_codes,
             plan_origin,
             manager_context,
+            single_defender_per_club,
         ),
         solver=solver,
         rules=_rules_snapshot(rules),
@@ -791,6 +799,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("artifact", type=Path)
     parser.add_argument("--rules", type=Path, default=None)
     parser.add_argument("--risk-lambda", type=float, default=0.0)
+    parser.add_argument(
+        "--single-defender-per-club",
+        action="store_true",
+        help="at most one DEF per club in every 15-player squad; Arsenal exempt",
+    )
     parser.add_argument(
         "--min-bench-appearance",
         type=float,
@@ -945,6 +958,7 @@ def main(argv: list[str] | None = None) -> int:
             args.min_bench_appearance,
             locked_codes,
             excluded_codes,
+            single_defender_per_club=args.single_defender_per_club,
             manager_capture=manager_capture,
             free_transfers_override=args.free_transfers_override,
         )
@@ -974,6 +988,7 @@ def main(argv: list[str] | None = None) -> int:
         "locked_codes": list(locked_codes),
         "excluded_codes": list(excluded_codes),
         "plan_origin": args.plan_origin,
+        "single_defender_per_club": args.single_defender_per_club,
         "manager": (
             {
                 "capture_id": manager_capture.capture_id,
@@ -1025,6 +1040,7 @@ def main(argv: list[str] | None = None) -> int:
             locked_codes=locked_codes,
             excluded_codes=excluded_codes,
             plan_origin=args.plan_origin,
+            single_defender_per_club=args.single_defender_per_club,
             manager_capture=manager_capture,
             free_transfers_override=args.free_transfers_override,
             solver_package_version=solver_package_version,
@@ -1053,6 +1069,7 @@ def _write_artifact(
     free_transfers_override: int | None = None,
     solver_package_version: str,
     solver_binary_version: str,
+    single_defender_per_club: bool = False,
 ) -> int:
     """Gather provenance and write the immutable optimizer artifact, failing closed on any gap."""
     try:
@@ -1081,6 +1098,7 @@ def _write_artifact(
             locked_codes=locked_codes,
             excluded_codes=excluded_codes,
             plan_origin=plan_origin,
+            single_defender_per_club=single_defender_per_club,
             manager_context=(
                 _manager_plan_context(
                     manager_capture,
