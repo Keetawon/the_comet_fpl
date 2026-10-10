@@ -34,7 +34,7 @@ it("shows updates without a deadline schedule, in both languages", () => {
   expect(screen.getByText(/อ่านสรุปข่าวที่ตรวจแล้ว/)).toBeTruthy();
 });
 
-it("copies all sorted source reports verbatim with attribution and branding, with manual fallback", async () => {
+it("copies all sorted summaries with one website link and no repeated source metadata, with manual fallback", async () => {
   const story: PublicNewsFeed["stories"][number] = {
     id: "a".repeat(64), source_id: "scout", source_name: "Scout", source_kind: "x",
     source_url: "https://x.com/Scout/status/1", source_record_id: "1", source_sha256: "b".repeat(64),
@@ -54,7 +54,10 @@ it("copies all sorted source reports verbatim with attribution and branding, wit
   expect(text.indexOf("A CLUB")).toBeLessThan(text.indexOf("B CLUB"));
   expect(text).toContain(story.summary.en);
   expect(text).toContain("No status has been confirmed.");
-  expect(text).toContain("Reported: 2026-10-09 12:00 UTC\nSource: Scout\nhttps://x.com/Scout/status/1");
+  expect(text).not.toContain(story.source_url);
+  expect(text).not.toContain("Source: Scout");
+  expect(text).not.toContain("Reported:");
+  expect(text.match(/https:\/\//g)).toHaveLength(1);
   expect(text).toContain("THE COMET FPL\nhttps://www.thecometfpl.com/#news?lang=en");
   fireEvent.click(screen.getByRole("button", { name: "Copy all teams" }));
   await screen.findByText("All-team roundup copied.");
@@ -68,6 +71,9 @@ it("copies all sorted source reports verbatim with attribution and branding, wit
   expect(translated.value).toContain(story.summary.th);
   expect(translated.value).toContain("[รอคำแปลไทย]\nNo status has been confirmed.");
   expect(translated.value).toContain("#news?lang=th");
+  expect(translated.value).not.toContain(story.source_url);
+  expect(translated.value).not.toContain("ที่มา:");
+  expect(translated.value).not.toContain("รายงานเมื่อ:");
   expect(screen.queryByText("All-team roundup copied.")).toBeNull();
   rerender(<NewsRoundup feed={{ ...edition, demo: true }} language="en" />);
   expect(screen.getByRole("button", { name: "Share all teams" })).toBeDisabled();

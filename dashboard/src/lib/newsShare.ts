@@ -21,9 +21,6 @@ export function newsRoundupText(feed: PublicNewsFeed, language: NewsLanguage): s
       label(story).toUpperCase(),
       // Preserve reviewed status lines verbatim. The browser never classifies players.
       thai && story.summary.th ? story.summary.th : (thai ? "[รอคำแปลไทย]\n" : "") + story.summary.en,
-      `${thai ? "รายงานเมื่อ" : "Reported"}: ${stamp(story.published_at || story.known_at)}`,
-      `${thai ? "ที่มา" : "Source"}: ${story.source_name}`,
-      ...(feed.demo ? [] : [story.source_url]),
       "",
     ].join("\n")),
     ...(stories.length ? [] : [thai ? "ยังไม่มีข่าวที่ตรวจแล้ว" : "No reviewed reports available.", ""]),
@@ -33,7 +30,7 @@ export function newsRoundupText(feed: PublicNewsFeed, language: NewsLanguage): s
   ].join("\n");
 }
 
-/** Share the complete reviewed text, including branding and sources, only on demand. */
+/** Share the reviewed text and website link only on demand; source links stay on cards. */
 export async function shareNewsRoundup(text: string): Promise<"shared" | "copied" | "cancelled"> {
   if (navigator.share) {
     try {

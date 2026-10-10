@@ -191,3 +191,15 @@ The live news body matches the corrected local publication byte for byte.
 At the phone viewport the text box stays within the page width with no horizontal
 document overflow; the temporary viewport override was reset. News is left open
 in Thai. The feature worktree is clean and the protected worktrees are unchanged.
+
+## Owner follow-up: cleaner shared text
+
+The all-team text box and its copy/share payload now omit each report's source
+name, source URL and individual publication timestamp. They keep the team name,
+exact reviewed status rows, one edition timestamp, the shared status legend and
+THE COMET website link. Full attribution and source dates remain on the
+individual news cards below. This supersedes the earlier source-per-team layout;
+it changes presentation only, with no news-store or publication changes.
+The complete dashboard suite remains **797 passed**; lint and build pass.
+Existing copy checks verify the cleaner payload in both languages, including
+the website link and absence of the repeated source metadata.
