@@ -142,6 +142,15 @@ it("selects the available next-GW plan instead of an older default", async () =>
   expect(screen.queryByRole("columnheader", { name: "Plan xP GW1" })).not.toBeInTheDocument();
 });
 
+it.each([true, false, undefined])("shows the defender rule only when the selected platform plan used it: %s", async (enabled) => {
+  const platform = structuredClone(plans[0]);
+  platform.policy.single_defender_per_club = enabled;
+  vi.mocked(loadNextGw).mockResolvedValue({ plans: [customPlan, platform] });
+  render(<NextGwPage />);
+  await screen.findByRole("columnheader", { name: "Plan xP GW1" });
+  expect(screen.queryByText("One DEF per club (Arsenal exempt)") !== null).toBe(enabled === true);
+});
+
 describe("SummaryPage", () => {
   it("shows next GW, optimizer squad summaries, availability watch, and watchlists", async () => {
     render(<SummaryPage />);

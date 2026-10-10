@@ -510,6 +510,9 @@ export function NextGwPage() {
           frozen-price scenario)
         </span>
         <span>hit GW{week.gw}: -{fmt(week.hit_points, 0)} pts</span>
+        {plan.policy.single_defender_per_club && (
+          <Badge variant="outline">One DEF per club (Arsenal exempt)</Badge>
+        )}
         <span>
           architecture {isDefaultArchitecture(plan.component_modes) ? "default" : "diagnostic"} ·{" "}
           {planDisplayLabel(plan)}

@@ -57,6 +57,7 @@ def reusable_plan(path: Path, forecast_hash: str) -> bool:
         artifact.provenance.forecast.sha256 == forecast_hash
         and artifact.provenance.squad_rules.sha256 == digest(config_dir() / "squad_2026_27.yaml")
         and policy.plan_origin in (None, "platform")
+        and policy.single_defender_per_club
         and not policy.locked_codes
         and not policy.excluded_codes
         and policy.risk_lambda == 0
@@ -95,6 +96,7 @@ def complete(
                     "-m",
                     "fpl.jobs.optimize_squad",
                     str(forecast),
+                    "--single-defender-per-club",
                     "--output",
                     str(plan),
                 ],

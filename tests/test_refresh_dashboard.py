@@ -108,8 +108,9 @@ def test_freshness_separates_pending_gw_current_plan_and_old_scored_vintage(
     assert status["next_fixture_gw"] == 6
 
 
-def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_inference(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("reuse_existing", [True, False])
+def test_completion_reuses_only_current_policy_and_never_runs_inference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reuse_existing: bool
 ) -> None:
     calls = []
     forecast = tmp_path / "forecast.jsonl"
@@ -117,7 +118,11 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
     plan = tmp_path / "plan.json"
     plan.write_bytes(b"immutable plan")
     monkeypatch.setattr(job, "latest_primary", lambda *a: (forecast, "2026-27", "run"))
-    monkeypatch.setattr(job, "reusable_plan", lambda p, h: h == job.digest(forecast))
+    monkeypatch.setattr(
+        job,
+        "reusable_plan",
+        lambda p, h: h == job.digest(forecast) and (reuse_existing or p != plan) and p.is_file(),
+    )
 
     class Connection:
         def execute(self, _: str) -> None:
@@ -153,6 +158,11 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
     monkeypatch.setattr(job.shutil, "which", lambda _: "npm")
 
     def command(args: list[str], **kw: Any) -> None:
+        if "fpl.jobs.optimize_squad" in args:
+            assert args[3:] == [str(forecast), "--single-defender-per-club", "--output", args[-1]]
+            Path(args[-1]).write_bytes(b"new constrained platform plan")
+            calls.append("optimize")
+            return
         assert args == ["npm", "run", "build"]
         calls.append("frontend")
 
@@ -168,9 +178,12 @@ def test_completion_reuses_bound_plan_attaches_before_build_and_never_runs_infer
             tmp_path / "cache",
             initial_plan=plan,
         )
-        assert result["plan_reused"]
+        assert result["plan_reused"] == (reuse_existing or index == 1)
         assert result["current_availability"] == {"matched_player_rows": 15}
-    assert calls == ["attach", "build", "install", "frontend"] * 2
+    expected = ["attach", "build", "install", "frontend"] * 2
+    if not reuse_existing:
+        expected.insert(1, "optimize")
+    assert calls == expected
     assert forecast.read_bytes() == b"frozen"
     assert plan.read_bytes() == b"immutable plan"
 
@@ -184,6 +197,7 @@ def test_reusable_plan_rejects_custom_constraints_and_wrong_forecast(
         excluded_codes=(),
         risk_lambda=0,
         min_bench_appearance=0,
+        single_defender_per_club=True,
     )
     artifact = SimpleNamespace(
         search_policy=policy,
@@ -196,5 +210,11 @@ def test_reusable_plan_rejects_custom_constraints_and_wrong_forecast(
     monkeypatch.setattr(job, "digest", lambda _: "rules")
     assert job.reusable_plan(tmp_path, "forecast")
     assert not job.reusable_plan(tmp_path, "wrong")
+    policy.single_defender_per_club = False
+    assert not job.reusable_plan(tmp_path, "forecast")
+    policy.single_defender_per_club = True
+    policy.plan_origin = "user_custom"
+    assert not job.reusable_plan(tmp_path, "forecast")
+    policy.plan_origin = "platform"
     policy.locked_codes = (1,)
     assert not job.reusable_plan(tmp_path, "forecast")

@@ -132,8 +132,8 @@ vintage, optimized from that vintage's own forecast artifact (clean worktree; th
 fails closed otherwise):
 
 ```powershell
-.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad gw1_5_default.jsonl --output plan_default.json
-.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad gw1_5_diagnostic.jsonl --output plan_diagnostic.json
+.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad gw1_5_default.jsonl --single-defender-per-club --output plan_default.json
+.\.venv\Scripts\python.exe -m fpl.jobs.optimize_squad gw1_5_diagnostic.jsonl --single-defender-per-club --output plan_diagnostic.json
 ```
 
 Publish the BI Parquet export and the dashboard read models, then copy the read models
@@ -700,7 +700,8 @@ each immutable optimizer artifact when publishing, e.g. `export_bi --optimizer-p
 
 ### Defender club limit (owner preference, 2026-10-10)
 
-New local Plan Builder scenarios enable **One defender per club (Arsenal exempt)**.
+New local Plan Builder scenarios and refreshed platform Next GW suggestions enable
+**One defender per club (Arsenal exempt)**.
 It caps DEF players across the entire 15-player squad, including the bench, in every
 planned gameweek. Arsenal is identified by permanent official club code 3 and retains
 the ordinary three-player club cap. GK, MID and FWD are unaffected. Uncheck to opt out.
@@ -711,5 +712,9 @@ If the bounded search cannot repair it, the solve fails without relaxing the rul
 The API boolean and CLI `--single-defender-per-club` default off for existing callers.
 The preference is recorded in the immutable search policy, run identity, and local
 read models. Old artifact identities and canonical bytes remain valid. The browser
-requires the server capability before submitting this option. Existing platform plans,
-forecast values, official FPL rules, and the public-export sanitizer are unchanged.
+requires the server capability before submitting this option. The dashboard refresh
+explicitly enables it and refuses to reuse an older platform plan without the rule,
+even when its forecast matches. It creates a new immutable platform artifact; custom
+plans cannot substitute. Next GW shows the rule on plans that actually used it.
+Retained historical artifacts, forecast values, official FPL rules, and the
+public-export sanitizer are unchanged.
