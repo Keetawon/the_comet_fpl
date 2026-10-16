@@ -121,17 +121,37 @@ Pages release in `public-data-release.json` is untouched by this job.
 
 ## What the owner must configure once
 
-The workflow needs a `production-fpl` GitHub environment holding five values. Four are
-ordinary configuration and one is the credential; all five are read only by the step that
-writes the config file, and none is echoed, logged or written into the repository.
+### Integration with the mobile export and newer rest report (2026-10-16)
+
+The republisher now checks the shared uncompressed mobile budgets before fetching
+any generation payload. Changed read models use the same compact serialization as
+the public publisher; the manifest retains its canonical indented representation.
+Replaying an already-published capture therefore remains a no-op.
+
+Publication is bound to the exact base generation read for the restatement, checked
+before remote writes. The existing conditional pointer write also protects the
+upload interval. A newer desktop generation cannot be overwritten by a restatement
+prepared from an older forecast. Older immutable rest sidecars without both new
+midweek-load fields remain valid under their original evidence contract; partial
+new fields and contradictory new evidence are rejected.
+
+The cloud job accepts only trusted main-branch captures or manual dispatch on main.
+It checks out main after capture completion because the triggering workflow's
+original head SHA predates its newly committed capture package. Forecasts, model
+parameters and the Summary table's display limit are unchanged.
+
+### Environment configuration
+
+The workflow reuses the existing `production-fpl` environment configured for official
+FPL reporting. The public base URL is the already-published `https://data.thecometfpl.com`.
+No credential is copied between environments or committed to the repository.
 
 | Name | Value |
 | --- | --- |
-| `R2_BUCKET` | the public dashboard bucket |
-| `R2_ENDPOINT_URL` | `https://<account>.r2.cloudflarestorage.com` |
-| `R2_PUBLIC_BASE_URL` | `https://data.thecometfpl.com` |
-| `R2_ACCESS_KEY_ID` | R2 API token id |
-| `R2_SECRET_ACCESS_KEY` | R2 API token secret |
+| Variable `FPL_R2_BUCKET` | the existing public dashboard bucket |
+| Secret `FPL_R2_ENDPOINT_URL` | the existing R2 endpoint |
+| Secret `FPL_R2_ACCESS_KEY_ID` | the existing R2 API token id |
+| Secret `FPL_R2_SECRET_ACCESS_KEY` | the existing R2 API token secret |
 
 The token needs only object read and write on that one bucket -- the same capability the
 desktop publisher already uses, no account-level or zone-level scope. Nothing here is
@@ -140,6 +160,6 @@ usefully: dispatch it with `stage_only`, or simply leave the secrets absent, and
 and verifies the restatement without publishing.
 
 Until that environment exists the workflow is inert rather than broken: with none of the
-five set it warns, stages, verifies and publishes nothing, so a daily capture does not turn
+four set it warns, stages, verifies and publishes nothing, so a daily capture does not turn
 red over a setup step. With *some* of them set it fails instead -- a partial configuration
 is a mistake, and quietly not publishing would hide it.

@@ -43,8 +43,10 @@ jobs:
   republish:
     # Only after a capture that succeeded. A failed or skipped capture has nothing new.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # Holds the R2 credential. Nothing else in this workflow needs a secret.
@@ -52,8 +54,9 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          # The capture commit lands on the default branch; take it, not the dispatch ref.
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          # The capture workflow pushes its package AFTER its head_sha. Read the
+          # trusted main branch containing that completed capture, not the older SHA.
+          ref: main
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -69,14 +72,14 @@ jobs:
         id: r2
         if: ${{ !inputs.stage_only }}
         env:
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
-          R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ vars.FPL_R2_BUCKET }}
+          R2_ENDPOINT_URL: ${{ secrets.FPL_R2_ENDPOINT_URL }}
+          R2_PUBLIC_BASE_URL: https://data.thecometfpl.com
+          R2_ACCESS_KEY_ID: ${{ secrets.FPL_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.FPL_R2_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
-          names="R2_BUCKET R2_ENDPOINT_URL R2_PUBLIC_BASE_URL R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY"
+          names="R2_BUCKET R2_ENDPOINT_URL R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY"
           present=0 missing=""
           for name in ${names}; do
             if [ -n "${!name:-}" ]; then
