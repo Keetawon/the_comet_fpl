@@ -11,7 +11,7 @@ from typing import Any
 
 from fpl.ingest.fpl_api import BootstrapStatic, FplApiClient
 from fpl.ingest.live_snapshot import capture_payload
-from fpl.publish.public_news import export_news_feed, validate_news_feed
+from fpl.publish.public_news import attach_scout_clubs, export_news_feed, validate_news_feed
 from fpl.publish.r2_dashboard import _read, load_config, s3_client
 from fpl.storage.public_news import canonical
 
@@ -37,11 +37,12 @@ def add_roundup(
     event = min(future, key=lambda e: e.deadline_time or captured_at)
     first = min(e.deadline_time for e in deadlines if e.deadline_time)
     year = first.year if first.month >= 7 else first.year - 1
+    season = f"{year}-{str(year + 1)[-2:]}"
     assert event.deadline_time is not None
-    result = document | {
+    result = attach_scout_clubs(document, parsed.teams, season=season, as_of=captured_at) | {
         "schema_version": 2,
         "roundup": {
-            "season": f"{year}-{str(year + 1)[-2:]}",
+            "season": season,
             "gw": event.id,
             "deadline_at": event.deadline_time.isoformat(),
             "opens_at": (event.deadline_time - timedelta(hours=5)).isoformat(),

@@ -11,7 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from fpl.publish.public_news import empty_news_feed, export_news_feed, validate_news_feed
+from fpl.ingest.fpl_api import BootstrapTeam
+from fpl.publish.public_news import (
+    attach_scout_clubs,
+    empty_news_feed,
+    export_news_feed,
+    validate_news_feed,
+)
 from fpl.storage.public_news import (
     BilingualSummary,
     CaptureStatus,
@@ -62,6 +68,79 @@ def test_missing_store_is_not_created(tmp_path: Path) -> None:
     assert not path.exists()
     assert first["stories"] == []
     assert first["sources"][0]["status"] == "not_configured"
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "exact",
+        "alias",
+        "alias_wrong_code",
+        "partial",
+        "old",
+        "season",
+        "account",
+        "duplicate",
+        "code",
+        "unreviewed",
+        "existing",
+    ],
+)
+def test_reviewed_club_heading_resolves_only_exact_current_registry(case: str) -> None:
+    doc = example()
+    doc["sources"][0].update(source_id="ffscout_press_conferences_v2", source_kind="x")
+    story = doc["stories"][0]
+    story.update(
+        source_id="ffscout_press_conferences_v2",
+        source_kind="x",
+        source_url="https://x.com/FFScout/status/123",
+        published_at="2026-09-19T10:00:00Z",
+        season=None,
+        team_code=None,
+        team_name=None,
+        player_code=None,
+        player_name=None,
+        rendering="ai_summary",
+        ai_model="reviewed-digest",
+        summarized_at="2026-09-19T11:30:00Z",
+        title={"en": "EXAMPLE CLUB | Team news", "th": "ข่าวทีม"},
+        summary={"en": "Availability remains uncertain.", "th": "ยังไม่ยืนยันว่าพร้อม"},
+    )
+    teams = [BootstrapTeam(id=1, code=3, name="Example Club", short_name="EXA")]
+    if case in {"alias", "alias_wrong_code"}:
+        story["title"]["en"] = "IPSWICH | Team news"
+        teams = [
+            BootstrapTeam(
+                id=1, code=40 if case == "alias" else 999, name="Ipswich Town", short_name="IPS"
+            )
+        ]
+    elif case == "partial":
+        story["title"]["en"] = "EXAMPLE | Team news"
+    elif case == "old":
+        story["published_at"] = "2026-09-10T10:00:00Z"
+    elif case == "season":
+        story["season"] = "2025-26"
+    elif case == "account":
+        story["source_url"] = "https://x.com/OtherScout/status/123"
+    elif case == "duplicate":
+        teams.append(BootstrapTeam(id=2, code=4, name="Example Club", short_name="EXB"))
+    elif case == "code":
+        teams[0] = teams[0].model_copy(update={"code": None})
+    elif case == "unreviewed":
+        story.update(rendering="source_text", ai_model=None, summarized_at=None)
+    elif case == "existing":
+        story.update(season="2025-26", team_code=99, team_name="Retained club")
+    before = deepcopy(doc)
+    result = attach_scout_clubs(doc, teams, season="2026-27", as_of=AS_OF)
+    assert doc == before
+    if case in {"exact", "alias"}:
+        assert result["stories"][0] == story | {
+            "season": "2026-27",
+            "team_code": 40 if case == "alias" else 3,
+            "team_name": "Ipswich Town" if case == "alias" else "Example Club",
+        }
+    else:
+        assert result == doc
 
 
 def test_original_news_has_no_fabricated_translation_or_forecast() -> None:
