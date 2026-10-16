@@ -553,3 +553,15 @@ def test_refresh_keeps_local_success_and_lock_until_optional_publication_finishe
     assert report["public_publication"]["status"] == "FAILED"
     assert not (runs / ".dashboard-refresh.lock").exists()
     assert db.read_bytes() == b"untouched"
+
+
+def test_oversized_generation_is_rejected_before_parsing_or_upload(
+    generation: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fpl.publish.dashboard_json import DashboardJsonError
+    from fpl.publish.dashboard_scope import PUBLIC_PAYLOAD_LIMITS
+    from fpl.publish.r2_dashboard import prepare_generation
+
+    monkeypatch.setitem(PUBLIC_PAYLOAD_LIMITS, "players.json", 1)
+    with pytest.raises(DashboardJsonError, match="mobile limit"):
+        prepare_generation(generation, tmp_path / "output")

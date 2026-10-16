@@ -1,8 +1,6 @@
-// Vintage (run) selection. A read-model export carries EVERY recorded forecast
-// vintage -- two architectures per recorded pack plus any older dev vintages -- so
-// teams and players repeat once per run_id. These helpers pick and label ONE run for
-// the exploratory pages, defaulting to the default architecture referenced by the
-// default optimizer plan.
+// Public planning exports contain only active forecast vintages and formal plan
+// bindings. Historical accuracy runs have a separate bounded read model. These
+// helpers select and label one published planning run without changing its values.
 
 import {
   isDefaultArchitecture,

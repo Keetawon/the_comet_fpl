@@ -1,0 +1,198 @@
+{
+  "active_run_ids": [
+    "1faf389a41701ece6e00dd8db0298a4b8ca713bf454845ff74074f278e9cf220",
+    "c198907c41ecf402f170e2fdaf1f4e7b12ee6291c6fb93eb8c443d086b850c18",
+    "f6c722ca9a394878a7c3078ca6babb4b33b2caadb51773847acad53e355ad7fd"
+  ],
+  "browser_checks": {
+    "engine": "desktop Chrome",
+    "live_planning_vintage_options": 3,
+    "live_players_rendered": true,
+    "live_summary_rendered": true,
+    "physical_ios_device_tested": false,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    }
+  },
+  "data_publication_status": "COMPLETE",
+  "files": {
+    "fixture_matrix.json": {
+      "after_bytes": 375150,
+      "after_rows": 60,
+      "all_retained_values_exact": true,
+      "before_bytes": 8201512,
+      "before_rows": 1120
+    },
+    "next_gw.json": {
+      "after_bytes": 58035,
+      "after_rows": 2,
+      "all_retained_values_exact": true,
+      "before_bytes": 102467,
+      "before_rows": 2
+    },
+    "optimizer_audit.json": {
+      "after_bytes": 9766,
+      "after_rows": 2,
+      "all_retained_values_exact": true,
+      "before_bytes": 12100,
+      "before_rows": 2
+    },
+    "player_actuals.json": {
+      "after_bytes": 9100709,
+      "after_rows": 1147,
+      "all_retained_values_exact": true,
+      "before_bytes": 15181142,
+      "before_rows": 1147
+    },
+    "player_forecast_vs_actual.json": {
+      "after_bytes": 5397997,
+      "after_rows": 11,
+      "all_retained_values_exact": true,
+      "before_bytes": 42957990,
+      "before_rows": 56
+    },
+    "player_horizons.json": {
+      "after_bytes": 847505,
+      "after_rows": 9925,
+      "all_retained_values_exact": true,
+      "before_bytes": 15301976,
+      "before_rows": 179800
+    },
+    "player_provisional_actuals.json": {
+      "after_bytes": 110,
+      "after_rows": 0,
+      "all_retained_values_exact": true,
+      "before_bytes": 127,
+      "before_rows": 0
+    },
+    "players.json": {
+      "after_bytes": 11399271,
+      "after_rows": 1985,
+      "all_retained_values_exact": true,
+      "before_bytes": 289830082,
+      "before_rows": 35960
+    },
+    "summary.json": {
+      "after_bytes": 8232,
+      "after_rows": 1,
+      "all_retained_values_exact": true,
+      "before_bytes": 10047,
+      "before_rows": 1
+    },
+    "team_actuals.json": {
+      "after_bytes": 190226,
+      "after_rows": 37,
+      "all_retained_values_exact": true,
+      "before_bytes": 315851,
+      "before_rows": 37
+    },
+    "team_forecast_vs_actual.json": {
+      "after_bytes": 557341,
+      "after_rows": 11,
+      "all_retained_values_exact": true,
+      "before_bytes": 3903073,
+      "before_rows": 56
+    },
+    "team_provisional_actuals.json": {
+      "after_bytes": 106,
+      "after_rows": 0,
+      "all_retained_values_exact": true,
+      "before_bytes": 123,
+      "before_rows": 0
+    }
+  },
+  "forecast_regenerated": false,
+  "frontend_publication_status": "READY_FOR_PAGES_DEPLOYMENT",
+  "ledger_modified": false,
+  "operational_activation": {
+    "after": "80b071f234719fae934ab02a528c366f3bdee142",
+    "before": "ff302ce8480137448c441a6a56b139bdb5a345b2",
+    "manifest_sha256": "a125aeffcac9479c96cac15c990506b917d74ece6ddc594526fba895b2a97384",
+    "operational_task_schedule_unchanged": true,
+    "public_players_bytes": 11399271,
+    "worktree_clean": true
+  },
+  "parameters_refitted": false,
+  "pr": "https://github.com/Keetawon/the_comet_fpl/pull/21",
+  "public_generation_sha256": "bed72419a0319d612a3ab24d3f3afefcec31838b3103c36632cbd86771ca8fdc",
+  "public_manifest_sha256": "a125aeffcac9479c96cac15c990506b917d74ece6ddc594526fba895b2a97384",
+  "publication_status": {
+    "awaiting_finality": [],
+    "current_platform_plan": true,
+    "data_manifest_sha256": "a125aeffcac9479c96cac15c990506b917d74ece6ddc594526fba895b2a97384",
+    "exported_at": "2026-10-16T14:28:42.350638+00:00",
+    "forecast_rollover_required": false,
+    "latest_finalized_gw": 6,
+    "latest_forecast": {
+      "as_of": "2026-10-16T14:19:19.736231+00:00",
+      "gw_from": 7,
+      "gw_to": 11,
+      "run_id": "1faf389a41701ece6e00dd8db0298a4b8ca713bf454845ff74074f278e9cf220"
+    },
+    "latest_scored_gw": {
+      "player": 6,
+      "team": 6
+    },
+    "meaning": "Capture, forecast, plan and finalized scores have independent timestamps. This export reads registered immutable forecasts.",
+    "next_fixture_gw": 7,
+    "schema": "fpl.dashboard-publication-status/v1",
+    "season": "2026-27",
+    "source_known_at": "2026-10-16T13:31:53.891425+00:00"
+  },
+  "release_pin": {
+    "asset_name": "dashboard-public-data.zip",
+    "asset_sha256": "528b6ab2a554518b293aaeae1e84c9af6a64ec4ac0addecb5c3349437834f5a0",
+    "asset_size_bytes": 2737551,
+    "competitive_schedule_asset": {
+      "name": "competitive_schedule.json",
+      "sha256": "608330684d51a615a2f63707aef782ba66608f8c7dcfa810d8b5d2d6b89d6423",
+      "size_bytes": 33399
+    },
+    "manifest_content_sha256": "a125aeffcac9479c96cac15c990506b917d74ece6ddc594526fba895b2a97384",
+    "release_tag": "dashboard-data-a125aeffcac9-mobile-20261016",
+    "repository": "Keetawon/the_comet_fpl",
+    "schema": "fpl.dashboard-public-release-pin",
+    "schema_version": 1,
+    "sdp_asset": {
+      "name": "sdp_stats.json",
+      "sha256": "3579bff9314471e9a9174072d1813523a00994fc2cf5592fd7303e231f699c49",
+      "size_bytes": 15006678
+    },
+    "status": "published"
+  },
+  "schema": "fpl.mobile-dashboard-publication-verification/v1",
+  "source_generation_sha256": "21692b8a85a7c506365ec15ce556a5e8bb076c534d2ae3cdbe14234946420a9c",
+  "source_manifest_sha256": "afbbd8c8dfb924d57dd46a46aaaa9bf2f4c22416ae90e7bc1f70a55598bcda4f",
+  "tests": {
+    "baseline_reproduced_failures": 86,
+    "baseline_revision": "0fb9c12e878e1373f86bd503b3c2975aa3e05cd3",
+    "ci_format_failures_all_unchanged_from_main": true,
+    "ci_format_files": [
+      "src/fpl/insights/contracts.py",
+      "src/fpl/publish/contract.py",
+      "src/fpl/publish/dashboard_json.py",
+      "src/fpl/publish/export.py",
+      "tests/test_bi_export.py",
+      "tests/test_bi_semantic_contract.py",
+      "tests/test_dashboard_json.py",
+      "tests/test_snapshot_workflows.py"
+    ],
+    "dashboard_files": 75,
+    "dashboard_passed": 812,
+    "frontend_build": "PASS",
+    "frontend_lint": "PASS",
+    "full_windows_pytest": {
+      "errors": 22,
+      "failed": 64,
+      "passed": 4623,
+      "skipped": 156
+    },
+    "main_focused_python_passed": 131,
+    "mypy_source_files": 251,
+    "new_failure_nodes": [],
+    "operational_focused_python_initial_passed": 142,
+    "operational_latest_added_checks_passed": 107,
+    "ruff_check": "PASS"
+  }
+}

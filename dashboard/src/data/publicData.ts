@@ -2,6 +2,16 @@
 // pointer stays failed until reload; mixing it with older bundled files is unsafe.
 const RELATIVE_FILE = /^(?:data|sdp)\/[a-z][a-z0-9_]*\.json$/;
 const SHA256 = /^[0-9a-f]{64}$/;
+// Match the publisher's uncompressed limits. Refuse a regressed release before
+// fetching/parsing its large JSON; Content-Length can describe only gzip bytes.
+const PAYLOAD_LIMITS: Record<string, number> = {
+  "data/players.json": 15_000_000,
+  "data/player_horizons.json": 2_000_000,
+  "data/fixture_matrix.json": 2_000_000,
+  "data/player_actuals.json": 15_000_000,
+  "data/player_forecast_vs_actual.json": 20_000_000,
+  "data/team_forecast_vs_actual.json": 2_000_000,
+};
 
 interface Generation {
   base: URL;
@@ -58,6 +68,9 @@ export async function resolveDataUrl(relative: string): Promise<string> {
   const generation = await (pinnedGeneration ??= readGeneration(pointer));
   if (!Object.hasOwn(generation.files, relative)) {
     throw new Error(`Dashboard data generation does not contain ${relative}.`);
+  }
+  if (generation.files[relative].size_bytes > (PAYLOAD_LIMITS[relative] ?? Infinity)) {
+    throw new Error("This dashboard data release exceeds the mobile size limit. Please try again after the next data update.");
   }
   return new URL(relative, generation.base).href;
 }

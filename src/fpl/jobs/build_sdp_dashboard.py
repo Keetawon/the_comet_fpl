@@ -111,6 +111,7 @@ def build(
             base,
             output / "public" / "data",
             output / "dashboard-public-data.zip",
+            mobile_scope=True,
         )
         sidecar = export_sdp_stats(db, output / "public" / "sdp" / "sdp_stats.json", as_of=stamp)
         calendar = export_competitive_schedule(
