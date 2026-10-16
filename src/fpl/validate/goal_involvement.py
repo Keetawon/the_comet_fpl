@@ -81,7 +81,9 @@ def prepare_fold(raw: dict[str, Any], predictions: list[dict[str, Any]]) -> Fold
                 raise ValueError("missing or mismatched component label")
             pmf = arm["arms"]["candidate"]
             conditional.append(
-                (max(0, (pmf[0] - (1 - play)) / play), *(p / play for p in pmf[1:]))
+                tuple(pmf)
+                if row["components"][component]["fallback"] is not None
+                else (max(0, (pmf[0] - (1 - play)) / play), *(p / play for p in pmf[1:]))
                 if play > 0
                 else (1.0, 0.0)
             )

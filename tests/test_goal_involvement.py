@@ -12,7 +12,7 @@ from fpl.models.goal_involvement import (
     fixture_low_counts,
     gameweek_probability,
 )
-from fpl.validate.goal_involvement import Fold, eligible_folds
+from fpl.validate.goal_involvement import Fold, eligible_folds, prepare_fold
 
 
 def test_one_shared_appearance_gate():
@@ -76,3 +76,35 @@ def test_extreme_event_rates_finite_and_deterministic():
     assert one == fit_event_model(rows, ridge=100, fit_slope=True)
     assert math.isfinite(binary_log_loss(0, 1))
     assert 0 <= one.predict("GK", 0) <= 1
+
+
+def test_flagged_fallback_is_conditional_and_missing_leg_is_rejected():
+    identity = {"season": "2021-22", "gw": 9, "fixture": 82, "code": 123, "position": "MID"}
+    raw = {
+        "season": "2021-22",
+        "gw": 9,
+        "cutoff": "2021-10-22T19:00:00+00:00",
+        "labels_available": "2021-10-24T18:30:00+00:00",
+        "records": [
+            {
+                **identity,
+                "cold": True,
+                "minutes_pmf": [0.8, 0, 0, 0.2],
+                "components": {c: {"fallback": "unmeasured_prior"} for c in ("goals", "assists")},
+            }
+        ],
+        "labels": [{**identity, "goals": 1, "assists": 1}],
+    }
+    saved = [
+        {
+            **identity,
+            "p_play": 0.2,
+            "components": {
+                c: {"actual": 1, "arms": {"candidate": [0, 1]}} for c in ("goals", "assists")
+            },
+        }
+    ]
+    assert prepare_fold(raw, saved).rows[0]["baseline"] == pytest.approx(0.2)
+    raw["labels"] = []
+    with pytest.raises(ValueError, match="unique, complete and paired"):
+        prepare_fold(raw, saved)

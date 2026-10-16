@@ -88,3 +88,14 @@ unavailable if any of those five GWs is missing or extends beyond the season end
 No shortened window or cumulative-five-GW event probability is substituted.
 Python computes these values; the browser selects the exact published start GW.
 Availability remains a separate overlay and never multiplies these probabilities.
+
+### Input-only preflight correction, before any fit or claim
+
+The initial input validation at 9f9a0b6 rejected the no-xG historical fallback:
+frozen V2 preserves the independent trailing Poisson PMF there, without an
+appearance mixture. Those explicitly flagged fallbacks must be treated as
+conditional input and gated once, matching the live composer fallback convention.
+Only nonfallback PMFs have their known appearance mixture inverted. This is a
+new event-baseline mapping, not a change to the old conversion result. No event
+fit, outer score or formal run claim existed at this rejection. Preserve the
+no-xG evidence caveat and test this mapping before the formal run.
