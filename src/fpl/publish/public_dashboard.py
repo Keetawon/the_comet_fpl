@@ -3,10 +3,10 @@
 The normal dashboard generation is an internal immutable read model.  It may include
 browser-specific ``user_custom`` optimizer plans and an absolute local path to the squad
 rules file.  Those values must never leak into the static public deployment.  This module
-is a narrow transport boundary: it validates the source generation, removes only custom
-plans, normalizes the one provenance path, reseals the dashboard manifest, validates the
-result, and emits a deterministic ZIP containing the complete read-model generation at
-its root.
+is a narrow transport boundary: it validates the source generation, removes custom
+plans, and normalizes the one provenance path. Public build/CLI callers also request
+the bounded planning/monitoring projection, after the unchanged privacy checks.
+It reseals and validates the manifest and emits a deterministic ZIP at its root.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from fpl.publish.dashboard_json import (
     _manifest_content_sha256,
     validate_dashboard_json,
 )
+from fpl.publish.dashboard_scope import scope_public_documents, validate_public_payload_sizes
 from fpl.publish.export import (
     BiExportError,
     _canonical_json_bytes,
@@ -451,7 +452,7 @@ def _validate_document_envelopes(documents: Mapping[str, dict[str, Any]]) -> Non
 
 
 def _render_sanitized_generation(
-    source: Path, staging: Path, source_manifest: Mapping[str, Any]
+    source: Path, staging: Path, source_manifest: Mapping[str, Any], *, mobile_scope: bool
 ) -> dict[str, Any]:
     documents = {filename: _load_document(source / filename) for filename in _READ_MODEL_FILENAMES}
     _validate_document_envelopes(documents)
@@ -459,23 +460,24 @@ def _render_sanitized_generation(
     for filename, document in documents.items():
         _assert_public_safe(document, f"{filename}:$")
 
+    manifest = dict(source_manifest)
+    if mobile_scope:
+        scope_public_documents(documents, manifest)
+
     files: dict[str, dict[str, Any]] = {}
     for filename in _READ_MODEL_FILENAMES:
         document = documents[filename]
-        # Keep the high-cardinality positional horizon transport compact after the
-        # public-safety pass. Re-expanding it here would more than double the served
-        # payload and undo the schema-v4 wire-format budget.
-        payload = _canonical_json_bytes(
-            document,
-            indent=None if filename == PLAYER_HORIZONS_FILENAME else 2,
-        )
+        # Compact transport preserves every value/type; scoping above bounds the
+        # parsed object population as well as removing whitespace on the wire.
+        payload = _canonical_json_bytes(document)
         (staging / filename).write_bytes(payload)
         files[filename] = {
             "row_count": _file_row_count(document, filename),
             "sha256": _sha256_bytes(payload),
         }
 
-    manifest = dict(source_manifest)
+    if mobile_scope:
+        validate_public_payload_sizes(staging)
     manifest["files"] = files
     manifest["content_sha256"] = _manifest_content_sha256(manifest)
     _assert_public_safe(manifest, f"{MANIFEST_FILENAME}:$")
@@ -538,6 +540,8 @@ def package_public_dashboard(
     input_dir: Path,
     output_dir: Path,
     archive_path: Path,
+    *,
+    mobile_scope: bool = False,
 ) -> PublicDashboardPackageResult:
     """Sanitize and deterministically package one validated dashboard generation.
 
@@ -571,7 +575,9 @@ def package_public_dashboard(
     promoted_archive = False
     succeeded = False
     try:
-        manifest = _render_sanitized_generation(source, staging, source_manifest)
+        manifest = _render_sanitized_generation(
+            source, staging, source_manifest, mobile_scope=mobile_scope
+        )
         validated_manifest = validate_dashboard_json(staging)
         if validated_manifest["content_sha256"] != manifest["content_sha256"]:
             raise PublicDashboardPackageError(

@@ -21,6 +21,7 @@ from fpl.config import repo_root
 from fpl.publish.competitive_schedule import validate_competitive_schedule
 from fpl.publish.dashboard_json import validate_dashboard_json
 from fpl.publish.dashboard_refresh import check_observed_freshness, publication_status
+from fpl.publish.dashboard_scope import validate_public_payload_sizes
 from fpl.publish.export import _canonical_json_bytes, _strict_json_loads
 from fpl.publish.public_dashboard import (
     _ARCHIVE_FILENAMES,
@@ -191,6 +192,7 @@ def _prepare_generation(generation: Path, staging: Path) -> tuple[dict[str, byte
     completed = datetime.fromisoformat(receipt["completed_at"])
     if completed.tzinfo is None or completed.utcoffset() is None or completed > datetime.now(UTC):
         raise ValueError("R2 generation completion time is invalid")
+    validate_public_payload_sizes(generation / "public/data")
     source_manifest = validate_dashboard_json(generation / "public/data")
     if source_manifest["content_sha256"] != receipt.get("public_package", {}).get(
         "manifest_content_sha256"

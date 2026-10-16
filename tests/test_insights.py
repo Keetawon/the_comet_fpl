@@ -878,6 +878,37 @@ def _rewrite_insight_read_model(
     (data / "manifest.json").write_bytes(_canonical_json_bytes(manifest, indent=2))
 
 
+@pytest.mark.parametrize(
+    ("page", "filename"),
+    [
+        (InsightPage.PLAYER_FORECAST_VS_ACTUAL, "player_forecast_vs_actual.json"),
+        (InsightPage.TEAM_FORECAST_VS_ACTUAL, "team_forecast_vs_actual.json"),
+    ],
+)
+def test_monitoring_insights_use_sealed_history_outside_active_planning_runs(
+    tmp_path: Path, page: InsightPage, filename: str
+) -> None:
+    data, manifest = _generation(tmp_path)
+    historical_id = "d" * 64
+
+    def add_history(document: dict[str, Any]) -> None:
+        original = next(r for r in document["runs"] if r["run_id"] == RUN_ID)
+        document["runs"].append({**original, "run_id": historical_id})
+
+    _rewrite_insight_read_model(data, manifest, filename, add_history)
+    assert historical_id not in manifest["run_ids"]
+    request = _page_request(page, manifest).model_copy(update={"run_id": historical_id})
+    evidence = resolve_insight_evidence(data, request)
+    assert evidence.facts
+    # A monitoring-only ID still cannot select a planning forecast or evade its timestamp.
+    with pytest.raises(InsightEvidenceError, match="identity"):
+        resolve_insight_evidence(data, _request(manifest, run_id=historical_id))
+    with pytest.raises(InsightEvidenceError, match="timestamp"):
+        resolve_insight_evidence(
+            data, request.model_copy(update={"as_of": AS_OF.replace(year=2025)})
+        )
+
+
 def test_players_insight_resolves_exact_cross_season_actual_endpoints(
     tmp_path: Path,
 ) -> None:
@@ -1035,9 +1066,7 @@ def test_players_insight_resolves_exact_cross_season_actual_endpoints(
         resolve_insight_evidence(data, outside)
 
     hidden_season = request.model_copy(
-        update={
-            "scope": request.scope.model_copy(update={"actual_season_from": "2024-25"})
-        }
+        update={"scope": request.scope.model_copy(update={"actual_season_from": "2024-25"})}
     )
     with pytest.raises(InsightEvidenceError, match="outside the page"):
         resolve_insight_evidence(data, hidden_season)
@@ -1055,13 +1084,9 @@ def test_players_insight_resolves_exact_cross_season_actual_endpoints(
         "player_actuals.json",
         remove_intermediate_period,
     )
-    gap_request = request.model_copy(
-        update={"manifest_sha256": manifest["content_sha256"]}
-    )
+    gap_request = request.model_copy(update={"manifest_sha256": manifest["content_sha256"]})
     gap_evidence = resolve_insight_evidence(data, gap_request)
-    gap_leader = next(
-        fact for fact in gap_evidence.facts if fact.id == "players.actual.rank.1"
-    )
+    gap_leader = next(fact for fact in gap_evidence.facts if fact.id == "players.actual.rank.1")
     assert gap_leader.statement.startswith("Vicario ranks 1 with 8 replayed actual points")
 
 
@@ -1206,9 +1231,7 @@ def test_player_analytics_cold_start_selector_matches_visible_reporting_scope(
         )
         evidence = resolve_insight_evidence(data, request)
         return next(
-            fact.statement
-            for fact in evidence.facts
-            if fact.id == "player.analytics.coverage"
+            fact.statement for fact in evidence.facts if fact.id == "player.analytics.coverage"
         )
 
     assert "1 published players" in coverage(False)

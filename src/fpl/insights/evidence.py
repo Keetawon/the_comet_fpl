@@ -173,9 +173,26 @@ def _load_generation(directory: Path, request: InsightSummaryRequest) -> _Genera
         if manifest.get("content_sha256") != request.manifest_sha256:
             raise InsightEvidenceError("dashboard generation identity does not match the request")
 
+        documents: dict[InsightReadModel, Mapping[str, Any]] = {}
+        for source in _PAGE_FILES[request.page]:
+            payload = (root / source.value).read_bytes()
+            entry = manifest["files"][source.value]
+            if hashlib.sha256(payload).hexdigest() != entry["sha256"]:
+                raise InsightEvidenceError("dashboard read model changed after validation")
+            document = _strict_document(payload)
+            if document.get("json_schema_version") != DASHBOARD_JSON_SCHEMA_VERSION:
+                raise InsightEvidenceError("dashboard read model schema is unsupported")
+            documents[source] = document
+        run_records = manifest.get("runs", [])
+        if request.page in (
+            InsightPage.PLAYER_FORECAST_VS_ACTUAL,
+            InsightPage.TEAM_FORECAST_VS_ACTUAL,
+        ):
+            # Monitoring has its own bounded history, sealed by this same manifest.
+            run_records = documents[_PAGE_FILES[request.page][0]].get("runs", [])
         matching_runs = [
             item
-            for item in manifest.get("runs", [])
+            for item in run_records
             if isinstance(item, dict)
             and item.get("run_id") == request.run_id
             and item.get("season") == request.season
@@ -187,16 +204,6 @@ def _load_generation(directory: Path, request: InsightSummaryRequest) -> _Genera
         if run_as_of.tzinfo is None or run_as_of != request.as_of:
             raise InsightEvidenceError("forecast run timestamp does not match the request")
 
-        documents: dict[InsightReadModel, Mapping[str, Any]] = {}
-        for source in _PAGE_FILES[request.page]:
-            payload = (root / source.value).read_bytes()
-            entry = manifest["files"][source.value]
-            if hashlib.sha256(payload).hexdigest() != entry["sha256"]:
-                raise InsightEvidenceError("dashboard read model changed after validation")
-            document = _strict_document(payload)
-            if document.get("json_schema_version") != DASHBOARD_JSON_SCHEMA_VERSION:
-                raise InsightEvidenceError("dashboard read model schema is unsupported")
-            documents[source] = document
         after = manifest_path.read_bytes()
     except InsightEvidenceError:
         raise
@@ -307,8 +314,7 @@ def _validate_scope(request: InsightSummaryRequest, run: Mapping[str, Any]) -> N
         allowed_seasons = {previous_season, request.season}
         if {actual_season_from, actual_season_to} - allowed_seasons:
             raise InsightEvidenceError(
-                "actual endpoint season is outside the page's "
-                "forecast-season/immediate-prior scope"
+                "actual endpoint season is outside the page's forecast-season/immediate-prior scope"
             )
         season_rank = {previous_season: 0, request.season: 1}
         actual_gw_from = request.scope.actual_gw_from
@@ -702,8 +708,7 @@ def _players(generation: _Generation, request: InsightSummaryRequest) -> list[In
             )
         actual_scored.sort(key=lambda item: (-item[1], int(item[0]["code"])))
         actual_scope_label = (
-            f"{actual_season_from} GW{actual_from} through "
-            f"{actual_season_to} GW{actual_to}"
+            f"{actual_season_from} GW{actual_from} through {actual_season_to} GW{actual_to}"
         )
         facts.append(
             _fact(
