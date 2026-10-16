@@ -1,0 +1,24 @@
+{
+  "name": "gameweek_goal_involvement_event_v1",
+  "version": 1,
+  "serving": "component_baseline",
+  "training_cutoff": "2026-07-01T00:00:00+00:00",
+  "selected": "r1_slope",
+  "fit": {
+    "intercepts": [
+      -1.7599519207286274,
+      -1.863330219080592,
+      -1.0381289417711206,
+      -0.783382836484188
+    ],
+    "slope_delta": -0.37702748133524017,
+    "ridge": 1,
+    "fit_slope": true,
+    "rows": 128443,
+    "events": 1328,
+    "iterations": 8,
+    "gradient_max": 4.229474381833853e-8
+  },
+  "result_sha256": "7c43ed2df7d783e37e00ddcda89ad9a50ff155a49d74ec0a1cc85a9d53376d41",
+  "scientific_status": "retrospective_development_not_deadline_validated"
+}

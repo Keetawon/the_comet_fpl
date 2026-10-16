@@ -1,0 +1,12 @@
+{
+  "fold": "2021-22-gw9",
+  "cutoff": "2021-10-22T19:00:00+00:00",
+  "available": "2021-10-24T18:30:00+00:00",
+  "past_folds": [],
+  "inner_folds": [],
+  "training_rows": 0,
+  "selected": "off",
+  "inner_losses": {},
+  "fits": {},
+  "warmup": true
+}

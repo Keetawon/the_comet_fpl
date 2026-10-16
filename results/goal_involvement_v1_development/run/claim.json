@@ -1,0 +1,8 @@
+{
+  "started_at": "2026-10-16T10:28:56.059413+00:00",
+  "head": "a50afeff67447e719072527d0b7d97af8f90fed6",
+  "config_sha256": "74a4ff4e1cfbadfb6328496ceb9a5ac6a5f36943b36baef5bcecbfae8e43d01d",
+  "input_manifest_sha256": "9eabd0377968f16408f77d1c9bf2f931d131f28ee3d0d17a0c4c1426bbdadad7",
+  "fixture_rows": 133964,
+  "folds": 181
+}

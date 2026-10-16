@@ -1,0 +1,29 @@
+{
+  "folds": 181,
+  "player_gameweeks": 128443,
+  "covered_player_gameweeks": 84999,
+  "complete_label_cutoff_checks": true,
+  "inner_windows_checked": 181,
+  "inner_fold_references": 1065,
+  "max_prediction_difference": 5.551115123125783e-17,
+  "scores": {
+    "baseline": {
+      "log_loss": 0.04322072482300747,
+      "brier": 0.009136232456436143
+    },
+    "candidate": {
+      "log_loss": 0.04294046897047301,
+      "brier": 0.009114643042541346
+    },
+    "position_prior": {
+      "log_loss": 0.051078943944321074,
+      "brier": 0.009534184517499905
+    },
+    "trailing": {
+      "log_loss": 0.047899816551074545,
+      "brier": 0.009349872252455762
+    }
+  },
+  "result_sha256": "7c43ed2df7d783e37e00ddcda89ad9a50ff155a49d74ec0a1cc85a9d53376d41",
+  "parameters_refitted": false
+}
