@@ -104,6 +104,19 @@
   },
   "forecast_regenerated": false,
   "frontend_publication_status": "READY_FOR_PAGES_DEPLOYMENT",
+  "pages_companion_follow_up": {
+    "failed_initial_run": "https://github.com/Keetawon/the_comet_fpl/actions/runs/38928547452",
+    "failure_reason": "Main lacked one existing audited public evidence URL used by the pinned SDP companion.",
+    "existing_audit_source_commit": "34b78801c5d22a485ad63e8ac62a017f2fe349cc",
+    "audit_rows_copied_unchanged": 1,
+    "public_validator_changed": false,
+    "immutable_release_assets_changed": false,
+    "exact_pinned_companion_validation": "PASS",
+    "schema_v9_manifest_validation": "PASS",
+    "current_plan_and_forecast_agreement": true,
+    "focused_python_tests_passed": 86,
+    "retry_status": "READY"
+  },
   "ledger_modified": false,
   "operational_activation": {
     "after": "80b071f234719fae934ab02a528c366f3bdee142",

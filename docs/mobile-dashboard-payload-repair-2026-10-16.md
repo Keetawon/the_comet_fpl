@@ -115,8 +115,27 @@ unchanged from main. This is not an all-green repository gate.
 
 The new 2,737,551-byte immutable ZIP and companion hashes are pinned for Pages;
 main's publisher reproduces every byte exactly. Live Summary and Players render
-at 390?844, with precisely three planning-vintage choices. Physical iOS memory
+at 390 by 844, with precisely three planning-vintage choices. Physical iOS memory
 limits and Jetsam behavior have not been tested on a device.
 
 See `results/mobile_dashboard_publication_20261016.json` for the data publication
 and pre-deployment frontend verification record.
+
+### Pages companion validation follow-up
+
+The first Pages run after PR #21 (`38928547452`) passed the dashboard tests,
+privacy checks, byte-for-byte public package replay and manifest validation, but
+stopped at the SDP companion. Main lacked one existing display audit row from
+operational commit `34b78801c5d22a485ad63e8ac62a017f2fe349cc`: Leeds' GW4 fixture 40,
+reviewed on 18 September. Its exact public match-report URL was consequently
+absent from main's evidence allowlist.
+
+The follow-up copies that existing row unchanged, preserving its original review
+time, fixture identity and raw-payload hash. It adds no new interpretation or URL
+exception and leaves both immutable release assets and the validator unchanged.
+The pinned SDP and competitive-schedule files then pass their complete validators
+under main, with exact sizes/hashes, schema-v9 manifest integrity and current
+plan/forecast agreement. The Pages path filter now includes this display audit
+and its goal-pattern/public-scope dependencies.
+All 86 focused goal-pattern, SDP, competitive-schedule and Pages freshness tests
+pass after this configuration synchronization.
