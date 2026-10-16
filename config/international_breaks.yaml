@@ -1,0 +1,26 @@
+# Published international-window annotations, used only to qualify a "full rest" claim.
+#
+# These are calendar annotations from the Premier League's own published article. They are
+# NOT player call-ups: this repository captures no national-team squad list, so a window
+# overlap can only downgrade a rest claim to "qualified", never establish that a specific
+# player travelled. The dashboard calendar keeps its own copy of the same published windows
+# in `dashboard/src/data/internationalBreaks.ts`; `tests/test_rest_summary.py` pins the two
+# to each other so they cannot drift.
+source:
+  name: Premier League international calendar
+  url: https://www.premierleague.com/en/news/4689113/when-are-the-international-breaks-for-202627
+  published_on: 2026-09-05
+  verified_at: 2026-09-15T08:35:18Z
+windows:
+  - season: "2026-27"
+    from: 2026-09-21
+    to: 2026-10-06
+    label: 21 Sep-6 Oct
+  - season: "2026-27"
+    from: 2026-11-09
+    to: 2026-11-17
+    label: 9-17 Nov
+  - season: "2026-27"
+    from: 2027-03-22
+    to: 2027-03-30
+    label: 22-30 Mar
