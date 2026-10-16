@@ -70,6 +70,63 @@ Every downgrade carries its reason and the exact `provider_match_id` that caused
 * `no_next_fixture_listed` / `next_fixture_kickoff_unavailable` -- the gap has no second endpoint;
 * `international_window_overlap_call_ups_not_captured` -- see below.
 
+### An unregistered squad member is evidence, not a defect (2026-10-16)
+
+"Interpreted cleanly" deliberately does **not** mean every named squad member resolves to an
+FPL element. A European squad list carries academy players this season's FPL registry never
+lists, so they carry no Opta anchor. Measured on the real payloads: Arsenal's 2026-10-13
+Champions League tie named 23 players of whom **20 resolved and 3 did not** -- shirts 74, 53
+and 89, all academy substitutes -- against **21 of 21** for Aston Villa the following night.
+
+Treating that as a broken side was wrong, and expensively so: on the 2026-10-16 published
+generation it made **604 of 667** players `unknown` and `full_rest` exactly **0**, hiding the
+midweek minutes of every Arsenal, Liverpool, Man Utd, Crystal Palace, Sunderland, Bournemouth
+and Brighton player while Villa and Man City came through intact.
+
+The relaxation is sound rather than convenient. `exact_crosswalk` resolves a provider id
+through FPL's own `opta_code` (`p<provider id>`) with no name or bare-code fallback, so
+resolution is a pure function of the provider id: a player the registry **does** carry always
+resolves and therefore always reaches `observations`. An unlistable row can never be him, so
+it can neither hide his appearance nor fake his non-selection. Such rows are counted in
+`unregistered_squad_members` on each published `evidence_versions` entry and decide nothing.
+
+What still fails closed is unchanged: an absent or incomplete endpoint, a contradictory
+interpretation, a side whose rows are missing, ambiguous club identity (two permanent codes
+behind one provider side are refused by the club crosswalk before any fixture is built), and
+the separate `schedule_coverage_unproven` gate, which continues to deny `full_rest` on its
+own evidence. A loaned-out player is not a counterexample: FPL kept Bakwa at Nott'm Forest
+with status `u` while he played for Lille, so his anchor resolves on the opponent's side and
+`provider_team_id` keeps him out of Arsenal's.
+
+### `full_rest` is reached two ways, so the load says which (2026-10-16)
+
+The verdict answers "did he play midweek", and `full_rest` is correct for two players whose
+situations are not the same: one whose club played a midweek tie he was proved absent from,
+and one whose club played no midweek football at all. A reader cannot tell them apart from
+the verdict, and reporting both as a flat zero asserts a measurement that was never taken --
+the `NULL` is not zero rule, in the one place a reader meets it.
+
+Two additive fields on each published row name the difference. `midweek_fixtures` counts the
+usable midweek legs his club played inside the window, and `midweek_load` reports:
+
+| `midweek_load` | Meaning |
+| --- | --- |
+| `heavy` | Witnessed midweek appearance over `LIGHT_MIDWEEK_MINUTES` (45) nominal minutes |
+| `light` | Witnessed midweek appearance of 45 nominal minutes or fewer -- a cameo, not a full match |
+| `none_not_selected` | A leg existed and a complete roster proved he was not in the side: a measured **0** |
+| `none_no_fixture` | His club played no midweek leg, so the load is **unavailable**, not zero |
+| `unknown` | Evidence does not decide it, in either direction |
+
+The split is display resolution over evidence the verdict already used: it decides no verdict,
+and `midweek_played` covers `heavy`, `light` and a witnessed appearance whose duration is
+missing alike. `validate_rest_summary` refuses a document whose load contradicts its own
+evidence -- a measured zero without a proved unplayed leg, an unavailable load where a leg
+exists, a cameo tier above the boundary, or more appearances than legs behind them.
+
+The 45-minute boundary is a reporting convention, not a measured constant: it is half a
+match, and the repository's own Stage B minutes bins already cut at 1-59 / 60-89 / 90.
+Nothing downstream consumes it, and it must not become a model input.
+
 ## Two limitations that must stay visible
 
 1. **National-team call-ups are not captured anywhere in this repository.** When a published

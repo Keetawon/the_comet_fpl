@@ -249,10 +249,17 @@ def completed_fixtures(
             errors = list(whole_errors)
             if not side_rows:
                 errors.append("empty_side_interpretation")
-            if any(
-                e.get("team_code") != team_code or e.get("code") is None or e.get("identity_errors")
-                for e in side_rows
-            ):
+            # A squad member the FPL registry never lists resolves to no Opta anchor --
+            # measured at 3 of Arsenal's 23 named players (shirts 74/53/89, all academy
+            # substitutes) in the 2026-10-13 Champions League tie, against 0 of 21 for Aston
+            # Villa the next night. Treating that as a broken side was wrong: resolution is a
+            # pure function of the provider id, so a player the registry DOES carry always
+            # resolves and therefore always reaches `observations`. An unlistable row can
+            # never be him, so it cannot hide an appearance or fake a non-selection. Count it
+            # as evidence instead of discarding the side. A row that resolved and still
+            # contradicts this side's club identity remains a real contradiction.
+            unregistered = sum(1 for e in side_rows if e.get("code") is None)
+            if any(e.get("team_code") != team_code for e in side_rows if e.get("code") is not None):
                 errors.append("side_identity_unresolved")
             opponent_provider = (
                 summary.away_team_id
@@ -297,6 +304,7 @@ def completed_fixtures(
                     and not record.get("errors")
                     and not errors,
                     observations=tuple(sorted(observations, key=lambda o: o.code)),
+                    unregistered_squad_members=unregistered,
                     source_known_at=row["known_at"],
                     version_id=row["version_id"],
                     errors=tuple(errors),

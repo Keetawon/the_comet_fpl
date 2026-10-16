@@ -1,0 +1,176 @@
+name: Provisional preview republish
+
+# The full dashboard refresh rebuilds every read model from the operational database on the
+# owner's machine, so a completed match reaches the public site only when that machine runs.
+# On 2026-10-10 the refresh finished 27 minutes before GW6's first kickoff and the next one
+# was six days later, so the public site carried no GW6 result for the whole of that window.
+#
+# This workflow closes that window and nothing else. It restates ONLY the two provisional
+# preview documents of the generation already being served, plus the team-form summaries
+# those rows own, and carries every other published file forward byte for byte. Forecasts,
+# xP, PMFs, ledger vintages, optimizer plans, finalized outcomes and monitoring scores are
+# not inputs here and cannot move: the provisional facts are forbidden from reaching any of
+# them, and this job never opens a database that holds them.
+#
+# It is deliberately NOT on a clock. Republishing writes a new immutable R2 generation, so
+# it runs after a capture that actually changed, and no-ops when the published preview
+# already matches that capture.
+
+on:
+  workflow_run:
+    workflows: ["Provisional player history snapshot (R5)"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      capture:
+        description: "Capture package path; default is the newest committed one"
+        required: false
+      stage_only:
+        description: "Build and verify without publishing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Never overlap another republish; the R2 pointer update is conditional on the pointer we
+# read, so a second writer would simply lose, but one at a time keeps the receipts readable.
+concurrency:
+  group: provisional-republish
+  cancel-in-progress: false
+
+jobs:
+  republish:
+    # Only after a capture that succeeded. A failed or skipped capture has nothing new.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Holds the R2 credential. Nothing else in this workflow needs a secret.
+    environment: production-fpl
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # The capture commit lands on the default branch; take it, not the dispatch ref.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install locked environment
+        # `public-data` carries the optional S3 SDK the R2 publisher imports lazily.
+        run: uv sync --frozen --extra public-data
+
+      - name: Write the R2 configuration outside the checkout
+        id: r2
+        if: ${{ !inputs.stage_only }}
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          names="R2_BUCKET R2_ENDPOINT_URL R2_PUBLIC_BASE_URL R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY"
+          present=0 missing=""
+          for name in ${names}; do
+            if [ -n "${!name:-}" ]; then
+              present=$((present + 1))
+            else
+              missing="${missing} ${name}"
+            fi
+          done
+          # None set means the environment has not been configured yet: stage and verify
+          # without publishing, so a capture does not turn red every day over a setup step.
+          # Some set means a misconfiguration, which must fail rather than quietly not publish.
+          if [ "${present}" -eq 0 ]; then
+            echo "::warning::production-fpl holds no R2 configuration; staging only"
+            exit 0
+          fi
+          if [ -n "${missing}" ]; then
+            echo "::error::production-fpl is partially configured; missing:${missing}"
+            exit 1
+          fi
+          # The publisher refuses a config inside a Git worktree, so this lives in the
+          # runner's temporary directory. The credential never enters the repository, the
+          # config file, a log line or an output; only the SDK reads it.
+          CONF="${RUNNER_TEMP}/r2"
+          mkdir -p "${CONF}"
+          chmod 700 "${CONF}"
+          umask 077
+          printf '[comet-r2]\naws_access_key_id = %s\naws_secret_access_key = %s\n' \
+            "${R2_ACCESS_KEY_ID}" "${R2_SECRET_ACCESS_KEY}" > "${CONF}/credentials"
+          jq -n \
+            --arg bucket "${R2_BUCKET}" \
+            --arg endpoint_url "${R2_ENDPOINT_URL}" \
+            --arg public_base_url "${R2_PUBLIC_BASE_URL}" \
+            --arg credentials_file "${CONF}/credentials" \
+            '{bucket:$bucket, endpoint_url:$endpoint_url,
+              public_base_url:$public_base_url, credentials_file:$credentials_file,
+              profile:"comet-r2"}' > "${CONF}/config.json"
+          echo "config=${CONF}/config.json" >> "$GITHUB_OUTPUT"
+          echo "base_url=${R2_PUBLIC_BASE_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Restate the provisional preview
+        env:
+          CAPTURE: ${{ inputs.capture }}
+          R2_CONFIG: ${{ steps.r2.outputs.config }}
+          BASE_URL: ${{ steps.r2.outputs.base_url }}
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/provisional-republish"
+          args=(--out "${OUT}")
+          if [ -n "${CAPTURE:-}" ]; then
+            if ! [[ "${CAPTURE}" =~ ^snapshots/player-history-provisional/[0-9]{4}-[0-9]{2}/gw-[1-9][0-9]*/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z-[0-9a-f]{16}$ ]]; then
+              echo "::error::refusing unexpected capture path: ${CAPTURE}"
+              exit 1
+            fi
+            args+=(--capture "${CAPTURE}")
+          fi
+          if [ -n "${BASE_URL:-}" ]; then args+=(--base-url "${BASE_URL}"); fi
+          if [ -n "${R2_CONFIG:-}" ]; then args+=(--r2-config "${R2_CONFIG}"); fi
+          uv run python -m fpl.jobs.republish_provisional "${args[@]}"
+          echo "out=${OUT}" >> "$GITHUB_ENV"
+
+      - name: Summarise
+        if: always()
+        run: |
+          set -euo pipefail
+          RECEIPT="${out:-${RUNNER_TEMP}/provisional-republish}/republish-receipt.json"
+          if [ ! -s "${RECEIPT}" ]; then
+            echo "No receipt was produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Provisional preview republish"
+            echo
+            jq -r '
+              "- capture: `\(.capture)`",
+              "- base generation: `\(.base_generation_sha256[0:16])`",
+              "- restated files: \(.restated_files | if length == 0 then "none" else join(", ") end)",
+              "- published: \(.published)",
+              "- player rows: \(.capture_evidence.player_fixture_rows) over \(.capture_evidence.player_identities) players",
+              "- team rows: \(.capture_evidence.team_fixture_rows) over \(.capture_evidence.team_identities) clubs",
+              "- finalized fixtures excluded: \(.capture_evidence.published_finalized_fixtures_excluded)",
+              (if .reason then "- note: \(.reason)" else empty end)
+            ' "${RECEIPT}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain the receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provisional-republish-receipts
+          # Receipts and pointers only. The staged generation is public data already served
+          # from R2, so there is nothing to gain by duplicating 380 MB into an artifact.
+          path: |
+            ${{ runner.temp }}/provisional-republish/republish-receipt.json
+            ${{ runner.temp }}/provisional-republish/generation/receipt.json
+            ${{ runner.temp }}/provisional-republish/r2/*.json
+          if-no-files-found: warn
+          retention-days: 30

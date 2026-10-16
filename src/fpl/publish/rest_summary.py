@@ -53,6 +53,16 @@ COMPETITION_NAMES: Final[Mapping[int, str]] = {
 }
 
 Verdict = Literal["midweek_played", "full_rest", "unknown"]
+# A cameo is not the load of a full match, so a witnessed appearance splits at this
+# boundary. It is a display tier over evidence the verdict already used, never a verdict.
+LIGHT_MIDWEEK_MINUTES: Final = 45.0
+# `full_rest` answers one question -- no midweek appearance -- but reaches that answer two
+# different ways that a reader cannot tell apart from the verdict alone, and conflating
+# them reads as a measured zero where nothing was measured. `none_no_fixture` means his
+# club played no midweek leg at all, so his midweek load is unavailable rather than zero;
+# `none_not_selected` means a leg existed and a complete roster proved he was not in it,
+# which is a measured zero. `unknown` carries neither claim.
+MidweekLoad = Literal["none_no_fixture", "none_not_selected", "light", "heavy", "unknown"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +93,9 @@ class CompletedFixture:
     # absence from `observations` is a proved non-selection rather than missing evidence.
     roster_proven: bool
     observations: tuple[PlayerObservation, ...] = ()
+    # Named squad members this season's FPL registry does not list, so they carry no Opta
+    # anchor. Retained as evidence; they never decide a verdict in either direction.
+    unregistered_squad_members: int = 0
     source_known_at: datetime | None = None
     version_id: str | None = None
     errors: tuple[str, ...] = ()
@@ -155,6 +168,7 @@ class EvidenceVersion(RestRecord):
     known_at: AwareDatetime | None = None
     version_id: str | None = None
     roster_proven: bool
+    unregistered_squad_members: int = Field(default=0, ge=0)
 
 
 class UpcomingFixture(RestRecord):
@@ -180,6 +194,10 @@ class PlayerRest(RestRecord):
     rest_days: int | None
     midweek_appearances: int
     midweek_nominal_minutes: float | None
+    # Usable midweek legs his club played in the window, counted from his own evidence, so
+    # `midweek_fixtures == 0` with a `full_rest` verdict means there was nothing to rest from.
+    midweek_fixtures: int = 0
+    midweek_load: MidweekLoad = "unknown"
     window_appearances: int
     international_window_overlap: bool
     unknown_reasons: list[str]
@@ -373,6 +391,7 @@ def _player_rest(
 
     midweek = [(f, o) for f, o in appearances if f.midweek]
     measured = [o.nominal_minutes for _, o in midweek if o.nominal_minutes is not None]
+    midweek_fixtures = sum(1 for f in club_fixtures if f.midweek and f.roster_proven)
     last = max(
         appearances,
         key=lambda pair: (pair[0].kickoff, pair[0].provider_match_id),
@@ -385,6 +404,16 @@ def _player_rest(
         verdict = "unknown"
     else:
         verdict = "full_rest"
+
+    total = sum(measured) if midweek and len(measured) == len(midweek) else None
+    if verdict == "midweek_played":
+        load: MidweekLoad = (
+            "unknown" if total is None else ("light" if total <= LIGHT_MIDWEEK_MINUTES else "heavy")
+        )
+    elif verdict == "unknown":
+        load = "unknown"
+    else:
+        load = "none_not_selected" if midweek_fixtures else "none_no_fixture"
     if not appearances:
         reasons.add("no_witnessed_appearance_in_window")
 
@@ -433,9 +462,9 @@ def _player_rest(
         rest_hours=rest_hours,
         rest_days=rest_days,
         midweek_appearances=len(midweek),
-        midweek_nominal_minutes=(
-            sum(measured) if midweek and len(measured) == len(midweek) else None
-        ),
+        midweek_nominal_minutes=total,
+        midweek_fixtures=midweek_fixtures,
+        midweek_load=load,
         window_appearances=len(appearances),
         international_window_overlap=overlap,
         unknown_reasons=sorted(reasons),
@@ -447,6 +476,7 @@ def _player_rest(
                 known_at=f.source_known_at,
                 version_id=f.version_id,
                 roster_proven=f.roster_proven,
+                unregistered_squad_members=f.unregistered_squad_members,
             )
             for f in club_fixtures
         ],
@@ -507,6 +537,23 @@ def validate_rest_summary(value: Any) -> RestSummary:
             raise ValueError("an unknown verdict must state its reason")
         if player.window_appearances < player.midweek_appearances:
             raise ValueError("midweek appearances exceed window appearances")
+        if player.midweek_appearances > player.midweek_fixtures:
+            raise ValueError("midweek appearances exceed the usable legs behind them")
+        if (player.midweek_load == "none_not_selected") != (
+            player.verdict == "full_rest" and player.midweek_fixtures > 0
+        ):
+            raise ValueError("a measured zero midweek load requires a proved unplayed leg")
+        if (player.midweek_load == "none_no_fixture") != (
+            player.verdict == "full_rest" and player.midweek_fixtures == 0
+        ):
+            raise ValueError("an unavailable midweek load requires no midweek leg")
+        if player.midweek_load in {"light", "heavy"} and player.verdict != "midweek_played":
+            raise ValueError("a witnessed midweek load requires a witnessed appearance")
+        if player.midweek_load == "light" and (
+            player.midweek_nominal_minutes is None
+            or player.midweek_nominal_minutes > LIGHT_MIDWEEK_MINUTES
+        ):
+            raise ValueError("a light midweek load must be a measured cameo")
         if (last is None or upcoming is None or upcoming.kickoff is None) and (
             player.rest_hours is not None or player.rest_days is not None
         ):
@@ -528,10 +575,19 @@ def validate_rest_summary(value: Any) -> RestSummary:
     return document
 
 
-_MARKS: Final[Mapping[Verdict, str]] = {
-    "midweek_played": "\N{LARGE RED CIRCLE}",
-    "full_rest": "\N{LARGE GREEN CIRCLE}",
+_MARKS: Final[Mapping[MidweekLoad, str]] = {
+    "heavy": "\N{LARGE RED CIRCLE}",
+    "light": "\N{LARGE YELLOW CIRCLE}",
+    "none_not_selected": "\N{LARGE GREEN CIRCLE}",
+    "none_no_fixture": "\N{LARGE GREEN CIRCLE}",
     "unknown": "\N{MEDIUM WHITE CIRCLE}",
+}
+# What the midweek line says when there was no appearance to report. The two differ on
+# purpose: an absent fixture leaves the load unmeasured, a proved omission measures zero.
+_NO_LOAD: Final[Mapping[MidweekLoad, str]] = {
+    "none_not_selected": "midweek load: 0 min, club played but he was not in the side",
+    "none_no_fixture": "midweek load: unavailable, club played no midweek fixture",
+    "unknown": "midweek load: unknown, evidence does not decide it",
 }
 
 
@@ -540,8 +596,10 @@ def _day(value: datetime) -> str:
 
 
 def _sort_key(player: PlayerRest) -> tuple[int, float, str]:
-    # Most congested first: red before unknown before green, then by the shortest gap.
-    order = {"midweek_played": 0, "unknown": 1, "full_rest": 2}[player.verdict]
+    # Heaviest midweek load first, then by the shortest gap to the next kickoff.
+    order = {"heavy": 0, "light": 1, "unknown": 2, "none_not_selected": 3, "none_no_fixture": 4}[
+        player.midweek_load
+    ]
     return (
         order,
         player.rest_hours if player.rest_hours is not None else float("inf"),
@@ -559,14 +617,15 @@ def render_rest_summary_text(document: RestSummary) -> str:
         f"Rest check before Premier League {heading}".rstrip(),
         f"as_of {document.as_of.isoformat()} | window {document.window_hours}h "
         f"| midweek {document.midweek_definition}",
-        f"{_MARKS['full_rest']} proved no midweek match  "
-        f"{_MARKS['midweek_played']} played midweek  "
+        f"{_MARKS['heavy']} played midweek over {LIGHT_MIDWEEK_MINUTES:g} min  "
+        f"{_MARKS['light']} played midweek {LIGHT_MIDWEEK_MINUTES:g} min or less  "
+        f"{_MARKS['none_no_fixture']} no midweek appearance  "
         f"{_MARKS['unknown']} unknown, check manually",
         "Durations are provider nominal period-clock minutes, not FPL minutes.",
         "",
     ]
     for player in sorted(document.players, key=_sort_key):
-        lines.append(f"{_MARKS[player.verdict]} {player.web_name} | {player.team_name}")
+        lines.append(f"{_MARKS[player.midweek_load]} {player.web_name} | {player.team_name}")
         last = player.last_appearance
         if last is None:
             lines.append("   last: no witnessed appearance in the window")
@@ -600,6 +659,8 @@ def render_rest_summary_text(document: RestSummary) -> str:
             total = player.midweek_nominal_minutes
             load = "duration unknown" if total is None else f"{total:g} nominal min"
             lines.append(f"   midweek load: {player.midweek_appearances} appearance(s), {load}")
+        else:
+            lines.append(f"   {_NO_LOAD[player.midweek_load]}")
         for reason in player.unknown_reasons:
             lines.append(f"   ! {reason}")
         lines.append("")
