@@ -2019,7 +2019,7 @@ describe("PlayersPage", () => {
     expect(order()).toEqual(["Blank xP", "Double xP", "High xP", "Missing xP"]);
   });
 
-  it("shows stored G+A probabilities beside xP, sorts them and follows Forecast From", async () => {
+  it("shows stored GA probabilities after horizon xP, sorts them and follows Forecast From", async () => {
     const user = userEvent.setup();
     const players: PlayerRecord[] = playersWithActuals.map((player, index) => ({
       ...player,
@@ -2037,14 +2037,14 @@ describe("PlayersPage", () => {
     render(<PlayersPage />);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
-    expect(headers.slice(headers.indexOf("xP GW1") + 1, headers.indexOf("xP GW1") + 3))
-      .toEqual(["G+A ≥2 GW1", "Avg G+A ≥2 · 5 GW"]);
+    expect(headers.slice(headers.indexOf("xP GW1-5") + 1, headers.indexOf("xP GW1-5") + 3))
+      .toEqual(["GA>=2 GW1", "Avg_GA>=2 5GWs"]);
     const alpha = () => within(screen.getByText("Alpha").closest("tr")!);
     expect(alpha().getByText("42.0%")).toBeInTheDocument();
     expect(alpha().getByText("12.3%")).toBeInTheDocument();
     const legacy = within(screen.getByText("Beta").closest("tr")!);
     expect(legacy.getAllByTitle("Probability unavailable for this forecast or filter")).toHaveLength(2);
-    const header = screen.getByRole("columnheader", { name: "G+A ≥2 GW1" });
+    const header = screen.getByRole("columnheader", { name: "GA>=2 GW1" });
     await user.click(within(header).getByRole("button"));
     expect(header).not.toHaveAttribute("aria-sort", "none");
     const body = header.closest("table")!.querySelector("tbody")!;
@@ -2054,7 +2054,7 @@ describe("PlayersPage", () => {
 
     await user.click(screen.getByRole("combobox", { name: "From gameweek" }));
     await user.click(screen.getByRole("option", { name: "GW2" }));
-    expect(screen.getByRole("columnheader", { name: "G+A ≥2 GW2" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "GA>=2 GW2" })).toBeInTheDocument();
     expect(alpha().getByText("0.0%")).toBeInTheDocument();
     expect(alpha().getByText("20.0%")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent("2026-27 GW1");

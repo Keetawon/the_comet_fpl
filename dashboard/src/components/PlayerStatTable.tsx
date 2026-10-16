@@ -878,9 +878,9 @@ export function PlayerStatTable({
       : [];
     const involvementColumns: LegacyColumnDef<PlayerStatRow>[] = showGwFromXp
       ? ([
-          ["goalInvolvementProbability", `G+A ≥2 GW${gwFrom}`,
+          ["goalInvolvementProbability", `GA>=2 GW${gwFrom}`,
             `Chance of at least two combined goals and FPL assists in GW${gwFrom}, across every fixture`],
-          ["goalInvolvementMean5", "Avg G+A ≥2 · 5 GW",
+          ["goalInvolvementMean5", "Avg_GA>=2 5GWs",
             `Average of the five separate gameweek probabilities from GW${gwFrom} to GW${gwFrom + 4}, including blanks; not a cumulative five-gameweek probability`],
         ] as const).map(([key, label, description]) => ({
           id: key,
@@ -982,8 +982,8 @@ export function PlayerStatTable({
       },
       ...visibleFormColumns,
       ...gwFromXpColumns,
-      ...involvementColumns,
       ...totalXpColumns,
+      ...involvementColumns,
       ...(formColumnProfile === "players" ? [{
         id: "fiveGwXpPerCost",
         header: () => (
