@@ -83,6 +83,9 @@ class CompletedFixture:
     # absence from `observations` is a proved non-selection rather than missing evidence.
     roster_proven: bool
     observations: tuple[PlayerObservation, ...] = ()
+    # Named squad members this season's FPL registry does not list, so they carry no Opta
+    # anchor. Retained as evidence; they never decide a verdict in either direction.
+    unregistered_squad_members: int = 0
     source_known_at: datetime | None = None
     version_id: str | None = None
     errors: tuple[str, ...] = ()
@@ -155,6 +158,7 @@ class EvidenceVersion(RestRecord):
     known_at: AwareDatetime | None = None
     version_id: str | None = None
     roster_proven: bool
+    unregistered_squad_members: int = Field(default=0, ge=0)
 
 
 class UpcomingFixture(RestRecord):
@@ -447,6 +451,7 @@ def _player_rest(
                 known_at=f.source_known_at,
                 version_id=f.version_id,
                 roster_proven=f.roster_proven,
+                unregistered_squad_members=f.unregistered_squad_members,
             )
             for f in club_fixtures
         ],
