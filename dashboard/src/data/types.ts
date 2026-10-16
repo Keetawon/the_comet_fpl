@@ -271,6 +271,15 @@ export interface CurrentPlayerPrice {
   semantics: "current_reported_not_forecast";
 }
 
+/** Python-published whole-gameweek probabilities; never aggregated in the browser. */
+export interface PlayerGoalInvolvement {
+  schema_version: 1;
+  threshold: 2;
+  model: "component_baseline" | "trained_event";
+  semantics: "whole_gameweek_probability_and_mean_next_5";
+  gameweeks: { gw: number; probability_ge_2: number; mean_next_5: number | null }[];
+}
+
 export interface PlayerRecord {
   run_id: string;
   as_of: string;
@@ -288,6 +297,8 @@ export interface PlayerRecord {
   /** Absent in legacy packages; null means no current source evidence. */
   current_availability?: CurrentPlayerAvailability | null;
   current_price?: CurrentPlayerPrice | null;
+  /** Missing for older forecast vintages; no retrospective backfill. */
+  goal_involvement?: PlayerGoalInvolvement | null;
   /** True when the selected forecast vintage used its no-history player path. */
   cold_start_player: boolean;
   form: PlayerForm | null;
@@ -428,6 +439,7 @@ export interface ForecastRun {
   gw_from: number;
   gw_to: number;
   horizon_gameweeks: number;
+  goal_involvement_model?: "component_baseline" | "trained_event";
 }
 
 // ---- next_gw.json (P1.7d): optimizer plans joined to forecast EV and overlay context ----
