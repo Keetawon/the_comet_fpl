@@ -98,6 +98,35 @@ own evidence. A loaned-out player is not a counterexample: FPL kept Bakwa at Not
 with status `u` while he played for Lille, so his anchor resolves on the opponent's side and
 `provider_team_id` keeps him out of Arsenal's.
 
+### `full_rest` is reached two ways, so the load says which (2026-10-16)
+
+The verdict answers "did he play midweek", and `full_rest` is correct for two players whose
+situations are not the same: one whose club played a midweek tie he was proved absent from,
+and one whose club played no midweek football at all. A reader cannot tell them apart from
+the verdict, and reporting both as a flat zero asserts a measurement that was never taken --
+the `NULL` is not zero rule, in the one place a reader meets it.
+
+Two additive fields on each published row name the difference. `midweek_fixtures` counts the
+usable midweek legs his club played inside the window, and `midweek_load` reports:
+
+| `midweek_load` | Meaning |
+| --- | --- |
+| `heavy` | Witnessed midweek appearance over `LIGHT_MIDWEEK_MINUTES` (45) nominal minutes |
+| `light` | Witnessed midweek appearance of 45 nominal minutes or fewer -- a cameo, not a full match |
+| `none_not_selected` | A leg existed and a complete roster proved he was not in the side: a measured **0** |
+| `none_no_fixture` | His club played no midweek leg, so the load is **unavailable**, not zero |
+| `unknown` | Evidence does not decide it, in either direction |
+
+The split is display resolution over evidence the verdict already used: it decides no verdict,
+and `midweek_played` covers `heavy`, `light` and a witnessed appearance whose duration is
+missing alike. `validate_rest_summary` refuses a document whose load contradicts its own
+evidence -- a measured zero without a proved unplayed leg, an unavailable load where a leg
+exists, a cameo tier above the boundary, or more appearances than legs behind them.
+
+The 45-minute boundary is a reporting convention, not a measured constant: it is half a
+match, and the repository's own Stage B minutes bins already cut at 1-59 / 60-89 / 90.
+Nothing downstream consumes it, and it must not become a model input.
+
 ## Two limitations that must stay visible
 
 1. **National-team call-ups are not captured anywhere in this repository.** When a published

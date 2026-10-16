@@ -655,3 +655,134 @@ def test_international_window_qualifies_even_without_witnessed_appearance() -> N
     assert row.international_window_overlap
     assert "international_window_overlap_call_ups_not_captured" in row.unknown_reasons
     assert row.rest_hours is None
+
+
+def test_no_midweek_fixture_leaves_the_load_unavailable_rather_than_zero() -> None:
+    """`full_rest` is reached two ways and a reader cannot tell them apart from it alone."""
+    document = summarise([league(CITY, code=HAALAND, day=13)])
+    row = player(document, HAALAND)
+    assert row.verdict == "full_rest"
+    assert row.midweek_fixtures == 0
+    # Nothing was measured, so there is no zero to report.
+    assert row.midweek_load == "none_no_fixture"
+    assert row.midweek_nominal_minutes is None
+    text = render_rest_summary_text(document)
+    assert "midweek load: unavailable, club played no midweek fixture" in text
+
+
+def test_a_proved_omission_from_a_midweek_side_is_a_measured_zero() -> None:
+    document = summarise(
+        [
+            league(LIVERPOOL, code=GAKPO, day=13),
+            # A complete side that simply does not name him.
+            cup(
+                LIVERPOOL,
+                observations=(
+                    PlayerObservation(
+                        code=999999, appeared=True, started=True, nominal_minutes=90.0
+                    ),
+                ),
+            ),
+        ]
+    )
+    row = player(document, GAKPO)
+    assert row.verdict == "full_rest"
+    assert row.midweek_fixtures == 1
+    assert row.midweek_load == "none_not_selected"
+    # The gap still dates from his own last appearance, which is the league leg.
+    assert row.last_appearance is not None
+    assert row.last_appearance.competition_name == "Premier League"
+    text = render_rest_summary_text(document)
+    assert "midweek load: 0 min, club played but he was not in the side" in text
+
+
+@pytest.mark.parametrize(
+    ("minutes", "load", "marker"),
+    [
+        (90.0, "heavy", "\N{LARGE RED CIRCLE}"),
+        (45.0, "light", "\N{LARGE YELLOW CIRCLE}"),
+        (25.0, "light", "\N{LARGE YELLOW CIRCLE}"),
+        (None, "unknown", "\N{MEDIUM WHITE CIRCLE}"),
+    ],
+)
+def test_a_cameo_is_marked_apart_from_a_full_midweek_match(
+    minutes: float | None, load: str, marker: str
+) -> None:
+    document = summarise(
+        [
+            cup(
+                LIVERPOOL,
+                observations=(
+                    PlayerObservation(
+                        code=GAKPO, appeared=True, started=False, nominal_minutes=minutes
+                    ),
+                ),
+            )
+        ]
+    )
+    row = player(document, GAKPO)
+    # The verdict is unchanged: he played midweek either way.
+    assert row.verdict == "midweek_played"
+    assert row.midweek_load == load
+    assert f"{marker} Gakpo | Liverpool" in render_rest_summary_text(document)
+
+
+def test_an_unusable_midweek_side_reports_neither_zero_nor_a_load() -> None:
+    document = summarise(
+        [
+            league(LIVERPOOL, code=GAKPO, day=13),
+            cup(LIVERPOOL, observations=(), roster_proven=False),
+        ]
+    )
+    row = player(document, GAKPO)
+    assert row.verdict == "unknown"
+    assert row.midweek_load == "unknown"
+    # An unproven side is not counted as a leg he was proved absent from.
+    assert row.midweek_fixtures == 0
+    assert "midweek load: unknown, evidence does not decide it" in render_rest_summary_text(
+        document
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda v: v["players"][0].update(midweek_load="none_not_selected"),
+            "requires a proved unplayed leg",
+        ),
+        (
+            lambda v: v["players"][0].update(midweek_load="none_no_fixture"),
+            "requires no midweek leg",
+        ),
+        (
+            lambda v: v["players"][0].update(midweek_load="light"),
+            "must be a measured cameo",
+        ),
+        (
+            lambda v: v["players"][0].update(midweek_fixtures=0),
+            "exceed the usable legs behind them",
+        ),
+    ],
+)
+def test_validation_refuses_a_midweek_load_its_evidence_does_not_support(
+    mutate, message: str
+) -> None:
+    document = summarise(
+        [
+            cup(
+                LIVERPOOL,
+                observations=(
+                    PlayerObservation(
+                        code=GAKPO, appeared=True, started=True, nominal_minutes=90.0
+                    ),
+                ),
+            )
+        ]
+    )
+    value = document.model_dump(mode="json")
+    value["players"] = [p for p in value["players"] if p["code"] == GAKPO]
+    value["counts"] = {"players": 1, "midweek_played": 1, "full_rest": 0, "unknown": 0}
+    mutate(value)
+    with pytest.raises(ValueError, match=message):
+        validate_rest_summary(value)
