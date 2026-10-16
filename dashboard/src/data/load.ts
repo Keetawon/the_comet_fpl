@@ -241,6 +241,54 @@ export async function loadPlayers(): Promise<PlayersData> {
       player.current_availability.source_sha256 !== current.source_sha256
     )) throw new Error(`invalid ${subject}: price and availability must share a capture`);
   }
+  for (const player of candidate.players as PlayerRecord[]) {
+    const run = manifest?.runs.find((value) => value.run_id === player.run_id);
+    if (player.goal_involvement == null) {
+      if (run?.goal_involvement_model != null) {
+        throw new Error("players.json lost its published goal_involvement block");
+      }
+      continue;
+    }
+    const subject = "players.json goal_involvement";
+    const event = strictObject(player.goal_involvement, [
+      "schema_version", "threshold", "model", "semantics", "gameweeks",
+    ], subject);
+    if (event.schema_version !== 1 || event.threshold !== 2 ||
+        !["component_baseline", "trained_event"].includes(String(event.model)) ||
+        event.semantics !== "whole_gameweek_probability_and_mean_next_5" ||
+        !Array.isArray(event.gameweeks) || event.gameweeks.length === 0) {
+      throw new Error(`invalid ${subject}: unsupported event contract`);
+    }
+    if (run && (run.goal_involvement_model !== event.model || run.season !== player.season ||
+        event.gameweeks.length !== run.horizon_gameweeks ||
+        (event.gameweeks[0] as Record<string, unknown>).gw !== run.gw_from)) {
+      throw new Error(`invalid ${subject}: event model or horizon differs from its forecast`);
+    }
+    let previous = 0;
+    for (const value of event.gameweeks) {
+      const row = strictObject(value, ["gw", "probability_ge_2", "mean_next_5"], subject);
+      const gw = integerValue(row.gw, `${subject}.gw`, 1);
+      if (gw > 38 || (previous !== 0 && gw !== previous + 1)) {
+        throw new Error(`invalid ${subject}: gameweeks must be unique and consecutive`);
+      }
+      previous = gw;
+      for (const key of ["probability_ge_2", "mean_next_5"] as const) {
+        const probability = row[key];
+        if (key === "mean_next_5" && probability === null) continue;
+        if (typeof probability !== "number" || !Number.isFinite(probability) ||
+            probability < 0 || probability > 1) {
+          throw new Error(`invalid ${subject}: ${key} must be a probability`);
+        }
+      }
+    }
+    for (let i = 0; i < event.gameweeks.length; i++) {
+      const row = event.gameweeks[i] as Record<string, unknown>;
+      const complete = i + 4 < event.gameweeks.length;
+      if ((row.mean_next_5 !== null) !== complete) {
+        throw new Error(`invalid ${subject}: five-GW mean needs exactly five published gameweeks`);
+      }
+    }
+  }
   return { players: applyLivePlayers(candidate.players as PlayerRecord[], live), manifest };
 }
 

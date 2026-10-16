@@ -450,12 +450,17 @@ export function PlayersPage() {
       const observedPoints = aggregateObservedPoints(selectedActuals);
       const observedPointsPerAppearance =
         averageObservedPointsPerAppearance(selectedActuals);
+      const involvement = filters.venue === "all"
+        ? player.goal_involvement?.gameweeks.find((row) => row.gw === filters.gwFrom)
+        : undefined;
       return {
         // Suppress the shared detail row's retired prior-season form anchor on this page.
         player: { ...player, form: null },
         filtered,
         gwFromXp: gwFromHorizon?.xp ?? filteredGwFromXp,
         fiveGwXp,
+        goalInvolvementProbability: involvement?.probability_ge_2 ?? null,
+        goalInvolvementMean5: involvement?.mean_next_5 ?? null,
         bpsPerAppearance:
           actualRange == null
             ? null

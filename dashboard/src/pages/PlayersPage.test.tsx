@@ -2019,6 +2019,47 @@ describe("PlayersPage", () => {
     expect(order()).toEqual(["Blank xP", "Double xP", "High xP", "Missing xP"]);
   });
 
+  it("shows stored G+A probabilities beside xP, sorts them and follows Forecast From", async () => {
+    const user = userEvent.setup();
+    const players: PlayerRecord[] = playersWithActuals.map((player, index) => ({
+      ...player,
+      goal_involvement: index !== 0 ? null : {
+        schema_version: 1, threshold: 2, model: "component_baseline",
+        semantics: "whole_gameweek_probability_and_mean_next_5",
+        gameweeks: [0.42, 0, 0.1, 0.2, 0.3, 0.4].map((p, i) => ({
+          gw: i + 1, probability_ge_2: p,
+          // Deliberately distinct: the UI selects the published mean, never recomputes it.
+          mean_next_5: i === 0 ? 0.1234 : i === 1 ? 0.2 : null,
+        })),
+      },
+    }));
+    vi.mocked(loadPlayers).mockResolvedValueOnce({ players, manifest: null });
+    render(<PlayersPage />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
+    expect(headers.slice(headers.indexOf("xP GW1") + 1, headers.indexOf("xP GW1") + 3))
+      .toEqual(["G+A ≥2 GW1", "Avg G+A ≥2 · 5 GW"]);
+    const alpha = () => within(screen.getByText("Alpha").closest("tr")!);
+    expect(alpha().getByText("42.0%")).toBeInTheDocument();
+    expect(alpha().getByText("12.3%")).toBeInTheDocument();
+    const legacy = within(screen.getByText("Beta").closest("tr")!);
+    expect(legacy.getAllByTitle("Probability unavailable for this forecast or filter")).toHaveLength(2);
+    const header = screen.getByRole("columnheader", { name: "G+A ≥2 GW1" });
+    await user.click(within(header).getByRole("button"));
+    expect(header).not.toHaveAttribute("aria-sort", "none");
+    const body = header.closest("table")!.querySelector("tbody")!;
+    expect(body.querySelector("tr")!).toHaveTextContent("Alpha");
+    await user.click(within(header).getByRole("button"));
+    expect(body.querySelector("tr")!).toHaveTextContent("Alpha");
+
+    await user.click(screen.getByRole("combobox", { name: "From gameweek" }));
+    await user.click(screen.getByRole("option", { name: "GW2" }));
+    expect(screen.getByRole("columnheader", { name: "G+A ≥2 GW2" })).toBeInTheDocument();
+    expect(alpha().getByText("0.0%")).toBeInTheDocument();
+    expect(alpha().getByText("20.0%")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Actual from" })).toHaveTextContent("2026-27 GW1");
+  });
+
   it("updates the next-GW xP column from Forecast From without changing actual scope", async () => {
     const user = userEvent.setup();
     render(<PlayersPage />);
