@@ -1017,11 +1017,9 @@ def _source_queries(
             "SELECT season, fixture FROM ledger_outcome_player_fixture"
         )
     if team_outcomes_present:
-        finalized_fixture_sources.append(
-            "SELECT season, fixture FROM ledger_outcome_team_fixture"
-        )
-    provisional_player_observation, provisional_team_observation = (
-        provisional_observation_queries(finalized_fixture_union(finalized_fixture_sources))
+        finalized_fixture_sources.append("SELECT season, fixture FROM ledger_outcome_team_fixture")
+    provisional_player_observation, provisional_team_observation = provisional_observation_queries(
+        finalized_fixture_union(finalized_fixture_sources)
     )
     queries: dict[str, str] = {
         "dim_player": f"""

@@ -326,6 +326,7 @@ def publish_r2_dashboard(
     *,
     client: Any = None,
     published_at: datetime | None = None,
+    expected_base_generation: str | None = None,
 ) -> dict[str, Any]:
     """Caller holds the existing refresh lock; every failure has a non-secret receipt."""
     output.mkdir(parents=True, exist_ok=False)
@@ -368,6 +369,12 @@ def publish_r2_dashboard(
                 or previous[1].get("ContentType") != "application/json"
             ):
                 raise ValueError("R2 previous pointer has unsafe cache or content metadata")
+        if expected_base_generation is not None and (
+            previous is None
+            or _strict_json_loads(previous[0].decode("utf-8"))["generation_sha256"]
+            != expected_base_generation
+        ):
+            raise ValueError("provisional base generation changed before publication")
         prefix = f"generations/{digest}/"
         expected_keys = {prefix + relative for relative in inventory}
         if _keys(client, config.bucket, prefix) - expected_keys:

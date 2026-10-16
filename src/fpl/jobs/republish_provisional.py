@@ -82,7 +82,11 @@ def main(argv: list[str] | None = None) -> int:
         report["reason"] = "the published preview already matches this capture"
     elif args.r2_config is not None:
         publication = publish_r2_dashboard(
-            args.out / "generation", args.r2_config, args.out / "r2", published_at=stamp
+            args.out / "generation",
+            args.r2_config,
+            args.out / "r2",
+            published_at=stamp,
+            expected_base_generation=generation.generation_sha256,
         )
         report["published"] = publication["status"] == "COMPLETE"
         report["r2"] = {

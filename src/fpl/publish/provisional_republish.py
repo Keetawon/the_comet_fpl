@@ -52,6 +52,7 @@ from fpl.publish.dashboard_json import (
     validate_dashboard_json,
 )
 from fpl.publish.dashboard_refresh import check_observed_freshness
+from fpl.publish.dashboard_scope import PUBLIC_PAYLOAD_LIMITS
 from fpl.publish.export import (
     _canonical_json_bytes,
     _contract_query,
@@ -79,11 +80,10 @@ RESTATED_FILES: Final[frozenset[str]] = frozenset(
         "manifest.json",
     }
 )
-# Bounds that stop a wrong base URL from streaming without end. The published
-# all-vintage `players.json` is the largest file and grows with every recorded forecast
-# run, so the per-file bound is generous and the whole-generation bound is the real guard.
+# The same uncompressed mobile budgets apply before downloading a restatement base.
+# Companion files also have a ceiling and the complete generation has a total bound.
 _POINTER_LIMIT: Final = 65_536
-_FILE_LIMIT: Final = 512 * 1024 * 1024
+_FILE_LIMIT: Final = 100_000_000
 _GENERATION_LIMIT: Final = 1024 * 1024 * 1024
 
 Reader = Callable[[str], bytes]
@@ -143,10 +143,12 @@ def fetch_published_generation(base_url: str, *, read: Reader) -> PublishedGener
     declared = sum(int(entry["size_bytes"]) for entry in pointer["files"].values())
     if declared > _GENERATION_LIMIT:
         raise ProvisionalRepublishError("the published generation exceeds its declared bound")
+    for relative, entry in sorted(pointer["files"].items()):
+        limit = PUBLIC_PAYLOAD_LIMITS.get(relative.removeprefix("data/"), _FILE_LIMIT)
+        if entry["size_bytes"] > limit:
+            raise ProvisionalRepublishError(f"published file {relative} exceeds its bound")
     files: dict[str, bytes] = {}
     for relative, entry in sorted(pointer["files"].items()):
-        if entry["size_bytes"] > _FILE_LIMIT:
-            raise ProvisionalRepublishError(f"published file {relative} exceeds its bound")
         content = _decode(read(f"{base}/{pointer['base_path']}/{relative}"))
         if (
             hashlib.sha256(content).hexdigest() != entry["sha256"]
@@ -309,7 +311,6 @@ def build_restatement(
                 "captured_at": captured_at,
                 "players": list(player_rows),
             },
-            indent=2,
         ),
         TEAM_PROVISIONAL_ACTUALS_FILENAME: _canonical_json_bytes(
             {
@@ -318,7 +319,6 @@ def build_restatement(
                 "captured_at": captured_at,
                 "teams": list(team_rows),
             },
-            indent=2,
         ),
     }
     return Restatement(
@@ -385,7 +385,7 @@ def restate_generation(
     )
     if refreshed != matrix["teams"]:
         matrix["teams"] = refreshed
-        body = _canonical_json_bytes(matrix, indent=2)
+        body = _canonical_json_bytes(matrix)
         (data / "fixture_matrix.json").write_bytes(body)
         changed.append("fixture_matrix.json")
         manifest["files"]["fixture_matrix.json"] = {

@@ -537,13 +537,20 @@ def validate_rest_summary(value: Any) -> RestSummary:
             raise ValueError("an unknown verdict must state its reason")
         if player.window_appearances < player.midweek_appearances:
             raise ValueError("midweek appearances exceed window appearances")
-        if player.midweek_appearances > player.midweek_fixtures:
+        load_fields = {"midweek_fixtures", "midweek_load"}
+        supplied_load_fields = load_fields & player.model_fields_set
+        if supplied_load_fields and supplied_load_fields != load_fields:
+            raise ValueError("midweek load fields must be supplied together")
+        # Older immutable v1 sidecars predate these additive fields. Validate their
+        # original evidence without inventing a measured zero or rewriting their bytes.
+        has_load = supplied_load_fields == load_fields
+        if has_load and player.midweek_appearances > player.midweek_fixtures:
             raise ValueError("midweek appearances exceed the usable legs behind them")
-        if (player.midweek_load == "none_not_selected") != (
+        if has_load and (player.midweek_load == "none_not_selected") != (
             player.verdict == "full_rest" and player.midweek_fixtures > 0
         ):
             raise ValueError("a measured zero midweek load requires a proved unplayed leg")
-        if (player.midweek_load == "none_no_fixture") != (
+        if has_load and (player.midweek_load == "none_no_fixture") != (
             player.verdict == "full_rest" and player.midweek_fixtures == 0
         ):
             raise ValueError("an unavailable midweek load requires no midweek leg")
