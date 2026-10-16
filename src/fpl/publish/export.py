@@ -35,6 +35,12 @@ import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 from fpl.artifacts.optimizer_plan import OptimizerPlanArtifact, read_optimizer_artifact
 from fpl.publish.contract import SEMANTIC_CONTRACT_V6, Column, Table
+from fpl.publish.provisional_sql import (
+    LIVE_FIXTURE_LATEST,
+    LIVE_TEAM_LATEST,
+    finalized_fixture_union,
+    provisional_observation_queries,
+)
 from fpl.storage.db import connect, table_columns, table_exists
 
 BI_EXPORT_SCHEMA: Final[str] = "fpl.bi-semantic-export"
@@ -796,29 +802,6 @@ _LIVE_PLAYER_LATEST: Final[str] = """
         PARTITION BY season, code ORDER BY known_at DESC, capture_id DESC
     ) = 1
 """
-_LIVE_TEAM_LATEST: Final[str] = """
-    SELECT season, team_id, team_code, team_name, short_name, pulse_id
-    FROM stg_live_team_version
-    WHERE team_code IS NOT NULL
-    QUALIFY row_number() OVER (
-        PARTITION BY season, team_id ORDER BY known_at DESC, capture_id DESC
-    ) = 1
-"""
-_LIVE_FIXTURE_LATEST: Final[str] = """
-    SELECT season, fixture, gw, kickoff_time, team_h, team_a, finished
-    FROM stg_live_fixture_version
-    QUALIFY row_number() OVER (
-        PARTITION BY season, fixture ORDER BY known_at DESC, capture_id DESC
-    ) = 1
-"""
-_LATEST_PLAYER_HISTORY_CAPTURE: Final[str] = """
-    SELECT season, capture_id, captured_at AS observed_at
-    FROM snapshot_capture
-    WHERE mode = 'player-history'
-    QUALIFY row_number() OVER (
-        PARTITION BY season ORDER BY captured_at DESC, capture_id DESC
-    ) = 1
-"""
 _LIVE_FDR_LATEST: Final[str] = """
     SELECT season, fixture, team_id, fdr
     FROM mart_team_fixture_live
@@ -892,7 +875,7 @@ def _source_queries(
               ON outcome.season = live.season
              AND outcome.fixture = live.fixture
              AND outcome.code = live.code
-            LEFT JOIN ({_LIVE_TEAM_LATEST}) AS team
+            LEFT JOIN ({LIVE_TEAM_LATEST}) AS team
               ON team.season = live.season
              AND team.team_id = live.team_id
         """
@@ -1013,7 +996,7 @@ def _source_queries(
                    components.team_xg, components.team_xgc, components.team_bps,
                    components.defensive_contribution
             FROM ledger_outcome_team_fixture AS outcome
-            LEFT JOIN ({_LIVE_TEAM_LATEST}) AS team
+            LEFT JOIN ({LIVE_TEAM_LATEST}) AS team
               ON team.season = outcome.season
              AND team.team_id = outcome.team_id
             LEFT JOIN ({live_team_components}) AS components
@@ -1033,149 +1016,10 @@ def _source_queries(
             "SELECT season, fixture FROM ledger_outcome_player_fixture"
         )
     if team_outcomes_present:
-        finalized_fixture_sources.append(
-            "SELECT season, fixture FROM ledger_outcome_team_fixture"
-        )
-    finalized_fixture_sql = "\n            UNION\n            ".join(
-        finalized_fixture_sources
+        finalized_fixture_sources.append("SELECT season, fixture FROM ledger_outcome_team_fixture")
+    provisional_player_observation, provisional_team_observation = provisional_observation_queries(
+        finalized_fixture_union(finalized_fixture_sources)
     )
-    provisional_player_observation = f"""
-        WITH selected_capture AS ({_LATEST_PLAYER_HISTORY_CAPTURE}),
-        finalized_fixture AS (
-            {finalized_fixture_sql}
-        ),
-        completed_fixture AS (
-            SELECT fixture.*, selected_capture.observed_at
-            FROM stg_live_fixture_version AS fixture
-            INNER JOIN selected_capture
-              ON selected_capture.season = fixture.season
-             AND selected_capture.capture_id = fixture.capture_id
-            WHERE (fixture.finished_provisional IS TRUE OR fixture.finished IS TRUE)
-              AND fixture.gw IS NOT NULL
-              AND fixture.kickoff_time IS NOT NULL
-              AND fixture.team_h_score IS NOT NULL
-              AND fixture.team_a_score IS NOT NULL
-              AND NOT EXISTS (
-                    SELECT 1
-                    FROM finalized_fixture AS final
-                    WHERE final.season = fixture.season
-                      AND final.fixture = fixture.fixture
-              )
-        )
-        SELECT history.season, history.fixture, history.code, history.gw,
-               history.kickoff_time, history.position, history.team_id, team.team_code,
-               history.opponent_team_id, history.was_home, history.minutes, history.starts,
-               history.goals_scored, history.assists, history.clean_sheets,
-               history.goals_conceded, history.saves, history.penalties_saved,
-               history.penalties_missed, history.own_goals, history.yellow_cards,
-               history.red_cards, history.bonus, history.bps, history.expected_goals,
-               history.expected_assists, history.expected_goals_conceded,
-               history.defensive_contribution, history.threat, history.creativity,
-               history.influence, history.total_points AS total_points_as_recorded,
-               fixture.observed_at
-        FROM stg_live_player_fixture_version AS history
-        INNER JOIN completed_fixture AS fixture
-          ON fixture.season = history.season
-         AND fixture.fixture = history.fixture
-         AND fixture.capture_id = history.capture_id
-        LEFT JOIN stg_live_team_version AS team
-          ON team.season = history.season
-         AND team.team_id = history.team_id
-         AND team.capture_id = history.capture_id
-    """
-    provisional_team_observation = f"""
-        WITH selected_capture AS ({_LATEST_PLAYER_HISTORY_CAPTURE}),
-        finalized_fixture AS (
-            {finalized_fixture_sql}
-        ),
-        completed_fixture AS (
-            SELECT fixture.*, selected_capture.observed_at
-            FROM stg_live_fixture_version AS fixture
-            INNER JOIN selected_capture
-              ON selected_capture.season = fixture.season
-             AND selected_capture.capture_id = fixture.capture_id
-            WHERE (fixture.finished_provisional IS TRUE OR fixture.finished IS TRUE)
-              AND fixture.gw IS NOT NULL
-              AND fixture.kickoff_time IS NOT NULL
-              AND fixture.team_h_score IS NOT NULL
-              AND fixture.team_a_score IS NOT NULL
-              AND NOT EXISTS (
-                    SELECT 1
-                    FROM finalized_fixture AS final
-                    WHERE final.season = fixture.season
-                      AND final.fixture = fixture.fixture
-              )
-        ), player_components AS (
-            SELECT history.season, history.fixture, history.capture_id, history.team_id,
-                   CASE
-                       WHEN count(*) FILTER (WHERE history.minutes >= 1) > 0
-                        AND count(history.expected_goals) FILTER (WHERE history.minutes >= 1)
-                            = count(*) FILTER (WHERE history.minutes >= 1)
-                       THEN sum(history.expected_goals) FILTER (WHERE history.minutes >= 1)
-                   END AS team_xg,
-                   CASE
-                       WHEN count(*) FILTER (WHERE history.minutes >= 1) > 0
-                        AND count(history.expected_goals_conceded)
-                                FILTER (WHERE history.minutes >= 1)
-                            = count(*) FILTER (WHERE history.minutes >= 1)
-                       THEN max(history.expected_goals_conceded)
-                                FILTER (WHERE history.minutes >= 1)
-                   END AS team_xgc,
-                   CASE
-                       WHEN count(*) FILTER (WHERE history.minutes >= 1) > 0
-                        AND count(history.bps) FILTER (WHERE history.minutes >= 1)
-                            = count(*) FILTER (WHERE history.minutes >= 1)
-                       THEN sum(history.bps) FILTER (WHERE history.minutes >= 1)
-                   END AS team_bps,
-                   CASE
-                       WHEN count(*) FILTER (
-                                WHERE history.position <> 'GK' AND history.minutes >= 1
-                            ) > 0
-                        AND count(history.defensive_contribution) FILTER (
-                                WHERE history.position <> 'GK' AND history.minutes >= 1
-                            ) = count(*) FILTER (
-                                WHERE history.position <> 'GK' AND history.minutes >= 1
-                            )
-                       THEN sum(history.defensive_contribution) FILTER (
-                                WHERE history.position <> 'GK' AND history.minutes >= 1
-                            )
-                   END AS defensive_contribution
-            FROM stg_live_player_fixture_version AS history
-            INNER JOIN selected_capture
-              ON selected_capture.season = history.season
-             AND selected_capture.capture_id = history.capture_id
-            GROUP BY history.season, history.fixture, history.capture_id, history.team_id
-        ), sides AS (
-            SELECT fixture.season, fixture.fixture, fixture.team_h AS team_id,
-                   fixture.team_a AS opponent_team_id, fixture.gw, fixture.kickoff_time,
-                   TRUE AS was_home, fixture.team_h_score AS goals_for,
-                   fixture.team_a_score AS goals_against, fixture.capture_id,
-                   fixture.observed_at
-            FROM completed_fixture AS fixture
-            UNION ALL
-            SELECT fixture.season, fixture.fixture, fixture.team_a AS team_id,
-                   fixture.team_h AS opponent_team_id, fixture.gw, fixture.kickoff_time,
-                   FALSE AS was_home, fixture.team_a_score AS goals_for,
-                   fixture.team_h_score AS goals_against, fixture.capture_id,
-                   fixture.observed_at
-            FROM completed_fixture AS fixture
-        )
-        SELECT sides.season, sides.fixture, sides.team_id, team.team_code,
-               sides.opponent_team_id, sides.gw, sides.kickoff_time, sides.was_home,
-               sides.goals_for, sides.goals_against, components.team_xg,
-               components.team_xgc, components.team_bps, components.defensive_contribution,
-               sides.observed_at
-        FROM sides
-        LEFT JOIN stg_live_team_version AS team
-          ON team.season = sides.season
-         AND team.team_id = sides.team_id
-         AND team.capture_id = sides.capture_id
-        LEFT JOIN player_components AS components
-          ON components.season = sides.season
-         AND components.fixture = sides.fixture
-         AND components.capture_id = sides.capture_id
-         AND components.team_id = sides.team_id
-    """
     queries: dict[str, str] = {
         "dim_player": f"""
             WITH unified AS (
@@ -1223,7 +1067,7 @@ def _source_queries(
                 FROM mart_dim_team
                 UNION ALL
                 SELECT season, team_id AS sort_id, team_code, team_name, short_name
-                FROM ({_LIVE_TEAM_LATEST})
+                FROM ({LIVE_TEAM_LATEST})
             ),
             ranked AS (
                 SELECT team_code, team_name, short_name,
@@ -1242,7 +1086,7 @@ def _source_queries(
             FROM mart_dim_team
             UNION ALL
             SELECT season, team_id, team_code, team_name, short_name, pulse_id
-            FROM ({_LIVE_TEAM_LATEST})
+            FROM ({LIVE_TEAM_LATEST})
             WHERE season NOT IN (SELECT DISTINCT season FROM mart_dim_team)
         """,
         "dim_fixture": f"""
@@ -1274,10 +1118,10 @@ def _source_queries(
                    home_fdr.fdr AS home_official_fdr,
                    away_fdr.fdr AS away_official_fdr,
                    CAST(NULL AS INTEGER) AS pulse_id, lf.finished
-            FROM ({_LIVE_FIXTURE_LATEST}) AS lf
-            LEFT JOIN ({_LIVE_TEAM_LATEST}) AS home
+            FROM ({LIVE_FIXTURE_LATEST}) AS lf
+            LEFT JOIN ({LIVE_TEAM_LATEST}) AS home
               ON home.season = lf.season AND home.team_id = lf.team_h
-            LEFT JOIN ({_LIVE_TEAM_LATEST}) AS away
+            LEFT JOIN ({LIVE_TEAM_LATEST}) AS away
               ON away.season = lf.season AND away.team_id = lf.team_a
             LEFT JOIN ({_OFFICIAL_FDR}) AS home_fdr
               ON home_fdr.season = lf.season
@@ -1310,7 +1154,7 @@ def _source_queries(
                    CASE
                        WHEN count(finished) = count(*) THEN bool_and(finished)
                    END AS finished
-            FROM ({_LIVE_FIXTURE_LATEST})
+            FROM ({LIVE_FIXTURE_LATEST})
             WHERE gw IS NOT NULL AND season NOT IN (SELECT DISTINCT season FROM stg_fixture)
             GROUP BY season, gw
         """,
@@ -1446,7 +1290,7 @@ def _source_queries(
                     FROM stg_fixture
                     UNION ALL
                     SELECT season, fixture, gw
-                    FROM ({_LIVE_FIXTURE_LATEST})
+                    FROM ({LIVE_FIXTURE_LATEST})
                     WHERE season NOT IN (SELECT DISTINCT season FROM stg_fixture)
                 )
                 SELECT outcome.season, outcome.fixture, outcome.code, schedule.gw,

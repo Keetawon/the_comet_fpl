@@ -1,5 +1,21 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
+**Owner-authorized provisional-only republish (2026-10-16):** a cloud path that puts
+completed-match statistics on the public site without the owner's desktop. It restates ONLY
+the two provisional preview documents of the generation already being served, plus the
+`fixture_matrix.json` team-form summaries those published rows own, and carries every other
+published file forward byte for byte. The gap it closes is measured: the 2026-10-10 refresh
+finished 27 minutes before GW6's first kickoff and the next ran on 2026-10-16, so the site
+carried no GW6 result for almost six days. Provisional eligibility is now written once in
+`publish/provisional_sql.py` and shared by the BI export and this job, so there is no second
+contract; the finalized anti-join comes from the published `player_actuals.json` /
+`team_actuals.json` instead of the ledger this job cannot see, which can only remove a
+fixture from the preview and never add one. No forecast, PMF, ledger vintage, optimizer
+plan, finalized outcome or monitoring score is an input or an output here, and a restatement
+naming any other file is refused before anything is written. It is not on a clock: it runs
+after a successful capture and no-ops when the published preview already matches.
+See `docs/provisional-only-republish.md`.
+
 Status: active execution plan  
 Last updated: 2026-09-01<br>
 Target: 2026/27 GW1  
