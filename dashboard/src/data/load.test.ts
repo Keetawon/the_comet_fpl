@@ -44,14 +44,14 @@ async function loadHorizonsPayload(payload: unknown) {
   return loadPlayerHorizons();
 }
 
-async function loadPlayersPayload(payload: unknown) {
+async function loadPlayersPayload(payload: unknown, manifest?: unknown) {
   vi.resetModules();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       return url.endsWith("/manifest.json")
-        ? { ok: false, status: 404, json: async () => ({}) }
+        ? { ok: manifest != null, status: manifest == null ? 404 : 200, json: async () => manifest }
         : { ok: true, status: 200, json: async () => payload };
     }),
   );
@@ -123,6 +123,76 @@ function decodedHorizonsSample() {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();
+});
+
+describe("published whole-gameweek goal involvement", () => {
+  function payload() {
+    return {
+      ...structuredClone(playersSample),
+      players: [{
+        ...structuredClone(playersSample.players[0]),
+        goal_involvement: {
+          schema_version: 1,
+          threshold: 2,
+          model: "component_baseline",
+          semantics: "whole_gameweek_probability_and_mean_next_5",
+          gameweeks: [0.2, 0, 0.3, 0.1, 0.4].map((p, i) => ({
+            gw: i + 1, probability_ge_2: p, mean_next_5: i === 0 ? 0.2 : null,
+          })),
+        },
+      }],
+    };
+  }
+
+  it("loads published values including a true blank, while legacy vintages remain usable", async () => {
+    const data = payload();
+    expect((await loadPlayersPayload(data)).players[0].goal_involvement)
+      .toEqual(data.players[0].goal_involvement);
+    expect((await loadPlayersPayload(playersSample)).players[0].goal_involvement).toBeUndefined();
+  });
+
+  it.each([-0.01, 1.01, Number.NaN, Number.POSITIVE_INFINITY])(
+    "rejects invalid event probability %s", async (value) => {
+      const data = payload();
+      data.players[0].goal_involvement.gameweeks[0].probability_ge_2 = value;
+      await expect(loadPlayersPayload(data)).rejects.toThrow("must be a probability");
+    },
+  );
+
+  it("binds a new event block to its exact manifest model and horizon", async () => {
+    const data = payload();
+    const run = {
+      run_id: data.players[0].run_id, season: data.players[0].season,
+      gw_from: 1, gw_to: 5, horizon_gameweeks: 5,
+      goal_involvement_model: "component_baseline",
+    };
+    const manifest = {
+      schema: "fpl.dashboard-read-models", json_schema_version: 9,
+      content_sha256: "a".repeat(64), runs: [run],
+    };
+    expect((await loadPlayersPayload(data, manifest)).players[0].goal_involvement)
+      .toEqual(data.players[0].goal_involvement);
+    const missing = { ...data, players: [{ ...data.players[0], goal_involvement: null }] };
+    await expect(loadPlayersPayload(missing, manifest)).rejects.toThrow("lost its published");
+    await expect(loadPlayersPayload(data, { ...manifest, runs: [{ ...run, gw_from: 2 }] }))
+      .rejects.toThrow("differs from its forecast");
+    await expect(loadPlayersPayload(data, {
+      ...manifest, runs: [{ ...run, goal_involvement_model: "trained_event" }],
+    })).rejects.toThrow("differs from its forecast");
+  });
+
+  it.each(["duplicate", "gap", "shortened", "missing_mean", "wrong_threshold"])(
+    "rejects %s event coverage", async (defect) => {
+      const data = payload();
+      const event = data.players[0].goal_involvement;
+      if (defect === "duplicate") event.gameweeks[1].gw = 1;
+      if (defect === "gap") event.gameweeks[1].gw = 3;
+      if (defect === "shortened") event.gameweeks.pop();
+      if (defect === "missing_mean") event.gameweeks[0].mean_next_5 = null;
+      if (defect === "wrong_threshold") event.threshold = 1;
+      await expect(loadPlayersPayload(data)).rejects.toThrow(/goal_involvement/);
+    },
+  );
 });
 
 describe("atomic schema-v9 generation", () => {

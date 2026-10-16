@@ -99,3 +99,29 @@ Only nonfallback PMFs have their known appearance mixture inverted. This is a
 new event-baseline mapping, not a change to the old conversion result. No event
 fit, outer score or formal run claim existed at this rejection. Preserve the
 no-xG evidence caveat and test this mapping before the formal run.
+
+## Operational implementation and rollback
+
+The frozen coefficients and selected policy live in
+`config/player_components_production.json`. CLI forecasts use its enabled stack
+by default; explicit `--player-components incumbent` retains the previous stack.
+For a persistent scheduled rollback, disable the config in a new committed
+revision. The refresh job detects both configuration hash changes and disablement
+and requests a fresh immutable forecast, subject to the existing deadline guard.
+The direct Python forecasting API retains its incumbent default for historical
+research callers; production uses the CLI configuration resolver.
+
+New forecasts use artifact schema 3. Both model configuration hashes and the
+complete frozen event parameters are bound to each artifact. Per-fixture zero/one
+G+A masses reconcile to each whole-GW component probability, served probability
+and learned shadow. Pair recording preserves identical player models in the SDP
+primary and incumbent-environment shadow. Old canonical artifacts retain their
+original bytes. The semantic export is version 7; established dashboard envelopes
+remain v9 with a separately versioned Player event block.
+
+On the retained GW7 comparison inputs, the runtime adapter reproduces all 667
+players across ten fixtures exactly: goals, assists, duration DC, every full-points
+PMF and expected bonus match the comparison. This verification refits no parameters
+and reads no outcomes. It establishes implementation equivalence, not predictive
+accuracy. The completed classifier verdict is recorded separately in
+`goal-involvement-v1-development-2026-10-16.md`.

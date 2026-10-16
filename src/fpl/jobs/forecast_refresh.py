@@ -220,6 +220,23 @@ def refresh(
             ):
                 raise ValueError("forecast refresh baseline artifact binding mismatch")
     due = reasons(state, latest, previous, now=now)
+    # A committed owner-authorized model adoption needs a fresh immutable vintage,
+    # even when match sources have not changed and the old forecast is younger than 24h.
+    from fpl.config import config_dir
+    from fpl.models.player_components_production import load_component_config, load_event_config
+
+    adopted, component_sha = load_component_config(config_dir())
+    _, event_sha = load_event_config(config_dir())
+    if adopted.enabled and state["gw_from"] is not None and latest is not None:
+        expected_contracts = {"player_components": component_sha, "goal_involvement": event_sha}
+        if any(
+            key not in latest.contracts or latest.contracts[key].sha256 != value
+            for key, value in expected_contracts.items()
+        ):
+            due.append("owner_adopted_player_model_changed")
+    elif not adopted.enabled and state["gw_from"] is not None and latest is not None:
+        if "player_components" in latest.contracts:
+            due.append("owner_adopted_player_model_disabled")
     report: dict[str, Any] = {
         "status": "NOT_DUE",
         "reasons": due,

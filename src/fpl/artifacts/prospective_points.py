@@ -91,7 +91,7 @@ class ForecastArtifactManifest(_Frozen):
     # The manifest declares what the file actually contains, so the default is the version that
     # carries no fixture-grain rows. A producer emitting fixture rows opts into version 2 and must
     # state both counts; supplying rows under version 1 fails closed in _validate_fixture_grain.
-    schema_version: Literal[1, 2] = 1
+    schema_version: Literal[1, 2, 3] = 1
     status: Literal["development_only_not_a_validated_production_forecast"] = (
         "development_only_not_a_validated_production_forecast"
     )
@@ -138,6 +138,26 @@ class ForecastArtifactManifest(_Frozen):
         return self
 
 
+class GoalInvolvementFixture(_Frozen):
+    probability_zero: float = Field(ge=0, le=1, allow_inf_nan=False)
+    probability_one: float = Field(ge=0, le=1, allow_inf_nan=False)
+    probability_appears: float = Field(ge=0, le=1, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _sum(self) -> Self:
+        if self.probability_zero + self.probability_one > 1 + 1e-9:
+            raise ValueError("G+A low-count probabilities exceed one")
+        if self.probability_zero < 1 - self.probability_appears - 1e-9:
+            raise ValueError("G+A zero count violates common appearance gate")
+        return self
+
+
+class GoalInvolvementForecast(_Frozen):
+    probability_ge_2: float = Field(ge=0, le=1, allow_inf_nan=False)
+    component_probability_ge_2: float = Field(ge=0, le=1, allow_inf_nan=False)
+    shadow_probability_ge_2: float = Field(ge=0, le=1, allow_inf_nan=False)
+
+
 class ForecastArtifactRow(_Frozen):
     """One full points distribution for a stable player identity in one gameweek."""
 
@@ -165,6 +185,7 @@ class ForecastArtifactRow(_Frozen):
     attacking_signal_cold_start: bool
     assist_signal_cold_start: bool
     transferred_no_rescale: bool
+    goal_involvement: GoalInvolvementForecast | None = None
 
     @field_validator("fixture_ids")
     @classmethod
@@ -238,6 +259,7 @@ class ForecastPlayerFixtureRow(_Frozen):
     expected_bonus: float = Field(ge=0.0)
     distribution: tuple[float, ...]
     stage_a_league_average_team: bool
+    goal_involvement: GoalInvolvementFixture | None = None
 
     @field_validator("distribution")
     @classmethod
@@ -435,6 +457,12 @@ def build_artifact_rows(
 def _json_line(model: BaseModel) -> str:
     payload = model.model_dump(mode="json", by_alias=True)
     if (
+        isinstance(model, (ForecastArtifactRow, ForecastPlayerFixtureRow))
+        and model.goal_involvement is None
+    ):
+        # Original canonical bytes and run ids remain unchanged for legacy vintages.
+        payload.pop("goal_involvement", None)
+    if (
         isinstance(model, ForecastArtifactManifest)
         and model.live_inputs.selectable_player_registry_sha256 is None
     ):
@@ -552,6 +580,71 @@ def _validate_artifact(artifact: ProspectivePointsArtifact) -> None:
         if row.season != manifest.season or not manifest.gw_from <= row.gw <= manifest.gw_to:
             raise ArtifactError("forecast row is outside the manifest season/horizon")
     _validate_fixture_grain(artifact)
+    _validate_goal_involvement(artifact)
+
+
+def _validate_goal_involvement(artifact: ProspectivePointsArtifact) -> None:
+    from fpl.models.goal_involvement import gameweek_probability
+    from fpl.models.player_components_production import GoalInvolvementConfig
+
+    if artifact.manifest.schema_version < 3:
+        if any(r.goal_involvement is not None for r in artifact.rows) or any(
+            r.goal_involvement is not None for r in artifact.player_fixture_rows
+        ):
+            raise ArtifactError("G+A probabilities require artifact schema version 3")
+        return
+    raw = artifact.manifest.component_modes.get("goal_involvement.parameters")
+    contract = artifact.manifest.contracts.get("goal_involvement")
+    if (
+        raw is None
+        or contract is None
+        or hashlib.sha256(raw.encode()).hexdigest() != contract.sha256
+    ):
+        raise ArtifactError("G+A model parameters are missing or fail their immutable hash binding")
+    try:
+        config = GoalInvolvementConfig.model_validate_json(raw)
+    except ValueError as exc:
+        raise ArtifactError(f"invalid frozen G+A model: {exc}") from exc
+    if (
+        contract.name != config.name
+        or contract.version != str(config.version)
+        or artifact.manifest.component_modes.get("goal_involvement.serving") != config.serving
+    ):
+        raise ArtifactError("G+A model identity or serving mode disagrees with its frozen config")
+    if artifact.manifest.as_of <= config.training_cutoff:
+        raise ArtifactError("event model fit must precede forecast cutoff")
+    grouped: dict[tuple[int, int], list[GoalInvolvementFixture]] = {}
+    for fixture_row in artifact.player_fixture_rows:
+        if fixture_row.goal_involvement is None:
+            raise ArtifactError("schema version 3 is missing a fixture G+A prediction")
+        grouped.setdefault((fixture_row.gw, fixture_row.code), []).append(
+            fixture_row.goal_involvement
+        )
+    for row in artifact.rows:
+        if row.goal_involvement is None:
+            raise ArtifactError("schema version 3 is missing a gameweek G+A prediction")
+        legs = grouped.get((row.gw, row.code), [])
+        baseline = gameweek_probability(
+            [(leg.probability_zero, leg.probability_one) for leg in legs]
+        )
+        served, shadow = config.probabilities(
+            row.position,
+            baseline,
+            structural_zero=all(leg.probability_appears == 0 for leg in legs),
+        )
+        expected = (served, baseline, shadow)
+        actual = (
+            row.goal_involvement.probability_ge_2,
+            row.goal_involvement.component_probability_ge_2,
+            row.goal_involvement.shadow_probability_ge_2,
+        )
+        if any(
+            not math.isclose(a, b, rel_tol=0, abs_tol=1e-12)
+            for a, b in zip(expected, actual, strict=True)
+        ):
+            raise ArtifactError(
+                "G+A gameweek probability does not reconcile with every fixture and frozen model"
+            )
 
 
 def _validate_fixture_grain(artifact: ProspectivePointsArtifact) -> None:

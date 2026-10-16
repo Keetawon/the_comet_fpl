@@ -71,6 +71,17 @@ class OutcomeValueConflictError(LedgerError):
 
 
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS ledger_prediction_goal_involvement_gameweek (
+    run_id VARCHAR NOT NULL,
+    season VARCHAR NOT NULL,
+    gw INTEGER NOT NULL,
+    code INTEGER NOT NULL,
+    probability_ga_ge_2 DOUBLE NOT NULL,
+    component_probability_ga_ge_2 DOUBLE NOT NULL,
+    shadow_probability_ga_ge_2 DOUBLE NOT NULL,
+    PRIMARY KEY (run_id, season, gw, code)
+);
+
 CREATE TABLE IF NOT EXISTS ledger_forecast_run (
     run_id                      VARCHAR PRIMARY KEY,
     created_at                  TIMESTAMPTZ NOT NULL,
@@ -362,6 +373,24 @@ def _insert_predictions(
         params,
     )
     _insert_fixture_predictions(con, run_id, artifact)
+    event_rows = [
+        [
+            run_id,
+            row.season,
+            row.gw,
+            row.code,
+            row.goal_involvement.probability_ge_2,
+            row.goal_involvement.component_probability_ge_2,
+            row.goal_involvement.shadow_probability_ge_2,
+        ]
+        for row in artifact.rows
+        if row.goal_involvement is not None
+    ]
+    if event_rows:
+        con.executemany(
+            "INSERT INTO ledger_prediction_goal_involvement_gameweek VALUES (?, ?, ?, ?, ?, ?, ?)",
+            event_rows,
+        )
 
 
 def _insert_fixture_predictions(

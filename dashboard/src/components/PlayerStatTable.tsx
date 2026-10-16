@@ -56,6 +56,10 @@ export interface PlayerStatRow {
   filtered: PlayerFixture[];
   /** Exact or strictly summed raw xP for the selected forecast-start GW. */
   gwFromXp?: number | null;
+  /** Exact published probability for the selected start GW, all its fixture legs. */
+  goalInvolvementProbability?: number | null;
+  /** Python-published arithmetic mean over start..start+4, including blanks. */
+  goalInvolvementMean5?: number | null;
   /** Players-only descriptive BPS average over appeared fixtures between the Actual endpoints. */
   bpsPerAppearance?: number | null;
   /** Players-only fail-closed minutes average over played fixtures between the Actual endpoints. */
@@ -861,6 +865,25 @@ export function PlayerStatTable({
           },
         ]
       : [];
+    const involvementColumns: LegacyColumnDef<PlayerStatRow>[] = showGwFromXp
+      ? ([
+          ["goalInvolvementProbability", `G+A ≥2 GW${gwFrom}`,
+            `Chance of at least two combined goals and FPL assists in GW${gwFrom}, across every fixture`],
+          ["goalInvolvementMean5", "Avg G+A ≥2 · 5 GW",
+            `Average of the five separate gameweek probabilities from GW${gwFrom} to GW${gwFrom + 4}, including blanks; not a cumulative five-gameweek probability`],
+        ] as const).map(([key, label, description]) => ({
+          id: key,
+          header: () => <span title={`${description}. Availability is not applied. Unavailable for older forecasts, incomplete windows or a venue filter.`}>{label}</span>,
+          accessorFn: (row) => row[key] ?? undefined,
+          sortUndefined: "last" as const,
+          cell: ({ row }) => {
+            const value = row.original[key];
+            return <span className="tabular-nums" title={value == null ? "Probability unavailable for this forecast or filter" : description}>
+              {value == null ? "–" : `${(value * 100).toFixed(1)}%`}
+            </span>;
+          },
+        }))
+      : [];
     const totalXpColumns: LegacyColumnDef<PlayerStatRow>[] =
       showGwFromXp && gwFrom === gwTo
         ? []
@@ -948,6 +971,7 @@ export function PlayerStatTable({
       },
       ...visibleFormColumns,
       ...gwFromXpColumns,
+      ...involvementColumns,
       ...totalXpColumns,
       ...beforeFixtureColumns,
       ...gwColumns,

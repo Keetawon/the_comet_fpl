@@ -1,4 +1,8 @@
 # Preserve exact bytes for new hash-pinned tactical evidence across Windows checkouts.
+# Owner-adopted player parameters and frozen G+A training evidence.
+config/player_components_production.json -text
+config/goal_involvement_production.json -text
+results/goal_involvement_v1_development/** -text
 config/sdp_v2_frozen_parameters.json -text
 config/sdp_gk_shadow_parameters.json -text
 src/fpl/validate/tactical_state.py -text

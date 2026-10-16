@@ -22,7 +22,7 @@ from fpl.publish.contract import (
     SEMANTIC_CONTRACT_V3,
     SEMANTIC_CONTRACT_V4,
     SEMANTIC_CONTRACT_V5,
-    SEMANTIC_CONTRACT_V6,
+    SEMANTIC_CONTRACT_V7,
     Column,
     Join,
     SemanticContract,
@@ -30,11 +30,12 @@ from fpl.publish.contract import (
     Table,
 )
 
-CONTRACT = SEMANTIC_CONTRACT_V6
+CONTRACT = SEMANTIC_CONTRACT_V7
 LEDGER_SOURCE_TABLES = frozenset(
     {
         "ledger_forecast_run",
         "ledger_prediction_player_gameweek",
+        "ledger_prediction_goal_involvement_gameweek",
         "ledger_prediction_player_fixture",
         "ledger_prediction_team_fixture",
         "ledger_outcome_player_fixture",
@@ -45,6 +46,7 @@ FORECAST_LEDGER_SOURCE_TABLES = frozenset(
     {
         "ledger_forecast_run",
         "ledger_prediction_player_gameweek",
+        "ledger_prediction_goal_involvement_gameweek",
         "ledger_prediction_player_fixture",
         "ledger_prediction_team_fixture",
     }
@@ -58,7 +60,7 @@ OUTCOME_LEDGER_SOURCE_TABLES = LEDGER_SOURCE_TABLES - FORECAST_LEDGER_SOURCE_TAB
 
 
 def test_contract_publishes_the_expected_tables() -> None:
-    assert CONTRACT.version == 6
+    assert CONTRACT.version == 7
     assert {table.name for table in CONTRACT.tables} == {
         # dimensions
         "dim_forecast_run",

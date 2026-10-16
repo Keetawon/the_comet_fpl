@@ -202,8 +202,9 @@ def test_deadline_budget_defers_without_starting_inference(tmp_path, monkeypatch
 
 
 @pytest.mark.parametrize("baseline", ["valid", "truncated", "wrong_hash"])
+@pytest.mark.parametrize("model_change", ["unchanged", "old", "hash"])
 def test_registered_baseline_controls_repeat_and_recovers_partial_receipt(
-    tmp_path, monkeypatch, baseline
+    tmp_path, monkeypatch, baseline, model_change
 ):
     from fpl.jobs import refresh_dashboard
 
@@ -234,11 +235,24 @@ def test_registered_baseline_controls_repeat_and_recovers_partial_receipt(
     original = sidecar.read_bytes()
     monkeypatch.setattr(job, "source_state", lambda *a, **kw: state)
     monkeypatch.setattr(refresh_dashboard, "latest_primary", lambda *a: (primary, SEASON, "run"))
+    from fpl.config import config_dir
+    from fpl.models.player_components_production import load_component_config, load_event_config
+
+    contracts = {
+        "player_components": SimpleNamespace(sha256=load_component_config(config_dir())[1]),
+        "goal_involvement": SimpleNamespace(sha256=load_event_config(config_dir())[1]),
+    }
+    if model_change == "old":
+        contracts = {}
+    elif model_change == "hash":
+        contracts["goal_involvement"] = SimpleNamespace(sha256="old config")
     monkeypatch.setattr(
         job,
         "read_artifact",
         lambda *a: SimpleNamespace(
-            manifest=SimpleNamespace(season=SEASON, gw_from=6, gw_to=10, as_of=now)
+            manifest=SimpleNamespace(
+                season=SEASON, gw_from=6, gw_to=10, as_of=now, contracts=contracts
+            )
         ),
     )
 
@@ -254,9 +268,9 @@ def test_registered_baseline_controls_repeat_and_recovers_partial_receipt(
         "capture_status": 0,
         "started_at": now,
     }
-    if baseline == "valid":
+    if baseline == "valid" and model_change == "unchanged":
         assert job.refresh(**kwargs)["status"] == "NOT_DUE"
-    elif baseline == "truncated":
+    elif baseline != "wrong_hash":
         with pytest.raises(RuntimeError, match="new build requested"):
             job.refresh(**kwargs)
     else:

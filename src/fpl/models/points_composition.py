@@ -43,6 +43,7 @@ bit-for-bit.
 
 from __future__ import annotations
 
+import math
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -182,6 +183,16 @@ class ComponentDistributions:
     dc_hit_probability: float = 0.0
     # Optional development-only FPL-scored outcomes; current prospective jobs leave this absent.
     disciplinary: ConditionalDisciplinary | None = None
+    # Owner-adopted duration model. None preserves the frozen scalar and RNG path.
+    dc_by_minutes: tuple[float, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if self.dc_by_minutes is not None and (
+            len(self.dc_by_minutes) != 4
+            or self.dc_by_minutes[0] != 0
+            or any(not math.isfinite(v) or not 0 <= v <= 1 for v in self.dc_by_minutes)
+        ):
+            raise ValueError("DC requires four finite duration probabilities with zero DNP")
 
 
 def conditional_rate(unconditional: float, p_play: float, *, cap: float) -> float:
@@ -382,7 +393,11 @@ def compose_points_distribution(
     """
     if draws <= 0:
         raise ValueError(f"draws must be positive, got {draws}")
-    extended = components.saves is not None or components.dc_hit_probability != 0.0
+    extended = (
+        components.saves is not None
+        or components.dc_hit_probability != 0.0
+        or components.dc_by_minutes is not None
+    )
     if extended and extra is None:
         raise ValueError(
             "saves / defensive-contribution components require an ExtraScoring; got extra=None"
@@ -433,7 +448,11 @@ def compose_points_distribution(
                 if saves_cumulative is not None and position in extra.saves_positions:
                     saves = _sample_index(saves_cumulative, u_saves)
                     total += saves // extra.saves_unit
-                if position in extra.dc_positions and u_dc < dc_probability:
+                if position in extra.dc_positions and u_dc < (
+                    components.dc_by_minutes[bin_index]
+                    if components.dc_by_minutes is not None
+                    else dc_probability
+                ):
                     total += extra.dc_points
             if card_cumulative is not None and u_card is not None:
                 total += lookup.disciplinary_points(
@@ -616,9 +635,15 @@ def compose_fixture_full_points(
 
     positions = [p.components.position for p in ordered]
     extended = [
-        p.components.saves is not None or p.components.dc_hit_probability != 0.0 for p in ordered
+        p.components.saves is not None
+        or p.components.dc_hit_probability != 0.0
+        or p.components.dc_by_minutes is not None
+        for p in ordered
     ]
-    dc_probability = [p.components.dc_hit_probability for p in ordered]
+    dc_probability = [
+        p.components.dc_by_minutes or (0.0, *(p.components.dc_hit_probability for _ in range(3)))
+        for p in ordered
+    ]
     residual_mean = [p.residual_mean for p in ordered]
     residual_sigma = [p.residual_sigma for p in ordered]
     minutes_cumulative = [_cumulative(p.components.minutes) for p in ordered]
@@ -683,7 +708,7 @@ def compose_fixture_full_points(
                 if cumulative_saves is not None and position in extra.saves_positions:
                     saves = _sample_index(cumulative_saves, u_saves)
                     base += saves // extra.saves_unit
-                if position in extra.dc_positions and u_dc < dc_probability[i]:
+                if position in extra.dc_positions and u_dc < dc_probability[i][bin_index]:
                     base += extra.dc_points
             cumulative_cards = card_cumulative[i]
             if cumulative_cards is not None and u_card is not None:

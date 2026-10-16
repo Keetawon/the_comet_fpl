@@ -1,0 +1,38 @@
+{
+  "status": "COMPLETE_WITH_INHERITED_FAILURES",
+  "base_revision": "2cb1832bb4189c9add1c8d0ce5e9f86803cd2a4c",
+  "full_suite_counts": {
+    "passed": 4612,
+    "skipped": 156,
+    "failure": 64,
+    "error": 22
+  },
+  "inherited_failure_nodes": 86,
+  "new_failure_nodes": [],
+  "verification": "All 86 failing nodes reproduce with identical failure/error status on a fresh unchanged base checkout under the same Windows settings.",
+  "publication_checks": {
+    "passed": 134,
+    "skipped": 4
+  },
+  "final_artifact_pair_refresh_checks": {
+    "passed": 72
+  },
+  "ruff": "pass",
+  "mypy_source_files": 250,
+  "frontend_main_tests": 809,
+  "frontend_test_files": 75,
+  "frontend_main_commit": "017d009bef2bebba24678659ff6d15744ec65509",
+  "public_merge_commit": "6f359b0f4aa5015bac16496fbaa44399a6436bf2",
+  "frontend_pages_run": 38905407536,
+  "frontend_pages_status": "success",
+  "gw7_parity": {
+    "status": "PASS",
+    "players": 667,
+    "fixtures": 10,
+    "component_max_abs_difference": 0.0,
+    "full_points_pmfs_exact": true,
+    "parameters_refitted": false,
+    "outcomes_read": false
+  },
+  "formal_training_rerun": false
+}

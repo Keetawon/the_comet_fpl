@@ -98,6 +98,8 @@ from fpl.artifacts.prospective_points import (
     ForecastArtifactManifest,
     ForecastPlayerFixtureRow,
     ForecastTeamFixtureRow,
+    GoalInvolvementFixture,
+    GoalInvolvementForecast,
     LiveInputProvenance,
     ProspectivePointsArtifact,
     build_artifact_rows,
@@ -124,12 +126,20 @@ from fpl.models.attacking_baselines import (
 from fpl.models.attacking_v2 import _RosterEntry, mean_trailing_signal, season_signal_kind
 from fpl.models.attacking_v3 import allocate_minutes_gated_rates
 from fpl.models.bps_bonus import BpsSimConfig, fit_residual_model
+from fpl.models.component_followup import Observation, Target
 from fpl.models.defensive_contribution_v1 import DcHistoryRow
 from fpl.models.gk_saves_v1 import GkSavesHistoryRow, GkSavesV1
+from fpl.models.goal_involvement import fixture_low_counts, gameweek_probability
 from fpl.models.minutes_shrinkage import (
     MINUTES_SHRINKAGE_ALPHA,
     MINUTES_SHRINKAGE_MIN_PRIOR_ROWS,
     shrink_minute_bins,
+)
+from fpl.models.player_components_production import (
+    FrozenPlayerAdapter,
+    GoalInvolvementConfig,
+    load_component_config,
+    load_event_config,
 )
 from fpl.models.points_composition import (
     DEFAULT_MAX_POINTS_FULL,
@@ -1102,6 +1112,7 @@ class ProspectivePointsRecord:
     cold_start_player: bool
     transferred_no_rescale: bool
     distribution: Distribution
+    goal_involvement: GoalInvolvementFixture | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1199,6 +1210,8 @@ class ProspectivePointsResult:
     football_environment_provenance: dict[str, Any] | None = None
     shadow_incumbent: ProspectivePointsResult | None = None
     player_history_provenance: dict[str, Any] | None = None
+    player_components_provenance: dict[str, str] | None = None
+    goal_involvement_parameters: str | None = None
 
 
 def _stage_a_uses_league_average(
@@ -1240,6 +1253,7 @@ def predict_prospective_points(
     appearance: str = "seasonal",
     share_signal: str = "auto",
     assists: str = "coupled",
+    player_components: str = "incumbent",
     suite: PointsComponentSuite | None = None,
     draws: int = DEFAULT_DRAWS,
     base_seed: int = BASE_SEED,
@@ -1250,6 +1264,10 @@ def predict_prospective_points(
     sdp_refresh_failure: str | None = None,
 ) -> ProspectivePointsResult:
     """Compose prospective full-points xP for ``season`` GW ``gw_from``..``gw_to`` at ``as_of``."""
+    if player_components not in {"incumbent", "trained"}:
+        raise ValueError("unknown player component mode")
+    if player_components == "trained" and (attacking != "v3" or assists != "coupled"):
+        raise ValueError("trained player components require coupled goals and assists")
     if gw_to < gw_from:
         raise ValueError(f"gw_to ({gw_to}) < gw_from ({gw_from})")
     if attacking not in {"v1", "v3"}:
@@ -1336,6 +1354,52 @@ def predict_prospective_points(
     ):
         raise ValueError("latest completed GW is captured but absent from consumed player history")
     frontier = _trailing_frontier_season(con, as_of)
+    adopted_adapter = None
+    adopted_provenance = None
+    event_parameters = None
+    if player_components == "trained":
+        adopted, adopted_sha = load_component_config(config_dir())
+        event_config, event_sha = load_event_config(config_dir())
+        event_parameters = (
+            (config_dir() / "goal_involvement_production.json").read_bytes().decode("utf-8")
+        )
+        if hashlib.sha256(event_parameters.encode()).hexdigest() != event_sha:
+            raise ValueError("event configuration changed while loading")
+        if as_of <= event_config.training_cutoff or not adopted.enabled:
+            raise ValueError("trained player configuration is disabled or not cutoff-known")
+        observations = [
+            Observation(
+                season=r["season"],
+                gw=r["gw"],
+                fixture=r["fixture"],
+                code=r["code"],
+                team_code=r["team_code"],
+                position=Position.from_archive_label(r["position"]),
+                kickoff=r["kickoff_time"],
+                minutes=r["minutes"],
+                goals=r["goals_scored"],
+                assists=r["assists"],
+                xg=r["expected_goals"],
+                xa=r["expected_assists"],
+                dc=r["defensive_contribution"],
+            )
+            for r in player_history.iter_rows(named=True)
+        ]
+        adopted_adapter = FrozenPlayerAdapter(
+            observations,
+            cutoff=as_of,
+            season=season,
+            gw=gw_from,
+            frontier_season=frontier or season,
+            config=adopted,
+        )
+        adopted_provenance = {
+            "model": adopted.name,
+            "config_sha256": adopted_sha,
+            "goal_involvement_config_sha256": event_sha,
+            "serving": event_config.serving,
+            "scientific_status": adopted.scientific_status,
+        }
     trailing_history = player_history.filter(
         pl.col("code").is_in(list(current_club))
         & (
@@ -1921,6 +1985,42 @@ def predict_prospective_points(
         targets = by_fixture[fixture]
         goals_by_code = _fixture_goals(targets, fixture)
         assists_by_code = _fixture_assists(targets, fixture)
+        dc_by_code: dict[int, tuple[float, ...] | None] = {}
+        if adopted_adapter is not None:
+            roster_groups: dict[int, list[Target]] = defaultdict(list)
+            for t in targets:
+                if t.team_code is None:
+                    raise ValueError(
+                        "trained player components require exact permanent club identity"
+                    )
+                roster_groups[t.team_code].append(
+                    Target(
+                        t.code,
+                        t.team_code,
+                        t.position,
+                        t.minutes,
+                        goals_by_code[t.code],
+                        assists_by_code[t.code],
+                        t.dc_hit_probability,
+                    )
+                )
+            for club_code, club_roster in roster_groups.items():
+                own_scored = team_scored.get((fixture, club_code))
+                if own_scored is None:
+                    raise ValueError(
+                        "trained player allocation is missing its exact team goal budget"
+                    )
+                budget = sum(i * p for i, p in enumerate(own_scored))
+                predicted = adopted_adapter.predict_roster(
+                    club_roster,
+                    goal_budget=budget,
+                    assist_budget=budget * assist_rate,
+                    thresholds=rules.defensive_contribution.thresholds,
+                )
+                for code, prediction in predicted.items():
+                    goals_by_code[code] = prediction.goals
+                    assists_by_code[code] = prediction.assists
+                    dc_by_code[code] = prediction.dc_by_minutes
         players = [
             FixturePlayer(
                 code=t.code,
@@ -1932,6 +2032,7 @@ def predict_prospective_points(
                     team_goals_conceded=t.team_goals_conceded,
                     saves=t.saves,
                     dc_hit_probability=t.dc_hit_probability,
+                    dc_by_minutes=dc_by_code.get(t.code),
                 ),
                 residual_mean=t.residual_mean,
                 residual_sigma=t.residual_sigma,
@@ -1977,6 +2078,19 @@ def predict_prospective_points(
                     cold_start_player=t.cold_start,
                     transferred_no_rescale=t.transferred,
                     distribution=result.distribution,
+                    goal_involvement=(
+                        GoalInvolvementFixture(
+                            probability_zero=fixture_low_counts(
+                                t.minutes, goals_by_code[t.code], assists_by_code[t.code]
+                            )[0],
+                            probability_one=fixture_low_counts(
+                                t.minutes, goals_by_code[t.code], assists_by_code[t.code]
+                            )[1],
+                            probability_appears=t.p_play,
+                        )
+                        if adopted_adapter is not None
+                        else None
+                    ),
                 )
             )
 
@@ -2139,7 +2253,19 @@ def predict_prospective_points(
         ),
         football_environment_provenance=environment_provenance,
         player_history_provenance=player_history_evidence,
+        player_components_provenance=adopted_provenance,
+        goal_involvement_parameters=event_parameters,
     )
+    if adopted_provenance is not None:
+        prospective_result = replace(
+            prospective_result,
+            component_names={
+                **prospective_result.component_names,
+                "goals": "sparse_prior_last_ten_conversion_v2_goals",
+                "assists": "sparse_prior_last_ten_conversion_v2_assists",
+                "defensive_contribution": "duration_conditioned_destination_club_dc_v1",
+            },
+        )
     if (
         environment_provenance is not None
         and environment_config is not None
@@ -2155,6 +2281,7 @@ def predict_prospective_points(
             appearance=appearance,
             share_signal=share_signal,
             assists=assists,
+            player_components=player_components,
             suite=resolved_suite,
             draws=draws,
             base_seed=base_seed,
@@ -2297,6 +2424,36 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
         players=players,
         fixtures=fixture_inputs,
     )
+    if result.goal_involvement_parameters is not None:
+        event_config = GoalInvolvementConfig.model_validate_json(result.goal_involvement_parameters)
+        event_legs: dict[tuple[int, int], list[GoalInvolvementFixture]] = defaultdict(list)
+        for record in result.records:
+            if record.goal_involvement is None:
+                raise ValueError("missing fixture G+A inputs")
+            event_legs[record.gw, record.code].append(record.goal_involvement)
+        updated_rows = []
+        for row in rows:
+            legs = event_legs.get((row.gw, row.code), [])
+            baseline = gameweek_probability(
+                [(leg.probability_zero, leg.probability_one) for leg in legs]
+            )
+            served, shadow = event_config.probabilities(
+                row.position,
+                baseline,
+                structural_zero=all(leg.probability_appears == 0 for leg in legs),
+            )
+            updated_rows.append(
+                row.model_copy(
+                    update={
+                        "goal_involvement": GoalInvolvementForecast(
+                            probability_ge_2=served,
+                            component_probability_ge_2=baseline,
+                            shadow_probability_ge_2=shadow,
+                        )
+                    }
+                )
+            )
+        rows = tuple(updated_rows)
     # The fixture-grain transport (schema version 2). These are the SAME composed distributions the
     # gameweek rows are convolved from, not a second forecast, and the artifact validator proves
     # that by re-convolving them on every read.
@@ -2319,6 +2476,7 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
                     expected_bonus=record.expected_bonus,
                     distribution=record.distribution,
                     stage_a_league_average_team=record.stage_a_league_average_team,
+                    goal_involvement=record.goal_involvement,
                 )
                 for record in result.records
             ),
@@ -2372,6 +2530,22 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
         "share_signal_kind": result.share_signal_kind,
         **{f"component.{name}": value for name, value in result.component_names.items()},
     }
+    if result.player_components_provenance is not None:
+        provenance = result.player_components_provenance
+        contracts["player_components"] = ContractIdentity(
+            name=provenance["model"], version="1", sha256=provenance["config_sha256"]
+        )
+        contracts["goal_involvement"] = ContractIdentity(
+            name="gameweek_goal_involvement_event_v1",
+            version="1",
+            sha256=provenance["goal_involvement_config_sha256"],
+        )
+        component_modes["player_components.model"] = provenance["model"]
+        component_modes["player_components.adoption"] = provenance["scientific_status"]
+        component_modes["goal_involvement.serving"] = provenance["serving"]
+        if result.goal_involvement_parameters is None:
+            raise ValueError("missing bound event-model parameters")
+        component_modes["goal_involvement.parameters"] = result.goal_involvement_parameters
     if result.player_history_provenance is not None:
         component_modes["player_history.contract"] = HISTORY_CONTRACT
         component_modes["player_history.provenance"] = canonical_provenance(
@@ -2388,7 +2562,7 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
         component_modes["football_environment.primary"] = "sdp_v2"
         component_modes["forecast_role"] = "primary"
     manifest = ForecastArtifactManifest(
-        schema_version=2,
+        schema_version=3 if result.goal_involvement_parameters is not None else 2,
         as_of=result.as_of,
         season=result.season,
         gw_from=result.gw_from,
@@ -2488,6 +2662,15 @@ def main(argv: list[str] | None = None) -> int:
         default="coupled",
         help="assists: coupled team xA-share of assisted goals (default) or independent V1",
     )
+    parser.add_argument(
+        "--player-components",
+        choices=("trained", "incumbent"),
+        default=None,
+        help=(
+            "defaults to the enabled frozen production configuration; "
+            "incumbent explicitly rolls back"
+        ),
+    )
     parser.add_argument("--draws", type=int, default=DEFAULT_DRAWS)
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument("--football-environment", choices=("sdp_v2", "disabled"), default=None)
@@ -2522,6 +2705,8 @@ def main(argv: list[str] | None = None) -> int:
             appearance=args.appearance,
             share_signal=args.share_signal,
             assists=args.assists,
+            player_components=args.player_components
+            or ("trained" if load_component_config(config_dir())[0].enabled else "incumbent"),
             draws=args.draws,
             db_path=db_path,
             repo=repo,

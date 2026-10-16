@@ -1,4 +1,4 @@
-"""Isolated, fixed-policy component research; no production caller imports this module."""
+"""Fixed-policy components, operationally adopted by the owner on 2026-10-16."""
 
 from __future__ import annotations
 

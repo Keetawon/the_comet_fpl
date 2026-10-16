@@ -34,7 +34,7 @@ import pyarrow as pa  # type: ignore[import-untyped]
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 from fpl.artifacts.optimizer_plan import OptimizerPlanArtifact, read_optimizer_artifact
-from fpl.publish.contract import SEMANTIC_CONTRACT_V6, Column, Table
+from fpl.publish.contract import SEMANTIC_CONTRACT_V7, Column, Table
 from fpl.storage.db import connect, table_columns, table_exists
 
 BI_EXPORT_SCHEMA: Final[str] = "fpl.bi-semantic-export"
@@ -841,6 +841,7 @@ def _source_queries(
     *,
     player_outcomes_present: bool,
     team_outcomes_present: bool,
+    goal_involvement_present: bool = False,
 ) -> dict[str, str]:
     archive_player_actual = """
         SELECT fact.season, fact.fixture, fact.code, fact.gw, fact.kickoff_time,
@@ -1033,12 +1034,8 @@ def _source_queries(
             "SELECT season, fixture FROM ledger_outcome_player_fixture"
         )
     if team_outcomes_present:
-        finalized_fixture_sources.append(
-            "SELECT season, fixture FROM ledger_outcome_team_fixture"
-        )
-    finalized_fixture_sql = "\n            UNION\n            ".join(
-        finalized_fixture_sources
-    )
+        finalized_fixture_sources.append("SELECT season, fixture FROM ledger_outcome_team_fixture")
+    finalized_fixture_sql = "\n            UNION\n            ".join(finalized_fixture_sources)
     provisional_player_observation = f"""
         WITH selected_capture AS ({_LATEST_PLAYER_HISTORY_CAPTURE}),
         finalized_fixture AS (
@@ -1337,9 +1334,29 @@ def _source_queries(
     }
     if not ledger_present:
         for table_name in _LEDGER_PUBLISHED_TABLE_NAMES:
-            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V6.table(table_name))
+            queries[table_name] = _empty_source_sql(SEMANTIC_CONTRACT_V7.table(table_name))
         return queries
 
+    event_table = "ledger_prediction_goal_involvement_gameweek"
+    event_columns = (
+        "run_id",
+        "season",
+        "gw",
+        "code",
+        "probability_ga_ge_2",
+        "component_probability_ga_ge_2",
+        "shadow_probability_ga_ge_2",
+    )
+    if goal_involvement_present:
+        event_source = "SELECT " + ", ".join(event_columns) + " FROM " + event_table
+    else:
+        event_source = (
+            "SELECT CAST(NULL AS VARCHAR) AS run_id, CAST(NULL AS VARCHAR) AS season, "
+            "CAST(NULL AS INTEGER) AS gw, CAST(NULL AS INTEGER) AS code, "
+            "CAST(NULL AS DOUBLE) AS probability_ga_ge_2, "
+            "CAST(NULL AS DOUBLE) AS component_probability_ga_ge_2, "
+            "CAST(NULL AS DOUBLE) AS shadow_probability_ga_ge_2 WHERE FALSE"
+        )
     queries.update(
         {
             "dim_forecast_run": """
@@ -1348,7 +1365,7 @@ def _source_queries(
                        roster_size, component_modes, contract_identities, bootstrap_known_at
                 FROM ledger_forecast_run
             """,
-            "fact_forecast_player_gameweek": """
+            "fact_forecast_player_gameweek": f"""
                 SELECT prediction.run_id, run.as_of, prediction.season, prediction.gw,
                        prediction.code, prediction.position, prediction.team_id,
                        prediction.team_code, prediction.now_cost, prediction.selected_by_percent,
@@ -1361,9 +1378,13 @@ def _source_queries(
                        prediction.cold_start_player, prediction.stage_a_league_average_team,
                        prediction.attacking_signal_cold_start,
                        prediction.assist_signal_cold_start,
-                       prediction.transferred_no_rescale
+                       prediction.transferred_no_rescale, event.probability_ga_ge_2,
+                       event.component_probability_ga_ge_2, event.shadow_probability_ga_ge_2
                 FROM ledger_prediction_player_gameweek AS prediction
                 LEFT JOIN ledger_forecast_run AS run ON run.run_id = prediction.run_id
+                LEFT JOIN ({event_source}) AS event ON event.run_id = prediction.run_id
+                  AND event.season = prediction.season AND event.gw = prediction.gw
+                  AND event.code = prediction.code
             """,
             "fact_forecast_player_fixture": """
                 SELECT prediction.run_id, run.as_of, prediction.season, prediction.fixture,
@@ -1466,11 +1487,11 @@ def _source_queries(
     )
     if not player_outcomes_present:
         queries["fact_finalized_player_fixture_outcome"] = _empty_source_sql(
-            SEMANTIC_CONTRACT_V6.table("fact_finalized_player_fixture_outcome")
+            SEMANTIC_CONTRACT_V7.table("fact_finalized_player_fixture_outcome")
         )
     if not team_outcomes_present:
         queries["fact_finalized_team_fixture_outcome"] = _empty_source_sql(
-            SEMANTIC_CONTRACT_V6.table("fact_finalized_team_fixture_outcome")
+            SEMANTIC_CONTRACT_V7.table("fact_finalized_team_fixture_outcome")
         )
     return queries
 
@@ -1712,19 +1733,18 @@ def _validate_provisional_fixture_consistency(con: duckdb.DuckDBPyConnection) ->
     ).fetchone()
     if overlap is not None:
         raise BiExportValidationError(
-            "provisional observation overlaps a finalized actual at the same grain: "
-            f"{overlap}"
+            f"provisional observation overlaps a finalized actual at the same grain: {overlap}"
         )
 
 
 def _validate_referential_integrity(tables: Mapping[str, pa.Table]) -> None:
     con = duckdb.connect(":memory:")
     try:
-        for table in SEMANTIC_CONTRACT_V6.tables:
+        for table in SEMANTIC_CONTRACT_V7.tables:
             con.register(table.name, tables[table.name])
-        for child in SEMANTIC_CONTRACT_V6.tables:
+        for child in SEMANTIC_CONTRACT_V7.tables:
             for join in child.joins:
-                parent = SEMANTIC_CONTRACT_V6.table(join.to_table)
+                parent = SEMANTIC_CONTRACT_V7.table(join.to_table)
                 on = " AND ".join(
                     f"child.{_quote_identifier(local)} = parent.{_quote_identifier(remote)}"
                     for local, remote in join.on
@@ -2070,7 +2090,7 @@ def _manifest(
     payload: dict[str, Any] = {
         "schema": BI_EXPORT_SCHEMA,
         "schema_version": BI_EXPORT_SCHEMA_VERSION,
-        "semantic_contract_version": SEMANTIC_CONTRACT_V6.version,
+        "semantic_contract_version": SEMANTIC_CONTRACT_V7.version,
         "created_at": _isoformat(created_at),
         "database_sha256": database_sha256,
         "exported_run_ids": list(exported_run_ids),
@@ -2144,8 +2164,8 @@ def _assert_manifest_shape(manifest: Mapping[str, Any]) -> None:
         or manifest["schema_version"] != BI_EXPORT_SCHEMA_VERSION
     ):
         raise BiExportValidationError("manifest export schema/version does not match this exporter")
-    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V6.version:
-        raise BiExportValidationError("manifest semantic contract version does not match v6")
+    if manifest["semantic_contract_version"] != SEMANTIC_CONTRACT_V7.version:
+        raise BiExportValidationError("manifest semantic contract version does not match v7")
     _manifest_timestamp(manifest["created_at"], "created_at")
     if not _is_sha256(manifest["database_sha256"]):
         raise BiExportValidationError("manifest database_sha256 must be a SHA-256 string")
@@ -2209,14 +2229,14 @@ def _validate_export_directory(
     table_metadata = manifest["tables"]
     if not isinstance(table_metadata, dict):
         raise BiExportValidationError("manifest tables must be an object")
-    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V6.tables}
+    expected_table_names = {table.name for table in SEMANTIC_CONTRACT_V7.tables}
     if set(table_metadata) != expected_table_names:
         raise BiExportValidationError(
             "manifest does not enumerate exactly the semantic contract tables"
         )
     expected_files = {MANIFEST_FILENAME}
     frames: dict[str, pa.Table] = {}
-    for table in SEMANTIC_CONTRACT_V6.tables:
+    for table in SEMANTIC_CONTRACT_V7.tables:
         entry = table_metadata[table.name]
         if not isinstance(entry, dict) or set(entry) != {"file", "row_count", "sha256"}:
             raise BiExportValidationError(f"manifest entry for {table.name} is malformed")
@@ -2428,6 +2448,9 @@ def export_bi(
                     ledger_present,
                     player_outcomes_present=table_exists(con, "ledger_outcome_player_fixture"),
                     team_outcomes_present=table_exists(con, "ledger_outcome_team_fixture"),
+                    goal_involvement_present=table_exists(
+                        con, "ledger_prediction_goal_involvement_gameweek"
+                    ),
                 )
 
                 injected: Mapping[str, tuple[dict[str, object], ...]] = {
@@ -2436,7 +2459,7 @@ def export_bi(
                 }
                 table_exports: dict[str, TableExport] = {}
                 expected_null_counts: dict[str, dict[str, int]] = {}
-                for table in SEMANTIC_CONTRACT_V6.tables:
+                for table in SEMANTIC_CONTRACT_V7.tables:
                     if table.name in injected:
                         rows = injected[table.name]
                         frame = (

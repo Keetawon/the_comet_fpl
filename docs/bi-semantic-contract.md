@@ -1,4 +1,4 @@
-# BI semantic contract, version 6
+# BI semantic contract, version 7
 
 Status: **implemented and frozen development-only** (P1.1 plus the P2.3/P2.5 amendments).
 
@@ -8,6 +8,26 @@ ease formula. Version 3 added exact team PMFs and append-only player/team monito
 Version 4 added finalized current-season player observations, and version 5 added normalized
 finalized team-fixture observations. All five executable historical declarations remain
 importable.
+
+## Version 7 stored goal-involvement probabilities (2026-10-16)
+
+Version 7 adds three nullable scalar columns to `fact_forecast_player_gameweek`:
+`probability_ga_ge_2`, `component_probability_ga_ge_2`, and
+`shadow_probability_ga_ge_2`. They come from the append-only
+`ledger_prediction_goal_involvement_gameweek`, joined on exact run, season, GW
+and permanent player code. Earlier vintages remain null. All six earlier contract
+declarations remain frozen and importable.
+
+The event means at least two combined goals and FPL assists in the whole GW,
+including all double-gameweek legs. A real blank is zero. The separate learned
+classifier missed its predeclared serving gate and remains shadow; the published
+probability uses the adopted attacking components and their common appearance
+gate. These stored probabilities do not change xP or optimizer scoring.
+
+Dashboard schema v9 gains an optional, separately versioned `goal_involvement`
+block on each Player. Python publishes the exact five-GW arithmetic mean, with
+blanks in its denominator; incomplete windows are unavailable. The browser only
+selects the published start GW. See `player-production-ga-design-2026-10-16.md`.
 
 ## Version 6 provisional completed-match observation amendment (2026-09-01)
 

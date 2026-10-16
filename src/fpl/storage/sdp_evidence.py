@@ -1043,6 +1043,30 @@ def _ensure_vintage(
                 f"run {run_id} claims a recording instant after the pair record entry; every "
                 "forecast run must already exist at the pair record entry time"
             )
+        if artifact.manifest.schema_version >= 3:
+            expected = [
+                (
+                    r.season,
+                    r.gw,
+                    r.code,
+                    r.goal_involvement.probability_ge_2,
+                    r.goal_involvement.component_probability_ge_2,
+                    r.goal_involvement.shadow_probability_ge_2,
+                )
+                for r in artifact.rows
+                if r.goal_involvement is not None
+            ]
+            stored = con.execute(
+                "SELECT season, gw, code, probability_ga_ge_2, "
+                "component_probability_ga_ge_2, shadow_probability_ga_ge_2 "
+                "FROM ledger_prediction_goal_involvement_gameweek "
+                "WHERE run_id=? ORDER BY season, gw, code",
+                [run_id],
+            ).fetchall()
+            if stored != expected:
+                raise PairVerificationError(
+                    f"run {run_id} G+A ledger rows disagree with the immutable artifact"
+                )
         return row
     ledger._insert_run(con, run_id, artifact.manifest, artifact_sha256, stamp)
     ledger._insert_predictions(con, run_id, artifact)

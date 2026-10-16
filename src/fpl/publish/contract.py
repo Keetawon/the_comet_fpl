@@ -37,7 +37,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SEMANTIC_CONTRACT_VERSION = 6
+SEMANTIC_CONTRACT_VERSION = 7
 
 #: Season-scoped identifiers. A join may use one only when ``season`` is bound in the same join.
 SEASON_SCOPED_KEYS: frozenset[str] = frozenset({"element_id", "team_id", "opponent_team_id"})
@@ -1536,9 +1536,7 @@ FACT_PLAYER_FIXTURE_ACTUAL_V4 = FACT_PLAYER_FIXTURE_ACTUAL.model_copy(
 SEMANTIC_CONTRACT_V4 = SemanticContract(
     version=4,
     tables=tuple(
-        FACT_PLAYER_FIXTURE_ACTUAL_V4
-        if table.name == "fact_player_fixture_actual"
-        else table
+        FACT_PLAYER_FIXTURE_ACTUAL_V4 if table.name == "fact_player_fixture_actual" else table
         for table in SEMANTIC_CONTRACT_V3.tables
     ),
 )
@@ -1550,11 +1548,48 @@ SEMANTIC_CONTRACT_V5 = SemanticContract(
 
 
 SEMANTIC_CONTRACT_V6 = SemanticContract(
-    version=SEMANTIC_CONTRACT_VERSION,
+    version=6,
     tables=(
         *SEMANTIC_CONTRACT_V5.tables,
         FACT_PROVISIONAL_PLAYER_FIXTURE_OBSERVATION,
         FACT_PROVISIONAL_TEAM_FIXTURE_OBSERVATION,
+    ),
+)
+
+FACT_FORECAST_PLAYER_GAMEWEEK_V7 = FACT_FORECAST_PLAYER_GAMEWEEK.model_copy(
+    update={
+        "columns": (
+            *FACT_FORECAST_PLAYER_GAMEWEEK.columns,
+            _nullable(
+                "probability_ga_ge_2",
+                "float",
+                "unmeasured",
+                "Published P(goals + FPL assists >= 2) in this whole gameweek; legacy unavailable.",
+            ),
+            _nullable(
+                "component_probability_ga_ge_2",
+                "float",
+                "unmeasured",
+                "Common-appearance component probability, including every fixture leg.",
+            ),
+            _nullable(
+                "shadow_probability_ga_ge_2",
+                "float",
+                "unmeasured",
+                "Frozen learned event-classifier probability, retained for prospective comparison.",
+            ),
+        ),
+        "source_owner": (
+            "fpl.storage.ledger:ledger_prediction_player_gameweek + "
+            "ledger_prediction_goal_involvement_gameweek"
+        ),
+    }
+)
+SEMANTIC_CONTRACT_V7 = SemanticContract(
+    version=SEMANTIC_CONTRACT_VERSION,
+    tables=tuple(
+        FACT_FORECAST_PLAYER_GAMEWEEK_V7 if t.name == "fact_forecast_player_gameweek" else t
+        for t in SEMANTIC_CONTRACT_V6.tables
     ),
 )
 
@@ -1595,6 +1630,7 @@ __all__ = [
     "SEMANTIC_CONTRACT_V4",
     "SEMANTIC_CONTRACT_V5",
     "SEMANTIC_CONTRACT_V6",
+    "SEMANTIC_CONTRACT_V7",
     "SEMANTIC_CONTRACT_VERSION",
     "Column",
     "Join",

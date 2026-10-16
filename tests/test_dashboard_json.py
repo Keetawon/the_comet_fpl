@@ -24,7 +24,7 @@ import polars as pl
 import pytest
 
 import fpl.storage.db
-from fpl.publish.contract import SEMANTIC_CONTRACT_V6, SEMANTIC_CONTRACT_VERSION
+from fpl.publish.contract import SEMANTIC_CONTRACT_V7, SEMANTIC_CONTRACT_VERSION
 from fpl.publish.dashboard_json import (
     DASHBOARD_JSON_SCHEMA_VERSION,
     FIXTURE_MATRIX_FILENAME,
@@ -775,7 +775,7 @@ def _write_parquet(path: Path, rows: list[dict[str, Any]]) -> int:
             "bool": pl.Boolean,
             "timestamp": pl.Datetime(time_unit="us", time_zone="UTC"),
         }
-        table = SEMANTIC_CONTRACT_V6.table(path.stem)
+        table = SEMANTIC_CONTRACT_V7.table(path.stem)
         frame = pl.DataFrame(schema={column.name: dtype[column.dtype] for column in table.columns})
     frame.write_parquet(path)
     return len(rows)
