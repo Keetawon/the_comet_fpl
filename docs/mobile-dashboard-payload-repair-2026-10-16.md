@@ -95,3 +95,28 @@ exact record/null/DGW preservation, cutoff-safe score-independent selection,
 season/roster scope, missing plan rejection, privacy checks on discarded rows,
 deterministic replay, atomic failure, byte limits, and monitoring-only insight IDs.
 Release evidence and test limitations are recorded alongside the publication result.
+
+## Publication verification
+
+R2 publication completed at 2026-10-16 15:44:34 UTC with generation
+`bed72419a0319d612a3ab24d3f3afefcec31838b3103c36632cbd86771ca8fdc`.
+All 17 objects were verified before the pointer switch. Manifest
+`a125aeffcac9479c96cac15c990506b917d74ece6ddc594526fba895b2a97384`
+retains current plan/forecast agreement and player/team scoring through GW6.
+The operational checkout is clean at `80b071f`; its existing 16:00 UTC refresh
+uses this bounded publisher. The schedule itself is unchanged.
+
+Main-based integration: 131 focused Python checks and all 812 dashboard tests
+pass; frontend lint/build pass. Operational source Ruff and strict mypy pass.
+Full Windows pytest: 4,623 passed, 156 skipped, 64 failed, 22 errors. Every one
+of those 86 failing nodes reproduces on unchanged `0fb9c12`, with zero new
+failure nodes. Repository CI flags eight formatting files, all byte-for-byte
+unchanged from main. This is not an all-green repository gate.
+
+The new 2,737,551-byte immutable ZIP and companion hashes are pinned for Pages;
+main's publisher reproduces every byte exactly. Live Summary and Players render
+at 390?844, with precisely three planning-vintage choices. Physical iOS memory
+limits and Jetsam behavior have not been tested on a device.
+
+See `results/mobile_dashboard_publication_20261016.json` for the data publication
+and pre-deployment frontend verification record.
