@@ -1,5 +1,16 @@
 # Repository agent instructions
 
+### Owner-directed player-component production adoption (2026-10-16)
+
+The owner explicitly confirmed adoption of the complete New xP comparison stack,
+including frozen full-training conversion V2 goals/assists and duration DC, and
+requested a separate model for P(G+A >= 2) plus next-GW and five-GW mean columns.
+This narrowly supersedes the earlier player-component/default freeze for this
+work. Preserve every historical scientific verdict and every old vintage. New
+research is preregistered in `docs/player-production-ga-design-2026-10-16.md`;
+its event-model serving gate and fallback are fixed before fitting.
+
+
 ### Owner-authorized operational retention and storage bounds (2026-10-10)
 
 The owner explicitly authorized bounding operational retention and adjusting preflight

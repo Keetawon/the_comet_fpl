@@ -1,3 +1,7 @@
+<!-- Owner-authorized active work, 2026-10-16: adopt complete trained New xP;
+train and validate P(G+A>=2); add next-GW and mean-five-GW Players columns.
+Contract: docs/player-production-ga-design-2026-10-16.md. -->
+
 # Development roadmap: GW1 decision record, then decision analytics
 
 **Owner-directed forecast automation active (2026-10-05):** connect the existing desktop

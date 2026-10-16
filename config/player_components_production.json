@@ -1,0 +1,36 @@
+{
+  "name": "trained_conversion_duration_player_components_v1",
+  "version": 1,
+  "enabled": true,
+  "owner_adoption": "2026-10-16 complete New xP including duration DC",
+  "scientific_status": "owner_adopted_frozen_development_models_not_gate_promoted",
+  "training_cutoff": "2026-07-01T00:00:00+00:00",
+  "conversion_result_sha256": "da0849b2691546538940441a448d57a6765101231a7bb2977559b282f5b7e46b",
+  "fitted_parameters_sha256": "aae7097ad805f1e4ac960585ddbdbcced7dc0417f491c51148bc5df1f27b3e80",
+  "components": {
+    "goals": {
+      "smoothing": 1,
+      "ridge": 100,
+      "bound": 0.5,
+      "name": "k1_r100_b0.5",
+      "beta": 0.13642959649545564,
+      "training_rows": 41458
+    },
+    "assists": {
+      "smoothing": 1,
+      "ridge": 0.1,
+      "bound": 0.5,
+      "name": "k1_r0.1_b0.5",
+      "beta": 0.1960665313904956,
+      "training_rows": 41458
+    }
+  },
+  "policy": {
+    "attack_player_strength": 1,
+    "attack_position_strength": 5,
+    "dc_team_strength": 20,
+    "dc_player_strength": 5,
+    "dc_beta_half": 0.5,
+    "window": 5
+  }
+}
