@@ -21,6 +21,7 @@ from pydantic import (
     model_validator,
 )
 
+from fpl.ingest.fpl_api import BootstrapTeam
 from fpl.publish.public_dashboard import PublicDashboardPackageError, _assert_public_safe
 from fpl.storage.public_news import NewsStore
 
@@ -243,6 +244,61 @@ def export_news_feed(store: Path, *, as_of: datetime) -> dict[str, Any]:
         # Optional source failure must not block the core football-data publication.
         # Do not echo database paths, provider bodies, or private record content.
         return empty_news_feed(as_of=as_of, status="error")
+
+
+def attach_scout_clubs(
+    document: dict[str, Any], teams: list[BootstrapTeam], *, season: str, as_of: datetime
+) -> dict[str, Any]:
+    """Resolve an exact reviewed club heading against this edition's official registry.
+
+    This is current descriptive metadata, not a historical identity reconstruction.
+    No free-text/player matching or replacement of retained observations.
+    The enclosing roundup retains the registry capture time and source SHA-256.
+    """
+    validate_news_feed(document)
+    by_name: dict[str, list[BootstrapTeam]] = {}
+    for team in teams:
+        by_name.setdefault(team.name.casefold(), []).append(team)
+    # Exact reviewed Scout headings reconciled to the official registry on 2026-10-16.
+    # Require BOTH the permanent code and canonical name in this edition's registry.
+    aliases = {
+        "coventry": ("Coventry City", 9),
+        "hull": ("Hull City", 88),
+        "ipswich": ("Ipswich Town", 40),
+    }
+    stories = []
+    for story in document["stories"]:
+        heading, separator, kind = story["title"]["en"].partition(" | ")
+        candidates = by_name.get(heading.casefold(), [])
+        if not candidates and heading.casefold() in aliases:
+            name, code = aliases[heading.casefold()]
+            candidates = [team for team in by_name.get(name.casefold(), []) if team.code == code]
+        published = datetime.fromisoformat(story["published_at"]) if story["published_at"] else None
+        if (
+            story["source_kind"] == "x"
+            and story["source_id"] == "ffscout_press_conferences_v2"
+            and re.fullmatch(r"https://x\.com/FFScout/status/\d+", story["source_url"], re.I)
+            and story["rendering"] == "ai_summary"
+            and story["team_code"] is None
+            and story["season"] in (None, season)
+            and separator
+            and kind == "Team news"
+            and published is not None
+            and as_of - timedelta(days=7) <= published <= as_of
+            and len(candidates) == 1
+            and candidates[0].code is not None
+            and candidates[0].code > 0
+            and sum(team.code == candidates[0].code for team in teams) == 1
+        ):
+            story = story | {
+                "season": season,
+                "team_code": candidates[0].code,
+                "team_name": candidates[0].name,
+            }
+        stories.append(story)
+    result = document | {"stories": stories}
+    validate_news_feed(result)
+    return result
 
 
 def _retained_feed(store: NewsStore, *, as_of: datetime) -> dict[str, Any]:

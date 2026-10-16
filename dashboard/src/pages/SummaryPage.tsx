@@ -14,6 +14,7 @@ import { PlayerPhoto, TeamBadge } from "@/components/Avatars";
 import { FixtureTicker } from "@/components/FixtureTicker";
 import { VintageSelect } from "@/components/VintageSelect";
 import { SummaryRestTable } from "@/components/SummaryRestTable";
+import { SummaryGwBriefing } from "@/components/SummaryGwBriefing";
 import { NewsFeed } from "@/components/NewsFeed";
 import { PublicationStatus } from "@/components/PublicationStatus";
 import {
@@ -278,6 +279,8 @@ export function SummaryPage() {
           <ArrowUpRight className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" aria-hidden="true" />
         </a>)}
       </nav>
+
+      <SummaryGwBriefing teams={view.teams} players={view.players} schedule={state.schedule} run={view.run} gw={view.nextGw} />
 
       <div className="grid gap-3">
         <Card title="Availability watch">

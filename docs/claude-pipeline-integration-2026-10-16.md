@@ -31,6 +31,21 @@ strict mypy passes on 254 source files. The existing full-suite baseline and mai
 formatting failures documented by the mobile repair are separate from these changes.
 Further main integration, full-suite and publication results are recorded at delivery.
 
+The full operational suite completed with 4,655 passed, 156 skipped, 64 failed and
+22 errors. All 86 failing node IDs exactly match the independently reproduced
+pre-change baseline; no new failures. Main's focused integration also passes all
+142 checks. PR #23 merged normally as `ab44a88`; CI still stops on the same eight
+pre-existing formatting failures, without a new formatting failure in this PR.
+
+Operational checkout activation to `d881580` held the existing refresh lock after
+the running cycle completed. The rest-only publication changed exactly
+`sdp/rest_summary.json`; every other public file remained identical. All 667 players
+remain included, with 172 witnessed midweek appearances and 495 unknown verdicts.
+The live rest cutoff is 2026-10-16 17:22:16 UTC; generation
+`03788fb2f5a11588e111f04e47cee471a373da21166886fb4dcf9c51abd646a9`.
+`players.json` remains 11,399,271 bytes. Cloud stage-only workflow run 38938901632
+succeeded and correctly reported no changes because the preview already matched.
+
 The running desktop refresh is allowed to finish before its checkout changes. The
 new cloud path updates only provisional player/team observations and their observed
 team form. It carries forecasts, finalized histories, rest evidence and monitoring

@@ -29,6 +29,8 @@ export interface PlayerRest {
   rest_days: number | null;
   midweek_appearances: number;
   midweek_nominal_minutes: number | null;
+  midweek_fixtures?: number;
+  midweek_load?: "none_no_fixture" | "none_not_selected" | "light" | "heavy" | "unknown";
   international_window_overlap: boolean;
   unknown_reasons: string[];
   evidence_versions?: { provider_match_id: number; competition_id: number; known_at: string | null; version_id: string | null; roster_proven: boolean }[];
@@ -73,6 +75,16 @@ export function parseRestSummary(value: unknown): RestSummary {
         (row.verdict === "midweek_played") !== (row.midweek_appearances > 0) ||
         (row.verdict === "unknown" && row.unknown_reasons.length === 0)) throw new Error("Invalid rest player identity or evidence.");
     codes.add(row.code);
+    // Older immutable reports omit both fields. Never turn that absence into zero load.
+    if (row.midweek_fixtures !== undefined || row.midweek_load !== undefined) {
+      if (!natural(row.midweek_fixtures) || row.midweek_appearances > row.midweek_fixtures ||
+          !["none_no_fixture", "none_not_selected", "light", "heavy", "unknown"].includes(String(row.midweek_load)) ||
+          (row.midweek_load === "none_not_selected") !== (row.verdict === "full_rest" && row.midweek_fixtures > 0) ||
+          (row.midweek_load === "none_no_fixture") !== (row.verdict === "full_rest" && row.midweek_fixtures === 0) ||
+          (["light", "heavy"].includes(String(row.midweek_load)) && (row.verdict !== "midweek_played" || typeof row.midweek_nominal_minutes !== "number")) ||
+          (row.midweek_load === "light" && Number(row.midweek_nominal_minutes) > 45) ||
+          (row.midweek_load === "heavy" && Number(row.midweek_nominal_minutes) <= 45)) throw new Error("Invalid midweek load evidence.");
+    }
     const last = row.last_appearance;
     if (last !== null && (!object(last) || !date(last.kickoff) || Date.parse(last.kickoff) >= Date.parse(value.as_of) ||
         !natural(last.provider_match_id) || last.provider_match_id === 0 || typeof last.competition_name !== "string" ||
