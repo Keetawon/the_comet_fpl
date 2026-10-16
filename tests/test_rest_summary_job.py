@@ -313,20 +313,94 @@ def test_failed_empty_side_is_not_dropped_after_known_club_mapping(database: Pat
     assert row.evidence_versions[0].roster_proven is False
 
 
-def test_unresolved_participant_makes_whole_side_unusable(database: Path) -> None:
+def test_an_unregistered_squad_member_keeps_the_side_usable(database: Path) -> None:
+    """Measured on the 2026-10-13 Champions League tie: 3 of Arsenal's 23 named players were
+    academy substitutes the FPL registry does not list, which used to make every Arsenal
+    player unknown. A registered player's row always resolves, so an unlistable row can
+    neither hide his appearance nor fake his non-selection."""
     add_version(
         database,
-        version="unresolved",
+        version="unregistered",
         known=AS_OF - timedelta(hours=1),
         rows=[
             _row(code=GAKPO, team_code=LIVERPOOL_CODE, provider_team_id=LIVERPOOL_PROVIDER),
+            # An academy substitute with no Opta anchor in this season's registry.
             _row(code=None, team_code=LIVERPOOL_CODE, provider_team_id=LIVERPOOL_PROVIDER),
+        ],
+    )
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.verdict == "midweek_played"
+    assert row.last_appearance is not None
+    assert row.last_appearance.nominal_minutes == 90.0
+    assert not [r for r in row.unknown_reasons if r.startswith("side_identity_unresolved")]
+    assert not [r for r in row.unknown_reasons if r.startswith("roster_not_proven")]
+    version = next(v for v in row.evidence_versions if v.provider_match_id == 5001)
+    assert version.roster_proven is True
+    assert version.unregistered_squad_members == 1
+
+
+def test_an_unregistered_squad_member_cannot_prove_another_player_rested(database: Path) -> None:
+    """The relaxation must not invent rest either: a teammate absent from a usable roster is
+    still only a proved non-selection, and the separate coverage gate still applies."""
+    add_version(
+        database,
+        version="unregistered-absent",
+        known=AS_OF - timedelta(hours=1),
+        rows=[_row(code=None, team_code=LIVERPOOL_CODE, provider_team_id=LIVERPOOL_PROVIDER)],
+    )
+    row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
+    assert row.verdict == "unknown"
+    assert row.last_appearance is None
+    assert "no_witnessed_appearance_in_window" in row.unknown_reasons
+    assert "schedule_coverage_unproven" in row.unknown_reasons
+    version = next(v for v in row.evidence_versions if v.provider_match_id == 5001)
+    assert version.roster_proven is True
+    assert version.unregistered_squad_members == 1
+
+
+def test_two_club_codes_on_one_provider_side_drop_the_side_entirely(database: Path) -> None:
+    """Relaxing the unregistered-member rule must not weaken club identity. Two permanent
+    codes behind one provider side make that side's club ambiguous, and the existing club
+    crosswalk refuses it before any fixture is built -- a stronger outcome than flagging the
+    roster, which is why the per-side club check that remains is only local defence."""
+    add_version(
+        database,
+        version="contradiction",
+        known=AS_OF - timedelta(hours=1),
+        rows=[
+            _row(code=GAKPO, team_code=LIVERPOOL_CODE, provider_team_id=LIVERPOOL_PROVIDER),
+            _row(code=HAALAND, team_code=CITY_CODE, provider_team_id=LIVERPOOL_PROVIDER),
         ],
     )
     row = next(p for p in job.build(database, as_of=AS_OF).players if p.code == GAKPO)
     assert row.verdict == "unknown"
     assert row.last_appearance is None
-    assert "side_identity_unresolved:5001" in row.unknown_reasons
+    assert row.evidence_versions == []
+    assert "no_witnessed_appearance_in_window" in row.unknown_reasons
+
+
+def test_a_player_on_loan_to_the_opponent_never_joins_this_side(database: Path) -> None:
+    """Measured case: FPL kept Bakwa at Nott'm Forest with status `u` while he played for
+    Lille, so his exact Opta anchor resolves to an FPL code on the opponent's side."""
+    add_version(
+        database,
+        version="loan",
+        known=AS_OF - timedelta(hours=1),
+        rows=[
+            _row(code=GAKPO, team_code=LIVERPOOL_CODE, provider_team_id=LIVERPOOL_PROVIDER),
+            # Registered elsewhere in FPL, named by the foreign opponent in this match.
+            _row(code=HAALAND, team_code=None, provider_team_id=6),
+        ],
+    )
+    document = job.build(database, as_of=AS_OF)
+    row = next(p for p in document.players if p.code == GAKPO)
+    assert row.verdict == "midweek_played"
+    version = next(v for v in row.evidence_versions if v.provider_match_id == 5001)
+    assert version.roster_proven is True
+    assert version.unregistered_squad_members == 0
+    # The loaned player's own club sees no fixture from the opponent's side of this match.
+    haaland = next(p for p in document.players if p.code == HAALAND)
+    assert [v.provider_match_id for v in haaland.evidence_versions] == []
 
 
 def test_revised_future_kickoff_cannot_resurrect_old_completed_version(database: Path) -> None:

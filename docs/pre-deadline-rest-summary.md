@@ -70,6 +70,34 @@ Every downgrade carries its reason and the exact `provider_match_id` that caused
 * `no_next_fixture_listed` / `next_fixture_kickoff_unavailable` -- the gap has no second endpoint;
 * `international_window_overlap_call_ups_not_captured` -- see below.
 
+### An unregistered squad member is evidence, not a defect (2026-10-16)
+
+"Interpreted cleanly" deliberately does **not** mean every named squad member resolves to an
+FPL element. A European squad list carries academy players this season's FPL registry never
+lists, so they carry no Opta anchor. Measured on the real payloads: Arsenal's 2026-10-13
+Champions League tie named 23 players of whom **20 resolved and 3 did not** -- shirts 74, 53
+and 89, all academy substitutes -- against **21 of 21** for Aston Villa the following night.
+
+Treating that as a broken side was wrong, and expensively so: on the 2026-10-16 published
+generation it made **604 of 667** players `unknown` and `full_rest` exactly **0**, hiding the
+midweek minutes of every Arsenal, Liverpool, Man Utd, Crystal Palace, Sunderland, Bournemouth
+and Brighton player while Villa and Man City came through intact.
+
+The relaxation is sound rather than convenient. `exact_crosswalk` resolves a provider id
+through FPL's own `opta_code` (`p<provider id>`) with no name or bare-code fallback, so
+resolution is a pure function of the provider id: a player the registry **does** carry always
+resolves and therefore always reaches `observations`. An unlistable row can never be him, so
+it can neither hide his appearance nor fake his non-selection. Such rows are counted in
+`unregistered_squad_members` on each published `evidence_versions` entry and decide nothing.
+
+What still fails closed is unchanged: an absent or incomplete endpoint, a contradictory
+interpretation, a side whose rows are missing, ambiguous club identity (two permanent codes
+behind one provider side are refused by the club crosswalk before any fixture is built), and
+the separate `schedule_coverage_unproven` gate, which continues to deny `full_rest` on its
+own evidence. A loaned-out player is not a counterexample: FPL kept Bakwa at Nott'm Forest
+with status `u` while he played for Lille, so his anchor resolves on the opponent's side and
+`provider_team_id` keeps him out of Arsenal's.
+
 ## Two limitations that must stay visible
 
 1. **National-team call-ups are not captured anywhere in this repository.** When a published
