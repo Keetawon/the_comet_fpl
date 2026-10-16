@@ -125,3 +125,28 @@ PMF and expected bonus match the comparison. This verification refits no paramet
 and reads no outcomes. It establishes implementation equivalence, not predictive
 accuracy. The completed classifier verdict is recorded separately in
 `goal-involvement-v1-development-2026-10-16.md`.
+
+### Verified public activation, 2026-10-16
+
+The complete owner-adopted stack was published for 667 players across GW7-11
+from backend commit `ff302ce8480137448c441a6a56b139bdb5a345b2`, with prediction
+cutoff `2026-10-16T14:19:19.736231+00:00`. Run
+`1faf389a41701ece6e00dd8db0298a4b8ca713bf454845ff74074f278e9cf220`
+retains both frozen model configurations and its paired environment comparison.
+The public release completed at `2026-10-16T14:37:15.150179+00:00`; the refresh
+and retention cleanup finished successfully at `2026-10-16T14:42:52.054993+00:00`.
+
+Independent verification reconciled all 3,335 player-gameweeks to the ledger and
+public JSON, including fixture/gameweek xP, whole-GW G+A probabilities and exact
+five-GW means. The live Players page selected the new default vintage and both
+probability columns sorted correctly. The frontend was merged through PR #19 at
+`6f359b0f4aa5015bac16496fbaa44399a6436bf2`.
+
+The trained event classifier remains shadow-only: its 0.648429% covered-season
+log-loss lift missed the fixed 1% serving gate. Public probabilities use the
+adopted component baseline. This activation does not change any scientific verdict
+or rerun any formal training. Publication/privacy checks and frontend checks
+passed; all 86 full-suite failure/error nodes reproduced on the unchanged base.
+
+The retained [publication record](../results/player_production_ga_publication_20261016/publication-complete.json)
+links the numerical, browser and test verification records.

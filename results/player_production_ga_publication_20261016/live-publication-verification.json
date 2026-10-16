@@ -1,0 +1,309 @@
+{
+  "status": "PASS",
+  "run_id": "1faf389a41701ece6e00dd8db0298a4b8ca713bf454845ff74074f278e9cf220",
+  "cutoff": "2026-10-16T14:19:19.736231+00:00",
+  "backend_commit": "ff302ce8480137448c441a6a56b139bdb5a345b2",
+  "artifact_schema": 3,
+  "season": "2026-27",
+  "gw_from": 7,
+  "gw_to": 11,
+  "players": 667,
+  "ledger_gameweeks": 3335,
+  "generation_sha256": "21692b8a85a7c506365ec15ce556a5e8bb076c534d2ae3cdbe14234946420a9c",
+  "public_players_sha256": "f3faa06daab3fa1e7c8d48dbb505cf294c924b10599285a5c7ef0ed41f0ed8de",
+  "pair_id": "12f84e416877f120802984e34932ba8de0c464be9861317f5c2361bac8f9b33f",
+  "shadow_run_id": "f6c722ca9a394878a7c3078ca6babb4b33b2caadb51773847acad53e355ad7fd",
+  "all_public_probabilities_and_five_gw_means_reconcile": true,
+  "all_public_fixture_and_gameweek_xp_reconcile": true,
+  "public_pointer_verified": true,
+  "top_10_by_position": {
+    "GK": [
+      {
+        "player": "Donnarumma",
+        "club": "MCI",
+        "xp": 3.7729999999999997,
+        "ga_ge_2": 2.478564446074935e-07,
+        "mean_next_5": 1.8560312122530008e-07
+      },
+      {
+        "player": "Verbruggen",
+        "club": "BHA",
+        "xp": 3.7125,
+        "ga_ge_2": 0.0014246414507792793,
+        "mean_next_5": 0.0009258286601483354
+      },
+      {
+        "player": "Raya",
+        "club": "ARS",
+        "xp": 3.5905,
+        "ga_ge_2": 4.038517650123332e-06,
+        "mean_next_5": 3.958625873328684e-06
+      },
+      {
+        "player": "Leno",
+        "club": "FUL",
+        "xp": 3.5555,
+        "ga_ge_2": 2.0639239555180627e-07,
+        "mean_next_5": 1.425119545222023e-07
+      },
+      {
+        "player": "Petrovi\u0107",
+        "club": "BOU",
+        "xp": 3.439,
+        "ga_ge_2": 1.8129490695901855e-07,
+        "mean_next_5": 2.3487880605372897e-07
+      },
+      {
+        "player": "Tzolakis",
+        "club": "HUL",
+        "xp": 3.3715,
+        "ga_ge_2": 2.658312105198457e-07,
+        "mean_next_5": 3.4155660806339674e-07
+      },
+      {
+        "player": "Horn\u00ed\u010dek",
+        "club": "NEW",
+        "xp": 3.307,
+        "ga_ge_2": 2.611563223382015e-07,
+        "mean_next_5": 2.1614554452928976e-07
+      },
+      {
+        "player": "Kelleher",
+        "club": "BRE",
+        "xp": 3.2325,
+        "ga_ge_2": 1.5357202207719016e-07,
+        "mean_next_5": 1.7403806076515903e-07
+      },
+      {
+        "player": "Roefs",
+        "club": "SUN",
+        "xp": 3.1705,
+        "ga_ge_2": 2.133399082413466e-06,
+        "mean_next_5": 2.3949105192623815e-06
+      },
+      {
+        "player": "Lammens",
+        "club": "MUN",
+        "xp": 3.1685,
+        "ga_ge_2": 1.4260525341277738e-07,
+        "mean_next_5": 1.2922593045020924e-07
+      }
+    ],
+    "DEF": [
+      {
+        "player": "Silva",
+        "club": "BOU",
+        "xp": 4.608,
+        "ga_ge_2": 0.023285848984941265,
+        "mean_next_5": 0.02937681202112461
+      },
+      {
+        "player": "Calafiori",
+        "club": "ARS",
+        "xp": 4.538,
+        "ga_ge_2": 0.04370393397437472,
+        "mean_next_5": 0.04261888536898021
+      },
+      {
+        "player": "Truffert",
+        "club": "BOU",
+        "xp": 4.4190000000000005,
+        "ga_ge_2": 0.012412266128439625,
+        "mean_next_5": 0.01578629292638603
+      },
+      {
+        "player": "Van Hecke",
+        "club": "TOT",
+        "xp": 4.3395,
+        "ga_ge_2": 0.028922358408437127,
+        "mean_next_5": 0.03088770332443207
+      },
+      {
+        "player": "Bogle",
+        "club": "LEE",
+        "xp": 4.1715,
+        "ga_ge_2": 0.028931185537867804,
+        "mean_next_5": 0.023107267612468813
+      },
+      {
+        "player": "Gabriel",
+        "club": "ARS",
+        "xp": 4.1000000000000005,
+        "ga_ge_2": 0.00741697073491232,
+        "mean_next_5": 0.007255448541814829
+      },
+      {
+        "player": "Mukiele",
+        "club": "SUN",
+        "xp": 3.9364999999999997,
+        "ga_ge_2": 0.007846944416970716,
+        "mean_next_5": 0.008715051845214076
+      },
+      {
+        "player": "De Cuyper",
+        "club": "BHA",
+        "xp": 3.767,
+        "ga_ge_2": 0.017631433662815832,
+        "mean_next_5": 0.011647250036212147
+      },
+      {
+        "player": "Tarkowski",
+        "club": "EVE",
+        "xp": 3.7225,
+        "ga_ge_2": 0.0013869996215477715,
+        "mean_next_5": 0.0011442907323735221
+      },
+      {
+        "player": "O'Reilly",
+        "club": "MCI",
+        "xp": 3.7045,
+        "ga_ge_2": 0.030745214525387976,
+        "mean_next_5": 0.023566738377056362
+      }
+    ],
+    "MID": [
+      {
+        "player": "Saka",
+        "club": "ARS",
+        "xp": 6.3375,
+        "ga_ge_2": 0.16562902728505718,
+        "mean_next_5": 0.16087683741439673
+      },
+      {
+        "player": "B.Fernandes",
+        "club": "MUN",
+        "xp": 5.6935,
+        "ga_ge_2": 0.11864029048462954,
+        "mean_next_5": 0.10875329738228263
+      },
+      {
+        "player": "Gro\u00df",
+        "club": "BHA",
+        "xp": 5.479,
+        "ga_ge_2": 0.12842551757762988,
+        "mean_next_5": 0.08837440882134182
+      },
+      {
+        "player": "Cherki",
+        "club": "MCI",
+        "xp": 5.198,
+        "ga_ge_2": 0.13614667811964815,
+        "mean_next_5": 0.10748272992286216
+      },
+      {
+        "player": "Rudoni",
+        "club": "COV",
+        "xp": 4.962,
+        "ga_ge_2": 0.11257055485792844,
+        "mean_next_5": 0.12732382353204735
+      },
+      {
+        "player": "Rogers",
+        "club": "CHE",
+        "xp": 4.73,
+        "ga_ge_2": 0.09418529829052025,
+        "mean_next_5": 0.11180795397153875
+      },
+      {
+        "player": "Mbeumo",
+        "club": "MUN",
+        "xp": 4.6945,
+        "ga_ge_2": 0.08318447390802369,
+        "mean_next_5": 0.0760891234118728
+      },
+      {
+        "player": "\u00d8degaard",
+        "club": "ARS",
+        "xp": 4.6625,
+        "ga_ge_2": 0.10054217042595798,
+        "mean_next_5": 0.09779531069209943
+      },
+      {
+        "player": "E.Le F\u00e9e",
+        "club": "SUN",
+        "xp": 4.578,
+        "ga_ge_2": 0.07742214765676614,
+        "mean_next_5": 0.08402047631097853
+      },
+      {
+        "player": "Barnes",
+        "club": "NEW",
+        "xp": 4.3675,
+        "ga_ge_2": 0.08158883124256389,
+        "mean_next_5": 0.06902155604970528
+      }
+    ],
+    "FWD": [
+      {
+        "player": "Haaland",
+        "club": "MCI",
+        "xp": 7.126,
+        "ga_ge_2": 0.3047064782878166,
+        "mean_next_5": 0.24912103309382433
+      },
+      {
+        "player": "Barry",
+        "club": "EVE",
+        "xp": 4.916,
+        "ga_ge_2": 0.1251276676584817,
+        "mean_next_5": 0.10444440552453696
+      },
+      {
+        "player": "Jo\u00e3o Pedro",
+        "club": "CHE",
+        "xp": 4.57,
+        "ga_ge_2": 0.12451945469947706,
+        "mean_next_5": 0.1461543314283118
+      },
+      {
+        "player": "Gonzalo",
+        "club": "FUL",
+        "xp": 4.0465,
+        "ga_ge_2": 0.08628815667911605,
+        "mean_next_5": 0.06221278067877676
+      },
+      {
+        "player": "Calvert-Lewin",
+        "club": "LEE",
+        "xp": 4.011,
+        "ga_ge_2": 0.0811819381019343,
+        "mean_next_5": 0.06565975467040448
+      },
+      {
+        "player": "Thiago",
+        "club": "BRE",
+        "xp": 3.706,
+        "ga_ge_2": 0.058777761194831524,
+        "mean_next_5": 0.06514949303771637
+      },
+      {
+        "player": "Evanilson",
+        "club": "BOU",
+        "xp": 3.347,
+        "ga_ge_2": 0.04468155025947018,
+        "mean_next_5": 0.05580161552158362
+      },
+      {
+        "player": "Brobbey",
+        "club": "SUN",
+        "xp": 3.044,
+        "ga_ge_2": 0.03927239445961109,
+        "mean_next_5": 0.042992852461107435
+      },
+      {
+        "player": "Isak",
+        "club": "LIV",
+        "xp": 2.996,
+        "ga_ge_2": 0.08876377356976276,
+        "mean_next_5": 0.09859807731384407
+      },
+      {
+        "player": "McBurnie",
+        "club": "HUL",
+        "xp": 2.9234999999999998,
+        "ga_ge_2": 0.031037360606802872,
+        "mean_next_5": 0.03832597334623445
+      }
+    ]
+  }
+}

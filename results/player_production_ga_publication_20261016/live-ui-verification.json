@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "url": "https://www.thecometfpl.com/#players",
+  "browser": "Chrome",
+  "forecast_run_id": "1faf389a41701ece6e00dd8db0298a4b8ca713bf454845ff74074f278e9cf220",
+  "displayed_default_vintage": "Default · 1faf389a · GW7-11",
+  "displayed_forecast_cutoff": "2026-10-16 14:19 UTC",
+  "adjacent_headers": ["xP GW7", "G+A ≥2 GW7", "Avg G+A ≥2 · 5 GW"],
+  "next_gw_probability_sort_top_three": ["Haaland", "Saka", "Cherki"],
+  "five_gw_mean_sort_top_three": ["Haaland", "Saka", "João Pedro"],
+  "restored_xp_sort_top_three": ["Haaland", "Saka", "B.Fernandes"],
+  "displayed_examples": [
+    {"player": "Haaland", "xp": "7.1", "ga_ge_2": "30.5%", "mean_next_5": "24.9%"},
+    {"player": "Saka", "xp": "6.3", "ga_ge_2": "16.6%", "mean_next_5": "16.1%"}
+  ]
+}
