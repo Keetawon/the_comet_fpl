@@ -329,7 +329,11 @@ def _documents() -> dict[str, dict[str, Any]]:
     }
 
 
-def _write_generation(directory: Path, documents: dict[str, dict[str, Any]]) -> None:
+def _write_generation(
+    directory: Path,
+    documents: dict[str, dict[str, Any]],
+    runs: list[dict[str, Any]] | None = None,
+) -> None:
     directory.mkdir()
     files: dict[str, dict[str, Any]] = {}
     for filename in _FILENAMES:
@@ -365,6 +369,9 @@ def _write_generation(directory: Path, documents: dict[str, dict[str, Any]]) -> 
         "ease_index_formula_version": "fixture-ease-v1",
         "files": files,
     }
+    if runs is not None:
+        manifest["runs"] = runs
+        manifest["run_ids"] = [r["run_id"] for r in runs]
     manifest["content_sha256"] = _manifest_content_sha256(manifest)
     (directory / MANIFEST_FILENAME).write_bytes(_canonical_json_bytes(manifest, indent=2))
     validate_dashboard_json(directory)
@@ -751,7 +758,9 @@ def test_cli_prints_one_machine_readable_metadata_record(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     source = tmp_path / "source"
-    _write_generation(source, deepcopy(_documents()))
+    from .test_dashboard_scope import _mobile_source
+
+    _mobile_source(source)
     output = tmp_path / "public"
     archive = tmp_path / "dashboard-public-data.zip"
 

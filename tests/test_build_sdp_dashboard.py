@@ -88,7 +88,8 @@ def test_existing_base_is_explicit_and_never_relabels_forecast_vintage(
         def metadata(self) -> dict[str, str]:
             return {"validated": "existing sanitizer"}
 
-    def package(source: Path, *args: Any) -> Package:
+    def package(source: Path, *args: Any, **kwargs: Any) -> Package:
+        assert kwargs == {"mobile_scope": True}
         calls.append(("package", source))
         return Package()
 

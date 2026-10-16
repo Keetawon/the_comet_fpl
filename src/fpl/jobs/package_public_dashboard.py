@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        result = package_public_dashboard(args.input, args.output, args.archive)
+        result = package_public_dashboard(args.input, args.output, args.archive, mobile_scope=True)
     except (
         PublicDashboardPackageError,
         DashboardJsonError,
