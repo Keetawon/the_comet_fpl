@@ -41,9 +41,8 @@ import { PLAYER_HORIZON_FIELDS } from "./types";
 import { resolveDataUrl } from "./publicData";
 import { AVAILABILITY_LABEL } from "@/lib/availability";
 
-// Session-level cache: players.json is ~15 MB, so every page fetches it through this
-// map and the browser tab parses it exactly once. A failed fetch is evicted so it can
-// be retried.
+// Session cache: each bounded public read model is parsed once per tab. Failed
+// fetches are evicted for retry; publicData rejects oversized advertised payloads.
 const cache = new Map<string, Promise<unknown>>();
 const DASHBOARD_SCHEMA_VERSION = 9;
 const FORECAST_ACCURACY_SCHEMA_VERSION = 9;

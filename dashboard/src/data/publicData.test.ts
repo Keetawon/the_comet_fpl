@@ -18,6 +18,25 @@ beforeEach(() => { vi.resetModules(); vi.stubEnv("VITE_PUBLIC_DATA_POINTER", poi
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("public data generation resolution", () => {
+  it.each([15_000_001, 276_900_780])("rejects an oversized players payload before fetching it (%i bytes)", async size => {
+    const value = pointer();
+    value.files["data/players.json"].size_bytes = size;
+    const fetcher = vi.fn(async (_url: string) => ({ ok: true, json: async () => value }));
+    vi.stubGlobal("fetch", fetcher);
+    const { loadPlayers } = await import("./load");
+    await expect(loadPlayers()).rejects.toThrow(/mobile size limit/);
+    expect(fetcher.mock.calls.some(([url]) => url.endsWith("/players.json"))).toBe(false);
+    expect(fetcher).toHaveBeenCalledWith(pointerUrl, expect.objectContaining({ cache: "no-store" }));
+  });
+
+  it("accepts a players payload exactly at the publisher limit", async () => {
+    const value = pointer();
+    value.files["data/players.json"].size_bytes = 15_000_000;
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => value })));
+    const { resolveDataUrl } = await import("./publicData");
+    expect(await resolveDataUrl("data/players.json")).toContain(`/generations/${generation}/`);
+  });
+
   it("pins a single concurrent pointer read across data, SDP and publication status for this session", async () => {
     let livePointer = pointer();
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => livePointer }));
