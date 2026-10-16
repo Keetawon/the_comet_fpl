@@ -1,3 +1,4 @@
+import { isHostedStatic } from "@/lib/pageAccess";
 import { PublicationStatus } from "@/components/PublicationStatus";
 import { AccuracyObservationTable, AccuracyDelta } from "@/components/AccuracyObservationTable";
 import { useEffect, useMemo, useState } from "react";
@@ -262,6 +263,11 @@ export function PlayerForecastVsActualPage() {
         <button className="rounded-md border px-3 py-2" onClick={() => { setRunId(defaultAccuracyRun(runOptions)?.run_id ?? ""); setGwFilter("all"); }}>Latest scored forecast</button>
         <button className="rounded-md border px-3 py-2" onClick={() => { const latest = runOptions.find((r) => r.component_modes?.["football_environment.primary"] === "sdp_v2") ?? runOptions[0]; if (latest) setRunId(latest.run_id); setGwFilter("all"); }}>Latest published forecast · may be pending</button>
       </div>
+      {isHostedStatic() && (
+        <p className="text-xs text-muted-foreground">
+          Public history covers six recent scored forecast windows and active forecasts. Earlier vintages remain in the archive.
+        </p>
+      )}
       <PublicationStatus manifestHash={state.data.manifest?.content_sha256 ?? ""} />
 
       <div
