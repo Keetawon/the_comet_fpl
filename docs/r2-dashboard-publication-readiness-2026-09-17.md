@@ -72,6 +72,14 @@ capability needed by the implemented uploader.
   process exit code even when the local refresh succeeded. An unconfirmed pointer
   write is reported as `UNKNOWN`; it is not described as a successful publication
   or blindly rolled back.
+- A second, narrower writer was added on 2026-10-16: `fpl.jobs.republish_provisional`
+  restates only the provisional preview of the generation currently being served and
+  publishes it through this same uploader, so the pointer-last sequence, the immutable
+  prefix and the conditional pointer write are unchanged. It carries every other
+  published file forward byte for byte and refuses a restatement that names any other
+  file. Its R2 credential comes from the `production-fpl` GitHub environment rather
+  than the owner machine; the read side needs none. See
+  `docs/provisional-only-republish.md`.
 - `dashboard/src/data/publicData.ts` resolves one generation per page session for
   main data, SDP statistics, competitive schedule, and publication status. Invalid
   configured pointers fail closed. An unset or blank pointer preserves existing
