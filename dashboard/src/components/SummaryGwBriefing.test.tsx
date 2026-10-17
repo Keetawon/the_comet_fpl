@@ -42,7 +42,9 @@ describe("combined public GW message", () => {
     expect(sections).toEqual([...sections].sort((a, b) => a - b));
     expect(result.text).toContain("Home player: 3d (68.0h) gap; 90 midweek min / 1 app");
     expect(result.text).toContain(data.news!.stories[0].summary.en);
-    expect(result.text).toContain("https://x.com/FFScout/status/100");
+    expect(result.text).toContain("@FFScout · 2026-10-16 09:00 UTC");
+    expect(result.text).not.toContain("https://x.com/");
+    expect(result.text).toContain("https://www.thecometfpl.com/#summary");
     expect(data).toEqual(before);
   });
   it("keeps every DGW leg in kickoff order without using first-leg rest for the later leg", () => {
@@ -157,11 +159,14 @@ it("loads context on demand, copies the complete message and switches languages"
   fireEvent.click(screen.getByRole("button", { name: "Create GW briefing" }));
   const area = await screen.findByRole("textbox", { name: "Analysis message" });
   expect(area).toHaveValue(buildSummaryBriefing(data).text);
+  expect((area as HTMLTextAreaElement).value).not.toContain("https://x.com/");
   fireEvent.click(screen.getByRole("button", { name: "Copy text" }));
   await screen.findByRole("button", { name: "Copied" });
   expect(writeText).toHaveBeenCalledWith(buildSummaryBriefing(data).text);
   fireEvent.click(screen.getByRole("button", { name: "ไทย" }));
   expect(screen.getByRole("textbox")).toHaveValue(buildSummaryBriefing({ ...data, language: "th" }).text);
+  expect((area as HTMLTextAreaElement).value).not.toContain("https://x.com/");
+  expect((area as HTMLTextAreaElement).value).toContain("https://www.thecometfpl.com/#summary");
 });
 it("still offers score text when both context sources fail", async () => {
   vi.mocked(loadNewsFeed).mockRejectedValue(new Error("Offline")); vi.mocked(loadRestSummary).mockRejectedValue(new Error("Missing"));

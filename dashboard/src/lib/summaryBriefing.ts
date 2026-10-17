@@ -102,7 +102,7 @@ export function buildSummaryBriefing(input: SummaryBriefingInput): SummaryBriefi
     return stories.flatMap(story => [
       // Preserve reviewed uncertainty/status lines. The browser neither classifies nor rewrites news.
       language === "th" && story.summary.th ? story.summary.th : `${language === "th" ? "[รอคำแปลไทย] " : ""}${story.summary.en}`,
-      `@FFScout · ${stamp(story.published_at)} · ${story.source_url}`,
+      `@FFScout · ${stamp(story.published_at)}`,
     ]);
   };
   const lines = [say(`GW${gw} MATCHWEEK BRIEFING | THE COMET FPL`, `สรุปก่อนเกม GW${gw} | THE COMET FPL`),
