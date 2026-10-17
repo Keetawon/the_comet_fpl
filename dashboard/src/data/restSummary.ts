@@ -42,7 +42,7 @@ export interface RestSummary {
   season: string;
   as_of: string;
   window_hours: number;
-  midweek_definition: "Monday_through_Thursday_UTC";
+  midweek_definition: "Monday_through_Thursday_UTC" | "Tuesday_through_Thursday_UTC";
   duration_definition: "nominal_period_clock_intervals_v1_not_fpl_minutes";
   promotion_permitted: false;
   players: PlayerRest[];
@@ -61,7 +61,7 @@ export function parseRestSummary(value: unknown): RestSummary {
   if (!object(value) || value.schema_version !== 1 || value.semantics !== "descriptive_observed_rest_not_forecast" ||
       value.promotion_permitted !== false || typeof value.season !== "string" || !date(value.as_of) ||
       !natural(value.window_hours) || value.window_hours === 0 || !Array.isArray(value.players) ||
-      value.midweek_definition !== "Monday_through_Thursday_UTC" ||
+      !["Monday_through_Thursday_UTC", "Tuesday_through_Thursday_UTC"].includes(String(value.midweek_definition)) ||
       value.duration_definition !== "nominal_period_clock_intervals_v1_not_fpl_minutes") throw new Error("Invalid published rest summary.");
   const codes = new Set<number>();
   for (const row of value.players) {

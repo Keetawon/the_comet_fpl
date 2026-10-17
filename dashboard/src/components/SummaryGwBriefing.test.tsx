@@ -33,7 +33,7 @@ function input(): SummaryBriefingInput & { teams: TeamRecord[]; players: PlayerR
       team_attack_ease_index: null, team_defence_ease_index: null, team_overall_ease_index: null, team_official_fdr: null, team_lambda_for: null, team_lambda_against: null, team_probability_clean_sheet: null })) }));
   const stories: NewsStory[] = teams.map((team, i) => ({ id: String(i).repeat(64), source_id: "scout", source_name: "Fantasy Football Scout", source_kind: "x", source_url: `https://x.com/FFScout/status/${100 + i}`, source_record_id: String(100 + i), published_at: "2026-10-16T09:00:00Z", known_at: "2026-10-16T09:10:00Z", source_sha256: "a".repeat(64), season: run.season, team_code: team.team_code, team_name: team.team_name, player_code: null, player_name: null, category: "press_conference", title: { en: "Update", th: null }, summary: { en: i ? "Away fitness remains uncertain." : "Home player has returned to training; availability unconfirmed.", th: i ? "ความฟิตทีมเยือนยังไม่ชัดเจน" : "กลับมาซ้อมแล้ว แต่ยังไม่ยืนยันว่าพร้อม" }, rendering: "source_text", ai_model: null, summarized_at: null }));
   const news: PublicNewsFeed = { schema: "fpl.public-news", schema_version: 1, semantics: "reported_news_not_forecast", generated_at: "2026-10-16T10:00:00Z", demo: false, sources: [{ source_id: "scout", source_name: "Fantasy Football Scout", source_kind: "x", status: "ok", last_checked_at: "2026-10-16T09:10:00Z", last_success_at: "2026-10-16T09:10:00Z", message: "" }], stories };
-  const rest: RestSummary = { schema_version: 1, semantics: "descriptive_observed_rest_not_forecast", season: run.season, as_of: "2026-10-16T10:00:00Z", window_hours: 168, midweek_definition: "Monday_through_Thursday_UTC", duration_definition: "nominal_period_clock_intervals_v1_not_fpl_minutes", promotion_permitted: false,
+  const rest: RestSummary = { schema_version: 1, semantics: "descriptive_observed_rest_not_forecast", season: run.season, as_of: "2026-10-16T10:00:00Z", window_hours: 168, midweek_definition: "Tuesday_through_Thursday_UTC", duration_definition: "nominal_period_clock_intervals_v1_not_fpl_minutes", promotion_permitted: false,
     players: players.map(player => ({ code: player.code, team_code: player.team_code, verdict: "midweek_played", coverage_complete: false,
       last_appearance: { competition_id: 5, competition_name: "Champions League", provider_match_id: player.code + 900, kickoff: "2026-10-14T18:00:00Z", opponent_name: "Prior opponent", nominal_minutes: 90 },
       next_fixture: { fixture_id: 71, gw: 7, kickoff, was_home: player.team_code === 3, opponent_name: player.team_code === 3 ? "Beta" : "Alpha" }, rest_days: 3, rest_hours: 68, midweek_appearances: 1, midweek_nominal_minutes: 90, midweek_fixtures: 1, midweek_load: "heavy", international_window_overlap: false, unknown_reasons: ["schedule_coverage_unproven"] })) };
@@ -216,6 +216,20 @@ describe("combined public GW message", () => {
     const text = buildSummaryBriefing(data).text;
     expect(text).toContain("Kickoff has passed");
     expect(text).not.toContain("3d (68.0h)");
+  });
+  it("renders the report's actual midweek convention and leaves Monday-only minutes unmarked", () => {
+    const data = input();
+    Object.assign(data.rest!.players[0], { verdict: "unknown", midweek_appearances: 0, midweek_fixtures: 0, midweek_nominal_minutes: null, midweek_load: "unknown" });
+    data.rest!.players[0].last_appearance!.kickoff = "2026-10-12T18:00:00Z";
+    expect(parseRestSummary(data.rest)).toBe(data.rest);
+    const text = buildSummaryBriefing(data).text;
+    expect(text).toContain("gap: Home player (—)");
+    expect(text).toContain("Midweek = Tue–Thu UTC");
+    expect(buildSummaryBriefing({ ...data, language: "th" }).text).toContain("กลางสัปดาห์คือ อ.–พฤ. UTC");
+    data.rest!.midweek_definition = "Monday_through_Thursday_UTC";
+    expect(parseRestSummary(data.rest)).toBe(data.rest);
+    expect(buildSummaryBriefing(data).text).toContain("Midweek = Mon–Thu UTC");
+    expect(() => parseRestSummary({ ...data.rest, midweek_definition: "all_week" })).toThrow(/rest summary/);
   });
 });
 

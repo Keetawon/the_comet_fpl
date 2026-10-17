@@ -145,8 +145,9 @@ export function buildSummaryBriefing(input: SummaryBriefingInput): SummaryBriefi
         say("Later DGW leg: rest will be updated after the earlier appearance is known; no assumed minutes or recovery.", "นัดหลังใน DGW: รอข้อมูลการลงเล่นนัดก่อนเพื่ออัปเดตวันพัก ไม่สมมตินาทีหรือการฟื้นตัว"));
     }
   }
-  lines.push("", say(`Rest = UK calendar days and hours between witnessed kickoffs. Midweek = Mon–Thu UTC within the report's ${freshRest?.window_hours ?? "—"}h window; nominal club minutes, not FPL minutes. Coverage may be incomplete; unknown does not mean rested. National-team minutes are not captured.`,
-    `วันพักนับตามวันที่อังกฤษและชั่วโมงระหว่างเวลาเตะที่มีหลักฐาน กลางสัปดาห์คือ จ.–พฤ. UTC ในช่วง ${freshRest?.window_hours ?? "—"} ชม. ของรายงาน นาทีสโมสรเป็นเวลาตามนาฬิกาเกม ไม่ใช่นาที FPL ข้อมูลอาจไม่ครบ ไม่ทราบไม่ได้แปลว่าได้พัก และยังไม่มีนาทีทีมชาติ`),
+  const midweekDays = freshRest === null ? "—" : freshRest.midweek_definition === "Tuesday_through_Thursday_UTC" ? say("Tue–Thu", "อ.–พฤ.") : say("Mon–Thu", "จ.–พฤ.");
+  lines.push("", say(`Rest = UK calendar days and hours between witnessed kickoffs. Midweek = ${midweekDays} UTC within the report's ${freshRest?.window_hours ?? "—"}h window; nominal club minutes, not FPL minutes. Coverage may be incomplete; unknown does not mean rested. National-team minutes are not captured.`,
+    `วันพักนับตามวันที่อังกฤษและชั่วโมงระหว่างเวลาเตะที่มีหลักฐาน กลางสัปดาห์คือ ${midweekDays} UTC ในช่วง ${freshRest?.window_hours ?? "—"} ชม. ของรายงาน นาทีสโมสรเป็นเวลาตามนาฬิกาเกม ไม่ใช่นาที FPL ข้อมูลอาจไม่ครบ ไม่ทราบไม่ได้แปลว่าได้พัก และยังไม่มีนาทีทีมชาติ`),
     say("News comes from selected @FFScout reports, not confirmed lineups or proof every conference is complete. Reports may be newer than the saved forecast.", "ข่าวมาจากรายงาน @FFScout ที่เลือก ไม่ใช่การยืนยันตัวจริงหรือยืนยันว่าแถลงครบทุกทีม ข่าวอาจใหม่กว่าชุดคาดการณ์"),
     ...warnings, "https://www.thecometfpl.com/#summary");
   return { text: lines.join("\n"), fixtures: matches.length, forecasts, warnings };
