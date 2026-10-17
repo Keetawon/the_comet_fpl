@@ -42,7 +42,10 @@ News is limited to dated @FFScout injury, suspension, squad and press-conference
 reports from the selected season and club, within seven days. A different-GW
 edition, demo, future-dated record, unresolved identity or failed source remains
 unavailable. Reviewed status text and uncertainty are preserved verbatim, with
-post timestamps and links. Missing reports do not establish fitness.
+post timestamps and attribution. Individual source URLs are omitted from the
+shareable message in both languages; the original links remain on the News page.
+THE COMET's footer link remains. Source validation and retained news records are
+unchanged. Missing reports do not establish fitness.
 
 The existing news publisher now assigns stable club identity only when the exact
 reviewed `CLUB | Team news` heading of `ffscout_press_conferences_v2` matches one
