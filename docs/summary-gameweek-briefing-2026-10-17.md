@@ -74,3 +74,42 @@ all ten fixtures appeared in kickoff order, the English message contained 13,286
 characters, and Copy text confirmed success. Responsive DOM inspection found the
 text area narrower than the viewport. Screenshot capture timed out, so no visual
 screenshot or physical iOS verification is claimed.
+
+## Owner follow-up: minute markers and current GW7 news
+
+The English unknown-minute label now reads **midweek minutes unknown or did not
+play**, with the equivalent Thai wording. It describes the two possibilities;
+it does not reclassify missing evidence as confirmed non-participation. Witnessed
+appearances with missing durations still say that the player played but the
+minutes are unknown. Confirmed zero and no-fixture descriptions remain distinct.
+
+Each player name in the shared message carries **🟠** for more than 45 published
+nominal midweek minutes or **🟡** for a positive total up to and including 45.
+Zero, missing minutes and an unavailable fixture-matched report have no marker.
+The symbols use the reported total, not xP or a fitness inference. The legend is
+included in both languages and remains part of the copied/downloaded text.
+
+The existing bounded, authorized FFScout capture retrieved 47 posts from
+15–16 October. Twenty current club reports were selected, using the later Hull
+duplicate and excluding promotional posts. Each English/Thai editorial digest
+was checked against its complete retained post, with append-only exact-summary
+review receipts and `Codex-source-reviewed-editorial` provenance. This is agent
+review, not independent human approval. No additional language-provider call or
+new unattended capture schedule was used.
+
+All 20 clubs match the current official season registry. Spurs' report explicitly
+retains the pending Sunday, 18 October conference and Bentancur's three-gameweek
+suspension; it is not labelled a completed conference. Other reports preserve
+uncertainty, training-only updates and FFScout's own stated inferences.
+
+The refreshed news edition was published and independently read back with SHA-256
+`ffd5e7b46797417ca775b48a5102d264706f90fcf2473677cd81c3ae897070e1`.
+Private source/review records and the official registry replay remain under the
+existing operations news directory. No forecast generation was republished.
+
+Validation: **838 dashboard tests** and **80 Python news checks** pass. Dashboard
+lint and the hosted production build pass with the existing lint warnings. The
+new regression checks cover 45 versus 46 minutes, zero/null values, witnessed
+appearances with unknown minutes, grouped player names, both languages and no
+marker on a later DGW leg without a matching rest report. Python source and the
+previously documented unrelated full-suite/format failures are unchanged.
