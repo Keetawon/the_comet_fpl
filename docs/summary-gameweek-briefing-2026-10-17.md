@@ -113,3 +113,25 @@ new regression checks cover 45 versus 46 minutes, zero/null values, witnessed
 appearances with unknown minutes, grouped player names, both languages and no
 marker on a later DGW leg without a matching rest report. Python source and the
 previously documented unrelated full-suite/format failures are unchanged.
+
+Live text verification found 115 orange and 55 yellow player markers across all
+ten GW7 fixtures, with zero/unknown minutes unmarked and all 20 current news links
+present in both languages. Copying the entire English message succeeded. The
+marker update deployed through Pages run `38985760189` (merge `2047337`).
+
+The screenshot check found that an older Windows emoji font rendered the two
+circles as empty boxes. An explicit system emoji fallback alone did not fix it.
+The shared message now includes a self-hosted **840-byte** Noto Color Emoji WOFF2
+subset restricted to U+1F7E0 and U+1F7E1, with native Apple Color Emoji preferred
+on Apple devices. It leaves the Unicode copy/share text unchanged. The font has
+no runtime Google request or new npm dependency. Its SIL Open Font License is
+included at `dashboard/public/licenses/noto-color-emoji-OFL.txt`.
+
+Source: [Noto Emoji](https://github.com/googlefonts/noto-emoji), obtained via the
+Google Fonts CSS API's exact two-character `text` subset using a modern browser
+user agent. The retained WOFF2 SHA-256 is
+`a15dd66c82288446c8fcaca5275339854715538770c061d1b4d3594e7176e653`.
+The subset response was bounded to 20 KB before retention. The legacy TrueType
+response was rejected for exceeding the bound and was never saved or shipped.
+The built browser preview visually confirms distinct orange/yellow circles on
+the affected Windows browser. No forecast or rest data was changed for this fix.
