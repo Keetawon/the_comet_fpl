@@ -16,9 +16,8 @@ METHOD = "audited_goal_accounting_v1"
 SOURCE_METHOD = "source_goal_accounting_v1"
 DESCRIPTION = (
     "SDP goal accounting, with match-report corroboration where separately audited. "
-    "Automatic accounting confirms explicit penalty and direct free-kick goals only; "
-    "other origins require evidence. Opponent own goals are separate. "
-    "An incomplete classification stays unavailable, never zero. Display-only; "
+    "Automatic accounting classifies non-open-play, non-own-goal residuals as set-piece goals. "
+    "Opponent own goals are separate. Display-only; "
     "not a provider-supplied set-piece total. See each match's goal-pattern evidence."
 )
 
@@ -26,11 +25,12 @@ DESCRIPTION = (
 def apply_source_goal_pattern(
     row: dict[str, Any], source: dict[str, Any], *, interpreted_at: datetime
 ) -> None:
-    """Account only explicit counts from the identity-validated export source.
+    """Account counts from the identity-validated export source.
 
     The caller supplies the exact raw payload used to construct this match side,
-    never an independently selected latest payload. No residual is called open play
-    or set piece. A future capture is reinterpreted afresh; manual audits stay pinned.
+    never an independently selected latest payload. Non-open-play, non-opponent-own-goal
+    residual is classified as set pieces. A future capture is reinterpreted afresh;
+    manual audits stay pinned.
     """
     if row["goal_patterns"] is not None:
         return
@@ -75,8 +75,8 @@ def apply_source_goal_pattern(
     ):
         return
     confirmed = penalties + free_kicks
-    unknown = total - open_play - confirmed - own_received
-    if unknown < 0:
+    set_piece = total - open_play - own_received
+    if set_piece < 0 or set_piece < confirmed:
         return
     row["goal_patterns"] = {
         "method": SOURCE_METHOD,
@@ -85,10 +85,10 @@ def apply_source_goal_pattern(
         "interpreted_at": interpreted_at.isoformat(),
         "raw_payload_sha256": source["sha256"],
         "open_play_goals": open_play,
-        "confirmed_set_piece_goals": confirmed,
-        "set_piece_goals": None if unknown else confirmed,
+        "confirmed_set_piece_goals": set_piece,
+        "set_piece_goals": set_piece,
         "own_goals_received": own_received,
-        "unclassified_goals": unknown,
+        "unclassified_goals": 0,
         "total_goals": total,
         "evidence_urls": [],
     }

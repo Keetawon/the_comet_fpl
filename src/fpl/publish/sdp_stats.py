@@ -1354,9 +1354,9 @@ def build_sdp_stats(
     notes.append(
         "Goal patterns retain exact pinned match audits where valid. Other current-season "
         "validated match sources use explicit open-play, penalty, direct free-kick and "
-        "opponent own-goal counts. Remaining origins stay unclassified, never assumed open "
-        "play or set piece. Source corrections are reinterpreted at each export; old audits "
-        "are never carried over to revised payloads. This is display-only accounting."
+        "opponent own-goal counts, auto-classifying remaining non-open-play residuals as "
+        "set pieces. Source corrections are reinterpreted at each export; old audits are "
+        "never carried over to revised payloads. This is display-only accounting."
     )
     notes.extend(apply_team_xg_supplements(con, team_rows, cutoff=cutoff, current=current))
     notes.append(
