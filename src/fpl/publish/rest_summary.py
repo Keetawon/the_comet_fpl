@@ -38,7 +38,8 @@ from fpl.config import config_dir
 
 EVIDENCE_CLASS: Final = "descriptive_observed_rest_development"
 DURATION_DEFINITION: Final = "nominal_period_clock_intervals_v1_not_fpl_minutes"
-MIDWEEK_DEFINITION: Final = "Monday_through_Thursday_UTC"
+MidweekDefinition = Literal["Monday_through_Thursday_UTC", "Tuesday_through_Thursday_UTC"]
+MIDWEEK_DEFINITION: Final[MidweekDefinition] = "Tuesday_through_Thursday_UTC"
 # Matches `config/competitive_workload_staging.yaml`; a week is the default review window.
 DEFAULT_WINDOW_HOURS: Final = 168
 # Presentation calendar. The all-competition calendar already counts listed gaps in UK dates.
@@ -102,7 +103,9 @@ class CompletedFixture:
 
     @property
     def midweek(self) -> bool:
-        return self.kickoff.astimezone(UTC).weekday() <= 3
+        # Monday commonly closes the preceding PL round. It still dates the last
+        # appearance/rest gap, but is not additional Tue-Thu midweek workload.
+        return 1 <= self.kickoff.astimezone(UTC).weekday() <= 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,7 +216,8 @@ class RestSummary(RestRecord):
     season: str
     as_of: AwareDatetime
     window_hours: int = Field(gt=0)
-    midweek_definition: str = MIDWEEK_DEFINITION
+    # Legacy immutable reports retain their explicit Monday-inclusive convention.
+    midweek_definition: MidweekDefinition = MIDWEEK_DEFINITION
     duration_definition: str = DURATION_DEFINITION
     evidence_class: str = EVIDENCE_CLASS
     promotion_permitted: Literal[False] = False

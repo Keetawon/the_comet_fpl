@@ -36,7 +36,7 @@ export function SummaryRestTable({ players, gw }: { players: RankedNextPlayer[];
         <summary className="cursor-pointer py-1 font-medium focus-visible:outline-2">About points &amp; rest</summary>
         <div className="space-y-1 py-2 leading-relaxed">
           <p>Ranked by published raw xP for this GW only. Midweek context does not change the ranking or forecast.</p>
-          {report && <p>Previous {report.window_hours} hours · midweek: Mon–Thu UTC.</p>}
+          {report && <p>Previous {report.window_hours} hours · midweek: {report.midweek_definition === "Tuesday_through_Thursday_UTC" ? "Tue–Thu" : "Mon–Thu"} UTC.</p>}
           <p>Club participation only; national-team call-ups are not captured. Gaps are kickoff-to-kickoff, not verified recovery or fitness.</p>
         </div>
       </details>

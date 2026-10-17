@@ -178,3 +178,17 @@ Players-page interaction timeout and a subsequent dependent UI failure; the
 complete two-worker run passed without test or timeout changes. Lint and both
 ordinary and hosted production builds pass, with the existing lint warnings.
 No Python source, model, forecast artifact or public data schema changed.
+
+## Monday match correction
+
+The owner identified Coventry's Monday GW6 match being included in GW7's midweek
+minutes. The shared descriptive publisher now uses Tuesday-Thursday UTC; Monday
+matches remain part of last-appearance and rest-gap history. The briefing and
+Summary rest table display the report's explicit convention, retaining accurate
+labels for older Monday-Thursday reports. This also fixes Newcastle's appearances
+in the same Monday match. Unmeasured midweek load stays `(—)` without a symbol.
+
+Validation: 137 focused Python publisher/job/publication tests and all 846
+dashboard tests pass. Strict mypy for the changed publisher, Ruff for changed
+Python files, dashboard lint and hosted build pass. Forecasts and model workload
+features are unchanged; this correction applies only to descriptive reporting.
