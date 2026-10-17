@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Download, MessageSquareText, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { copyGwBriefing, downloadGwBriefing, gwBriefingLineUrl, prepareGwBriefingFacebook, shareGwBriefing } from "@/lib/gwBriefingShare";
+import "./ShareBriefing.css";
 type Language = "en" | "th";
 
 /** Read-only public text. Users edit their copy in their own app, never this page. */
@@ -41,7 +42,7 @@ export function ShareBriefing({ text, language, title }: { text: string; languag
     </div>
     <div className="p-5 sm:p-6">
       <label htmlFor="score-analysis-text" className="sr-only">Analysis message</label>
-      <textarea id="score-analysis-text" readOnly lang={language} value={text} className="min-h-80 w-full resize-y rounded-xl border bg-muted/30 p-4 text-sm leading-7 focus-visible:outline-2 focus-visible:outline-offset-2 sm:min-h-[26rem]" />
+      <textarea id="score-analysis-text" readOnly lang={language} value={text} className="briefing-message min-h-80 w-full resize-y rounded-xl border bg-muted/30 p-4 text-sm leading-7 focus-visible:outline-2 focus-visible:outline-offset-2 sm:min-h-[26rem]" />
       <div className="mt-4 flex flex-wrap gap-2" aria-label="Share analysis">
         <Button className="min-h-11 gap-2" disabled={busy || !text} onClick={() => { void act("copy"); }}>{copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}{copied ? "Copied" : "Copy text"}</Button>
         <Button className="min-h-11 gap-2" variant="outline" disabled={busy || !text} onClick={() => { void act("share"); }}><Share2 className="size-4" aria-hidden="true" />Share</Button>

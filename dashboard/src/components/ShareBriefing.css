@@ -1,0 +1,13 @@
+/* Two self-hosted Noto Color Emoji glyphs (840 bytes); license in public/licenses. */
+@font-face {
+  font-family: "Comet Midweek Emoji";
+  src: url("../assets/fonts/noto-color-emoji-midweek.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+1F7E0-1F7E1;
+}
+
+.briefing-message {
+  font-family: "Geist Variable", "Apple Color Emoji", "Comet Midweek Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
