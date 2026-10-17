@@ -54,7 +54,8 @@ describe("combined public GW message", () => {
     expect(result.text).toContain("DGW · ALP 1/2 · BET 1/2");
     const later = result.text.split("2) Alpha")[1];
     expect(later).toContain("DGW · ALP 2/2 · BET 2/2");
-    expect(later).toContain("Home player: rest and midweek minutes unavailable for this fixture");
+    expect(later).toContain("Home player: rest unavailable for this fixture; midweek minutes unknown or did not play");
+    expect(later).not.toMatch(/[🟠🟡]/u);
     expect(later).not.toContain("3d (68.0h)");
     expect(later).toContain("Later DGW leg");
   });
@@ -63,7 +64,7 @@ describe("combined public GW message", () => {
     data.players.push(...Array.from({ length: 20 }, (_, i) => ({ ...data.players[0], code: i + 20, web_name: `Roster-${i + 20}` })));
     const result = buildSummaryBriefing(data);
     for (let i = 20; i < 40; i++) expect(result.text).toContain(`Roster-${i}`);
-    expect(result.text).toContain("rest and midweek minutes unavailable");
+    expect(result.text).toContain("midweek minutes unknown or did not play");
     expect(result.text).not.toMatch(/\b0 midweek min/);
   });
   it.each(["different account", "old", "wrong season", "unmapped", "other category", "future", "different GW", "demo"])("excludes %s news", kind => {
@@ -106,6 +107,37 @@ describe("combined public GW message", () => {
     expect(buildSummaryBriefing(data).text).toContain("no midweek appearance; minutes unavailable");
     row.midweek_load = "light";
     expect(() => parseRestSummary(data.rest)).toThrow(/midweek load/);
+  });
+  it.each([
+    { minutes: 90, appearances: 1, marker: "🟠 " },
+    { minutes: 46, appearances: 1, marker: "🟠 " },
+    { minutes: 45, appearances: 1, marker: "🟡 " },
+    { minutes: 1, appearances: 1, marker: "🟡 " },
+    { minutes: 0, appearances: 1, marker: "" },
+    { minutes: 0, appearances: 0, marker: "" },
+    { minutes: null, appearances: 1, marker: "" },
+    { minutes: null, appearances: 0, marker: "" },
+  ])("marks recorded midweek minutes $minutes with $appearances appearances in both languages", ({ minutes, appearances, marker }) => {
+    const data = input();
+    Object.assign(data.rest!.players[0], { midweek_nominal_minutes: minutes, midweek_appearances: appearances, midweek_load: "unknown" });
+    for (const language of ["en", "th"] as const) {
+      const text = buildSummaryBriefing({ ...data, language }).text;
+      expect(text.split("\n").find(line => line.includes("Home player:"))).toMatch(new RegExp(`^• ${marker}Home player:`));
+      if (minutes === null && appearances === 0) {
+        expect(text).toContain(language === "en" ? "midweek minutes unknown or did not play" : "ไม่ทราบนาทีกลางสัปดาห์ หรือไม่ได้ลงเล่น");
+      }
+      if (minutes === null && appearances > 0) {
+        expect(text).toContain(language === "en" ? "played midweek; minutes unknown" : "เล่นกลางสัปดาห์ แต่ไม่ทราบนาที");
+      }
+    }
+  });
+  it("marks each player in a grouped row without marking players with no rest report", () => {
+    const data = input();
+    data.players.push({ ...data.players[0], code: 3, web_name: "Teammate" }, { ...data.players[0], code: 4, web_name: "Unmeasured" });
+    data.rest!.players.push({ ...data.rest!.players[0], code: 3 });
+    const text = buildSummaryBriefing(data).text;
+    expect(text).toContain("• 🟠 Home player, 🟠 Teammate: 3d");
+    expect(text).toContain("• Unmeasured: rest unavailable for this fixture; midweek minutes unknown or did not play");
   });
   it("withholds rest after kickoff and uses reviewed Thai text without reclassifying fitness", () => {
     const data = input(); data.language = "th";
