@@ -192,3 +192,16 @@ Validation: 137 focused Python publisher/job/publication tests and all 846
 dashboard tests pass. Strict mypy for the changed publisher, Ruff for changed
 Python files, dashboard lint and hosted build pass. Forecasts and model workload
 features are unchanged; this correction applies only to descriptive reporting.
+
+The correction is live through merge `8c25ea9` and successful Pages deployment
+`39000500786`. The rest-only R2 generation is
+`f6b882360aaa5eb1120314e7846252e06ad2bcbca7d5a8a1158e8cce2de0a36f`.
+Independent HTTP/hash verification confirms that only `sdp/rest_summary.json`
+changed; the other 16 public files and every player's rest-day/hour gap remain
+identical. The original evidence cutoff remains October 16 at 19:01:25 UTC.
+
+Live English and Thai briefings show Coventry's five key players as
+`Mfuni (—), Cherif (—), Thomas (—), Dasilva (—), Rudoni (—)` without minute
+markers, retaining the seven-day/168-hour gap. Newcastle's Monday-only players
+are likewise unmarked. Both languages display the Tuesday-Thursday convention
+and contain identical player entries. No forecast or model input was regenerated.
