@@ -52,7 +52,7 @@ injuries and doubts.
 
 | Verdict | Meaning | What it takes to earn it |
 | --- | --- | --- |
-| `midweek_played` | At least one witnessed appearance in a Mon-Thu UTC fixture inside the window | One proved appearance |
+| `midweek_played` | At least one witnessed appearance in a Tue-Thu UTC fixture inside the window | One proved appearance |
 | `full_rest` | No midweek appearance | A complete, error-free interpretation of that club's side in **every** midweek fixture it played in the window |
 | `unknown` | Cannot be decided | Any midweek fixture whose evidence is unusable |
 
@@ -69,6 +69,20 @@ Every downgrade carries its reason and the exact `provider_match_id` that caused
 * `no_witnessed_appearance_in_window` -- nothing was witnessed at all, so no last match is shown;
 * `no_next_fixture_listed` / `next_fixture_kickoff_unavailable` -- the gap has no second endpoint;
 * `international_window_overlap_call_ups_not_captured` -- see below.
+
+### Monday previous-round correction (2026-10-17)
+
+New reports explicitly publish `Tuesday_through_Thursday_UTC`. The previous
+Monday-inclusive rule incorrectly presented Coventry's Monday 12 October GW6
+league minutes as extra midweek workload before GW7. Monday appearances still
+count in witnessed history and date the last-match/rest gap; they no longer
+contribute to midweek appearances, minutes, load tiers or fixture counts. All
+supported competitions use the same UTC Tuesday-Thursday rule. Unknown coverage
+still cannot establish full rest or a measured zero.
+
+Old immutable reports retain `Monday_through_Thursday_UTC`; readers accept both
+named conventions and display the one the report actually used. No historical
+report, model workload feature, forecast or optimizer input is rewritten.
 
 ### An unregistered squad member is evidence, not a defect (2026-10-16)
 

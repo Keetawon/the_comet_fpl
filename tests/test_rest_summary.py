@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import replace
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -76,7 +76,7 @@ def cup(
     roster_proven: bool = True,
     day: int = 15,
 ) -> CompletedFixture:
-    """A Monday-to-Thursday League Cup tie -- the midweek leg the summary is about."""
+    """A Tuesday-to-Thursday League Cup tie -- the midweek leg the summary is about."""
     return CompletedFixture(
         competition_id=2,
         provider_match_id=7000 + day,
@@ -235,6 +235,65 @@ def test_rest_days_count_uk_calendar_dates_between_the_two_kickoffs() -> None:
     # 13 September to 20 September reads seven days, as a matchday-to-matchday count.
     assert player(document, HAALAND).rest_days == 7
     assert player(document, HAALAND).rest_hours == pytest.approx(167.0)
+
+
+@pytest.mark.parametrize("coverage", [True, False])
+def test_monday_previous_round_dates_rest_but_is_not_midweek_load(coverage: bool) -> None:
+    document = summarise(
+        [league(CITY, code=HAALAND, day=14)],
+        coverage_by_team={CITY: coverage},
+    )
+    row = player(document, HAALAND)
+    assert document.midweek_definition == "Tuesday_through_Thursday_UTC"
+    assert row.last_appearance is not None and row.last_appearance.midweek is False
+    assert row.window_appearances == 1
+    assert row.rest_days == 6
+    assert row.rest_hours == pytest.approx(143.0)
+    assert row.midweek_appearances == row.midweek_fixtures == 0
+    assert row.midweek_nominal_minutes is None
+    assert row.verdict == ("full_rest" if coverage else "unknown")
+    assert row.midweek_load == ("none_no_fixture" if coverage else "unknown")
+    validate_rest_summary(document.model_dump(mode="json"))
+
+
+def test_monday_plus_thursday_counts_only_thursday_minutes() -> None:
+    document = summarise(
+        [
+            league(CITY, code=HAALAND, day=14),
+            cup(
+                CITY,
+                day=17,
+                observations=(
+                    PlayerObservation(
+                        code=HAALAND, appeared=True, started=False, nominal_minutes=25.0
+                    ),
+                ),
+            ),
+        ]
+    )
+    row = player(document, HAALAND)
+    assert row.window_appearances == 2
+    assert row.midweek_appearances == row.midweek_fixtures == 1
+    assert row.midweek_nominal_minutes == 25.0
+    assert row.midweek_load == "light"
+    assert row.rest_days == 3
+
+
+@pytest.mark.parametrize("day", range(14, 21))
+def test_midweek_days_are_tuesday_through_thursday_utc(day: int) -> None:
+    fixture = league(CITY, code=HAALAND, day=day)
+    assert fixture.midweek is (day in {15, 16, 17})
+    shifted = replace(fixture, kickoff=fixture.kickoff.astimezone(timezone(timedelta(hours=14))))
+    assert shifted.midweek is fixture.midweek
+
+
+def test_legacy_midweek_definition_is_preserved_and_unknown_conventions_are_refused() -> None:
+    value = summarise([]).model_dump(mode="json")
+    value["midweek_definition"] = "Monday_through_Thursday_UTC"
+    assert validate_rest_summary(value).midweek_definition == "Monday_through_Thursday_UTC"
+    value["midweek_definition"] = "all_week"
+    with pytest.raises(ValueError, match="midweek_definition"):
+        validate_rest_summary(value)
 
 
 def test_a_club_with_no_fixture_in_the_window_is_rested_but_says_it_witnessed_nothing() -> None:
