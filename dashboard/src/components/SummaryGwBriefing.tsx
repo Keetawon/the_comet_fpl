@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquareText } from "lucide-react";
+import { loadPlayerActuals, loadPlayerProvisionalActuals } from "@/data/load";
 import { loadNewsFeed, type PublicNewsFeed } from "@/data/newsFeed";
 import { loadRestSummary, type RestSummary } from "@/data/restSummary";
-import type { FixtureScheduleOverlay, PlayerRecord, TeamRecord } from "@/data/types";
+import type { FixtureScheduleOverlay, PlayerObservedActualsRecord, PlayerRecord, TeamRecord } from "@/data/types";
+import { mergePlayerActualRecords } from "@/lib/playerActuals";
 import { buildSummaryBriefing, type BriefingLanguage } from "@/lib/summaryBriefing";
 import { ShareBriefing } from "./ShareBriefing";
 import { Button } from "./ui/button";
@@ -14,9 +16,9 @@ interface Props {
   run: { run_id: string; season: string };
   gw: number | null;
 }
-type Reports = { status: "loading" } | { status: "ready"; news: PublicNewsFeed | null; rest: RestSummary | null };
+type Reports = { status: "loading" } | { status: "ready"; news: PublicNewsFeed | null; rest: RestSummary | null; actuals: PlayerObservedActualsRecord[] | null };
 
-/** Load the small public context only when requested. No SDP statistics bundle or AI request. */
+/** Load public context and points history only when requested. No SDP bundle or AI request. */
 export function SummaryGwBriefing(props: Props) {
   const [opened, setOpened] = useState(false);
   const [language, setLanguage] = useState<BriefingLanguage>("en");
@@ -30,7 +32,7 @@ export function SummaryGwBriefing(props: Props) {
       {props.gw === null && <p className="mt-2 text-sm text-muted-foreground">The next GW is not covered by this forecast.</p>}
       {opened && <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Briefing language">
         {(["en", "th"] as const).map(value => <Button key={value} variant={language === value ? "secondary" : "ghost"} aria-pressed={language === value} onClick={() => setLanguage(value)}>{value === "en" ? "English" : "ไทย"}</Button>)}
-        <span className="text-xs text-muted-foreground">All published players; matching rest statuses are grouped.</span>
+        <span className="text-xs text-muted-foreground">Top 5 per team by current-season points per appearance; matching rest days are grouped.</span>
       </div>}
     </section>
     {opened && props.gw !== null && <LoadedBriefing key={`${props.run.run_id}/${props.run.season}/${props.gw}`} {...props} gw={props.gw} language={language} />}
@@ -44,11 +46,22 @@ function LoadedBriefing({ language, ...props }: Props & { gw: number; language: 
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     let active = true;
-    Promise.all([loadNewsFeed().catch(() => null), loadRestSummary().catch(() => null)]).then(([news, rest]) => {
-      if (active) { setReports({ status: "ready", news, rest }); setNow(Date.now()); }
+    Promise.all([
+      loadNewsFeed().catch(() => null), loadRestSummary().catch(() => null),
+      loadPlayerActuals().catch(() => null), loadPlayerProvisionalActuals().catch(() => null),
+    ]).then(([news, rest, finalized, provisional]) => {
+      if (!active) return;
+      let actuals: PlayerObservedActualsRecord[] | null = null;
+      if (finalized && provisional && (provisional.captured_at === null || Date.parse(provisional.captured_at) <= Date.now())) {
+        try {
+          // Retain only this season after the standard, identity-checked display merge.
+          actuals = mergePlayerActualRecords(finalized.players.filter(row => row.season === run.season), provisional.players.filter(row => row.season === run.season));
+        } catch { /* Conflicting observations withhold ranking; score/news text remains usable. */ }
+      }
+      setReports({ status: "ready", news, rest, actuals }); setNow(Date.now());
     });
     return () => { active = false; };
-  }, [revision]);
+  }, [revision, run.season]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(timer);
@@ -58,7 +71,7 @@ function LoadedBriefing({ language, ...props }: Props & { gw: number; language: 
   if (reports.status === "loading") return <p role="status" className="rounded-xl border p-4 text-sm text-muted-foreground">Preparing all fixtures, team news and rest reports…</p>;
   return <>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-      <p>{briefing?.fixtures ?? 0} fixtures · {briefing?.forecasts ?? 0} matching forecasts. {reports.news === null ? "News unavailable. " : ""}{reports.rest === null ? "Rest report unavailable." : ""}</p>
+      <p>{briefing?.fixtures ?? 0} fixtures · {briefing?.forecasts ?? 0} matching forecasts. {reports.news === null ? "News unavailable. " : ""}{reports.rest === null ? "Rest report unavailable. " : ""}{reports.actuals === null ? "Key-player ranking unavailable." : ""}</p>
       <Button variant="ghost" onClick={() => { setReports({ status: "loading" }); setRevision(value => value + 1); }}>Refresh reports</Button>
     </div>
     {briefing?.text ? <ShareBriefing key={`${language}/${briefing.text}`} text={briefing.text} language={language} title={language === "th" ? `สรุป GW${props.gw} พร้อมแชร์` : `GW${props.gw} · ready to share`} />

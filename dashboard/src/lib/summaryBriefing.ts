@@ -1,7 +1,8 @@
 import type { PublicNewsFeed } from "@/data/newsFeed";
 import type { PlayerRest, RestSummary } from "@/data/restSummary";
-import type { FixtureScheduleOverlay, PlayerRecord, TeamRecord } from "@/data/types";
+import type { FixtureScheduleOverlay, PlayerObservedActualsRecord, PlayerRecord, TeamRecord } from "@/data/types";
 import { buildMatchPreviews, previewNews, previewRest, type MatchPreview } from "./matchPreview";
+import { averageObservedPointsPerAppearance } from "./playerActuals";
 
 export type BriefingLanguage = "en" | "th";
 export interface SummaryBriefingInput {
@@ -12,6 +13,7 @@ export interface SummaryBriefingInput {
   gw: number;
   news: PublicNewsFeed | null;
   rest: RestSummary | null;
+  actuals: readonly PlayerObservedActualsRecord[] | null;
   now: number;
   language: BriefingLanguage;
 }
@@ -73,23 +75,19 @@ export function buildSummaryBriefing(input: SummaryBriefingInput): SummaryBriefi
   const freshRest = rest && rest.season === run.season && Number.isFinite(Date.parse(rest.as_of)) && Date.parse(rest.as_of) <= now ? rest : null;
   if (forecasts < matches.length) warnings.push(say(`${matches.length - forecasts} fixture(s) have no matching saved forecast; shown as —.`, `${matches.length - forecasts} คู่ไม่มีคาดการณ์ที่ตรงกับตารางปัจจุบัน แสดงเป็น —`));
 
+  // One current-season cohort for the whole GW, including every DGW leg. Never
+  // substitute forecast xP, archived form or rest-report availability for observed points.
+  const historyBefore = Math.min(now, ...matches.flatMap(match => match.kickoff_time === null ? [] : [Date.parse(match.kickoff_time)]));
+  const averages = new Map((input.actuals ?? []).filter(record => record.season === run.season).map(record => [record.code,
+    averageObservedPointsPerAppearance(record.actuals.filter(row => row.gw < gw && Date.parse(row.kickoff_time) < historyBefore)),
+  ]));
+  const includesProvisional = [...averages.values()].some(value => value.includesProvisional);
+
   const restLabel = (row: PlayerRest | null): string => {
-    const unknownMidweek = say("midweek minutes unknown or did not play", "ไม่ทราบนาทีกลางสัปดาห์ หรือไม่ได้ลงเล่น");
-    if (!row) return `${say("rest unavailable for this fixture", "ยังไม่มีวันพักที่ตรงกับคู่นี้")}; ${unknownMidweek}`;
+    if (!row) return say("rest unavailable for this fixture", "ยังไม่มีวันพักที่ตรงกับคู่นี้");
     const gap = row.rest_days === null || row.rest_hours === null ? say("rest unknown", "ไม่ทราบวันพัก")
       : say(`${row.rest_days}d (${row.rest_hours.toFixed(1)}h) gap`, `ห่าง ${row.rest_days} วัน (${row.rest_hours.toFixed(1)} ชม.)`);
-    let load: string;
-    if (row.midweek_appearances > 0) {
-      load = row.midweek_nominal_minutes === null ? say("played midweek; minutes unknown", "เล่นกลางสัปดาห์ แต่ไม่ทราบนาที")
-        : say(`${row.midweek_nominal_minutes.toFixed(0)} midweek min / ${row.midweek_appearances} app`, `กลางสัปดาห์ ${row.midweek_nominal_minutes.toFixed(0)} นาที / ${row.midweek_appearances} นัด`);
-    } else if (row.midweek_load === "none_not_selected" && row.coverage_complete === true) {
-      load = say("0 midweek min (confirmed non-participation)", "กลางสัปดาห์ 0 นาที (ยืนยันว่าไม่ได้ลง)");
-    } else if (row.midweek_load === "none_no_fixture" && row.coverage_complete === true) {
-      load = say("no midweek club fixture; minutes not measured", "สโมสรไม่มีเกมกลางสัปดาห์ จึงไม่มีนาทีที่วัดได้");
-    } else if (row.verdict === "full_rest" && row.coverage_complete === true) {
-      load = say("no midweek appearance; minutes unavailable", "ไม่มีการลงเล่นกลางสัปดาห์ แต่ไม่มีค่านาที");
-    } else load = unknownMidweek;
-    return `${gap}; ${load}${row.last_appearance?.observed_team_code != null && row.last_appearance.observed_team_code !== row.team_code
+    return `${gap}${row.last_appearance?.observed_team_code != null && row.last_appearance.observed_team_code !== row.team_code
       ? say("; last appearance for a previous club", "; นัดล่าสุดเป็นการเล่นให้สโมสรเดิม") : ""}`;
   };
   const newsLines = (match: MatchPreview, teamCode: number): string[] => {
@@ -110,7 +108,10 @@ export function buildSummaryBriefing(input: SummaryBriefingInput): SummaryBriefi
     say(`Forecast: ${stamp(asOf)}`, `คาดการณ์: ${stamp(asOf)}`),
     say(`News edition: ${stamp(news?.generated_at)} | Rest report: ${stamp(freshRest?.as_of)}`, `ชุดข่าว: ${stamp(news?.generated_at)} | ข้อมูลพัก: ${stamp(freshRest?.as_of)}`),
     say("Scores below are rounded goal averages, not exact-score picks.", "ตัวเลขสกอร์คือค่าเฉลี่ยประตูปัดเศษ ไม่ใช่คำทายสกอร์ที่แน่นอน"),
-    say("Recorded midweek minutes: 🟠 more than 45 · 🟡 1–45 · no symbol = zero or unknown minutes.", "นาทีกลางสัปดาห์ที่มีข้อมูล: 🟠 มากกว่า 45 · 🟡 1–45 · ไม่มีสัญลักษณ์ = 0 นาทีหรือไม่ทราบนาที")];
+    say(`Key players: up to 5 per team by ${run.season} points per appearance before GW${gw}; fewer if history is unavailable.${includesProvisional ? " Includes provisional points." : ""}`,
+      `นักเตะหลัก: สูงสุดทีมละ 5 คน ตามแต้มเฉลี่ยต่อนัดที่ลงเล่นในฤดูกาล ${run.season} ก่อน GW${gw} อาจน้อยกว่า 5 หากไม่มีประวัติ${includesProvisional ? " รวมแต้มที่ยังไม่ยืนยันผลสุดท้าย" : ""}`),
+    say("Player (midweek minutes): 🟠 more than 45 · 🟡 1–45 · no symbol = zero or unknown minutes. (—) = midweek minutes unknown or did not play.",
+      "นักเตะ (นาทีกลางสัปดาห์): 🟠 มากกว่า 45 · 🟡 1–45 · ไม่มีสัญลักษณ์ = 0 นาทีหรือไม่ทราบนาที (—) = ไม่ทราบนาทีกลางสัปดาห์ หรือไม่ได้ลงเล่น")];
   if (run.run_id.startsWith("DEMO-")) lines.unshift(say("DEMO — synthetic forecasts, not current predictions.", "DEMO — ข้อมูลคาดการณ์สมมติ ไม่ใช่ผลปัจจุบัน"));
   for (const [index, match] of matches.entries()) {
     lines.push("", `${index + 1}) ${match.home.team.team_name} (${rounded(match.home.forecast.lambda_for)}) - (${rounded(match.away.forecast.lambda_for)}) ${match.away.team.team_name}`,
@@ -127,19 +128,19 @@ export function buildSummaryBriefing(input: SummaryBriefingInput): SummaryBriefi
     const report = previewRest(freshRest, match, roster, now);
     for (const [sideIndex, side] of [match.home, match.away].entries()) {
       lines.push("", `${side.team.short_name} ${say(`${sideIndex ? "away" : "home"} rest & midweek minutes`, `${sideIndex ? "ทีมเยือน" : "เจ้าบ้าน"}: วันพักและนาทีกลางสัปดาห์`)}`);
-      const rows = report.rows.filter(row => row.player.team_code === side.team.team_code).sort((a, b) =>
-        (b.rest?.midweek_nominal_minutes ?? -1) - (a.rest?.midweek_nominal_minutes ?? -1) ||
-        (a.rest?.rest_hours ?? Infinity) - (b.rest?.rest_hours ?? Infinity) || a.player.web_name.localeCompare(b.player.web_name, "en") || a.player.code - b.player.code);
+      const rows = report.rows.filter(row => row.player.team_code === side.team.team_code && averages.get(row.player.code)?.pointsPerAppearance != null)
+        .sort((a, b) => averages.get(b.player.code)!.pointsPerAppearance! - averages.get(a.player.code)!.pointsPerAppearance! || a.player.code - b.player.code)
+        .slice(0, 5);
       const groups = new Map<string, string[]>();
       for (const row of rows) {
         const label = restLabel(row.rest), names = groups.get(label) ?? [];
         const minutes = row.rest?.midweek_nominal_minutes;
         const marker = row.rest && row.rest.midweek_appearances > 0 && typeof minutes === "number" && Number.isFinite(minutes) && minutes > 0
           ? minutes > 45 ? "🟠 " : "🟡 " : "";
-        names.push(`${marker}${row.player.web_name}`); groups.set(label, names);
+        names.push(`${marker}${row.player.web_name} (${minutes == null ? "—" : minutes.toFixed(0)})`); groups.set(label, names);
       }
-      if (!rows.length) lines.push(say("• Published player roster unavailable.", "• ไม่มีรายชื่อนักเตะที่เผยแพร่"));
-      for (const [label, names] of groups) lines.push(`• ${names.join(", ")}: ${label}`);
+      if (!rows.length) lines.push(say("• Key-player ranking unavailable: no usable current-season points per appearance.", "• ยังจัดอันดับนักเตะหลักไม่ได้: ไม่มีแต้มเฉลี่ยต่อนัดที่ใช้ได้ในฤดูกาลนี้"));
+      for (const [label, names] of groups) lines.push(`• ${label}: ${names.join(", ")}`);
       if (clubFixtures.get(side.team.team_code)!.indexOf(match.fixture) > 0 && rows.some(row => row.rest === null)) lines.push(
         say("Later DGW leg: rest will be updated after the earlier appearance is known; no assumed minutes or recovery.", "นัดหลังใน DGW: รอข้อมูลการลงเล่นนัดก่อนเพื่ออัปเดตวันพัก ไม่สมมตินาทีหรือการฟื้นตัว"));
     }

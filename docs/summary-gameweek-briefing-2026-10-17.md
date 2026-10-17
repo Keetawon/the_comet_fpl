@@ -24,9 +24,28 @@ forecast fixtures remain in the schedule with unavailable scores. Conflicting
 schedule identities prevent a purported complete briefing. No new distribution,
 probability, availability adjustment or model quantity is computed.
 
-The full published player roster is included; equal rest descriptions are grouped
-to shorten the message. There is no top-15 restriction on this briefing. Each DGW
-fixture has its own numbered section and club leg number. Rest joins require the
+The rest sections include up to **five players per club**, selected by current-season
+observed points per appearance before the selected GW. Selection joins the selected
+forecast roster to published actuals by season and permanent player code. Each played
+fixture leg counts as an appearance, including both DGW legs; DNPs are excluded.
+Finalized rows use replayed 2026/27 points, while explicitly provisional rows use raw
+recorded points and the message labels their inclusion. Finalized observations replace
+their provisional predecessors only after the existing fixture identity checks. A
+missing value on an appeared leg makes that player's average unavailable. No previous
+season, future fixture, forecast xP, position or rest-report availability affects ranking.
+Equal averages break ties by permanent player code. Fewer than five eligible players
+stay fewer; failed or conflicting history never falls back to the full roster.
+
+Each entry is `🟠 Player (90)`, `🟡 Player (30)`, `Player (0)` or `Player (—)`.
+Identical rest gaps are grouped once, for example:
+
+```text
+• 3d (68.0h) gap: 🟠 Player A (90), 🟡 Player B (30)
+• rest unavailable for this fixture: Player C (—)
+```
+
+Each DGW fixture has its own numbered section and club leg number, with the same
+key-player cohort across the GW. Rest joins require the
 exact season, stable player/club codes, fixture, venue and kickoff. A report for
 the first leg is never reused for the second leg. Later-leg rest remains unavailable
 until the preceding appearance is actually witnessed. Blank weeks add no invented
@@ -62,11 +81,14 @@ The live feed inspected during implementation was generated on 14 October from
 requires the existing capture, factual review and publication process. The UI
 honestly shows no verified update until that process publishes current reports.
 
-Only the small news/rest sidecars load when the user opens the briefing. It uses
-the Summary data already loaded and does not request the 15 MB SDP statistics
-bundle. The established schema-v9 files and mobile payload budgets are unchanged.
+News, rest and the existing finalized/provisional player actuals load only when the
+user opens the briefing. Initial Summary loading is unchanged. The briefing retains
+only current-season merged history, reuses the shared validated read-model cache,
+and does not request the 15 MB SDP statistics bundle. The existing actuals request
+is bounded by the public-data payload budget and shared with Players/Player Analytics.
+The established schema-v9 files, forecasts and published payloads are unchanged.
 
-Validation: all 829 dashboard tests pass, including DGW separation, all-player
+Initial validation: all 829 dashboard tests passed, including DGW separation, all-player
 coverage, missing/moved fixtures, stale or misidentified news, null-versus-zero
 rest, language switching, source failure and full-text copying. The 80 Python
 news checks pass. Dashboard production build, Ruff and strict mypy pass. The
@@ -80,11 +102,12 @@ screenshot or physical iOS verification is claimed.
 
 ## Owner follow-up: minute markers and current GW7 news
 
-The English unknown-minute label now reads **midweek minutes unknown or did not
+The English unknown-minute legend reads **midweek minutes unknown or did not
 play**, with the equivalent Thai wording. It describes the two possibilities;
-it does not reclassify missing evidence as confirmed non-participation. Witnessed
-appearances with missing durations still say that the player played but the
-minutes are unknown. Confirmed zero and no-fixture descriptions remain distinct.
+it does not reclassify missing evidence as confirmed non-participation. The compact
+format uses `(—)` for unavailable durations, including witnessed appearances whose
+minutes were not measured and clubs without a midweek fixture. Measured zero remains
+`(0)`; the descriptive rest report itself retains the detailed participation status.
 
 Each player name in the shared message carries **🟠** for more than 45 published
 nominal midweek minutes or **🟡** for a positive total up to and including 45.
@@ -138,3 +161,20 @@ The subset response was bounded to 20 KB before retention. The legacy TrueType
 response was rejected for exceeding the bound and was never saved or shipped.
 The built browser preview visually confirms distinct orange/yellow circles on
 the affected Windows browser. No forecast or rest data was changed for this fix.
+
+## Owner follow-up: five key players and compact entries
+
+The full-roster section above was replaced by the top-five current-season
+points-per-appearance selection described in this document. Per-player entries
+now follow `symbol name (midweek minutes)` in both languages, with rest gaps
+printed once per group. The score/news ordering, source-link omission and each
+separate DGW fixture remain unchanged.
+
+Validation: **845 dashboard tests pass** with two workers, including 33 briefing
+checks for ranking, stable tie-breaking, earlier same-season history, DNPs,
+provisional points, missing/conflicting observations, on-demand loading, DGW
+cohorts and compact minute markers. The initial unrestricted suite hit an existing
+Players-page interaction timeout and a subsequent dependent UI failure; the
+complete two-worker run passed without test or timeout changes. Lint and both
+ordinary and hosted production builds pass, with the existing lint warnings.
+No Python source, model, forecast artifact or public data schema changed.

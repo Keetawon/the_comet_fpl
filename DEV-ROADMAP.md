@@ -1,8 +1,9 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
 **Owner-requested Summary briefing (2026-10-17):** combine each scheduled match's
-published score outlook, reviewed @FFScout team news and full-roster rest/minute
-context into one English/Thai shareable message. DGW legs remain distinct and
+published score outlook, reviewed @FFScout team news and rest/minute context for
+up to five players per team by current-season points per appearance into one
+English/Thai shareable message. DGW legs remain distinct and
 unknown evidence stays unavailable. See `docs/summary-gameweek-briefing-2026-10-17.md`.
 
 **Owner-authorized provisional-only republish (2026-10-16):** a cloud path that puts
