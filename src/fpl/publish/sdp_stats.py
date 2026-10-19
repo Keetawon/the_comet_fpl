@@ -30,6 +30,7 @@ from fpl.publish.fpl_team_xg import TABLES, FplXgSupplement, apply_team_xg_suppl
 from fpl.publish.player_attacking_usage import _raw_capture
 from fpl.publish.sdp_goal_patterns import (
     DESCRIPTION,
+    LEGACY_DESCRIPTION,
     apply_goal_patterns,
     apply_source_goal_pattern,
     public_evidence_urls,
@@ -1451,7 +1452,14 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
         or set(document["coverage"]) != COVERAGE_FIELDS
     ):
         raise ValueError("invalid SDP sidecar status/coverage")
-    if document["metrics"] != metric_catalog():
+    current_metrics = metric_catalog()
+    legacy_metrics = [
+        {**metric, "description": LEGACY_DESCRIPTION}
+        if metric["key"] == "set_piece_goals"
+        else metric
+        for metric in current_metrics
+    ]
+    if document["metrics"] not in (current_metrics, legacy_metrics):
         raise ValueError("metric catalog differs from the observed-source contract")
     for field in ("team_stats", "player_stats", "player_lineups", "fpl_enrichment"):
         if document["source_status"][field] not in {"AVAILABLE", "PARTIAL", "UNAVAILABLE"}:

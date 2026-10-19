@@ -20,6 +20,15 @@ DESCRIPTION = (
     "Opponent own goals are separate. Display-only; "
     "not a provider-supplied set-piece total. See each match's goal-pattern evidence."
 )
+# Previously published exports use this earlier goal-accounting description.
+# Their original accounting and metadata remain valid and must not be rewritten.
+LEGACY_DESCRIPTION = (
+    "SDP goal accounting, with match-report corroboration where separately audited. "
+    "Automatic accounting confirms explicit penalty and direct free-kick goals only; "
+    "other origins require evidence. Opponent own goals are separate. "
+    "An incomplete classification stays unavailable, never zero. Display-only; "
+    "not a provider-supplied set-piece total. See each match's goal-pattern evidence."
+)
 
 
 def apply_source_goal_pattern(

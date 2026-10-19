@@ -646,6 +646,42 @@ def test_metric_aliases_finite_values_and_semantics() -> None:
     assert metric_value({"first": 4, "second": "4"}, conflicting) == 4
 
 
+def test_immutable_legacy_goal_description_preserves_data_and_strict_validation(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "source.duckdb"
+    _write(db)
+    document = _load(db)
+    legacy_description = (
+        "SDP goal accounting, with match-report corroboration where separately audited. "
+        "Automatic accounting confirms explicit penalty and direct free-kick goals only; "
+        "other origins require evidence. Opponent own goals are separate. "
+        "An incomplete classification stays unavailable, never zero. Display-only; "
+        "not a provider-supplied set-piece total. See each match's goal-pattern evidence."
+    )
+    metric = next(m for m in document["metrics"] if m["key"] == "set_piece_goals")
+    assert metric["description"] != legacy_description
+    validate_sdp_stats(document)
+    metric["description"] = legacy_description
+    before = deepcopy(document)
+    validate_sdp_stats(document)
+    assert document == before
+    for field, value in (
+        ("description", "Unrecognized goal-accounting semantics"),
+        ("source", "fpl"),
+        ("unit", "percent"),
+        ("provider_field", "invented"),
+        ("verified_semantics", False),
+    ):
+        tampered = deepcopy(document)
+        next(m for m in tampered["metrics"] if m["key"] == "set_piece_goals")[field] = value
+        with pytest.raises(ValueError, match="metric catalog"):
+            validate_sdp_stats(tampered)
+    document["team_matches"][0]["sdp"]["shots"] = float("nan")
+    with pytest.raises(ValueError, match="non-finite/non-numeric observed metric"):
+        validate_sdp_stats(document)
+
+
 @pytest.mark.parametrize("incomplete", [False, True])
 def test_goal_patterns_are_display_only_and_do_not_invent_set_piece_totals(
     tmp_path: Path, incomplete: bool
