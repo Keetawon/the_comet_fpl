@@ -20,6 +20,49 @@ def empty_fixture_matrix(tmp_path: Path) -> None:
     write(tmp_path / "fixture_matrix.json", {"teams": []})
 
 
+@pytest.mark.parametrize(("forecast_start", "rollover"), [(6, True), (7, False), (8, False)])
+def test_unfinished_gameweek_does_not_make_next_deadline_forecast_stale(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    forecast_start: int,
+    rollover: bool,
+) -> None:
+    monkeypatch.setattr(
+        refresh,
+        "validate_dashboard_json",
+        lambda _: {"content_sha256": "bound", "generated_at": "2026-10-19T14:00:00Z"},
+    )
+    run = {
+        "run_id": "current",
+        "season": "2026-27",
+        "as_of": "2026-10-19T13:00:00Z",
+        "gw_from": forecast_start,
+        "gw_to": forecast_start + 4,
+        "by_gw": [],
+    }
+    for scope in ("player", "team"):
+        write(tmp_path / f"{scope}_forecast_vs_actual.json", {"runs": [run]})
+    write(tmp_path / "next_gw.json", {"plans": []})
+    sidecar = {
+        "gameweeks": [
+            {
+                "season": "2026-27",
+                "gw": 7,
+                "fixtures_completed": 9,
+                "fixtures_total": 10,
+                "finished": False,
+                "source_known_at": "2026-10-19T13:00:00Z",
+            }
+        ]
+    }
+    status = refresh.publication_status(tmp_path, sidecar)
+    assert status["forecast_rollover_required"] is rollover
+    assert status["next_fixture_gw"] == 7
+    assert status["latest_forecast"]["gw_from"] == forecast_start
+    assert status["awaiting_finality"] == [{"gw": 7, "fixtures_completed": 9, "fixtures_total": 10}]
+    assert status["latest_scored_gw"] == {"player": None, "team": None}
+
+
 @pytest.mark.parametrize("provisional", [False, True])
 def test_current_observations_cannot_be_replaced_by_a_freshly_dated_old_base(
     tmp_path: Path, provisional: bool

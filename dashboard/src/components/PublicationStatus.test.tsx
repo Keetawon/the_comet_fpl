@@ -26,6 +26,24 @@ describe("publication freshness", () => {
     expect(screen.queryByLabelText("Dashboard publication status")).not.toBeInTheDocument();
     expect(screen.queryByText("Full dashboard update overdue")).not.toBeInTheDocument();
   });
+  it.each([6, 7, 8])("keeps GW7 finality separate from a forecast starting at GW%i", async (gwFrom) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ok: true, json: async () => ({
+      ...receipt,
+      latest_finalized_gw: 6,
+      awaiting_finality: [{ gw: 7, fixtures_completed: 9, fixtures_total: 10 }],
+      latest_forecast: { ...receipt.latest_forecast, gw_from: gwFrom, gw_to: gwFrom + 4 },
+      next_fixture_gw: 7,
+      // Preserve compatibility with an already-published receipt's old flag.
+      forecast_rollover_required: true,
+    })}));
+    render(<PublicationStatus manifestHash="bound" />);
+    await screen.findByLabelText("Dashboard publication status");
+    expect(screen.getByText("GW7: 9/10 matches ended.")).toBeInTheDocument();
+    expect(screen.getByText(/prediction scores remain pending/)).toBeInTheDocument();
+    const rollover = screen.queryByText(/A new pre-deadline forecast is required/);
+    if (gwFrom < 7) expect(rollover).toBeInTheDocument();
+    else expect(rollover).not.toBeInTheDocument();
+  });
   it("warns as an open page ages beyond the operational limit without changing data", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-15T07:59:00Z"));

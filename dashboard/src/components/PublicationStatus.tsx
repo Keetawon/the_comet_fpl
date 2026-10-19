@@ -39,6 +39,10 @@ export function PublicationStatus({ manifestHash, freshnessOnly = false }: { man
     return () => { cancelled = true; };
   }, [manifestHash]);
   if (!status || status.data_manifest_sha256 !== manifestHash) return null;
+  // Older immutable receipts also flagged forecasts ahead of an unfinished GW.
+  const forecastRolloverRequired = status.forecast_rollover_required &&
+    status.latest_forecast != null && status.next_fixture_gw != null &&
+    status.latest_forecast.gw_from < status.next_fixture_gw;
   const dates = [status.source_known_at, status.exported_at];
   const unknownFreshness = dates.some((date) => !date || !Number.isFinite(Date.parse(date)));
   // Match the existing operational capture-health limit; forecasts have their own dates.
@@ -59,7 +63,7 @@ export function PublicationStatus({ manifestHash, freshnessOnly = false }: { man
     {status.awaiting_finality.map((gw) => <p key={gw.gw} className="mt-2 text-amber-800 dark:text-amber-300">
       <strong>GW{gw.gw}: {gw.fixtures_completed}/{gw.fixtures_total} matches ended.</strong> Awaiting official finality; prediction scores remain pending, including all double-gameweek legs.
     </p>)}
-    {status.forecast_rollover_required && <p className="mt-2 text-amber-800 dark:text-amber-300">Next match scope is GW{status.next_fixture_gw}. A new pre-deadline forecast is required; this export has kept the original forecast vintage.</p>}
+    {forecastRolloverRequired && <p className="mt-2 text-amber-800 dark:text-amber-300">Next match scope is GW{status.next_fixture_gw}. A new pre-deadline forecast is required; this export has kept the original forecast vintage.</p>}
     {!status.current_platform_plan && <p className="mt-2 text-amber-800 dark:text-amber-300">Platform plan update required. Older plans retain their original forecast dates.</p>}
     <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Refresh and forecast dates</summary>
       <p>Match-history FPL source: {status.source_known_at ?? "Unavailable"}</p><p>Dashboard exported: {status.exported_at}</p>

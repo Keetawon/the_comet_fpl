@@ -258,7 +258,7 @@ def publication_status(generation: Path, sidecar: dict[str, Any]) -> dict[str, A
         "current_platform_plan": bool(current_plans),
         "next_fixture_gw": next_fixture_gw,
         "forecast_rollover_required": bool(
-            latest and next_fixture_gw is not None and latest["gw_from"] != next_fixture_gw
+            latest and next_fixture_gw is not None and latest["gw_from"] < next_fixture_gw
         ),
         "latest_scored_gw": score_status,
         "meaning": (

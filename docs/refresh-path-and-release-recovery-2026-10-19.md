@@ -38,4 +38,14 @@ and strict type checking pass. The exact 15,006,678-byte pinned companion with
 SHA256 `3579bff9314471e9a9174072d1813523a00994fc2cf5592fd7303e231f699c49`
 also passes the complete validator without changing its bytes. The initial
 frontend deployment passed its dashboard test/lint/build job before encountering
-this legacy companion error; a new deployment includes the compatibility fix.
+this legacy companion error. Deployment run `39258755248` passed with the
+compatibility fix and the requested Summary briefing order. Live HTTPS assets
+were verified; no browser session was available for visual inspection.
+
+The refresh also exposed a misleading rollover warning: a forecast for GW8-12
+was treated as outdated because the final GW7 fixture had not ended. Rollover
+now requires the forecast start to be behind the next unfinished match scope.
+The browser applies the same directional guard when reading older immutable
+receipts. GW7 finality warnings and pending accuracy scores remain unchanged.
+Regression cases cover forecast starts behind, equal to, and ahead of that
+unfinished gameweek. This changes only freshness reporting, not predictions.
