@@ -26,7 +26,7 @@ export function SummaryGwBriefing(props: Props) {
     <section aria-labelledby="summary-briefing-heading" className="comet-glass rounded-2xl border p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h2 id="summary-briefing-heading" className="flex items-center gap-2 text-base font-semibold"><MessageSquareText className="size-4" aria-hidden="true" />Next GW briefing{props.gw === null ? "" : ` · GW${props.gw}`}</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">One message for LINE or Facebook: every match, score outlook, @FFScout team news, then each side’s player rest days and midweek minutes. Double gameweeks include every leg.</p></div>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">One message for LINE or Facebook: each match’s score outlook, then the home team’s @FFScout news and player rest days, followed by the away team’s news and rest days. Midweek minutes and every double-gameweek leg are included.</p></div>
         <Button className="min-h-11" disabled={props.gw === null} onClick={() => setOpened(!opened)}>{opened ? "Hide briefing" : "Create GW briefing"}</Button>
       </div>
       {props.gw === null && <p className="mt-2 text-sm text-muted-foreground">The next GW is not covered by this forecast.</p>}

@@ -122,11 +122,10 @@ export function buildSummaryBriefing(input: SummaryBriefingInput): SummaryBriefi
     });
     if (doubleLegs.length) lines.push(`DGW · ${doubleLegs.join(" · ")}`);
     if (match.kickoff_time !== null && Date.parse(match.kickoff_time) <= now) lines.push(say("Kickoff has passed; this remains the saved pre-match forecast.", "ผ่านเวลาเตะแล้ว ตัวเลขนี้ยังเป็นคาดการณ์ก่อนเกมที่บันทึกไว้"));
-    for (const [index, side] of [match.home, match.away].entries()) lines.push(
-      "", `${side.team.short_name} ${say(`${index ? "away" : "home"} team news / press conference`, `${index ? "ทีมเยือน" : "เจ้าบ้าน"}: ข่าวทีม / แถลงข่าว`)}`,
-      ...newsLines(match, side.team.team_code));
     const report = previewRest(freshRest, match, roster, now);
     for (const [sideIndex, side] of [match.home, match.away].entries()) {
+      lines.push("", `${side.team.short_name} ${say(`${sideIndex ? "away" : "home"} team news / press conference`, `${sideIndex ? "ทีมเยือน" : "เจ้าบ้าน"}: ข่าวทีม / แถลงข่าว`)}`,
+        ...newsLines(match, side.team.team_code));
       lines.push("", `${side.team.short_name} ${say(`${sideIndex ? "away" : "home"} rest & midweek minutes`, `${sideIndex ? "ทีมเยือน" : "เจ้าบ้าน"}: วันพักและนาทีกลางสัปดาห์`)}`);
       const rows = report.rows.filter(row => row.player.team_code === side.team.team_code && averages.get(row.player.code)?.pointsPerAppearance != null)
         .sort((a, b) => averages.get(b.player.code)!.pointsPerAppearance! - averages.get(a.player.code)!.pointsPerAppearance! || a.player.code - b.player.code)

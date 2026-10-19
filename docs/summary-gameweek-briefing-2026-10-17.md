@@ -13,10 +13,13 @@ Every scheduled fixture appears once, in kickoff order:
 1) Home club (n) - (m) Away club
 Kickoff · original expected-goal estimates
 Home team news / press conference
-Away team news / press conference
 Home player rest days and midweek minutes
+Away team news / press conference
 Away player rest days and midweek minutes
 ```
+
+The owner-requested order keeps each team's press-conference summary immediately
+before its rest section, in both English and Thai and for every DGW leg.
 
 The headline numbers retain Score Prediction's rounded expected-goal display,
 explicitly labelled as averages rather than exact-score picks. Missing or moved

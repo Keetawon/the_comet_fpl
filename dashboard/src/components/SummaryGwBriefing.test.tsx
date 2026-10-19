@@ -48,12 +48,13 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
 describe("combined public GW message", () => {
-  it("orders the score, home news, away news, home rest and away rest without changing inputs", () => {
+  it("orders the score, home news, home rest, away news and away rest without changing inputs", () => {
     const data = input(), before = structuredClone(data), result = buildSummaryBriefing(data);
     expect(result).toMatchObject({ fixtures: 1, forecasts: 1, warnings: [] });
     expect(result.text).toContain("1) Alpha (2) - (1) Beta");
     expect(result.text).toContain("Expected goals 1.80 – 0.80");
-    const sections = ["ALP home team news", "BET away team news", "ALP home rest", "BET away rest"].map(s => result.text.indexOf(s));
+    const sections = ["1) Alpha (2) - (1) Beta", "ALP home team news", "ALP home rest", "BET away team news", "BET away rest"].map(s => result.text.indexOf(s));
+    expect(sections.every(index => index >= 0)).toBe(true);
     expect(sections).toEqual([...sections].sort((a, b) => a - b));
     expect(result.text).toContain("3d (68.0h) gap: 🟠 Home player (90)");
     expect(result.text).toContain(data.news!.stories[0].summary.en);
