@@ -1,5 +1,44 @@
 # Shot-axis controls and Brighton goal-origin follow-up
 
+## Observed effectiveness update (2026-10-20)
+
+The owner requested team attacking and defensive effectiveness relative to
+observed chance value. Attack now defaults to `100 * total goals / total xG`;
+Defence defaults to `100 * total goals conceded / total xGC`. The latter uses
+the existing `expected_goals_allowed` metric (xGA), not summed player xGC.
+SOT share, SOT/match and box shots/match remain selectable independently.
+
+Both ratios use every fixture in the same selected season/GW/venue/recent-match
+scope, including every DGW leg. Ratios of totals are never averages of match
+ratios. Missing, invalid or disjoint coverage, empty scope, and zero aggregate
+xG/xGC produce unavailable values. A measured zero goal count with positive
+chance value produces 0%. Existing marked FPL xG supplements retain provenance
+on both axes and the tooltip; a measured SDP zero is never overwritten.
+
+Official team goals include own goals. The chart and tooltip state this rather
+than claiming isolated finishing or goalkeeper skill. These descriptive ratios
+can exceed 100% and are not probabilities or future model inputs. Higher
+Goals/xG means more goals relative to expectation; lower conceded/xGC means fewer
+conceded relative to expectation. The vertical axes retain observed xG/match and
+xGC/match. A separate solid 100% reference remains visible even when all clubs
+are on one side; dashed eligible-cohort medians retain their existing meaning.
+Tooltips expose goals, chance totals, matched counts and shot context.
+
+Focused checks cover aggregation, DGW legs, zero/missing/invalid observations,
+source supplements, above-100% plotting, baseline visibility and legacy selectors.
+No transport schema, forecast, model, scoring or optimizer behavior changes.
+
+Validation: all 857 dashboard tests across 76 files pass, as do the production
+TypeScript/Vite build, frontend lint (existing warnings only), Python Ruff lint
+and mypy. The broader Python gate is not green: the unchanged `AGENTS.md` differs
+from an older frozen audit hash, Windows export tests lack symlink privilege
+(also outside the sandbox), and eight existing Python files fail formatting.
+The browser preview confirms 20 clubs in each ratio chart, both 100% references,
+the published Chelsea/Brighton ratios and the legacy selector. Screenshot capture
+timed out, so this is DOM verification rather than completed visual screenshot QA.
+
+## Original change (2026-09-15)
+
 Descriptive dashboard work on the existing V2 branch, starting at
 `8127a7dac331871d6e38f742a14fce6e35bfb756`. No inference, optimizer run, source
 capture, model change or historical evaluation was performed.

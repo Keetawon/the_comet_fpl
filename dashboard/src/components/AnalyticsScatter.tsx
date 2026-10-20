@@ -61,6 +61,8 @@ export interface AnalyticsScatterProps {
   provenanceLabel?: string;
   medianX?: number | null;
   medianY?: number | null;
+  /** A labelled contextual benchmark, distinct from the eligible-cohort median. */
+  referenceX?: { value: number; label: string };
   emptyMessage?: string;
   className?: string;
   /** Optional linked selection for descriptive comparisons. Does not change values. */
@@ -194,6 +196,7 @@ export function AnalyticsScatter({
   provenanceLabel = "Forecast",
   medianX = null,
   medianY = null,
+  referenceX,
   emptyMessage = "No eligible values to plot.",
   className,
   selectedPointId,
@@ -219,10 +222,11 @@ export function AnalyticsScatter({
 
   const xDomain = useMemo(
     () => domain(
-      [...eligible.map(({ x }) => x), ...(finite(medianX) ? [medianX] : [])],
+      [...eligible.map(({ x }) => x), ...(finite(medianX) ? [medianX] : []),
+        ...(finite(referenceX?.value) ? [referenceX.value] : [])],
       xAxis.bounds,
     ),
-    [eligible, medianX, xAxis.bounds],
+    [eligible, medianX, referenceX?.value, xAxis.bounds],
   );
   const yDomain = useMemo(
     () => domain(
@@ -290,6 +294,9 @@ export function AnalyticsScatter({
       <p className="mt-1 text-[11px] text-muted-foreground">
         {provenanceLabel} {vintageDisplayLabel} · {horizonDisplayLabel}
       </p>
+      {referenceX && finite(referenceX.value) && <p className="mt-1 text-[11px] text-muted-foreground">
+        Reference line: {formatX(referenceX.value)} · {referenceX.label}
+      </p>}
 
       <div ref={plot} className="relative mt-2 w-full overflow-visible">
         <svg
@@ -302,6 +309,7 @@ export function AnalyticsScatter({
           <title id={`${id}-chart-title`}>{title}</title>
           <desc id={`${id}-chart-description`}>
             {description ? `${description} ` : ""}{accessibleAxisX}; {accessibleAxisY}. Vintage {vintageLabel}; horizon {horizonLabel}.
+            {referenceX && finite(referenceX.value) ? ` Reference line: ${formatX(referenceX.value)}; ${referenceX.label}.` : ""}
           </desc>
 
           <g aria-hidden="true" className="text-muted-foreground">
@@ -363,6 +371,17 @@ export function AnalyticsScatter({
               opacity="0.45"
             />
           )}
+          {referenceX && finite(referenceX.value) && <g aria-hidden="true">
+            <line data-testid="reference-x"
+              x1={scale(referenceX.value, xDomain, MARGIN.left, MARGIN.left + PLOT_WIDTH)}
+              x2={scale(referenceX.value, xDomain, MARGIN.left, MARGIN.left + PLOT_WIDTH)}
+              y1={MARGIN.top} y2={MARGIN.top + PLOT_HEIGHT}
+              stroke="currentColor" strokeWidth="2" opacity="0.7" />
+            <text x={scale(referenceX.value, xDomain, MARGIN.left, MARGIN.left + PLOT_WIDTH)}
+              y={MARGIN.top - 7} textAnchor="middle" fill="currentColor" fontSize="11">
+              {formatX(referenceX.value)}
+            </text>
+          </g>}
 
           <g>
             {eligible.map((point, index) => {

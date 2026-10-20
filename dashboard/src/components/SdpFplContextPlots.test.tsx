@@ -27,7 +27,62 @@ function inputs() {
   return { teams, league: teams, teamMatches: rows, metrics, filters, asOf: "2026-09-14T03:00:00Z", selectedId: "team:3", onSelectTeam: vi.fn() };
 }
 
+function selectShotShares() {
+  for (const panel of ["Attack", "Defence"]) {
+    fireEvent.change(screen.getByRole("combobox", { name: `${panel} X-axis` }), { target: { value: "share" } });
+  }
+}
+
 describe("four observed team context plots", () => {
+  it("defaults to observed effectiveness with a 100% reference, uncapped ratios and matched totals", () => {
+    const props = inputs();
+    props.teams[0].rows[0].sdp.expected_goals = .25;
+    props.teams[0].rows[1].sdp.expected_goals = 1.75;
+    const before = JSON.stringify(props);
+    render(<SdpFplContextPlots {...props} />);
+    const attack = screen.getByRole("article", { name: "Attack plot panel" });
+    const defence = screen.getByRole("article", { name: "Defence plot panel" });
+    expect(screen.getByRole("combobox", { name: "Attack X-axis" })).toHaveValue("effectiveness");
+    expect(screen.getByRole("combobox", { name: "Defence X-axis" })).toHaveValue("effectiveness");
+    const a = within(attack).getByTestId("analytics-point");
+    const d = within(defence).getByTestId("analytics-point");
+    expect(a).toHaveAccessibleName(/Goals \/ xG \(%\): 200%;.*xG \/match: 1/);
+    expect(d).toHaveAccessibleName(/Goals conceded \/ xGC \(%\): 200%;.*xGC \/match: 0.5/);
+    for (const panel of [attack, defence]) {
+      expect(Number(within(panel).getByTestId("analytics-point").getAttribute("cx")))
+        .toBeGreaterThan(Number(within(panel).getByTestId("reference-x").getAttribute("x1")));
+      expect(panel).toHaveTextContent("not a probability or a forecast");
+      expect(panel).toHaveTextContent("including own goals");
+    }
+    expect(defence).toHaveTextContent("Left of 100%: fewer goals conceded");
+    fireEvent.focus(a);
+    expect(within(attack).getByRole("tooltip")).toHaveTextContent("Goals total · FPL (including own goals)4");
+    expect(within(attack).getByRole("tooltip")).toHaveTextContent("xG total · SDP / marked FPL2");
+    expect(JSON.stringify(props)).toBe(before);
+  });
+  it("keeps goals ratios independent of shot coverage and unavailable on incomplete paired evidence", () => {
+    const props = inputs();
+    props.teams[0].rows.forEach(row => { row.sdp.shots_on_target = null; row.fpl!.goals_scored = 0; });
+    const { rerender } = render(<SdpFplContextPlots {...props} />);
+    const attack = screen.getByRole("article", { name: "Attack plot panel" });
+    expect(within(attack).getByTestId("analytics-point")).toHaveAccessibleName(/Goals \/ xG \(%\): 0%/);
+    props.teams[0].rows[0].sdp.expected_goals = null;
+    props.teams[0].rows[1].fpl!.goals_scored = null;
+    rerender(<SdpFplContextPlots {...props} />);
+    expect(within(attack).queryByTestId("analytics-point")).not.toBeInTheDocument();
+    expect(within(attack).getByRole("status")).toHaveTextContent("Missing observations remain unavailable");
+    expect(within(screen.getByRole("article", { name: "Defence plot panel" })).getByTestId("analytics-point")).toBeInTheDocument();
+  });
+  it("marks supplemented xG in both the ratio and chance axis", () => {
+    const props = inputs();
+    props.teams[0].rows.forEach(row => {
+      row.sdp.expected_goals = null;
+      row.display_supplements = { expected_goals: fplSupplement(row, 2) };
+    });
+    render(<SdpFplContextPlots {...props} />);
+    expect(within(screen.getByRole("article", { name: "Attack plot panel" })).getByTestId("analytics-point"))
+      .toHaveAccessibleName(/Goals \/ xG \(%\): 100% \[FPL\];.*xG \/match: 2 \[FPL\]/);
+  });
   it("switches axes independently with matched shot shares and exact opponent box-shot counts", async () => {
     const user = userEvent.setup(); const props = inputs();
     props.teams[0].rows[1].sdp.shots_on_target = 2;
@@ -38,6 +93,7 @@ describe("four observed team context plots", () => {
     props.teamMatches = [...props.teamMatches, ...other, { ...other[0], season: "2025-26", sdp: { shots_inside_box: 99 } }];
     const before = JSON.stringify(props);
     render(<SdpFplContextPlots {...props} filters={{ ...props.filters, venue: "home" }} />);
+    selectShotShares();
     const attack = screen.getByRole("article", { name: "Attack plot panel" });
     const defence = screen.getByRole("article", { name: "Defence plot panel" });
     const a = () => within(attack).getByTestId("analytics-point");
@@ -82,6 +138,7 @@ describe("four observed team context plots", () => {
     const props = inputs();
     props.teams[0].rows.forEach(row => { row.sdp.shots = 0; row.sdp.shots_on_target = 0; });
     render(<SdpFplContextPlots {...props} />);
+    selectShotShares();
     const attack = screen.getByRole("article", { name: "Attack plot panel" });
     expect(within(attack).queryByTestId("analytics-point")).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Attack X-axis" }), { target: { value: "volume" } });
@@ -91,6 +148,7 @@ describe("four observed team context plots", () => {
   it("uses consistent matched observations and source-labelled details across four panels", () => {
     const props = inputs(); const before = JSON.stringify(props);
     render(<SdpFplContextPlots {...props} />);
+    selectShotShares();
     const attack = screen.getByRole("article", { name: "Attack plot panel" });
     const defence = screen.getByRole("article", { name: "Defence plot panel" });
     const finishing = screen.getByRole("article", { name: "Goals vs xG plot panel" });
@@ -156,6 +214,7 @@ describe("four observed team context plots", () => {
     } };
     const original = JSON.stringify(props);
     render(<SdpFplContextPlots {...props} />);
+    selectShotShares();
     const a = within(screen.getByRole("article", { name: "Attack plot panel" })).getByTestId("analytics-point");
     expect(a).toHaveAccessibleName(/SOT \/ all shots \(%\): 0% ‡; SDP \/ marked FPL xG \/match: 2 \[FPL\]/);
     expect(within(screen.getByRole("article", { name: "Goals vs xG plot panel" })).getByTestId("analytics-point")).toHaveAccessibleName(/SDP \/ marked FPL xG \/match: 2 \[FPL\]; FPL Goals \/match: 2/);

@@ -43,6 +43,9 @@ describe("SDP football observatory", () => {
     data.team_matches.forEach(row => { row.sdp.shots_on_target = row.was_home ? 2 : 6; row.sdp.shots_on_target_allowed = row.was_home ? 1 : 3; row.sdp.shots_allowed = 10; });
     vi.mocked(loadSdpStats).mockResolvedValue(data);
     render(<TeamSdpStatsPage />); const grid = await table();
+    for (const panel of ["Attack", "Defence"]) {
+      fireEvent.change(screen.getByRole("combobox", { name: `${panel} X-axis` }), { target: { value: "share" } });
+    }
     const plots = screen.getByRole("region", { name: "Attack and defence FPL context" });
     expect(grid.compareDocumentPosition(plots) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const defence = within(plots).getByRole("article", { name: "Defence plot panel" });

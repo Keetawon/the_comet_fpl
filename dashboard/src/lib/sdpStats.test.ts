@@ -1,10 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { isShotBreakdown, metricAssumptions, metricCorrections, metricRaw, metricValue, sdpCsv, selectSdpEntities, shotShare, sortSdpEntities } from "./sdpStats";
+import { goalExpectationRatio, isShotBreakdown, metricAssumptions, metricCorrections, metricRaw, metricValue, sdpCsv, selectSdpEntities, shotShare, sortSdpEntities } from "./sdpStats";
 import { fplSupplement, fplXg, possession, sdpFixture, sdpMatch, shooting, xg } from "@/test/sdpFixture";
 import type { SdpFilters } from "./sdpStats";
 
 const filters: SdpFilters = { season: "2026-27", from: 1, to: 6, team: "all", venue: "all", recent: "all", search: "", position: "all", minMinutes: 0 };
 describe("SDP observed descriptive arithmetic", () => {
+  it("measures goals against xG from matched totals, retaining every DGW leg and official own goals", () => {
+    const goals = { ...shooting, source: "fpl" as const, key: "goals_scored" };
+    const rows = [
+      sdpMatch({ fixture: 1, gw: 3, sdp: { expected_goals: .25 }, fpl: { goals_scored: 1 } }),
+      sdpMatch({ fixture: 2, gw: 3, sdp: { expected_goals: 1.75 }, fpl: { goals_scored: 3 } }),
+    ];
+    const before = JSON.stringify(rows);
+    expect(goalExpectationRatio(rows, goals, xg)).toBe(200);
+    expect(goalExpectationRatio([...rows].reverse(), goals, xg)).toBe(200);
+    expect(JSON.stringify(rows)).toBe(before);
+    expect(goalExpectationRatio(rows, { ...goals, key: "goals_conceded" }, xg)).toBeNull();
+    expect(goalExpectationRatio(rows, { ...goals, scope: "player" }, xg)).toBeNull();
+    expect(goalExpectationRatio(rows, goals, { ...xg, source: "fpl" })).toBeNull();
+  });
+  it("keeps missing, invalid and zero xGC denominators unavailable while preserving zero conceded", () => {
+    const conceded = { ...shooting, source: "fpl" as const, key: "goals_conceded" };
+    const xgc = { ...xg, key: "expected_goals_allowed" };
+    const row = (goals: number | null, expected: number | null) =>
+      sdpMatch({ fpl: { goals_conceded: goals }, sdp: { expected_goals_allowed: expected } });
+    for (const [goals, expected] of [[null, 1], [1, null], [0, 0], [1, 0], [-1, 1], [1.5, 1], [1, -1], [1, Infinity], [NaN, 1]]) {
+      expect(goalExpectationRatio([row(goals, expected)], conceded, xgc)).toBeNull();
+    }
+    expect(goalExpectationRatio([], conceded, xgc)).toBeNull();
+    expect(goalExpectationRatio([row(0, 1)], conceded, xgc)).toBe(0);
+    expect(goalExpectationRatio([row(1, null), row(null, 1)], conceded, xgc)).toBeNull();
+    expect(goalExpectationRatio([row(1, 0), row(1, 1)], conceded, xgc)).toBe(200);
+  });
+  it("uses the existing marked FPL xG supplement without substituting for a measured zero", () => {
+    const goals = { ...shooting, source: "fpl" as const, key: "goals_scored" };
+    const row = sdpMatch({ sdp: { expected_goals: null }, fpl: { goals_scored: 3 } });
+    row.display_supplements = { expected_goals: fplSupplement(row, 2) };
+    expect(goalExpectationRatio([row], goals, xg)).toBe(150);
+    expect(row.sdp.expected_goals).toBeNull();
+    row.sdp.expected_goals = 0;
+    expect(goalExpectationRatio([row], goals, xg)).toBeNull();
+  });
   it("uses only matched conceded-shot denominators and preserves missing and observed zero", () => {
     const sot = { ...shooting, key: "shots_on_target_allowed" }, shots = { ...shooting, key: "shots_allowed" };
     const rows = [sdpMatch({ sdp: { shots_on_target_allowed: 2, shots_allowed: 4 } }),

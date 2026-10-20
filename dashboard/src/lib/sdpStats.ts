@@ -96,6 +96,22 @@ export function shotShare(rows: readonly SdpMatch[], metric: SdpMetric, shots: S
   return finite(numerator) && finite(denominator) && denominator > 0 ? numerator / denominator * 100 : null;
 }
 
+// Observed team outcomes relative to chance value, not a probability or forecast.
+// Both totals require every selected fixture; own goals remain in official totals.
+export function goalExpectationRatio(rows: readonly SdpMatch[], goals: SdpMetric, expected: SdpMetric): number | null {
+  if (goals.scope !== "team" || expected.scope !== "team" || goals.source !== "fpl" || expected.source !== "sdp" ||
+      !((goals.key === "goals_scored" && expected.key === "expected_goals") ||
+        (goals.key === "goals_conceded" && expected.key === "expected_goals_allowed"))) return null;
+  let numerator = 0, denominator = 0;
+  for (const row of rows) {
+    const actual = metricRaw(row, goals), chance = metricRaw(row, expected);
+    if (!finite(actual) || !Number.isSafeInteger(actual) || actual < 0 || !finite(chance) || chance < 0) return null;
+    numerator += actual; denominator += chance;
+  }
+  const ratio = denominator > 0 ? numerator / denominator * 100 : null;
+  return Number.isSafeInteger(numerator) && finite(denominator) && finite(ratio) ? ratio : null;
+}
+
 export function metricValue(rows: readonly SdpMatch[], metric: SdpMetric, mode: SdpMode): MetricValue {
   // Per-appearance averages require witnessed actual exposure for every selected row.
   // A missing minute value is not a DNP; unknown exposure keeps the average unavailable.

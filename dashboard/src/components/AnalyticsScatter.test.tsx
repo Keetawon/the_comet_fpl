@@ -46,6 +46,22 @@ const props = {
 };
 
 describe("AnalyticsScatter", () => {
+  it.each([50, 250])("keeps a 100%% reference visible with all points at %s%%, separate from the median", value => {
+    render(<AnalyticsScatter {...props}
+      points={[{ id: 1, label: "Club", x: value, y: 1 }]}
+      xAxis={{ label: "Goals / xG (%)", direction: "explanatory", bounds: { min: 0 }, format: n => `${n}%` }}
+      medianX={value} referenceX={{ value: 100, label: "Goals equal xG" }} />);
+    const reference = screen.getByTestId("reference-x");
+    const median = screen.getByTestId("median-x");
+    const point = screen.getByTestId("analytics-point");
+    const referencePosition = Number(reference.getAttribute("x1"));
+    expect(referencePosition).toBeGreaterThanOrEqual(82);
+    expect(referencePosition).toBeLessThanOrEqual(696);
+    expect(reference.getAttribute("x1")).not.toBe(median.getAttribute("x1"));
+    expect(Number(point.getAttribute("cx")) > referencePosition).toBe(value > 100);
+    expect(screen.getByText("Reference line: 100% · Goals equal xG")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: props.title })).toHaveAccessibleDescription(/Reference line: 100%; Goals equal xG/);
+  });
   it("labels observed points with abbreviations without moving or conflating coincident points", () => {
     render(<AnalyticsScatter {...props} provenanceLabel="Observed" points={[
       { id: 1, label: "Arsenal", shortLabel: "ARS", x: 1.5, y: 1 },

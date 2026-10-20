@@ -1,5 +1,11 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
+**Owner-requested team effectiveness (2026-10-20):** SDP Attack and Defence
+default to observed goals/xG and goals conceded/xGC ratios, with a 100% reference,
+matched fixture totals, source labels and existing shot-axis options. Values may
+exceed 100%; they describe observed results and do not alter forecasts.
+See `docs/sdp-shot-axis-and-brighton-review-2026-09-15.md`.
+
 **Owner-requested Summary briefing (2026-10-17):** combine each scheduled match's
 published score outlook, reviewed @FFScout team news and rest/minute context for
 up to five players per team by current-season points per appearance into one
