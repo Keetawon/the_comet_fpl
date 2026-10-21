@@ -250,8 +250,9 @@ def test_new_match_source_counts_separate_unknown_and_opponent_own_goal() -> Non
     apply_source_goal_pattern(row, source, interpreted_at=stamp)
     receipt = row["goal_patterns"]
     assert receipt["open_play_goals"] == 2
-    assert receipt["own_goals_received"] == receipt["unclassified_goals"] == 1
-    assert receipt["confirmed_set_piece_goals"] == 0 and receipt["set_piece_goals"] is None
+    assert receipt["own_goals_received"] == 1
+    assert receipt["unclassified_goals"] == 0
+    assert receipt["confirmed_set_piece_goals"] == 1 and receipt["set_piece_goals"] == 1
     assert receipt["method"] == "source_goal_accounting_v1" and "audited_at" not in receipt
     assert receipt["source_known_at"] == source["fetched_at"].isoformat()
     assert source == original and row["sdp"]["set_piece_goals"] is None
@@ -312,3 +313,10 @@ def test_new_capture_reaccounts_without_inheriting_old_audit_or_backdating() -> 
     wrong["fpl"]["goals_scored"] = 0
     apply_source_goal_pattern(wrong, source, interpreted_at=stamp)
     assert wrong["goal_patterns"] is None
+    contradictory = deepcopy(source)
+    payload_contra = json.loads(contradictory["body"])
+    payload_contra[0]["stats"]["attPenGoal"] = 2  # exceeds set_piece residual = 1
+    contradictory.update(body=json.dumps(payload_contra), sha256="f" * 64)
+    invalid_candidate, _ = source_example()
+    apply_source_goal_pattern(invalid_candidate, contradictory, interpreted_at=stamp)
+    assert invalid_candidate["goal_patterns"] is None
