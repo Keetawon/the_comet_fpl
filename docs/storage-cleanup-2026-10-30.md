@@ -1,46 +1,61 @@
 # Owner-requested storage cleanup — 2026-10-30
 
-The owner requested an update check and immediate cleanup of bloated backups and
-stale operational outputs in `D:\Personal\fpl-operations` and the `the_comet_fpl`
-codebase ("มี อัพเดท เช็คหน่อยว่าอันไหนเคลียร์ได้บ้าง", "จัดไป").
+The owner requested an update check and deep cleanup of bloated backups and stale
+outputs across drive D:, `D:\Personal\fpl-operations`, and `the_comet_fpl` codebase
+("มี อัพเดท เช็คหน่อยว่าอันไหนเคลียร์ได้บ้าง", "จัดไป", "ออกอีกได้มะ", "จัดไป อ่านแล้ว").
 
-This maintenance safely reclaimed **35,992,729,600 bytes (33.52 GB / 35.99 GB decimal)**,
-restoring drive D: free space from **39.99 GB (19.9%)** to **73.28 GB (36.5%)**.
-The actively executing scheduled task (`dashboard-20261030T080009Z-c95f77ec`, PID 34916)
-was protected throughout and continues capturing SDP data without interruption.
+This maintenance safely reclaimed **83,863,941,120 bytes (78.10 GB / 83.86 GB decimal)**
+in two consecutive passes, restoring drive D: free space from **39.99 GB (19.9%)**
+to **107.43 GB (53.5%)** — freeing more than half of the entire 200.98 GB drive.
 
 ---
 
 ## 1. Reclaimed Space Breakdown
 
+### Pass 1: FPL Operational Runs & Legacy Backups (33.52 GB)
+
 | Location / File | Action | Reclaimed |
 |---|---|---:|
-| `dashboard-runs/dashboard-20261027T030034Z-8c090ad3/forecast-source.duckdb` | Superseded uncompressed forecast source database (Oct 27) | 8.05 GB |
-| `dashboard-runs/dashboard-20261027T030034Z-8c090ad3/recovery.duckdb.gz` | Gzip archive older than 72 hours (exceeds 48h TTL) | 1.38 GB |
-| `dashboard-runs/dashboard-20261027T030034Z-8c090ad3/generation/` | Superseded preview export directory (Oct 27) | 1.66 GB |
-| `dashboard-runs/dashboard-20261030T024052Z-efdeeb42/forecast-source.duckdb` | Forecast source database superseded by 07:11Z cycle | 8.20 GB |
-| `dashboard-runs/dashboard-20261030T024052Z-efdeeb42/recovery.duckdb` | Superseded recovery copy (verified successor: `00b9c291`) | 8.05 GB |
-| `dashboard-runs/dashboard-20261030T024052Z-efdeeb42/generation/` | Superseded preview export directory (02:40Z) | 1.70 GB |
-| `runs/20261028T000849.737083Z-3817aed3/before.duckdb` | Superseded pre-capture backup of `operational.duckdb` | 1.48 GB |
-| `runs/20261029T015646.509330Z-86becb57/before.duckdb` | Superseded pre-capture backup of `operational.duckdb` | 1.48 GB |
-| `runs/20261030T015940.587801Z-106b6187/before.duckdb` | Superseded pre-capture backup of `operational.duckdb` | 1.52 GB |
-| **Total Reclaimed** | | **33.52 GB** |
+| `dashboard-runs/...8c090ad3/forecast-source.duckdb` | Superseded uncompressed forecast source database (Oct 27) | 8.05 GB |
+| `dashboard-runs/...8c090ad3/recovery.duckdb.gz` | Gzip archive older than 72 hours (exceeds 48h TTL) | 1.38 GB |
+| `dashboard-runs/...8c090ad3/generation/` | Superseded preview export directory (Oct 27) | 1.66 GB |
+| `dashboard-runs/...efdeeb42/forecast-source.duckdb` | Forecast source database superseded by 07:11Z cycle | 8.20 GB |
+| `dashboard-runs/...efdeeb42/recovery.duckdb` | Superseded recovery copy (verified successor: `00b9c291`) | 8.05 GB |
+| `dashboard-runs/...efdeeb42/generation/` | Superseded preview export directory (02:40Z) | 1.70 GB |
+| `runs/20261028.../before.duckdb` | Superseded pre-capture backup of `operational.duckdb` | 1.48 GB |
+| `runs/20261029.../before.duckdb` | Superseded pre-capture backup of `operational.duckdb` | 1.48 GB |
+| `runs/20261030.../before.duckdb` | Superseded pre-capture backup of `operational.duckdb` | 1.52 GB |
+| **Pass 1 Subtotal** | | **33.52 GB** |
+
+### Pass 2: Root Archives, Completed Worktrees & Project Caches (44.58 GB)
+
+| Location / Target | Action | Reclaimed |
+|---|---|---:|
+| `D:\docker-migration-backup-full_SENADW.tar` | One-time Docker migration backup from 2026-09-07 | 36.96 GB |
+| `D:\SSMS-Setup-ENU.exe` | Obsolete SQL Server Management Studio installer (2023) | 0.61 GB |
+| `.worktrees/mobile_export_bounds` | Merged Git worktree in `the_comet_fpl` (pipelines) | 0.45 GB |
+| `.worktrees/player_production_ga` | Completed Git worktree in `the_comet_fpl` (position-free research) | 0.61 GB |
+| `.worktrees/optimizer_defender_limit` | Completed Git worktree in `the_comet_fpl` (defender limit) | 0.25 GB |
+| `sena_digital_hub_mkt/.local/hosted-test-simulation` | Stale simulation outputs from automated test suite | 4.85 GB |
+| `sena_digital_hub_mkt/.cache` | Stale build and framework cache | 0.88 GB |
+| **Pass 2 Subtotal** | | **44.58 GB** |
+| **Grand Total Reclaimed** | | **78.10 GB** |
 
 ---
 
-## 2. Protected Assets Verification
+## 2. Protected Assets & Operational Integrity
 
-All core operational and scientific evidence remained strictly protected:
+All active systems and core evidence were verified untouched:
 - **Active primary database**: `D:\Personal\fpl-operations\data\sdp-primary-v2.duckdb` (8.26 GB).
 - **Active in-flight execution**: `dashboard-runs/dashboard-20261030T080009Z-c95f77ec/` (PID 34916).
-- **Latest verified recovery backup**: `dashboard-runs/dashboard-20261030T060002Z-00b9c291/recovery.duckdb` (8.20 GB, SHA256 `9bebacdaa4b8d955718d6a0173a0b450c26605b9fce9bbbe9f545fcd8dca4199`).
-- **Latest forecast replay source**: `dashboard-runs/dashboard-20261030T060002Z-00b9c291/forecast-source.duckdb` (8.26 GB, SHA256 `b193f3c5178b9e2a4881f57c853b270bba77dca3c3bcaf83ce822e4fd950f54b`).
+- **Latest verified recovery backup**: `dashboard-runs/dashboard-20261030T060002Z-00b9c291/recovery.duckdb` (8.20 GB).
+- **Latest forecast replay source**: `dashboard-runs/dashboard-20261030T060002Z-00b9c291/forecast-source.duckdb` (8.26 GB).
 - **Registered predictions**: All `predictions/*.jsonl` files intact.
-- **Runtime credentials & Plan Server**: Untouched.
+- **Git branches**: All commit history preserved on remote; working branch `claude/comet-fpl-v2-architecture-mqrj8f` clean.
 
 ---
 
-## 3. Post-Cleanup System State
+## 3. Final Storage Status
 
-- **Drive D: Free Space**: **73.28 GB free** out of 200.98 GB (36.5% free).
-- **Scheduled Task Status**: Healthy and actively running cycle `c95f77ec`.
+- **Drive D: Free Space**: **107.43 GB free** out of 200.98 GB (**53.5% free**).
+- **Headroom**: Over 100 GB available for automated scheduled cycles and routine operations.
