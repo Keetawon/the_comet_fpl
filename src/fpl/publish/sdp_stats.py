@@ -59,6 +59,7 @@ OPEN_PLAY_GOALS = SdpMetric(
 )
 DISPLAY_CORRECTIONS_FILE = "sdp_dashboard_display_corrections.yaml"
 OMITTED_ZERO_POLICY_RECORDED_AT = datetime.fromisoformat("2026-09-09T02:47:16.006705+00:00")
+ZERO_SOT_XGOT_DISPLAY_RECORDED_AT = datetime.fromisoformat("2026-11-03T14:36:56+00:00")
 # Display-only policy for sparse nonnegative counts. High-volume/core counts,
 # percentages and continuous values remain unavailable when omitted.
 OMITTED_ZERO_DISPLAY_FIELDS = frozenset(
@@ -302,6 +303,7 @@ def _partial_current_stats(
     official: dict[str, Any],
     cutoff: datetime,
     observed_pair: list[dict[str, Any]] | None = None,
+    quarantine_zero_sot_xgot: bool = False,
 ) -> tuple[dict[str, dict[str, Any]], datetime, str, int, str] | None:
     """Display measured fields of an incomplete core, never license model use.
 
@@ -309,6 +311,8 @@ def _partial_current_stats(
     completion and both teams independently of the production health result.
     Missing fields stay missing; no older revision is substituted.
     """
+    if quarantine_zero_sot_xgot and cutoff < ZERO_SOT_XGOT_DISPLAY_RECORDED_AT:
+        return None
     config = load_sources().pl_sdp
     assert config is not None
     raw = [row for row in raw if row["fetched_at"] <= cutoff]
@@ -396,8 +400,26 @@ def _partial_current_stats(
                 return None
             if any(s.team_id != official[s.side] for s in sides):
                 return None
-            for side in sides:
-                values = dict(side.stats)
+            display_sides = {side.side: dict(side.stats) for side in sides}
+            if quarantine_zero_sot_xgot:
+                quarantined = False
+                for side_label, values in display_sides.items():
+                    score = _number(official.get(f"{side_label}_score"), integer=True)
+                    if score is None or _number(values.get("goals"), integer=True) != score:
+                        return None
+                    sot = _number(values.get("ontargetScoringAtt"), integer=True)
+                    xgot = _number(values.get("expectedGoalsOnTarget"))
+                    if score == 0 and sot == 0 and xgot is not None and xgot > 0:
+                        # xGOT is optional. Withhold its contradictory observation;
+                        # never replace it with zero or change the immutable source.
+                        del values["expectedGoalsOnTarget"]
+                        quarantined = True
+                    # Every core field and every other supplied extra must still
+                    # pass the unchanged production validator on both match sides.
+                    checked_metrics(values)
+                if not quarantined:
+                    return None
+            for values in display_sides.values():
                 for part, total in (
                     ("ontargetScoringAtt", "totalScoringAtt"),
                     ("attemptsIbox", "totalScoringAtt"),
@@ -409,7 +431,7 @@ def _partial_current_stats(
                     if left is not None and right is not None and left > right:
                         return None
             return (
-                {s.side: dict(s.stats) for s in sides},
+                display_sides,
                 max(
                     capture["fetched_at"],
                     receipt["fetched_at"],
@@ -1281,7 +1303,9 @@ def build_sdp_stats(
                         "kickoff": home_row["kickoff_time"],
                     }
         for (match_season, fixture), official in partial_fixtures.items():
-            if state.failures.get((match_season, fixture)) != "SDP_INCOMPLETE_FALLBACK":
+            failure = state.failures.get((match_season, fixture))
+            quarantine_xgot = failure == "SDP_SCHEMA_FALLBACK"
+            if failure != "SDP_INCOMPLETE_FALLBACK" and not quarantine_xgot:
                 continue
             partial = _partial_current_stats(
                 con,
@@ -1291,9 +1315,17 @@ def build_sdp_stats(
                 official=official,
                 cutoff=cutoff,
                 observed_pair=historical_pairs.get((match_season, fixture)),
+                quarantine_zero_sot_xgot=quarantine_xgot,
             )
             if partial is None:
                 continue
+            if quarantine_xgot:
+                notes.append(
+                    f"{match_season} fixture {fixture}: positive xGOT contradicting explicit "
+                    "zero SOT is withheld, not replaced with zero. Other match cells passed "
+                    "separate source/identity, official-score and remaining-metric checks. "
+                    "Provider health and forecast fallback are unchanged."
+                )
             sides, known, version, provider_match_id, stats_sha256 = partial
             if match_season == current:
                 partial_sources[fixture] = (sides, stats_sha256)

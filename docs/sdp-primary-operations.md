@@ -345,3 +345,37 @@ they never default to open play. This does not change capture windows, provider
 core validity, selection policy or forecasts. See
 `sdp-goal-pattern-refresh-2026-09-17.md` for source reconciliation and verification.
 Local refresh/build and public release publication remain separate operations.
+
+### Zero-SOT / positive-xGOT display quarantine (2026-11-03)
+
+Liverpool and Arsenal disappeared from the complete-coverage effectiveness plots
+after the provider revised Liverpool's GW9 shots on target to zero while retaining
+positive xGOT. The owner confirmed zero SOT, not zero xGOT. The strict model reader
+correctly rejects that contradictory source; its health and fallback are unchanged.
+
+For descriptive exports at or after `2026-11-03T14:36:56Z`, the partial-source reader
+may withhold that optional xGOT observation when the side has an explicit zero SOT
+and zero official goals. Both sides must independently reconcile to the official
+scores and pass the unchanged remaining core/optional metric validator, alongside
+the existing latest-revision, raw-hash, cutoff, completed-match and exact-identity
+checks. Other schema failures remain unavailable. The exporter preserves explicit
+SOT zero, leaves conflicting xGOT null, and exposes the other validated statistics,
+including reciprocal xG/xGC. It never rewrites raw captures, invents xGOT zero,
+promotes provider health, or changes forecasts. The sidecar's source notes explain
+the quarantine, and both affected rows retain incomplete dashboard status.
+
+The policy is prospective from its recorded time: earlier export cutoffs retain
+their original behavior. Eleven regression scenarios cover the accepted case,
+the earlier cutoff, identity/hash/mapping/score defects, invalid or missing core
+fields, positive-SOT contradictions and invalid optional fields. Together with
+the SDP primary tests, all 102 focused tests pass; changed-source lint and strict
+typing also pass. Publication uses the immutable source and preserves the other
+live files, with exact-base conditional pointer protection.
+
+The actual dashboard TypeScript selectors reproduce 18 eligible clubs before and
+20 after the repair in both effectiveness plots (2026/27 GW1-9, latest five
+matches). LIV and ARS each have 5/5 paired observations. The broader local gate
+passes repository-wide lint and strict typing (254 modules), but stops after
+307 passing tests on the pre-existing frozen `AGENTS.md` hash assertion in
+`tests/test_audit_json.py`. Repository formatting also reports five unrelated,
+unchanged files. Those historical pins and files are not altered by this repair.

@@ -18,6 +18,7 @@ from fpl.jobs.export_sdp_stats import main
 from fpl.publish.sdp_stats import (
     OMITTED_ZERO_POLICY_RECORDED_AT,
     OPEN_PLAY_GOALS,
+    ZERO_SOT_XGOT_DISPLAY_RECORDED_AT,
     DisplayCorrection,
     DisplayCorrectionPolicy,
     _add_lineups,
@@ -644,6 +645,91 @@ def test_metric_aliases_finite_values_and_semantics() -> None:
     assert metric_value({"first": 4, "second": 5}, conflicting) is None
     assert metric_value({"first": 4, "second": None}, conflicting) is None
     assert metric_value({"first": 4, "second": "4"}, conflicting) == 4
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        None,
+        "before_policy",
+        "identity",
+        "corrupt",
+        "late_mapping",
+        "score",
+        "core",
+        "missing",
+        "positive_sot",
+        "invalid_xgot",
+        "other_optional",
+    ],
+)
+def test_zero_sot_quarantine_preserves_other_metrics_and_strict_model_failure(
+    tmp_path: Path, defect: str | None
+) -> None:
+    cutoff = ZERO_SOT_XGOT_DISPLAY_RECORDED_AT + timedelta(seconds=1)
+    if defect == "before_policy":
+        cutoff = ZERO_SOT_XGOT_DISPLAY_RECORDED_AT - timedelta(seconds=1)
+    with initialise(tmp_path / "xgot-quarantine.duckdb") as con:
+
+        def disputed_xgot(payload: Any) -> None:
+            home = payload[0]["stats"]
+            home.update(ontargetScoringAtt=0, expectedGoalsOnTarget=0.6749, goals=0)
+            payload[1]["stats"].update(goals=1, expectedGoalsOnTarget=1.4432)
+            if defect == "core":
+                home["accuratePass"] = 9999
+            if defect == "missing":
+                home.pop("expectedGoals")
+            if defect == "positive_sot":
+                home.update(ontargetScoringAtt=1, expectedGoalsOnTarget=1.2)
+            if defect == "invalid_xgot":
+                home["expectedGoalsOnTarget"] = True
+            if defect == "other_optional":
+                payload[1]["stats"]["fwdPass"] = 9999
+
+        seed(con, change=disputed_xgot)  # type: ignore[no-untyped-call]
+        con.execute(
+            "UPDATE stg_pl_sdp_fixture_crosswalk SET resolved_at=?",
+            [cutoff + timedelta(seconds=1) if defect == "late_mapping" else CAPTURED],
+        )
+        state_before = load_sdp_state(con, cutoff=cutoff, season=SEASON)
+        assert (SEASON, 103) in state_before.failures
+        raw_before = raw_at(con, cutoff)
+        raw = deepcopy(raw_before)
+        metadata = next(r for r in raw if r["endpoint"] == "matches")
+        record = json.loads(metadata["body"])["content"][-1]
+        official = {
+            "kickoff": datetime.fromtimestamp(record["kickoff"]["millis"] / 1000, UTC),
+            "home": 8,
+            "away": 999 if defect == "identity" else 3,
+            "home_score": 0,
+            "away_score": 2 if defect == "score" else 1,
+        }
+        if defect == "corrupt":
+            next(r for r in raw if r["endpoint"] == "match_stats" and r["sdp_match_id"] == 300103)[
+                "sha256"
+            ] = "b" * 64
+        result = _partial_current_stats(
+            con,
+            raw,
+            season=SEASON,
+            fixture=103,
+            official=official,
+            cutoff=cutoff,
+            quarantine_zero_sot_xgot=True,
+        )
+        if defect is not None:
+            assert result is None
+        else:
+            assert result is not None
+            sides = result[0]
+            assert sides["home"]["ontargetScoringAtt"] == 0
+            assert "expectedGoalsOnTarget" not in sides["home"]
+            assert sides["away"]["expectedGoalsOnTarget"] == 1.4432
+            assert sides["home"]["expectedGoals"] == sides["away"]["expectedGoals"] == 1.2
+            assert sides["home"]["goals"] == 0 and sides["away"]["goals"] == 1
+            assert state_before.failures[SEASON, 103] == "SDP_SCHEMA_FALLBACK"
+        assert raw_at(con, cutoff) == raw_before
+        assert load_sdp_state(con, cutoff=cutoff, season=SEASON) == state_before
 
 
 @pytest.mark.parametrize("incomplete", [False, True])
