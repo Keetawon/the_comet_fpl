@@ -10,8 +10,12 @@ a pre-registered gate: both restore semantics the code already intended, and the
 - Tests: `tests/test_prospective_live_data_plumbing.py` (written first; every defect
   test reproduced its defect before the fix).
 - Preregistration: `docs/appearance-rostered-decay-preregistration.md` +
-  `config/appearance_decay_evaluation.yaml`.
-- Before/after regeneration harness: `scripts/prospective_plumbing_before_after.py`.
+  `config/appearance_decay_evaluation.yaml`; the single evaluation's record:
+  `docs/appearance-rostered-decay-development.md` +
+  `results/appearance_decay_evaluation_v1.json`.
+- Before/after regeneration harness: `scripts/prospective_plumbing_before_after.py`;
+  its measured GW11-deadline report and the retained SDP state probes live under
+  `data/artifacts/prospective-plumbing-20261121/`.
 
 ## Defect 1 (P0): absent prior seasons read as "benched all season"
 
@@ -94,11 +98,15 @@ is deliberately outside the rule for exactly this reason.
 
 ### The rostered-decay successor (preregistered, single evaluation)
 
-The calendar weight itself is replaced -- as a new mode, default unchanged -- by
-`w(n) = 0.7 * c / (c + n)` over the player's current-season rostered gameweeks, with the
-`n = 0` anchor exactly 0.7 (bit-equal to the shipped August blend). See the
-preregistration and `results/appearance_decay_evaluation_v1.json` for the single run,
-the selected `c`, and the gate verdicts.
+The calendar weight itself is replaced -- as a new mode, then (gates passed) the default
+-- by `w(n) = 0.7 * c / (c + n)` over the player's current-season rostered gameweeks,
+with the `n = 0` anchor exactly 0.7 (bit-equal to the shipped August blend). The single
+pre-registered evaluation selected `c = 1.0` and passed all three default-switch gates on
+the held-out 2025-26 boundary (pooled mean log loss 0.43697 vs the calendar's 0.48159,
+-9.29% relative, every phase improving, benched-prior subpopulation -11.8%); see
+`docs/appearance-rostered-decay-development.md` and
+`results/appearance_decay_evaluation_v1.json`. The default switched in its own recorded
+commit; `seasonal` remains selectable and bit-for-bit reproducible.
 
 ## Defect 2 (P0): the incumbent team model never saw the current season
 
@@ -147,7 +155,9 @@ What the retained evidence shows, per database available in this workspace:
 1. `data/fpl.duckdb` (dev): **no SDP raw payloads at all** → `load_sdp_state` returns
    `global_failure = SDP_MISSING_FALLBACK`; every fixture selects the incumbent.
 2. `.worktrees/sdp_test/data/fpl.duckdb` (a 2026-09-04 copy carrying the first real
-   SDP captures): at cutoff 2026-09-03T10:40Z (the vintage time) the payloads are
+   SDP captures; read-only probe, outputs retained at
+   `data/artifacts/prospective-plumbing-20261121/sdp_state_at_*.txt`): at cutoff
+   2026-09-03T10:40Z (the vintage time) the payloads are
    correctly invisible (`fetched_at > cutoff`) → `SDP_MISSING_FALLBACK`. At
    cutoff 2026-09-05Z, when the 2026-09-04T23:59 payloads are cutoff-eligible, the state
    is `global_failure = SDP_SCHEMA_FALLBACK` with the diagnostic
@@ -155,7 +165,7 @@ What the retained evidence shows, per database available in this workspace:
    operational database before reading eligible SDP observations"* — raw payloads were
    captured but never staged, so the strict PIT crosswalk refuses to read them and
    **every** club blocks. The probe lists each club's blocking (season, fixture)
-   keys (`sdp_probe.py`, retained output below).
+   keys.
 3. The operational database that produced the 2026-10-16 vintage -- where the selector
    did go primary for 8-10 of 20 fixtures and fell back for exactly six clubs -- is not
    retained in this workspace (the documented storage cleanup reclaimed ~78 GB on
@@ -175,17 +185,72 @@ falling back: the incumbent the fallback uses is no longer blind to the current 
 
 ### 2d: regeneration at the next deadline
 
-`scripts/prospective_plumbing_before_after.py` runs the forecast twice at the next
-deadline's cutoff on the same loaded database -- BEFORE (pre-repair behaviour
-reconstructed by suppressing the live training rows and disabling the availability rule
-in the harness process only) and AFTER (the repaired path) -- and reports team lambdas,
-the fallback share, the Defect-1 population's xP, and every top-20 rank change by
-position. Measured output for the GW11 deadline: REGENERATION-RESULTS.
+`scripts/prospective_plumbing_before_after.py` ran the forecast three times at the GW11
+deadline cutoff (**2026-11-21T11:00:00Z**, the next deadline after the loaded
+2026-11-20T14:54Z capture) on the same database, horizon GW11-15 (50 fixtures, 672
+players, 3,360 rows per arm):
 
-## Gate results
+- **before** -- pre-repair behaviour (live Stage A rows suppressed, availability rule
+  disabled, `seasonal`), reconstructed by in-process monkeypatching only;
+- **after_fixes_seasonal** -- the two P0 repairs with the old appearance mode (isolates
+  the data-plumbing fixes);
+- **after_fixes_default** -- the repairs plus the gate-passing `rostered_decay` default.
 
-See HANDOFF section of the covering conversation record; the pre-existing failures on
-this branch (present on `origin/main` before this change set) are:
+Full report: `data/artifacts/prospective-plumbing-20261121/before_after_gw11.json`.
+
+**Team lambdas.** All 100 team-fixture rows of the horizon changed (both after-arms
+identically -- the appearance mode cannot move team lambdas, verified 0 rows changed
+between them). `lambda_for` delta: mean -0.0285, range -0.4509 to +0.3056 -- 2026-27 is
+running below the archive-pooled scoring level, so clubs' ratings now respond to the
+actual season. The before-arm reproduces the published vintage exactly: the GW11 fixture
+101 home side reads `lambda_for 1.482` before (the user's measured published value) and
+**1.569** after -- inside the 1.59-0.02 current-season xG-based band quoted for that
+fixture, from 100 previously-invisible finalized matches (200 team sides, all with NULL
+xG and official scores).
+
+**Fallback share.** On this workspace's dev database the SDP raw payloads are absent, so
+the selector reports `SDP_MISSING_FALLBACK: 100/100` team predictions in every arm -- the
+share is environment state, not code (see 2c). What the repair changes is what the
+fallback **uses**: `stage_a_league_average_team_rows` fell **20 -> 0** -- the promoted
+sides that ran on the 1.0x league-average fallback all season now carry real
+current-season ratings. On the owner's operational database (SDP present), the same
+change applies to the incumbent half of every `sdp_v2_with_incumbent_fallback` decision.
+
+**The 26 defect-1 players' xP (GW11-15 horizon totals).**
+
+| arm | mean delta | lifted | range |
+|---|---|---|---|
+| fixes only (`seasonal`) | +0.907 | 19/26 | -0.505 to +4.933 |
+| fixes + new default | **+1.681** | **26/26** | +0.407 to +5.155 |
+
+Largest repairs (new default): Enciso 15.90 -> 21.05, N.Jackson 17.95 -> 22.99 (+5.04
+over five gameweeks, ~+1.0/GW), Vuskovic 15.17 -> 19.36, Colwill 10.85 -> 13.81,
+Trafford 11.23 -> 14.00, Rushworth 12.22 -> 14.21, Kinsky 12.73 -> 14.73. The 18 small
+declines in the seasonal arm (max -0.50, Kudus) are all rotation-prior players
+(prior 0.32-0.58, priors kept by the rule) whose clubs' Stage A ratings moved on real
+current-season results -- the team model working, not the appearance rule.
+
+**Top-20 rank changes by position (before -> new default).**
+
+- **DEF**: Vuskovic (610799) enters at 8; Canvot (146426) enters at 17; 12 inside-top-20
+  movers (e.g. 97032 5->6, 465730 6->5).
+- **FWD**: N.Jackson rises 5 -> 3; Marmoush (438234) enters at 19; Isak 4 -> 5.
+- **GK**: Penders (549939) enters at 19, Benitez (121709) at 20; the top two swap
+  (433969 1->2, 473284 2->1).
+- **MID**: Enciso (474120) enters at 19; the top three reorder (480457 1->3,
+  122806 2->1, 201666 3->2); 16 movers in total.
+
+Every changed rank traces to a repaired input: a lifted availability (the entering
+zero/low-prior starters), or a club rating that finally moved on the current season.
+
+## Gate results (this change set)
+
+Run on this branch at `db1baf4` (see the handoff for the exact commands): focused suites
+green (new plumbing tests 9/9; prospective suites 110+/110+ passing with the known
+pre-existing exceptions below); `ruff check src tests scripts` clean;
+`ruff format --check` clean on every touched file; `mypy src` clean (251 files). The
+known pre-existing failures on `origin/main` (present before this change set, verified by
+stashing):
 
 1. `tests/test_development_reference_components.py::test_existing_production_source_pins_are_unchanged`
    (1 failed) plus 24 fixture ERRORs (`assert 2 == 1`: the fixture counts one minutes
