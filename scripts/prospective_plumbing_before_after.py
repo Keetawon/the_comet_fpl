@@ -48,7 +48,11 @@ def _next_deadline(con: Any, season: str, as_of_floor: datetime) -> tuple[int, d
 
 
 def _defect1_population(con: Any, as_of: datetime) -> list[dict[str, Any]]:
-    """The 26-player scope: >=4 of GW6-10 with 60+ minutes, prior-2025-26 rate < 0.6, n >= 35."""
+    """The 26-player scope: >=4 of GW6-10 with 60+ minutes, prior-2025-26 rate < 0.6, n >= 35.
+
+    Current-season rows are deduplicated to the latest version per (season, code, fixture):
+    the finalized sweep and earlier captures both hold GW6-10 rows.
+    """
     rows = con.execute(
         """
         WITH prior AS (
@@ -59,9 +63,16 @@ def _defect1_population(con: Any, as_of: datetime) -> list[dict[str, Any]]:
         ),
         current AS (
             SELECT code, count(*) FILTER (WHERE minutes >= 60) AS big
-            FROM mart_fact_player_fixture_live
-            WHERE season = '2026-27' AND gw BETWEEN 6 AND 10
-              AND minutes IS NOT NULL AND kickoff_time < ?
+            FROM (
+                SELECT code, minutes, row_number() OVER (
+                    PARTITION BY season, code, fixture
+                    ORDER BY known_at DESC, capture_id DESC
+                ) AS rn
+                FROM mart_fact_player_fixture_live
+                WHERE season = '2026-27' AND gw BETWEEN 6 AND 10
+                  AND minutes IS NOT NULL AND kickoff_time < ?
+            )
+            WHERE rn = 1
             GROUP BY code
         )
         SELECT c.code, p.rate, p.n, c.big
@@ -77,7 +88,16 @@ def _defect1_population(con: Any, as_of: datetime) -> list[dict[str, Any]]:
     ]
 
 
-def _arm(con: Any, *, as_of: datetime, season: str, gw_from: int, gw_to: int, before: bool) -> Any:
+def _arm(
+    con: Any,
+    *,
+    as_of: datetime,
+    season: str,
+    gw_from: int,
+    gw_to: int,
+    before: bool,
+    appearance: str = "rostered_decay",
+) -> Any:
     restore_frame = prospective.live_finalized_team_match_rows
     restore_min = prospective._PRIOR_SEASON_MIN_APPEARANCES
     if before:
@@ -106,6 +126,7 @@ def _arm(con: Any, *, as_of: datetime, season: str, gw_from: int, gw_to: int, be
             season=season,
             gw_from=gw_from,
             gw_to=gw_to,
+            appearance=appearance,
             db_path=None,
             repo=None,
         )
@@ -129,140 +150,167 @@ def main(argv: list[str] | None = None) -> int:
         print(f"next deadline: {args.season} GW{gw_from} at {deadline.isoformat()}")
         population = _defect1_population(con, deadline)
         print(f"defect-1 population: {len(population)} players")
-        before = _arm(
-            con, as_of=deadline, season=args.season, gw_from=gw_from, gw_to=gw_to, before=True
-        )
-        after = _arm(
-            con, as_of=deadline, season=args.season, gw_from=gw_from, gw_to=gw_to, before=False
-        )
-
-        # 1. Team lambdas.
-        before_teams = {
-            (r.gw, r.fixture, r.team_code): (r.lambda_for, r.lambda_against)
-            for r in before.team_records
+        arms = {
+            "before": _arm(
+                con,
+                as_of=deadline,
+                season=args.season,
+                gw_from=gw_from,
+                gw_to=gw_to,
+                before=True,
+                appearance="seasonal",
+            ),
+            "after_fixes_seasonal": _arm(
+                con,
+                as_of=deadline,
+                season=args.season,
+                gw_from=gw_from,
+                gw_to=gw_to,
+                before=False,
+                appearance="seasonal",
+            ),
+            "after_fixes_default": _arm(
+                con,
+                as_of=deadline,
+                season=args.season,
+                gw_from=gw_from,
+                gw_to=gw_to,
+                before=False,
+                appearance="rostered_decay",
+            ),
         }
-        after_teams = {
-            (r.gw, r.fixture, r.team_code): (r.lambda_for, r.lambda_against)
-            for r in after.team_records
-        }
-        assert before_teams.keys() == after_teams.keys()
-        changed = [
-            {
-                "gw": gw,
-                "fixture": fixture,
-                "team_code": code,
-                "lambda_for_before": before_teams[(gw, fixture, code)][0],
-                "lambda_for_after": after_teams[(gw, fixture, code)][0],
-                "lambda_against_before": before_teams[(gw, fixture, code)][1],
-                "lambda_against_after": after_teams[(gw, fixture, code)][1],
-            }
-            for gw, fixture, code in sorted(before_teams)
-            if abs(before_teams[(gw, fixture, code)][0] - after_teams[(gw, fixture, code)][0])
-            > 1e-9
-            or abs(before_teams[(gw, fixture, code)][1] - after_teams[(gw, fixture, code)][1])
-            > 1e-9
-        ]
-        print(f"team-fixture lambda rows changed: {len(changed)} of {len(before_teams)}")
-
-        # 2. Fallback share.
-        def _selector_share(result: Any) -> dict[str, Any]:
-            provenance = result.football_environment_provenance
-            if provenance is None:
-                return {"mode": "incumbent_only"}
-            return {
-                "mode": "sdp_v2_with_incumbent_fallback",
-                "selector_counts_team_predictions": provenance.get(
-                    "selector_counts_team_predictions"
-                ),
-                "health": provenance.get("health", {}).get("matches_using_fallback"),
-            }
-
-        share_before = _selector_share(before)
-        share_after = _selector_share(after)
-        league_avg_before = sum(1 for r in before.team_records if r.stage_a_league_average_team)
-        league_avg_after = sum(1 for r in after.team_records if r.stage_a_league_average_team)
-
-        # 3. Defect-1 players' xP.
-        codes = [p["code"] for p in population]
-        totals_before = {t.code: t for t in before.player_totals}
-        totals_after = {t.code: t for t in after.player_totals}
-        defect1_xp = [
-            {
-                **p,
-                "xp_before": totals_before[c].expected_points if c in totals_before else None,
-                "xp_after": totals_after[c].expected_points if c in totals_after else None,
-            }
-            for p, c in zip(population, codes, strict=True)
-        ]
-        for row in defect1_xp:
-            if row["xp_before"] is not None and row["xp_after"] is not None:
-                row["delta"] = row["xp_after"] - row["xp_before"]
-
-        # 4. Top-20 rank changes by position.
-        def _ranks(result: Any) -> dict[str, dict[int, int]]:
-            by_pos: dict[str, list[Any]] = {}
-            for t in result.player_totals:
-                by_pos.setdefault(t.position, []).append(t)
-            return {
-                pos: {
-                    t.code: rank
-                    for rank, t in enumerate(
-                        sorted(rows, key=lambda t: (-t.expected_points, t.code))[:20], start=1
-                    )
-                }
-                for pos, rows in by_pos.items()
-            }
-
-        ranks_before = _ranks(before)
-        ranks_after = _ranks(after)
-        rank_changes = []
-        for pos in sorted(set(ranks_before) | set(ranks_after)):
-            entered = [
-                {"code": c, "rank": r}
-                for c, r in ranks_after.get(pos, {}).items()
-                if c not in ranks_before.get(pos, {})
-            ]
-            exited = [
-                {"code": c, "rank": r}
-                for c, r in ranks_before.get(pos, {}).items()
-                if c not in ranks_after.get(pos, {})
-            ]
-            moved = [
-                {"code": c, "before": ranks_before[pos][c], "after": ranks_after[pos][c]}
-                for c in ranks_before.get(pos, {})
-                if c in ranks_after.get(pos, {}) and ranks_before[pos][c] != ranks_after[pos][c]
-            ]
-            if entered or exited or moved:
-                rank_changes.append(
-                    {"position": pos, "entered": entered, "exited": exited, "moved": moved}
-                )
-
         report = {
             "schema": "prospective_plumbing_before_after/v1",
             "as_of": deadline.isoformat(),
             "season": args.season,
             "gw_from": gw_from,
             "gw_to": gw_to,
-            "team_lambda_rows_changed": len(changed),
-            "team_lambda_changes": changed,
-            "fallback_share": {"before": share_before, "after": share_after},
-            "stage_a_league_average_team_rows": {
-                "before": league_avg_before,
-                "after": league_avg_after,
-            },
+            "arms": {name: _arm_summary(result) for name, result in arms.items()},
             "defect1_population": population,
-            "defect1_xp": defect1_xp,
-            "top20_rank_changes_by_position": rank_changes,
+            "diffs": {
+                f"{base}->{target}": _diff(arms[base], arms[target], population)
+                for base, target in (
+                    ("before", "after_fixes_seasonal"),
+                    ("before", "after_fixes_default"),
+                    ("after_fixes_seasonal", "after_fixes_default"),
+                )
+            },
         }
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(f"wrote {args.output}")
-        print(f"fallback share before={share_before} after={share_after}")
-        lifted = [r for r in defect1_xp if r.get("delta", 0) > 0.05]
-        print(f"defect-1 players with xP lift > 0.05: {len(lifted)} of {len(defect1_xp)}")
+        for name, diff in report["diffs"].items():
+            lifted = [r for r in diff["defect1_xp"] if r.get("delta", 0) > 0.05]
+            print(
+                f"{name}: lambda rows changed={diff['team_lambda_rows_changed']}"
+                f" defect-1 lifted>0.05={len(lifted)}/{len(diff['defect1_xp'])}"
+                f" rank-change positions={len(diff['top20_rank_changes_by_position'])}"
+            )
     finally:
         con.close()
     return 0
+
+
+def _arm_summary(result: Any) -> dict[str, Any]:
+    provenance = result.football_environment_provenance
+    selector = (
+        {"mode": "incumbent_only"}
+        if provenance is None
+        else {
+            "mode": "sdp_v2_with_incumbent_fallback",
+            "selector_counts_team_predictions": provenance.get("selector_counts_team_predictions"),
+        }
+    )
+    return {
+        "appearance_mode": result.appearance_mode,
+        "roster_size": result.roster_size,
+        "fixture_count": result.fixture_count,
+        "rows": len(result.records),
+        "selector": selector,
+        "stage_a_league_average_team_rows": sum(
+            1 for r in result.team_records if r.stage_a_league_average_team
+        ),
+    }
+
+
+def _lambda_map(result: Any) -> dict[tuple[int, int, int], tuple[float, float]]:
+    return {
+        (r.gw, r.fixture, r.team_code): (r.lambda_for, r.lambda_against)
+        for r in result.team_records
+    }
+
+
+def _ranks(result: Any) -> dict[str, dict[int, int]]:
+    by_pos: dict[str, list[Any]] = {}
+    for t in result.player_totals:
+        by_pos.setdefault(t.position, []).append(t)
+    ordered = {
+        pos: sorted(rows, key=lambda t: (-t.expected_points, t.code))[:20]
+        for pos, rows in by_pos.items()
+    }
+    return {
+        pos: {t.code: rank for rank, t in enumerate(rows, start=1)} for pos, rows in ordered.items()
+    }
+
+
+def _diff(base: Any, target: Any, population: list[dict[str, Any]]) -> dict[str, Any]:
+    base_teams = _lambda_map(base)
+    target_teams = _lambda_map(target)
+    assert base_teams.keys() == target_teams.keys()
+    changed = [
+        {
+            "gw": gw,
+            "fixture": fixture,
+            "team_code": code,
+            "lambda_for_base": base_teams[(gw, fixture, code)][0],
+            "lambda_for_target": target_teams[(gw, fixture, code)][0],
+            "lambda_against_base": base_teams[(gw, fixture, code)][1],
+            "lambda_against_target": target_teams[(gw, fixture, code)][1],
+        }
+        for gw, fixture, code in sorted(base_teams)
+        if abs(base_teams[(gw, fixture, code)][0] - target_teams[(gw, fixture, code)][0]) > 1e-9
+        or abs(base_teams[(gw, fixture, code)][1] - target_teams[(gw, fixture, code)][1]) > 1e-9
+    ]
+    totals_base = {t.code: t for t in base.player_totals}
+    totals_target = {t.code: t for t in target.player_totals}
+    defect1_xp = []
+    for p in population:
+        code = p["code"]
+        row = dict(p)
+        row["xp_base"] = totals_base[code].expected_points if code in totals_base else None
+        row["xp_target"] = totals_target[code].expected_points if code in totals_target else None
+        if row["xp_base"] is not None and row["xp_target"] is not None:
+            row["delta"] = row["xp_target"] - row["xp_base"]
+        defect1_xp.append(row)
+    ranks_base = _ranks(base)
+    ranks_target = _ranks(target)
+    rank_changes = []
+    for pos in sorted(set(ranks_base) | set(ranks_target)):
+        entered = [
+            {"code": c, "rank": r}
+            for c, r in ranks_target.get(pos, {}).items()
+            if c not in ranks_base.get(pos, {})
+        ]
+        exited = [
+            {"code": c, "rank": r}
+            for c, r in ranks_base.get(pos, {}).items()
+            if c not in ranks_target.get(pos, {})
+        ]
+        moved = [
+            {"code": c, "base": ranks_base[pos][c], "target": ranks_target[pos][c]}
+            for c in ranks_base.get(pos, {})
+            if c in ranks_target.get(pos, {}) and ranks_base[pos][c] != ranks_target[pos][c]
+        ]
+        if entered or exited or moved:
+            rank_changes.append(
+                {"position": pos, "entered": entered, "exited": exited, "moved": moved}
+            )
+    return {
+        "team_lambda_rows_changed": len(changed),
+        "team_lambda_changes": changed,
+        "defect1_xp": defect1_xp,
+        "top20_rank_changes_by_position": rank_changes,
+    }
 
 
 if __name__ == "__main__":
