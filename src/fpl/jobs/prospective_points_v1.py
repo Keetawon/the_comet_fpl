@@ -1155,7 +1155,32 @@ def live_finalized_team_match_rows(con: duckdb.DuckDBPyConnection, as_of: dateti
     * no duplicate keys against the archive: a ``(season, fixture)`` the archive mart
       already carries is excluded, so a reload after an archive refresh cannot
       double-count a match.
+
+    A database without the live staging tables (a raw test database, an archive-only
+    copy) has no current-season evidence by definition and gets an empty frame -- exactly
+    the archive-only behaviour such databases always had.
     """
+    from fpl.storage.db import table_exists
+
+    if not (
+        table_exists(con, "stg_live_fixture_version") and table_exists(con, "stg_live_team_version")
+    ):
+        return pl.DataFrame(
+            schema={
+                "season": pl.String,
+                "gw": pl.Int32,
+                "fixture": pl.Int32,
+                "was_home": pl.Boolean,
+                "team_code": pl.Int32,
+                "opponent_team_code": pl.Int32,
+                "goals_for": pl.Int32,
+                "goals_against": pl.Int32,
+                "team_xg": pl.Float64,
+                "team_xgc": pl.Float64,
+                "fdr": pl.Int32,
+                "kickoff_time": pl.Datetime(time_zone="UTC"),
+            }
+        )
     return con.execute(
         """
         WITH latest_fixture AS (
