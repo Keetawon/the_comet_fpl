@@ -763,7 +763,7 @@ def test_trailing_ict_population_and_null_semantics_are_unchanged() -> None:
         con.close()
 
 
-def test_appearance_seasonal_is_default_and_mode_is_validated() -> None:
+def test_appearance_rostered_decay_is_default_and_modes_are_validated() -> None:
     con = _basic_db(
         players=[_player(11, 1001, 3, 1), _player(12, 1002, 4, 2)],
         fixtures=[_fixture(501, 1, 2)],
@@ -773,7 +773,20 @@ def test_appearance_seasonal_is_default_and_mode_is_validated() -> None:
         default = predict_prospective_points(
             con, as_of=AS_OF, season="2026-27", gw_from=1, gw_to=1, db_path=None, repo=None
         )
-        assert default.appearance_mode == "seasonal"
+        # Default since the 2026-11-21 gate-passing switch; seasonal stays explicitly
+        # selectable and bit-for-bit reproducible.
+        assert default.appearance_mode == "rostered_decay"
+        seasonal = predict_prospective_points(
+            con,
+            as_of=AS_OF,
+            season="2026-27",
+            gw_from=1,
+            gw_to=1,
+            appearance="seasonal",
+            db_path=None,
+            repo=None,
+        )
+        assert seasonal.appearance_mode == "seasonal"
         model = predict_prospective_points(
             con,
             as_of=AS_OF,
@@ -785,7 +798,7 @@ def test_appearance_seasonal_is_default_and_mode_is_validated() -> None:
             repo=None,
         )
         assert model.appearance_mode == "model"
-        for r in list(default.records) + list(model.records):
+        for r in list(default.records) + list(model.records) + list(seasonal.records):
             assert abs(sum(r.distribution) - 1.0) < 1e-9
 
         import pytest
