@@ -624,13 +624,13 @@ def prior_season_appearance_rate(
     if history is not None:
         rows: list[tuple[Any, ...]] = (
             history.drop_nulls(["minutes"])
+            .sort(["kickoff_time", "season", "fixture", "code"], maintain_order=True)
             .select(
                 "code",
                 "season",
                 (pl.col("minutes") >= 1).cast(pl.Float64).alias("played"),
                 "team_code",
             )
-            .sort(["kickoff_time", "season", "fixture", "code"], maintain_order=True)
             .rows()
         )
     else:
