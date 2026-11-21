@@ -175,15 +175,29 @@ def _fold_inputs(
 ) -> _FoldInputs:
     frame = _replay_history(con, as_of)
     current_club = _current_club_from_fact_rows(frame)
-    trailing = trailing5_minute_bins(con, as_of, bins, current_club=current_club, history=frame)
-    # Live-path semantics: the prior is the latest season the live path would hold
-    # archived -- strictly before the target season (the replay mart already contains
-    # the target season, which in-season live data does not).
+    # Live-path semantics: the eligibility frontier is the most recent COMPLETED season --
+    # the latest season strictly before the target (the replay mart contains the in-progress
+    # target season, which the live path holds in live staging instead).
+    prior_row = con.execute(
+        "SELECT max(season) FROM mart_fact_player_fixture WHERE season < ?", [season]
+    ).fetchone()
+    prior_season = str(prior_row[0]) if prior_row is not None and prior_row[0] is not None else ""
+    trailing = trailing5_minute_bins(
+        con,
+        as_of,
+        bins,
+        current_club=current_club,
+        history=frame,
+        frontier_season=prior_season,
+    )
+    # The prior rate is likewise the latest season the live path would hold archived --
+    # strictly before the target season.
     prior = prior_season_appearance_rate(
         con,
         as_of,
         current_club=current_club,
         history=frame.filter(pl.col("season") < pl.lit(season)),
+        frontier_season=prior_season,
     )
     rostered = {
         int(r["code"]): int(r["n"])

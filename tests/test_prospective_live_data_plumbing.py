@@ -46,6 +46,8 @@ TEAM_CODE = {1: 101, 2: 102}
 
 JACKSON = 517052  # the measured case: AVL FWD, loaned at Bayern through 2025-26
 CONTROL = 4242  # a same-club veteran who genuinely played the prior season
+BOUNDARY_LOW = 4321  # 4 prior-season appearances: an unavailability season
+BOUNDARY_HIGH = 4322  # 5 prior-season appearances: the first rotation prior kept
 
 
 def _teams(*ids: int) -> list[dict[str, Any]]:
@@ -210,7 +212,14 @@ def _seed_prior_season(
         kickoff = _PRIOR_BASE + timedelta(days=7 * (gw - 1))
         fixture = 900 + gw
         was_home = gw % 2 == 0
-        for code, minutes in ((JACKSON, jackson_minutes), (CONTROL, control_minutes)):
+        for code, minutes in (
+            (JACKSON, jackson_minutes),
+            (CONTROL, control_minutes),
+            # The measured boundary: 4 prior-season appearances is an unavailability
+            # season (Trafford/Pinnock 2025-26); 5 is the first rotation prior kept.
+            (BOUNDARY_LOW, 90 if gw <= 4 else 0),
+            (BOUNDARY_HIGH, 90 if gw <= 5 else 0),
+        ):
             player_rows.append(
                 (
                     "2025-26",
@@ -364,16 +373,21 @@ def test_zero_appearance_prior_season_carries_no_appearance_prior() -> None:
 
     The prior-season rate map must not carry a (0.0, 38) entry for such a player: a
     zero rate here is the signature of a loan/out-all-season absence, not of a benching
-    the current trailing window would confirm. The genuine ever-present keeps his entry.
+    the current trailing window would confirm. The genuine ever-present keeps his entry,
+    and the measured k=5 boundary holds: a 4-appearance season (Trafford/Pinnock 2025-26)
+    is unavailability, a 5-appearance season is the first rotation prior kept.
     """
     con = _jackson_db()
     try:
-        prior = prior_season_appearance_rate(
-            con, AS_OF_NOVEMBER, current_club={JACKSON: 101, CONTROL: 101}
-        )
+        clubs = {JACKSON: 101, CONTROL: 101, BOUNDARY_LOW: 101, BOUNDARY_HIGH: 101}
+        prior = prior_season_appearance_rate(con, AS_OF_NOVEMBER, current_club=clubs)
         assert JACKSON not in prior
+        assert BOUNDARY_LOW not in prior
         assert prior[CONTROL][0] == 1.0
         assert prior[CONTROL][1] >= 10
+        rate, n = prior[BOUNDARY_HIGH]
+        assert rate == pytest.approx(5.0 / 38.0)
+        assert n == 38
     finally:
         con.close()
 
@@ -417,6 +431,7 @@ def test_frozen_unfiltered_prior_path_keeps_zero_rate_semantics() -> None:
         prior = prior_season_appearance_rate(con, AS_OF_NOVEMBER)
         assert prior[JACKSON] == (0.0, 38)
         assert prior[CONTROL] == (1.0, 38)
+        assert prior[BOUNDARY_LOW][0] == pytest.approx(4.0 / 38.0)
     finally:
         con.close()
 

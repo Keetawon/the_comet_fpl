@@ -543,17 +543,28 @@ def last_team_code(
 # Minimum prior-season appearances for the long-window rate to be trusted over the model estimate.
 _MIN_PRIOR_SEASON_ROWS = 10
 
-# A prior season with fewer than this many appearances means the player was not available to the
-# club (loaned abroad, injured all season, out of the squad) -- not that he was benched in
+# A prior season with fewer than this many appearances means the player was not available to
+# the club (loaned abroad, injured out, out of the squad) -- not that he was benched in
 # matches he could have played. The FPL registry keeps a zero-minute DNP row for every gameweek
-# such a player was on a PL roster, so the observable signature is a near-zero appearance rate
-# over a FULL season of rows (n >= _MIN_PRIOR_SEASON_ROWS). Carrying that ~0.0 rate into the
-# season-boundary blend reads "benched all season" and halves a returning starter's P(play)
-# in-season (measured: N.Jackson 2026-27, 38 zero-minute 2025-26 rows on loan at Bayern ->
-# P(play) ~0.45 in November against a ~0.90 trailing-5 estimate). Such a season carries no
-# appearance prior: the player's recent evidence stands on its own. Measured candidate counts
-# behind the chosen bound are recorded in docs/prospective-live-data-plumbing-2026-11-21.md.
-_PRIOR_SEASON_MIN_APPEARANCES = 1
+# such a player was on a PL roster, so the observable signature is a near-zero appearance
+# count over a FULL season of rows. Below 5 appearances (~13% of a 38-round season) the
+# appearance rate cannot distinguish unavailability from fringe rotation -- its binomial
+# standard error exceeds its mean -- so the season carries no nailed-ness information at all.
+# Carrying that ~0.0 rate into the season-boundary blend reads "benched all season" and
+# halves a returning starter's P(play) in-season (measured: N.Jackson 2026-27, 38 zero-minute
+# 2025-26 rows on loan at Bayern -> P(play) ~0.45 in November against a ~0.90 trailing-5
+# estimate). Such a season carries no appearance prior: the player's recent evidence stands
+# on its own. Rotation priors at >= 5 appearances (measured 2026-27: 7-22 appearance seasons
+# reading 0.18-0.58) stay -- their rates are honest partial-season evidence, and their
+# in-season drag is the stale blend WEIGHT (the rostered-decay repair), not the prior.
+# Measured candidate counts behind the chosen bound (2026-27 registry at the GW11-deadline
+# cutoff, raw pre-rule map of 865 entries): ==0 apps drops 310 (4 current starters
+# released); <2 -> 343 (4); <3 -> 357 (4); <4 -> 377 (5); <5 -> 387 (7); <6 -> 396 (7);
+# <8 -> 422 (9). The named unavailability cases (Jackson 0, Trafford 4, Pinnock 4,
+# Colwill 3, Benitez 1, Maddison 3, Enciso/Rushworth/Vuskovic/Penders/Gelhardt 0) are all
+# covered at k=5; Kinsky (7 apps) is deliberately not. Full table and scope coverage in
+# docs/prospective-live-data-plumbing-2026-11-21.md.
+_PRIOR_SEASON_MIN_APPEARANCES = 5
 
 
 def prior_season_appearance_rate(
@@ -562,6 +573,7 @@ def prior_season_appearance_rate(
     *,
     current_club: Mapping[int, int] | None = None,
     history: pl.DataFrame | None = None,
+    frontier_season: str | None = None,
 ) -> dict[int, tuple[float, int]]:
     """``code -> (appearance rate, n)`` over the player's most-recent completed season before as_of.
 
@@ -634,7 +646,9 @@ def prior_season_appearance_rate(
             """,
             [as_of],
         ).fetchall()
-    frontier = _trailing_frontier_season(con, as_of)
+    frontier = (
+        frontier_season if frontier_season is not None else _trailing_frontier_season(con, as_of)
+    )
     latest_season: dict[int, str] = {}
     played_by_code: dict[int, list[float]] = defaultdict(list)
     for code, season, played, row_team_code in rows:
@@ -675,6 +689,7 @@ def trailing5_minute_bins(
     alpha: float = MINUTES_SHRINKAGE_ALPHA,
     current_club: Mapping[int, int] | None = None,
     history: pl.DataFrame | None = None,
+    frontier_season: str | None = None,
 ) -> dict[int, tuple[tuple[float, float, float, float], int]]:
     """``code -> (shrunk minute-bin distribution, n)`` over the most recent ``window`` rows.
 
@@ -703,6 +718,11 @@ def trailing5_minute_bins(
     rule (:func:`_trailing_row_eligible`) before the window is taken -- a stale former-club
     sequence cannot be a player's "last five". The shrinkage priors are built from the same
     eligible population. Without it, the query and window are exactly the frozen legacy ones.
+
+    ``frontier_season`` overrides the eligibility frontier (the "most recent archived season"
+    label). The live path derives it from the mart, whose latest season is a completed one, but
+    an archive replay mart contains the in-progress target season -- so a replay caller passes
+    the latest season strictly BEFORE its target to reproduce the live semantics exactly.
     """
     if current_club is None:
         frame = con.execute(
@@ -718,7 +738,11 @@ def trailing5_minute_bins(
     else:
         frame = history if history is not None else load_player_history(con, as_of)
         frame = frame.sort(["code", "kickoff_time", "season", "fixture"])
-        frontier = _trailing_frontier_season(con, as_of)
+        frontier = (
+            frontier_season
+            if frontier_season is not None
+            else _trailing_frontier_season(con, as_of)
+        )
     n_bins = bins.n_bins()
     by_code: dict[int, list[int]] = defaultdict(list)
     position_of: dict[int, str] = {}
