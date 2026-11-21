@@ -8,8 +8,7 @@ a pre-registered gate: both restore semantics the code already intended, and the
 `seasonal` appearance arithmetic is untouched and bit-for-bit reproducible.
 
 - Tests: `tests/test_prospective_live_data_plumbing.py` (written first; every defect
-  test reproduced its defect before the fix).
-- Preregistration: `docs/appearance-rostered-decay-preregistration.md` +
+  test reproduced its defect before the fix).- Preregistration: `docs/appearance-rostered-decay-preregistration.md` +
   `config/appearance_decay_evaluation.yaml`; the single evaluation's record:
   `docs/appearance-rostered-decay-development.md` +
   `results/appearance_decay_evaluation_v1.json`.
@@ -245,25 +244,47 @@ zero/low-prior starters), or a club rating that finally moved on the current sea
 
 ## Gate results (this change set)
 
-Run on this branch at `db1baf4` (see the handoff for the exact commands): focused suites
-green (new plumbing tests 9/9; prospective suites 110+/110+ passing with the known
-pre-existing exceptions below); `ruff check src tests scripts` clean;
-`ruff format --check` clean on every touched file; `mypy src` clean (251 files). The
-known pre-existing failures on `origin/main` (present before this change set, verified by
-stashing):
+Full local gate, run twice -- once on `origin/main` (`ba223a8`, the base) and once on this
+branch -- to attribute every failure exactly:
+
+| gate | result |
+|---|---|
+| `pytest -q` (base) | 73 failed / 4,676 passed / 5 skipped / 22 errors |
+| `pytest -q` (branch, pre-final-fix commits) | 67 failed / 4,682 passed / 5 skipped / 22 errors |
+| `pytest -q` (branch at HEAD) | **65 failures, every one of which also fails on base; 0 introduced** |
+| `ruff check src tests` | **All checks passed** |
+| `ruff format --check .` | fails on 8 pre-existing base files (listed below); every touched file formatted |
+| `mypy src` | **Success: no issues in 251 source files** |
+
+The base-vs-branch diff of the failure sets: the only tests failing on the branch and not
+the base were the default-mode pin (updated with the switch, `7a7fdcb`) and
+`test_dev_ev_backtest.py::test_prospective_team_scored_reproducible_ordering` (raw test DB
+without live staging; `59b1065` restores the archive-only degradation) -- both fixed at
+HEAD. The only tests failing on the base and not the branch are this change set's eight
+new plumbing tests (the intended red-on-base state). The pre-existing base failures, none
+touched by this change set:
 
 1. `tests/test_development_reference_components.py::test_existing_production_source_pins_are_unchanged`
-   (1 failed) plus 24 fixture ERRORs (`assert 2 == 1`: the fixture counts one minutes
+   (1 failed) plus 17 fixture ERRORs (`assert 2 == 1`: the fixture counts one minutes
    fit, the shadow-incumbent recursion now fits twice by design).
 2. `tests/test_retrospective_minutes_proxy.py::test_contract_pins_and_prospective_import_boundary`
    (source SHA pin drift on `src/fpl/validate/prospective_incumbent_adapter.py`).
 3. `tests/test_prospective_incumbent_adapter.py::test_existing_sql_helpers_reproduce_shrinkage_and_latest_season_exactly`
    (raw in-memory DB never created `stg_live_team_version`, which `load_player_history`
    reads).
-4. The documented Windows `WinError 1314` symlink suite in `tests/test_bi_export.py` /
-   `tests/test_dashboard_json.py` publication tests, plus the `.pytest_cache`/basetemp
-   permission denials on this host (worked around with `--basetemp` under the approved
-   temp root).
-5. `ruff format --check .` fails on 8 pre-existing files under `src/fpl/publish`,
-   `src/fpl/insights`, and 4 test files on `origin/main`; the files touched by this
-   change set are formatted.
+4. The bulk of the remaining pre-existing failures (test_dev_v2_corroborated_sot,
+   test_dev_v2_weekly_sot, test_dev_v2_weekly_inner, test_dev_v2_tactical_numeric,
+   test_player_model_gw1_3_v2_identity, test_player_workload_minutes_runner, and others)
+   are raw-byte config/result SHA pins computed on an LF checkout: this host has
+   `core.autocrlf=true`, so the working tree holds CRLF and `file_sha256` over raw bytes
+   mismatches the pins (verified: the pinned digest matches the LF-normalized bytes).
+   They fail identically on the base.
+5. The documented Windows `WinError 1314` symlink suite in `tests/test_bi_export.py` /
+   `tests/test_dashboard_json.py` publication tests (14 rows on both base and branch),
+   plus the `.pytest_cache`/basetemp permission denials on this host (worked around with
+   `--basetemp` under the approved temp root).
+6. `ruff format --check .` fails on 8 pre-existing base files: `src/fpl/insights/contracts.py`,
+   `src/fpl/publish/contract.py`, `src/fpl/publish/dashboard_json.py`,
+   `src/fpl/publish/export.py`, `tests/test_bi_export.py`,
+   `tests/test_bi_semantic_contract.py`, `tests/test_dashboard_json.py`,
+   `tests/test_snapshot_workflows.py`.
