@@ -30,9 +30,9 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from fpl.jobs import prospective_points_v1 as prospective  # noqa: E402
-from fpl.jobs.prospective_points_v1 import predict_prospective_points  # noqa: E402
-from fpl.storage.db import connect  # noqa: E402
+from fpl.jobs import prospective_points_v1 as prospective
+from fpl.jobs.prospective_points_v1 import predict_prospective_points
+from fpl.storage.db import connect
 
 _EMPTY_FRAME: pl.DataFrame | None = None
 
@@ -129,12 +129,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"next deadline: {args.season} GW{gw_from} at {deadline.isoformat()}")
         population = _defect1_population(con, deadline)
         print(f"defect-1 population: {len(population)} players")
-        before = _arm(con, as_of=deadline, season=args.season, gw_from=gw_from, gw_to=gw_to, before=True)
-        after = _arm(con, as_of=deadline, season=args.season, gw_from=gw_from, gw_to=gw_to, before=False)
+        before = _arm(
+            con, as_of=deadline, season=args.season, gw_from=gw_from, gw_to=gw_to, before=True
+        )
+        after = _arm(
+            con, as_of=deadline, season=args.season, gw_from=gw_from, gw_to=gw_to, before=False
+        )
 
         # 1. Team lambdas.
-        before_teams = {(r.gw, r.fixture, r.team_code): (r.lambda_for, r.lambda_against) for r in before.team_records}
-        after_teams = {(r.gw, r.fixture, r.team_code): (r.lambda_for, r.lambda_against) for r in after.team_records}
+        before_teams = {
+            (r.gw, r.fixture, r.team_code): (r.lambda_for, r.lambda_against)
+            for r in before.team_records
+        }
+        after_teams = {
+            (r.gw, r.fixture, r.team_code): (r.lambda_for, r.lambda_against)
+            for r in after.team_records
+        }
         assert before_teams.keys() == after_teams.keys()
         changed = [
             {
@@ -147,8 +157,10 @@ def main(argv: list[str] | None = None) -> int:
                 "lambda_against_after": after_teams[(gw, fixture, code)][1],
             }
             for gw, fixture, code in sorted(before_teams)
-            if abs(before_teams[(gw, fixture, code)][0] - after_teams[(gw, fixture, code)][0]) > 1e-9
-            or abs(before_teams[(gw, fixture, code)][1] - after_teams[(gw, fixture, code)][1]) > 1e-9
+            if abs(before_teams[(gw, fixture, code)][0] - after_teams[(gw, fixture, code)][0])
+            > 1e-9
+            or abs(before_teams[(gw, fixture, code)][1] - after_teams[(gw, fixture, code)][1])
+            > 1e-9
         ]
         print(f"team-fixture lambda rows changed: {len(changed)} of {len(before_teams)}")
 
@@ -192,7 +204,12 @@ def main(argv: list[str] | None = None) -> int:
             for t in result.player_totals:
                 by_pos.setdefault(t.position, []).append(t)
             return {
-                pos: {t.code: rank for rank, t in enumerate(sorted(rows, key=lambda t: (-t.expected_points, t.code))[:20], start=1)}
+                pos: {
+                    t.code: rank
+                    for rank, t in enumerate(
+                        sorted(rows, key=lambda t: (-t.expected_points, t.code))[:20], start=1
+                    )
+                }
                 for pos, rows in by_pos.items()
             }
 
@@ -229,7 +246,10 @@ def main(argv: list[str] | None = None) -> int:
             "team_lambda_rows_changed": len(changed),
             "team_lambda_changes": changed,
             "fallback_share": {"before": share_before, "after": share_after},
-            "stage_a_league_average_team_rows": {"before": league_avg_before, "after": league_avg_after},
+            "stage_a_league_average_team_rows": {
+                "before": league_avg_before,
+                "after": league_avg_after,
+            },
             "defect1_population": population,
             "defect1_xp": defect1_xp,
             "top20_rank_changes_by_position": rank_changes,
