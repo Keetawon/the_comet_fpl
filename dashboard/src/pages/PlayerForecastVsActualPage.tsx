@@ -213,7 +213,7 @@ export function PlayerForecastVsActualPage() {
   ];
   const firstCompletedGw = completedGws[0] ?? run.gw_from;
   const lastCompletedGw = completedGws.at(-1) ?? run.gw_to;
-  const selectedRole = accuracyRunRole(run.component_modes);
+  const selectedRole = accuracyRunRole(run.component_modes, run.created_at);
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">

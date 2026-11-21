@@ -397,8 +397,15 @@ def generate_forecasts_for_fold(
     # The league-mean fallback the production job uses is deliberately not taken here: the
     # schedule frame is built from these very target rows and reciprocity is validated above, so
     # every (fixture, team_code) must resolve. A missing entry is a defect and fails closed.
+    # `include_live_current_season=False` pins the archive-only Stage A training frame of the
+    # immutable 2026-08-07 run: this adapter's semantics never depend on live capture state.
     team_scored, _league_conceded = prospective_team_scored(
-        con, season=season, as_of=as_of, team_map=team_map, schedule=schedule_df
+        con,
+        season=season,
+        as_of=as_of,
+        team_map=team_map,
+        schedule=schedule_df,
+        include_live_current_season=False,
     )
 
     # Signal resolution for primary V3 goals & coupled assists

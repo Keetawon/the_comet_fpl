@@ -36,18 +36,26 @@ Prospective-specific behaviour, all documented in the output record:
     (``lambda_team * measured assist_rate``, ~0.90) is allocated by an xA-share (creativity pre-xG),
     so a genuine creator takes a large assist share; ``--assists v1`` reverts to independent per-
     player assists, and ``--attacking v1`` reverts goals.
-  * **Season-boundary appearance correction (default).** The trailing-minutes window at a GW1
-    deadline is the END of the prior season -- its least representative phase, since a nailed
-    starter rested in dead-rubber final fixtures reads as a rotation risk. By default
-    (``--appearance seasonal``) the recent appearance is the *equal-weighted* average of the last
-    five matches -- no recency weight, which would otherwise land hardest on the dead-rubber final
-    gameweek (measured: equal weighting predicts a next-season opener better than a recency-weighted
-    window, overall MAE 0.223 vs 0.234, goalkeepers 0.181 vs 0.195) -- then an early-season target
-    blends that with the player's full prior-season appearance rate (measured: the boundary-robust
-    nailed-ness signal predicts an opener better than any five-match window), preserving the when-
-    playing minute shape; ``--appearance model`` uses the raw recency-weighted model distribution.
-    Even so, cross-season appearance is genuinely uncertain (measured MAE ~0.22; nailed-last-season
-    players average ~0.78 early next season), so this lifts rested starters without false certainty.
+  * **Appearance: prior-season nailed-ness under a rostered-decay weight (default).**
+    The recent appearance estimate is the *equal-weighted* average of the last five
+    matches -- no recency weight, which would otherwise land hardest on the dead-rubber
+    final gameweek (measured: equal weighting predicts a next-season opener better than a
+    recency-weighted window, overall MAE 0.223 vs 0.234, goalkeepers 0.181 vs 0.195) --
+    then blended with the player's full prior-season appearance rate under
+    ``w(n) = 0.7 * c / (c + n)`` over the player's rostered current-season gameweeks
+    (``--appearance rostered_decay``, default since 2026-11-21: the single pre-registered
+    evaluation at ``results/appearance_decay_evaluation_v1.json`` passed all three
+    default-switch gates -- held-out 2025-26 mean log loss 0.43697 vs the calendar
+    weight's 0.48159, every phase improving). The prior-season rate itself carries the
+    not-available-to-the-club rule: a prior season with fewer than five appearances
+    (loaned abroad / out all season) carries no prior at all -- it cannot distinguish
+    unavailability from fringe rotation and reads "benched all season" (measured:
+    N.Jackson's 38 zero-minute 2025-26 rows halved his November P(play) to ~0.45).
+    ``--appearance seasonal`` keeps the shipped calendar weight (0.7 Aug/Sep, 0.5
+    Oct/Nov, 0 from December) bit-for-bit; ``--appearance model`` uses the raw
+    recency-weighted model distribution. Even so, cross-season appearance is genuinely
+    uncertain (measured MAE ~0.22; nailed-last-season players average ~0.78 early next
+    season).
   * **Promoted clubs get league-average team strength.** ``trailing_goals_attack_defence`` keys
     attack and defence on ``team_code``; a club with no archive history (a genuine cold-start
     promotion) falls back to the league-average multiplier (1.0), not the promoted prior. Flagged.
@@ -543,12 +551,38 @@ def last_team_code(
 # Minimum prior-season appearances for the long-window rate to be trusted over the model estimate.
 _MIN_PRIOR_SEASON_ROWS = 10
 
+# A prior season with fewer than this many appearances means the player was not available to
+# the club (loaned abroad, injured out, out of the squad) -- not that he was benched in
+# matches he could have played. The FPL registry keeps a zero-minute DNP row for every gameweek
+# such a player was on a PL roster, so the observable signature is a near-zero appearance
+# count over a FULL season of rows. Below 5 appearances (~13% of a 38-round season) the
+# appearance rate cannot distinguish unavailability from fringe rotation -- its binomial
+# standard error exceeds its mean -- so the season carries no nailed-ness information at all.
+# Carrying that ~0.0 rate into the season-boundary blend reads "benched all season" and
+# halves a returning starter's P(play) in-season (measured: N.Jackson 2026-27, 38 zero-minute
+# 2025-26 rows on loan at Bayern -> P(play) ~0.45 in November against a ~0.90 trailing-5
+# estimate). Such a season carries no appearance prior: the player's recent evidence stands
+# on its own. Rotation priors at >= 5 appearances (measured 2026-27: 7-22 appearance seasons
+# reading 0.18-0.58) stay -- their rates are honest partial-season evidence, and their
+# in-season drag is the stale blend WEIGHT (the rostered-decay repair), not the prior.
+# Measured candidate counts behind the chosen bound (2026-27 registry at the GW11-deadline
+# cutoff, raw pre-rule map of 865 entries): ==0 apps drops 310 (4 current starters
+# released); <2 -> 343 (4); <3 -> 357 (4); <4 -> 377 (5); <5 -> 387 (7); <6 -> 396 (7);
+# <8 -> 422 (9). The named unavailability cases (Jackson 0, Trafford 4, Pinnock 4,
+# Colwill 3, Benitez 1, Maddison 3, Enciso/Rushworth/Vuskovic/Penders/Gelhardt 0) are all
+# covered at k=5; Kinsky (7 apps) is deliberately not. Full table and scope coverage in
+# docs/prospective-live-data-plumbing-2026-11-21.md.
+_PRIOR_SEASON_MIN_APPEARANCES = 5
+
 
 def prior_season_appearance_rate(
     con: duckdb.DuckDBPyConnection,
     as_of: datetime,
     *,
     current_club: Mapping[int, int] | None = None,
+    history: pl.DataFrame | None = None,
+    frontier_season: str | None = None,
+    unavailable_prior_min_appearances: int | None = None,
 ) -> dict[int, tuple[float, int]]:
     """``code -> (appearance rate, n)`` over the player's most-recent completed season before as_of.
 
@@ -562,7 +596,22 @@ def prior_season_appearance_rate(
     With ``current_club`` (the prospective path), "most recent season" is the most recent
     season with an ELIGIBLE row (:func:`_trailing_row_eligible`) -- a player whose only history
     is stale and at a former club has no trusted prior-season rate at all and is absent from the
-    map (the caller's zero-history route), rather than carrying a two-seasons-old rate.
+    map (the caller's zero-history route), rather than carrying a two-seasons-old rate. A
+    caller-supplied ``history`` frame (columns ``code``/``season``/``minutes``/``team_code``,
+    already cutoff-filtered) replaces the mart query -- the archive replay path, which must
+    restrict the frame to seasons the LIVE path would hold archived (strictly before the target
+    season) to reproduce the live semantics on a mart that already contains the target season.
+
+    ``unavailable_prior_min_appearances`` is an OPT-IN availability rule and is ``None`` by
+    default: every default call -- the frozen Phase 4 EV backtest adapter,
+    ``current_minutes_control_cache``, the replay adapters -- keeps the exact pre-branch
+    semantics on every path (a full-season zero-appearance player carries ``(0.0, 38)``, not an
+    absence). When a caller passes a bound, a prior season with fewer than that many
+    appearances over its roster rows (loaned abroad, out all season) carries NO appearance
+    prior on the ``current_club`` path: a ~0.0 rate there is the signature of unavailability,
+    not of benching, and blending it into an in-season target halves a returning starter's
+    P(play) (the measured Jackson defect). Rows that do exist stay NULL-safe and are never
+    zero-filled; the rule never applies to the unfiltered ``current_club=None`` path.
     """
     if current_club is None:
         frame = con.execute(
@@ -584,19 +633,34 @@ def prior_season_appearance_rate(
         return {
             int(r["code"]): (float(r["rate"]), int(r["n"])) for r in frame.iter_rows(named=True)
         }
-    rows = con.execute(
-        """
-        SELECT f.code, f.season,
-               CASE WHEN f.minutes >= 1 THEN 1.0 ELSE 0.0 END AS played,
-               t.team_code
-        FROM mart_fact_player_fixture AS f
-        LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
-        WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
-        ORDER BY f.kickoff_time, f.season, f.fixture, f.code
-        """,
-        [as_of],
-    ).fetchall()
-    frontier = _trailing_frontier_season(con, as_of)
+    if history is not None:
+        rows: list[tuple[Any, ...]] = (
+            history.drop_nulls(["minutes"])
+            .sort(["kickoff_time", "season", "fixture", "code"], maintain_order=True)
+            .select(
+                "code",
+                "season",
+                (pl.col("minutes") >= 1).cast(pl.Float64).alias("played"),
+                "team_code",
+            )
+            .rows()
+        )
+    else:
+        rows = con.execute(
+            """
+            SELECT f.code, f.season,
+                   CASE WHEN f.minutes >= 1 THEN 1.0 ELSE 0.0 END AS played,
+                   t.team_code
+            FROM mart_fact_player_fixture AS f
+            LEFT JOIN mart_dim_team AS t ON t.season = f.season AND t.team_id = f.team_id
+            WHERE f.minutes IS NOT NULL AND f.kickoff_time < ?
+            ORDER BY f.kickoff_time, f.season, f.fixture, f.code
+            """,
+            [as_of],
+        ).fetchall()
+    frontier = (
+        frontier_season if frontier_season is not None else _trailing_frontier_season(con, as_of)
+    )
     latest_season: dict[int, str] = {}
     played_by_code: dict[int, list[float]] = defaultdict(list)
     for code, season, played, row_team_code in rows:
@@ -616,7 +680,17 @@ def prior_season_appearance_rate(
     return {
         code: (math.fsum(values) / len(values), len(values))
         for code, values in played_by_code.items()
+        # The opt-in not-available-to-the-club rule (``unavailable_prior_min_appearances``):
+        # a season of registry rows with fewer than the bound's appearances is an absence,
+        # not a benching. Without this the Jackson pattern -- 38 zero-minute rows,
+        # n = 38 >= _MIN_PRIOR_SEASON_ROWS -- hands the boundary blend a 0.0 "nailed-ness"
+        # rate. ``None`` (the default, and every frozen-reference caller's form) keeps the
+        # exact pre-branch map.
         if values
+        and (
+            unavailable_prior_min_appearances is None
+            or math.fsum(values) >= unavailable_prior_min_appearances
+        )
     }
 
 
@@ -633,6 +707,7 @@ def trailing5_minute_bins(
     alpha: float = MINUTES_SHRINKAGE_ALPHA,
     current_club: Mapping[int, int] | None = None,
     history: pl.DataFrame | None = None,
+    frontier_season: str | None = None,
 ) -> dict[int, tuple[tuple[float, float, float, float], int]]:
     """``code -> (shrunk minute-bin distribution, n)`` over the most recent ``window`` rows.
 
@@ -661,6 +736,11 @@ def trailing5_minute_bins(
     rule (:func:`_trailing_row_eligible`) before the window is taken -- a stale former-club
     sequence cannot be a player's "last five". The shrinkage priors are built from the same
     eligible population. Without it, the query and window are exactly the frozen legacy ones.
+
+    ``frontier_season`` overrides the eligibility frontier (the "most recent archived season"
+    label). The live path derives it from the mart, whose latest season is a completed one, but
+    an archive replay mart contains the in-progress target season -- so a replay caller passes
+    the latest season strictly BEFORE its target to reproduce the live semantics exactly.
     """
     if current_club is None:
         frame = con.execute(
@@ -676,7 +756,11 @@ def trailing5_minute_bins(
     else:
         frame = history if history is not None else load_player_history(con, as_of)
         frame = frame.sort(["code", "kickoff_time", "season", "fixture"])
-        frontier = _trailing_frontier_season(con, as_of)
+        frontier = (
+            frontier_season
+            if frontier_season is not None
+            else _trailing_frontier_season(con, as_of)
+        )
     n_bins = bins.n_bins()
     by_code: dict[int, list[int]] = defaultdict(list)
     position_of: dict[int, str] = {}
@@ -756,6 +840,25 @@ def _season_boundary_long_weight(month: int) -> float:
     return 0.0
 
 
+def _blend_appearance(
+    minutes: tuple[float, float, float, float], *, p_play: float
+) -> tuple[float, float, float, float]:
+    """Rescale a 4-bin minutes distribution to ``p_play``, preserving the when-playing shape.
+
+    The freed/added mass is redistributed across the playing bins in the distribution's own
+    proportions, so appearance probability changes without inventing a minute shape. Shared
+    by the calendar-boundary and rostered-decay blends; the arithmetic (and therefore the
+    bits) of each existing caller's output is unchanged.
+    """
+    p1, p2, p3 = minutes[1], minutes[2], minutes[3]
+    play_model = p1 + p2 + p3
+    if play_model <= 1e-12:
+        # The model gives no when-playing shape; default a re-confirmed starter toward a full match.
+        return (1.0 - p_play, 0.0, p_play * 0.15, p_play * 0.85)
+    scale = p_play / play_model
+    return (1.0 - p_play, p1 * scale, p2 * scale, p3 * scale)
+
+
 def season_boundary_minutes(
     minutes: tuple[float, float, float, float],
     *,
@@ -773,18 +876,66 @@ def season_boundary_minutes(
     coupled goal share without inventing a minute shape. Availability is NOT applied here (it stays
     the separate reported overlay, never double-counted).
     """
-    p0, p1, p2, p3 = minutes
-    p_recent = 1.0 - p0
     weight = _season_boundary_long_weight(target_month)
     if prior_rate is None or prior_n < _MIN_PRIOR_SEASON_ROWS or weight <= 0.0:
         return minutes
+    p_play = max(0.0, min(1.0, weight * prior_rate + (1.0 - weight) * (1.0 - minutes[0])))
+    return _blend_appearance(minutes, p_play=p_play)
+
+
+# The rostered-decay anchor: the measured season-boundary blend weight at n = 0 (~0.7 long +
+# 0.3 recent predicts a next-season opener best). Selected on the training boundaries of
+# config/appearance_decay_evaluation.yaml; see docs/appearance-rostered-decay-preregistration.md.
+ROSTERED_DECAY_ANCHOR = 0.7
+# The decay constant c shipped with the ``rostered_decay`` appearance mode, selected by the
+# contract's single pre-registered evaluation (results/appearance_decay_evaluation_v1.json,
+# run at git 51b1a2c: training pooled mean log loss 0.43478 at c=1 vs the calendar 0.47754;
+# held-out 2025-26 0.43697 vs 0.48159, -9.29% relative, every phase improving, benched-prior
+# subpopulation -11.8%; all three default-switch gates passed). Do not retune against its
+# held-out season.
+ROSTERED_DECAY_C: float | None = 1.0
+
+
+def rostered_decay_weight(rostered_gws: int, *, c: float) -> float:
+    """``0.7 * c / (c + n)``: the long-rate weight as a function of current-season rostered GWs.
+
+    Keeps the measured ``n = 0`` boundary anchor (0.7 -- returned exactly, so the boundary
+    blend's bits equal the shipped ``seasonal`` behaviour) and fades the stale
+    prior-season rate as current-season rostered evidence accrues -- the calendar-month
+    alternative (0.7 Aug/Sep, 0.5 Oct/Nov, 0 from December) keys on the target's month
+    while the prior it blends never updates in-season (the archive mart's latest season
+    is fixed during a live season).
+    """
+    n = max(0, rostered_gws)
+    if n == 0:
+        return ROSTERED_DECAY_ANCHOR
+    return ROSTERED_DECAY_ANCHOR * c / (c + n)
+
+
+def rostered_decay_minutes(
+    minutes: tuple[float, float, float, float],
+    *,
+    prior_rate: float | None,
+    prior_n: int,
+    rostered_gws: int,
+    decay_c: float,
+) -> tuple[float, float, float, float]:
+    """The rostered-decay sibling of :func:`season_boundary_minutes`.
+
+    ``p_play`` is blended ``w(n) * prior_rate + (1 - w(n)) * recent`` with
+    ``w(n) = 0.7 * c / (c + n)`` (:func:`rostered_decay_weight`) and ``n`` the number of
+    current-season rostered gameweeks before the cutoff; the when-playing minute shape is
+    preserved by the same redistribution. The same trust rules apply: no prior-season rate,
+    too few prior rows, or a zero decay weight leaves the passed distribution untouched.
+    """
+    if prior_rate is None or prior_n < _MIN_PRIOR_SEASON_ROWS:
+        return minutes
+    weight = rostered_decay_weight(rostered_gws, c=decay_c)
+    if weight <= 0.0:
+        return minutes
+    p_recent = 1.0 - minutes[0]
     p_play = max(0.0, min(1.0, weight * prior_rate + (1.0 - weight) * p_recent))
-    play_model = p1 + p2 + p3
-    if play_model <= 1e-12:
-        # The model gives no when-playing shape; default a re-confirmed starter toward a full match.
-        return (1.0 - p_play, 0.0, p_play * 0.15, p_play * 0.85)
-    scale = p_play / play_model
-    return (1.0 - p_play, p1 * scale, p2 * scale, p3 * scale)
+    return _blend_appearance(minutes, p_play=p_play)
 
 
 def appeared_attack_signals(
@@ -989,6 +1140,125 @@ def league_assist_rate(
     return max(0.0, min(2.0, float(row[0]) / float(row[1])))
 
 
+def live_finalized_team_match_rows(con: duckdb.DuckDBPyConnection, as_of: datetime) -> pl.DataFrame:
+    """Finalized current-season team sides for Stage A training (official scores only).
+
+    The archive ``mart_fact_team_match`` covers completed seasons only (``sources.yaml``
+    archive seasons end at 2025-26), so during a live season the incumbent Stage A fit
+    otherwise never sees a current-season match: its ratings, venue means and league
+    conceded average are frozen at the summer rebuild. This restores the semantics the
+    frozen historical evaluation used -- every match kicked off and known before the
+    cutoff is visible -- from the *same source the team-outcome ledger attaches*: the
+    versioned live fixtures' final official home/away scores.
+
+    Point-in-time and identity discipline (mirrors ``fpl.storage.outcomes`` exactly):
+
+    * latest fixture version per ``(season, fixture)`` with ``known_at <= as_of``;
+    * ``kickoff_time < as_of`` and ``finished IS TRUE`` with BOTH scores non-NULL --
+      a finished fixture without official scores is excluded, never zero-filled;
+    * ``(season, team_id) -> team_code`` resolved through ``stg_live_team_version``
+      (latest version known by ``as_of``) on both sides, inner join: a side whose club
+      cannot resolve carries no cross-season identity and cannot train the model;
+    * ``team_xg``/``team_xgc`` stay NULL (the live fixtures payload carries no xG; a
+      zero there would be a measurement claim nobody made) -- the incumbent
+      ``trailing_goals_attack_defence`` measures goals anyway;
+    * no duplicate keys against the archive: a ``(season, fixture)`` the archive mart
+      already carries is excluded, so a reload after an archive refresh cannot
+      double-count a match.
+
+    A database without the live staging tables (a raw test database, an archive-only
+    copy) has no current-season evidence by definition and gets an empty frame -- exactly
+    the archive-only behaviour such databases always had.
+    """
+    from fpl.storage.db import table_exists
+
+    if not (
+        table_exists(con, "stg_live_fixture_version") and table_exists(con, "stg_live_team_version")
+    ):
+        return pl.DataFrame(
+            schema={
+                "season": pl.String,
+                "gw": pl.Int32,
+                "fixture": pl.Int32,
+                "was_home": pl.Boolean,
+                "team_code": pl.Int32,
+                "opponent_team_code": pl.Int32,
+                "goals_for": pl.Int32,
+                "goals_against": pl.Int32,
+                "team_xg": pl.Float64,
+                "team_xgc": pl.Float64,
+                "fdr": pl.Int32,
+                "kickoff_time": pl.Datetime(time_zone="UTC"),
+            }
+        )
+    return con.execute(
+        """
+        WITH latest_fixture AS (
+            SELECT * EXCLUDE (version_rank)
+            FROM (
+                SELECT *, row_number() OVER (
+                    PARTITION BY season, fixture
+                    ORDER BY known_at DESC, capture_id DESC
+                ) AS version_rank
+                FROM stg_live_fixture_version
+                WHERE known_at <= ?
+            )
+            WHERE version_rank = 1
+        ),
+        latest_team AS (
+            SELECT season, team_id, team_code
+            FROM (
+                SELECT season, team_id, team_code, row_number() OVER (
+                    PARTITION BY season, team_id
+                    ORDER BY known_at DESC, capture_id DESC
+                ) AS version_rank
+                FROM stg_live_team_version
+                WHERE known_at <= ?
+            )
+            WHERE version_rank = 1
+        ),
+        sides AS (
+            SELECT season, gw, fixture, CAST(kickoff_time AS TIMESTAMPTZ) AS kickoff_time,
+                   TRUE AS was_home, finished,
+                   team_h AS team_id, team_a AS opponent_team_id,
+                   team_h_score AS goals_for, team_a_score AS goals_against,
+                   team_h_difficulty AS fdr
+            FROM latest_fixture
+            UNION ALL
+            SELECT season, gw, fixture, CAST(kickoff_time AS TIMESTAMPTZ) AS kickoff_time,
+                   FALSE AS was_home, finished,
+                   team_a AS team_id, team_h AS opponent_team_id,
+                   team_a_score AS goals_for, team_h_score AS goals_against,
+                   team_a_difficulty AS fdr
+            FROM latest_fixture
+        )
+        SELECT s.season, s.gw, s.fixture, s.was_home,
+               club.team_code AS team_code,
+               opponent.team_code AS opponent_team_code,
+               s.goals_for, s.goals_against,
+               CAST(NULL AS DOUBLE) AS team_xg,
+               CAST(NULL AS DOUBLE) AS team_xgc,
+               s.fdr,
+               s.kickoff_time
+        FROM sides AS s
+        JOIN latest_team AS club
+          ON club.season = s.season AND club.team_id = s.team_id
+        JOIN latest_team AS opponent
+          ON opponent.season = s.season AND opponent.team_id = s.opponent_team_id
+        WHERE CAST(s.kickoff_time AS TIMESTAMPTZ) < ?
+          AND s.finished IS TRUE
+          AND s.goals_for IS NOT NULL AND s.goals_against IS NOT NULL
+          AND s.gw IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM mart_fact_team_match AS m
+              WHERE m.season = s.season AND m.fixture = s.fixture
+          )
+        ORDER BY s.kickoff_time, s.season, s.fixture, club.team_code, opponent.team_code
+        """,
+        [as_of, as_of, as_of],
+    ).pl()
+
+
 def prospective_team_scored(
     con: duckdb.DuckDBPyConnection,
     *,
@@ -997,6 +1267,7 @@ def prospective_team_scored(
     team_map: dict[int, int],
     schedule: pl.DataFrame,
     model: TrailingGoalsAttackDefence | None = None,
+    include_live_current_season: bool = True,
 ) -> tuple[dict[tuple[int, int], Distribution], float]:
     """Fit ``trailing_goals_attack_defence`` on history < ``as_of`` and predict each team's scored
     goals for every scheduled fixture in ``schedule``.
@@ -1007,6 +1278,14 @@ def prospective_team_scored(
     Pass a caller-owned ``model`` to keep a handle on the fitted Stage A model after the call (the
     prospective job does this to read its ``known_team_codes()`` and flag league-average inputs);
     the default fits an internal instance, leaving every other caller's behaviour unchanged.
+
+    The training frame is the archive ``mart_fact_team_match`` UNION the finalized
+    current-season team sides from the versioned live fixtures
+    (:func:`live_finalized_team_match_rows`) -- without them a live-season fit is frozen
+    at the summer archive refresh. ``include_live_current_season=False`` pins the
+    archive-only frame the frozen Phase 4 EV backtest adapter consumed, independent of
+    any live capture state: its immutable run's semantics stay explicit rather than
+    resting on the loaders never back-filling a historical season.
     """
     from fpl.validate.baselines import TrailingGoalsAttackDefence, TrainingWindow
 
@@ -1014,7 +1293,8 @@ def prospective_team_scored(
         m.season, m.gw, m.fixture, m.was_home,
         club.team_code AS team_code,
         opponent.team_code AS opponent_team_code,
-        m.goals_for, m.goals_against, m.team_xg, m.team_xgc, m.fdr
+        m.goals_for, m.goals_against, m.team_xg, m.team_xgc, m.fdr,
+        CAST(m.kickoff_time AS TIMESTAMPTZ) AS kickoff_time
     """
     join = """
         FROM mart_fact_team_match AS m
@@ -1031,6 +1311,18 @@ def prospective_team_scored(
         f"SELECT {select} {join} WHERE CAST(m.kickoff_time AS TIMESTAMPTZ) < ? {order_by}",
         [as_of],
     ).pl()
+    if include_live_current_season:
+        live_frame = live_finalized_team_match_rows(con, as_of)
+        if not live_frame.is_empty():
+            window_frame = pl.concat([window_frame, live_frame], how="vertical").sort(
+                ["kickoff_time", "season", "fixture", "team_code", "opponent_team_code"],
+                maintain_order=True,
+            )
+            logger.info(
+                "stage A training frame: %d archive + %d finalized live current-season team sides",
+                window_frame.height - live_frame.height,
+                live_frame.height,
+            )
     league_conceded = 1.4
     if not window_frame.is_empty():
         conceded = window_frame["goals_against"].drop_nulls()
@@ -1176,6 +1468,10 @@ class ProspectivePointsResult:
     attacking_mode: str
     share_signal_kind: str
     appearance_mode: str
+    # Provenance label for the prior-season availability rule the appearance path ran
+    # with ("min5_apps_v1" for the rostered_decay opt-in, "none" otherwise). Runs with
+    # different prior semantics never share an identical label.
+    appearance_prior_rule: str
     assists_mode: str
     freshness_cold_start: bool
     records: tuple[ProspectivePointsRecord, ...]
@@ -1237,7 +1533,7 @@ def predict_prospective_points(
     gw_from: int = DEFAULT_GW_FROM,
     gw_to: int = DEFAULT_GW_TO,
     attacking: str = "v3",
-    appearance: str = "seasonal",
+    appearance: str = "rostered_decay",
     share_signal: str = "auto",
     assists: str = "coupled",
     suite: PointsComponentSuite | None = None,
@@ -1254,8 +1550,17 @@ def predict_prospective_points(
         raise ValueError(f"gw_to ({gw_to}) < gw_from ({gw_from})")
     if attacking not in {"v1", "v3"}:
         raise ValueError(f"attacking must be 'v1' or 'v3', got {attacking!r}")
-    if appearance not in {"model", "seasonal"}:
-        raise ValueError(f"appearance must be 'model' or 'seasonal', got {appearance!r}")
+    if appearance not in {"model", "seasonal", "rostered_decay"}:
+        raise ValueError(
+            f"appearance must be 'model', 'seasonal', or 'rostered_decay', got {appearance!r}"
+        )
+    decay_c = ROSTERED_DECAY_C
+    if appearance == "rostered_decay" and decay_c is None:
+        raise ValueError(
+            "rostered_decay appearance mode has no evaluated decay constant "
+            "(ROSTERED_DECAY_C); run config/appearance_decay_evaluation.yaml's single "
+            "evaluation before using it"
+        )
     if share_signal not in {"auto", "xg", "threat"}:
         raise ValueError(f"share_signal must be 'auto', 'xg', or 'threat', got {share_signal!r}")
     if assists not in {"coupled", "v1"}:
@@ -1354,14 +1659,38 @@ def predict_prospective_points(
     # "With history" means with ELIGIBLE history (owner rule 2026-08-17): a player whose every
     # archived row is stale and at a former club is a cold start, not a transfer.
     codes_with_history = set(last_team)
+    # The availability rule is scoped to the rostered_decay mode ONLY: `seasonal` consumes
+    # the exact pre-branch prior map (inputs included), so it stays truly bit-for-bit.
+    prior_rule_bound: int | None = (
+        _PRIOR_SEASON_MIN_APPEARANCES if appearance == "rostered_decay" else None
+    )
     prior_appearance = (
-        prior_season_appearance_rate(con, as_of, current_club=current_club)
-        if appearance == "seasonal"
+        prior_season_appearance_rate(
+            con,
+            as_of,
+            current_club=current_club,
+            unavailable_prior_min_appearances=prior_rule_bound,
+        )
+        if appearance in {"seasonal", "rostered_decay"}
         else {}
     )
     trailing5_bins = (
         trailing5_minute_bins(con, as_of, bins, current_club=current_club, history=player_history)
-        if appearance == "seasonal"
+        if appearance in {"seasonal", "rostered_decay"}
+        else {}
+    )
+    # Rostered current-season gameweeks before the cutoff: the rostered-decay weight's n. A
+    # rostered gameweek is one the player has a consumed row for (played or DNP -- he was in
+    # the squad), from the same cutoff-filtered history everything else reads.
+    rostered_gws_by_code: dict[int, int] = (
+        {
+            int(row["code"]): int(row["n"])
+            for row in player_history.filter(pl.col("season") == season)
+            .group_by("code")
+            .agg(pl.col("gw").n_unique().alias("n"))
+            .iter_rows(named=True)
+        }
+        if appearance == "rostered_decay"
         else {}
     )
 
@@ -1759,6 +2088,24 @@ def predict_prospective_points(
                     prior_n=prior_n,
                     target_month=kickoff_ts.month,
                 )
+            elif appearance == "rostered_decay":
+                # Same real minutes path (equal-weighted shrunk trailing-5, prior-season rate
+                # under the not-available rule); only the blend weight differs: w(n) decays in
+                # the player's rostered current-season gameweeks instead of the target month.
+                recent = trailing5_bins.get(code)
+                base_dist = (
+                    recent[0]
+                    if recent is not None and recent[1] >= _MIN_TRAILING5_ROWS
+                    else minutes_dist
+                )
+                prior_rate, prior_n = prior_appearance.get(code, (None, 0))
+                minutes_dist = rostered_decay_minutes(
+                    base_dist,
+                    prior_rate=prior_rate,
+                    prior_n=prior_n,
+                    rostered_gws=rostered_gws_by_code.get(code, 0),
+                    decay_c=cast(float, decay_c),
+                )
             v1_goals = goals_model.predict(stage_c_target)
             v1_assists = assists_model.predict(stage_c_target)
 
@@ -2096,6 +2443,11 @@ def predict_prospective_points(
         attacking_mode=attacking,
         share_signal_kind=signal_kind if attacking == "v3" else "not_applicable",
         appearance_mode=appearance,
+        appearance_prior_rule=(
+            "min5_apps_v1"
+            if appearance == "rostered_decay" and prior_rule_bound is not None
+            else "none"
+        ),
         assists_mode=assists,
         freshness_cold_start=freshness.cold_start,
         records=tuple(sorted(records, key=lambda row: (row.fixture, row.code))),
@@ -2187,6 +2539,7 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             "attacking_mode": result.attacking_mode,
             "share_signal_kind": result.share_signal_kind,
             "appearance_mode": result.appearance_mode,
+            "appearance_prior_rule": result.appearance_prior_rule,
             "assists_mode": result.assists_mode,
             "freshness_cold_start": result.freshness_cold_start,
             "commit_sha": result.commit_sha,
@@ -2367,6 +2720,7 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
     }
     component_modes = {
         "appearance_mode": result.appearance_mode,
+        "appearance.prior_rule": result.appearance_prior_rule,
         "assists_mode": result.assists_mode,
         "attacking_mode": result.attacking_mode,
         "share_signal_kind": result.share_signal_kind,
@@ -2472,9 +2826,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--appearance",
-        choices=("seasonal", "model"),
-        default="seasonal",
-        help="appearance probability: seasonal season-boundary fix (default) or raw model minutes",
+        choices=("rostered_decay", "seasonal", "model"),
+        default="rostered_decay",
+        help=(
+            "appearance probability: rostered_decay prior-season rate weighted by rostered"
+            " current-season GWs (default, gates passed 2026-11-21), the seasonal"
+            " season-boundary calendar fix, or raw model minutes"
+        ),
     )
     parser.add_argument(
         "--share-signal",

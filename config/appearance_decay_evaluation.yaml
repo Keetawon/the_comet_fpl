@@ -1,0 +1,88 @@
+# Preregistration: rostered-decay season-boundary appearance weight (contract 1.0).
+#
+# Committed BEFORE any scoring. The single evaluation this contract authorizes runs
+# exactly once; its immutable result lands in results/ and the constant it selects in
+# ROSTERED_DECAY_C. Nothing here re-judges a frozen evaluation or retunes a shipped
+# model: `seasonal` stays bit-for-bit reproducible, and the prospective default changes
+# only in a separate recorded commit if (and only if) every gate below passes.
+schema_version: 1
+contract_version: "1.0"
+name: rostered_decay_appearance_weight_v1
+
+research_question: >
+  The shipped `seasonal` appearance blend weights the most-recent-ARCHIVED-season
+  appearance rate by the TARGET's calendar month (0.7 Aug/Sep, 0.5 Oct/Nov, 0 from
+  December). During a live season that prior never updates (the archive mart's latest
+  season is fixed), so the weight decays on the calendar while its input stays stale.
+  Replace the calendar weight with w(n) = 0.7 * c / (c + n), n = the player's
+  current-season rostered gameweeks before the cutoff, which keeps the measured
+  n = 0 boundary anchor 0.7 and fades the prior exactly as current-season evidence
+  accrues.
+
+candidate:
+  mode_name: rostered_decay
+  anchor: 0.7
+  weight_formula: "0.7 * c / (c + n)"
+  n_definition: distinct target-season gameweeks with a consumed player row before the cutoff
+  c_grid: [1, 2, 3, 5, 8]
+
+comparator:
+  mode_name: seasonal
+  weight_rule: calendar months {8,9}->0.7, {10,11}->0.5, else 0.0
+
+evaluation_regime:
+  # Archive season boundaries: target season + the season whose rate is blended.
+  training_boundaries:
+    - {target_season: "2022-23", prior_season: "2021-22"}
+    - {target_season: "2023-24", prior_season: "2022-23"}
+    - {target_season: "2024-25", prior_season: "2023-24"}
+  held_out_boundary:
+    target_season: "2025-26"
+    prior_season: "2024-25"
+  target_gameweeks: [1, 20]
+  cutoff_rule: first kickoff of the target gameweek (first-kickoff cutoff proxy)
+  outcome: minutes >= 1 in the target gameweek row
+
+population:
+  # The target-roster proxy of Stage B: every player with a target-season row at the
+  # scored gameweek. A player who left the league has no scorable row and cannot be
+  # scored; a summer departure from the scored roster is the documented unversioned
+  # proxy caveat, not a leak.
+  definition: players with a target-season player-fixture row at the scored gameweek
+  scored_subset: players carrying a prior-season appearance record under the prospective-path semantics
+  excluded_reported: blend-ineligible players (no prior record; their P(play) cannot depend on w)
+  real_composer_minutes_path:
+    - equal-weighted trailing-5 shrunk minute bins (alpha 3.5, regime split, position priors)
+    - trailing-history eligibility rule with fact-row-resolved current club
+    - prior-season rate under the not-available-to-the-club rule (Defect 1b)
+    - blend + when-playing redistribution exactly as season_boundary_minutes
+  price_prior_note: >
+    The launch-price starter prior applies only to cold starts, which by construction
+    carry no prior-season record and cannot enter the scored subset; it is part of the
+    shipped mode's path but cannot bind in this evaluation's scored population.
+
+metric:
+  primary: pooled mean Bernoulli log loss over all scored (season, gw, code) rows
+  clip: [1.0e-6, 1.0e-6]
+  phase_splits: [[1, 3], [4, 6], [7, 10], [11, 20]]
+  subpopulations:
+    benched_prior: prior-season rate < 0.2 with n >= 10
+    established_prior: prior-season rate >= 0.6 with n >= 10
+
+selection:
+  rule: argmin pooled training mean log loss over the c grid; ties resolve to the smaller c
+
+gates:
+  # ALL must hold on the held-out 2025-26 boundary for the default to switch (separate commit).
+  held_out_pooled_log_loss_beats_seasonal: true
+  held_out_gw7_20_log_loss_beats_seasonal: true
+  max_phase_relative_regression: 0.02
+  verdict_on_failure: >
+    The mode still ships as `--appearance rostered_decay` at the selected c, and the
+    prospective default stays `seasonal`. No retuning, no second run.
+
+provenance:
+  result_path: results/appearance_decay_evaluation_v1.json
+  single_run: true
+  require_clean_worktree: true
+  development_only: true

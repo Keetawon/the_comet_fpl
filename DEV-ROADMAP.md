@@ -1,5 +1,17 @@
 # Development roadmap: GW1 decision record, then decision analytics
 
+**Prospective live data-plumbing repairs + rostered-decay default switch (2026-11-21):** the
+two confirmed P0 data defects (absent prior seasons read as "benched all season"; the
+incumbent Stage A fit never seeing finalized current-season matches) are repaired, and the
+prospective appearance default is now `--appearance rostered_decay` after its single
+pre-registered evaluation passed all three default-switch gates (held-out 2025-26 mean log
+loss 0.43697 vs the calendar weight's 0.48159). Full record, measured candidate counts and
+the SDP six-club fallback diagnosis:
+`docs/prospective-live-data-plumbing-2026-11-21.md`; preregistration:
+`docs/appearance-rostered-decay-preregistration.md`; immutable result:
+`results/appearance_decay_evaluation_v1.json`. `seasonal` stays bit-for-bit reproducible and
+its recorded vintages remain selectable sensitivities.
+
 **Owner-requested team effectiveness (2026-10-20):** SDP Attack and Defence
 default to observed goals/xG and goals conceded/xGC ratios, with a 100% reference,
 matched fixture totals, source labels and existing shot-axis options. Values may

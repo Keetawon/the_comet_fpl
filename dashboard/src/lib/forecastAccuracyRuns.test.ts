@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ComponentModes } from "@/data/types";
 import {
+  APPEARANCE_DEFAULT_SWITCHED_AT,
   accuracyComponentLabel,
   accuracyRunLabel,
   accuracyRunRole,
@@ -12,7 +13,7 @@ import {
 function modes(
   attacking: string,
   assists: string,
-  appearance = "seasonal",
+  appearance = "rostered_decay",
 ): ComponentModes {
   return {
     attacking_mode: attacking,
@@ -40,34 +41,116 @@ function run(
   };
 }
 
+// Derived from the exported switch instant: one hour either side of it.
+const SWITCH_MILLIS = Date.parse(APPEARANCE_DEFAULT_SWITCHED_AT);
+const PRE_SWITCH = new Date(SWITCH_MILLIS - 3_600_000).toISOString();
+const POST_SWITCH = new Date(SWITCH_MILLIS + 3_600_000).toISOString();
+
 describe("forecast accuracy run selection", () => {
-  it("classifies only the complete frozen mode triples as default or comparator", () => {
-    expect(accuracyRunRole(modes("v3", "coupled"))).toBe("prospective_default");
-    expect(accuracyRunRole(modes("v1", "v1"))).toBe("diagnostic_comparator");
-    expect(accuracyRunRole(modes("v3", "coupled", "model"))).toBe("recorded_sensitivity");
-    expect(accuracyRunRole({ attacking_mode: "v3", assists_mode: "coupled" })).toBe(
-      "unclassified",
+  it("exports the documented switch instant (commit 86f4a32)", () => {
+    expect(APPEARANCE_DEFAULT_SWITCHED_AT).toBe("2026-11-21T08:21:09Z");
+  });
+
+  it("classifies the default that was in effect at the vintage's creation", () => {
+    // Pre-switch (and every formal GW1-era vintage): v3/coupled/seasonal IS the default.
+    expect(accuracyRunRole(modes("v3", "coupled", "seasonal"), PRE_SWITCH)).toBe(
+      "prospective_default",
     );
-    expect(accuracyRunRole(null)).toBe("unclassified");
+    // From the switch instant on: v3/coupled/rostered_decay is the default.
+    expect(accuracyRunRole(modes("v3", "coupled", "rostered_decay"), POST_SWITCH)).toBe(
+      "prospective_default",
+    );
+    // A post-switch seasonal run is a recorded sensitivity, never a relabelled default.
+    expect(accuracyRunRole(modes("v3", "coupled", "seasonal"), POST_SWITCH)).toBe(
+      "recorded_sensitivity",
+    );
+    // A pre-switch rostered_decay run did not exist, but classifies consistently.
+    expect(accuracyRunRole(modes("v3", "coupled", "rostered_decay"), PRE_SWITCH)).toBe(
+      "recorded_sensitivity",
+    );
+    expect(accuracyRunRole(modes("v3", "coupled", "model"), POST_SWITCH)).toBe(
+      "recorded_sensitivity",
+    );
+    expect(
+      accuracyRunRole({ attacking_mode: "v3", assists_mode: "coupled" }, POST_SWITCH),
+    ).toBe("unclassified");
+    expect(accuracyRunRole(null, POST_SWITCH)).toBe("unclassified");
+  });
+
+  it("applies the same era rule to the diagnostic comparator", () => {
+    // Before the switch the runbook's diagnostic command ran v1/v1/seasonal.
+    expect(accuracyRunRole(modes("v1", "v1", "seasonal"), PRE_SWITCH)).toBe(
+      "diagnostic_comparator",
+    );
+    // After it the diagnostic command inherits the default appearance mode.
+    expect(accuracyRunRole(modes("v1", "v1", "rostered_decay"), POST_SWITCH)).toBe(
+      "diagnostic_comparator",
+    );
+    // The pre-switch diagnostic triple is a sensitivity after the switch, and vice versa.
+    expect(accuracyRunRole(modes("v1", "v1", "seasonal"), POST_SWITCH)).toBe(
+      "recorded_sensitivity",
+    );
+    expect(accuracyRunRole(modes("v1", "v1", "rostered_decay"), PRE_SWITCH)).toBe(
+      "recorded_sensitivity",
+    );
+  });
+
+  it("labels pre-switch default vintages as Prospective default in the composed label", () => {
+    const gw1Default = run("7425b337c746abcdef", "2026-08-21T09:00:00Z",
+      modes("v3", "coupled", "seasonal"), 584);
+    expect(accuracyRunRole(gw1Default.component_modes, gw1Default.created_at)).toBe(
+      "prospective_default",
+    );
+    expect(accuracyRunLabel(gw1Default)).toContain("Prospective default");
+    expect(accuracyRunLabel(gw1Default)).toContain("appearance seasonal");
+  });
+
+  it("prefers the newest scored default across the switch, pre-switch defaults included", () => {
+    // The newest SCORED default is a pre-switch seasonal vintage sitting below newer
+    // post-switch sensitivities: it must still be the page's opening selection.
+    const scoredPreSwitchDefault = run(
+      "scored-pre-switch-default",
+      "2026-11-01T12:00:00Z",
+      modes("v3", "coupled", "seasonal"),
+      584,
+    );
+    const newerSensitivity = run(
+      "newer-sensitivity",
+      "2026-11-20T12:00:00Z",
+      modes("v3", "coupled", "seasonal"),
+      0,
+    );
+    const newestPendingPostSwitchDefault = run(
+      "newest-pending-post-switch-default",
+      "2026-11-22T12:00:00Z",
+      modes("v3", "coupled", "rostered_decay"),
+      0,
+    );
+
+    expect(
+      defaultAccuracyRun([newerSensitivity, newestPendingPostSwitchDefault, scoredPreSwitchDefault])
+        ?.run_id,
+    ).toBe("scored-pre-switch-default");
   });
 
   it("prefers a scored prospective default over newer scored or pending alternatives", () => {
+    // August 2026 vintages: the era's default triple is v3/coupled/seasonal.
     const scoredDefault = run(
       "scored-default",
       "2026-08-15T12:01:00Z",
-      modes("v3", "coupled"),
+      modes("v3", "coupled", "seasonal"),
       584,
     );
     const newerDiagnostic = run(
       "newer-diagnostic",
       "2026-08-15T12:03:00Z",
-      modes("v1", "v1"),
+      modes("v1", "v1", "seasonal"),
       584,
     );
     const newestPendingDefault = run(
       "newest-pending-default",
       "2026-08-15T12:05:00Z",
-      modes("v3", "coupled"),
+      modes("v3", "coupled", "seasonal"),
       0,
     );
 
@@ -80,13 +163,13 @@ describe("forecast accuracy run selection", () => {
     const scoredDiagnostic = run(
       "scored-diagnostic",
       "2026-08-15T12:03:00Z",
-      modes("v1", "v1"),
+      modes("v1", "v1", "seasonal"),
       2,
     );
     const pendingDefault = run(
       "pending-default",
       "2026-08-15T12:02:00Z",
-      modes("v3", "coupled"),
+      modes("v3", "coupled", "seasonal"),
       0,
     );
     const pendingUnknown = run(
@@ -109,13 +192,13 @@ describe("forecast accuracy run selection", () => {
     const older = run(
       "7425b337c746abcdef",
       "2026-08-15T12:01:00Z",
-      modes("v3", "coupled"),
+      modes("v3", "coupled", "seasonal"),
       584,
     );
     const newer = run(
       "9649bb64d50fabcdef",
       "2026-08-15T12:02:00Z",
-      modes("v1", "v1"),
+      modes("v1", "v1", "seasonal"),
       584,
     );
     const input = [older, newer];
@@ -137,10 +220,11 @@ describe("forecast accuracy run selection", () => {
 
 
 it("labels incumbent shadow separately and opens its scored primary counterpart", () => {
+  // September 2026 vintages: the era's default triple is v3/coupled/seasonal.
   const primary = run("primary", "2026-09-09T06:00:00Z",
-    {...modes("v3", "coupled"), forecast_role: "primary", "football_environment.primary": "sdp_v2"}, 654);
+    {...modes("v3", "coupled", "seasonal"), forecast_role: "primary", "football_environment.primary": "sdp_v2"}, 654);
   const shadow = run("shadow", "2026-09-09T06:01:00Z",
-    {...modes("v3", "coupled"), forecast_role: "shadow_incumbent"}, 654);
+    {...modes("v3", "coupled", "seasonal"), forecast_role: "shadow_incumbent"}, 654);
   expect(defaultAccuracyRun([shadow, primary])?.run_id).toBe("primary");
   expect(accuracyRunLabel(shadow)).toContain("Incumbent shadow");
   expect(accuracyRunLabel(primary)).toContain("SDP V2 + fallback");

@@ -16,35 +16,49 @@ export interface AccuracyRunLike extends ForecastAccuracyRunProvenance {
   };
 }
 
-const DEFAULT_MODES = {
-  attacking: "v3",
-  assists: "coupled",
-  appearance: "seasonal",
-} as const;
+/**
+ * The instant the prospective appearance default switched from `seasonal` to
+ * `rostered_decay`: commit 86f4a32, 2026-11-21T08:21:09Z (2026-11-21T15:21:09+07:00),
+ * recorded in AGENTS.md. Classification is era-aware: a vintage is the prospective
+ * default when its complete mode triple matches the default in effect AT ITS OWN
+ * CREATION, so pre-switch `v3/coupled/seasonal` vintages -- including the formal GW1
+ * deadline default -- keep the "Prospective default" label and are never rewritten to
+ * sensitivities. The diagnostic comparator follows the same era rule because the
+ * runbook's diagnostic command inherits the default appearance mode.
+ */
+export const APPEARANCE_DEFAULT_SWITCHED_AT = "2026-11-21T08:21:09Z";
 
-const DIAGNOSTIC_MODES = {
-  attacking: "v1",
-  assists: "v1",
-  appearance: "seasonal",
-} as const;
+const SWITCH_EPOCH = Date.parse(APPEARANCE_DEFAULT_SWITCHED_AT);
+
+function isPreSwitch(createdAt?: string | null): boolean {
+  const parsed = createdAt ? Date.parse(createdAt) : Number.NaN;
+  // A vintage without a parsable creation time cannot be placed in an era; the
+  // read model always carries created_at, so this only affects degenerate inputs,
+  // which classify against the post-switch (current) defaults.
+  return Number.isFinite(parsed) && parsed < SWITCH_EPOCH;
+}
 
 function matchesModes(
   modes: ComponentModes,
-  expected: typeof DEFAULT_MODES | typeof DIAGNOSTIC_MODES,
+  attacking: string,
+  assists: string,
+  appearance: string,
 ) {
   return (
-    modes.attacking_mode === expected.attacking &&
-    modes.assists_mode === expected.assists &&
-    modes.appearance_mode === expected.appearance
+    modes.attacking_mode === attacking &&
+    modes.assists_mode === assists &&
+    modes.appearance_mode === appearance
   );
 }
 
 /**
- * Classify one immutable forecast vintage from its declared component modes.
- * Missing modes never inherit the prospective-default label.
+ * Classify one immutable forecast vintage from its declared component modes and the
+ * default era its creation time falls in. Missing modes never inherit the
+ * prospective-default label.
  */
 export function accuracyRunRole(
   modes: ComponentModes | null,
+  createdAt?: string | null,
 ): AccuracyRunRole {
   if (
     !modes ||
@@ -55,8 +69,9 @@ export function accuracyRunRole(
     return "unclassified";
   }
   if (modes.forecast_role === "shadow_incumbent") return "incumbent_shadow";
-  if (matchesModes(modes, DEFAULT_MODES)) return "prospective_default";
-  if (matchesModes(modes, DIAGNOSTIC_MODES)) return "diagnostic_comparator";
+  const eraAppearance = isPreSwitch(createdAt) ? "seasonal" : "rostered_decay";
+  if (matchesModes(modes, "v3", "coupled", eraAppearance)) return "prospective_default";
+  if (matchesModes(modes, "v1", "v1", eraAppearance)) return "diagnostic_comparator";
   return "recorded_sensitivity";
 }
 
@@ -86,7 +101,7 @@ export function accuracyComponentLabel(modes: ComponentModes | null): string {
 
 export function accuracyRunLabel(run: AccuracyRunLike): string {
   return [
-    accuracyRunRoleLabel(accuracyRunRole(run.component_modes)),
+    accuracyRunRoleLabel(accuracyRunRole(run.component_modes, run.created_at)),
     accuracyComponentLabel(run.component_modes),
     `${run.season} GW${run.gw_from}-${run.gw_to}`,
     `${run.coverage.scored_rows} scored`,
@@ -124,11 +139,11 @@ export function defaultAccuracyRun<T extends AccuracyRunLike>(
     ordered.find(
       (run) =>
         run.coverage.scored_rows > 0 &&
-        accuracyRunRole(run.component_modes) === "prospective_default",
+        accuracyRunRole(run.component_modes, run.created_at) === "prospective_default",
     ) ??
     ordered.find((run) => run.coverage.scored_rows > 0) ??
     ordered.find(
-      (run) => accuracyRunRole(run.component_modes) === "prospective_default",
+      (run) => accuracyRunRole(run.component_modes, run.created_at) === "prospective_default",
     ) ??
     ordered[0]
   );

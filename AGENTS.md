@@ -1,5 +1,54 @@
 # Repository agent instructions
 
+### Prospective live data-plumbing repairs and rostered-decay default switch (2026-11-21)
+
+Two confirmed P0 DATA/PLUMBING defects in the live prospective forecast were repaired, and the
+appearance default was switched under a pre-registered gate that passed. No model family,
+frozen result, or pre-registered historical gate changed.
+
+1. **Prior-season availability rule (Defect 1).** On the prospective path only, a prior season
+   with fewer than five appearances (loaned abroad / out all season) now carries NO appearance
+   prior: such a rate cannot distinguish unavailability from fringe rotation and read as
+   "benched all season" (measured: N.Jackson's 38 zero-minute 2025-26 rows halved his November
+   P(play) to ~0.45). Measured candidate counts are in
+   `docs/prospective-live-data-plumbing-2026-11-21.md`; prior-season status `u` had zero
+   coverage (committed snapshots begin 2026-07-27) and was not chosen. The rule is OPT-IN at
+   the function level (`unavailable_prior_min_appearances`) and is passed only by the
+   prospective job's `rostered_decay` mode; every other caller -- the frozen Phase 4 EV
+   backtest adapter, `current_minutes_control_cache`, the replay adapters -- keeps the exact
+   pre-branch semantics on every path, and each manifest records which semantics it ran with
+   (`appearance.prior_rule`).
+2. **Finalized current-season team matches enter Stage A training (Defect 2).** The incumbent
+   `trailing_goals_attack_defence` fit now unions the versioned live fixtures' final official
+   scores (the team-outcome ledger's source) under `known_at <= as_of`, `kickoff_time < as_of`,
+   `stg_live_team_version` identity, NULL xG and an archive anti-join. Previously the archive
+   mart ended at 2025-26, so 2026-27 ratings were frozen at the summer rebuild (published GW7
+   lambdas identical across 60 played matches). The EV backtest adapter pins
+   `include_live_current_season=False`. The SDP selector's fail-closed checks are untouched;
+   its six-club fallback diagnosis and the operational staging repair are reported in the doc.
+3. **`--appearance rostered_decay` is the prospective default.** `w(n) = 0.7*c/(c+n)` over the
+   player's rostered current-season gameweeks, `c = 1.0`, exact n=0 anchor. Preregistration
+   `docs/appearance-rostered-decay-preregistration.md` + `config/appearance_decay_evaluation.yaml`
+   (grid {1,2,3,5,8}; training 2022-23/2023-24/2024-25; held-out 2025-26) was committed before
+   the single run (`results/appearance_decay_evaluation_v1.json`, git 51b1a2c): held-out mean
+   log loss 0.43697 vs the calendar's 0.48159 (-9.29%), every phase improving, all three
+   default-switch gates passed. **The default switch instant is 2026-11-21T08:21:09Z (commit
+   86f4a32, 2026-11-21T15:21:09+07:00), exported once as `APPEARANCE_DEFAULT_SWITCHED_AT` in
+   `dashboard/src/lib/forecastAccuracyRuns.ts`.** Vintage classification is era-aware against
+   that instant: a vintage is the prospective default when its complete mode triple matches
+   the default in effect at its own `created_at` (`v3/coupled/seasonal` before it,
+   `v3/coupled/rostered_decay` from it on; the diagnostic comparator eras are
+   `v1/v1/seasonal` and `v1/v1/rostered_decay` for the same reason -- the runbook's
+   diagnostic command inherits the default appearance mode). Pre-switch default vintages,
+   including the formal GW1 deadline default, keep the "Prospective default" label; no
+   Python emitter mirrors this classification (the optimizer plan-kind keys on
+   attacking/assists only). The availability rule is recorded in every manifest as
+   `appearance.prior_rule` (`min5_apps_v1` when active, `none` otherwise); runs with
+   different prior semantics never share a label. `--appearance seasonal` keeps the exact
+   pre-switch behaviour, inputs included (its prior map is consumed WITHOUT the
+   availability rule); its recorded vintages remain selectable as sensitivities; do not
+   retune `c` against the held-out season.
+
 ### Owner-authorized public Players squad filter (2026-09-17)
 
 The owner additionally authorized the Players page's Manager ID filter to use the
@@ -299,12 +348,19 @@ one-winner-per-fixture couplings are represented). The prospective job
 (`jobs/prospective_points_v1.py`) forecasts a full-points xP distribution per player over a future
 gameweek horizon (default GW1-5) from the versioned live registry + schedule: **goals are
 team-coupled Candidate V3 by default** (opponent-aware via `lambda_team`, minutes-gated;
-`--attacking v1` reverts to independent per-player), **appearance uses a season-boundary correction
-by default** (`--appearance seasonal`; `--appearance model` reverts), and live availability is a
-reported overlay never folded into the distribution. The `seasonal` appearance recent estimate is
-the **equal-weighted average of the last five matches (no recency weight)**, then blended with the
-full prior-season appearance rate in early season; a recency weight (as the Stage B V3 minutes model
-carries) lands hardest on the dead-rubber final gameweek and is measurably wrong at the boundary
+`--attacking v1` reverts to independent per-player), **appearance uses the rostered-decay
+prior-season rate by default** (`--appearance rostered_decay`, default since 2026-11-21 after
+its single pre-registered evaluation passed all three default-switch gates;
+`--appearance seasonal` reverts to the shipped calendar weight bit-for-bit; `--appearance
+model` reverts to the raw model minutes), and live availability is a
+reported overlay never folded into the distribution. The appearance recent estimate is
+the **equal-weighted average of the last five matches (no recency weight)**, then blended
+with the full prior-season appearance rate under `w(n) = 0.7*c/(c+n)` over the player's
+rostered current-season gameweeks (`c = 1.0`, held-out 2025-26 mean log loss 0.43697 vs
+the calendar's 0.48159); the prior-season rate itself carries the not-available-to-the-club
+rule (a prior season with fewer than five appearances carries no prior). A recency weight
+(as the Stage B V3 minutes model carries) lands hardest on the dead-rubber final gameweek
+and is measurably wrong at the boundary
 (see the measured constant below). A recency audit of the whole composer confirmed appearance was
 the **only** recency-weighted signal: xG-share and xA-share (`mean_trailing_signal`), the DC hit
 rate, and the pooled GK save rate are all equal-weighted or league-pooled and were left unchanged.
@@ -500,7 +556,9 @@ GW suggestion, Player prediction vs actual, Team prediction vs actual, and Optim
 the interactive Plan Builder and Squad Draft routes. The legacy `#forecast-vs-actual` hash is only a
 temporary alias to the player page. Both prediction-monitoring routes classify each immutable
 vintage from its complete declared component modes: only `v3` goals / `coupled` assists /
-`seasonal` appearance is the prospective default, `v1` / `v1` / `seasonal` is the diagnostic
+`rostered_decay` appearance is the prospective default (since the 2026-11-21 gate-passing
+switch; pre-switch `v3` / `coupled` / `seasonal` vintages are recorded sensitivities and stay
+selectable), `v1` / `v1` / `seasonal` is the diagnostic
 comparator, any other complete triple is a recorded sensitivity, and missing modes remain
 unclassified. They open on the newest **scored prospective-default** vintage; if none exists they
 fall back, in order, to the newest scored vintage, newest pending prospective default, and newest
