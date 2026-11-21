@@ -266,34 +266,31 @@ zero/low-prior starters), or a club rating that finally moved on the current sea
 
 ## Gate results (this change set)
 
-Full local gate, run twice -- once on `origin/main` (`ba223a8`, the base) and once on this
-branch -- to attribute every failure exactly:
+Full local gate, run on `origin/main` (`ba223a8`, the base), on this branch before the
+environment fix, and on this branch in the fixed (byte-pinned) environment:
 
 | gate | result |
 |---|---|
 | `pytest -q` (base) | 73 failed / 4,676 passed / 5 skipped / 22 errors |
-| `pytest -q` (branch, pre-final-fix commits) | 67 failed / 4,682 passed / 5 skipped / 22 errors |
-| `pytest -q` (branch at HEAD) | **65 failures, every one of which also fails on base; 0 introduced** |
+| `pytest -q` (branch, pre-environment-fix) | 65 failures, every one also failing on base; 0 introduced |
+| `pytest -q` (branch, fixed environment) | **21 failed / 4,736 passed / 5 skipped / 17 errors** |
 | `ruff check src tests` | **All checks passed** |
 | `ruff format --check .` | fails on 8 pre-existing base files (listed below); every touched file formatted |
 | `mypy src` | **Success: no issues in 251 source files** |
+| `npm test` (dashboard) | 3 failed / 858 passed -- the 3 are `PlayersPage` manager-filter tests that pass 42/42 in isolation with AND without this change set and fail variably (1-4 per run) in every full parallel run, including the pre-change stash run: load-flaky `userEvent` timing, pre-existing |
+| `npm run build` (dashboard) | **clean** (`tsc -b` + worker + vite build) |
+| `npm run lint` (dashboard) | **exit 0** (react fast-refresh warnings only, pre-existing pattern) |
 
-The base-vs-branch diff of the failure sets: the only tests failing on the branch and not
-the base were the default-mode pin (updated with the switch, `7a7fdcb`) and
-`test_dev_ev_backtest.py::test_prospective_team_scored_reproducible_ordering` (raw test DB
-without live staging; `59b1065` restores the archive-only degradation) -- both fixed at
-HEAD. The only tests failing on the base and not the branch are this change set's eight
-new plumbing tests (the intended red-on-base state). The pre-existing base failures, none
-touched by this change set:
-
-1. `tests/test_development_reference_components.py::test_existing_production_source_pins_are_unchanged`
-   (1 failed) plus 17 fixture ERRORs (`assert 2 == 1`: the fixture counts one minutes
-   fit, the shadow-incumbent recursion now fits twice by design).
-2. `tests/test_retrospective_minutes_proxy.py::test_contract_pins_and_prospective_import_boundary`
-   (source SHA pin drift on `src/fpl/validate/prospective_incumbent_adapter.py`).
-3. `tests/test_prospective_incumbent_adapter.py::test_existing_sql_helpers_reproduce_shrinkage_and_latest_season_exactly`
-   (raw in-memory DB never created `stg_live_team_version`, which `load_player_history`
-   reads).
+The 21 remaining failures in the fixed environment, all pre-existing and individually
+verified non-autocrlf (see the test-environment section below for the mechanism of each):
+`test_development_reference_components` (1 FAILED + 17 ERRORs), `test_bi_export` (14,
+WinError 1314 symlink), `test_player_model_gw1_3_v2_identity` (2) +
+`test_audit_json` (1) [2026-09-08 audit whole-repo drift],
+`test_player_workload_minutes_runner` (1, database host-state pins),
+`test_prospective_incumbent_adapter` (1, raw in-memory DB missing
+`stg_live_team_version`), `test_dev_v2_weekly_inner` (1, unreconstructable
+`pl_sdp_metrics` pin), and one load-flaky `test_plan_server` HTTP-surface test (passes
+87/87 solo).
 4. The bulk of the remaining pre-existing failures (test_dev_v2_corroborated_sot,
    test_dev_v2_weekly_sot, test_dev_v2_weekly_inner, test_dev_v2_tactical_numeric,
    test_player_model_gw1_3_v2_identity, test_player_workload_minutes_runner, and others)
@@ -313,50 +310,67 @@ touched by this change set:
 
 ## Test environment: the autocrlf pin audit and `.gitattributes` (2026-11-21 review)
 
-Every config-declared and result-provenance SHA pin was audited for its byte form
-(`raw` vs LF-normalized vs CRLF-normalized):
+Every config-declared, result-provenance and module-constant SHA pin was audited for its
+byte form (`raw` vs LF-normalized vs CRLF-normalized). The repository has **two pinned
+byte conventions side by side**:
 
-- **21 LF-pinned files** (chained evaluation configs, immutable results, one pinned
-  doc): the pins were computed over LF bytes; a `core.autocrlf=true` host rewrites them
-  to CRLF in the working tree and every pin breaks.
-- **5 CRLF-pinned files**: four sources pinned over the original Windows checkout
-  (`points_harness.py`, `price_starter_prior.py`, `minutes_shrinkage.py`,
-  `minutes_v3.py` -- the origin `frozen_source_checks.py` documents) and one result
-  (`results/v2_team_environment_development.json`, pinned by a module constant in
-  `dev_v2_real_sot.py`).
-- **2 LF-pinned sources inside a result's provenance map** (`dev_v2_real_sot.py`,
-  `retrospective_sdp.py`).
+- **Later frozen contracts (2026-09-20 onward) pin LF bytes** — 21 config-declared
+  config/result/doc pins, the frozen-parser and provenance-map source pins
+  (`competitive_participation.py`, `dev_v2_real_sot.py`, `retrospective_sdp.py`, the
+  v1-verification map's LF entries), i.e. effectively every source file.
+- **The 2026-09-08 audit era pins CRLF bytes** (recorded on the original Windows
+  checkout): four Phase 4 sources (`points_harness.py`, `price_starter_prior.py`,
+  `minutes_shrinkage.py`, `minutes_v3.py`), the frozen SDP selector
+  (`sdp_environment.py`, `v2_team_environment_development.json`), and the
+  `v2_real_sot` map's six sources (`config.py`, `football_engine_v2.py`,
+  `team_goals.py`, `baselines.py`, `metrics.py`, `v2_environment_harness.py`). The
+  `player_model_gw1_3_verification_2026-09-08.json` map goes further and pins ~150
+  files in CRLF form — but that map's tests fail on genuinely-changed files first (see
+  below), so its byte form is recorded rather than restored.
 
-`.gitattributes` now pins each file's byte form deterministically: `-text` for the
-LF-pinned classes (`config/**`, `results/**`, `docs/**`, `snapshots/**`, and the LF-form
-pinned sources) and `text eol=crlf` for the five CRLF-form pinned files. The covered
-paths were re-checked out so the working tree holds the pinned bytes.
+`.gitattributes` therefore pins each file's byte form deterministically: `-text` for
+`config/**`, `results/**`, `docs/**`, `snapshots/**`, `src/**`, `tests/**` (LF, which
+Python/YAML/JSON need on no host anyway), and explicit `text eol=crlf` overrides for
+the eleven CRLF-form pinned files whose tests can pass. The covered paths were
+re-checked out so the working tree holds the pinned bytes.
 
 **Frozen-reference pins that now pass in the fixed environment** (all previously failing
-on this host): `test_dev_v2_corroborated_sot` (18/18, including
-`test_frozen_inputs_and_all_original_estimator_sources_remain_identical`),
-`test_dev_v2_weekly_sot` (18/18), `test_dev_v2_weekly_inner` (5 of 6),
-`test_dev_v2_tactical_numeric` (4/4), `test_dev_v2_tactical_matchup`,
+on this host): `test_dev_v2_corroborated_sot` (18/18), `test_dev_v2_weekly_sot` (18/18),
+`test_dev_v2_weekly_inner` (5 of 6), `test_dev_v2_tactical_numeric` (4/4),
+`test_dev_v2_tactical_matchup`, `test_sdp_counterfactual` (19/19),
 `test_retrospective_minutes_proxy::test_contract_pins_and_prospective_import_boundary`,
-and `test_current_minutes_control_cache` **(23/23, with the availability rule made
-opt-in -- its `current_club` path keeps returning the raw `(0.0, 38)` rate)**.
+`test_competitive_participation_v2` and `_v3`'s frozen-parser pins, and
+`test_current_minutes_control_cache` **(23/23, with the availability rule made opt-in --
+its `current_club` path keeps returning the raw `(0.0, 38)` rate)**. Net: the base's
+73 failed / 22 errors fall to 21 failed / 17 errors, all of the remainder individually
+verified as pre-existing content drift, host state, or environmental limits.
 
-**Still failing, none autocrlf** (verified byte-form mismatches in BOTH directions, i.e.
+**Still failing, none autocrlf** (each verified byte-mismatched in BOTH directions --
 genuine content drift or host state, present on the base):
 
 1. `test_dev_v2_weekly_inner.py::test_frozen_control_estimator_and_prior_results_remain_byte_identical`
-   -- its `config/pl_sdp_metrics.yaml` pin matches neither the raw, LF, nor CRLF form of
-   the current file (content changed after the pin was recorded; the file's last commit
-   predates the contract, so the pin was computed on unreconstructable bytes).
-2. `test_player_model_gw1_3_v2_identity.py` (2) -- the V1 verification result pins
-   dozens of repo files (`AGENTS.md`, configs, sources) that legitimately changed on
-   main after 2026-09-08; whole-repo evolution since the pin, not an EOL issue.
-3. `test_player_workload_minutes_runner.py::test_actual_frozen_config_loads_exactly_with_numeric_yaml_types`
-   -- its contract pins the exact operational/archive DATABASE SHA-256 hashes; those
-   bytes are host state (the original databases), not repo content.
-4. The `WinError 1314` symlink publication suites and the two
-   `test_development_reference_components` items (fixture double-fit by design;
-   production source pins over post-pin edits).
+   (its 5 former formal-order/toy cascades now PASS): the
+   `config/pl_sdp_metrics.yaml` pin matches neither the raw, LF, nor CRLF form of the
+   current file (content drifted after the pin; unreconstructable bytes).
+2. `test_player_model_gw1_3_v2_identity.py` (2) and
+   `test_audit_json.py::test_original_v1_records_and_frozen_model_configs_remain_unchanged`:
+   the 2026-09-08 V1 verification pins dozens of repo files (`AGENTS.md`, `sources.yaml`,
+   `insights/evidence.py`, `plan_server.py`, ... ) that legitimately changed on main
+   after the audit; whole-repo evolution since the pin.
+3. `test_player_workload_minutes_runner.py::test_actual_frozen_config_loads_exactly_with_numeric_yaml_types`:
+   its contract pins the exact operational/archive DATABASE SHA-256 hashes -- host state,
+   not repo content.
+4. `test_development_reference_components` (1 FAILED + 17 ERRORs): production source
+   pins over post-pin edits; the fixture's `assert 2 == 1` double-fit is the
+   shadow-incumbent recursion by design.
+5. The documented Windows `WinError 1314` symlink publication suites
+   (`test_bi_export`, 14 rows), plus the `.pytest_cache`/basetemp permission denials on
+   this host (worked around with `--basetemp` under the approved temp root).
+6. `ruff format --check .` fails on 8 pre-existing base files: `src/fpl/insights/contracts.py`,
+   `src/fpl/publish/contract.py`, `src/fpl/publish/dashboard_json.py`,
+   `src/fpl/publish/export.py`, `tests/test_bi_export.py`,
+   `tests/test_bi_semantic_contract.py`, `tests/test_dashboard_json.py`,
+   `tests/test_snapshot_workflows.py`.
 
 ## Finding 4 (report only): unavailable-season trailing windows at the season start
 
