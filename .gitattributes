@@ -21,6 +21,7 @@ tests/** -text
 # check out as CRLF deterministically. Later lines override the src/** rule above.
 results/v2_team_environment_development.json text eol=crlf
 src/fpl/validate/points_harness.py text eol=crlf
+src/fpl/models/sdp_environment.py text eol=crlf
 src/fpl/models/price_starter_prior.py text eol=crlf
 src/fpl/models/minutes_shrinkage.py text eol=crlf
 src/fpl/models/minutes_v3.py text eol=crlf
