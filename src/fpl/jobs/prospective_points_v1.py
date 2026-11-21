@@ -582,6 +582,7 @@ def prior_season_appearance_rate(
     current_club: Mapping[int, int] | None = None,
     history: pl.DataFrame | None = None,
     frontier_season: str | None = None,
+    unavailable_prior_min_appearances: int | None = None,
 ) -> dict[int, tuple[float, int]]:
     """``code -> (appearance rate, n)`` over the player's most-recent completed season before as_of.
 
@@ -601,13 +602,16 @@ def prior_season_appearance_rate(
     restrict the frame to seasons the LIVE path would hold archived (strictly before the target
     season) to reproduce the live semantics on a mart that already contains the target season.
 
-    Also on the prospective path only, a prior season in which the player was not available to
-    the club (fewer than ``_PRIOR_SEASON_MIN_APPEARANCES`` appearances over a full season of
-    roster rows -- loaned abroad, out all season) carries NO appearance prior: a ~0.0 rate
-    there is the signature of unavailability, not of benching, and blending it into an
-    in-season target halves a returning starter's P(play) (the measured Jackson defect).
-    Rows that do exist stay NULL-safe and are never zero-filled; the unfiltered path (the
-    frozen Phase 4 EV backtest adapter) keeps its exact historical semantics.
+    ``unavailable_prior_min_appearances`` is an OPT-IN availability rule and is ``None`` by
+    default: every default call -- the frozen Phase 4 EV backtest adapter,
+    ``current_minutes_control_cache``, the replay adapters -- keeps the exact pre-branch
+    semantics on every path (a full-season zero-appearance player carries ``(0.0, 38)``, not an
+    absence). When a caller passes a bound, a prior season with fewer than that many
+    appearances over its roster rows (loaned abroad, out all season) carries NO appearance
+    prior on the ``current_club`` path: a ~0.0 rate there is the signature of unavailability,
+    not of benching, and blending it into an in-season target halves a returning starter's
+    P(play) (the measured Jackson defect). Rows that do exist stay NULL-safe and are never
+    zero-filled; the rule never applies to the unfiltered ``current_club=None`` path.
     """
     if current_club is None:
         frame = con.execute(
@@ -676,11 +680,17 @@ def prior_season_appearance_rate(
     return {
         code: (math.fsum(values) / len(values), len(values))
         for code, values in played_by_code.items()
-        # The not-available-to-the-club rule (prospective path only): a season of registry
-        # rows with (almost) no appearances is an absence, not a benching. Without this the
-        # Jackson pattern -- 38 zero-minute rows, n = 38 >= _MIN_PRIOR_SEASON_ROWS -- hands
-        # the boundary blend a 0.0 "nailed-ness" rate.
-        if values and math.fsum(values) >= _PRIOR_SEASON_MIN_APPEARANCES
+        # The opt-in not-available-to-the-club rule (``unavailable_prior_min_appearances``):
+        # a season of registry rows with fewer than the bound's appearances is an absence,
+        # not a benching. Without this the Jackson pattern -- 38 zero-minute rows,
+        # n = 38 >= _MIN_PRIOR_SEASON_ROWS -- hands the boundary blend a 0.0 "nailed-ness"
+        # rate. ``None`` (the default, and every frozen-reference caller's form) keeps the
+        # exact pre-branch map.
+        if values
+        and (
+            unavailable_prior_min_appearances is None
+            or math.fsum(values) >= unavailable_prior_min_appearances
+        )
     }
 
 
@@ -1458,6 +1468,10 @@ class ProspectivePointsResult:
     attacking_mode: str
     share_signal_kind: str
     appearance_mode: str
+    # Provenance label for the prior-season availability rule the appearance path ran
+    # with ("min5_apps_v1" for the rostered_decay opt-in, "none" otherwise). Runs with
+    # different prior semantics never share an identical label.
+    appearance_prior_rule: str
     assists_mode: str
     freshness_cold_start: bool
     records: tuple[ProspectivePointsRecord, ...]
@@ -1645,8 +1659,18 @@ def predict_prospective_points(
     # "With history" means with ELIGIBLE history (owner rule 2026-08-17): a player whose every
     # archived row is stale and at a former club is a cold start, not a transfer.
     codes_with_history = set(last_team)
+    # The availability rule is scoped to the rostered_decay mode ONLY: `seasonal` consumes
+    # the exact pre-branch prior map (inputs included), so it stays truly bit-for-bit.
+    prior_rule_bound: int | None = (
+        _PRIOR_SEASON_MIN_APPEARANCES if appearance == "rostered_decay" else None
+    )
     prior_appearance = (
-        prior_season_appearance_rate(con, as_of, current_club=current_club)
+        prior_season_appearance_rate(
+            con,
+            as_of,
+            current_club=current_club,
+            unavailable_prior_min_appearances=prior_rule_bound,
+        )
         if appearance in {"seasonal", "rostered_decay"}
         else {}
     )
@@ -2419,6 +2443,11 @@ def predict_prospective_points(
         attacking_mode=attacking,
         share_signal_kind=signal_kind if attacking == "v3" else "not_applicable",
         appearance_mode=appearance,
+        appearance_prior_rule=(
+            "min5_apps_v1"
+            if appearance == "rostered_decay" and prior_rule_bound is not None
+            else "none"
+        ),
         assists_mode=assists,
         freshness_cold_start=freshness.cold_start,
         records=tuple(sorted(records, key=lambda row: (row.fixture, row.code))),
@@ -2510,6 +2539,7 @@ def result_to_record(result: ProspectivePointsResult) -> dict[str, object]:
             "attacking_mode": result.attacking_mode,
             "share_signal_kind": result.share_signal_kind,
             "appearance_mode": result.appearance_mode,
+            "appearance_prior_rule": result.appearance_prior_rule,
             "assists_mode": result.assists_mode,
             "freshness_cold_start": result.freshness_cold_start,
             "commit_sha": result.commit_sha,
@@ -2690,6 +2720,7 @@ def build_prospective_artifact(result: ProspectivePointsResult) -> ProspectivePo
     }
     component_modes = {
         "appearance_mode": result.appearance_mode,
+        "appearance.prior_rule": result.appearance_prior_rule,
         "assists_mode": result.assists_mode,
         "attacking_mode": result.attacking_mode,
         "share_signal_kind": result.share_signal_kind,

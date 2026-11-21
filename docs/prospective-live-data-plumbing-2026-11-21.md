@@ -86,12 +86,23 @@ group above, plus Penders and Gelhardt at 0), and the remaining 41 have informat
 rotation priors (0.24-0.58) whose repair is the decay weight. Kinsky (7 appearances)
 is deliberately outside the rule for exactly this reason.
 
-### Scope guards
+### Scope guards (updated 2026-11-21 review)
 
-- The frozen Phase 4 EV backtest adapter path (`current_club=None`) keeps its exact
-  historical semantics — pinned by
-  `test_frozen_unfiltered_prior_path_keeps_zero_rate_semantics`.
-- Prior rows that exist remain NULL-safe and are never zero-filled.
+- The availability rule is **opt-in at the function level**:
+  `prior_season_appearance_rate(..., unavailable_prior_min_appearances=None)` keeps the
+  exact pre-branch semantics on every path, and only `predict_prospective_points` passes
+  `_PRIOR_SEASON_MIN_APPEARANCES` -- and only for the `rostered_decay` mode.
+- Consequently `--appearance seasonal` is **truly bit-for-bit pre-branch, inputs
+  included**: its prior map is consumed without the rule (a full-season zero-appearance
+  player carries `(0.0, 38)`), so its composed outputs equal the pre-branch outputs.
+- The frozen Phase 4 EV backtest adapter (`current_club=None`),
+  `current_minutes_control_cache`, and the replay adapters call the plain form and keep
+  their exact pre-branch semantics (pinned by
+  `test_frozen_unfiltered_prior_path_keeps_zero_rate_semantics` and
+  `test_control_cache_current_club_path_keeps_zero_rate_for_jackson`).
+- Every manifest records which prior semantics its run used:
+  `component_modes["appearance.prior_rule"]` is `min5_apps_v1` (rostered_decay with the
+  rule) or `none` (every other mode). Runs with different semantics never share a label.
 - `established_price` (incumbent detection for the cold-start price prior) is unchanged:
   a dropped prior was never an incumbent (`rate < INCUMBENT_APPEARANCE_THRESHOLD`).
 
@@ -105,7 +116,18 @@ the held-out 2025-26 boundary (pooled mean log loss 0.43697 vs the calendar's 0.
 -9.29% relative, every phase improving, benched-prior subpopulation -11.8%); see
 `docs/appearance-rostered-decay-development.md` and
 `results/appearance_decay_evaluation_v1.json`. The default switched in its own recorded
-commit; `seasonal` remains selectable and bit-for-bit reproducible.
+commit (86f4a32 at 2026-11-21T08:21:09Z, exported once as
+`APPEARANCE_DEFAULT_SWITCHED_AT` in `dashboard/src/lib/forecastAccuracyRuns.ts`);
+`seasonal` remains selectable and keeps the exact pre-switch behaviour, inputs included.
+Monitoring classification is **era-aware against that instant**: a vintage is the
+prospective default when its triple matches the default in effect at its own
+`created_at` (`v3/coupled/seasonal` before the switch, `v3/coupled/rostered_decay`
+after; the diagnostic comparator eras are `v1/v1/seasonal` and `v1/v1/rostered_decay`,
+since the runbook's diagnostic command inherits the default appearance mode), so
+pre-switch default vintages -- including the formal GW1 deadline default -- keep the
+"Prospective default" label and no recorded vintage is ever relabelled. No Python
+emitter mirrors this classification (the optimizer plan-kind keys on attacking/assists
+only).
 
 ## Defect 2 (P0): the incumbent team model never saw the current season
 
@@ -278,7 +300,7 @@ touched by this change set:
    are raw-byte config/result SHA pins computed on an LF checkout: this host has
    `core.autocrlf=true`, so the working tree holds CRLF and `file_sha256` over raw bytes
    mismatches the pins (verified: the pinned digest matches the LF-normalized bytes).
-   They fail identically on the base.
+   They fail identically on the base. **Fixed by the `.gitattributes` below.**
 5. The documented Windows `WinError 1314` symlink suite in `tests/test_bi_export.py` /
    `tests/test_dashboard_json.py` publication tests (14 rows on both base and branch),
    plus the `.pytest_cache`/basetemp permission denials on this host (worked around with
@@ -288,3 +310,77 @@ touched by this change set:
    `src/fpl/publish/export.py`, `tests/test_bi_export.py`,
    `tests/test_bi_semantic_contract.py`, `tests/test_dashboard_json.py`,
    `tests/test_snapshot_workflows.py`.
+
+## Test environment: the autocrlf pin audit and `.gitattributes` (2026-11-21 review)
+
+Every config-declared and result-provenance SHA pin was audited for its byte form
+(`raw` vs LF-normalized vs CRLF-normalized):
+
+- **21 LF-pinned files** (chained evaluation configs, immutable results, one pinned
+  doc): the pins were computed over LF bytes; a `core.autocrlf=true` host rewrites them
+  to CRLF in the working tree and every pin breaks.
+- **5 CRLF-pinned files**: four sources pinned over the original Windows checkout
+  (`points_harness.py`, `price_starter_prior.py`, `minutes_shrinkage.py`,
+  `minutes_v3.py` -- the origin `frozen_source_checks.py` documents) and one result
+  (`results/v2_team_environment_development.json`, pinned by a module constant in
+  `dev_v2_real_sot.py`).
+- **2 LF-pinned sources inside a result's provenance map** (`dev_v2_real_sot.py`,
+  `retrospective_sdp.py`).
+
+`.gitattributes` now pins each file's byte form deterministically: `-text` for the
+LF-pinned classes (`config/**`, `results/**`, `docs/**`, `snapshots/**`, and the LF-form
+pinned sources) and `text eol=crlf` for the five CRLF-form pinned files. The covered
+paths were re-checked out so the working tree holds the pinned bytes.
+
+**Frozen-reference pins that now pass in the fixed environment** (all previously failing
+on this host): `test_dev_v2_corroborated_sot` (18/18, including
+`test_frozen_inputs_and_all_original_estimator_sources_remain_identical`),
+`test_dev_v2_weekly_sot` (18/18), `test_dev_v2_weekly_inner` (5 of 6),
+`test_dev_v2_tactical_numeric` (4/4), `test_dev_v2_tactical_matchup`,
+`test_retrospective_minutes_proxy::test_contract_pins_and_prospective_import_boundary`,
+and `test_current_minutes_control_cache` **(23/23, with the availability rule made
+opt-in -- its `current_club` path keeps returning the raw `(0.0, 38)` rate)**.
+
+**Still failing, none autocrlf** (verified byte-form mismatches in BOTH directions, i.e.
+genuine content drift or host state, present on the base):
+
+1. `test_dev_v2_weekly_inner.py::test_frozen_control_estimator_and_prior_results_remain_byte_identical`
+   -- its `config/pl_sdp_metrics.yaml` pin matches neither the raw, LF, nor CRLF form of
+   the current file (content changed after the pin was recorded; the file's last commit
+   predates the contract, so the pin was computed on unreconstructable bytes).
+2. `test_player_model_gw1_3_v2_identity.py` (2) -- the V1 verification result pins
+   dozens of repo files (`AGENTS.md`, configs, sources) that legitimately changed on
+   main after 2026-09-08; whole-repo evolution since the pin, not an EOL issue.
+3. `test_player_workload_minutes_runner.py::test_actual_frozen_config_loads_exactly_with_numeric_yaml_types`
+   -- its contract pins the exact operational/archive DATABASE SHA-256 hashes; those
+   bytes are host state (the original databases), not repo content.
+4. The `WinError 1314` symlink publication suites and the two
+   `test_development_reference_components` items (fixture double-fit by design;
+   production source pins over post-pin edits).
+
+## Finding 4 (report only): unavailable-season trailing windows at the season start
+
+Measured at each of the GW1/GW2/GW3 deadline cutoffs over the deadline-known registry,
+using the real prospective minutes inputs (`load_player_history` + eligibility + shrunk
+trailing-5), counting players whose entire 5-row trailing window is rows from a prior
+season in which they had fewer than 5 appearances:
+
+| cutoff | registry | unavailable-window players | would rise >1pp under the rule |
+|---|---|---|---|
+| GW1 deadline (2026-08-21T17:30Z) | 599 | **373** | 329 |
+| GW2 deadline (2026-08-28T17:30Z) | 616 | 265 | 247 |
+| GW3 deadline (2026-09-04T17:30Z) | 652 | 262 | 244 |
+
+P(play) they received under the shipped `seasonal` blend (w=0.7 at an August target over
+the raw prior rate): min 0.005, **median 0.013**, max 0.430 -- the August blend of a
+near-zero prior over the out-of-side May window (0.7*~0.0 + 0.3*0.037). Under the rule +
+`rostered_decay` default (no prior, the trailing estimate stands alone): min 0.017,
+median 0.042, max 0.430. The population is dominated by genuinely-unavailable players
+(correctly near-zero either way; the change for most is +0.5pp-3pp), so the measured
+harm concentrated in the small returning-starter subset (the Jackson class: the
+published 2026-09-03 vintage gave ~0.02 xP). This scopes a possible later season-start
+fix -- the availability rule already removes the actively-wrong prior; what remains is
+the out-of-side floor itself being the only signal for a returning player with no
+current-season rows, which is the documented cold-start under-prediction
+(`docs/phase4-season-boundary-appearance-underprediction.md`) and needs its own
+authorized validation window before any change.

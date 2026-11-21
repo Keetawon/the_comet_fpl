@@ -368,8 +368,149 @@ def _play_probability(dist: tuple[float, float, float, float]) -> float:
 # --------------------------------------------------------------------------------------
 
 
+def test_prior_season_availability_rule_is_opt_in() -> None:
+    """The availability rule is an explicit argument; every default call keeps pre-branch
+    semantics on every path.
+
+    `current_minutes_control_cache`, the replay adapters and any other caller that does
+    not pass ``unavailable_prior_min_appearances`` must keep seeing the raw map,
+    Jackson's (0.0, 38) entry included.
+    """
+    from fpl.jobs.prospective_points_v1 import _PRIOR_SEASON_MIN_APPEARANCES
+
+    con = _jackson_db()
+    try:
+        clubs = {JACKSON: 101, CONTROL: 101, BOUNDARY_LOW: 101, BOUNDARY_HIGH: 101}
+        # Default call form (exactly how current_minutes_control_cache.build_fold calls
+        # it): the pre-branch raw map, no availability rule.
+        raw = prior_season_appearance_rate(con, AS_OF_NOVEMBER, current_club=clubs)
+        assert raw[JACKSON] == (0.0, 38)
+        assert raw[BOUNDARY_LOW][0] == pytest.approx(4.0 / 38.0)
+        assert raw[CONTROL] == (1.0, 38)
+        # Explicit opt-in applies the rule; None is the explicit no-rule value too.
+        ruled = prior_season_appearance_rate(
+            con,
+            AS_OF_NOVEMBER,
+            current_club=clubs,
+            unavailable_prior_min_appearances=_PRIOR_SEASON_MIN_APPEARANCES,
+        )
+        assert JACKSON not in ruled
+        assert BOUNDARY_LOW not in ruled
+        assert ruled[CONTROL] == (1.0, 38)
+        none_is_no_rule = prior_season_appearance_rate(
+            con, AS_OF_NOVEMBER, current_club=clubs, unavailable_prior_min_appearances=None
+        )
+        assert none_is_no_rule == raw
+    finally:
+        con.close()
+
+
+def test_control_cache_current_club_path_keeps_zero_rate_for_jackson() -> None:
+    """Regression: the frozen-reference callers' current_club path returns (0.0, 38).
+
+    `fpl.validate.current_minutes_control_cache.build_fold` calls
+    ``prior_season_appearance_rate(con, as_of, current_club=clubs)`` -- the plain form,
+    with no rule argument -- and ``fpl.validate.player_model_gw1_3_replay`` consumes the
+    same helpers through the incumbent adapter. Their semantics are pinned here so the
+    availability rule can never silently reach them.
+    """
+    import fpl.jobs.prospective_points_v1 as prospective_module
+    import fpl.validate.current_minutes_control_cache as cache_module
+
+    con = _jackson_db()
+    try:
+        clubs = {JACKSON: 101}
+        # The exact call form of cache_module.build_fold.
+        prior = cache_module.prior_season_appearance_rate(con, AS_OF_NOVEMBER, current_club=clubs)
+        assert prior[JACKSON] == (0.0, 38)
+        # It is the very same function object: no local override, so the replay adapter's
+        # identical call form shares these semantics.
+        assert (
+            cache_module.prior_season_appearance_rate
+            is prospective_module.prior_season_appearance_rate
+        )
+    finally:
+        con.close()
+
+
+def test_predictive_job_scopes_the_rule_to_rostered_decay_only() -> None:
+    """`seasonal` consumes the pre-branch prior map (inputs included); only the
+    `rostered_decay` mode opts into the availability rule, and each semantic carries a
+    distinct manifest label."""
+    import fpl.jobs.prospective_points_v1 as prospective_module
+    from fpl.jobs.prospective_points_v1 import (
+        _PRIOR_SEASON_MIN_APPEARANCES,
+        build_prospective_artifact,
+        predict_prospective_points,
+    )
+
+    captured: list[dict[str, object]] = []
+    original = prospective_module.prior_season_appearance_rate
+
+    def recording(con, as_of, **kwargs):
+        captured.append(dict(kwargs))
+        return original(con, as_of, **kwargs)
+
+    con = _jackson_db()
+    try:
+        prospective_module.prior_season_appearance_rate = recording
+        seasonal = predict_prospective_points(
+            con,
+            as_of=AS_OF_NOVEMBER,
+            season="2026-27",
+            gw_from=11,
+            gw_to=11,
+            appearance="seasonal",
+            db_path=None,
+            repo=None,
+        )
+        assert captured
+        assert all(
+            call.get("unavailable_prior_min_appearances") is None for call in captured
+        ), "seasonal must consume the pre-branch prior map, inputs included"
+        captured.clear()
+        decay = predict_prospective_points(
+            con,
+            as_of=AS_OF_NOVEMBER,
+            season="2026-27",
+            gw_from=11,
+            gw_to=11,
+            appearance="rostered_decay",
+            db_path=None,
+            repo=None,
+        )
+        assert captured
+        assert all(
+            call.get("unavailable_prior_min_appearances") == _PRIOR_SEASON_MIN_APPEARANCES
+            for call in captured
+        ), "rostered_decay opts into the availability rule"
+        assert seasonal.appearance_mode == "seasonal"
+        assert decay.appearance_mode == "rostered_decay"
+        # The rule reaches the manifest provenance with distinct labels per semantics.
+        from dataclasses import replace as dataclass_replace
+
+        def artifact_of(result):
+            return build_prospective_artifact(
+                dataclass_replace(
+                    result,
+                    commit_sha="0" * 40,
+                    worktree_clean=True,
+                    config_sha256="0" * 64,
+                    archive_sha256="0" * 64,
+                    phase2_config_sha256="0" * 64,
+                    phase3_config_sha256="0" * 64,
+                )
+            ).manifest.component_modes
+
+        assert artifact_of(decay)["appearance.prior_rule"] == "min5_apps_v1"
+        assert artifact_of(seasonal)["appearance.prior_rule"] == "none"
+    finally:
+        prospective_module.prior_season_appearance_rate = original
+        con.close()
+
+
 def test_zero_appearance_prior_season_carries_no_appearance_prior() -> None:
-    """38 prior-season rows, zero minutes: the season is 'not available to the club'.
+    """38 prior-season rows, zero minutes: under the RULE the season is 'not available'.
 
     The prior-season rate map must not carry a (0.0, 38) entry for such a player: a
     zero rate here is the signature of a loan/out-all-season absence, not of a benching
@@ -377,10 +518,17 @@ def test_zero_appearance_prior_season_carries_no_appearance_prior() -> None:
     and the measured k=5 boundary holds: a 4-appearance season (Trafford/Pinnock 2025-26)
     is unavailability, a 5-appearance season is the first rotation prior kept.
     """
+    from fpl.jobs.prospective_points_v1 import _PRIOR_SEASON_MIN_APPEARANCES
+
     con = _jackson_db()
     try:
         clubs = {JACKSON: 101, CONTROL: 101, BOUNDARY_LOW: 101, BOUNDARY_HIGH: 101}
-        prior = prior_season_appearance_rate(con, AS_OF_NOVEMBER, current_club=clubs)
+        prior = prior_season_appearance_rate(
+            con,
+            AS_OF_NOVEMBER,
+            current_club=clubs,
+            unavailable_prior_min_appearances=_PRIOR_SEASON_MIN_APPEARANCES,
+        )
         assert JACKSON not in prior
         assert BOUNDARY_LOW not in prior
         assert prior[CONTROL][0] == 1.0
@@ -404,7 +552,14 @@ def test_returning_starter_keeps_trailing5_play_probability_in_november() -> Non
     try:
         bins = MinuteBins.from_config(load_phase2_evaluation())
         clubs = {JACKSON: 101, CONTROL: 101}
-        prior = prior_season_appearance_rate(con, AS_OF_NOVEMBER, current_club=clubs)
+        from fpl.jobs.prospective_points_v1 import _PRIOR_SEASON_MIN_APPEARANCES
+
+        prior = prior_season_appearance_rate(
+            con,
+            AS_OF_NOVEMBER,
+            current_club=clubs,
+            unavailable_prior_min_appearances=_PRIOR_SEASON_MIN_APPEARANCES,
+        )
         recent = trailing5_minute_bins(con, AS_OF_NOVEMBER, bins, current_club=clubs)[JACKSON]
         assert recent[1] == 5  # the window is the five current-season rows, not May 2026
         rate, n = prior.get(JACKSON, (None, 0))
@@ -424,7 +579,8 @@ def test_frozen_unfiltered_prior_path_keeps_zero_rate_semantics() -> None:
     """The Phase 4 EV backtest adapter path (no ``current_club``) is bit-identical.
 
     Its immutable 2026-08-07 run read the raw most-recent-season rate with no
-    availability rule; the repair is scoped to the prospective path only.
+    availability rule; the rule is scoped to the prospective job's ``rostered_decay``
+    mode only (and is opt-in at the function level for every other caller).
     """
     con = _jackson_db()
     try:

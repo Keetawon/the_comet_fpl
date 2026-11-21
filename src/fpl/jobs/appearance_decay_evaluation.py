@@ -191,13 +191,19 @@ def _fold_inputs(
         frontier_season=prior_season,
     )
     # The prior rate is likewise the latest season the live path would hold archived --
-    # strictly before the target season.
+    # strictly before the target season. The availability rule is passed EXPLICITLY here:
+    # it is part of this contract's preregistered population semantics (the scored subset
+    # carries a prior-season record under the rule), and the rule is otherwise opt-in at
+    # the function level (None = pre-branch raw map).
+    from fpl.jobs.prospective_points_v1 import _PRIOR_SEASON_MIN_APPEARANCES
+
     prior = prior_season_appearance_rate(
         con,
         as_of,
         current_club=current_club,
         history=frame.filter(pl.col("season") < pl.lit(season)),
         frontier_season=prior_season,
+        unavailable_prior_min_appearances=_PRIOR_SEASON_MIN_APPEARANCES,
     )
     rostered = {
         int(r["code"]): int(r["n"])

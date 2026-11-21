@@ -12,8 +12,12 @@ frozen result, or pre-registered historical gate changed.
    "benched all season" (measured: N.Jackson's 38 zero-minute 2025-26 rows halved his November
    P(play) to ~0.45). Measured candidate counts are in
    `docs/prospective-live-data-plumbing-2026-11-21.md`; prior-season status `u` had zero
-   coverage (committed snapshots begin 2026-07-27) and was not chosen. The frozen Phase 4 EV
-   backtest adapter path keeps its exact historical semantics.
+   coverage (committed snapshots begin 2026-07-27) and was not chosen. The rule is OPT-IN at
+   the function level (`unavailable_prior_min_appearances`) and is passed only by the
+   prospective job's `rostered_decay` mode; every other caller -- the frozen Phase 4 EV
+   backtest adapter, `current_minutes_control_cache`, the replay adapters -- keeps the exact
+   pre-branch semantics on every path, and each manifest records which semantics it ran with
+   (`appearance.prior_rule`).
 2. **Finalized current-season team matches enter Stage A training (Defect 2).** The incumbent
    `trailing_goals_attack_defence` fit now unions the versioned live fixtures' final official
    scores (the team-outcome ledger's source) under `known_at <= as_of`, `kickoff_time < as_of`,
@@ -28,10 +32,22 @@ frozen result, or pre-registered historical gate changed.
    (grid {1,2,3,5,8}; training 2022-23/2023-24/2024-25; held-out 2025-26) was committed before
    the single run (`results/appearance_decay_evaluation_v1.json`, git 51b1a2c): held-out mean
    log loss 0.43697 vs the calendar's 0.48159 (-9.29%), every phase improving, all three
-   default-switch gates passed. `--appearance seasonal` stays bit-for-bit reproducible and its
-   recorded vintages remain selectable as sensitivities; do not retune `c` against the held-out
-   season. Monitoring classification (`v3`/`coupled`/`rostered_decay` = prospective default)
-   updated with the switch.
+   default-switch gates passed. **The default switch instant is 2026-11-21T08:21:09Z (commit
+   86f4a32, 2026-11-21T15:21:09+07:00), exported once as `APPEARANCE_DEFAULT_SWITCHED_AT` in
+   `dashboard/src/lib/forecastAccuracyRuns.ts`.** Vintage classification is era-aware against
+   that instant: a vintage is the prospective default when its complete mode triple matches
+   the default in effect at its own `created_at` (`v3/coupled/seasonal` before it,
+   `v3/coupled/rostered_decay` from it on; the diagnostic comparator eras are
+   `v1/v1/seasonal` and `v1/v1/rostered_decay` for the same reason -- the runbook's
+   diagnostic command inherits the default appearance mode). Pre-switch default vintages,
+   including the formal GW1 deadline default, keep the "Prospective default" label; no
+   Python emitter mirrors this classification (the optimizer plan-kind keys on
+   attacking/assists only). The availability rule is recorded in every manifest as
+   `appearance.prior_rule` (`min5_apps_v1` when active, `none` otherwise); runs with
+   different prior semantics never share a label. `--appearance seasonal` keeps the exact
+   pre-switch behaviour, inputs included (its prior map is consumed WITHOUT the
+   availability rule); its recorded vintages remain selectable as sensitivities; do not
+   retune `c` against the held-out season.
 
 ### Owner-authorized public Players squad filter (2026-09-17)
 
