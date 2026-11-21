@@ -19,7 +19,7 @@ export interface AccuracyRunLike extends ForecastAccuracyRunProvenance {
 const DEFAULT_MODES = {
   attacking: "v3",
   assists: "coupled",
-  appearance: "seasonal",
+  appearance: "rostered_decay",
 } as const;
 
 const DIAGNOSTIC_MODES = {

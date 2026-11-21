@@ -36,18 +36,26 @@ Prospective-specific behaviour, all documented in the output record:
     (``lambda_team * measured assist_rate``, ~0.90) is allocated by an xA-share (creativity pre-xG),
     so a genuine creator takes a large assist share; ``--assists v1`` reverts to independent per-
     player assists, and ``--attacking v1`` reverts goals.
-  * **Season-boundary appearance correction (default).** The trailing-minutes window at a GW1
-    deadline is the END of the prior season -- its least representative phase, since a nailed
-    starter rested in dead-rubber final fixtures reads as a rotation risk. By default
-    (``--appearance seasonal``) the recent appearance is the *equal-weighted* average of the last
-    five matches -- no recency weight, which would otherwise land hardest on the dead-rubber final
-    gameweek (measured: equal weighting predicts a next-season opener better than a recency-weighted
-    window, overall MAE 0.223 vs 0.234, goalkeepers 0.181 vs 0.195) -- then an early-season target
-    blends that with the player's full prior-season appearance rate (measured: the boundary-robust
-    nailed-ness signal predicts an opener better than any five-match window), preserving the when-
-    playing minute shape; ``--appearance model`` uses the raw recency-weighted model distribution.
-    Even so, cross-season appearance is genuinely uncertain (measured MAE ~0.22; nailed-last-season
-    players average ~0.78 early next season), so this lifts rested starters without false certainty.
+  * **Appearance: prior-season nailed-ness under a rostered-decay weight (default).**
+    The recent appearance estimate is the *equal-weighted* average of the last five
+    matches -- no recency weight, which would otherwise land hardest on the dead-rubber
+    final gameweek (measured: equal weighting predicts a next-season opener better than a
+    recency-weighted window, overall MAE 0.223 vs 0.234, goalkeepers 0.181 vs 0.195) --
+    then blended with the player's full prior-season appearance rate under
+    ``w(n) = 0.7 * c / (c + n)`` over the player's rostered current-season gameweeks
+    (``--appearance rostered_decay``, default since 2026-11-21: the single pre-registered
+    evaluation at ``results/appearance_decay_evaluation_v1.json`` passed all three
+    default-switch gates -- held-out 2025-26 mean log loss 0.43697 vs the calendar
+    weight's 0.48159, every phase improving). The prior-season rate itself carries the
+    not-available-to-the-club rule: a prior season with fewer than five appearances
+    (loaned abroad / out all season) carries no prior at all -- it cannot distinguish
+    unavailability from fringe rotation and reads "benched all season" (measured:
+    N.Jackson's 38 zero-minute 2025-26 rows halved his November P(play) to ~0.45).
+    ``--appearance seasonal`` keeps the shipped calendar weight (0.7 Aug/Sep, 0.5
+    Oct/Nov, 0 from December) bit-for-bit; ``--appearance model`` uses the raw
+    recency-weighted model distribution. Even so, cross-season appearance is genuinely
+    uncertain (measured MAE ~0.22; nailed-last-season players average ~0.78 early next
+    season).
   * **Promoted clubs get league-average team strength.** ``trailing_goals_attack_defence`` keys
     attack and defence on ``team_code``; a club with no archive history (a genuine cold-start
     promotion) falls back to the league-average multiplier (1.0), not the promoted prior. Flagged.
@@ -869,9 +877,13 @@ def season_boundary_minutes(
 # 0.3 recent predicts a next-season opener best). Selected on the training boundaries of
 # config/appearance_decay_evaluation.yaml; see docs/appearance-rostered-decay-preregistration.md.
 ROSTERED_DECAY_ANCHOR = 0.7
-# The decay constant c shipped with the ``rostered_decay`` appearance mode, from that contract's
-# single pre-registered evaluation. Do not retune against its held-out season.
-ROSTERED_DECAY_C: float | None = None
+# The decay constant c shipped with the ``rostered_decay`` appearance mode, selected by the
+# contract's single pre-registered evaluation (results/appearance_decay_evaluation_v1.json,
+# run at git 51b1a2c: training pooled mean log loss 0.43478 at c=1 vs the calendar 0.47754;
+# held-out 2025-26 0.43697 vs 0.48159, -9.29% relative, every phase improving, benched-prior
+# subpopulation -11.8%; all three default-switch gates passed). Do not retune against its
+# held-out season.
+ROSTERED_DECAY_C: float | None = 1.0
 
 
 def rostered_decay_weight(rostered_gws: int, *, c: float) -> float:
@@ -1482,7 +1494,7 @@ def predict_prospective_points(
     gw_from: int = DEFAULT_GW_FROM,
     gw_to: int = DEFAULT_GW_TO,
     attacking: str = "v3",
-    appearance: str = "seasonal",
+    appearance: str = "rostered_decay",
     share_signal: str = "auto",
     assists: str = "coupled",
     suite: PointsComponentSuite | None = None,
@@ -2758,11 +2770,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--appearance",
-        choices=("seasonal", "model", "rostered_decay"),
-        default="seasonal",
+        choices=("rostered_decay", "seasonal", "model"),
+        default="rostered_decay",
         help=(
-            "appearance probability: seasonal season-boundary fix (default), raw model minutes,"
-            " or rostered_decay (prior-season rate weighted by rostered current-season GWs)"
+            "appearance probability: rostered_decay prior-season rate weighted by rostered"
+            " current-season GWs (default, gates passed 2026-11-21), the seasonal"
+            " season-boundary calendar fix, or raw model minutes"
         ),
     )
     parser.add_argument(

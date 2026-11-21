@@ -700,23 +700,36 @@ def test_rostered_decay_minutes_blends_and_is_a_noop_without_a_prior() -> None:
     assert abs(blended[3] / blended[2] - dist[3] / dist[2]) < 1e-9
 
 
-def test_rostered_decay_mode_fails_closed_until_the_evaluation_selects_c() -> None:
+def test_rostered_decay_mode_runs_end_to_end_with_the_evaluated_constant() -> None:
+    """With ROSTERED_DECAY_C selected, the mode composes a real forecast.
+
+    The Jackson-shaped player (no appearance prior under the availability rule) keeps his
+    trailing-5 P(play) in November under the new default mode, exactly as under `seasonal`
+    with the rule: the two defects' repairs are independent of the weight's form.
+    """
     from fpl.jobs.prospective_points_v1 import ROSTERED_DECAY_C, predict_prospective_points
 
-    if ROSTERED_DECAY_C is not None:  # already evaluated: the mode must simply run
-        return
+    assert ROSTERED_DECAY_C is not None
     con = _jackson_db()
     try:
-        with pytest.raises(ValueError, match="ROSTERED_DECAY_C"):
-            predict_prospective_points(
-                con,
-                as_of=AS_OF_NOVEMBER,
-                season="2026-27",
-                gw_from=11,
-                gw_to=11,
-                appearance="rostered_decay",
-                db_path=None,
-                repo=None,
-            )
+        result = predict_prospective_points(
+            con,
+            as_of=AS_OF_NOVEMBER,
+            season="2026-27",
+            gw_from=11,
+            gw_to=11,
+            appearance="rostered_decay",
+            db_path=None,
+            repo=None,
+        )
+        assert result.appearance_mode == "rostered_decay"
+        assert len(result.records) == 2  # Jackson + the control player
+        jackson = next(r for r in result.records if r.code == JACKSON)
+        control = next(r for r in result.records if r.code == CONTROL)
+        for record in (jackson, control):
+            assert abs(sum(record.distribution) - 1.0) < 1e-9
+        # The returning starter is no longer halved: his GW11 xP sits at the same scale as
+        # the ever-present control's, not at ~half of it.
+        assert jackson.expected_points > 0.5 * control.expected_points
     finally:
         con.close()

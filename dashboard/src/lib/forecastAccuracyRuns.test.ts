@@ -12,7 +12,7 @@ import {
 function modes(
   attacking: string,
   assists: string,
-  appearance = "seasonal",
+  appearance = "rostered_decay",
 ): ComponentModes {
   return {
     attacking_mode: attacking,
@@ -43,7 +43,10 @@ function run(
 describe("forecast accuracy run selection", () => {
   it("classifies only the complete frozen mode triples as default or comparator", () => {
     expect(accuracyRunRole(modes("v3", "coupled"))).toBe("prospective_default");
-    expect(accuracyRunRole(modes("v1", "v1"))).toBe("diagnostic_comparator");
+    expect(accuracyRunRole(modes("v1", "v1", "seasonal"))).toBe("diagnostic_comparator");
+    // The pre-repair calendar appearance is a recorded sensitivity since the
+    // rostered-decay default switch (2026-11-21); its recorded vintages stay selectable.
+    expect(accuracyRunRole(modes("v3", "coupled", "seasonal"))).toBe("recorded_sensitivity");
     expect(accuracyRunRole(modes("v3", "coupled", "model"))).toBe("recorded_sensitivity");
     expect(accuracyRunRole({ attacking_mode: "v3", assists_mode: "coupled" })).toBe(
       "unclassified",
@@ -126,10 +129,10 @@ describe("forecast accuracy run selection", () => {
     ]);
     expect(input.map(({ run_id }) => run_id)).toEqual([older.run_id, newer.run_id]);
     expect(accuracyComponentLabel(older.component_modes)).toBe(
-      "goals v3 · assists coupled · appearance seasonal",
+      "goals v3 · assists coupled · appearance rostered_decay",
     );
     expect(accuracyRunLabel(older)).toBe(
-      "Prospective default · goals v3 · assists coupled · appearance seasonal · " +
+      "Prospective default · goals v3 · assists coupled · appearance rostered_decay · " +
         "2026-27 GW1-5 · 584 scored · 7425b337c746",
     );
   });

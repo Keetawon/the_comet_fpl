@@ -1,0 +1,211 @@
+{
+  "schema": "appearance_decay_evaluation_v1",
+  "status": "development_only_not_a_promotion",
+  "contract": {
+    "name": "rostered_decay_appearance_weight_v1",
+    "contract_version": "1.0",
+    "config_sha256": "da6e5badcf1ee3d69383dec061638274fca93402870435fa976c6717614f886c"
+  },
+  "provenance": {
+    "run_at": "2026-11-21T08:13:31.915101+00:00",
+    "git_head": "51b1a2c4a2b152746fce68eb321db6011764ea0e",
+    "worktree_clean": true,
+    "database": "data\\fpl.duckdb",
+    "folds_per_season": {
+      "2022-23": 19,
+      "2023-24": 20,
+      "2024-25": 20,
+      "2025-26": 20
+    },
+    "population_rows": {
+      "model_fallback_rows": 0,
+      "no_prior_rows": 24848,
+      "scored_rows": 29875
+    }
+  },
+  "training": {
+    "seasonal": {
+      "rows": 22220,
+      "mean_log_loss": 0.47754107504306553,
+      "phase_mean_log_loss": {
+        "gw1-3": 0.551608825227598,
+        "gw11-20": 0.43857161998203364,
+        "gw4-6": 0.536380337188229,
+        "gw7-10": 0.47449300743929845
+      },
+      "benched_prior_mean_log_loss": 0.3452383715849977,
+      "benched_prior_rows": 918,
+      "established_prior_mean_log_loss": 0.47200727861718195,
+      "established_prior_rows": 13928
+    },
+    "rostered_decay_by_c": {
+      "1.0": {
+        "rows": 22220,
+        "mean_log_loss": 0.4347803559800339,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.523555841015186,
+          "gw11-20": 0.4142124251848934,
+          "gw4-6": 0.446193585071617,
+          "gw7-10": 0.4085655626455572
+        },
+        "benched_prior_mean_log_loss": 0.3119751657067622,
+        "benched_prior_rows": 918,
+        "established_prior_mean_log_loss": 0.4302170197385501,
+        "established_prior_rows": 13928
+      },
+      "2.0": {
+        "rows": 22220,
+        "mean_log_loss": 0.4382708227665289,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5282370981219967,
+          "gw11-20": 0.41564147795929945,
+          "gw4-6": 0.4543464482560716,
+          "gw7-10": 0.4128509678220968
+        },
+        "benched_prior_mean_log_loss": 0.3129768595346874,
+        "benched_prior_rows": 918,
+        "established_prior_mean_log_loss": 0.4338793900417649,
+        "established_prior_rows": 13928
+      },
+      "3.0": {
+        "rows": 22220,
+        "mean_log_loss": 0.44218861547587246,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5318477365506127,
+          "gw11-20": 0.4180937146459819,
+          "gw4-6": 0.46184342996985944,
+          "gw7-10": 0.41806563004116853
+        },
+        "benched_prior_mean_log_loss": 0.3149691632475914,
+        "benched_prior_rows": 918,
+        "established_prior_mean_log_loss": 0.43778326975489074,
+        "established_prior_rows": 13928
+      },
+      "5.0": {
+        "rows": 22220,
+        "mean_log_loss": 0.44965414511672,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5366104709990296,
+          "gw11-20": 0.424001871927952,
+          "gw4-6": 0.47381575882090043,
+          "gw7-10": 0.42828371753300026
+        },
+        "benched_prior_mean_log_loss": 0.31950941364896646,
+        "benched_prior_rows": 918,
+        "established_prior_mean_log_loss": 0.44507457122644717,
+        "established_prior_rows": 13928
+      },
+      "8.0": {
+        "rows": 22220,
+        "mean_log_loss": 0.4591318054782656,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5406215918271117,
+          "gw11-20": 0.4330190152781353,
+          "gw4-6": 0.48617723624740833,
+          "gw7-10": 0.44113281653444636
+        },
+        "benched_prior_mean_log_loss": 0.3258745961836131,
+        "benched_prior_rows": 918,
+        "established_prior_mean_log_loss": 0.45425577719795296,
+        "established_prior_rows": 13928
+      }
+    }
+  },
+  "selected_c": 1.0,
+  "held_out": {
+    "season": "2025-26",
+    "seasonal": {
+      "rows": 7655,
+      "mean_log_loss": 0.48158988337505193,
+      "phase_mean_log_loss": {
+        "gw1-3": 0.5976000521767092,
+        "gw11-20": 0.4273861987003099,
+        "gw4-6": 0.5713739940957645,
+        "gw7-10": 0.4632431143349367
+      },
+      "benched_prior_mean_log_loss": 0.42616637483214476,
+      "benched_prior_rows": 301,
+      "established_prior_mean_log_loss": 0.4801485034367717,
+      "established_prior_rows": 5137
+    },
+    "rostered_decay_by_c": {
+      "1.0": {
+        "rows": 7655,
+        "mean_log_loss": 0.43697307039109806,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5619271179087738,
+          "gw11-20": 0.40649014333746586,
+          "gw4-6": 0.4612855135229769,
+          "gw7-10": 0.40173979367519247
+        },
+        "benched_prior_mean_log_loss": 0.37596815601698963,
+        "benched_prior_rows": 301,
+        "established_prior_mean_log_loss": 0.44075920843531663,
+        "established_prior_rows": 5137
+      },
+      "2.0": {
+        "rows": 7655,
+        "mean_log_loss": 0.4415846303615255,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5686427294240396,
+          "gw11-20": 0.40890279079710606,
+          "gw4-6": 0.47148442783562167,
+          "gw7-10": 0.4060897562395289
+        },
+        "benched_prior_mean_log_loss": 0.38170733719943656,
+        "benched_prior_rows": 301,
+        "established_prior_mean_log_loss": 0.4447916105611874,
+        "established_prior_rows": 5137
+      },
+      "3.0": {
+        "rows": 7655,
+        "mean_log_loss": 0.44643762232046996,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5734227242888361,
+          "gw11-20": 0.41231439708517137,
+          "gw4-6": 0.4806672696076514,
+          "gw7-10": 0.41135422779933095
+        },
+        "benched_prior_mean_log_loss": 0.3878182835330941,
+        "benched_prior_rows": 301,
+        "established_prior_mean_log_loss": 0.4491521435000695,
+        "established_prior_rows": 5137
+      },
+      "5.0": {
+        "rows": 7655,
+        "mean_log_loss": 0.4554277155932117,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5794857258536488,
+          "gw11-20": 0.41995518962219863,
+          "gw4-6": 0.49521983757807553,
+          "gw7-10": 0.4217304526080046
+        },
+        "benched_prior_mean_log_loss": 0.39928312299780444,
+        "benched_prior_rows": 301,
+        "established_prior_mean_log_loss": 0.45736505004758365,
+        "established_prior_rows": 5137
+      },
+      "8.0": {
+        "rows": 7655,
+        "mean_log_loss": 0.4666683562436035,
+        "phase_mean_log_loss": {
+          "gw1-3": 0.5844517348866172,
+          "gw11-20": 0.4311663491739738,
+          "gw4-6": 0.5102081496112721,
+          "gw7-10": 0.4349154611491752
+        },
+        "benched_prior_mean_log_loss": 0.41382876687163084,
+        "benched_prior_rows": 301,
+        "established_prior_mean_log_loss": 0.46778965675746165,
+        "established_prior_rows": 5137
+      }
+    }
+  },
+  "gates": {
+    "held_out_pooled_log_loss_beats_seasonal": true,
+    "held_out_gw7_20_log_loss_beats_seasonal": true,
+    "max_phase_relative_regression": 0.0,
+    "gate3_within_2pct": true
+  },
+  "default_switch_authorised": true
+}
