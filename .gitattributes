@@ -25,3 +25,12 @@ src/fpl/models/sdp_environment.py text eol=crlf
 src/fpl/models/price_starter_prior.py text eol=crlf
 src/fpl/models/minutes_shrinkage.py text eol=crlf
 src/fpl/models/minutes_v3.py text eol=crlf
+# The v2_real_sot result's source_sha256 map (results/v2_real_sot_development.json)
+# records these six over the original Windows CRLF checkout; the corroborated-zero and
+# weekly-SOT contracts verify that map, so their bytes stay pinned to CRLF.
+src/fpl/config.py text eol=crlf
+src/fpl/models/football_engine_v2.py text eol=crlf
+src/fpl/models/team_goals.py text eol=crlf
+src/fpl/validate/baselines.py text eol=crlf
+src/fpl/validate/metrics.py text eol=crlf
+src/fpl/validate/v2_environment_harness.py text eol=crlf
