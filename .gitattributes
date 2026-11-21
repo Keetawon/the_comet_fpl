@@ -9,21 +9,17 @@ config/** -text
 results/** -text
 docs/** -text
 snapshots/** -text
+# Every Python source is byte-pinned somewhere (frozen evaluation contracts, result
+# provenance maps, frozen parser hashes), and every one of those pins was computed
+# over LF bytes; a CRLF working tree breaks them. LF sources need no conversion on
+# any host.
+src/** -text
+tests/** -text
 # Pins computed over the CRLF bytes of the original Windows checkout (module-constant
-# pins in src/fpl/validate/dev_v2_real_sot.py): these check out as CRLF deterministically.
+# pins in src/fpl/validate/dev_v2_real_sot.py, and the frozen Phase 4 source pins that
+# frozen_source_checks.py documents as the exact original Windows checkout): these
+# check out as CRLF deterministically. Later lines override the src/** rule above.
 results/v2_team_environment_development.json text eol=crlf
-
-# Raw-byte-pinned sources (config/retrospective_current_minutes_proxy_v1.yaml's
-# unchanged_source_sha256 map and the frozen Phase 4 checks that read it). Two byte
-# forms are pinned, matching how each pin was originally computed:
-# - prospective_incumbent_adapter.py is pinned over LF bytes (-text above);
-# - the four files below are pinned over the CRLF bytes of the original Windows
-#   checkout (frozen_source_checks.py documents that origin), so they check out as
-#   CRLF deterministically on every machine.
-src/fpl/validate/prospective_incumbent_adapter.py -text
-# LF-pinned sources inside results' provenance maps (v2_real_sot source_sha256).
-src/fpl/validate/dev_v2_real_sot.py -text
-src/fpl/validate/retrospective_sdp.py -text
 src/fpl/validate/points_harness.py text eol=crlf
 src/fpl/models/price_starter_prior.py text eol=crlf
 src/fpl/models/minutes_shrinkage.py text eol=crlf

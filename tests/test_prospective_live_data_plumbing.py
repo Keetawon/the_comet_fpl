@@ -465,9 +465,9 @@ def test_predictive_job_scopes_the_rule_to_rostered_decay_only() -> None:
             repo=None,
         )
         assert captured
-        assert all(
-            call.get("unavailable_prior_min_appearances") is None for call in captured
-        ), "seasonal must consume the pre-branch prior map, inputs included"
+        assert all(call.get("unavailable_prior_min_appearances") is None for call in captured), (
+            "seasonal must consume the pre-branch prior map, inputs included"
+        )
         captured.clear()
         decay = predict_prospective_points(
             con,
