@@ -59,6 +59,18 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
     const x = metricValue(team.rows, xMetric, "per_match").value, y = metricValue(team.rows, yMetric, "per_match").value;
     return x !== null && y !== null ? [{ id: team.id, label: team.name, shortLabel: team.rows.at(-1)?.team_short_name, x, y, groupLabel: `${team.rows.length} matches · xG: ${metricSupplements(team.rows, xMetric).length} FPL supplements; xGA: ${metricSupplements(team.rows, yMetric).length} FPL supplements; remainder SDP or unavailable`, color: team.id === selected?.id ? "var(--sdp-accent)" : "var(--sdp-series-2)" }] : [];
   }) : [];
+  const homeLeague = useMemo(() => selectSdpEntities(data.team_matches, "team", { ...filters, venue: "home", team: "all", search: "" }), [data, filters]);
+  const homeFiltered = homeLeague.filter(team => (filters.team === "all" || String(team.teamCode) === filters.team) && `${team.name} ${team.clubs}`.toLocaleLowerCase().includes(filters.search.trim().toLocaleLowerCase()));
+  const homeScatterPoints = xMetric && yMetric ? homeFiltered.flatMap(team => {
+    const x = metricValue(team.rows, xMetric, "per_match").value, y = metricValue(team.rows, yMetric, "per_match").value;
+    return x !== null && y !== null ? [{ id: team.id, label: team.name, shortLabel: team.rows.at(-1)?.team_short_name, x, y, groupLabel: `${team.rows.length} home matches · xG: ${metricSupplements(team.rows, xMetric).length} FPL supplements; xGA: ${metricSupplements(team.rows, yMetric).length} FPL supplements; remainder SDP or unavailable`, color: team.id === selected?.id ? "var(--sdp-accent)" : "var(--sdp-series-2)" }] : [];
+  }) : [];
+  const awayLeague = useMemo(() => selectSdpEntities(data.team_matches, "team", { ...filters, venue: "away", team: "all", search: "" }), [data, filters]);
+  const awayFiltered = awayLeague.filter(team => (filters.team === "all" || String(team.teamCode) === filters.team) && `${team.name} ${team.clubs}`.toLocaleLowerCase().includes(filters.search.trim().toLocaleLowerCase()));
+  const awayScatterPoints = xMetric && yMetric ? awayFiltered.flatMap(team => {
+    const x = metricValue(team.rows, xMetric, "per_match").value, y = metricValue(team.rows, yMetric, "per_match").value;
+    return x !== null && y !== null ? [{ id: team.id, label: team.name, shortLabel: team.rows.at(-1)?.team_short_name, x, y, groupLabel: `${team.rows.length} away matches · xG: ${metricSupplements(team.rows, xMetric).length} FPL supplements; xGA: ${metricSupplements(team.rows, yMetric).length} FPL supplements; remainder SDP or unavailable`, color: team.id === selected?.id ? "var(--sdp-accent)" : "var(--sdp-series-3)" }] : [];
+  }) : [];
   const seasons = [...new Set(data.team_matches.map(row => row.season))].sort().reverse();
   const seasonRows = data.team_matches.filter(row => row.season === filters.season);
   const weeks = [...new Set(seasonRows.map(row => row.gw))].sort((a, b) => a - b);
@@ -120,10 +132,71 @@ function ReadyPage({ data }: { data: SdpStatsData }) {
     <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="sdp-eyebrow">Explore the league</p><h2 className="mt-1 text-xl font-semibold tracking-tight">The bigger picture</h2></div><p className="text-xs text-muted-foreground">Profiles and charts use per-match averages.</p></div>
     <div className="grid min-w-0 gap-5 xl:grid-cols-2">
       <section className="sdp-panel min-w-0 p-4 sm:p-5" aria-label="League comparison">
-        {xMetric && yMetric ? <AnalyticsScatter title="Attack meets defence" className="border-0 p-0 shadow-none" description={`${scatterPoints.length} of ${filtered.length} visible clubs have complete paired xG coverage.`} readingNote="Further right: more xG created. Lower: less xG conceded. Dashed lines mark league medians. Tap a point for exact values; select a club below to explore its profile." points={scatterPoints} xAxis={{ label: "xG created /match (SDP / marked FPL)", displayLabel: "xG created /match →", direction: "explanatory", bounds: { min: 0 } }} yAxis={{ label: "xG conceded /match (SDP / marked FPL)", displayLabel: "xG conceded /match", direction: "explanatory", bounds: { min: 0 } }} medianX={teamBenchmark(league, xMetric, "per_match", null).median} medianY={teamBenchmark(league, yMetric, "per_match", null).median} vintageLabel={`Observed export ${data.as_of}`} provenanceLabel="Observed" vintageDisplayLabel="SDP / marked FPL statistics" emptyMessage="No clubs have complete xG and opponent xG in this range. Other available statistics are shown below; missing xG is not zero." horizonLabel={`${filters.season} GW${filters.from}–${filters.to}; ${filters.recent}; ${filters.venue}`} horizonDisplayLabel={`GW${filters.from}–${filters.to} · ${filters.venue}`} /> : <div className="p-5 text-sm text-muted-foreground">The attack/defence chart needs independently reconciled xG and opponent xG fields. Other measured statistics remain available below.</div>}
+        {xMetric && yMetric ? <AnalyticsScatter title="Attack meets defence" className="border-0 p-0 shadow-none" description={`${scatterPoints.length} of ${filtered.length} visible clubs have complete paired xG coverage.`} readingNote="Further right: more xG created. Lower: less xG conceded. Dashed lines mark league medians. Tap a point for exact values; select a club below to explore its profile." points={scatterPoints} xAxis={{ label: "xG created /match (SDP / marked FPL)", displayLabel: "xG created /match →", direction: "explanatory", bounds: { min: 0 } }} yAxis={{ label: "xG conceded /match (SDP / marked FPL)", displayLabel: "xG conceded /match", direction: "explanatory", bounds: { min: 0 } }} medianX={teamBenchmark(league, xMetric, "per_match", null).median} medianY={teamBenchmark(league, yMetric, "per_match", null).median} vintageLabel={`Observed export ${data.as_of}`} provenanceLabel="Observed" vintageDisplayLabel="SDP / marked FPL statistics" emptyMessage="No clubs have complete xG and opponent xG in this range. Other available statistics are shown below; missing xG is not zero." horizonLabel={`${filters.season} GW${filters.from}–${filters.to}; ${filters.recent}; ${filters.venue}`} horizonDisplayLabel={`GW${filters.from}–${filters.to} · ${filters.venue}`} selectedPointId={selected?.id ?? null} onSelectPoint={id => { setDetail(String(id)); setShowLog(false); }} /> : <div className="p-5 text-sm text-muted-foreground">The attack/defence chart needs independently reconciled xG and opponent xG fields. Other measured statistics remain available below.</div>}
         <div className="mt-4 border-t pt-4"><Control label="Explore club profile" value={selected?.id ?? ""} options={filtered.map(team => [team.id, team.name])} onChange={value => { setDetail(value); setShowLog(false); }} /></div>
       </section>
       {selected ? <TeamProfile team={selected} league={league} fullRange={fullRange.find(team => team.id === selected.id)} metrics={profileMetrics} onLog={() => setShowLog(true)} /> : <div className="sdp-panel flex items-center justify-center p-8 text-sm text-muted-foreground">No clubs match this view. Reset filters to explore the league.</div>}
+    </div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="sdp-eyebrow">Venue breakdown</p>
+          <h3 className="mt-1 text-lg font-semibold tracking-tight">Home vs Away: Attack meets defence</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">Compare chance creation and concession when playing at home versus away.</p>
+      </div>
+      <div className="grid min-w-0 gap-5 xl:grid-cols-2">
+        <section className="sdp-panel sdp-home-plot min-w-0 p-4 sm:p-5" aria-label="Home attack and defence">
+          {xMetric && yMetric ? (
+            <AnalyticsScatter
+              title="Home: Attack meets defence"
+              className="border-0 p-0 shadow-none"
+              description={`${homeScatterPoints.length} of ${homeFiltered.length} visible clubs have complete paired home xG coverage.`}
+              readingNote="Home matches only. Further right: more xG created at home. Lower: less xG conceded at home. Dashed lines mark home league medians. Tap a point for exact values; select a club to explore its profile."
+              points={homeScatterPoints}
+              xAxis={{ label: "Home xG created /match (SDP / marked FPL)", displayLabel: "Home xG created /match →", direction: "explanatory", bounds: { min: 0 } }}
+              yAxis={{ label: "Home xG conceded /match (SDP / marked FPL)", displayLabel: "Home xG conceded /match", direction: "explanatory", bounds: { min: 0 } }}
+              medianX={teamBenchmark(homeLeague, xMetric, "per_match", null).median}
+              medianY={teamBenchmark(homeLeague, yMetric, "per_match", null).median}
+              vintageLabel={`Observed export ${data.as_of}`}
+              provenanceLabel="Observed"
+              vintageDisplayLabel="SDP / marked FPL statistics"
+              emptyMessage="No clubs have complete home xG and opponent xG in this range."
+              horizonLabel={`${filters.season} GW${filters.from}–${filters.to}; ${filters.recent}; home`}
+              horizonDisplayLabel={`GW${filters.from}–${filters.to} · Home`}
+              selectedPointId={selected?.id ?? null}
+              onSelectPoint={id => { setDetail(String(id)); setShowLog(false); }}
+            />
+          ) : (
+            <div className="p-5 text-sm text-muted-foreground">The home attack/defence chart needs independently reconciled xG and opponent xG fields.</div>
+          )}
+        </section>
+        <section className="sdp-panel sdp-away-plot min-w-0 p-4 sm:p-5" aria-label="Away attack and defence">
+          {xMetric && yMetric ? (
+            <AnalyticsScatter
+              title="Away: Attack meets defence"
+              className="border-0 p-0 shadow-none"
+              description={`${awayScatterPoints.length} of ${awayFiltered.length} visible clubs have complete paired away xG coverage.`}
+              readingNote="Away matches only. Further right: more xG created away. Lower: less xG conceded away. Dashed lines mark away league medians. Tap a point for exact values; select a club to explore its profile."
+              points={awayScatterPoints}
+              xAxis={{ label: "Away xG created /match (SDP / marked FPL)", displayLabel: "Away xG created /match →", direction: "explanatory", bounds: { min: 0 } }}
+              yAxis={{ label: "Away xG conceded /match (SDP / marked FPL)", displayLabel: "Away xG conceded /match", direction: "explanatory", bounds: { min: 0 } }}
+              medianX={teamBenchmark(awayLeague, xMetric, "per_match", null).median}
+              medianY={teamBenchmark(awayLeague, yMetric, "per_match", null).median}
+              vintageLabel={`Observed export ${data.as_of}`}
+              provenanceLabel="Observed"
+              vintageDisplayLabel="SDP / marked FPL statistics"
+              emptyMessage="No clubs have complete away xG and opponent xG in this range."
+              horizonLabel={`${filters.season} GW${filters.from}–${filters.to}; ${filters.recent}; away`}
+              horizonDisplayLabel={`GW${filters.from}–${filters.to} · Away`}
+              selectedPointId={selected?.id ?? null}
+              onSelectPoint={id => { setDetail(String(id)); setShowLog(false); }}
+            />
+          ) : (
+            <div className="p-5 text-sm text-muted-foreground">The away attack/defence chart needs independently reconciled xG and opponent xG fields.</div>
+          )}
+        </section>
+      </div>
     </div>
     <section className="space-y-4" aria-label="Team statistics explorer">
       <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="sdp-eyebrow">The detail behind the picture</p><h2 className="mt-1 text-xl font-semibold tracking-tight">Club comparison</h2></div><Button variant="outline" onClick={exportCsv} disabled={!ordered.length}><Download className="size-4" aria-hidden="true" />Export filtered CSV</Button></div>

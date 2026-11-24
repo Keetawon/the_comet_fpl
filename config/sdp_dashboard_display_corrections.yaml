@@ -166,3 +166,96 @@ corrections:
     blocked_attempts: 4
     opponent_goalkeeper_saves: 0
     fpl_goals_scored: 0
+
+  # Verified owner-confirmed display corrections for GW7 zero-SOT fixtures (2026-11-24).
+  # Bournemouth 2-0 Sunderland: Sunderland had 3 total attempts, all 3 off target (0 SOT, 0 blocked, 0 xGOT). Kepa 0 saves.
+  - correction_id: 2026-27-f61-sunderland-sot
+    season: 2026-27
+    fixture: 61
+    team_code: 56
+    opponent_team_code: 91
+    provider_match_id: 2645255
+    provider_side: away
+    provider_field: ontargetScoringAtt
+    raw_payload_sha256: 6194944c64d9c9560db034e3b11bf4dfadc821792820f4dba09fa10f6acd71fd
+    source_known_at: "2026-10-19T13:34:09.402748+00:00"
+    owner_confirmation_recorded_at: "2026-11-24T06:30:00+00:00"
+    display_value: 0
+    total_scoring_attempts: 3
+    shot_off_target_attempts: 3
+    blocked_attempts: null
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0
+
+  - correction_id: 2026-27-f61-sunderland-blocked
+    season: 2026-27
+    fixture: 61
+    team_code: 56
+    opponent_team_code: 91
+    provider_match_id: 2645255
+    provider_side: away
+    provider_field: blockedScoringAtt
+    raw_payload_sha256: 6194944c64d9c9560db034e3b11bf4dfadc821792820f4dba09fa10f6acd71fd
+    source_known_at: "2026-10-19T13:34:09.402748+00:00"
+    owner_confirmation_recorded_at: "2026-11-24T06:30:00+00:00"
+    display_value: 0
+    total_scoring_attempts: 3
+    shot_off_target_attempts: 3
+    blocked_attempts: null
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0
+
+  - correction_id: 2026-27-f61-sunderland-xgot
+    season: 2026-27
+    fixture: 61
+    team_code: 56
+    opponent_team_code: 91
+    provider_match_id: 2645255
+    provider_side: away
+    provider_field: expectedGoalsOnTarget
+    raw_payload_sha256: 6194944c64d9c9560db034e3b11bf4dfadc821792820f4dba09fa10f6acd71fd
+    source_known_at: "2026-10-19T13:34:09.402748+00:00"
+    owner_confirmation_recorded_at: "2026-11-24T06:30:00+00:00"
+    display_value: 0
+    total_scoring_attempts: 3
+    shot_off_target_attempts: 3
+    blocked_attempts: null
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0
+
+  # Fulham 1-0 Hull City: Hull had 5 total attempts, 4 off target + 1 blocked (0 SOT, 0 xGOT). Leno 0 saves.
+  - correction_id: 2026-27-f65-hull-city-sot
+    season: 2026-27
+    fixture: 65
+    team_code: 88
+    opponent_team_code: 54
+    provider_match_id: 2645259
+    provider_side: away
+    provider_field: ontargetScoringAtt
+    raw_payload_sha256: 41a0ae4a7808756a4eab2868176a130dc0cf20604ce61060a078cf64a23800c3
+    source_known_at: "2026-10-19T13:34:15.427631+00:00"
+    owner_confirmation_recorded_at: "2026-11-24T06:30:00+00:00"
+    display_value: 0
+    total_scoring_attempts: 5
+    shot_off_target_attempts: 4
+    blocked_attempts: 1
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0
+
+  - correction_id: 2026-27-f65-hull-city-xgot
+    season: 2026-27
+    fixture: 65
+    team_code: 88
+    opponent_team_code: 54
+    provider_match_id: 2645259
+    provider_side: away
+    provider_field: expectedGoalsOnTarget
+    raw_payload_sha256: 41a0ae4a7808756a4eab2868176a130dc0cf20604ce61060a078cf64a23800c3
+    source_known_at: "2026-10-19T13:34:15.427631+00:00"
+    owner_confirmation_recorded_at: "2026-11-24T06:30:00+00:00"
+    display_value: 0
+    total_scoring_attempts: 5
+    shot_off_target_attempts: 4
+    blocked_attempts: 1
+    opponent_goalkeeper_saves: 0
+    fpl_goals_scored: 0

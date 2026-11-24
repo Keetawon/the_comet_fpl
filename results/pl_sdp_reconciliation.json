@@ -657,11 +657,11 @@
     "identity_fallback": {
       "fixtures": 2280,
       "kickoff_corroborated": 2280,
-      "score_corroborated": 1920,
+      "score_corroborated": 2010,
       "teams_corroborated": 2280
     }
   },
-  "generated_at": "2026-09-05 11:06:42.802249+00:00",
+  "generated_at": "2026-11-24 07:54:22.368902+00:00",
   "note": "differences are reported, never reconciled away; both values are retained",
   "provider_internal_comparisons": [
     {
@@ -749,7 +749,7 @@
             "p75": 0.0,
             "p90": 0.0
           },
-          "rows": 39
+          "rows": 213
         }
       },
       "definition_source": "https://www.statsperform.com/insights/introducing-expected-goals-on-target-xgot/",
@@ -766,10 +766,10 @@
           "p75": 0.0,
           "p90": 0.0
         },
-        "rows": 1122
+        "rows": 1296
       },
       "evidence_type": "provider_internal_semantic_mirror",
-      "exact_agreements": 1122,
+      "exact_agreements": 1296,
       "exact_match_rate": 1.0,
       "independent_source": false,
       "label": "expected_goals_on_target_vs_opponent_conceded",
@@ -877,7 +877,7 @@
       ],
       "note": "Same-provider internal consistency, not an independent-source accuracy check; both raw values remain retained in the tall metric store.",
       "opponent_conceded_provider_field": "expectedGoalsOnTargetConceded",
-      "rows_compared": 1122
+      "rows_compared": 1296
     }
   ],
   "sanity_checks": {
@@ -888,7 +888,7 @@
           "accurate_crosses",
           "crosses"
         ],
-        "rows_checked": 3738,
+        "rows_checked": 3912,
         "violation_count": 0,
         "violations": []
       },
@@ -898,7 +898,7 @@
           "accurate_passes",
           "passes"
         ],
-        "rows_checked": 3842,
+        "rows_checked": 4020,
         "violation_count": 0,
         "violations": []
       },
@@ -909,7 +909,7 @@
           "fixture",
           "was_home"
         ],
-        "rows_checked": 1921,
+        "rows_checked": 2010,
         "violation_count": 0,
         "violations": []
       },
@@ -956,7 +956,7 @@
           "touches_in_opposition_box",
           "yellow_cards"
         ],
-        "rows_checked": 3842,
+        "rows_checked": 4020,
         "violation_count": 0,
         "violations": []
       },
@@ -965,15 +965,15 @@
         "required_fields": [
           "possession"
         ],
-        "rows_checked": 3842,
+        "rows_checked": 4020,
         "violation_count": 0,
         "violations": []
       },
       "shots_inside_plus_outside_approximately_shots": {
         "available": true,
         "difference": {
-          "mean": 0.000539,
-          "mean_absolute": 0.000539,
+          "mean": 0.000771,
+          "mean_absolute": 0.000771,
           "quantiles": {
             "p00": 0.0,
             "p10": 0.0,
@@ -983,15 +983,15 @@
             "p75": 0.0,
             "p90": 0.0
           },
-          "rows": 3714
+          "rows": 3889
         },
-        "exact_agreements": 3712,
+        "exact_agreements": 3886,
         "required_fields": [
           "shots_inside_box",
           "shots_outside_box",
           "shots"
         ],
-        "rows_checked": 3714,
+        "rows_checked": 3889,
         "tolerance": 1.0,
         "violation_count": 0,
         "violations": []
@@ -1002,7 +1002,7 @@
           "shots_on_target",
           "shots"
         ],
-        "rows_checked": 3754,
+        "rows_checked": 3929,
         "violation_count": 0,
         "violations": []
       },
@@ -1012,7 +1012,7 @@
           "tackles_won",
           "tackles"
         ],
-        "rows_checked": 3841,
+        "rows_checked": 4019,
         "violation_count": 0,
         "violations": []
       },
@@ -1022,14 +1022,14 @@
           "possession",
           "was_home"
         ],
-        "rows_checked": 1921,
+        "rows_checked": 2010,
         "tolerance": 0.2,
         "violation_count": 0,
         "violations": []
       }
     },
     "status": "pass",
-    "team_rows": 3842,
+    "team_rows": 4020,
     "total_violations": 0
   },
   "schema_version": 4,
@@ -1046,9 +1046,9 @@
         "p75": 0.0,
         "p90": 0.0
       },
-      "rows": 1920
+      "rows": 2010
     },
-    "exact_agreements": 1920,
+    "exact_agreements": 2010,
     "exceptions": [],
     "home_goal_difference": {
       "mean": 0.0,
@@ -1062,9 +1062,9 @@
         "p75": 0.0,
         "p90": 0.0
       },
-      "rows": 1920
+      "rows": 2010
     },
     "match_rate": 1.0,
-    "rows_compared": 1920
+    "rows_compared": 2010
   }
 }
