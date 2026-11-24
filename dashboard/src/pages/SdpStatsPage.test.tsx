@@ -99,7 +99,7 @@ describe("SDP football observatory", () => {
     render(<TeamSdpStatsPage />); const grid = await table();
     expect(screen.getByText("FPL xG supplement")).toBeInTheDocument();
     expect(within(grid).getAllByLabelText("FPL archive xG supplement")).toHaveLength(4);
-    expect(screen.getAllByTestId("analytics-point")).toHaveLength(4);
+    expect(within(screen.getByRole("region", { name: "League comparison" })).getAllByTestId("analytics-point")).toHaveLength(4);
     expect(screen.getAllByTitle(/FPL archive player-sum xG/).length).toBeGreaterThan(4);
     expect(screen.getByLabelText("Dashboard validation breakdown")).toHaveTextContent("0 dashboard-ready fixtures");
     fireEvent.click(within(grid).getByRole("button", { name: "View Arsenal match detail" }));
@@ -123,8 +123,9 @@ describe("SDP football observatory", () => {
   it("shows league context without letting a search or club selection redefine percentiles", async () => {
     render(<TeamSdpStatsPage />); await table();
     expect(screen.getByRole("heading", { name: "Team stat from SDP" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: /Attack meets defence/ })).toBeInTheDocument();
-    expect(screen.getAllByTestId("analytics-point-label").map(label => label.textContent)).toEqual(["ARS", "BHA", "CHE", "EVE"]);
+    const leagueComparison = screen.getByRole("region", { name: "League comparison" });
+    expect(within(leagueComparison).getByRole("group", { name: /^Attack meets defence$/ })).toBeInTheDocument();
+    expect(within(leagueComparison).getAllByTestId("analytics-point-label").map(label => label.textContent)).toEqual(["ARS", "BHA", "CHE", "EVE"]);
     const before = screen.getByRole("region", { name: "Arsenal profile" }).textContent;
     fireEvent.change(screen.getByRole("textbox", { name: "Search clubs" }), { target: { value: "Arsenal" } });
     expect(within(await table()).getAllByRole("row")).toHaveLength(2);
@@ -140,10 +141,38 @@ describe("SDP football observatory", () => {
     const original = JSON.stringify(data);
     vi.mocked(loadSdpStats).mockResolvedValue(data);
     render(<TeamSdpStatsPage />); await table();
-    expect(screen.getAllByTestId("analytics-point")).toHaveLength(4);
-    expect(screen.getAllByTestId("analytics-point-label")).toHaveLength(4);
+    const leagueComparison = screen.getByRole("region", { name: "League comparison" });
+    expect(within(leagueComparison).getAllByTestId("analytics-point")).toHaveLength(4);
+    expect(within(leagueComparison).getAllByTestId("analytics-point-label")).toHaveLength(4);
     expect(screen.getByRole("region", { name: "Arsenal profile" })).toHaveTextContent("observed matches");
     expect(JSON.stringify(data)).toBe(original);
+  });
+
+  it("renders distinct Home and Away attack vs defence scatter plots with venue-specific form and styling", async () => {
+    render(<TeamSdpStatsPage />); await table();
+    const homeSection = screen.getByRole("region", { name: "Home attack and defence" });
+    const awaySection = screen.getByRole("region", { name: "Away attack and defence" });
+
+    expect(homeSection).toBeInTheDocument();
+    expect(awaySection).toBeInTheDocument();
+    expect(within(homeSection).getByRole("group", { name: /Home: Attack meets defence/ })).toBeInTheDocument();
+    expect(within(awaySection).getByRole("group", { name: /Away: Attack meets defence/ })).toBeInTheDocument();
+
+    const homePoints = within(homeSection).getAllByTestId("analytics-point");
+    const awayPoints = within(awaySection).getAllByTestId("analytics-point");
+    expect(homePoints).toHaveLength(4);
+    expect(awayPoints).toHaveLength(4);
+
+    const homeColors = homePoints.map(p => p.getAttribute("fill"));
+    const awayColors = awayPoints.map(p => p.getAttribute("fill"));
+    expect(homeColors).toContain("var(--sdp-series-2)");
+    expect(awayColors).toContain("var(--sdp-series-3)");
+    expect(homeColors).toContain("var(--sdp-accent)");
+    expect(awayColors).toContain("var(--sdp-accent)");
+
+    const chelseaAway = within(awaySection).getByRole("button", { name: /^Chelsea;/ });
+    fireEvent.click(chelseaAway);
+    expect(screen.getByRole("region", { name: "Chelsea profile" })).toBeInTheDocument();
   });
 
   it("compares up to six clubs and keeps sorting, removal, and match logs usable across fullscreen", async () => {
