@@ -666,6 +666,9 @@ def test_immutable_legacy_goal_description_preserves_data_and_strict_validation(
     before = deepcopy(document)
     validate_sdp_stats(document)
     assert document == before
+    fouls = next(m for m in document["metrics"] if m["key"] == "fouls")
+    fouls["provider_field"] = "fk_foul_lost | fkFoulLost | fouls | total_fouls_conceded"
+    validate_sdp_stats(document)
     for field, value in (
         ("description", "Unrecognized goal-accounting semantics"),
         ("source", "fpl"),

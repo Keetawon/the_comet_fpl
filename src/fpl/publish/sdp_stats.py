@@ -9,7 +9,7 @@ import re
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 import duckdb
 import yaml
@@ -1427,6 +1427,9 @@ def build_sdp_stats(
     return document
 
 
+LEGACY_FOULS_PROVIDER_FIELD: Final[str] = "fk_foul_lost | fkFoulLost | fouls | total_fouls_conceded"
+
+
 def validate_sdp_stats(document: dict[str, Any]) -> None:
     """Strict public allowlist: no PMFs, private capture identities, paths or source bodies."""
     if (
@@ -1453,13 +1456,43 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
     ):
         raise ValueError("invalid SDP sidecar status/coverage")
     current_metrics = metric_catalog()
-    legacy_metrics = [
-        {**metric, "description": LEGACY_DESCRIPTION}
-        if metric["key"] == "set_piece_goals"
-        else metric
-        for metric in current_metrics
+    legacy_catalogs = [
+        current_metrics,
+        [
+            {**metric, "description": LEGACY_DESCRIPTION}
+            if metric["key"] == "set_piece_goals"
+            else metric
+            for metric in current_metrics
+        ],
+        [
+            {
+                **metric,
+                "description": (
+                    LEGACY_DESCRIPTION
+                    if metric["key"] == "set_piece_goals"
+                    else metric["description"]
+                ),
+                "provider_field": (
+                    LEGACY_FOULS_PROVIDER_FIELD
+                    if metric["key"] == "fouls"
+                    else metric["provider_field"]
+                ),
+            }
+            for metric in current_metrics
+        ],
+        [
+            {
+                **metric,
+                "provider_field": (
+                    LEGACY_FOULS_PROVIDER_FIELD
+                    if metric["key"] == "fouls"
+                    else metric["provider_field"]
+                ),
+            }
+            for metric in current_metrics
+        ],
     ]
-    if document["metrics"] not in (current_metrics, legacy_metrics):
+    if document["metrics"] not in legacy_catalogs:
         raise ValueError("metric catalog differs from the observed-source contract")
     for field in ("team_stats", "player_stats", "player_lineups", "fpl_enrichment"):
         if document["source_status"][field] not in {"AVAILABLE", "PARTIAL", "UNAVAILABLE"}:
