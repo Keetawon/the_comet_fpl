@@ -299,7 +299,7 @@ metrics:
 
   # ---- discipline -----------------------------------------------------------------------
   - local_field: fouls
-    provider_fields: [fk_foul_lost, fkFoulLost, fouls, total_fouls_conceded]
+    provider_fields: [fk_foul_lost, fkFoulLost, total_fouls_conceded]
     type: int
     group: discipline
     description: Fouls conceded.
