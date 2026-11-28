@@ -318,3 +318,17 @@ describe("TeamAnalyticsPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("read model unavailable");
   });
 });
+
+
+it("shows each opponent’s attack, defence and fixture-level environment evidence", async () => {
+  const modelled = structuredClone(teams);
+  modelled[0].fixtures[0].environment_selector = "SDP_SCHEMA_FALLBACK";
+  vi.mocked(loadFixtureMatrix).mockResolvedValue({ teams: modelled, schedule, manifest: null, easeIndexFormulaVersion: "fixture-ease-v1" });
+  render(<TeamAnalyticsPage />);
+  const table = await screen.findByRole("table", { name: "Exact team analytics values" });
+  const row = within(table).getByText(modelled[0].team_name).closest("tr")!;
+  await userEvent.click(within(row).getByText("Opponent strength"));
+  expect(within(row).getAllByText(/Atk .*Def .*λ for .*λ against/).length).toBeGreaterThan(0);
+  expect(within(row).getByText(/SDP fallback \(schema\)/)).toBeVisible();
+  expect(within(row).getByText(/^1 SDP · \d+ 1\.0×$/)).toBeVisible();
+});

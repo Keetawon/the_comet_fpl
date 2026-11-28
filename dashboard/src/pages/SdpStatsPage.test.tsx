@@ -293,3 +293,29 @@ describe("SDP football observatory", () => {
     expect(screen.getByRole("combobox", { name: "GW to" })).toHaveTextContent("GW6 · in progress");
   });
 });
+
+
+it("counts automatic corrections in dashboard readiness and labels their evidence", async () => {
+  const data = sdpFixture();
+  const row = data.team_matches[0];
+  row.status = "UNAVAILABLE";
+  row.dashboard_status = "CORROBORATED_VALID";
+  row.sdp.shots_on_target = null;
+  data.metrics.push({ ...data.metrics[0], key: "shots_on_target", label: "Shots on target" });
+  row.display_corrections = { shots_on_target: {
+    correction_id: "auto-example", value: 0, evidence_class: "auto_corroborated_zero_display_correction",
+    policy_recorded_at: "2026-11-28T06:00:00+00:00", source_known_at: row.known_at,
+    provider_match_id: 123, subject_team_code: row.team_code, provider_field: "ontargetScoringAtt",
+    provider_field_state: "omitted", raw_payload_sha256: "a".repeat(64),
+    corroboration: "shot_partition_and_zero_goals_v1", relation: "direct",
+  }};
+  data.team_matches = [row, { ...row, team_code: row.opponent_team_code, team_name: "Opponent",
+    team_short_name: "OPP", opponent_team_code: row.team_code, was_home: !row.was_home,
+    display_corrections: {} }];
+  vi.mocked(loadSdpStats).mockResolvedValue(data);
+  render(<TeamSdpStatsPage />);
+  const grid = await table();
+  expect(screen.getByText("Dashboard-ready fixtures").parentElement).toHaveTextContent("1 / 1");
+  expect(within(grid).getByLabelText("corroborated display correction")).toBeInTheDocument();
+  expect(screen.getByLabelText("Dashboard validation breakdown")).toHaveTextContent("1 validated with corroborated zeros");
+});

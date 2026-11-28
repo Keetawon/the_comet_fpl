@@ -130,9 +130,7 @@ def _team_fixture_row(
         "overall_ease_index": overall,
         "ease_index_formula_version": "fixture-ease-v1",
         "probability_clean_sheet": 0.4,
-        "goals_for_distribution": (
-            "[0.2, 0.5, 0.3]" if lambda_for >= 1.0 else "[0.6, 0.3, 0.1]"
-        ),
+        "goals_for_distribution": ("[0.2, 0.5, 0.3]" if lambda_for >= 1.0 else "[0.6, 0.3, 0.1]"),
         "official_fdr": fdr,
         "stage_a_league_average_team": False,
     }
@@ -1514,8 +1512,7 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
         [*_source_tables()["fact_player_fixture_actual"], prior, older],
     )
     current_gameweeks = [
-        {**row, "finished": row["gw"] == 2}
-        for row in _source_tables()["dim_gameweek"]
+        {**row, "finished": row["gw"] == 2} for row in _source_tables()["dim_gameweek"]
     ]
     current_gameweeks.append(
         {
@@ -1563,10 +1560,7 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
         export_dir,
         "dim_fixture",
         [
-            *(
-                {**row, "finished": row["gw"] == 2}
-                for row in _source_tables()["dim_fixture"]
-            ),
+            *({**row, "finished": row["gw"] == 2} for row in _source_tables()["dim_fixture"]),
             {
                 **_source_tables()["dim_fixture"][0],
                 "season": PRIOR,
@@ -1637,9 +1631,7 @@ def test_player_actuals_are_current_season_complete_gameweeks_at_fixture_grain(
     assert current["actuals"][1]["starts"] is None
     assert current["actuals"][1]["expected_goals_conceded"] is None
     assert "actuals" not in _player(models, 1)
-    player_actuals_document = json.loads(
-        render_read_model_files(models)[PLAYER_ACTUALS_FILENAME]
-    )
+    player_actuals_document = json.loads(render_read_model_files(models)[PLAYER_ACTUALS_FILENAME])
     assert player_actuals_document["players"] == list(models.player_actuals)
 
     generation_documents = {
@@ -1681,9 +1673,7 @@ def test_player_actuals_keep_fixture_club_identity_across_a_transfer(tmp_path: P
 
     models = build_dashboard_read_models(export_dir)
     record = next(
-        row
-        for row in models.player_actuals
-        if row["season"] == SEASON and row["code"] == 2
+        row for row in models.player_actuals if row["season"] == SEASON and row["code"] == 2
     )
     assert [
         (
@@ -1724,11 +1714,7 @@ def test_player_actuals_use_fixture_kickoff_and_its_canonical_order() -> None:
     )
     gameweeks = pl.DataFrame([{**source["dim_gameweek"][1], "finished": True}])
     fixtures = pl.DataFrame(
-        [
-            {**row, "finished": True}
-            for row in source["dim_fixture"]
-            if row["fixture"] in (101, 102)
-        ]
+        [{**row, "finished": True} for row in source["dim_fixture"] if row["fixture"] in (101, 102)]
         + [
             {
                 **source["dim_fixture"][0],
@@ -1773,9 +1759,7 @@ def test_player_actual_identity_enrichment_fails_closed(
     message: str,
 ) -> None:
     actual = pl.DataFrame([_player_actual_row(100, 1, 1, **actual_patch)])
-    gameweeks = pl.DataFrame(
-        [{**_source_tables()["dim_gameweek"][0], "finished": True}]
-    )
+    gameweeks = pl.DataFrame([{**_source_tables()["dim_gameweek"][0], "finished": True}])
     teams = _source_tables()["dim_team_season"]
     if team_rows == "duplicate":
         teams = [*teams, dict(teams[0])]
@@ -1906,10 +1890,7 @@ def test_team_actuals_are_current_and_prior_complete_gameweeks_at_fixture_grain(
         "dim_team_season",
         [*_source_tables()["dim_team_season"], *prior_teams],
     )
-    fixture_rows = [
-        {**row, "finished": row["gw"] == 2}
-        for row in _source_tables()["dim_fixture"]
-    ]
+    fixture_rows = [{**row, "finished": row["gw"] == 2} for row in _source_tables()["dim_fixture"]]
     fixture_rows.append(
         {
             "season": PRIOR,
@@ -1927,10 +1908,7 @@ def test_team_actuals_are_current_and_prior_complete_gameweeks_at_fixture_grain(
         }
     )
     _rewrite_table(export_dir, "dim_fixture", fixture_rows)
-    gameweeks = [
-        {**row, "finished": row["gw"] == 2}
-        for row in _source_tables()["dim_gameweek"]
-    ]
+    gameweeks = [{**row, "finished": row["gw"] == 2} for row in _source_tables()["dim_gameweek"]]
     gameweeks.append(
         {
             "season": PRIOR,
@@ -1946,19 +1924,14 @@ def test_team_actuals_are_current_and_prior_complete_gameweeks_at_fixture_grain(
 
     models = build_dashboard_read_models(export_dir)
     alpha_current = next(
-        row
-        for row in models.team_actuals
-        if row["season"] == SEASON and row["team_code"] == 101
+        row for row in models.team_actuals if row["season"] == SEASON and row["team_code"] == 101
     )
     assert [row["fixture"] for row in alpha_current["actuals"]] == [101, 102]
     assert [row["opponent_short_name"] for row in alpha_current["actuals"]] == ["GAM", "BET"]
     assert alpha_current["actuals"][0]["team_xg"] is None
     assert alpha_current["actuals"][1]["team_xgc"] is None
     assert alpha_current["actuals"][1]["defensive_contribution"] is None
-    assert any(
-        row["season"] == PRIOR and row["team_code"] == 101
-        for row in models.team_actuals
-    )
+    assert any(row["season"] == PRIOR and row["team_code"] == 101 for row in models.team_actuals)
     assert "actuals" not in _team(models, 101)
     form = _team(models, 101)["form"]
     assert (form["season"], form["as_at_gw"]) == (SEASON, 2)
@@ -2072,12 +2045,10 @@ def test_source_integrity_chain_fails_closed(tmp_path: Path) -> None:
 
 def _mark_final(export_dir: Path, *, gameweeks: tuple[int, ...] = (1, 2)) -> None:
     fixture_rows = [
-        {**row, "finished": row["gw"] in gameweeks}
-        for row in _source_tables()["dim_fixture"]
+        {**row, "finished": row["gw"] in gameweeks} for row in _source_tables()["dim_fixture"]
     ]
     gameweek_rows = [
-        {**row, "finished": row["gw"] in gameweeks}
-        for row in _source_tables()["dim_gameweek"]
+        {**row, "finished": row["gw"] in gameweeks} for row in _source_tables()["dim_gameweek"]
     ]
     _rewrite_table(export_dir, "dim_fixture", fixture_rows)
     _rewrite_table(export_dir, "dim_gameweek", gameweek_rows)
@@ -2168,18 +2139,12 @@ def test_team_forecast_vs_actual_uses_opponent_pmf_for_defence_crps(tmp_path: Pa
     (run,) = result["runs"]
     assert run["coverage"]["scored_rows"] == 6
     alpha_fixture_101 = next(
-        row
-        for row in run["observations"]
-        if row["fixture"] == 101 and row["team_id"] == 1
+        row for row in run["observations"] if row["fixture"] == 101 and row["team_id"] == 1
     )
     # Alpha's defensive score uses Gamma's exact goals-for PMF [0.6, 0.3, 0.1],
     # never Alpha's own PMF [0.2, 0.5, 0.3] or a Poisson reconstructed from lambda.
-    assert alpha_fixture_101["defence_crps"] == pytest.approx(
-        _discrete_crps([0.6, 0.3, 0.1], 2.0)
-    )
-    assert alpha_fixture_101["defence_crps"] != pytest.approx(
-        _discrete_crps([0.2, 0.5, 0.3], 2.0)
-    )
+    assert alpha_fixture_101["defence_crps"] == pytest.approx(_discrete_crps([0.6, 0.3, 0.1], 2.0))
+    assert alpha_fixture_101["defence_crps"] != pytest.approx(_discrete_crps([0.2, 0.5, 0.3], 2.0))
     assert alpha_fixture_101["defence_residual"] == pytest.approx(2.0)
     assert run["clean_sheet"]["rows"] == 6
 
@@ -2205,9 +2170,7 @@ def test_team_forecast_vs_actual_rejects_nonreciprocal_final_score(tmp_path: Pat
     export_dir = _build_source_export(tmp_path)
     _mark_final(export_dir)
     rows = [
-        {**row, "goals_against": 9}
-        if row["fixture"] == 100 and row["team_id"] == 2
-        else row
+        {**row, "goals_against": 9} if row["fixture"] == 100 and row["team_id"] == 2 else row
         for row in _source_tables()["fact_finalized_team_fixture_outcome"]
     ]
     _rewrite_table(export_dir, "fact_finalized_team_fixture_outcome", rows)
@@ -2744,3 +2707,48 @@ def test_stale_fixture_kickoff_orders_after_current_gw(tmp_path: Path) -> None:
     # gw is the primary sort key; the postponed GW1 fixture stays with GW1 despite its late
     # kickoff, and NULL kickoffs (unscheduled) would order last, never first.
     assert [f["gw"] for f in alpha["fixtures"]] == [1, 1, 2, 2]
+
+
+def test_fixture_matrix_projects_only_public_environment_decisions(tmp_path: Path) -> None:
+    export_dir = _build_source_export(tmp_path)
+    baseline = json.loads(
+        render_read_model_files(build_dashboard_read_models(export_dir))[FIXTURE_MATRIX_FILENAME]
+    )
+    runs = _source_tables()["dim_forecast_run"]
+    selected = runs[0]
+    modes = json.loads(selected["component_modes"])
+    modes["football_environment.provenance"] = json.dumps(
+        {
+            "primary": "sdp_v2",
+            "decisions": [
+                {"fixture": 100, "selector": "SDP_PRIMARY", "environment": {"hidden": 1}},
+                {"fixture": 101, "selector": "SDP_INCOMPLETE_FALLBACK", "internal": "private"},
+            ],
+            "source_versions": [{"payload_id": "private"}],
+        }
+    )
+    selected["component_modes"] = json.dumps(modes)
+    _rewrite_table(export_dir, "dim_forecast_run", runs)
+    models = build_dashboard_read_models(export_dir)
+    document = json.loads(render_read_model_files(models)[FIXTURE_MATRIX_FILENAME])
+    summary = document["environment_summary"][selected["run_id"]]
+    assert summary["primary_engine"] == "sdp_v2"
+    assert summary["sdp_primary_count"] == summary["fallback_count"] == 1
+    assert summary["league_average_fallback_teams"] == sorted(
+        {
+            team["short_name"]
+            for team in document["teams"]
+            if team["run_id"] == selected["run_id"]
+            and team["fixtures"]
+            and all(f["stage_a_league_average_team"] for f in team["fixtures"])
+        }
+    )
+    for team in document["teams"]:
+        for fixture in team["fixtures"]:
+            assert fixture.pop("environment_selector", None) == {
+                100: "SDP_PRIMARY",
+                101: "SDP_INCOMPLETE_FALLBACK",
+            }.get(fixture["fixture"])
+    assert document["teams"] == baseline["teams"]
+    assert document["schedule"] == baseline["schedule"]
+    assert {"source_versions", "decisions", "payload_id"}.isdisjoint(_all_keys(document))

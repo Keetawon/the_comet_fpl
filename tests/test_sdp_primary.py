@@ -390,3 +390,146 @@ def test_pre_deadline_refresh_exception_still_attempts_incumbent(monkeypatch, tm
     receipt = json.loads(next((tmp_path / "runs").glob("*/forecast.json")).read_text())
     assert receipt["refresh_exit_code"] == 1
     assert receipt["forecast_exit_code"] == receipt["evidence_exit_code"] == 0
+
+
+def test_outfield_blocked_target_attempts_allow_bounded_xgot():
+    from fpl.storage.sdp_diagnostics import metric_issues
+
+    valid = {
+        **METRICS,
+        "totalScoringAtt": 17,
+        "ontargetScoringAtt": 0,
+        "blockedScoringAtt": 9,
+        "shotOffTarget": 8,
+        "attemptsIbox": 14,
+        "attIboxTarget": 1,
+        "attOboxTarget": 1,
+        "expectedGoalsOnTarget": 0.6749,
+    }
+    parsed = checked_metrics(valid)
+    assert parsed["ontargetScoringAtt"] == 0.0
+    assert parsed["expectedGoalsOnTarget"] == pytest.approx(0.6749)
+    assert metric_issues(valid) == []
+
+    for override in (
+        {"expectedGoalsOnTarget": 2.01},
+        {"shotOffTarget": 7},
+        {"attIboxTarget": 0, "attOboxTarget": 0},
+        {"attIboxTarget": None},
+    ):
+        broken = {**valid, **override}
+        with pytest.raises(
+            SdpHealthError, match="expectedGoalsOnTarget exceeds ontargetScoringAtt"
+        ):
+            checked_metrics(broken)
+        issues = metric_issues(broken)
+        assert any(
+            issue["field"] == "expectedGoalsOnTarget" and issue["status"] == "inconsistent"
+            for issue in issues
+        )
+
+
+def _seed_zero_sot_fixture(con, *, mutate=None, away_score: int = 0):
+    seed(con)
+    raw_matches = con.execute(
+        "SELECT CAST(payload AS VARCHAR) FROM raw_pl_sdp_payload "
+        "WHERE endpoint='matches' ORDER BY fetched_at DESC LIMIT 1"
+    ).fetchone()
+    metadata = json.loads(raw_matches[0])
+    target_match = next(row for row in metadata["content"] if row["id"] == 300103)
+    target_match["score"] = {"homeScore": 2, "awayScore": away_score}
+    sdp.land_payload(con, _raw("matches", metadata, CAPTURED + timedelta(seconds=2)), season=SEASON)
+
+    home_stats = {**METRICS, "goals": 2, "goalsConceded": 0}
+    away_stats = {k: v for k, v in METRICS.items() if k != "ontargetScoringAtt"} | {
+        "totalScoringAtt": 5,
+        "attemptsIbox": 1,
+        "shotOffTarget": 4,
+        "blockedScoringAtt": 1,
+        "goals": 0,
+        "goalsOpenplay": 0,
+        "goalsConceded": 2,
+    }
+    payload = [
+        {"side": "Home", "team": {"id": 8}, "stats": home_stats},
+        {"side": "Away", "team": {"id": 3}, "stats": away_stats},
+    ]
+    if mutate is not None:
+        mutate(payload)
+    sdp.land_payload(
+        con,
+        _raw("match_stats", payload, CAPTURED + timedelta(seconds=3), 300103),
+        season=SEASON,
+        sdp_match_id=300103,
+    )
+    _rebuild(con)
+
+
+def test_corroborated_zero_sot_promotes_proven_omission_and_preserves_raw_gate(tmp_path):
+    from fpl.storage.sdp_runtime import NORMALIZATION_VERSION_CORROBORATED_ZERO_SOT
+
+    with initialise(tmp_path / "db.duckdb") as con:
+        _seed_zero_sot_fixture(con)
+        raw_only = load_sdp_state(con, cutoff=CUTOFF, season=SEASON, corroborate_zero_sot=False)
+        assert raw_only.failures[SEASON, 103] == "SDP_INCOMPLETE_FALLBACK"
+
+        primary, report, incumbent = selection(con)
+        assert report["decisions"][0]["selector"] == "SDP_PRIMARY"
+        assert primary != incumbent
+        versions = {row["normalization_version"] for row in report["source_versions"]}
+        assert NORMALIZATION_VERSION_CORROBORATED_ZERO_SOT in versions
+
+
+@pytest.mark.parametrize(
+    ("away_score", "mutate"),
+    [
+        (0, lambda p: p[1]["stats"].update(ontargetScoringAtt=None)),
+        (0, lambda p: (p[1]["stats"].pop("shotOffTarget"), p[1]["stats"].pop("blockedScoringAtt"))),
+        (0, lambda p: p[1]["stats"].update(shotOffTarget=5, blockedScoringAtt=1)),
+        (0, lambda p: p[1]["stats"].update(goals=1)),
+        (0, lambda p: p[1]["stats"].update(attIboxTarget=1)),
+        (0, lambda p: p[1]["stats"].update(expectedGoalsOnTarget=0.15)),
+        (0, lambda p: p[0]["stats"].update(saves=1)),
+        (0, lambda p: p[0]["stats"].update(expectedGoalsOnTargetConceded=0.2)),
+        (1, None),
+    ],
+)
+def test_uncorroborated_or_contradictory_zero_sot_still_fails_closed(tmp_path, away_score, mutate):
+    with initialise(tmp_path / "db.duckdb") as con:
+        _seed_zero_sot_fixture(con, mutate=mutate, away_score=away_score)
+        primary, report, incumbent = selection(con)
+        assert primary == incumbent
+        assert report["decisions"][0]["selector"] == "SDP_INCOMPLETE_FALLBACK"
+
+
+@pytest.mark.parametrize("defect", [None, "null", "partition", "inside", "unwitnessed"])
+def test_omitted_inside_box_count_requires_exact_shot_partition(tmp_path, defect):
+    from fpl.storage.sdp_runtime import NORMALIZATION_VERSION_CORROBORATED_ZERO_SOT
+
+    def only_outside(payload):
+        stats = payload[1]["stats"]
+        stats.update(totalScoringAtt=4, attemptsObox=4, attIboxMiss=0)
+        del stats["attemptsIbox"]
+        if defect == "null":
+            stats["attemptsIbox"] = None
+        elif defect == "partition":
+            stats["attemptsObox"] = 3
+        elif defect == "inside":
+            stats["attIboxMiss"] = 1
+        elif defect == "unwitnessed":
+            del stats["attemptsObox"]
+
+    with initialise(tmp_path / "db.duckdb") as con:
+        seed(con, change=only_outside)
+        state = load_sdp_state(con, cutoff=CUTOFF, season=SEASON)
+        if defect is None:
+            assert (SEASON, 103) not in state.failures
+            pair = [row for row in state.rows if row.fixture == 103]
+            assert len(pair) == 2
+            assert {row.provenance["normalization_version"] for row in pair} == {
+                NORMALIZATION_VERSION_CORROBORATED_ZERO_SOT
+            }
+            assert selection(con)[1]["decisions"][0]["selector"] == "SDP_PRIMARY"
+        else:
+            assert state.failures[SEASON, 103] == "SDP_INCOMPLETE_FALLBACK"
+            assert selection(con)[1]["decisions"][0]["selector"] == "SDP_INCOMPLETE_FALLBACK"

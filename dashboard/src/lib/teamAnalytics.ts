@@ -1,4 +1,4 @@
-import type { TeamRecord, WindowLabel } from "@/data/types";
+import type { TeamFixture, TeamRecord, WindowLabel } from "@/data/types";
 import { teamFormLabel } from "@/lib/teamActuals";
 import {
   classifyPareto,
@@ -34,6 +34,7 @@ export interface TeamAnalyticsRow {
   teamName: string;
   shortName: string;
   fixtureCount: number;
+  fixtures: TeamFixture[];
   lambdaForTotal: number | null;
   lambdaAgainstTotal: number | null;
   expectedCleanSheets: number | null;
@@ -41,6 +42,8 @@ export interface TeamAnalyticsRow {
   lambdaAgainstPerFixture: number | null;
   expectedCleanSheetsPerFixture: number | null;
   fallbackFixtureCount: number;
+  /** Fixtures whose saved selector is an SDP fallback (absent selectors are not counted). */
+  sdpFallbackFixtureCount: number;
   formLabel: string | null;
   past: TeamPastValues;
 }
@@ -157,6 +160,7 @@ export function buildTeamAnalyticsRows(
       teamName: team.team_name,
       shortName: team.short_name,
       fixtureCount,
+      fixtures,
       lambdaForTotal,
       lambdaAgainstTotal,
       expectedCleanSheets,
@@ -165,6 +169,9 @@ export function buildTeamAnalyticsRows(
       expectedCleanSheetsPerFixture: perFixture(expectedCleanSheets, fixtureCount),
       fallbackFixtureCount: fixtures.filter(
         (fixture) => fixture.stage_a_league_average_team,
+      ).length,
+      sdpFallbackFixtureCount: fixtures.filter(
+        (fixture) => fixture.environment_selector != null && fixture.environment_selector !== "SDP_PRIMARY",
       ).length,
       formLabel: teamFormLabel(team.form, scope.formWindow),
       past: {

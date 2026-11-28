@@ -1,5 +1,23 @@
 # Repository agent instructions
 
+### SDP zero-SOT / xGOT production-health repair (2026-11-28)
+
+A DATA/PLUMBING repair, not a model change: no frozen parameter, frozen source file, selector,
+threshold or historical verdict changed. Seven 2026-27 matches had failed SDP health for reasons
+their own payloads contradict, sending 52 of 100 GW13-17 team sides to the incumbent fallback.
+`load_sdp_state` (and `audit_fallbacks`, which must agree with it) now accepts a provider-omitted
+`ontargetScoringAtt` as `0` only under an exact shot partition with zero goals, zero on-target
+fields and zero opponent saves/xGOT-conceded; an omitted `attemptsIbox` only when
+`attemptsObox == totalScoringAtt`; and xGOT above SOT only up to the outfield-blocked on-target
+shots Opta excludes from SOT. Explicit `null`, contradictory or partial evidence still fails
+closed, and corroborated rows carry `normalization_version =
+sdp_production_health_v2_corroborated_zero_sot`. Raw payloads and raw sidecar cells stay NULL.
+The dashboard sidecar keeps its provider-only core status; from 2026-11-28T06:00:00Z it adds
+`auto_corroborated_zero_display_correction` / `CORROBORATED_VALID` under the same proof, and
+earlier cutoffs reproduce byte for byte. Accuracy is NOT claimed: the prospective read-out is
+preregistered in `docs/sdp-health-repair-prospective-preregistration.md` (review flags only,
+no automatic default change); do not edit the corroboration rules during its window.
+
 ### Prospective live data-plumbing repairs and rostered-decay default switch (2026-11-21)
 
 Two confirmed P0 DATA/PLUMBING defects in the live prospective forecast were repaired, and the

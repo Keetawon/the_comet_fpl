@@ -125,6 +125,17 @@ def scope_public_documents(documents: dict[str, dict[str, Any]], manifest: dict[
         ("fixture_matrix.json", "teams"),
     ):
         documents[filename][key] = [r for r in documents[filename][key] if r["run_id"] in active]
+    matrix = documents["fixture_matrix.json"]
+    if "environment_summary" in matrix:
+        summary = matrix["environment_summary"]
+        if not isinstance(summary, dict):
+            raise DashboardJsonError("fixture environment summary must be keyed by run ID")
+        matrix["environment_summary"] = {
+            run_id: evidence for run_id, evidence in summary.items() if run_id in active
+        }
+        if not matrix["environment_summary"]:
+            # Mirror the renderer, which omits the field when no run has evidence.
+            del matrix["environment_summary"]
     for prefix, key in (("player", "players"), ("team", "teams")):
         identity = "code" if prefix == "player" else "team_code"
         roster = documents["players.json" if prefix == "player" else "fixture_matrix.json"][key]

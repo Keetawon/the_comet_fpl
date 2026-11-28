@@ -4,7 +4,7 @@ import { resolveDataUrl } from "./publicData";
 export type SdpScope = "team" | "player";
 export type SdpSource = "sdp" | "fpl";
 export type SourceAvailability = "AVAILABLE" | "PARTIAL" | "UNAVAILABLE";
-export type DashboardTeamStatus = "PROVIDER_VALID" | "OWNER_CONFIRMED_VALID" | "INCOMPLETE";
+export type DashboardTeamStatus = "PROVIDER_VALID" | "OWNER_CONFIRMED_VALID" | "CORROBORATED_VALID" | "INCOMPLETE";
 
 export interface SdpMetric {
   key: string;
@@ -40,20 +40,32 @@ export interface SdpDisplayAssumption {
   raw_payload_sha256: string;
 }
 
-export interface SdpDisplayCorrection {
+export const AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT = "2026-11-28T06:00:00+00:00";
+const CORRECTION_PROVIDER_FIELDS: Record<string, string> = {
+  shots_on_target: "ontargetScoringAtt", shots_on_target_allowed: "ontargetScoringAtt",
+  shots_blocked: "blockedScoringAtt", expected_goals_on_target: "expectedGoalsOnTarget",
+  shots_inside_box: "attemptsIbox",
+};
+
+export type SdpDisplayCorrection = {
   correction_id: string;
   value: 0;
-  evidence_class: "owner_confirmed_display_correction";
-  owner_confirmation_recorded_at: string;
   source_known_at: string;
   provider_match_id: number;
-  provider_field: "ontargetScoringAtt" | "blockedScoringAtt" | "expectedGoalsOnTarget";
+  provider_field: "ontargetScoringAtt" | "blockedScoringAtt" | "expectedGoalsOnTarget" | "attemptsIbox";
   provider_field_state: "omitted";
   raw_payload_sha256: string;
-  corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero" | "owner_confirmed_xgot_with_corroborated_zero_sot";
   relation: "direct" | "opponent_mirror";
   subject_team_code: number;
-}
+} & ({
+  evidence_class: "owner_confirmed_display_correction";
+  owner_confirmation_recorded_at: string;
+  corroboration: "shot_accounting_and_fpl_goalkeeper_proxy_zero" | "owner_confirmed_xgot_with_corroborated_zero_sot";
+} | {
+  evidence_class: "auto_corroborated_zero_display_correction";
+  policy_recorded_at: string;
+  corroboration: "shot_partition_and_zero_goals_v1";
+});
 
 export interface FplXgSupplement {
   value: number;
@@ -265,7 +277,7 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
         }
         if (Number(payload.json_schema_version) < 5 && row.dashboard_status !== undefined) return fail();
         if (Number(payload.json_schema_version) >= 5 && !(row.status === "UNAVAILABLE"
-          ? ["INCOMPLETE", "OWNER_CONFIRMED_VALID"] : ["PROVIDER_VALID"]).includes(String(row.dashboard_status))) return fail();
+          ? ["INCOMPLETE", "OWNER_CONFIRMED_VALID", "CORROBORATED_VALID"] : ["PROVIDER_VALID"]).includes(String(row.dashboard_status))) return fail();
         if (!object(row.display_corrections) ||
             (Number(payload.json_schema_version) >= 3 && !object(row.display_assumptions)) ||
             (row.display_assumptions !== undefined && !object(row.display_assumptions))) return fail();
@@ -283,20 +295,27 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
               Object.hasOwn(row.display_corrections, metric)) return fail();
         }
         for (const [metric, correction] of Object.entries(row.display_corrections)) {
-          if (!["shots_on_target", "shots_on_target_allowed", "shots_blocked", "expected_goals_on_target"].includes(metric) || !object(correction) ||
+          if (!object(correction)) return fail();
+          const auto = correction.evidence_class === "auto_corroborated_zero_display_correction";
+          const recorded = auto ? correction.policy_recorded_at : correction.owner_confirmation_recorded_at;
+          if (!Object.hasOwn(CORRECTION_PROVIDER_FIELDS, metric) ||
+              (metric === "shots_inside_box" && !auto) ||
               (metric === "expected_goals_on_target" && Number(payload.json_schema_version) < 4) ||
-              correction.value !== 0 || correction.evidence_class !== "owner_confirmed_display_correction" ||
-              correction.provider_field !== (metric === "expected_goals_on_target" ? "expectedGoalsOnTarget" : metric === "shots_blocked" ? "blockedScoringAtt" : "ontargetScoringAtt") || correction.provider_field_state !== "omitted" ||
-              correction.corroboration !== (metric === "expected_goals_on_target" ? "owner_confirmed_xgot_with_corroborated_zero_sot" : "shot_accounting_and_fpl_goalkeeper_proxy_zero") ||
+              correction.value !== 0 || (!auto && correction.evidence_class !== "owner_confirmed_display_correction") ||
+              correction.provider_field !== CORRECTION_PROVIDER_FIELDS[metric] || correction.provider_field_state !== "omitted" ||
+              correction.corroboration !== (auto ? "shot_partition_and_zero_goals_v1" : metric === "expected_goals_on_target" ? "owner_confirmed_xgot_with_corroborated_zero_sot" : "shot_accounting_and_fpl_goalkeeper_proxy_zero") ||
               !["direct", "opponent_mirror"].includes(String(correction.relation)) ||
               typeof correction.correction_id !== "string" || !/^[a-z0-9-]+$/.test(correction.correction_id) ||
               typeof correction.raw_payload_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(correction.raw_payload_sha256) ||
               !positiveId(correction.provider_match_id) || !positiveId(correction.subject_team_code) ||
-              !timestamp(correction.source_known_at) || !timestamp(correction.owner_confirmation_recorded_at) ||
-              Date.parse(correction.source_known_at as string) > Date.parse(correction.owner_confirmation_recorded_at as string) ||
-              Date.parse(correction.owner_confirmation_recorded_at as string) > asOf ||
+              !timestamp(correction.source_known_at) || !timestamp(recorded) ||
+              Date.parse(correction.source_known_at as string) > Date.parse((auto ? row.known_at : recorded) as string) ||
+              Date.parse(recorded as string) > asOf ||
+              (auto && (Date.parse(recorded as string) !== Date.parse(AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT) ||
+                correction.provider_match_id !== row.provider_match_id || Object.hasOwn(correction, "owner_confirmation_recorded_at"))) ||
+              (!auto && Object.hasOwn(correction, "policy_recorded_at")) ||
               (row.sdp as Record<string, unknown>)[metric] !== null || row.status !== "UNAVAILABLE" ||
-              (["shots_on_target", "shots_blocked", "expected_goals_on_target"].includes(metric) && (correction.relation !== "direct" || row.team_code !== correction.subject_team_code)) ||
+              (metric !== "shots_on_target_allowed" && (correction.relation !== "direct" || row.team_code !== correction.subject_team_code)) ||
               (metric === "shots_on_target_allowed" && (correction.relation !== "opponent_mirror" || row.opponent_team_code !== correction.subject_team_code))) return fail();
           const entries = corrections.get(correction.correction_id) ?? [];
           entries.push({ row, metric, correction });
@@ -324,21 +343,27 @@ export function parseSdpStats(payload: unknown): SdpStatsData {
     }
   }
   for (const entries of corrections.values()) {
-    if (entries.length === 1 && ["shots_blocked", "expected_goals_on_target"].includes(entries[0].metric)) continue;
+    if (entries.length === 1 && ["shots_blocked", "expected_goals_on_target", "shots_inside_box"].includes(entries[0].metric)) continue;
     if (entries.length !== 2 || new Set(entries.map(entry => entry.metric)).size !== 2) return fail();
     const direct = entries.find(entry => entry.metric === "shots_on_target");
     const mirror = entries.find(entry => entry.metric === "shots_on_target_allowed");
     if (!direct || !mirror || direct.row.season !== mirror.row.season || direct.row.fixture !== mirror.row.fixture ||
         direct.row.team_code !== mirror.row.opponent_team_code || direct.row.opponent_team_code !== mirror.row.team_code) return fail();
+    if ([direct, mirror].some(entry => entry.correction.evidence_class === "auto_corroborated_zero_display_correction") &&
+        Object.keys(direct.correction).some(key => key !== "relation" && direct.correction[key] !== mirror.correction[key])) return fail();
   }
   if (Number(payload.json_schema_version) >= 5) {
     const teams = payload.team_matches as unknown as SdpMatch[];
     const core = ["expected_goals", "shots", "shots_on_target", "shots_inside_box", "touches_in_opposition_box", "possession", "passes", "accurate_passes"];
-    for (const row of teams.filter(r => r.dashboard_status === "OWNER_CONFIRMED_VALID")) {
+    for (const row of teams.filter(r => r.dashboard_status === "OWNER_CONFIRMED_VALID" || r.dashboard_status === "CORROBORATED_VALID")) {
       const pair = teams.filter(r => r.season === row.season && r.fixture === row.fixture);
-      if (pair.length !== 2 || pair.some(r => r.dashboard_status !== "OWNER_CONFIRMED_VALID") ||
+      if (pair.length !== 2 || pair.some(r => r.dashboard_status !== row.dashboard_status) ||
         pair[0].team_code !== pair[1].opponent_team_code || pair[1].team_code !== pair[0].opponent_team_code ||
-        !pair.some(r => r.display_corrections?.shots_on_target?.relation === "direct")) return fail();
+        !pair.some(r => ["shots_on_target", "shots_inside_box"].some(key => {
+          const correction = r.display_corrections?.[key];
+          return correction?.relation === "direct" && correction.evidence_class ===
+            (row.dashboard_status === "CORROBORATED_VALID" ? "auto_corroborated_zero_display_correction" : "owner_confirmed_display_correction");
+        }))) return fail();
       if (!core.every(key => { const value = row.display_corrections?.[key]?.value ?? row.sdp[key]; return typeof value === "number" && Number.isFinite(value) && value >= 0; })) return fail();
     }
   }

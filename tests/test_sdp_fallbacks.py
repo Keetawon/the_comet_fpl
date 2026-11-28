@@ -765,3 +765,33 @@ def test_job_cli_writes_report_then_refuses_clobber(tmp_path) -> None:
         job_main(["--db", str(db), "--artifact", str(artifact_path), "--output", str(output)]) == 2
     )
     assert output.read_bytes() == first
+
+
+def test_audit_fallbacks_agrees_with_corroborated_zero_sot_and_bounded_xgot(tmp_path) -> None:
+    from .test_sdp_primary import _seed_zero_sot_fixture
+
+    def add_home_blocked_xgot(payload: list[dict[str, Any]]) -> None:
+        payload[0]["stats"].update(
+            totalScoringAtt=17,
+            ontargetScoringAtt=0,
+            blockedScoringAtt=9,
+            shotOffTarget=8,
+            attemptsIbox=14,
+            attIboxTarget=1,
+            attOboxTarget=1,
+            expectedGoalsOnTarget=0.6749,
+        )
+
+    original_mutation = add_home_blocked_xgot
+
+    def add_zero_ibox(payload: list[dict[str, Any]]) -> None:
+        original_mutation(payload)
+        payload[1]["stats"]["attemptsObox"] = payload[1]["stats"]["totalScoringAtt"]
+        del payload[1]["stats"]["attemptsIbox"]
+
+    with initialise(tmp_path / "db.duckdb") as con:
+        _seed_zero_sot_fixture(con, mutate=add_zero_ibox)
+        report = _audit(con, _artifact(selector="SDP_PRIMARY"))
+        assert report["summary"]["fallback_fixtures"] == 0
+        assert report["summary"]["rederived_agrees_with_saved"] == 1
+        assert report["fixtures"][0]["rederived"]["category"] == "SDP_PRIMARY"

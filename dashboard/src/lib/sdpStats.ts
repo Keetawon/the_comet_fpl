@@ -66,6 +66,11 @@ export const metricRaw = (row: SdpMatch, metric: SdpMetric): number | null => {
   return finite(value) ? value : metricSupplement(row, metric)?.value ?? null;
 };
 export const correctionDescription = (correction: SdpDisplayCorrection) =>
+  correction.evidence_class === "auto_corroborated_zero_display_correction"
+    ? "Corroborated display zero for omitted " + correction.provider_field +
+      "; shot evidence checked under the policy recorded " + correction.policy_recorded_at +
+      "; raw payload SHA256 " + correction.raw_payload_sha256 + "."
+    :
   `Owner-confirmed display correction recorded ${correction.owner_confirmation_recorded_at}; raw SDP ${correction.provider_field} was omitted; ${correction.provider_field === "expectedGoalsOnTarget" ? "xGOT zero confirmed by the owner, supported by corroborated zero shots on target" : "corroborated by shot accounting and the official FPL goalkeeper proxy"}; raw payload SHA256 ${correction.raw_payload_sha256}. Provider core validity is unchanged.`;
 export const assumptionDescription = (assumption: SdpDisplayAssumption) =>
   `Owner-directed display assumption recorded ${assumption.policy_recorded_at}; raw SDP ${assumption.provider_field} was omitted and is shown as zero for this sparse count. This is not a provider-verified zero; raw remains NULL. Raw payload SHA256 ${assumption.raw_payload_sha256}. Provider core validity is unchanged.`;

@@ -250,3 +250,25 @@ describe("SDP observed descriptive arithmetic", () => {
     expect(csv).toContain('"81","6/6"');
   });
 });
+
+
+it("uses corroborated display zeros in shot shares without changing raw cells", () => {
+  const sot = { ...shooting, key: "shots_on_target" };
+  const row = sdpMatch({
+    status: "UNAVAILABLE", dashboard_status: "CORROBORATED_VALID",
+    sdp: { shots: 5, shots_on_target: null },
+    display_corrections: {
+      shots_on_target: {
+        correction_id: "auto-example", value: 0, policy_recorded_at: "2026-11-28T06:00:00Z",
+        evidence_class: "auto_corroborated_zero_display_correction",
+        source_known_at: "2026-09-07T08:00:00Z", provider_match_id: 42, subject_team_code: 3,
+        provider_field: "ontargetScoringAtt", provider_field_state: "omitted",
+        raw_payload_sha256: "a".repeat(64), corroboration: "shot_partition_and_zero_goals_v1",
+        relation: "direct",
+      },
+    },
+  });
+  expect(row.sdp.shots_on_target).toBeNull();
+  expect(metricRaw(row, sot)).toBe(0);
+  expect(shotShare([row], sot, shooting)).toBe(0);
+});

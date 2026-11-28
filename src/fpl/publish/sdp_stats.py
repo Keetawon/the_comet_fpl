@@ -40,7 +40,10 @@ from fpl.storage.sdp_runtime import (
     CORE_FIELDS,
     SdpHealthError,
     _body,
+    _nonneg_int,
     checked_metrics,
+    corroborated_zero_ibox,
+    corroborated_zero_sot,
     load_sdp_state,
     raw_at,
     workload_at,
@@ -59,6 +62,15 @@ OPEN_PLAY_GOALS = SdpMetric(
     verified_semantics=False,
 )
 DISPLAY_CORRECTIONS_FILE = "sdp_dashboard_display_corrections.yaml"
+AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT = datetime.fromisoformat("2026-11-28T06:00:00+00:00")
+AUTO_ZERO_EVIDENCE = "auto_corroborated_zero_display_correction"
+CORRECTION_PROVIDER_FIELDS = {
+    "shots_on_target": "ontargetScoringAtt",
+    "shots_on_target_allowed": "ontargetScoringAtt",
+    "shots_blocked": "blockedScoringAtt",
+    "expected_goals_on_target": "expectedGoalsOnTarget",
+    "shots_inside_box": "attemptsIbox",
+}
 OMITTED_ZERO_POLICY_RECORDED_AT = datetime.fromisoformat("2026-09-09T02:47:16.006705+00:00")
 # Display-only policy for sparse nonnegative counts. High-volume/core counts,
 # percentages and continuous values remain unavailable when omitted.
@@ -171,6 +183,9 @@ DISPLAY_CORRECTION_FIELDS = {
     "relation",
     "subject_team_code",
 }
+AUTO_DISPLAY_CORRECTION_FIELDS = (
+    DISPLAY_CORRECTION_FIELDS - {"owner_confirmation_recorded_at"}
+) | {"policy_recorded_at"}
 DISPLAY_ASSUMPTION_FIELDS = {
     "value",
     "evidence_class",
@@ -303,7 +318,7 @@ def _partial_current_stats(
     official: dict[str, Any],
     cutoff: datetime,
     observed_pair: list[dict[str, Any]] | None = None,
-) -> tuple[dict[str, dict[str, Any]], datetime, str, int, str] | None:
+) -> tuple[dict[str, dict[str, Any]], datetime, str, int, str, dict[str, int | None]] | None:
     """Display measured fields of an incomplete core, never license model use.
 
     Recheck the latest immutable stats and metadata, exact crosswalk, PL identity,
@@ -419,6 +434,7 @@ def _partial_current_stats(
                 _version(capture["sha256"], receipt["sha256"]),
                 match_id,
                 capture["sha256"],
+                {"home": match.home_score, "away": match.away_score},
             )
     except (ValueError, TypeError, KeyError):
         return None
@@ -571,7 +587,77 @@ def _apply_display_corrections(
     return applied
 
 
-def _owner_corrected_dashboard_valid(
+def _apply_automatic_display_corrections(
+    sides: dict[str, dict[str, Any]],
+    rows: dict[str, dict[str, Any]],
+    *,
+    scores: dict[str, int | None],
+    source_known_at: datetime,
+    raw_sha256: str,
+) -> int:
+    applied = 0
+    for side, opposite in (("home", "away"), ("away", "home")):
+        stats = sides[side]
+        row, mirror = rows[side], rows[opposite]
+        goals = scores[side]
+        fpl_goals = row["fpl"].get("goals_scored")
+        zero_sot = (
+            row["sdp"]["shots_on_target"] is None
+            and (fpl_goals is None or fpl_goals == goals)
+            and corroborated_zero_sot(stats, official_goals=goals, opponent_stats=sides[opposite])
+        )
+        total = _nonneg_int(stats, "totalScoringAtt")
+        candidates = {
+            "shots_on_target": zero_sot,
+            "expected_goals_on_target": zero_sot,
+            "shots_blocked": zero_sot
+            and total is not None
+            and _nonneg_int(stats, "shotOffTarget") == total,
+            "shots_inside_box": corroborated_zero_ibox(stats),
+        }
+        for metric, proven in candidates.items():
+            provider_field = CORRECTION_PROVIDER_FIELDS[metric]
+            if (
+                not proven
+                or provider_field in stats
+                or row["sdp"][metric] is not None
+                or metric in row["display_corrections"]
+                or (
+                    metric == "shots_on_target"
+                    and (
+                        mirror["sdp"]["shots_on_target_allowed"] is not None
+                        or "shots_on_target_allowed" in mirror["display_corrections"]
+                    )
+                )
+            ):
+                continue
+            identity = f"{row['season']}-f{row['fixture']}-t{row['team_code']}"
+            suffix = metric.replace("_", "-")
+            public = {
+                "correction_id": f"auto-{identity}-{suffix}",
+                "value": 0,
+                "evidence_class": AUTO_ZERO_EVIDENCE,
+                "policy_recorded_at": _iso(AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT),
+                "source_known_at": _iso(source_known_at),
+                "provider_match_id": row["provider_match_id"],
+                "provider_field": provider_field,
+                "provider_field_state": "omitted",
+                "raw_payload_sha256": raw_sha256,
+                "corroboration": "shot_partition_and_zero_goals_v1",
+                "subject_team_code": row["team_code"],
+            }
+            row["display_assumptions"].pop(metric, None)
+            row["display_corrections"][metric] = {**public, "relation": "direct"}
+            if metric == "shots_on_target":
+                mirror["display_corrections"]["shots_on_target_allowed"] = {
+                    **public,
+                    "relation": "opponent_mirror",
+                }
+            applied += 1
+    return applied
+
+
+def _corrected_dashboard_valid(
     sides: dict[str, dict[str, Any]],
     rows: dict[str, dict[str, Any]],
     *,
@@ -593,11 +679,16 @@ def _owner_corrected_dashboard_valid(
                 continue
             field = correction["provider_field"]
             if (
-                correction["evidence_class"] != "owner_confirmed_display_correction"
+                correction["evidence_class"]
+                not in {"owner_confirmed_display_correction", AUTO_ZERO_EVIDENCE}
                 or correction["raw_payload_sha256"] != raw_sha256
                 or correction["subject_team_code"] != rows[side]["team_code"]
                 or correction["provider_match_id"] != rows[side]["provider_match_id"]
-                or datetime.fromisoformat(correction["owner_confirmation_recorded_at"]) > cutoff
+                or datetime.fromisoformat(
+                    correction.get("owner_confirmation_recorded_at")
+                    or correction["policy_recorded_at"]
+                )
+                > cutoff
                 or field in effective
             ):
                 return False
@@ -1120,13 +1211,22 @@ def build_sdp_stats(
         fixtures = frame["fixtures"]
         gameweeks = frame["gameweeks"]
     fixture_stamp = frame.get("known_at")
-    state = load_sdp_state(con, cutoff=cutoff, season=current)
+    state = load_sdp_state(con, cutoff=cutoff, season=current, corroborate_zero_sot=False)
     raw = raw_at(con, cutoff)
     raw_by_id = {r["payload_id"]: r for r in raw}
     metrics = [*load_sdp_metrics().metrics, OPEN_PLAY_GOALS]
     team_keys = [m.local_field for m in metrics] + list(OPPONENT_METRICS) + ["set_piece_goals"]
     teams: dict[tuple[str, int, int], dict[str, Any]] = {}
-    partial_sources: dict[int, tuple[dict[str, dict[str, Any]], str]] = {}
+    partial_sources: dict[
+        tuple[str, int],
+        tuple[
+            dict[str, dict[str, Any]],
+            dict[str, dict[str, Any]],
+            str,
+            datetime,
+            dict[str, int | None],
+        ],
+    ] = {}
     view = PointInTimeView(FeatureSource(con), AsOf(cutoff))
     metadata = view.observed_team_football(
         providers=["pl_sdp", "fpl_archive"],
@@ -1295,11 +1395,12 @@ def build_sdp_stats(
             )
             if partial is None:
                 continue
-            sides, known, version, provider_match_id, stats_sha256 = partial
-            if match_season == current:
-                partial_sources[fixture] = (sides, stats_sha256)
+            sides, known, version, provider_match_id, stats_sha256, scores = partial
+            pair = {side: teams[match_season, fixture, official[side]] for side in sides}
+            if match_season == current or cutoff >= AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT:
+                partial_sources[match_season, fixture] = (sides, pair, stats_sha256, known, scores)
             for side_label, stats in sides.items():
-                row = teams[match_season, fixture, official[side_label]]
+                row = pair[side_label]
                 opposite = sides["away" if side_label == "home" else "home"]
                 row["sdp"] = {
                     "set_piece_goals": None,
@@ -1341,11 +1442,28 @@ def build_sdp_stats(
         row["dashboard_status"] = (
             "INCOMPLETE" if row["status"] == "UNAVAILABLE" else "PROVIDER_VALID"
         )
-    for fixture, (sides, stats_sha256) in partial_sources.items():
-        pair = {side: teams[current, fixture, fixtures[fixture][side]] for side in sides}
-        if _owner_corrected_dashboard_valid(sides, pair, raw_sha256=stats_sha256, cutoff=cutoff):
-            for row in pair.values():
-                row["dashboard_status"] = "OWNER_CONFIRMED_VALID"
+    automatic = 0
+    automatic_enabled = cutoff >= AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT
+    for sides, pair, stats_sha256, known, scores in partial_sources.values():
+        owner_valid = _corrected_dashboard_valid(
+            sides, pair, raw_sha256=stats_sha256, cutoff=cutoff
+        )
+        added = 0
+        if automatic_enabled:
+            added = _apply_automatic_display_corrections(
+                sides, pair, scores=scores, source_known_at=known, raw_sha256=stats_sha256
+            )
+            automatic += added
+        if owner_valid:
+            status = "OWNER_CONFIRMED_VALID"
+        elif added and _corrected_dashboard_valid(
+            sides, pair, raw_sha256=stats_sha256, cutoff=cutoff
+        ):
+            status = "CORROBORATED_VALID"
+        else:
+            continue
+        for row in pair.values():
+            row["dashboard_status"] = status
     team_rows = [teams[k] for k in sorted(teams)]
     apply_goal_patterns(team_rows, raw)
     for row in team_rows:
@@ -1371,7 +1489,17 @@ def build_sdp_stats(
     players.sort(
         key=lambda r: (r["season"], r["fixture"], r["code"] or 0, r["provider_player_id"] or 0)
     )
-    failures = len({(r["season"], r["fixture"]) for r in team_rows if r["status"] == "UNAVAILABLE"})
+    failures = len(
+        {
+            (r["season"], r["fixture"])
+            for r in team_rows
+            if (
+                r["dashboard_status"] == "INCOMPLETE"
+                if automatic_enabled
+                else r["status"] == "UNAVAILABLE"
+            )
+        }
+    )
     valid = sum(r["status"] != "UNAVAILABLE" for r in team_rows)
     latest_sdp = max((r["fetched_at"] for r in raw), default=None)
     if failures:
@@ -1388,6 +1516,11 @@ def build_sdp_stats(
         notes.append(
             f"{display_corrections} owner-confirmed display correction(s) are shown separately; "
             "raw provider fields remain missing and SDP core validity is unchanged."
+        )
+    if automatic:
+        notes.append(
+            f"{automatic} omitted shot metrics have deductively corroborated display zeros. "
+            "Raw provider cells remain NULL."
         )
     display_assumptions = sum(len(row["display_assumptions"]) for row in team_rows)
     if display_assumptions:
@@ -1582,7 +1715,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                         raise ValueError("FPL supplement source/identity mismatch")
             if scope == "team" and document["json_schema_version"] >= 5:
                 allowed = (
-                    {"INCOMPLETE", "OWNER_CONFIRMED_VALID"}
+                    {"INCOMPLETE", "OWNER_CONFIRMED_VALID", "CORROBORATED_VALID"}
                     if row["status"] == "UNAVAILABLE"
                     else {"PROVIDER_VALID"}
                 )
@@ -1674,33 +1807,33 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                     ):
                         raise ValueError("future or contradictory display assumption")
                 for metric, correction in row["display_corrections"].items():
+                    auto = (
+                        isinstance(correction, dict)
+                        and correction.get("evidence_class") == AUTO_ZERO_EVIDENCE
+                    )
                     if (
-                        metric
-                        not in {
-                            "shots_on_target",
-                            "shots_on_target_allowed",
-                            "shots_blocked",
-                            "expected_goals_on_target",
-                        }
+                        metric not in CORRECTION_PROVIDER_FIELDS
+                        or (metric == "shots_inside_box" and not auto)
                         or (
                             metric == "expected_goals_on_target"
                             and document["json_schema_version"] < 4
                         )
                         or not isinstance(correction, dict)
-                        or set(correction) != DISPLAY_CORRECTION_FIELDS
+                        or set(correction)
+                        != (AUTO_DISPLAY_CORRECTION_FIELDS if auto else DISPLAY_CORRECTION_FIELDS)
                         or correction["value"] != 0
-                        or correction["evidence_class"] != "owner_confirmed_display_correction"
-                        or correction["provider_field"]
-                        != (
-                            {
-                                "shots_blocked": "blockedScoringAtt",
-                                "expected_goals_on_target": "expectedGoalsOnTarget",
-                            }.get(metric, "ontargetScoringAtt")
+                        or (
+                            not auto
+                            and correction["evidence_class"] != "owner_confirmed_display_correction"
                         )
+                        or correction["provider_field"] != CORRECTION_PROVIDER_FIELDS[metric]
+                        or (auto and correction["provider_match_id"] != row["provider_match_id"])
                         or correction["provider_field_state"] != "omitted"
                         or correction["corroboration"]
                         != (
-                            "owner_confirmed_xgot_with_corroborated_zero_sot"
+                            "shot_partition_and_zero_goals_v1"
+                            if auto
+                            else "owner_confirmed_xgot_with_corroborated_zero_sot"
                             if metric == "expected_goals_on_target"
                             else "shot_accounting_and_fpl_goalkeeper_proxy_zero"
                         )
@@ -1716,11 +1849,22 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                         raise ValueError("invalid display correction provenance")
                     source_known = AsOf(datetime.fromisoformat(correction["source_known_at"])).ts
                     confirmed = AsOf(
-                        datetime.fromisoformat(correction["owner_confirmation_recorded_at"])
+                        datetime.fromisoformat(
+                            correction[
+                                "policy_recorded_at" if auto else "owner_confirmation_recorded_at"
+                            ]
+                        )
                     ).ts
-                    if source_known > confirmed or confirmed > cutoff:
+                    latest_source = (
+                        AsOf(datetime.fromisoformat(row["known_at"])).ts if auto else confirmed
+                    )
+                    if (
+                        source_known > latest_source
+                        or confirmed > cutoff
+                        or (auto and confirmed != AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT)
+                    ):
                         raise ValueError("future or contradictory display correction")
-                    if metric in {"shots_on_target", "shots_blocked", "expected_goals_on_target"}:
+                    if metric != "shots_on_target_allowed":
                         valid_relation = (
                             correction["relation"] == "direct"
                             and row["team_code"] == correction["subject_team_code"]
@@ -1752,7 +1896,7 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
             for field in CORE_FIELDS
         }
         for row in document["team_matches"]:
-            if row["dashboard_status"] == "OWNER_CONFIRMED_VALID":
+            if row["dashboard_status"] in {"OWNER_CONFIRMED_VALID", "CORROBORATED_VALID"}:
                 pairs.setdefault((row["season"], row["fixture"]), []).append(row)
                 effective = {field: row["sdp"][key] for field, key in core_keys.items()}
                 for c in row["display_corrections"].values():
@@ -1765,10 +1909,18 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
         for pair in pairs.values():
             if (
                 len(pair) != 2
+                or pair[0]["dashboard_status"] != pair[1]["dashboard_status"]
                 or pair[0]["team_code"] != pair[1]["opponent_team_code"]
                 or pair[1]["team_code"] != pair[0]["opponent_team_code"]
                 or not any(
-                    c["relation"] == "direct" and c["provider_field"] in CORE_FIELDS
+                    c["relation"] == "direct"
+                    and c["provider_field"] in CORE_FIELDS
+                    and c["evidence_class"]
+                    == (
+                        AUTO_ZERO_EVIDENCE
+                        if pair[0]["dashboard_status"] == "CORROBORATED_VALID"
+                        else "owner_confirmed_display_correction"
+                    )
                     for row in pair
                     for c in row["display_corrections"].values()
                 )
@@ -1776,7 +1928,11 @@ def validate_sdp_stats(document: dict[str, Any]) -> None:
                 raise ValueError("corrected dashboard fixture lacks paired correction evidence")
     for entries in correction_rows.values():
         # Blocked attacking attempts are not the opponent's defensive block count.
-        if len(entries) == 1 and entries[0][1] in {"shots_blocked", "expected_goals_on_target"}:
+        if len(entries) == 1 and entries[0][1] in {
+            "shots_blocked",
+            "expected_goals_on_target",
+            "shots_inside_box",
+        }:
             continue
         if len(entries) != 2 or {entry[1] for entry in entries} != {
             "shots_on_target",

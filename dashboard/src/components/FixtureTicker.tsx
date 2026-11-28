@@ -27,6 +27,7 @@ export interface FixtureChipProps<T extends TickerFixture> {
   bucket: DifficultyBucket | null;
   /** Optional layout override for a consuming table's fixed column geometry. */
   className?: string;
+  annotation?: string;
 }
 
 export function FixtureChip<T extends TickerFixture>({
@@ -34,6 +35,7 @@ export function FixtureChip<T extends TickerFixture>({
   metric,
   bucket,
   className,
+  annotation,
 }: FixtureChipProps<T>) {
   const venue = fixture.was_home == null ? "" : fixture.was_home ? "(H)" : "(A)";
   const label =
@@ -50,8 +52,10 @@ export function FixtureChip<T extends TickerFixture>({
         "inline-flex h-8 min-w-12 flex-col justify-center rounded-md px-1 text-center",
         bucket ? BUCKET_CLASSES[bucket] : NULL_BUCKET_CLASS,
         className,
+        annotation && "h-auto min-h-8 py-0.5",
       )}
     >
+      {annotation && <span className="text-[8px] font-semibold leading-tight">{annotation}</span>}
       <span className="text-[10px] leading-tight font-semibold">
         {fixture.opponent_short_name}
         <span className="ml-0.5 font-normal">{venue}</span>

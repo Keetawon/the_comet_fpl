@@ -87,6 +87,15 @@ def _mobile_source(path: Path) -> dict[str, dict[str, Any]]:
     documents["fixture_matrix.json"]["teams"] = [
         {"run_id": r["run_id"], "season": r["season"], "team_code": 1} for r in runs
     ]
+    documents["fixture_matrix.json"]["environment_summary"] = {
+        r["run_id"]: {
+            "primary_engine": "sdp_v2",
+            "sdp_primary_count": 1,
+            "fallback_count": 0,
+            "league_average_fallback_teams": [],
+        }
+        for r in runs
+    }
     _write_generation(path, documents, runs)
     return documents
 
@@ -114,6 +123,9 @@ def test_public_scope_bounds_runs_and_preserves_exact_forecasts_scores_and_histo
             r for r in original[filename][key] if r["run_id"] in active
         ]
     assert published["summary.json"]["latest_run"] == original["summary.json"]["latest_run"]
+    assert published["fixture_matrix.json"]["environment_summary"] == {
+        run_id: original["fixture_matrix.json"]["environment_summary"][run_id] for run_id in active
+    }
     for name in (
         "player_actuals.json",
         "team_actuals.json",
@@ -137,8 +149,30 @@ def test_public_scope_bounds_runs_and_preserves_exact_forecasts_scores_and_histo
         assert (package.output_dir / name).read_bytes().count(b"\n") == 1
 
 
+def test_scope_drops_environment_summary_when_no_active_run_has_evidence(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    _mobile_source(source)
+    docs = _read_documents(source)
+    manifest = validate_dashboard_json(source)
+    active = {"gw9-0-2", "gw9-1-2", "gw1-0-0"}
+    summary = docs["fixture_matrix.json"]["environment_summary"]
+    docs["fixture_matrix.json"]["environment_summary"] = {
+        run_id: evidence for run_id, evidence in summary.items() if run_id not in active
+    }
+    changed = tmp_path / "changed"
+    _write_generation(changed, docs, manifest["runs"])
+    package = package_public_dashboard(
+        changed, tmp_path / "public", tmp_path / "public.zip", mobile_scope=True
+    )
+    published = _read_documents(package.output_dir)
+    # Same shape the renderer emits when no run carries environment evidence.
+    assert "environment_summary" not in published["fixture_matrix.json"]
+
+
 @pytest.mark.parametrize(
-    "problem", ["missing_default", "missing_plan", "private_old_row", "budget"]
+    "problem", ["missing_default", "missing_plan", "private_old_row", "bad_environment", "budget"]
 )
 def test_scope_failure_is_atomic_and_does_not_hide_private_discarded_rows(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, problem: str
@@ -160,6 +194,8 @@ def test_scope_failure_is_atomic_and_does_not_hide_private_discarded_rows(
                     plan["forecast_run_id"] = "absent"
     elif problem == "private_old_row":
         docs["players.json"]["players"][1]["manager_id"] = 123456
+    elif problem == "bad_environment":
+        docs["fixture_matrix.json"]["environment_summary"]["gw2-0-0"]["source_versions"] = []
     else:
         monkeypatch.setitem(PUBLIC_PAYLOAD_LIMITS, "players.json", 1)
     changed = tmp_path / "changed"
