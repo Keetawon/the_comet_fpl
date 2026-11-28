@@ -16,6 +16,7 @@ from fpl.config import load_sdp_metrics
 from fpl.features.pit import AsOf, FeatureSource, PointInTimeView
 from fpl.jobs.export_sdp_stats import main
 from fpl.publish.sdp_stats import (
+    AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT,
     OMITTED_ZERO_POLICY_RECORDED_AT,
     OPEN_PLAY_GOALS,
     DisplayCorrection,
@@ -38,7 +39,7 @@ from fpl.transform import pl_sdp
 
 from .test_pl_sdp_revision_pit import CAPTURED, SEASON, _raw, _rebuild
 from .test_player_attacking_usage_export import CUTOFF, STAMP, _inputs, _write
-from .test_sdp_primary import METRICS, seed
+from .test_sdp_primary import METRICS, _seed_zero_sot_fixture, seed
 
 
 def _load(db: Path, *, cutoff: Any = CUTOFF) -> dict[str, Any]:
@@ -397,16 +398,22 @@ def test_committed_display_policy_is_bounded_and_preserves_confirmation_times() 
         (19, 54, "expectedGoalsOnTarget"),
         (20, 7, "expectedGoalsOnTarget"),
         (28, 6, "expectedGoalsOnTarget"),
+        (61, 56, "ontargetScoringAtt"),
+        (61, 56, "blockedScoringAtt"),
+        (61, 56, "expectedGoalsOnTarget"),
+        (65, 88, "ontargetScoringAtt"),
+        (65, 88, "expectedGoalsOnTarget"),
     }
     old = {(7, "ontargetScoringAtt"), (20, "ontargetScoringAtt"), (28, "ontargetScoringAtt")}
     for row in policy.corrections:
-        expected = (
-            "2026-09-08T14:40:50.135115+00:00"
-            if (row.fixture, row.provider_field) in old
-            else "2026-09-09T02:12:10+00:00"
-        )
-        if row.provider_field == "expectedGoalsOnTarget":
+        if row.fixture in {61, 65}:
+            expected = "2026-11-24T06:30:00+00:00"
+        elif row.provider_field == "expectedGoalsOnTarget":
             expected = "2026-09-09T07:24:08+00:00"
+        elif (row.fixture, row.provider_field) in old:
+            expected = "2026-09-08T14:40:50.135115+00:00"
+        else:
+            expected = "2026-09-09T02:12:10+00:00"
         assert row.owner_confirmation_recorded_at.isoformat() == expected
         assert row.display_value == 0
     with pytest.raises(ValueError, match="require policy version 2"):
@@ -1021,3 +1028,82 @@ def test_failed_publication_leaves_no_partial_final_file(tmp_path: Path, monkeyp
         export_sdp_stats(db, output, as_of=CUTOFF)
     assert not output.exists()
     assert list(output.parent.iterdir()) == []
+
+
+@pytest.mark.parametrize("defect", [None, "goals", "saves", "sum", "inside_only"])
+@pytest.mark.parametrize("current", [SEASON, "2026-27"])
+def test_automatic_display_zeros_require_cutoff_and_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, defect: str | None, current: str
+) -> None:
+    edge = AUTO_CORROBORATED_ZERO_POLICY_RECORDED_AT
+    with initialise(tmp_path / "omissions.duckdb") as con:
+
+        def mutate(payload: list[dict[str, Any]]) -> None:
+            own, opposition = payload[1]["stats"], payload[0]["stats"]
+            del own["blockedScoringAtt"]
+            own.update(shotOffTarget=5)
+            if defect == "saves":
+                opposition["saves"] = 1
+            if defect == "sum":
+                own["shotOffTarget"] = 4
+            if defect == "inside_only":
+                own.update(ontargetScoringAtt=0, attemptsObox=5)
+                del own["attemptsIbox"]
+
+        _seed_zero_sot_fixture(  # type: ignore[no-untyped-call]
+            con, mutate=mutate, away_score=1 if defect == "goals" else 0
+        )
+        con.execute("UPDATE stg_pl_sdp_fixture_crosswalk SET resolved_at=?", [CAPTURED])
+        if current == SEASON:
+            # Exercise the current path with the independently verified FPL fixture frame.
+            match = con.execute(
+                "SELECT kickoff_time FROM stg_fixture WHERE season=? AND fixture=103", [SEASON]
+            ).fetchone()
+            assert match is not None
+            fixtures = {
+                103: {
+                    "home": 8,
+                    "away": 3,
+                    "gw": 4,
+                    "kickoff": match[0],
+                    "home_score": 2,
+                    "away_score": int(defect == "goals"),
+                    "source_version": "e" * 64,
+                }
+            }
+            monkeypatch.setattr(
+                "fpl.publish.sdp_stats._fpl_rows", lambda *_, **__: ([], fixtures, CAPTURED, [])
+            )
+        raw = raw_at(con, edge)
+        pre = build_sdp_stats(con, as_of=edge - timedelta(microseconds=1), season=current)
+        assert pre["coverage"]["team_failures"] == 1
+        post = build_sdp_stats(con, as_of=edge, season=current)
+        away = next(
+            row for row in post["team_matches"] if row["fixture"] == 103 and not row["was_home"]
+        )
+        home = next(
+            row for row in post["team_matches"] if row["fixture"] == 103 and row["was_home"]
+        )
+        if defect in {None, "inside_only"}:
+            assert post["coverage"]["team_failures"] == 0
+            assert {away["dashboard_status"], home["dashboard_status"]} == {"CORROBORATED_VALID"}
+            key = "shots_inside_box" if defect == "inside_only" else "shots_on_target"
+            assert away["sdp"][key] is None
+            correction = away["display_corrections"][key]
+            assert correction["value"] == 0
+            assert correction["evidence_class"] == "auto_corroborated_zero_display_correction"
+            if defect is None:
+                assert (
+                    home["display_corrections"]["shots_on_target_allowed"]["relation"]
+                    == "opponent_mirror"
+                )
+                assert set(away["display_corrections"]) == {
+                    "shots_on_target",
+                    "expected_goals_on_target",
+                    "shots_blocked",
+                }
+        else:
+            assert post["coverage"]["team_failures"] == 1
+            assert away["dashboard_status"] == "INCOMPLETE"
+            assert "shots_on_target" not in away["display_corrections"]
+        assert raw_at(con, edge) == raw

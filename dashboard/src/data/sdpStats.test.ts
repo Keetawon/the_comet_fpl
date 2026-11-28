@@ -195,3 +195,39 @@ describe("Observed SDP sidecar contract", () => {
     expect(fetch).toHaveBeenCalledExactlyOnceWith("/the_comet_fpl/sdp/sdp_stats.json");
   });
 });
+
+
+it("accepts automatic inside-box evidence at the policy cutoff and rejects a backdated policy", () => {
+  const data = sdpFixture();
+  data.json_schema_version = 5;
+  data.as_of = "2026-11-28T06:00:00+00:00";
+  data.metrics.forEach(metric => { metric.omitted_zero_display = false; });
+  data.team_matches.forEach(row => {
+    row.display_assumptions = {};
+    row.dashboard_status = "PROVIDER_VALID";
+  });
+  const direct = data.team_matches[0];
+  direct.status = "UNAVAILABLE";
+  direct.dashboard_status = "CORROBORATED_VALID";
+  direct.provider_match_id = 123;
+  Object.assign(direct.sdp, { shots_on_target: 2, shots_inside_box: null,
+    touches_in_opposition_box: 5, passes: 300, accurate_passes: 250 });
+  direct.display_corrections = { shots_inside_box: {
+    correction_id: "auto-example-ibox", value: 0,
+    evidence_class: "auto_corroborated_zero_display_correction",
+    policy_recorded_at: data.as_of, source_known_at: direct.known_at,
+    provider_match_id: 123, provider_field: "attemptsIbox", provider_field_state: "omitted",
+    raw_payload_sha256: "a".repeat(64), corroboration: "shot_partition_and_zero_goals_v1",
+    subject_team_code: direct.team_code, relation: "direct",
+  }};
+  data.team_matches.push({
+    ...direct, team_code: direct.opponent_team_code, team_name: direct.opponent_name,
+    team_short_name: direct.opponent_short_name, opponent_team_code: direct.team_code,
+    opponent_name: direct.team_name, opponent_short_name: direct.team_short_name,
+    was_home: !direct.was_home, sdp: { ...direct.sdp, shots_inside_box: 3 }, display_corrections: {},
+  });
+  expect(parseSdpStats(data)).toBe(data);
+  expect(direct.sdp.shots_inside_box).toBeNull();
+  data.as_of = "2026-11-28T05:59:59+00:00";
+  expect(() => parseSdpStats(data)).toThrow(/invalid or incompatible/);
+});

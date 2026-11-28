@@ -55,7 +55,8 @@ from fpl.storage.sdp_runtime import (
     SdpHealthError,
     SdpState,
     SdpStateRow,
-    checked_metrics,
+    blocked_target_allowance,
+    checked_match_metrics,
     load_sdp_state,
     raw_at,
 )
@@ -189,6 +190,18 @@ def metric_issues(stats: Any) -> list[dict[str, str]]:
             issues.append(
                 {"field": part, "status": "inconsistent", "detail": f"{part} exceeds {total}"}
             )
+    xgot = values.get("expectedGoalsOnTarget")
+    sot = values.get("ontargetScoringAtt")
+    if xgot is not None and sot is not None:
+        cap = sot + blocked_target_allowance(stats, sot=sot, total=values.get("totalScoringAtt"))
+        if xgot > cap:
+            issues.append(
+                {
+                    "field": "expectedGoalsOnTarget",
+                    "status": "inconsistent",
+                    "detail": "expectedGoalsOnTarget exceeds ontargetScoringAtt",
+                }
+            )
     return issues
 
 
@@ -196,7 +209,7 @@ _CONSISTENCY_PAIRS = (
     ("ontargetScoringAtt", "totalScoringAtt"),
     ("attemptsIbox", "totalScoringAtt"),
     ("expectedGoals", "totalScoringAtt"),
-    ("expectedGoalsOnTarget", "ontargetScoringAtt"),
+    ("expectedGoalsOnTarget", "totalScoringAtt"),
     ("accuratePass", "totalPass"),
     ("fwdPass", "totalPass"),
     ("backwardPass", "totalPass"),
@@ -496,10 +509,14 @@ def _version_identity(
     issues: list[str] = []
     record = entry["record"]
     config = load_sources().pl_sdp
+    home_score: int | None = None
+    away_score: int | None = None
     try:
         if config is None or uint(record.get("competitionId"), "competition") != config.competition:
             issues.append("non-PL competition identity")
         match = parse_match_summary(record)
+        home_score = match.home_score
+        away_score = match.away_score
         if match.match_id != match_id:
             issues.append("metadata match id mismatch")
         if config is not None and match.season_id != config.season_id(
@@ -516,7 +533,12 @@ def _version_identity(
             issues.append("raw/crosswalk/fixture identity mismatch")
     except (ValueError, TypeError, KeyError) as error:
         issues.append(f"{type(error).__name__}: {error}")
-    return {"identity_issues": issues, "identity_valid": not issues}
+    return {
+        "identity_issues": issues,
+        "identity_valid": not issues,
+        "home_score": home_score,
+        "away_score": away_score,
+    }
 
 
 def _stats_for(body: Any, team_code: int, match_id: int) -> Any:
@@ -671,8 +693,12 @@ def completed_match_evidence(
             }
             side_reports = {label: _side_issues(value) for label, value in stats.items()}
             try:
-                for value in stats.values():
-                    checked_metrics(value)
+                checked_match_metrics(
+                    stats["home"],
+                    stats["away"],
+                    home_score=newest_metadata.get("home_score"),
+                    away_score=newest_metadata.get("away_score"),
+                )
                 metrics_valid = True
             except SdpHealthError:
                 metrics_valid = False

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from fpl.publish.sdp_stats import _owner_corrected_dashboard_valid
+from fpl.publish.sdp_stats import _corrected_dashboard_valid
 from fpl.storage.sdp_runtime import SdpHealthError, checked_metrics
 
 
@@ -80,9 +80,9 @@ def test_effective_core_validation_is_bounded_and_leaves_source_unchanged(
         del sides["home"]
     original = deepcopy((sides, rows))
     for _ in range(2):
-        assert _owner_corrected_dashboard_valid(
-            sides, rows, raw_sha256="a" * 64, cutoff=cutoff
-        ) is (defect is None)
+        assert _corrected_dashboard_valid(sides, rows, raw_sha256="a" * 64, cutoff=cutoff) is (
+            defect is None
+        )
     assert (sides, rows) == original
     if defect is None:
         # The same raw payload still truthfully lacks a provider field.

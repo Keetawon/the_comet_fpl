@@ -29,6 +29,7 @@ from fpl.transform.pl_sdp import KICKOFF_TOLERANCE_SECONDS
 from fpl.validate.tactical_state import StateVector, tactical_values
 
 NORMALIZATION_VERSION = "sdp_production_health_v1"
+NORMALIZATION_VERSION_CORROBORATED_ZERO_SOT = "sdp_production_health_v2_corroborated_zero_sot"
 CORE_FIELDS = (
     "expectedGoals",
     "totalScoringAtt",
@@ -63,6 +64,155 @@ EXTRA_FIELDS = (
     "yellowCard",
     "redCard",
 )
+_ZERO_SOT_OWN_CONFLICT_FIELDS = (
+    "goals",
+    "goalsOpenplay",
+    "expectedGoalsOnTarget",
+    "attIboxTarget",
+    "attOboxTarget",
+    "attHdTarget",
+    "attLfTarget",
+    "attRfTarget",
+    "attObpTarget",
+    "attIboxGoal",
+    "attOboxGoal",
+    "attHdGoal",
+    "attLfGoal",
+    "attRfGoal",
+    "attObpGoal",
+    "attPenGoal",
+    "attPenTarget",
+    "attFreekickGoal",
+    "attFreekickTarget",
+)
+_ZERO_SOT_OPPONENT_CONFLICT_FIELDS = (
+    "goalsConceded",
+    "goalsConcededIbox",
+    "goalsConcededObox",
+    "penGoalsConceded",
+    "expectedGoalsOnTargetConceded",
+    "saves",
+    "savedIbox",
+    "savedObox",
+    "divingSave",
+    "penaltySave",
+)
+
+
+def _nonneg_int(stats: dict[str, Any], key: str) -> int | None:
+    raw = stats.get(key)
+    if raw is None or isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        return None
+    try:
+        value = float(raw)
+    except (ValueError, OverflowError):
+        return None
+    if not math.isfinite(value) or value < 0 or value != int(value):
+        return None
+    return int(value)
+
+
+def _is_zero_field(stats: dict[str, Any], key: str) -> bool:
+    if key not in stats:
+        return True
+    raw = stats[key]
+    if raw is None or isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        return False
+    try:
+        value = float(raw)
+    except (ValueError, OverflowError):
+        return False
+    return math.isfinite(value) and value == 0.0
+
+
+def blocked_target_allowance(stats: dict[str, Any], *, sot: float, total: float | None) -> int:
+    """Upper bound on outfield-blocked on-target attempts excluded from Opta SOT.
+
+    Opta's ``ontargetScoringAtt`` counts goals plus goalkeeper saves only; on-target
+    attempts blocked by an outfielder are partitioned into ``blockedScoringAtt`` and
+    recorded in ``attIboxTarget`` / ``attOboxTarget`` while still contributing to
+    ``expectedGoalsOnTarget``. An allowance above zero requires an exact non-negative
+    integer shot partition and explicit box-target counts.
+    """
+    if total is None:
+        return 0
+    blocked = _nonneg_int(stats, "blockedScoringAtt")
+    if blocked is None or blocked == 0:
+        return 0
+    if "shotOffTarget" in stats:
+        off_target = _nonneg_int(stats, "shotOffTarget")
+        if off_target is None:
+            return 0
+    else:
+        off_target = 0
+    if int(sot) + blocked + off_target != int(total):
+        return 0
+    zone_target = 0
+    saw_zone_target = False
+    for key in ("attIboxTarget", "attOboxTarget"):
+        if key in stats:
+            count = _nonneg_int(stats, key)
+            if count is None:
+                return 0
+            zone_target += count
+            saw_zone_target = True
+    if not saw_zone_target:
+        return 0
+    return min(blocked, zone_target)
+
+
+def corroborated_zero_sot(
+    stats: Any,
+    *,
+    official_goals: int | None,
+    opponent_stats: Any,
+) -> bool:
+    """True only when cutoff-known shot partition, score, and opponent stats prove SOT == 0."""
+    if not isinstance(stats, dict) or not isinstance(opponent_stats, dict):
+        return False
+    if "ontargetScoringAtt" in stats:
+        return False
+    if official_goals != 0:
+        return False
+    total = _nonneg_int(stats, "totalScoringAtt")
+    if total is None:
+        return False
+    has_off = "shotOffTarget" in stats
+    has_blocked = "blockedScoringAtt" in stats
+    if total > 0 and not (has_off or has_blocked):
+        return False
+    off_target = _nonneg_int(stats, "shotOffTarget") if has_off else 0
+    blocked = _nonneg_int(stats, "blockedScoringAtt") if has_blocked else 0
+    if off_target is None or blocked is None or off_target + blocked != total:
+        return False
+    if not all(_is_zero_field(stats, key) for key in _ZERO_SOT_OWN_CONFLICT_FIELDS):
+        return False
+    return all(_is_zero_field(opponent_stats, key) for key in _ZERO_SOT_OPPONENT_CONFLICT_FIELDS)
+
+
+_ZERO_IBOX_CONFLICT_FIELDS = (
+    "attIboxGoal",
+    "attIboxTarget",
+    "attIboxMiss",
+    "attIboxBlocked",
+    "attIboxPost",
+    "attPenGoal",
+    "attPenTarget",
+    "attPenMiss",
+    "attPenPost",
+)
+
+
+def corroborated_zero_ibox(stats: Any) -> bool:
+    """An omitted inside-box count is zero only when the shot counts prove it."""
+    if not isinstance(stats, dict) or "attemptsIbox" in stats:
+        return False
+    total = _nonneg_int(stats, "totalScoringAtt")
+    return (
+        total is not None
+        and (total == 0 or _nonneg_int(stats, "attemptsObox") == total)
+        and all(_is_zero_field(stats, key) for key in _ZERO_IBOX_CONFLICT_FIELDS)
+    )
 
 
 class SdpHealthError(ValueError):
@@ -128,7 +278,7 @@ def checked_metrics(stats: Any) -> dict[str, float | None]:
         ("ontargetScoringAtt", "totalScoringAtt"),
         ("attemptsIbox", "totalScoringAtt"),
         ("expectedGoals", "totalScoringAtt"),
-        ("expectedGoalsOnTarget", "ontargetScoringAtt"),
+        ("expectedGoalsOnTarget", "totalScoringAtt"),
         ("accuratePass", "totalPass"),
         ("fwdPass", "totalPass"),
         ("backwardPass", "totalPass"),
@@ -138,7 +288,42 @@ def checked_metrics(stats: Any) -> dict[str, float | None]:
         left, right = result.get(part), result.get(total)
         if left is not None and right is not None and left > right:
             raise SdpHealthError("SDP_SCHEMA_FALLBACK", f"{part} exceeds {total}")
+    xgot = result.get("expectedGoalsOnTarget")
+    sot = result.get("ontargetScoringAtt")
+    if xgot is not None and sot is not None:
+        cap = sot + blocked_target_allowance(stats, sot=sot, total=result.get("totalScoringAtt"))
+        if xgot > cap:
+            raise SdpHealthError(
+                "SDP_SCHEMA_FALLBACK", "expectedGoalsOnTarget exceeds ontargetScoringAtt"
+            )
     return result
+
+
+def checked_match_metrics(
+    home_stats: Any,
+    away_stats: Any,
+    *,
+    home_score: int | None,
+    away_score: int | None,
+    corroborate_zero_sot: bool = True,
+) -> tuple[dict[str, dict[str, float | None]], bool]:
+    """Check match stats; the legacy flag gates both deductive zero-count rules."""
+    prepared: dict[str, Any] = {"home": home_stats, "away": away_stats}
+    used_corroboration = False
+    if corroborate_zero_sot:
+        for side, own, opposite, score in (
+            ("home", home_stats, away_stats, home_score),
+            ("away", away_stats, home_stats, away_score),
+        ):
+            inferred = {}
+            if corroborated_zero_sot(own, official_goals=score, opponent_stats=opposite):
+                inferred["ontargetScoringAtt"] = 0.0
+            if corroborated_zero_ibox(own):
+                inferred["attemptsIbox"] = 0.0
+            if inferred:
+                prepared[side] = {**own, **inferred}
+                used_corroboration = True
+    return {label: checked_metrics(value) for label, value in prepared.items()}, used_corroboration
 
 
 def _body(row: dict[str, Any]) -> Any:
@@ -203,7 +388,13 @@ def workload_at(con: duckdb.DuckDBPyConnection, cutoff: datetime) -> list[dict[s
     return result
 
 
-def load_sdp_state(con: duckdb.DuckDBPyConnection, *, cutoff: datetime, season: str) -> SdpState:
+def load_sdp_state(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    cutoff: datetime,
+    season: str,
+    corroborate_zero_sot: bool = True,
+) -> SdpState:
     """Revalidate raw bytes/identity behind cutoff-selected football facts.
 
     Latest known malformed revisions fail for that match; another match cannot borrow
@@ -359,9 +550,18 @@ def load_sdp_state(con: duckdb.DuckDBPyConnection, *, cutoff: datetime, season: 
                     away["team_code"],
                 ):
                     raise SdpHealthError("SDP_IDENTITY_FALLBACK", "stats club identity mismatch")
-                metrics = {
-                    label: checked_metrics(dict(side.stats)) for label, side in parsed.items()
-                }
+                metrics, used_corroboration = checked_match_metrics(
+                    dict(parsed["home"].stats),
+                    dict(parsed["away"].stats),
+                    home_score=match.home_score,
+                    away_score=match.away_score,
+                    corroborate_zero_sot=corroborate_zero_sot,
+                )
+                normalization_version = (
+                    NORMALIZATION_VERSION_CORROBORATED_ZERO_SOT
+                    if used_corroboration
+                    else NORMALIZATION_VERSION
+                )
                 pending = []
                 for label, row in (("home", home), ("away", away)):
                     opposite = "away" if label == "home" else "home"
@@ -378,7 +578,7 @@ def load_sdp_state(con: duckdb.DuckDBPyConnection, *, cutoff: datetime, season: 
                         "match_metadata_sha256": receipt["sha256"],
                         "fpl_metadata_capture_id": row["metadata_capture_id"],
                         "fpl_metadata_known_at": row["metadata_known_at"].isoformat(),
-                        "normalization_version": NORMALIZATION_VERSION,
+                        "normalization_version": normalization_version,
                         "schema_version": record.get("schemaVersion"),
                     }
                     pending.append(

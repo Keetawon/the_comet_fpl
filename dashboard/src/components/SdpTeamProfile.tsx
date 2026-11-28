@@ -19,7 +19,7 @@ export function MetricCell({ rows, metric, mode, coverage = true, shots }: { row
   ].join(" ");
   return <span title={title} className="tabular-nums">
     {value.value === null ? <span className="text-muted-foreground">Unavailable</span> : fmt(value.value)}
-    {corrections.length > 0 && <sup className="ml-0.5 text-amber-700 dark:text-amber-300" aria-label="owner-confirmed display correction">‡</sup>}
+    {corrections.length > 0 && <sup className="ml-0.5 text-amber-700 dark:text-amber-300" aria-label={corrections.some(c => c.evidence_class === "auto_corroborated_zero_display_correction") ? "corroborated display correction" : "owner-confirmed display correction"}>‡</sup>}
     {assumptions.length > 0 && <sup className="ml-0.5 text-sky-700 dark:text-sky-300" aria-label="owner-directed omitted-count assumption">§</sup>}
     {metricSupplements(rows, metric).length > 0 && <sup className="ml-1 text-xs text-sky-700 dark:text-sky-300" aria-label="FPL archive xG supplement">FPL</sup>}
     {metric.key === "set_piece_goals" && rows.some(row => row.goal_patterns) && <sup className="ml-1 text-xs text-violet-700 dark:text-violet-300" aria-label={metricSourceLabel(metric, rows)}>†</sup>}
@@ -45,7 +45,7 @@ export function TeamTrend({ entity, metric, compact = false }: { entity: SdpEnti
     {values.map((value, i) => value === null ? null : <g key={entity.rows[i].fixture}>
       {i > 0 && values[i - 1] !== null && <line x1={x(i - 1)} y1={y(values[i - 1]!)} x2={x(i)} y2={y(value)} stroke="currentColor" strokeWidth={compact ? 3 : 2} />}
       <circle cx={x(i)} cy={y(value)} r={compact ? 3 : 4} fill="currentColor">
-        <title>{entity.rows[i].season} GW{entity.rows[i].gw} · {entity.rows[i].opponent_short_name} ({entity.rows[i].was_home ? "H" : "A"}){"\n"}{metric.label}: {fmt(value)} · {metricSupplements([entity.rows[i]], metric).length ? "FPL archive supplement" : metricSourceLabel(metric)}{metricCorrections([entity.rows[i]], metric).length ? " · owner-confirmed" : ""}{metricAssumptions([entity.rows[i]], metric).length ? " · assumed zero" : ""}{"\n"}Full source details in the match log.</title>
+        <title>{entity.rows[i].season} GW{entity.rows[i].gw} · {entity.rows[i].opponent_short_name} ({entity.rows[i].was_home ? "H" : "A"}){"\n"}{metric.label}: {fmt(value)} · {metricSupplements([entity.rows[i]], metric).length ? "FPL archive supplement" : metricSourceLabel(metric)}{metricCorrections([entity.rows[i]], metric).map(c => c.evidence_class === "auto_corroborated_zero_display_correction" ? " · corroborated zero" : " · owner-confirmed").join("")}{metricAssumptions([entity.rows[i]], metric).length ? " · assumed zero" : ""}{"\n"}Full source details in the match log.</title>
       </circle>
     </g>)}
   </svg>;
