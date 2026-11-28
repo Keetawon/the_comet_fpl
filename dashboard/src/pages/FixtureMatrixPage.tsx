@@ -55,6 +55,7 @@ import {
 import type {
   DashboardManifest,
   FixtureScheduleOverlay,
+  FixtureEnvironmentSummary,
   NextGwPlan,
   ScheduleFixture,
   TeamFixture,
@@ -81,6 +82,7 @@ import {
 import {
   SCHEDULE_EASE_PROXY_FORMULA,
   buildOpponentStrength,
+  fixtureEnvironmentLabels,
   opponentStrengthBucket,
   scheduleEaseProxy,
   type OpponentStrength,
@@ -110,6 +112,7 @@ type PageState =
       teamActuals: TeamObservedActualsRecord[];
       provisionalCapturedAt: string | null;
       schedule: FixtureScheduleOverlay;
+      environmentSummary?: Record<string, FixtureEnvironmentSummary>;
       plans: NextGwPlan[];
       manifest: DashboardManifest | null;
       runs: { run_id: string; season: string; gw_from: number; gw_to: number }[];
@@ -277,13 +280,24 @@ function TeamGwCell({
       className={`inline-flex ${FIXTURE_CARD_WIDTH_CLASS} flex-col items-stretch gap-0.5`}
     >
       {inGw.map((f) => {
+        const strength = strengthOf(f.opponent_team_code);
         const opponentIndex = opponentIndexOf(f.opponent_team_code);
+        const metric = chipMetric(f, view, colorSource, opponentIndex);
+        const labels = fixtureEnvironmentLabels(f);
+        const details = [
+          metric.title,
+          "Opponent strength " + fmt(opponentIndex, 0) + " · Atk " + fmt(strength?.attackStrength, 0) +
+            " / Def " + fmt(strength?.defenceStrength, 0),
+          "λ for " + fmt(f.lambda_for, 2) + " / λ against " + fmt(f.lambda_against, 2),
+          ...labels,
+        ];
         return (
           <FixtureChip
             key={f.fixture}
             fixture={f}
-            metric={chipMetric(f, view, colorSource, opponentIndex)}
+            metric={{ ...metric, title: details.join(" · ") }}
             bucket={chipBucket(f, view, colorSource, opponentIndex)}
+            annotation={labels.length ? labels.map(label => label.split(" (")[0]).join(" · ") : undefined}
             className={FIXTURE_CARD_WIDTH_CLASS}
           />
         );
@@ -394,6 +408,7 @@ export function FixtureMatrixPage() {
           ),
           provisionalCapturedAt: provisionalActuals.captured_at,
           schedule: fixtureData.schedule,
+          environmentSummary: fixtureData.environmentSummary,
           plans: nextGw.plans,
           manifest: fixtureData.manifest,
           runs,
@@ -768,6 +783,19 @@ export function FixtureMatrixPage() {
   }
 
   const activeRunId = runId ?? state.defaultRunId;
+  const environment = state.environmentSummary?.[activeRunId];
+  const runFixtures = runTeams.flatMap(team => team.fixtures);
+  const sdpFallbackCount = environment?.fallback_count ?? new Set(runFixtures.filter(fixture =>
+    fixture.environment_selector && fixture.environment_selector !== "SDP_PRIMARY",
+  ).map(fixture => fixture.fixture)).size;
+  const sdpPrimaryCount = environment?.sdp_primary_count ?? new Set(runFixtures.filter(fixture =>
+    fixture.environment_selector === "SDP_PRIMARY",
+  ).map(fixture => fixture.fixture)).size;
+  // The per-fixture flag is set when either club is unrated, so only clubs flagged on
+  // every horizon fixture ran on the 1.0x rating themselves (same rule as the publisher).
+  const coldStartTeams = environment?.league_average_fallback_teams ?? runTeams.filter(team =>
+    team.fixtures.length > 0 && team.fixtures.every(fixture => fixture.stage_a_league_average_team),
+  ).map(team => team.short_name);
   const activeRun = runTeams[0];
   const changeVintage = (nextRunId: string) => {
     if (nextRunId === activeRunId) return;
@@ -874,6 +902,15 @@ export function FixtureMatrixPage() {
           onColorSourceChange={setColorSource}
           easeIndexFormulaVersion={state.easeVersion}
         />
+        {(sdpPrimaryCount > 0 || sdpFallbackCount > 0 || coldStartTeams.length > 0) && (
+          <p className="my-1 inline-flex rounded-full border px-2 py-0.5 text-xs" aria-label="Forecast environment coverage">
+            {[
+              sdpPrimaryCount + sdpFallbackCount > 0 && "SDP V2 · " + sdpPrimaryCount +
+                " primary · " + sdpFallbackCount + " fallback fixtures",
+              coldStartTeams.length > 0 && "1.0× cold-start · " + coldStartTeams.join(", "),
+            ].filter(Boolean).join(" | ")}
+          </p>
+        )}
         <p className="mt-1 text-xs text-muted-foreground">
           Sorted by the selected source average, highest first (click any column to re-sort).
           Opponent strength, club ease, and official FDR each own the table average, every card

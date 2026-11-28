@@ -11,7 +11,7 @@
 // follows the opponent, not the row club. It is never blended into the published ease
 // indices or the official FDR.
 
-import type { TeamRecord } from "@/data/types";
+import type { TeamFixture, TeamRecord } from "@/data/types";
 import type { DifficultyBucket } from "@/lib/difficulty";
 
 export const OPPONENT_STRENGTH_FORMULA = "opponent-strength-v1";
@@ -19,6 +19,8 @@ export const SCHEDULE_EASE_PROXY_FORMULA = "fixture-ease-proxy-v1";
 
 export interface OpponentStrength {
   index: number | null;
+  attackStrength: number | null;
+  defenceStrength: number | null;
   avgFor: number | null;
   avgAgainst: number | null;
   leagueAverage: number | null;
@@ -31,7 +33,7 @@ export interface ScheduleEaseProxy {
   probabilityCleanSheet: number | null;
 }
 
-export function buildOpponentStrength(teams: TeamRecord[]): Map<number, OpponentStrength> {
+export function buildOpponentStrength(teams: readonly TeamRecord[]): Map<number, OpponentStrength> {
   const leagueValues: number[] = [];
   const perTeam = new Map<number, { for: number[]; against: number[] }>();
   for (const team of teams) {
@@ -56,7 +58,11 @@ export function buildOpponentStrength(teams: TeamRecord[]): Map<number, Opponent
       league != null && league > 0
         ? 100 * Math.sqrt((avgFor / league) * (league / avgAgainst))
         : null;
-    result.set(code, { index, avgFor, avgAgainst, leagueAverage: league });
+    result.set(code, {
+      index, avgFor, avgAgainst, leagueAverage: league,
+      attackStrength: league != null && league > 0 ? 100 * (avgFor / league) : null,
+      defenceStrength: league != null && league > 0 && avgAgainst > 0 ? 100 * (league / avgAgainst) : null,
+    });
   }
   return result;
 }
@@ -110,6 +116,16 @@ export function scheduleEaseProxy(
       defenceEase == null ? null : Math.sqrt(Math.max(0, attackEase * defenceEase)),
     probabilityCleanSheet: Math.exp(-lambdaAgainst),
   };
+}
+
+export function fixtureEnvironmentLabels(fixture: TeamFixture): string[] {
+  const labels: string[] = [];
+  if (fixture.environment_selector && fixture.environment_selector !== "SDP_PRIMARY") {
+    const reason = fixture.environment_selector.replace(/^SDP_|_FALLBACK$/g, "").toLowerCase();
+    labels.push("SDP fallback (" + reason + ")");
+  }
+  if (fixture.stage_a_league_average_team) labels.push("1.0× cold-start");
+  return labels;
 }
 
 /**

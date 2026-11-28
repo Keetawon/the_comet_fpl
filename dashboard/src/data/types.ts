@@ -44,6 +44,13 @@ export interface TeamForm {
   windows: Record<WindowLabel, TeamFormWindow>;
 }
 
+export interface FixtureEnvironmentSummary {
+  primary_engine: "sdp_v2" | null;
+  sdp_primary_count: number;
+  fallback_count: number;
+  league_average_fallback_teams: string[];
+}
+
 export interface TeamFixture {
   gw: number;
   fixture: number;
@@ -60,6 +67,7 @@ export interface TeamFixture {
   ease_index_formula_version: string;
   official_fdr: number | null;
   stage_a_league_average_team: boolean;
+  environment_selector?: string | null;
 }
 
 /**

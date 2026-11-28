@@ -31,6 +31,7 @@ import {
   type TeamAnalyticsView,
   type TeamPastMetric,
 } from "@/lib/teamAnalytics";
+import { buildOpponentStrength, fixtureEnvironmentLabels } from "@/lib/opponentStrength";
 import { defaultVintageRunId, vintageOptions } from "@/lib/vintage";
 import {
   compactInsightScope,
@@ -217,6 +218,9 @@ export function TeamAnalyticsPage() {
       ? state.runs.find((run) => run.run_id === (runId ?? state.defaultRunId)) ?? null
       : null;
   const activeRunId = selectedRun?.run_id ?? "";
+  const opponentStrength = useMemo(() => state.status === "ready"
+    ? buildOpponentStrength(state.teams.filter(team => team.run_id === activeRunId && team.season === selectedRun?.season))
+    : new Map(), [state, activeRunId, selectedRun?.season]);
   const scope = useMemo(
     () => ({
       runId: activeRunId,
@@ -692,6 +696,7 @@ export function TeamAnalyticsPage() {
               {view === "past-future" && <TableHead>{PAST_METRIC_LABELS[pastMetric]}</TableHead>}
               {view === "past-future" && <TableHead>Observed form anchor</TableHead>}
               <TableHead>Fallbacks</TableHead>
+              <TableHead>Opponent breakdown</TableHead>
               <TableHead>Chart status</TableHead>
             </TableRow>
           </TableHeader>
@@ -731,7 +736,28 @@ export function TeamAnalyticsPage() {
                     <TableCell>{row.formLabel ?? "unavailable"}</TableCell>
                   </>
                 )}
-                <TableCell className="tabular-nums">{row.fallbackFixtureCount}</TableCell>
+                <TableCell className="tabular-nums">
+                  {row.sdpFallbackFixtureCount > 0
+                    ? <>{row.sdpFallbackFixtureCount} SDP · {row.fallbackFixtureCount} 1.0×</>
+                    : row.fallbackFixtureCount}
+                </TableCell>
+                <TableCell>
+                  {row.fixtures.length > 0 && <details>
+                    <summary className="cursor-pointer text-xs">Opponent strength</summary>
+                    <ul className="mt-1 space-y-1 text-xs tabular-nums">
+                      {row.fixtures.map(fixture => {
+                        const strength = opponentStrength.get(fixture.opponent_team_code);
+                        const labels = fixtureEnvironmentLabels(fixture);
+                        return <li key={fixture.fixture}>
+                          GW{fixture.gw} {fixture.opponent_short_name} · {fmt(strength?.index, 0)} ·
+                          {" "}Atk {fmt(strength?.attackStrength, 0)} / Def {fmt(strength?.defenceStrength, 0)} ·
+                          {" "}λ for {fmt(fixture.lambda_for, 2)} / λ against {fmt(fixture.lambda_against, 2)}
+                          {labels.length > 0 && " · " + labels.join(" · ")}
+                        </li>;
+                      })}
+                    </ul>
+                  </details>}
+                </TableCell>
                 <TableCell>
                   {!plottedCodes.has(row.teamCode)
                     ? "Not plotted — missing axis"
@@ -748,6 +774,7 @@ export function TeamAnalyticsPage() {
       </section>
 
       <div className="space-y-1 text-xs text-muted-foreground">
+        <p>Opponent strength uses the selected vintage’s full horizon. Atk and Def use 100 as league average.</p>
         {TEAM_ANALYTICS_CAVEATS.map((caveat) => <p key={caveat}>{caveat}</p>)}
         <p>
           Both DGW legs count separately. A blank week contributes no fixture. Current

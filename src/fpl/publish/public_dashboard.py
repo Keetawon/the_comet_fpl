@@ -443,12 +443,54 @@ def _assert_public_safe(value: object, location: str = "$") -> None:
 
 def _validate_document_envelopes(documents: Mapping[str, dict[str, Any]]) -> None:
     for filename, allowed_keys in _DOCUMENT_TOP_LEVEL_KEYS.items():
-        actual_keys = frozenset(documents[filename])
+        document = documents[filename]
+        actual_keys = frozenset(document)
+        has_environment = filename == FIXTURE_MATRIX_FILENAME and "environment_summary" in document
+        if has_environment:
+            actual_keys -= {"environment_summary"}
         if actual_keys != allowed_keys:
             raise PublicDashboardPackageError(
                 f"{filename} has unsupported top-level field drift; expected "
                 f"{sorted(allowed_keys)}, found {sorted(actual_keys)}"
             )
+        if has_environment:
+            _validate_fixture_environment_summary(document)
+
+
+def _validate_fixture_environment_summary(document: dict[str, Any]) -> None:
+    summary = document["environment_summary"]
+    teams = document["teams"]
+    if not isinstance(teams, list):
+        raise PublicDashboardPackageError("invalid fixture environment summary teams")
+    runs = {
+        team["run_id"]
+        for team in teams
+        if isinstance(team, dict) and isinstance(team.get("run_id"), str)
+    }
+    fields = {
+        "primary_engine",
+        "sdp_primary_count",
+        "fallback_count",
+        "league_average_fallback_teams",
+    }
+    if not isinstance(summary, dict) or not summary.keys() <= runs:
+        raise PublicDashboardPackageError("invalid fixture environment summary run IDs")
+    for evidence in summary.values():
+        if (
+            not isinstance(evidence, dict)
+            or evidence.keys() != fields
+            or evidence["primary_engine"] not in (None, "sdp_v2")
+            or any(
+                type(evidence[key]) is not int or evidence[key] < 0
+                for key in ("sdp_primary_count", "fallback_count")
+            )
+            or not isinstance(evidence["league_average_fallback_teams"], list)
+            or any(
+                not isinstance(team, str) or not team
+                for team in evidence["league_average_fallback_teams"]
+            )
+        ):
+            raise PublicDashboardPackageError("invalid fixture environment summary evidence")
 
 
 def _render_sanitized_generation(

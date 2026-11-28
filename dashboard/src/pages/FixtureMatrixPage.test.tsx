@@ -778,3 +778,19 @@ describe("FixtureMatrixPage", () => {
     expect(await screen.findByText(/No recorded forecast vintages/)).toBeInTheDocument();
   });
 });
+
+
+it("shows saved SDP fallback and attack/defence context on modelled fixture cards", async () => {
+  const teams = structuredClone(sample.teams);
+  for (const team of teams) for (const fixture of team.fixtures) {
+    Object.assign(fixture, { environment_selector: "SDP_INCOMPLETE_FALLBACK", stage_a_league_average_team: true });
+  }
+  vi.mocked(loadFixtureMatrix).mockResolvedValue({ teams, schedule, manifest: null, easeIndexFormulaVersion: "fixture-ease-v1" });
+  const user = userEvent.setup();
+  render(<FixtureMatrixPage />);
+  await user.click(await screen.findByRole("radio", { name: "Gameweek matrix" }));
+  expect(screen.getByLabelText("Forecast environment coverage")).toHaveTextContent(/fallback fixtures.*cold-start/);
+  const chips = screen.getAllByTestId("chip");
+  expect(chips[0]).toHaveTextContent(/SDP fallback.*cold-start/);
+  expect(chips[0]).toHaveAttribute("title", expect.stringMatching(/Atk .*Def .*λ for .*λ against.*incomplete/));
+});

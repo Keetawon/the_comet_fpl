@@ -6,6 +6,7 @@ import sample from "@/data/sampleFixtureMatrix.json";
 import type { TeamRecord } from "@/data/types";
 import {
   buildOpponentStrength,
+  OPPONENT_STRENGTH_FORMULA,
   opponentStrengthBucket,
   scheduleEaseProxy,
 } from "@/lib/opponentStrength";
@@ -63,4 +64,19 @@ describe("opponentStrengthBucket", () => {
     expect(opponentStrengthBucket(null)).toBeNull();
     expect(opponentStrengthBucket(undefined)).toBeNull();
   });
+});
+
+it("exposes both factors without changing the composite formula", () => {
+  const teams = [
+    { team_code: 1, fixtures: [{ lambda_for: 1.8, lambda_against: 1.5 }] },
+    { team_code: 2, fixtures: [{ lambda_for: 1.5, lambda_against: 1.2 }] },
+    { team_code: 3, fixtures: [{ lambda_for: null, lambda_against: null }] },
+  ] as TeamRecord[];
+  const all = buildOpponentStrength(teams);
+  const opponent = all.get(1)!;
+  expect(OPPONENT_STRENGTH_FORMULA).toBe("opponent-strength-v1");
+  expect(opponent.attackStrength).toBeCloseTo(120);
+  expect(opponent.defenceStrength).toBeCloseTo(100);
+  expect(opponent.index).toBeCloseTo(100 * Math.sqrt(1.2));
+  expect(all.has(3)).toBe(false);
 });

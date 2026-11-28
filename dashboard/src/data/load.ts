@@ -36,6 +36,7 @@ import type {
   TeamProvisionalActualsData,
   TeamProvisionalActualsRecord,
   TeamRecord,
+  FixtureEnvironmentSummary,
 } from "./types";
 import { PLAYER_HORIZON_FIELDS } from "./types";
 import { resolveDataUrl } from "./publicData";
@@ -96,6 +97,7 @@ function readModelObject(
 }
 
 export interface FixtureMatrixData {
+  environmentSummary?: Record<string, FixtureEnvironmentSummary>;
   teams: TeamRecord[];
   schedule: FixtureScheduleOverlay;
   manifest: DashboardManifest | null;
@@ -159,6 +161,7 @@ export async function loadFixtureMatrix(): Promise<FixtureMatrixData> {
   }
   const versions = new Set(teams.flatMap((t) => t.fixtures.map((f) => f.ease_index_formula_version)));
   return {
+    environmentSummary: candidate.environment_summary as FixtureMatrixData["environmentSummary"],
     teams: applyLiveTeams(teams, live, schedule.export_created_at),
     schedule: applyLiveSchedule(schedule as FixtureScheduleOverlay, live),
     manifest,
